@@ -1,0 +1,16 @@
+{
+  "$comment": "Dev-only Claude Code settings for the pg-dashboard-v2 Design Agent. Passed via `claude --settings`. Registers the secret-guard PreToolUse hook. Never used by production.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ./src/lib/design-agent/hooks/secret-guard.mjs"
+          }
+        ]
+      }
+    ]
+  }
+}

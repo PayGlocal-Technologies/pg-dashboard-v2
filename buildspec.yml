@@ -1,0 +1,55 @@
+# Do not change version. This is the version of AWS buildspec, not the version of your buildspec file.
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 22
+
+  pre_build:
+    commands:
+      - echo "Setting environment to $ENV"
+      # Map CodeBuild $ENV to Next.js slug (dev | uat | prod) in .env and for this phase.
+      - |
+        case "$ENV" in
+          development) NEXT_PUBLIC_ENV_SLUG=dev ;;
+          uat) NEXT_PUBLIC_ENV_SLUG=uat ;;
+          prod) NEXT_PUBLIC_ENV_SLUG=prod ;;
+          *) NEXT_PUBLIC_ENV_SLUG="$ENV" ;;
+        esac
+        export NEXT_PUBLIC_ENV="$NEXT_PUBLIC_ENV_SLUG"
+        {
+          echo "NEXT_PUBLIC_FIREBASE_API_KEY=$FIREBASE_API_KEY"
+          echo "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=$FIREBASE_AUTH_DOMAIN"
+          echo "NEXT_PUBLIC_ENV=$NEXT_PUBLIC_ENV_SLUG"
+        } > .env
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin ${MY_AWS_ACCOUNT}.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+  build:
+    on-failure: ABORT
+    commands:
+      - echo "Building the Docker image"
+      - docker build --tag pg-dashboard-v2 .
+
+  post_build:
+    on-failure: ABORT
+    commands:
+      - echo "Build completed on $(date)"
+      - echo "Pushing image to ECR"
+      - export ECR_REPO_PATH=${MY_AWS_ACCOUNT}.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/${ECR_REPO_NAME}:latest
+      - echo "ECR_REPO_PATH= $ECR_REPO_PATH"
+      - docker tag pg-dashboard-v2:latest $ECR_REPO_PATH
+      - docker push $ECR_REPO_PATH
+      - echo "Writing image definitions file..."
+      - printf '[{"name":"pg-dashboard-v2","imageUri":"%s"}]' ${MY_AWS_ACCOUNT}.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/${ECR_REPO_NAME}:latest > imagedefinitions.json
+      - zip imagedefinitions-new.zip imagedefinitions.json
+      - aws s3 cp imagedefinitions-new.zip s3://gcc-ui-${PROFILE}-build-artifact/
+
+cache:
+  paths:
+    - "/root/.npm/**/*"
+
+artifacts:
+  files:
+    - "**/*"
+  base-directory: .
