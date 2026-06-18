@@ -41,7 +41,7 @@ export function TransactionsFeature() {
             size="sm"
             leftIcon={<Icon name="download" className="w-3.5 h-3.5" />}
           >
-            Export CSV
+            Export Report
           </Button>
         }
       />

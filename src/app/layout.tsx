@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Providers } from "@/app/providers";
-import { DesignAgentOverlay } from "@/components/devtools/DesignAgentOverlay";
+import { DesignAgentOverlay } from "@payglocal_ui/lumen/client";
+import "@payglocal_ui/lumen/styles.css";
 import "@/app/globals.css";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
