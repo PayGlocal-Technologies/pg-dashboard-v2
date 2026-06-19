@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import { withLumen } from "@payglocal_ui/lumen/next";
 
 const env = process.env.NEXT_PUBLIC_ENV;
 
@@ -42,4 +43,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// withLumen adds `dev.ts`/`dev.tsx` to pageExtensions in development so the
+// dev-only Lumen route (`route.dev.ts`) is compiled in `next dev` but excluded
+// from production builds (along with its node-pty / Claude Code deps).
+export default withLumen(nextConfig);
