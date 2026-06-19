@@ -49,9 +49,7 @@ function ExpandableItem({
   onNavClick?: () => void;
 }) {
   const childActive =
-    item.children?.some(
-      (c) => pathname === c.href || pathname.startsWith(c.href + "/")
-    ) ?? false;
+    item.children?.some((c) => pathname === c.href || pathname.startsWith(c.href + "/")) ?? false;
 
   const [open, setOpen] = useState(childActive);
   const isParentActive = pathname === item.href || childActive;
@@ -64,7 +62,7 @@ function ExpandableItem({
         onClick={() => !collapsed && setOpen((o) => !o)}
         title={collapsed ? item.label : undefined}
         className={cn(
-          "w-full p-0 h-auto min-h-0 text-[14px] font-medium transition-all duration-100 rounded-lg",
+          "w-full p-0 h-auto min-h-0 text-[14px] font-medium transition-all duration-100 rounded-lg text-left",
           "[&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-2.5 [&>span]:px-2.5 [&>span]:py-2",
           isParentActive
             ? "bg-card text-foreground border border-border shadow-sm"
@@ -74,10 +72,7 @@ function ExpandableItem({
         <Icon
           name={item.icon}
           size={16}
-          className={cn(
-            "flex-shrink-0",
-            isParentActive ? "text-primary" : "text-muted-foreground"
-          )}
+          className={cn("flex-shrink-0", isParentActive ? "text-primary" : "text-muted-foreground")}
         />
         {!collapsed && (
           <>
@@ -148,9 +143,7 @@ function SidebarBody({
   const { logout, isLoading } = useLogout();
 
   const displayName =
-    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
-    profile?.username ||
-    "";
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || profile?.username || "";
 
   return (
     <>
@@ -269,7 +262,11 @@ function SidebarBody({
                     void logout();
                   }}
                 >
-                  <Icon name={isLoading ? "loader" : "log-out"} size={16} className={isLoading ? "animate-spin" : ""} />
+                  <Icon
+                    name={isLoading ? "loader" : "log-out"}
+                    size={16}
+                    className={isLoading ? "animate-spin" : ""}
+                  />
                 </Button>
               </div>
             </>
@@ -295,7 +292,11 @@ function SidebarBody({
                   void logout();
                 }}
               >
-                <Icon name={isLoading ? "loader" : "log-out"} size={16} className={isLoading ? "animate-spin" : ""} />
+                <Icon
+                  name={isLoading ? "loader" : "log-out"}
+                  size={16}
+                  className={isLoading ? "animate-spin" : ""}
+                />
               </Button>
             </>
           )}
@@ -330,9 +331,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const filteredNavigation: NavGroup[] = baseNavigation
     .map((group) => {
       const visibleItems = group.items
-        .filter(
-          (item) => !item.permission?.length || checkPermissions(item.permission)
-        )
+        .filter((item) => !item.permission?.length || checkPermissions(item.permission))
         .map((item) => ({
           ...item,
           children: item.children?.filter(
@@ -379,18 +378,11 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               collapsed ? "h-9 w-9" : "h-8 w-8"
             )}
           >
-            <Icon
-              name={collapsed ? "panel-left-open" : "panel-left-close"}
-              size={18}
-            />
+            <Icon name={collapsed ? "panel-left-open" : "panel-left-close"} size={18} />
           </Button>
         </div>
 
-        <SidebarBody
-          collapsed={collapsed}
-          pathname={pathname}
-          navigation={filteredNavigation}
-        />
+        <SidebarBody collapsed={collapsed} pathname={pathname} navigation={filteredNavigation} />
       </aside>
 
       {/* ── Mobile nav (portaled so fixed layers cover full viewport) ────── */}
