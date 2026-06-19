@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { formatCurrency } from "@/lib/utils/format";
@@ -11,14 +12,14 @@ import { useApp } from "@/stores/useApp";
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
 const MCA_STATUS_META: Record<string, StatusMeta> = {
-  DOCUMENT_PENDING:           { label: "Invoice Pending",       variant: "warning" },
-  FUNDS_ON_HOLD:              { label: "Funds on Hold",         variant: "warning" },
-  SENT_FOR_REVIEW:            { label: "Sent for Review",       variant: "warning", trailIcon: "clock" },
-  SENT_FOR_SETTLEMENT:        { label: "Sent for Settlement",   variant: "warning" },
-  SETTLED:                    { label: "Settled",               variant: "success", trailIcon: "check" },
-  FIRC_SETTLED:               { label: "FIRC Settled",          variant: "success", trailIcon: "check" },
-  REVERSAL_FOR_RISK_REJECTED: { label: "Funds Reversed",        variant: "danger",  trailIcon: "x" },
-  REVERSAL_FOR_NOT_SUPPORTED: { label: "Funds Reversed",        variant: "danger",  trailIcon: "x" },
+  DOCUMENT_PENDING: { label: "Invoice Pending", variant: "warning" },
+  FUNDS_ON_HOLD: { label: "Funds on Hold", variant: "warning" },
+  SENT_FOR_REVIEW: { label: "Sent for Review", variant: "warning", trailIcon: "clock" },
+  SENT_FOR_SETTLEMENT: { label: "Sent for Settlement", variant: "warning" },
+  SETTLED: { label: "Settled", variant: "success", trailIcon: "check" },
+  FIRC_SETTLED: { label: "FIRC Settled", variant: "success", trailIcon: "check" },
+  REVERSAL_FOR_RISK_REJECTED: { label: "Funds Reversed", variant: "danger", trailIcon: "x" },
+  REVERSAL_FOR_NOT_SUPPORTED: { label: "Funds Reversed", variant: "danger", trailIcon: "x" },
 };
 
 function getStatusMeta(raw: string, isFrmPending: boolean): StatusMeta {
@@ -30,6 +31,8 @@ function getStatusMeta(raw: string, isFrmPending: boolean): StatusMeta {
 function CountryCell({ iso2 }: { iso2?: string | null }) {
   const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
 
+  // Normalise whatever the API sends (ISO2, ISO3, or full name) to a real ISO2 code
+  // so the CDN flag URL is always correct (e.g. "France" or "FRA" → "FR" → fr.svg)
   if (!iso2) return <span className="text-[13px] text-muted-foreground">—</span>;
 
   // Normalise whatever the API sends (ISO2, ISO3, or full name) to a real ISO2 code
@@ -45,15 +48,13 @@ function CountryCell({ iso2 }: { iso2?: string | null }) {
 
   return (
     <div className="flex items-center gap-1.5">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={flagSrc}
         alt={name}
+        width={20}
+        height={14}
         className="h-3.5 w-5 rounded-sm border border-border object-cover"
-        onError={(e) => {
-          (e.target as HTMLImageElement).src =
-            "https://static.payglocal.in/images/flags/default.svg";
-        }}
+        unoptimized
       />
       <span className="text-[13px] text-muted-foreground whitespace-nowrap">{name}</span>
     </div>
@@ -88,9 +89,7 @@ export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[
       render: (row) => {
         const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
         const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
-        return (
-          <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />
-        );
+        return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
       },
     },
     {
@@ -105,11 +104,7 @@ export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[
       minWidth: 155,
       render: (row) => {
         const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
-        return (
-          <span className="text-[13px] text-foreground whitespace-nowrap">
-            {name ?? "—"}
-          </span>
-        );
+        return <span className="text-[13px] text-foreground whitespace-nowrap">{name ?? "—"}</span>;
       },
     },
     {
