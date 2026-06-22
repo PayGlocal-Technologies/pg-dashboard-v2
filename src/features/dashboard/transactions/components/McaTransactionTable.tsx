@@ -16,7 +16,7 @@ import {
   MCA_CURRENCY_FILTERS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/transactions/constants";
-import type { McaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
+import type { McaTransaction, McaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
 
 export function McaTransactionTable() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
@@ -55,6 +55,11 @@ export function McaTransactionTable() {
   const onSearch   = (v: string) => { setSearch(v);   setPage(1); };
   const onClear    = () => { setStatus("All"); setCurrency("All"); setSearch(""); setPage(1); };
   const hasActive  = status !== "All" || currency !== "All" || search !== "";
+
+  const onViewDetails = (row: McaTransaction) => {
+    // TODO: open the transaction details view for this row (keyed by row.gid).
+    void row;
+  };
 
   const columns = buildMcaColumns(isPartnerUser);
 
@@ -146,7 +151,18 @@ export function McaTransactionTable() {
           totalRows={totalCount}
           page={page}
           onPageChange={setPage}
-          rowCta={{ label: "View details" }}
+          tableLayout="content"
+          rowAction={(row) => (
+            <Button
+              variant="outline"
+              size="sm"
+              rightIcon={<Icon name="chevron-right" className="w-2.5 h-2.5" />}
+              className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+              onClick={() => onViewDetails(row)}
+            >
+              View details
+            </Button>
+          )}
           density="compact"
         />
       )}

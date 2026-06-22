@@ -11,29 +11,29 @@ import type { PaTransaction } from "@/features/dashboard/transactions/types";
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
 const PA_STATUS_META: Record<string, StatusMeta> = {
-  SUCCESS:                { label: "Success",              variant: "success", trailIcon: "check" },
-  SENT_FOR_CAPTURE:       { label: "Sent for capture",     variant: "success", trailIcon: "check" },
-  AUTHORIZED:             { label: "Authorized",           variant: "warning" },
-  REVERSED:               { label: "Reversed",             variant: "success", trailIcon: "check" },
-  INPROGRESS:             { label: "In progress",          variant: "warning" },
-  IN_PROGRESS:            { label: "In progress",          variant: "warning" },
-  CAPTURE_STARTED:        { label: "Capture started",      variant: "warning" },
-  SENT_FOR_REFUND:        { label: "Sent for refund",      variant: "refund" },
-  REFUND_STARTED:         { label: "Refund started",       variant: "refund" },
-  AUTH_REVERSAL_STARTED:  { label: "Auth reversal",        variant: "warning" },
-  ISSUER_DECLINE:         { label: "Issuer decline",       variant: "danger",  trailIcon: "x" },
-  GENERAL_DECLINE:        { label: "General decline",      variant: "danger",  trailIcon: "x" },
-  CUSTOMER_CANCELLED:     { label: "Cancelled",            variant: "danger",  trailIcon: "x" },
-  AUTHENTICATION_TIMEOUT: { label: "Auth timeout",         variant: "danger",  trailIcon: "x" },
-  SYSTEM_ERROR:           { label: "System error",         variant: "danger",  trailIcon: "x" },
-  REQUEST_ERROR:          { label: "Request error",        variant: "danger",  trailIcon: "x" },
-  CONFIG_ERROR:           { label: "Config error",         variant: "danger",  trailIcon: "x" },
-  SYSTEM_DECLINED:        { label: "System declined",      variant: "danger",  trailIcon: "x" },
-  ABANDONED:              { label: "Abandoned",            variant: "danger",  trailIcon: "x" },
-  AUTHENTICATION_FAILED:  { label: "Auth failed",          variant: "danger",  trailIcon: "x" },
-  ALTPAY_DECLINE:         { label: "Altpay decline",       variant: "danger",  trailIcon: "x" },
-  MARKED_AS_FRAUD:        { label: "Marked as fraud",      variant: "danger",  trailIcon: "x" },
-  STEP_UP:                { label: "Step up",              variant: "warning" },
+  SUCCESS: { label: "Success", variant: "success", trailIcon: "check" },
+  SENT_FOR_CAPTURE: { label: "Sent for capture", variant: "success", trailIcon: "check" },
+  AUTHORIZED: { label: "Authorized", variant: "warning" },
+  REVERSED: { label: "Reversed", variant: "success", trailIcon: "check" },
+  INPROGRESS: { label: "In progress", variant: "warning" },
+  IN_PROGRESS: { label: "In progress", variant: "warning" },
+  CAPTURE_STARTED: { label: "Capture started", variant: "warning" },
+  SENT_FOR_REFUND: { label: "Sent for refund", variant: "refund" },
+  REFUND_STARTED: { label: "Refund started", variant: "refund" },
+  AUTH_REVERSAL_STARTED: { label: "Auth reversal", variant: "warning" },
+  ISSUER_DECLINE: { label: "Issuer decline", variant: "danger", trailIcon: "x" },
+  GENERAL_DECLINE: { label: "General decline", variant: "danger", trailIcon: "x" },
+  CUSTOMER_CANCELLED: { label: "Cancelled", variant: "danger", trailIcon: "x" },
+  AUTHENTICATION_TIMEOUT: { label: "Auth timeout", variant: "danger", trailIcon: "x" },
+  SYSTEM_ERROR: { label: "System error", variant: "danger", trailIcon: "x" },
+  REQUEST_ERROR: { label: "Request error", variant: "danger", trailIcon: "x" },
+  CONFIG_ERROR: { label: "Config error", variant: "danger", trailIcon: "x" },
+  SYSTEM_DECLINED: { label: "System declined", variant: "danger", trailIcon: "x" },
+  ABANDONED: { label: "Abandoned", variant: "danger", trailIcon: "x" },
+  AUTHENTICATION_FAILED: { label: "Auth failed", variant: "danger", trailIcon: "x" },
+  ALTPAY_DECLINE: { label: "Altpay decline", variant: "danger", trailIcon: "x" },
+  MARKED_AS_FRAUD: { label: "Marked as fraud", variant: "danger", trailIcon: "x" },
+  STEP_UP: { label: "Step up", variant: "warning" },
 };
 
 function getStatusMeta(raw?: string): StatusMeta {
@@ -46,23 +46,23 @@ function getStatusMeta(raw?: string): StatusMeta {
 const STATIC_BASE = "https://static.payglocal.in/";
 
 const CARD_BRAND_LOGO_MAPPER: Record<string, string> = {
-  VISA:                   "images/network/visa.v2.svg",
-  MASTERCARD:             "images/network/mastercard-new.v1.svg",
-  AMEX:                   "images/network/american-express.v3.svg",
-  AMERICAN_EXPRESS:       "images/network/american-express.v3.svg",
-  DINERS:                 "images/network/diners.v3.svg",
-  DINERSCLUBINTERNATIONAL:"images/network/diners.v3.svg",
-  JCB:                    "images/network/jcb.v5.svg",
-  MAESTRO:                "images/network/maestro.v2.svg",
-  RUPAY:                  "images/network/rupay.v3.svg",
-  DISCOVER:               "images/network/discover.v3.svg",
+  VISA: "images/network/visa.v2.svg",
+  MASTERCARD: "images/network/mastercard-new.v1.svg",
+  AMEX: "images/network/american-express.v3.svg",
+  AMERICAN_EXPRESS: "images/network/american-express.v3.svg",
+  DINERS: "images/network/diners.v3.svg",
+  DINERSCLUBINTERNATIONAL: "images/network/diners.v3.svg",
+  JCB: "images/network/jcb.v5.svg",
+  MAESTRO: "images/network/maestro.v2.svg",
+  RUPAY: "images/network/rupay.v3.svg",
+  DISCOVER: "images/network/discover.v3.svg",
 };
 
 const PAYMENT_METHOD_ICONS: Record<string, string> = {
-  ALTPAY_UPI_INTENT:          "images/payment-methods/upi/upi-name.v2.svg",
-  ALTPAY_UPI_COLLECT:         "images/payment-methods/upi/upi-name.v2.svg",
+  ALTPAY_UPI_INTENT: "images/payment-methods/upi/upi-name.v2.svg",
+  ALTPAY_UPI_COLLECT: "images/payment-methods/upi/upi-name.v2.svg",
   PAYMENT_ACCOUNT_GOOGLE_PAY: "images/payment-methods/upi/google-pay.v1.svg",
-  PAYMENT_ACCOUNT_APPLE_PAY:  "icons/payflow/apple-pay.v2.svg",
+  PAYMENT_ACCOUNT_APPLE_PAY: "icons/payflow/apple-pay.v2.svg",
 };
 
 function MethodImage({ src, alt }: { src: string; alt: string }) {
@@ -90,9 +90,11 @@ function PaymentMethodCell({ row }: { row: PaTransaction }) {
 
   if (row.maskedCardNumber && row.cardBrand) {
     const path = CARD_BRAND_LOGO_MAPPER[row.cardBrand.toUpperCase()];
-    logo = path
-      ? <MethodImage src={STATIC_BASE + path} alt={row.cardBrand} />
-      : <FallbackBrand brand={row.cardBrand} />;
+    logo = path ? (
+      <MethodImage src={STATIC_BASE + path} alt={row.cardBrand} />
+    ) : (
+      <FallbackBrand brand={row.cardBrand} />
+    );
   } else if (instrument && PAYMENT_METHOD_ICONS[instrument]) {
     logo = <MethodImage src={STATIC_BASE + PAYMENT_METHOD_ICONS[instrument]} alt={instrument} />;
   } else {
@@ -150,10 +152,7 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
       header: "Customer name",
       minWidth: 145,
       render: (row) => {
-        const name = [
-          row.firstName ?? row.billToFirstName,
-          row.lastName  ?? row.billToLastName,
-        ]
+        const name = [row.firstName ?? row.billToFirstName, row.lastName ?? row.billToLastName]
           .filter(Boolean)
           .join(" ")
           .trim();
@@ -179,7 +178,11 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
       header: "Transaction ID",
       minWidth: 155,
       render: (row) => (
-        <span className={cn("text-[13px] font-mono text-primary/70 hover:text-primary transition-colors cursor-pointer whitespace-nowrap")}>
+        <span
+          className={cn(
+            "text-[13px] font-mono text-primary/70 hover:text-primary transition-colors cursor-pointer whitespace-nowrap"
+          )}
+        >
           {row.gid ?? "—"}
         </span>
       ),

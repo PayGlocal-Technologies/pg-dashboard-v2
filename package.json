@@ -14,7 +14,7 @@
     "postbuild": "lumen-assert-no-agent"
   },
   "dependencies": {
-    "@payglocal_ui/flux-ui": "^0.2.1",
+    "@payglocal_ui/flux-ui": "^0.2.3",
     "@payglocal_ui/lumen": "^0.1.11",
     "@radix-ui/react-dialog": "^1.1.15",
     "@radix-ui/react-label": "^2.1.8",

@@ -16,7 +16,11 @@ import {
   PA_METHOD_FILTERS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/transactions/constants";
-import type { PaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
+import type {
+  PaTransaction,
+  PaTransactionsResponse,
+  TableReqBody,
+} from "@/features/dashboard/transactions/types";
 
 export function PaTransactionTable() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
@@ -69,6 +73,11 @@ export function PaTransactionTable() {
     setPage(1);
   };
   const hasActive = status !== "All" || method !== "All" || search !== "";
+
+  const onViewDetails = (row: PaTransaction) => {
+    // TODO: open the transaction details view for this row (keyed by row.gid).
+    void row;
+  };
 
   const columns = buildPaColumns(isPartnerUser);
 
@@ -159,6 +168,7 @@ export function PaTransactionTable() {
           data={rows}
           isLoading={isPending}
           skeletonRows={8}
+          tableLayout="content"
           emptyTitle="No transactions found"
           emptyDescription="Try adjusting your filters or search query"
           rowKey={(row) =>
@@ -169,7 +179,17 @@ export function PaTransactionTable() {
           totalRows={totalCount}
           page={page}
           onPageChange={setPage}
-          rowCta={{ label: "View details" }}
+          rowAction={(row) => (
+            <Button
+              variant="outline"
+              size="sm"
+              rightIcon={<Icon name="chevron-right" className="w-2.5 h-2.5" />}
+              className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+              onClick={() => onViewDetails(row)}
+            >
+              View details
+            </Button>
+          )}
           density="compact"
         />
       )}

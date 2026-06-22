@@ -50,9 +50,10 @@ export function TransactionsFeature() {
       {showSegmentToggle && (
         <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 w-fit border border-border">
           {SEGMENTS.map((seg) => (
-            <button
+            <Button
               key={seg.value}
-              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setSegment(seg.value)}
               className={cn(
                 "px-3.5 py-1.5 rounded-md text-sm font-medium transition-all",
@@ -62,7 +63,7 @@ export function TransactionsFeature() {
               )}
             >
               {seg.label}
-            </button>
+            </Button>
           ))}
         </div>
       )}
