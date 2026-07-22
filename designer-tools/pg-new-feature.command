@@ -82,7 +82,7 @@ echo ""
 echo "${C}Starting the live preview...${N}"
 echo "Keep THIS window open while you work. It runs the preview."
 echo ""
-npm run dev &
+npm run uat &
 DEV_PID=$!
 
 # Wait for the preview to be ready, then open the browser
