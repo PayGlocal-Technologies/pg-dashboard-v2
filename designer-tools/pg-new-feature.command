@@ -9,6 +9,12 @@
 
 REPO="$HOME/Desktop/PayGlocal Dashboard/pg-dashboard-v2"
 
+# Make user-level tools available (Node via nvm, GitHub tool in ~/bin).
+# A double-clicked .command does not read your shell startup files, so load them here.
+export PATH="$HOME/bin:$PATH"
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+
 # Colors (safe if unsupported)
 B=$(tput bold 2>/dev/null); G=$(tput setaf 2 2>/dev/null); Y=$(tput setaf 3 2>/dev/null)
 R=$(tput setaf 1 2>/dev/null); C=$(tput setaf 6 2>/dev/null); N=$(tput sgr0 2>/dev/null)
@@ -75,7 +81,9 @@ npm install --silent 2>/dev/null
 # 6. Open the editor
 echo ""
 echo "${C}Opening VS Code...${N}"
-open -a "Visual Studio Code" "$REPO" 2>/dev/null
+open -a "Visual Studio Code" "$REPO" 2>/dev/null \
+  || open -a "$HOME/Applications/Visual Studio Code.app" "$REPO" 2>/dev/null \
+  || open -a "/Applications/Visual Studio Code.app" "$REPO" 2>/dev/null
 
 # 7. Start the live preview
 echo ""
