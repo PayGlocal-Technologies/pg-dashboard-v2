@@ -19,7 +19,11 @@ export NVM_DIR="$HOME/.nvm"
 B=$(tput bold 2>/dev/null); G=$(tput setaf 2 2>/dev/null); Y=$(tput setaf 3 2>/dev/null)
 R=$(tput setaf 1 2>/dev/null); C=$(tput setaf 6 2>/dev/null); N=$(tput sgr0 2>/dev/null)
 
-pause_exit () { echo ""; echo "Press Enter to close this window."; read -r _; exit "${1:-0}"; }
+pause_exit () {
+  echo ""; echo "Press Enter to close this window."; read -r _
+  osascript -e 'tell application "Terminal" to close (first window whose frontmost is true)' >/dev/null 2>&1 &
+  exit "${1:-0}"
+}
 
 clear
 echo "${B}${C}=====================================================${N}"

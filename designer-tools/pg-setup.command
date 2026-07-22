@@ -27,7 +27,11 @@ ok ()   { echo "${G}   OK: $1${N}"; }
 warn () { echo "${Y}   Note: $1${N}"; }
 err ()  { echo "${R}   $1${N}"; }
 pause () { echo ""; echo "${Y}$1${N}"; printf "Press Enter to continue... "; read -r _; }
-pause_exit () { echo ""; echo "Press Enter to close this window."; read -r _; exit "${1:-0}"; }
+pause_exit () {
+  echo ""; echo "Press Enter to close this window."; read -r _
+  osascript -e 'tell application "Terminal" to close (first window whose frontmost is true)' >/dev/null 2>&1 &
+  exit "${1:-0}"
+}
 
 # Put our user-level tools (nvm's node, ~/bin) on PATH for this run.
 load_tools () {
@@ -181,24 +185,30 @@ echo ""
 if gh auth status >/dev/null 2>&1; then
   ok "Already signed in to GitHub."
 else
-  warn "A GitHub sign-in will open in your browser. Choose: GitHub.com, then HTTPS, then 'Login with a web browser'."
+  warn "A GitHub sign-in will open in your browser. Choose 'Login with a web browser' and approve."
+  warn "If it offers to add an SSH key, say yes and accept the defaults (just press Enter for the passphrase)."
   pause "Ready to sign in to GitHub?"
-  gh auth login
-  gh auth setup-git >/dev/null 2>&1
+  gh auth login --hostname github.com --git-protocol ssh --web
 fi
+# Use SSH for all git operations (pushing over HTTPS is not allowed on our repos).
+gh config set git_protocol ssh 2>/dev/null
+gh auth setup-git >/dev/null 2>&1
 
 # 7. Download the project + shortcuts
 step "Step 7 of 7: Download the dashboard project"
 mkdir -p "$DESK"
 if [ -d "$REPO_DIR/.git" ]; then
   ok "Already downloaded. Updating to the latest."
-  cd "$REPO_DIR" && git fetch origin --quiet
+  cd "$REPO_DIR"
+  git remote set-url origin "git@github.com:${REPO_URL}.git" 2>/dev/null
+  git fetch origin --quiet
 else
-  gh repo clone "$REPO_URL" "$REPO_DIR"
+  gh repo clone "$REPO_URL" "$REPO_DIR" -- --origin origin
   if [ ! -d "$REPO_DIR/.git" ]; then
     err "Could not download the project. Ask engineering to confirm your GitHub access to $REPO_URL."
     pause_exit 1
   fi
+  git -C "$REPO_DIR" remote set-url origin "git@github.com:${REPO_URL}.git" 2>/dev/null
 fi
 cd "$REPO_DIR" || pause_exit 1
 echo "   Installing the design system (one or two minutes) ..."
