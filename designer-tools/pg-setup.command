@@ -5,9 +5,9 @@
 # It is safe to run again later; it will skip anything already installed.
 
 set +e
-REPO_DIR="$HOME/PayGlocal/pg-dashboard-v2"
-REPO_URL="PayGlocal-Technologies/pg-dashboard-v2"
 DESK="$HOME/Desktop/PayGlocal Dashboard"
+REPO_DIR="$DESK/pg-dashboard-v2"
+REPO_URL="PayGlocal-Technologies/pg-dashboard-v2"
 
 B=$(tput bold 2>/dev/null); G=$(tput setaf 2 2>/dev/null); Y=$(tput setaf 3 2>/dev/null)
 R=$(tput setaf 1 2>/dev/null); C=$(tput setaf 6 2>/dev/null); N=$(tput sgr0 2>/dev/null)
@@ -17,6 +17,18 @@ ok ()   { echo "${G}   OK: $1${N}"; }
 warn () { echo "${Y}   Note: $1${N}"; }
 pause () { echo ""; echo "${Y}$1${N}"; printf "Press Enter to continue... "; read -r _; }
 pause_exit () { echo ""; echo "Press Enter to close this window."; read -r _; exit "${1:-0}"; }
+
+# Prints the signed-in Claude account email (and returns 0) if already logged in.
+# Mirrors how Claude Code records login in ~/.claude.json.
+claude_account () {
+  local cfg="$HOME/.claude.json"
+  [ -f "$cfg" ] || return 1
+  if command -v node >/dev/null 2>&1; then
+    node -e 'try{const c=require(process.env.HOME+"/.claude.json");const e=c&&c.oauthAccount&&c.oauthAccount.emailAddress;if(e){process.stdout.write(e);process.exit(0)}process.exit(1)}catch(_){process.exit(1)}' 2>/dev/null
+  else
+    grep -q "\"emailAddress\"" "$cfg" 2>/dev/null && echo "your Claude account"
+  fi
+}
 
 clear
 echo "${B}${C}=====================================================${N}"
@@ -103,7 +115,7 @@ fi
 
 # 7. Download the project
 step "Step 7 of 8: Download the dashboard project"
-mkdir -p "$HOME/PayGlocal"
+mkdir -p "$DESK"
 if [ -d "$REPO_DIR/.git" ]; then
   ok "Already downloaded. Updating to the latest."
   cd "$REPO_DIR" && git fetch origin --quiet
@@ -128,13 +140,18 @@ ok "Shortcuts are in the 'PayGlocal Dashboard' folder on your Desktop."
 
 echo ""
 echo "${B}${G}=====================================================${N}"
-echo "${B}${G}   Almost done. One last thing: sign in to Claude.${N}"
+echo "${B}${G}   Last step: Claude sign-in${N}"
 echo "${B}${G}=====================================================${N}"
 echo ""
-echo "A sign-in for Claude Code will start now. Log in with your PayGlocal Claude account"
-echo "in the browser window that opens, then return here."
-pause "Ready to sign in to Claude?"
-claude login 2>/dev/null || claude /login 2>/dev/null || warn "If nothing opened, open VS Code, click the Claude icon, and use its 'Sign in' button."
+ACCT="$(claude_account)"
+if [ -n "$ACCT" ]; then
+  ok "Already signed in to Claude as $ACCT. Nothing to do here."
+else
+  echo "A sign-in for Claude Code will start now. Log in with your PayGlocal Claude account"
+  echo "in the browser window that opens, then return here."
+  pause "Ready to sign in to Claude?"
+  claude login 2>/dev/null || claude /login 2>/dev/null || warn "If nothing opened, open VS Code, click the Claude icon, and use its 'Sign in' button."
+fi
 
 echo ""
 echo "${B}${G}Setup complete.${N}"

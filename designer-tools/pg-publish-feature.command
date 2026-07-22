@@ -7,7 +7,7 @@
 #
 # You never need to type any git commands. This does it for you.
 
-REPO="$HOME/PayGlocal/pg-dashboard-v2"
+REPO="$HOME/Desktop/PayGlocal Dashboard/pg-dashboard-v2"
 
 B=$(tput bold 2>/dev/null); G=$(tput setaf 2 2>/dev/null); Y=$(tput setaf 3 2>/dev/null)
 R=$(tput setaf 1 2>/dev/null); C=$(tput setaf 6 2>/dev/null); N=$(tput sgr0 2>/dev/null)

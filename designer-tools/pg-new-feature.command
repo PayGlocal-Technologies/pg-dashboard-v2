@@ -7,7 +7,7 @@
 #
 # You never need to type any git commands. This does it for you.
 
-REPO="$HOME/PayGlocal/pg-dashboard-v2"
+REPO="$HOME/Desktop/PayGlocal Dashboard/pg-dashboard-v2"
 
 # Colors (safe if unsupported)
 B=$(tput bold 2>/dev/null); G=$(tput setaf 2 2>/dev/null); Y=$(tput setaf 3 2>/dev/null)
