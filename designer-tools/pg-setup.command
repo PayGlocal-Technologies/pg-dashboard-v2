@@ -147,10 +147,32 @@ ACCT="$(claude_account)"
 if [ -n "$ACCT" ]; then
   ok "Already signed in to Claude as $ACCT. Nothing to do here."
 else
-  echo "A sign-in for Claude Code will start now. Log in with your PayGlocal Claude account"
-  echo "in the browser window that opens, then return here."
+  echo "A separate Terminal window will open for the Claude sign-in."
+  echo "Log in there with your PayGlocal Claude account. THIS window will continue"
+  echo "on its own the moment it sees you are signed in."
   pause "Ready to sign in to Claude?"
-  claude login 2>/dev/null || claude /login 2>/dev/null || warn "If nothing opened, open VS Code, click the Claude icon, and use its 'Sign in' button."
+
+  # Run the login in its own window so it never blocks this setup window.
+  # The window closes itself once login finishes.
+  osascript >/dev/null 2>&1 \
+    -e 'tell application "Terminal" to do script "claude login; exit"' \
+    -e 'tell application "Terminal" to activate'
+
+  printf "Waiting for you to finish signing in"
+  SIGNED=""
+  for i in $(seq 1 150); do
+    SIGNED="$(claude_account)"
+    [ -n "$SIGNED" ] && break
+    printf "."
+    sleep 2
+  done
+  echo ""
+  if [ -n "$SIGNED" ]; then
+    ok "Signed in to Claude as $SIGNED."
+  else
+    warn "Did not detect a sign-in yet. You can finish it in the other window, or later in the"
+    warn "VS Code Claude panel via its 'Sign in' button. Setup is otherwise complete."
+  fi
 fi
 
 echo ""
