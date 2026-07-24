@@ -1,8 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { type Column, StatusBadge } from "@/components/ui";
+import { type Column, StatusBadge, Button } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
+import { Icon } from "@/components/icon";
+import { CopyableText } from "@/components/common/CopyableText";
 import { formatCurrency } from "@/lib/utils/format";
 import { COUNTRY_NAME_MAP } from "@/features/dashboard/transactions/constants";
 import type { McaTransaction } from "@/features/dashboard/transactions/types";
@@ -12,7 +14,7 @@ import { useApp } from "@/stores/useApp";
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
 const MCA_STATUS_META: Record<string, StatusMeta> = {
-  DOCUMENT_PENDING: { label: "Invoice Pending", variant: "warning" },
+  DOCUMENT_PENDING: { label: "Waiting for Invoice", variant: "warning" },
   FUNDS_ON_HOLD: { label: "Funds on Hold", variant: "warning" },
   SENT_FOR_REVIEW: { label: "Sent for Review", variant: "warning", trailIcon: "clock" },
   SENT_FOR_SETTLEMENT: { label: "Sent for Settlement", variant: "warning" },
@@ -25,6 +27,16 @@ const MCA_STATUS_META: Record<string, StatusMeta> = {
 function getStatusMeta(raw: string, isFrmPending: boolean): StatusMeta {
   if (isFrmPending) return { label: "Action Required", variant: "orange", trailIcon: "alert" };
   return MCA_STATUS_META[raw] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
+}
+
+// A transaction is "Waiting for Invoice" exactly when its Settlement Status
+// badge reads that label — i.e. not FRM-pending and externalStatus is
+// DOCUMENT_PENDING. Deriving it from the same inputs as getStatusMeta keeps
+// the Action column's CTA choice in sync with what the Settlement Status
+// column actually displays.
+function isWaitingForInvoice(row: McaTransaction): boolean {
+  const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
+  return !isFrmPending && row.externalStatus === "DOCUMENT_PENDING";
 }
 
 // ── Country cell ──────────────────────────────────────────────────────────────
@@ -61,9 +73,28 @@ function CountryCell({ iso2 }: { iso2?: string | null }) {
   );
 }
 
+// TODO: wire up the invoice upload flow once the API/route is available.
+function handleUploadInvoice(row: McaTransaction) {
+  void row;
+}
+
+// TODO: wire up the invoice viewing flow once the API/route is available.
+function handleViewInvoice(row: McaTransaction) {
+  void row;
+}
+
 // ── Column definitions ────────────────────────────────────────────────────────
 export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[] {
   const cols: Column<McaTransaction>[] = [
+    {
+      key: "partnerMaskedCustomerFullName",
+      header: "Remitter Name",
+      minWidth: 155,
+      render: (row) => {
+        const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
+        return <span className="text-[13px] text-foreground whitespace-nowrap">{name ?? "—"}</span>;
+      },
+    },
     {
       key: "amount",
       header: "Amount",
@@ -83,14 +114,20 @@ export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[
       },
     },
     {
-      key: "externalStatus",
-      header: "Status",
+      key: "gid",
+      header: "Transaction ID",
       minWidth: 170,
-      render: (row) => {
-        const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
-        const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
-        return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
-      },
+      render: (row) => <CopyableText value={row.gid} />,
+    },
+    {
+      key: "formattedCreationDateTime",
+      header: "Date & Time",
+      minWidth: 150,
+      render: (row) => (
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {row.formattedCreationDateTime ?? "—"}
+        </span>
+      ),
     },
     {
       key: "partnerCustomerCountry",
@@ -99,29 +136,52 @@ export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[
       render: (row) => <CountryCell iso2={row.partnerCustomerCountry} />,
     },
     {
-      key: "partnerMaskedCustomerFullName",
-      header: "Remitter name",
-      minWidth: 155,
+      key: "externalStatus",
+      header: "Settlement Status",
+      minWidth: 170,
       render: (row) => {
-        const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
-        return <span className="text-[13px] text-foreground whitespace-nowrap">{name ?? "—"}</span>;
+        const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
+        const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
+        return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
       },
     },
     {
-      key: "formattedCreationDateTime",
-      header: "Date and time",
-      minWidth: 150,
-      render: (row) => (
-        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-          {row.formattedCreationDateTime ?? "—"}
-        </span>
-      ),
+      key: "action",
+      header: "Action",
+      minWidth: 170,
+      align: "right",
+      render: (row) => {
+        if (isWaitingForInvoice(row)) {
+          return (
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Icon name="upload" className="w-3 h-3" />}
+              onClick={() => handleUploadInvoice(row)}
+              className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+            >
+              Upload Invoice
+            </Button>
+          );
+        }
+        return (
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="eye" className="w-3 h-3" />}
+            onClick={() => handleViewInvoice(row)}
+            className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+          >
+            View Invoice
+          </Button>
+        );
+      },
     },
   ];
 
   if (!isPartnerUser) return cols;
 
-  cols.splice(4, 0, {
+  cols.splice(3, 0, {
     key: "merchantId",
     header: "Merchant ID",
     minWidth: 145,
