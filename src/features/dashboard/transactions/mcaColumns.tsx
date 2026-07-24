@@ -149,7 +149,7 @@ export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[
       key: "action",
       header: "Action",
       minWidth: 170,
-      align: "right",
+      align: "left",
       render: (row) => {
         if (isWaitingForInvoice(row)) {
           return (
@@ -166,7 +166,7 @@ export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[
         }
         return (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             leftIcon={<Icon name="eye" className="w-3 h-3" />}
             onClick={() => handleViewInvoice(row)}
