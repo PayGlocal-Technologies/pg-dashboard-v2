@@ -51,6 +51,15 @@ export const MCA_CURRENCY_FILTERS: FilterOption[] = [
   { value: "CAD", label: "CAD" },
 ];
 
+// ── Invoice upload constraints (Upload Invoice modal) ────────────────────────
+export const INVOICE_ACCEPTED_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png"] as const;
+export const INVOICE_ACCEPTED_MIME_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+] as const;
+export const INVOICE_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+
 // ── Country name map (ISO2 → display name, matches pg-dashboard) ─────────────
 export const COUNTRY_NAME_MAP: Record<string, string> = {
   US: "United States", GB: "United Kingdom", EU: "European Union",

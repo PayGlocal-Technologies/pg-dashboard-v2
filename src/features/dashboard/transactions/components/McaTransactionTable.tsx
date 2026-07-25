@@ -11,12 +11,13 @@ import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
+import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
 import {
   MCA_STATUS_FILTERS,
   MCA_CURRENCY_FILTERS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/transactions/constants";
-import type { McaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
+import type { McaTransaction, McaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
 
 export function McaTransactionTable() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
@@ -26,6 +27,9 @@ export function McaTransactionTable() {
   const [status, setStatus]     = useState("All");
   const [currency, setCurrency] = useState("All");
   const [page, setPage]         = useState(1);
+
+  const [uploadRow, setUploadRow]   = useState<McaTransaction | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const externalStatus = status   !== "All" ? [status]    : undefined;
   const currencyFilter = currency !== "All" ? [currency]  : undefined;
@@ -56,7 +60,12 @@ export function McaTransactionTable() {
   const onClear    = () => { setStatus("All"); setCurrency("All"); setSearch(""); setPage(1); };
   const hasActive  = status !== "All" || currency !== "All" || search !== "";
 
-  const columns = buildMcaColumns(isPartnerUser);
+  const openUploadInvoice = (row: McaTransaction) => {
+    setUploadRow(row);
+    setUploadOpen(true);
+  };
+
+  const columns = buildMcaColumns(isPartnerUser, openUploadInvoice);
 
   return (
     <div className="space-y-3">
@@ -150,6 +159,13 @@ export function McaTransactionTable() {
           density="compact"
         />
       )}
+
+      <UploadInvoiceModal
+        row={uploadRow}
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        onUploaded={() => void refetch()}
+      />
     </div>
   );
 }

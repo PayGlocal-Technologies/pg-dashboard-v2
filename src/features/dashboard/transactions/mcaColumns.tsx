@@ -73,18 +73,16 @@ function CountryCell({ iso2 }: { iso2?: string | null }) {
   );
 }
 
-// TODO: wire up the invoice upload flow once the API/route is available.
-function handleUploadInvoice(row: McaTransaction) {
-  void row;
-}
-
 // TODO: wire up the invoice viewing flow once the API/route is available.
 function handleViewInvoice(row: McaTransaction) {
   void row;
 }
 
 // ── Column definitions ────────────────────────────────────────────────────────
-export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[] {
+export function buildMcaColumns(
+  isPartnerUser: boolean,
+  onUploadInvoice: (row: McaTransaction) => void
+): Column<McaTransaction>[] {
   const cols: Column<McaTransaction>[] = [
     {
       key: "partnerMaskedCustomerFullName",
@@ -157,7 +155,7 @@ export function buildMcaColumns(isPartnerUser: boolean): Column<McaTransaction>[
               variant="outline"
               size="sm"
               leftIcon={<Icon name="upload" className="w-3 h-3" />}
-              onClick={() => handleUploadInvoice(row)}
+              onClick={() => onUploadInvoice(row)}
               className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
             >
               Upload Invoice
