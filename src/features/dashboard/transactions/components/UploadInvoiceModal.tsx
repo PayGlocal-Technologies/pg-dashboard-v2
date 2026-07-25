@@ -133,15 +133,15 @@ function UploadInvoiceFormBody({
       </div>
 
       <form onSubmit={handleSubmit} noValidate className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
+        <div className="flex-1 overflow-y-auto px-6 py-5">
           {saveError && (
-            <Alert variant="error">
+            <Alert variant="error" className="mb-5">
               <AlertDescription>{saveError}</AlertDescription>
             </Alert>
           )}
 
           <DialogDescription asChild>
-            <Alert variant="warning" className="mb-0">
+            <Alert variant="warning">
               <AlertDescription>
                 This transaction can&apos;t proceed to settlement until a purpose code and invoice
                 are provided.
@@ -157,7 +157,7 @@ function UploadInvoiceFormBody({
             }}
           >
             {(field) => (
-              <Field invalid={field.state.meta.errors.length > 0}>
+              <Field className="mt-5 mb-5" invalid={field.state.meta.errors.length > 0}>
                 <FieldLabel htmlFor="purposeCode">
                   Purpose code <span className="text-destructive">*</span>
                 </FieldLabel>
