@@ -229,6 +229,7 @@ function DrawerBody({
   const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
   const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
   const isReversed = REVERSED_STATUSES.has(row.externalStatus);
+  const isSettled = row.externalStatus === "SETTLED" || row.externalStatus === "FIRC_SETTLED";
 
   const counterpartyName = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName ?? "—";
   const amount = parseFloat(row.amount ?? "0");
@@ -293,52 +294,54 @@ function DrawerBody({
         </section>
         */}
 
-        <section>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Payment breakdown
-          </h3>
-          <div>
-            <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
-              <span className="text-muted-foreground">
-                Payment amount
-                <span className="ml-1 text-[11px]">(using live FX)</span>
-              </span>
-              <span className="font-medium tabular-nums text-foreground">
-                {formatCurrency(convertedAmount, "INR", "en-IN")}
-              </span>
+        {isSettled && (
+          <section>
+            <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Payment breakdown
+            </h3>
+            <div>
+              <div className="flex items-center justify-between gap-4 pb-2.5 text-[13px]">
+                <span className="text-muted-foreground">
+                  Payment amount
+                  <span className="ml-1 text-[11px]">(using live FX)</span>
+                </span>
+                <span className="font-medium tabular-nums text-foreground">
+                  {formatCurrency(convertedAmount, "INR", "en-IN")}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  PayGlocal processing fee
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="sm"
+                    className="h-auto min-h-0 px-0 py-0 text-[12px]"
+                    onClick={() => {
+                      // TODO: link to the processing-fee explainer once one exists.
+                    }}
+                  >
+                    Learn more
+                  </Button>
+                </span>
+                <span className="font-medium tabular-nums text-foreground">
+                  − {formatCurrency(processingFee, "INR", "en-IN")}
+                </span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+                <span className="font-semibold text-foreground">Net settlement amount</span>
+                <span className="font-semibold tabular-nums text-foreground">
+                  {formatCurrency(netAmount, "INR", "en-IN")}
+                </span>
+              </div>
             </div>
-            <Separator />
-            <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                PayGlocal processing fee
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  className="h-auto min-h-0 px-0 py-0 text-[12px]"
-                  onClick={() => {
-                    // TODO: link to the processing-fee explainer once one exists.
-                  }}
-                >
-                  Learn more
-                </Button>
-              </span>
-              <span className="font-medium tabular-nums text-foreground">
-                − {formatCurrency(processingFee, "INR", "en-IN")}
-              </span>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
-              <span className="font-semibold text-foreground">Net settlement amount</span>
-              <span className="font-semibold tabular-nums text-foreground">
-                {formatCurrency(netAmount, "INR", "en-IN")}
-              </span>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         <section>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Settlement timeline
           </h3>
           <div>
