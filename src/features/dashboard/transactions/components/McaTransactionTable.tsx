@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, DataTable } from "@/components/ui";
+import { Button, DataTable, Tabs, TabsList, TabsTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { cn } from "@/lib/utils";
@@ -96,66 +96,92 @@ export function McaTransactionTable() {
 
   return (
     <div className="space-y-3">
-      {/* Filter bar */}
-      <div className="bg-card rounded-xl px-4 py-2.5 flex items-center gap-2.5 flex-wrap border border-border">
-        <RotatingSearchInput
-          value={search}
-          onSearch={onSearch}
-          words={["remitter", "transaction ID", "UTR"]}
-          className="min-w-[160px] max-w-xs flex-1"
-        />
-
-        <div className="hidden sm:block h-4 w-px bg-border" />
-
-        <div className="flex items-center gap-1 flex-wrap">
-          {MCA_STATUS_FILTERS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={status === opt.value ? "primary" : "outline"}
-              size="sm"
-              onClick={() => onStatus(opt.value)}
-              className={cn(
-                "h-auto rounded-full px-2.5 py-1",
-                status === opt.value
-                  ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
+      {/* Search & filter container */}
+      <div className="bg-card rounded-xl border border-border">
+        {/* View tabs — an underline-style shortcut onto the same `status` filter
+            state as the "Waiting for Invoice" status pill below, not a separate
+            filter axis. */}
+        <Tabs
+          value={status === "DOCUMENT_PENDING" ? "waiting-for-invoice" : "all"}
+          onValueChange={(v) => onStatus(v === "waiting-for-invoice" ? "DOCUMENT_PENDING" : "All")}
+        >
+          <TabsList className="h-auto w-full justify-start gap-5 rounded-none border-0 border-b border-border bg-transparent p-0 px-4">
+            <TabsTrigger
+              value="all"
+              className="-mb-px h-auto rounded-none border-b-2 border-transparent px-0 py-2.5 text-[13px] font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
-
-        <div className="hidden sm:block h-4 w-px bg-border" />
-
-        <div className="flex items-center gap-1 flex-wrap">
-          {MCA_CURRENCY_FILTERS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={currency === opt.value ? "primary" : "outline"}
-              size="sm"
-              onClick={() => onCurrency(opt.value)}
-              className={cn(
-                "h-auto rounded-full px-2.5 py-1",
-                currency !== opt.value && "text-muted-foreground hover:text-foreground"
-              )}
+              All
+            </TabsTrigger>
+            <TabsTrigger
+              value="waiting-for-invoice"
+              className="-mb-px h-auto rounded-none border-b-2 border-transparent px-0 py-2.5 text-[13px] font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
+              Waiting for Invoice
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {hasActive && (
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon name="x" className="w-3 h-3" />}
-            onClick={onClear}
-            className="ml-auto text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </Button>
-        )}
+        {/* Existing filter row */}
+        <div className="px-4 py-2.5 flex items-center gap-2.5 flex-wrap">
+          <RotatingSearchInput
+            value={search}
+            onSearch={onSearch}
+            words={["remitter", "transaction ID", "UTR"]}
+            className="min-w-[160px] max-w-xs flex-1"
+          />
+
+          <div className="hidden sm:block h-4 w-px bg-border" />
+
+          <div className="flex items-center gap-1 flex-wrap">
+            {MCA_STATUS_FILTERS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={status === opt.value ? "primary" : "outline"}
+                size="sm"
+                onClick={() => onStatus(opt.value)}
+                className={cn(
+                  "h-auto rounded-full px-2.5 py-1",
+                  status === opt.value
+                    ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="hidden sm:block h-4 w-px bg-border" />
+
+          <div className="flex items-center gap-1 flex-wrap">
+            {MCA_CURRENCY_FILTERS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={currency === opt.value ? "primary" : "outline"}
+                size="sm"
+                onClick={() => onCurrency(opt.value)}
+                className={cn(
+                  "h-auto rounded-full px-2.5 py-1",
+                  currency !== opt.value && "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
+
+          {hasActive && (
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon name="x" className="w-3 h-3" />}
+              onClick={onClear}
+              className="ml-auto text-muted-foreground hover:text-foreground"
+            >
+              Clear
+            </Button>
+          )}
+        </div>
       </div>
 
       {isError ? (

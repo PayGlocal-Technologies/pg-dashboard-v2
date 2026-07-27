@@ -118,19 +118,6 @@ export function buildMcaColumns(
 ): Column<McaTransaction>[] {
   const cols: Column<McaTransaction>[] = [
     {
-      key: "partnerMaskedCustomerFullName",
-      header: "Remitter Name",
-      minWidth: 155,
-      render: (row) => {
-        const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
-        return (
-          <RowClick row={row} onOpenDetails={onOpenDetails}>
-            <span className="text-[13px] text-foreground whitespace-nowrap">{name ?? "—"}</span>
-          </RowClick>
-        );
-      },
-    },
-    {
       key: "amount",
       header: "Amount",
       minWidth: 135,
@@ -146,6 +133,19 @@ export function buildMcaColumns(
               </span>
               <span className="text-[11px] text-muted-foreground font-medium">{currency}</span>
             </div>
+          </RowClick>
+        );
+      },
+    },
+    {
+      key: "partnerMaskedCustomerFullName",
+      header: "Remitter Name",
+      minWidth: 155,
+      render: (row) => {
+        const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
+        return (
+          <RowClick row={row} onOpenDetails={onOpenDetails}>
+            <span className="text-[13px] text-foreground whitespace-nowrap">{name ?? "—"}</span>
           </RowClick>
         );
       },
