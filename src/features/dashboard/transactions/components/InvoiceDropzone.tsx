@@ -4,17 +4,30 @@ import { forwardRef, useRef, useState } from "react";
 import { Button, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatFileSize } from "@/lib/utils/format";
+import { formatCurrency, formatFileSize } from "@/lib/utils/format";
 import {
   INVOICE_ACCEPTED_EXTENSIONS,
   INVOICE_ACCEPTED_MIME_TYPES,
   INVOICE_MAX_SIZE_BYTES,
 } from "@/features/dashboard/transactions/constants";
 
+export interface InvoiceComparisonRow {
+  field: string;
+  expected: string;
+  found: string;
+}
+
 export type InvoiceUploadState =
   | { status: "idle" }
   | { status: "extracting"; file: File }
   | { status: "success"; name: string; size: number }
+  | {
+      status: "mismatch";
+      name: string;
+      size: number;
+      missing: InvoiceComparisonRow[];
+      mismatched: InvoiceComparisonRow[];
+    }
   | { status: "invalid"; message: string }
   | { status: "upload-error"; file: File; message: string };
 
@@ -22,19 +35,191 @@ export type InvoiceUploadState =
 // invoice details are (simulated to be) parsed out of the file.
 const EXTRACTING_DURATION_MS = 10_000;
 
+// The transaction-side values an extracted invoice is checked against.
+export interface InvoiceExpectedDetails {
+  amount: number;
+  currency: string;
+  senderName: string;
+}
+
+const MISMATCH_CURRENCY_POOL = ["USD", "EUR", "GBP", "INR", "AUD", "CAD"];
+const MISMATCH_NAME_POOL = ["Aman Sharma", "Priya Verma", "John Doe", "Wei Zhang"];
+
+function pickOtherThan(pool: string[], value: string): string {
+  const alternatives = pool.filter((item) => item !== value);
+  return alternatives[Math.floor(Math.random() * alternatives.length)] ?? pool[0];
+}
+
+// Simulates OCR/data-extraction results and checks them against the
+// transaction — there's no real extraction backend yet (see runUpload), so
+// this stands in for it: some fields are randomly "not found" on the invoice
+// (presence checks), and others are randomly extracted with a different value
+// than the transaction has on file (consistency checks).
+function buildValidationIssues(expected: InvoiceExpectedDetails): {
+  missing: InvoiceComparisonRow[];
+  mismatched: InvoiceComparisonRow[];
+} {
+  const missing: InvoiceComparisonRow[] = [];
+  const mismatched: InvoiceComparisonRow[] = [];
+
+  if (Math.random() < 0.3) {
+    missing.push({ field: "Sender address", expected: "Required", found: "—" });
+  }
+  if (Math.random() < 0.3) {
+    missing.push({ field: "Goods or service description", expected: "Required", found: "—" });
+  }
+
+  if (Math.random() < 0.3) {
+    const drift = (Math.random() < 0.5 ? -1 : 1) * (0.01 + Math.random() * 0.08);
+    const foundAmount = Math.round(expected.amount * (1 + drift) * 100) / 100;
+    mismatched.push({
+      field: "Amount",
+      expected: formatCurrency(expected.amount, expected.currency, "en-US"),
+      found: formatCurrency(foundAmount, expected.currency, "en-US"),
+    });
+  }
+  if (Math.random() < 0.3) {
+    mismatched.push({
+      field: "Currency",
+      expected: expected.currency,
+      found: pickOtherThan(MISMATCH_CURRENCY_POOL, expected.currency),
+    });
+  }
+  if (Math.random() < 0.3) {
+    mismatched.push({
+      field: "Sender name",
+      expected: expected.senderName,
+      found: pickOtherThan(MISMATCH_NAME_POOL, expected.senderName),
+    });
+  }
+
+  return { missing, mismatched };
+}
+
 interface InvoiceDropzoneProps {
   id: string;
   value: InvoiceUploadState;
   onChange: (next: InvoiceUploadState) => void;
   invalid?: boolean;
   errorId?: string;
+  expected: InvoiceExpectedDetails;
   onCreateInvoice?: () => void;
+  onEditDetails?: () => void;
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// A fixed-size, read-only field/expected/found comparison — not a paginated
+// data grid, so <DataTable> (built for sortable/paginated tables and always
+// rendering a "Showing X of Y" footer) doesn't fit. Follows the same
+// div-based row pattern as DetailRow elsewhere in this feature instead of a
+// bare <table>.
+function ValidationGroup({
+  label,
+  rows,
+}: {
+  label: string;
+  rows: InvoiceComparisonRow[];
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 dark:text-amber-500">
+        <Icon name="alert-triangle" className="h-3.5 w-3.5" />
+        {label}
+      </div>
+      <div className="mt-2 overflow-hidden rounded-lg border border-border">
+        <div className="grid grid-cols-3 bg-muted/60 text-[11px] font-semibold text-muted-foreground">
+          <span className="px-3 py-2">Field</span>
+          <span className="px-3 py-2">Transaction Details</span>
+          <span className="px-3 py-2">Invoice Details</span>
+        </div>
+        {rows.map((row) => (
+          <div
+            key={row.field}
+            className="grid grid-cols-3 border-t border-border text-[12.5px] text-foreground"
+          >
+            <span className="px-3 py-2.5">{row.field}</span>
+            <span className="px-3 py-2.5">{row.expected}</span>
+            <span className="px-3 py-2.5">{row.found}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MismatchPanel({
+  name,
+  size,
+  missing,
+  mismatched,
+  onEditDetails,
+  onReupload,
+  dropzoneRef,
+}: {
+  name: string;
+  size: number;
+  missing: InvoiceComparisonRow[];
+  mismatched: InvoiceComparisonRow[];
+  onEditDetails?: () => void;
+  onReupload: () => void;
+  dropzoneRef: React.Ref<HTMLDivElement>;
+}) {
+  const totalIssues = missing.length + mismatched.length;
+
+  return (
+    <div ref={dropzoneRef} tabIndex={-1} className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Icon name="file-text" className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+          <p className="text-[11px] text-muted-foreground">{formatFileSize(size)}</p>
+        </div>
+        <span className="flex shrink-0 items-center gap-1 text-[12px] font-medium text-amber-700 dark:text-amber-500">
+          {totalIssues} issue{totalIssues === 1 ? "" : "s"}
+          <Icon name="alert-circle" className="h-3.5 w-3.5" />
+        </span>
+      </div>
+
+      <p className="text-[12px] text-muted-foreground">
+        {totalIssues} issue{totalIssues === 1 ? "" : "s"} found. Fix details or upload a corrected
+        invoice.
+      </p>
+
+      <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
+        {missing.length > 0 && <ValidationGroup label="Missing" rows={missing} />}
+        {mismatched.length > 0 && <ValidationGroup label="Mismatch" rows={mismatched} />}
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1 rounded-full"
+            leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
+            onClick={onEditDetails}
+          >
+            Edit details
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="flex-1 rounded-full"
+            leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+            onClick={onReupload}
+          >
+            Re-upload invoice
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
-  ({ id, value, onChange, invalid, errorId, onCreateInvoice }, ref) => {
+  ({ id, value, onChange, invalid, errorId, expected, onCreateInvoice, onEditDetails }, ref) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const uploadTokenRef = useRef(0);
@@ -51,15 +236,21 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
       await wait(EXTRACTING_DURATION_MS);
       if (uploadTokenRef.current !== token) return;
 
-      const succeeded = Math.random() > 0.15;
-      if (succeeded) {
-        onChange({ status: "success", name: file.name, size: file.size });
-      } else {
+      const uploadSucceeded = Math.random() > 0.15;
+      if (!uploadSucceeded) {
         onChange({
           status: "upload-error",
           file,
           message: "Upload failed due to a network error.",
         });
+        return;
+      }
+
+      const { missing, mismatched } = buildValidationIssues(expected);
+      if (missing.length > 0 || mismatched.length > 0) {
+        onChange({ status: "mismatch", name: file.name, size: file.size, missing, mismatched });
+      } else {
+        onChange({ status: "success", name: file.name, size: file.size });
       }
     };
 
@@ -113,7 +304,13 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
       onChange({ status: "idle" });
     };
 
-    const showCreateInvoiceLink = value.status !== "success";
+    const handleReupload = () => {
+      uploadTokenRef.current++;
+      onChange({ status: "idle" });
+      openFileDialog();
+    };
+
+    const showCreateInvoiceLink = value.status !== "success" && value.status !== "mismatch";
 
     return (
       <div className="flex flex-col gap-2">
@@ -149,6 +346,16 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
               <Icon name="trash-2" className="h-3.5 w-3.5" />
             </IconButton>
           </div>
+        ) : value.status === "mismatch" ? (
+          <MismatchPanel
+            dropzoneRef={ref}
+            name={value.name}
+            size={value.size}
+            missing={value.missing}
+            mismatched={value.mismatched}
+            onEditDetails={onEditDetails}
+            onReupload={handleReupload}
+          />
         ) : value.status === "extracting" ? (
           <div
             ref={ref}

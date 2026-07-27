@@ -46,6 +46,12 @@ async function simulateSaveInvoice(): Promise<void> {
   }
 }
 
+// An invoice with validation issues can still be submitted ("Submit anyway")
+// for manual review — only "idle"/"extracting"/error states block submission.
+function isInvoiceReady(status: InvoiceUploadState["status"]): boolean {
+  return status === "success" || status === "mismatch";
+}
+
 export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess }: UploadInvoiceFormProps) {
   const isModal = variant === "modal";
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -137,7 +143,7 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
           name="invoice"
           validators={{
             onSubmit: ({ value }) =>
-              value.status !== "success" ? "Upload an invoice to continue." : undefined,
+              !isInvoiceReady(value.status) ? "Upload an invoice to continue." : undefined,
           }}
         >
           {(field) => (
@@ -156,9 +162,17 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
                 onChange={field.handleChange}
                 invalid={field.state.meta.errors.length > 0}
                 errorId="invoice-error"
+                expected={{
+                  amount: parseFloat(row.amount ?? "0"),
+                  currency: row.currency ?? "USD",
+                  senderName: row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName ?? "—",
+                }}
                 onCreateInvoice={() => {
                   // TODO: hand off to the /invoices/create flow and populate
                   // this field with the created invoice once that flow exists.
+                }}
+                onEditDetails={() => {
+                  // TODO: hand off to an edit-transaction-details flow once it exists.
                 }}
               />
               {field.state.value.status === "extracting" && (
@@ -174,33 +188,48 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
       </div>
 
       <div className={cn(isModal ? "shrink-0 border-t border-border bg-card px-6 py-4" : "mt-5")}>
-        <div className={cn("flex gap-2", isModal ? "flex-col-reverse sm:flex-row sm:justify-end" : "")}>
-          {onCancel && (
-            <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-              Cancel
-            </Button>
+        <form.Subscribe
+          selector={(s) => ({
+            purposeCode: s.values.purposeCode,
+            invoiceStatus: s.values.invoice.status,
+            isSubmitting: s.isSubmitting,
+          })}
+        >
+          {({ purposeCode, invoiceStatus, isSubmitting }) => (
+            <>
+              <div className={cn("flex gap-2", isModal ? "flex-col-reverse sm:flex-row sm:justify-end" : "")}>
+                {onCancel && (
+                  <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+                    Cancel
+                  </Button>
+                )}
+                <Button
+                  type="submit"
+                  variant="primary"
+                  size="sm"
+                  disabled={!purposeCode || !isInvoiceReady(invoiceStatus)}
+                  isLoading={isSubmitting}
+                  className={cn(!isModal && "w-full")}
+                >
+                  {isSubmitting
+                    ? isModal
+                      ? "Saving…"
+                      : "Submitting…"
+                    : invoiceStatus === "mismatch"
+                      ? "Submit anyway"
+                      : isModal
+                        ? "Save and continue"
+                        : "Submit"}
+                </Button>
+              </div>
+              {invoiceStatus === "mismatch" && (
+                <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                  Invoice will be flagged for manual review and might cause delay in settlement.
+                </p>
+              )}
+            </>
           )}
-          <form.Subscribe
-            selector={(s) => ({
-              purposeCode: s.values.purposeCode,
-              invoiceStatus: s.values.invoice.status,
-              isSubmitting: s.isSubmitting,
-            })}
-          >
-            {({ purposeCode, invoiceStatus, isSubmitting }) => (
-              <Button
-                type="submit"
-                variant="primary"
-                size="sm"
-                disabled={!purposeCode || invoiceStatus !== "success"}
-                isLoading={isSubmitting}
-                className={cn(!isModal && "w-full")}
-              >
-                {isSubmitting ? (isModal ? "Saving…" : "Submitting…") : isModal ? "Save and continue" : "Submit"}
-              </Button>
-            )}
-          </form.Subscribe>
-        </div>
+        </form.Subscribe>
       </div>
     </form>
   );

@@ -228,6 +228,27 @@ function ComboboxList({
   value: string;
   onSelect: (code: string) => void;
 }) {
+  const listRef = useRef<HTMLDivElement>(null);
+
+  // The dropdown is a Radix Popover portalled to document.body, opened from
+  // inside a Drawer/Dialog. The Drawer's scroll lock (react-remove-scroll)
+  // intercepts wheel events at the document level and can swallow them
+  // before they reach this list, even though the list itself scrolls fine
+  // via the scrollbar (a drag, not a wheel event). React's own onWheel is
+  // passive by default, so calling preventDefault there is a silent no-op —
+  // a real (non-passive) DOM listener is required to take control of the
+  // scroll ourselves.
+  useEffect(() => {
+    const el = listRef.current;
+    if (!el) return;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      el.scrollTop += e.deltaY;
+    };
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
+
   return (
     <Command>
       <CommandInput
@@ -243,7 +264,7 @@ function ComboboxList({
         aria-autocomplete="list"
         aria-label="Search purpose codes"
       />
-      <CommandList id={listboxId} aria-label="Purpose codes">
+      <CommandList ref={listRef} id={listboxId} aria-label="Purpose codes">
         {filtered.length === 0 ? (
           <CommandEmpty>No purpose codes match &ldquo;{search}&rdquo;</CommandEmpty>
         ) : (
