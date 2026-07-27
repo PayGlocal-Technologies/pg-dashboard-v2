@@ -2,10 +2,6 @@
 
 import type { ReactNode } from "react";
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
   Alert,
   AlertDescription,
   Button,
@@ -40,6 +36,11 @@ interface TimelineStep {
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
 
+// Index of "Waiting for invoice" within buildTimeline's `labels` array below —
+// the step that's active (blue dot) while a transaction needs an invoice, and
+// the step the inline Upload Invoice form nests under.
+const WAITING_FOR_INVOICE_STEP_INDEX = 1;
+
 // Derives a single "how far along" index (0-7) from the coarse status fields
 // the API exposes today. Steps 3-5 (the three settlement-transfer
 // sub-stages) can't be individually resolved from available data — they
@@ -54,7 +55,9 @@ function getCurrentStepIndex(row: McaTransaction): number {
   if (frmStatus === "APPROVED") return 3;
   if (frmStatus === "REVIEW_IN_PROGRESS" || externalStatus === "SENT_FOR_REVIEW") return 2;
   if (REVERSED_STATUSES.has(externalStatus)) return 2;
-  return 1;
+  // Waiting for Invoice (DOCUMENT_PENDING) and Action Required (FRM pending)
+  // both land on the "Waiting for invoice" step as the active one.
+  return WAITING_FOR_INVOICE_STEP_INDEX;
 }
 
 function buildTimeline(row: McaTransaction): TimelineStep[] {
@@ -82,7 +85,15 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
   }));
 }
 
-function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean }) {
+function TimelineItem({
+  step,
+  isLast,
+  content,
+}: {
+  step: TimelineStep;
+  isLast: boolean;
+  content?: ReactNode;
+}) {
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
@@ -104,7 +115,7 @@ function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean })
           />
         )}
       </div>
-      <div className={cn(!isLast && "pb-5")}>
+      <div className={cn("min-w-0 flex-1", !isLast && "pb-5")}>
         <p
           className={cn(
             "text-[13px] leading-snug",
@@ -113,6 +124,9 @@ function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean })
         >
           {step.label}
         </p>
+        {content && (
+          <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4">{content}</div>
+        )}
       </div>
     </div>
   );
@@ -211,7 +225,7 @@ function DrawerBody({
 
   return (
     <>
-      {/* Content container — Currency & Amount, Status, Remitter name, Date & Time. */}
+      {/* Content container — Currency & Amount, Status, Remitter name + timestamp, Remitter country. */}
       <div className="shrink-0 border-b border-border px-6 pb-5">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-wrap items-center gap-2.5">
@@ -220,11 +234,14 @@ function DrawerBody({
             </span>
             <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
           </div>
-          <span className="shrink-0 text-[12px] text-muted-foreground">
-            {row.formattedCreationDateTime ?? "—"}
-          </span>
+          <div className="shrink-0">
+            <CountryCell iso2={row.partnerCustomerCountry} />
+          </div>
         </div>
-        <p className="mt-1 text-[13px] text-muted-foreground">by {counterpartyName}</p>
+        <p className="mt-1 text-[13px] leading-snug">
+          <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
+          <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
+        </p>
       </div>
 
       {/* Body — scrollable sections. */}
@@ -235,17 +252,6 @@ function DrawerBody({
               Funds for this transaction were reversed and returned to the remitter.
             </AlertDescription>
           </Alert>
-        )}
-
-        {needsAction && !isReversed && (
-          <UploadInvoiceForm
-            row={row}
-            variant="inline"
-            onSuccess={() => {
-              onUploaded?.(row);
-              onOpenChange(false);
-            }}
-          />
         )}
 
         {/* Transaction details — temporarily disabled, kept for later restoration.
@@ -279,23 +285,23 @@ function DrawerBody({
           </h3>
           <div className="rounded-xl border border-border p-4">
             {timeline.map((step, i) => (
-              <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
+              <TimelineItem
+                key={step.label}
+                step={step}
+                isLast={i === timeline.length - 1}
+                content={
+                  i === WAITING_FOR_INVOICE_STEP_INDEX && needsAction && !isReversed ? (
+                    <UploadInvoiceForm
+                      row={row}
+                      variant="inline"
+                      onSuccess={() => onUploaded?.(row)}
+                    />
+                  ) : undefined
+                }
+              />
             ))}
           </div>
         </section>
-
-        <Accordion type="single" collapsible className="rounded-xl border border-border">
-          <AccordionItem value="more-details" className="border-b-0 px-4">
-            <AccordionTrigger>More details</AccordionTrigger>
-            <AccordionContent>
-              <div className="-mt-1 divide-y divide-border border-t border-border">
-                <DetailRow label="Internal status" value={row.internalStatus} className="px-0" />
-                <DetailRow label="FRM status" value={row.frmStatus} className="px-0" />
-                <DetailRow label="Invoice type" value={row.invoiceType} className="px-0" />
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
       </div>
     </>
   );

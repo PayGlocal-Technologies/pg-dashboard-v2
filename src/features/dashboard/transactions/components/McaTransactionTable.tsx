@@ -29,11 +29,13 @@ export function McaTransactionTable() {
   const [currency, setCurrency] = useState("All");
   const [page, setPage]         = useState(1);
 
-  const [uploadRow, setUploadRow]   = useState<McaTransaction | null>(null);
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, Partial<McaTransaction>>>({});
 
-  const [detailsRow, setDetailsRow]   = useState<McaTransaction | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [uploadRowId, setUploadRowId] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen]   = useState(false);
+
+  const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
+  const [detailsOpen, setDetailsOpen]   = useState(false);
 
   const externalStatus = status   !== "All" ? [status]    : undefined;
   const currencyFilter = currency !== "All" ? [currency]  : undefined;
@@ -55,8 +57,12 @@ export function McaTransactionTable() {
     isReady
   );
 
-  const rows       = data?.data?.data ?? [];
+  const rawRows    = data?.data?.data ?? [];
+  const rows       = rawRows.map((r) => (statusOverrides[r.gid] ? { ...r, ...statusOverrides[r.gid] } : r));
   const totalCount = data?.data?.totalCount ?? 0;
+
+  const uploadRow  = rows.find((r) => r.gid === uploadRowId) ?? null;
+  const detailsRow = rows.find((r) => r.gid === detailsRowId) ?? null;
 
   const onStatus   = (v: string) => { setStatus(v);   setPage(1); };
   const onCurrency = (v: string) => { setCurrency(v); setPage(1); };
@@ -65,13 +71,25 @@ export function McaTransactionTable() {
   const hasActive  = status !== "All" || currency !== "All" || search !== "";
 
   const openUploadInvoice = (row: McaTransaction) => {
-    setUploadRow(row);
+    setUploadRowId(row.gid);
     setUploadOpen(true);
   };
 
   const openDetails = (row: McaTransaction) => {
-    setDetailsRow(row);
+    setDetailsRowId(row.gid);
     setDetailsOpen(true);
+  };
+
+  // Optimistically moves a "waiting for invoice" row to "Sent for Review" once
+  // its invoice is submitted. There's no real invoice-upload endpoint yet (see
+  // UploadInvoiceForm's simulateSaveInvoice TODO), so this keeps the drawer's
+  // timeline and the table's Settlement Status column in sync with each other
+  // without a round trip to the server.
+  const handleInvoiceSubmitted = (row: McaTransaction) => {
+    setStatusOverrides((prev) => ({
+      ...prev,
+      [row.gid]: { externalStatus: "SENT_FOR_REVIEW", frmStatus: "REVIEW_IN_PROGRESS" },
+    }));
   };
 
   const columns = buildMcaColumns(isPartnerUser, openUploadInvoice, openDetails);
@@ -173,14 +191,14 @@ export function McaTransactionTable() {
         row={uploadRow}
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        onUploaded={() => void refetch()}
+        onUploaded={handleInvoiceSubmitted}
       />
 
       <TransactionDetailsDrawer
         row={detailsRow}
         open={detailsOpen}
         onOpenChange={setDetailsOpen}
-        onUploaded={() => void refetch()}
+        onUploaded={handleInvoiceSubmitted}
         isPartnerUser={isPartnerUser}
       />
     </div>
