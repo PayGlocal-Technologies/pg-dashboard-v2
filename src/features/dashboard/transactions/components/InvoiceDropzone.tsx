@@ -445,6 +445,13 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
           </div>
         )}
 
+        {value.status === "extracting" && (
+          <p className="text-[12px] text-muted-foreground">
+            Reviewing invoice details. This usually takes a few seconds. Please keep this window
+            open.
+          </p>
+        )}
+
         {showCreateInvoiceLink && (
           <Button
             type="button"

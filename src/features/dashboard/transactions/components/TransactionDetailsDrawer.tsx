@@ -9,6 +9,7 @@ import {
   DrawerClose,
   DrawerContent,
   DrawerTitle,
+  Separator,
   StatusBadge,
   VisuallyHidden,
 } from "@/components/ui";
@@ -228,27 +229,27 @@ function DrawerBody({
   const counterpartyName = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName ?? "—";
   const amount = parseFloat(row.amount ?? "0");
   const currency = row.currency ?? "USD";
+  const processingFee = parseFloat(row.totalMdrDiscount ?? "0");
+  const netAmount = amount - processingFee;
   const timeline = buildTimeline(row);
 
   return (
     <>
-      {/* Content container — Currency & Amount, Status, Remitter name + timestamp, Remitter country. */}
-      <div className="shrink-0 border-b border-border px-6 pb-5">
-        <div className="flex items-start justify-between gap-4">
+      {/* Content container — Country → Amount → Date&Time, a single left-aligned stack. */}
+      <div className="shrink-0 border-b border-border px-6 pt-1 pb-5">
+        <div className="flex flex-col items-start gap-1.5">
+          <CountryCell iso2={row.partnerCustomerCountry} />
           <div className="flex flex-wrap items-center gap-2.5">
             <span className="text-[26px] font-semibold tabular-nums text-foreground">
               {formatCurrency(amount, currency, "en-US")}
             </span>
             <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
           </div>
-          <div className="shrink-0">
-            <CountryCell iso2={row.partnerCustomerCountry} />
-          </div>
+          <p className="text-[13px] leading-snug">
+            <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
+            <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
+          </p>
         </div>
-        <p className="mt-1 text-[13px] leading-snug">
-          <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
-          <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
-        </p>
       </div>
 
       {/* Body — scrollable sections. */}
@@ -285,6 +286,47 @@ function DrawerBody({
           </div>
         </section>
         */}
+
+        <section>
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Payment breakdown
+          </h3>
+          <div>
+            <div className="flex items-center justify-between py-2.5 text-[13px]">
+              <span className="text-muted-foreground">Payment amount</span>
+              <span className="font-medium tabular-nums text-foreground">
+                {formatCurrency(amount, currency, "en-US")}
+              </span>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between py-2.5 text-[13px]">
+              <span className="flex items-center gap-1.5 text-muted-foreground">
+                PayGlocal processing fee(s)
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto min-h-0 px-0 py-0 text-[12px]"
+                  onClick={() => {
+                    // TODO: link to the processing-fee explainer once one exists.
+                  }}
+                >
+                  Learn more
+                </Button>
+              </span>
+              <span className="font-medium tabular-nums text-foreground">
+                − {formatCurrency(processingFee, currency, "en-US")}
+              </span>
+            </div>
+            <Separator />
+            <div className="flex items-center justify-between py-2.5 text-[13px]">
+              <span className="font-semibold text-foreground">Net amount</span>
+              <span className="font-semibold tabular-nums text-foreground">
+                {formatCurrency(netAmount, currency, "en-US")}
+              </span>
+            </div>
+          </div>
+        </section>
 
         <section>
           <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

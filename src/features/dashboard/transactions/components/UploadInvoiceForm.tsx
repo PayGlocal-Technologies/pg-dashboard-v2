@@ -175,12 +175,6 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
                   // TODO: hand off to an edit-transaction-details flow once it exists.
                 }}
               />
-              {field.state.value.status === "extracting" && (
-                <p className="mt-2 text-[12px] text-muted-foreground">
-                  Reviewing invoice details. This usually takes a few seconds. Please keep this
-                  window open.
-                </p>
-              )}
               <FieldError id="invoice-error">{field.state.meta.errors[0]}</FieldError>
             </Field>
           )}
