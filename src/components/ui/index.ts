@@ -1,4 +1,8 @@
 export {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
   Alert,
   AlertTitle,
   AlertDescription,
@@ -83,4 +87,5 @@ export {
   Badge,
   type BadgeProps,
   useBreakpoint,
+  VisuallyHidden,
 } from "@payglocal_ui/flux-ui";

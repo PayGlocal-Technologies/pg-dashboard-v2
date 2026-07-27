@@ -12,6 +12,7 @@ import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
 import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
+import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
 import {
   MCA_STATUS_FILTERS,
   MCA_CURRENCY_FILTERS,
@@ -30,6 +31,9 @@ export function McaTransactionTable() {
 
   const [uploadRow, setUploadRow]   = useState<McaTransaction | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
+
+  const [detailsRow, setDetailsRow]   = useState<McaTransaction | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const externalStatus = status   !== "All" ? [status]    : undefined;
   const currencyFilter = currency !== "All" ? [currency]  : undefined;
@@ -65,7 +69,12 @@ export function McaTransactionTable() {
     setUploadOpen(true);
   };
 
-  const columns = buildMcaColumns(isPartnerUser, openUploadInvoice);
+  const openDetails = (row: McaTransaction) => {
+    setDetailsRow(row);
+    setDetailsOpen(true);
+  };
+
+  const columns = buildMcaColumns(isPartnerUser, openUploadInvoice, openDetails);
 
   return (
     <div className="space-y-3">
@@ -165,6 +174,14 @@ export function McaTransactionTable() {
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         onUploaded={() => void refetch()}
+      />
+
+      <TransactionDetailsDrawer
+        row={detailsRow}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+        onUploaded={() => void refetch()}
+        isPartnerUser={isPartnerUser}
       />
     </div>
   );
