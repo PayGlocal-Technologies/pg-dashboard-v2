@@ -141,7 +141,7 @@ function UploadInvoiceFormBody({
           )}
 
           <DialogDescription asChild>
-            <Alert variant="warning">
+            <Alert variant="neutral">
               <AlertDescription>
                 This transaction can&apos;t proceed to settlement until a purpose code and invoice
                 are provided.
