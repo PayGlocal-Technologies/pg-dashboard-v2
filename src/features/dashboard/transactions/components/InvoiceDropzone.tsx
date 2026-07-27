@@ -1,7 +1,7 @@
 "use client";
 
 import { forwardRef, useRef, useState } from "react";
-import { Button, IconButton, Progress } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/utils/format";
@@ -13,10 +13,14 @@ import {
 
 export type InvoiceUploadState =
   | { status: "idle" }
-  | { status: "uploading"; file: File; progress: number }
+  | { status: "extracting"; file: File }
   | { status: "success"; name: string; size: number }
   | { status: "invalid"; message: string }
   | { status: "upload-error"; file: File; message: string };
+
+// How long the "Extracting" state stays visible after upload completes, while
+// invoice details are (simulated to be) parsed out of the file.
+const EXTRACTING_DURATION_MS = 10_000;
 
 interface InvoiceDropzoneProps {
   id: string;
@@ -37,19 +41,14 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
 
     const openFileDialog = () => inputRef.current?.click();
 
+    // The actual upload runs in the background for the whole duration of the
+    // "Extracting" state below — there's no separate uploading/progress step,
+    // so the user only ever sees this one processing state before submission.
     const runUpload = async (file: File) => {
       const token = ++uploadTokenRef.current;
-      onChange({ status: "uploading", file, progress: 8 });
+      onChange({ status: "extracting", file });
 
-      let progress = 8;
-      while (progress < 90) {
-        await wait(140);
-        if (uploadTokenRef.current !== token) return;
-        progress = Math.min(90, progress + 12 + Math.floor(Math.random() * 12));
-        onChange({ status: "uploading", file, progress });
-      }
-
-      await wait(220);
+      await wait(EXTRACTING_DURATION_MS);
       if (uploadTokenRef.current !== token) return;
 
       const succeeded = Math.random() > 0.15;
@@ -73,7 +72,7 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
       if (!typeOk) {
         onChange({
           status: "invalid",
-          message: `Unsupported file type. Upload a ${INVOICE_ACCEPTED_EXTENSIONS.join(", ")} file.`,
+          message: "Only PDF invoices are supported. Please upload a .pdf file.",
         });
         return;
       }
@@ -150,22 +149,17 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
               <Icon name="trash-2" className="h-3.5 w-3.5" />
             </IconButton>
           </div>
-        ) : value.status === "uploading" ? (
+        ) : value.status === "extracting" ? (
           <div
             ref={ref}
             tabIndex={-1}
-            className="flex flex-col gap-2.5 rounded-lg border border-border bg-card px-3.5 py-3"
+            className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3"
           >
-            <div className="flex items-center gap-2 min-w-0">
-              <Icon name="file-text" className="h-4 w-4 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
-                {value.file.name}
-              </span>
-              <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-                {value.progress}%
-              </span>
+            <Icon name="loader" className="h-4 w-4 shrink-0 animate-spin text-primary" />
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-medium text-foreground">Extracting</p>
+              <p className="truncate text-[11px] text-muted-foreground">{value.file.name}</p>
             </div>
-            <Progress value={value.progress} size="sm" />
           </div>
         ) : value.status === "invalid" ? (
           <div
@@ -235,12 +229,11 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
               className={cn("h-5 w-5", invalid ? "text-destructive" : "text-muted-foreground")}
             />
             <p className="text-[13px] font-medium text-foreground">
-              Drag and drop your invoice, or{" "}
+              Drag and drop your PDF invoice, or{" "}
               <span className="text-primary underline underline-offset-2">click to browse</span>
             </p>
             <p className="text-[11px] text-muted-foreground">
-              {INVOICE_ACCEPTED_EXTENSIONS.join(", ").toUpperCase()} up to{" "}
-              {formatFileSize(INVOICE_MAX_SIZE_BYTES)}
+              PDF only, up to {formatFileSize(INVOICE_MAX_SIZE_BYTES)}
             </p>
           </div>
         )}

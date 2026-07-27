@@ -147,7 +147,7 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
               </FieldLabel>
               <FieldDescription>
                 Invoice must match the amount, currency, and sender name. It should also include
-                the remitter address and item details.
+                the remitter address and item details. PDF only.
               </FieldDescription>
               <InvoiceDropzone
                 ref={dropzoneRef}
@@ -161,6 +161,12 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
                   // this field with the created invoice once that flow exists.
                 }}
               />
+              {field.state.value.status === "extracting" && (
+                <p className="mt-2 text-[12px] text-muted-foreground">
+                  Reviewing invoice details. This usually takes a few seconds. Please keep this
+                  window open.
+                </p>
+              )}
               <FieldError id="invoice-error">{field.state.meta.errors[0]}</FieldError>
             </Field>
           )}

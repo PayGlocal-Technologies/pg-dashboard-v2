@@ -49,14 +49,21 @@ const WAITING_FOR_INVOICE_STEP_INDEX = 1;
 function getCurrentStepIndex(row: McaTransaction): number {
   const { externalStatus, frmStatus } = row;
 
+  // Waiting for Invoice (DOCUMENT_PENDING) and Action Required (FRM pending)
+  // must always show "Waiting for invoice" as the active step, checked before
+  // anything else — frmStatus can independently read APPROVED/REVIEW_IN_PROGRESS
+  // for a transaction whose invoice still hasn't been submitted, which would
+  // otherwise fast-forward the timeline past a step that hasn't happened yet.
+  if (frmStatus === "PENDING_MERCHANT_UPLOAD" || externalStatus === "DOCUMENT_PENDING") {
+    return WAITING_FOR_INVOICE_STEP_INDEX;
+  }
+
   if (externalStatus === "FIRC_SETTLED") return 7;
   if (externalStatus === "SETTLED") return 6;
   if (externalStatus === "SENT_FOR_SETTLEMENT" || externalStatus === "FUNDS_ON_HOLD") return 3;
   if (frmStatus === "APPROVED") return 3;
   if (frmStatus === "REVIEW_IN_PROGRESS" || externalStatus === "SENT_FOR_REVIEW") return 2;
   if (REVERSED_STATUSES.has(externalStatus)) return 2;
-  // Waiting for Invoice (DOCUMENT_PENDING) and Action Required (FRM pending)
-  // both land on the "Waiting for invoice" step as the active one.
   return WAITING_FOR_INVOICE_STEP_INDEX;
 }
 
@@ -283,7 +290,7 @@ function DrawerBody({
           <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Settlement timeline
           </h3>
-          <div className="rounded-xl border border-border p-4">
+          <div>
             {timeline.map((step, i) => (
               <TimelineItem
                 key={step.label}
