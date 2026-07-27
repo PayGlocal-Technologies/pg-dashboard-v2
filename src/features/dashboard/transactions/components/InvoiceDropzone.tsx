@@ -194,9 +194,9 @@ function MismatchPanel({
         <div className="flex gap-2">
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
-            className="flex-1 rounded-full"
+            className="flex-1"
             leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
             onClick={onEditDetails}
           >
@@ -204,9 +204,9 @@ function MismatchPanel({
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="secondary"
             size="sm"
-            className="flex-1 rounded-full"
+            className="flex-1"
             leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
             onClick={onReupload}
           >
@@ -360,13 +360,19 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
           <div
             ref={ref}
             tabIndex={-1}
-            className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-3"
+            className="flex flex-col gap-1.5 rounded-lg border border-border bg-card px-3.5 py-3"
           >
-            <Icon name="loader" className="h-4 w-4 shrink-0 animate-spin text-primary" />
-            <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-foreground">Extracting</p>
-              <p className="truncate text-[11px] text-muted-foreground">{value.file.name}</p>
+            <div className="flex min-w-0 items-center gap-2">
+              <Icon name="loader" className="h-4 w-4 shrink-0 animate-spin text-primary" />
+              <p className="min-w-0 truncate text-[13px]">
+                <span className="font-medium text-foreground">Extracting</span>{" "}
+                <span className="text-muted-foreground">{value.file.name}</span>
+              </p>
             </div>
+            <p className="text-[12px] text-muted-foreground">
+              Reviewing invoice details. This usually takes a few seconds. Please keep this
+              window open.
+            </p>
           </div>
         ) : value.status === "invalid" ? (
           <div
@@ -443,13 +449,6 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
               PDF only, up to {formatFileSize(INVOICE_MAX_SIZE_BYTES)}
             </p>
           </div>
-        )}
-
-        {value.status === "extracting" && (
-          <p className="text-[12px] text-muted-foreground">
-            Reviewing invoice details. This usually takes a few seconds. Please keep this window
-            open.
-          </p>
         )}
 
         {showCreateInvoiceLink && (
