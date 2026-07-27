@@ -158,19 +158,30 @@ export function TransactionDetailsDrawer({
           "[&>button:last-child]:hidden"
         )}
       >
-        <DrawerClose asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            aria-label="Close"
-            className="absolute left-4 top-4 z-10 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <Icon name="x" className="h-4 w-4" />
-          </Button>
-        </DrawerClose>
         <DrawerTitle asChild>
           <VisuallyHidden>Transaction details</VisuallyHidden>
         </DrawerTitle>
+
+        {/* Header container — close button + Transaction ID, horizontally aligned. */}
+        <div className="flex shrink-0 items-center justify-between px-6 pt-4 pb-3">
+          <DrawerClose asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label="Close"
+              className="-ml-2 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Icon name="x" className="h-4 w-4" />
+            </Button>
+          </DrawerClose>
+          {row && (
+            <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+              <span>Txn ID</span>
+              <CopyableText value={row.gid} />
+            </div>
+          )}
+        </div>
+
         {row && <DrawerBody row={row} onOpenChange={onOpenChange} onUploaded={onUploaded} isPartnerUser={isPartnerUser} />}
       </DrawerContent>
     </Drawer>
@@ -200,23 +211,18 @@ function DrawerBody({
 
   return (
     <>
-      {/* Header — fixed, non-scrolling. Amount + status are the primary anchor. */}
-      <div className="shrink-0 border-b border-border px-6 pt-6 pb-5 pl-12">
-        <div className="flex justify-end">
-          <div className="flex flex-col items-end gap-0.5 text-[12px] text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <span>Txn ID</span>
-              <CopyableText value={row.gid} />
-            </div>
-            <span>{row.formattedCreationDateTime ?? "—"}</span>
+      {/* Content container — Currency & Amount, Status, Remitter name, Date & Time. */}
+      <div className="shrink-0 border-b border-border px-6 pb-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-[26px] font-semibold tabular-nums text-foreground">
+              {formatCurrency(amount, currency, "en-US")}
+            </span>
+            <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
           </div>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-2.5">
-          <span className="text-[26px] font-semibold tabular-nums text-foreground">
-            {formatCurrency(amount, currency, "en-US")}
+          <span className="shrink-0 text-[12px] text-muted-foreground">
+            {row.formattedCreationDateTime ?? "—"}
           </span>
-          <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
         </div>
         <p className="mt-1 text-[13px] text-muted-foreground">by {counterpartyName}</p>
       </div>
