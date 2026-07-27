@@ -295,7 +295,10 @@ function DrawerBody({
         */}
 
         {isSettled && (
-          <section>
+          // mb-8 overrides the space-y-6 gap below this section (24px) to 32px —
+          // space-y's margin is applied via a zero-specificity :where() selector,
+          // so a direct margin utility here replaces it cleanly for this child only.
+          <section className="mb-8">
             <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Payment breakdown
             </h3>

@@ -15,6 +15,7 @@ export {
   CardAction,
   CardDescription,
   CardContent,
+  Checkbox,
   Command,
   CommandInput,
   CommandList,

@@ -104,7 +104,6 @@ interface InvoiceDropzoneProps {
   errorId?: string;
   expected: InvoiceExpectedDetails;
   onCreateInvoice?: () => void;
-  onEditDetails?: () => void;
 }
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -153,7 +152,6 @@ function MismatchPanel({
   size,
   missing,
   mismatched,
-  onEditDetails,
   onReupload,
   dropzoneRef,
 }: {
@@ -161,7 +159,6 @@ function MismatchPanel({
   size: number;
   missing: InvoiceComparisonRow[];
   mismatched: InvoiceComparisonRow[];
-  onEditDetails?: () => void;
   onReupload: () => void;
   dropzoneRef: React.Ref<HTMLDivElement>;
 }) {
@@ -191,35 +188,23 @@ function MismatchPanel({
       <div className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4">
         {missing.length > 0 && <ValidationGroup label="Missing" rows={missing} />}
         {mismatched.length > 0 && <ValidationGroup label="Mismatch" rows={mismatched} />}
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="flex-1"
-            leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
-            onClick={onEditDetails}
-          >
-            Edit details
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="flex-1"
-            leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
-            onClick={onReupload}
-          >
-            Re-upload invoice
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full"
+          leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+          onClick={onReupload}
+        >
+          Re-upload invoice
+        </Button>
       </div>
     </div>
   );
 }
 
 export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
-  ({ id, value, onChange, invalid, errorId, expected, onCreateInvoice, onEditDetails }, ref) => {
+  ({ id, value, onChange, invalid, errorId, expected, onCreateInvoice }, ref) => {
     const [isDragOver, setIsDragOver] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
     const uploadTokenRef = useRef(0);
@@ -353,7 +338,6 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
             size={value.size}
             missing={value.missing}
             mismatched={value.mismatched}
-            onEditDetails={onEditDetails}
             onReupload={handleReupload}
           />
         ) : value.status === "extracting" ? (

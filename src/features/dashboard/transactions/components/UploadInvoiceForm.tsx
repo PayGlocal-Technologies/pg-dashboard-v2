@@ -6,6 +6,7 @@ import {
   Alert,
   AlertDescription,
   Button,
+  Checkbox,
   DialogDescription,
   Field,
   FieldDescription,
@@ -62,6 +63,7 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
     defaultValues: {
       purposeCode: "",
       invoice: { status: "idle" } as InvoiceUploadState,
+      generateFircWithInvoiceRemitterName: false,
     },
     onSubmit: async ({ value }) => {
       setSaveError(null);
@@ -171,9 +173,6 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
                   // TODO: hand off to the /invoices/create flow and populate
                   // this field with the created invoice once that flow exists.
                 }}
-                onEditDetails={() => {
-                  // TODO: hand off to an edit-transaction-details flow once it exists.
-                }}
               />
               <FieldError id="invoice-error">{field.state.meta.errors[0]}</FieldError>
             </Field>
@@ -191,6 +190,20 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
         >
           {({ purposeCode, invoiceStatus, isSubmitting }) => (
             <>
+              {invoiceStatus === "mismatch" && (
+                <form.Field name="generateFircWithInvoiceRemitterName">
+                  {(field) => (
+                    <label className="mb-3 flex items-start gap-2 text-[12px] text-foreground">
+                      <Checkbox
+                        checked={field.state.value}
+                        onCheckedChange={(checked) => field.handleChange(checked === true)}
+                        className="mt-0.5"
+                      />
+                      Generate FIRC using the &ldquo;Remitter Name&rdquo; mentioned in the invoice
+                    </label>
+                  )}
+                </form.Field>
+              )}
               <div className={cn("flex gap-2", isModal ? "flex-col-reverse sm:flex-row sm:justify-end" : "")}>
                 {onCancel && (
                   <Button type="button" variant="outline" size="sm" onClick={onCancel}>
