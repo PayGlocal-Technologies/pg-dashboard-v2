@@ -203,9 +203,15 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
                   )}
                 </form.Field>
               )}
-              <div className={cn("flex gap-2", isModal ? "flex-col-reverse sm:flex-row sm:justify-end" : "")}>
+              <div className={cn("flex gap-2", isModal ? "flex-col-reverse sm:flex-row" : "")}>
                 {onCancel && (
-                  <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={onCancel}
+                    className={cn(isModal && "flex-1")}
+                  >
                     Cancel
                   </Button>
                 )}
@@ -215,7 +221,7 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
                   size="sm"
                   disabled={!purposeCode || !isInvoiceReady(invoiceStatus)}
                   isLoading={isSubmitting}
-                  className={cn(!isModal && "w-full")}
+                  className={cn(isModal ? "flex-1" : "w-full")}
                 >
                   {isSubmitting
                     ? isModal
@@ -224,7 +230,7 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
                     : invoiceStatus === "mismatch"
                       ? "Submit anyway"
                       : isModal
-                        ? "Save and continue"
+                        ? "Submit"
                         : "Submit"}
                 </Button>
               </div>

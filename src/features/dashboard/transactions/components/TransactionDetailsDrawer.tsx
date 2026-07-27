@@ -11,6 +11,7 @@ import {
   DrawerTitle,
   Separator,
   StatusBadge,
+  useBreakpoint,
   VisuallyHidden,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -171,12 +172,18 @@ export function TransactionDetailsDrawer({
   onUploaded,
   isPartnerUser,
 }: TransactionDetailsDrawerProps) {
+  const { isMobile } = useBreakpoint();
+
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} side="right">
+    <Drawer open={open} onOpenChange={onOpenChange} side={isMobile ? "bottom" : "right"}>
       <DrawerContent
         className={cn(
-          "flex w-[92vw] flex-col gap-0 p-0",
-          "sm:w-[560px] sm:max-w-[560px]",
+          "flex flex-col gap-0 p-0",
+          // Desktop: fixed-width side panel. Mobile: the Drawer's own "bottom"
+          // side classes already provide w-full/max-h/rounded-t/border-t, so
+          // they're left untouched rather than fighting them with a width
+          // override meant for the right-side desktop layout.
+          !isMobile && "w-[92vw] sm:w-[560px] sm:max-w-[560px]",
           // The design system's Drawer always renders its own close button
           // (top-right, raw <button> + lucide icon) with no prop to disable
           // it, so it's hidden here in favor of the standard Button + Icon
