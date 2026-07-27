@@ -13,6 +13,7 @@ import {
   Drawer,
   DrawerContent,
   Field,
+  FieldDescription,
   FieldError,
   FieldLabel,
   useBreakpoint,
@@ -187,6 +188,10 @@ function UploadInvoiceFormBody({
                 <FieldLabel htmlFor="invoice">
                   Invoice <span className="text-destructive">*</span>
                 </FieldLabel>
+                <FieldDescription>
+                  Invoice must match the amount, currency, and sender name. It should also include
+                  the remitter address and item details.
+                </FieldDescription>
                 <InvoiceDropzone
                   ref={dropzoneRef}
                   id="invoice"
