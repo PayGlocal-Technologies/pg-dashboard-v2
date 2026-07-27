@@ -193,11 +193,10 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
               {invoiceStatus === "mismatch" && (
                 <form.Field name="generateFircWithInvoiceRemitterName">
                   {(field) => (
-                    <label className="mb-3 flex items-start gap-2 text-[12px] text-foreground">
+                    <label className="mb-3 flex items-center gap-2 text-[12px] text-foreground">
                       <Checkbox
                         checked={field.state.value}
                         onCheckedChange={(checked) => field.handleChange(checked === true)}
-                        className="mt-0.5"
                       />
                       Generate FIRC using the &ldquo;Remitter Name&rdquo; mentioned in the invoice
                     </label>

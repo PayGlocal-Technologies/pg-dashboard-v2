@@ -67,7 +67,7 @@ function UploadInvoiceFormBody({
       <div className="shrink-0 border-b border-border px-6 pt-5 pb-4">
         <DialogTitle>Upload invoice</DialogTitle>
         <p className="mt-1 truncate text-[12px] leading-snug text-muted-foreground">
-          {row.gid} · {counterpartyName} · {formatCurrency(amount, currency, "en-US")} {currency}
+          {counterpartyName} · {formatCurrency(amount, currency, "en-US")} {currency} · {row.gid}
         </p>
       </div>
 
