@@ -8,7 +8,9 @@ import {
   AccordionTrigger,
   Alert,
   AlertDescription,
+  Button,
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerTitle,
   StatusBadge,
@@ -149,13 +151,23 @@ export function TransactionDetailsDrawer({
         className={cn(
           "flex w-[92vw] flex-col gap-0 p-0",
           "sm:w-[560px] sm:max-w-[560px]",
-          // The design system's Drawer always renders its close button
-          // top-right; this drawer's reference layout puts it top-left, so
-          // it's repositioned via an arbitrary-variant override rather than
-          // building a second close control.
-          "[&>button:last-child]:left-4 [&>button:last-child]:right-auto"
+          // The design system's Drawer always renders its own close button
+          // (top-right, raw <button> + lucide icon) with no prop to disable
+          // it, so it's hidden here in favor of the standard Button + Icon
+          // close control used elsewhere in the app (see WidgetLibraryModal).
+          "[&>button:last-child]:hidden"
         )}
       >
+        <DrawerClose asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Close"
+            className="absolute left-4 top-4 z-10 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Icon name="x" className="h-4 w-4" />
+          </Button>
+        </DrawerClose>
         <DrawerTitle asChild>
           <VisuallyHidden>Transaction details</VisuallyHidden>
         </DrawerTitle>
@@ -190,10 +202,14 @@ function DrawerBody({
     <>
       {/* Header — fixed, non-scrolling. Amount + status are the primary anchor. */}
       <div className="shrink-0 border-b border-border px-6 pt-6 pb-5 pl-12">
-        <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-          <span>Txn ID</span>
-          <CopyableText value={row.gid} />
-          <span className="ml-auto shrink-0">{row.formattedCreationDateTime ?? "—"}</span>
+        <div className="flex justify-end">
+          <div className="flex flex-col items-end gap-0.5 text-[12px] text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <span>Txn ID</span>
+              <CopyableText value={row.gid} />
+            </div>
+            <span>{row.formattedCreationDateTime ?? "—"}</span>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center gap-2.5">
@@ -226,6 +242,7 @@ function DrawerBody({
           />
         )}
 
+        {/* Transaction details — temporarily disabled, kept for later restoration.
         <section>
           <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Transaction details
@@ -248,6 +265,7 @@ function DrawerBody({
             {row.settlementDate && <DetailRow label="Settlement date" value={row.settlementDate} />}
           </div>
         </section>
+        */}
 
         <section>
           <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
