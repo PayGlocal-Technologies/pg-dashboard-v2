@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { Button, DataTable, Tabs, TabsList, TabsTrigger } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  DataTable,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { cn } from "@/lib/utils";
@@ -68,7 +78,7 @@ export function McaTransactionTable() {
   const onCurrency = (v: string) => { setCurrency(v); setPage(1); };
   const onSearch   = (v: string) => { setSearch(v);   setPage(1); };
   const onClear    = () => { setStatus("All"); setCurrency("All"); setSearch(""); setPage(1); };
-  const hasActive  = status !== "All" || currency !== "All" || search !== "";
+  const activeFilterCount = (status !== "All" ? 1 : 0) + (currency !== "All" ? 1 : 0);
 
   const openUploadInvoice = (row: McaTransaction) => {
     setUploadRowId(row.gid);
@@ -98,89 +108,120 @@ export function McaTransactionTable() {
     <div className="space-y-3">
       {/* Search & filter container */}
       <div className="bg-card rounded-xl border border-border">
-        {/* View tabs — an underline-style shortcut onto the same `status` filter
-            state as the "Waiting for Invoice" status pill below, not a separate
-            filter axis. */}
-        <Tabs
-          value={status === "DOCUMENT_PENDING" ? "waiting-for-invoice" : "all"}
-          onValueChange={(v) => onStatus(v === "waiting-for-invoice" ? "DOCUMENT_PENDING" : "All")}
-        >
-          <TabsList className="h-auto w-full justify-start gap-5 rounded-none border-0 border-b border-border bg-transparent p-0 px-4">
-            <TabsTrigger
-              value="all"
-              className="-mb-px h-auto rounded-none border-b-2 border-transparent px-0 py-2.5 text-[13px] font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
-            >
-              All
-            </TabsTrigger>
-            <TabsTrigger
-              value="waiting-for-invoice"
-              className="-mb-px h-auto rounded-none border-b-2 border-transparent px-0 py-2.5 text-[13px] font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
-            >
-              Waiting for Invoice
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        {/* Existing filter row */}
-        <div className="px-4 py-2.5 flex items-center gap-2.5 flex-wrap">
-          <RotatingSearchInput
-            value={search}
-            onSearch={onSearch}
-            words={["remitter", "transaction ID", "UTR"]}
-            className="min-w-[160px] max-w-xs flex-1"
-          />
-
-          <div className="hidden sm:block h-4 w-px bg-border" />
-
-          <div className="flex items-center gap-1 flex-wrap">
-            {MCA_STATUS_FILTERS.map((opt) => (
-              <Button
-                key={opt.value}
-                variant={status === opt.value ? "primary" : "outline"}
-                size="sm"
-                onClick={() => onStatus(opt.value)}
-                className={cn(
-                  "h-auto rounded-full px-2.5 py-1",
-                  status === opt.value
-                    ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
-                    : "text-muted-foreground hover:text-foreground"
-                )}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4">
+          {/* View tabs — an underline-style shortcut onto the same `status`
+              filter state as the "Waiting for Invoice" pill inside the Filter
+              popover, not a separate filter axis. */}
+          <Tabs
+            value={status === "DOCUMENT_PENDING" ? "waiting-for-invoice" : "all"}
+            onValueChange={(v) => onStatus(v === "waiting-for-invoice" ? "DOCUMENT_PENDING" : "All")}
+          >
+            <TabsList className="h-auto justify-start gap-5 rounded-none border-0 bg-transparent p-0">
+              <TabsTrigger
+                value="all"
+                className="-mb-px h-auto rounded-none border-b-2 border-transparent px-0 py-2.5 text-[13px] font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
               >
-                {opt.label}
-              </Button>
-            ))}
-          </div>
-
-          <div className="hidden sm:block h-4 w-px bg-border" />
-
-          <div className="flex items-center gap-1 flex-wrap">
-            {MCA_CURRENCY_FILTERS.map((opt) => (
-              <Button
-                key={opt.value}
-                variant={currency === opt.value ? "primary" : "outline"}
-                size="sm"
-                onClick={() => onCurrency(opt.value)}
-                className={cn(
-                  "h-auto rounded-full px-2.5 py-1",
-                  currency !== opt.value && "text-muted-foreground hover:text-foreground"
-                )}
+                All
+              </TabsTrigger>
+              <TabsTrigger
+                value="waiting-for-invoice"
+                className="-mb-px h-auto rounded-none border-b-2 border-transparent px-0 py-2.5 text-[13px] font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
               >
-                {opt.label}
-              </Button>
-            ))}
-          </div>
+                Waiting for Invoice
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
 
-          {hasActive && (
-            <Button
-              variant="ghost"
-              size="sm"
-              leftIcon={<Icon name="x" className="w-3 h-3" />}
-              onClick={onClear}
-              className="ml-auto text-muted-foreground hover:text-foreground"
-            >
-              Clear
-            </Button>
-          )}
+          {/* Search + Filter — right-aligned, wraps below the tabs on narrow screens. */}
+          <div className="flex items-center gap-2 py-2">
+            <RotatingSearchInput
+              value={search}
+              onSearch={onSearch}
+              words={["remitter", "transaction ID", "UTR"]}
+              className="w-40 sm:w-56"
+            />
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Icon name="filter" className="h-3.5 w-3.5" />}
+                  rightIcon={
+                    activeFilterCount > 0 ? (
+                      <Badge variant="default" size="sm" square>
+                        {activeFilterCount}
+                      </Badge>
+                    ) : undefined
+                  }
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  Filter
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72">
+                <div className="space-y-3">
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Status
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {MCA_STATUS_FILTERS.map((opt) => (
+                        <Button
+                          key={opt.value}
+                          variant={status === opt.value ? "primary" : "outline"}
+                          size="sm"
+                          onClick={() => onStatus(opt.value)}
+                          className={cn(
+                            "h-auto rounded-full px-2.5 py-1",
+                            status === opt.value
+                              ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
+                              : "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {opt.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Currency
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {MCA_CURRENCY_FILTERS.map((opt) => (
+                        <Button
+                          key={opt.value}
+                          variant={currency === opt.value ? "primary" : "outline"}
+                          size="sm"
+                          onClick={() => onCurrency(opt.value)}
+                          className={cn(
+                            "h-auto rounded-full px-2.5 py-1",
+                            currency !== opt.value && "text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {opt.label}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {activeFilterCount > 0 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<Icon name="x" className="w-3 h-3" />}
+                      onClick={onClear}
+                      className="w-full justify-center text-muted-foreground hover:text-foreground"
+                    >
+                      Clear filters
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
 
