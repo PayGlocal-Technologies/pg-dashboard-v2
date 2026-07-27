@@ -19,6 +19,10 @@ import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
+import {
+  MCA_FX_RATES_TO_INR,
+  MCA_PROCESSING_FEE_RATE,
+} from "@/features/dashboard/transactions/constants";
 import type { McaTransaction } from "@/features/dashboard/transactions/types";
 
 interface TransactionDetailsDrawerProps {
@@ -229,8 +233,10 @@ function DrawerBody({
   const counterpartyName = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName ?? "—";
   const amount = parseFloat(row.amount ?? "0");
   const currency = row.currency ?? "USD";
-  const processingFee = parseFloat(row.totalMdrDiscount ?? "0");
-  const netAmount = amount - processingFee;
+  const fxRate = MCA_FX_RATES_TO_INR[currency] ?? 1;
+  const convertedAmount = amount * fxRate;
+  const processingFee = convertedAmount * MCA_PROCESSING_FEE_RATE;
+  const netAmount = convertedAmount - processingFee;
   const timeline = buildTimeline(row);
 
   return (
@@ -253,7 +259,7 @@ function DrawerBody({
       </div>
 
       {/* Body — scrollable sections. */}
-      <div className="flex-1 space-y-6 overflow-y-auto px-6 py-5">
+      <div className="flex-1 space-y-6 overflow-y-auto px-6 pt-6 pb-5">
         {isReversed && (
           <Alert variant="error">
             <AlertDescription>
@@ -292,16 +298,19 @@ function DrawerBody({
             Payment breakdown
           </h3>
           <div>
-            <div className="flex items-center justify-between py-2.5 text-[13px]">
-              <span className="text-muted-foreground">Payment amount</span>
+            <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+              <span className="text-muted-foreground">
+                Payment amount
+                <span className="ml-1 text-[11px]">(using live FX)</span>
+              </span>
               <span className="font-medium tabular-nums text-foreground">
-                {formatCurrency(amount, currency, "en-US")}
+                {formatCurrency(convertedAmount, "INR", "en-IN")}
               </span>
             </div>
             <Separator />
-            <div className="flex items-center justify-between py-2.5 text-[13px]">
+            <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
               <span className="flex items-center gap-1.5 text-muted-foreground">
-                PayGlocal processing fee(s)
+                PayGlocal processing fee
                 <Button
                   type="button"
                   variant="link"
@@ -315,14 +324,14 @@ function DrawerBody({
                 </Button>
               </span>
               <span className="font-medium tabular-nums text-foreground">
-                − {formatCurrency(processingFee, currency, "en-US")}
+                − {formatCurrency(processingFee, "INR", "en-IN")}
               </span>
             </div>
             <Separator />
-            <div className="flex items-center justify-between py-2.5 text-[13px]">
-              <span className="font-semibold text-foreground">Net amount</span>
+            <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+              <span className="font-semibold text-foreground">Net settlement amount</span>
               <span className="font-semibold tabular-nums text-foreground">
-                {formatCurrency(netAmount, currency, "en-US")}
+                {formatCurrency(netAmount, "INR", "en-IN")}
               </span>
             </div>
           </div>
