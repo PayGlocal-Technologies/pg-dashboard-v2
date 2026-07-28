@@ -5,7 +5,6 @@ import type { ReactNode } from "react";
 import { type Column, StatusBadge, Button } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { Icon } from "@/components/icon";
-import { CopyableText } from "@/components/common/CopyableText";
 import { formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { COUNTRY_NAME_MAP } from "@/features/dashboard/transactions/constants";
@@ -16,7 +15,7 @@ import { useApp } from "@/stores/useApp";
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
 const MCA_STATUS_META: Record<string, StatusMeta> = {
-  DOCUMENT_PENDING: { label: "Waiting for Invoice", variant: "warning" },
+  DOCUMENT_PENDING: { label: "Invoice Pending", variant: "warning" },
   FUNDS_ON_HOLD: { label: "Funds on Hold", variant: "warning" },
   SENT_FOR_REVIEW: { label: "Sent for Review", variant: "warning", trailIcon: "clock" },
   SENT_FOR_SETTLEMENT: { label: "Sent for Settlement", variant: "warning" },
@@ -31,10 +30,10 @@ export function getStatusMeta(raw: string, isFrmPending: boolean): StatusMeta {
   return MCA_STATUS_META[raw] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
 }
 
-// A transaction is "Waiting for Invoice" exactly when its Settlement Status
+// A transaction is "Invoice Pending" exactly when its Settlement Status
 // badge reads that label — i.e. not FRM-pending and externalStatus is
 // DOCUMENT_PENDING. Deriving it from the same inputs as getStatusMeta keeps
-// the Action column's CTA choice in sync with what the Settlement Status
+// the Actions column's CTA choice in sync with what the Settlement Status
 // column actually displays.
 export function isWaitingForInvoice(row: McaTransaction): boolean {
   const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
@@ -43,9 +42,9 @@ export function isWaitingForInvoice(row: McaTransaction): boolean {
 
 // ── Row-click wrapper ──────────────────────────────────────────────────────────
 // Wraps non-interactive cell content so clicking anywhere in the cell opens the
-// transaction details drawer. Deliberately not used on the Transaction ID or
-// Action columns — those already carry their own click targets (copy, upload/
-// view invoice) and shouldn't compete with a row-level click.
+// transaction details drawer. Deliberately not used on the Actions column —
+// it already carries its own click targets (upload/view invoice) and
+// shouldn't compete with a row-level click.
 function RowClick({
   row,
   onOpenDetails,
@@ -114,9 +113,11 @@ function handleViewInvoice(row: McaTransaction) {
 }
 
 // ── Column definitions ────────────────────────────────────────────────────────
+// Upload Invoice now opens the Transaction Details Drawer (its inline upload
+// flow) rather than the standalone modal, so the Actions column only needs
+// onOpenDetails — see McaTransactionTable's commented-out modal wiring.
 export function buildMcaColumns(
   isPartnerUser: boolean,
-  onUploadInvoice: (row: McaTransaction) => void,
   onOpenDetails: (row: McaTransaction) => void
 ): Column<McaTransaction>[] {
   const cols: Column<McaTransaction>[] = [
@@ -141,29 +142,18 @@ export function buildMcaColumns(
       },
     },
     {
-      key: "partnerMaskedCustomerFullName",
-      header: "Remitter Name",
-      minWidth: 200,
+      key: "externalStatus",
+      header: "Settlement Status",
+      minWidth: 170,
       render: (row) => {
-        const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
+        const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
+        const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
         return (
           <RowClick row={row} onOpenDetails={onOpenDetails}>
-            <span className="block w-[170px] truncate text-[13px] text-foreground">
-              {name ?? "—"}
-            </span>
+            <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />
           </RowClick>
         );
       },
-    },
-    {
-      key: "gid",
-      header: "Transaction ID",
-      minWidth: 108,
-      render: (row) => (
-        <div className="w-[108px]">
-          <CopyableText value={row.gid} variant="cell" />
-        </div>
-      ),
     },
     {
       key: "formattedCreationDateTime",
@@ -192,22 +182,23 @@ export function buildMcaColumns(
       ),
     },
     {
-      key: "externalStatus",
-      header: "Settlement Status",
-      minWidth: 170,
+      key: "partnerMaskedCustomerFullName",
+      header: "Remitter Name",
+      minWidth: 200,
       render: (row) => {
-        const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
-        const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
+        const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
         return (
           <RowClick row={row} onOpenDetails={onOpenDetails}>
-            <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />
+            <span className="block w-[150px] truncate text-[13px] text-foreground">
+              {name ?? "—"}
+            </span>
           </RowClick>
         );
       },
     },
     {
       key: "action",
-      header: "Action",
+      header: "Actions",
       minWidth: 170,
       align: "left",
       render: (row) => {
@@ -217,7 +208,7 @@ export function buildMcaColumns(
               variant="outline"
               size="sm"
               leftIcon={<Icon name="upload" className="w-3 h-3" />}
-              onClick={() => onUploadInvoice(row)}
+              onClick={() => onOpenDetails(row)}
               className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
             >
               Upload Invoice
@@ -225,12 +216,14 @@ export function buildMcaColumns(
           );
         }
         return (
+          // Hidden until the row is hovered/focused — opacity-only (no
+          // display/width change) so revealing it never shifts the layout.
           <Button
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="eye" className="w-3 h-3" />}
             onClick={() => handleViewInvoice(row)}
-            className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+            className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
           >
             View Invoice
           </Button>
@@ -241,7 +234,7 @@ export function buildMcaColumns(
 
   if (!isPartnerUser) return cols;
 
-  cols.splice(3, 0, {
+  cols.splice(4, 0, {
     key: "merchantId",
     header: "Merchant ID",
     minWidth: 145,

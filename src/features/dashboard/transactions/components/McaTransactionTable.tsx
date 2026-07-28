@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import {
   Badge,
   Button,
+  Checkbox,
   DataTable,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Separator,
   Tabs,
   TabsList,
   TabsTrigger,
@@ -21,7 +23,9 @@ import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
-import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
+// Upload Invoice now opens the drawer instead of this modal — import kept
+// commented out (not deleted) alongside the modal's usage below.
+// import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
 import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
 import {
   MCA_STATUS_FILTERS,
@@ -31,9 +35,108 @@ import {
 import type { McaTransaction, McaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
 
 const VIEW_TABS = [
+  { value: "invoice-pending", label: "Invoice Pending" },
   { value: "all", label: "All" },
-  { value: "waiting-for-invoice", label: "Waiting for Invoice" },
+  { value: "settled", label: "Settled" },
 ] as const;
+
+// externalStatus values each view tab (other than "All") maps onto — kept
+// distinct from MCA_STATUS_FILTERS since "Settled" here intentionally covers
+// both terminal-success statuses, not a single Filter-panel checkbox value.
+const INVOICE_PENDING_STATUSES = ["DOCUMENT_PENDING"];
+const SETTLED_STATUSES = ["SETTLED", "FIRC_SETTLED"];
+
+function sameStatusSet(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v) => b.includes(v));
+}
+
+// ── Filter categories — left column of the filter flyout. Adding a new
+// filterable field is just one more entry here; the panel scales without
+// layout changes since options render in the shared right column. ──────────
+type FilterCategoryKey = "status" | "currency";
+
+const FILTER_CATEGORIES: { key: FilterCategoryKey; label: string; options: { value: string; label: string }[] }[] = [
+  { key: "status", label: "Status", options: MCA_STATUS_FILTERS.filter((o) => o.value !== "All") },
+  { key: "currency", label: "Currency", options: MCA_CURRENCY_FILTERS.filter((o) => o.value !== "All") },
+];
+
+// Two-column filter flyout: categories on the left (hover/click to preview),
+// that category's multi-select options on the right. Selections for every
+// category persist across hovers since state lives in the parent, not here.
+function TransactionFilterPanel({
+  selected,
+  onToggle,
+  onClear,
+}: {
+  selected: Record<FilterCategoryKey, string[]>;
+  onToggle: (category: FilterCategoryKey, value: string) => void;
+  onClear: () => void;
+}) {
+  const [activeCategory, setActiveCategory] = useState<FilterCategoryKey>("status");
+  const activeOptions = FILTER_CATEGORIES.find((c) => c.key === activeCategory)?.options ?? [];
+  const totalSelected = FILTER_CATEGORIES.reduce((sum, c) => sum + selected[c.key].length, 0);
+
+  return (
+    <div className="w-72 p-3">
+      <div className="flex">
+        <div className="w-28 shrink-0 border-r border-border py-1.5">
+          {FILTER_CATEGORIES.map((category) => (
+            <button
+              key={category.key}
+              type="button"
+              onMouseEnter={() => setActiveCategory(category.key)}
+              onClick={() => setActiveCategory(category.key)}
+              className={cn(
+                "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors",
+                activeCategory === category.key
+                  ? "bg-muted font-medium text-foreground"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+            >
+              <span>{category.label}</span>
+              {selected[category.key].length > 0 && (
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
+              )}
+            </button>
+          ))}
+        </div>
+
+        <div className="min-h-40 flex-1 py-1.5 pl-2">
+          {activeOptions.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
+            >
+              <Checkbox
+                checked={selected[activeCategory].includes(option.value)}
+                onCheckedChange={() => onToggle(activeCategory, option.value)}
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div className="flex items-center justify-between px-1 pt-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="x" className="w-3 h-3" />}
+          onClick={onClear}
+          disabled={totalSelected === 0}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Clear filters
+        </Button>
+        {totalSelected > 0 && (
+          <span className="pr-1 text-[11px] text-muted-foreground">{totalSelected} selected</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // A single shared active indicator that slides between tabs, rather than each
 // tab drawing its own underline. Its position/width are measured from the DOM
@@ -100,22 +203,26 @@ export function McaTransactionTable() {
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
 
   const [search, setSearch]     = useState("");
-  const [status, setStatus]     = useState("All");
-  const [currency, setCurrency] = useState("All");
+  const [statusFilters, setStatusFilters]     = useState<string[]>([]);
+  const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [page, setPage]         = useState(1);
 
   const [statusOverrides, setStatusOverrides] = useState<Record<string, Partial<McaTransaction>>>({});
 
-  const [uploadRowId, setUploadRowId] = useState<string | null>(null);
-  const [uploadOpen, setUploadOpen]   = useState(false);
+  // Upload Invoice modal — superseded by the drawer's inline upload flow
+  // (Upload Invoice now opens the Transaction Details Drawer). Kept
+  // commented out, not deleted, so it can be restored if needed.
+  // const [uploadRowId, setUploadRowId] = useState<string | null>(null);
+  // const [uploadOpen, setUploadOpen]   = useState(false);
 
   const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen]   = useState(false);
 
-  const externalStatus = status   !== "All" ? [status]    : undefined;
-  const currencyFilter = currency !== "All" ? [currency]  : undefined;
   const body = buildTxnRequestBody(
-    { externalStatus, currency: currencyFilter },
+    {
+      externalStatus: statusFilters.length ? statusFilters : undefined,
+      currency: currencyFilters.length ? currencyFilters : undefined,
+    },
     {
       searchQuery: search || undefined,
       selectedMid: midFilter,
@@ -136,19 +243,29 @@ export function McaTransactionTable() {
   const rows       = rawRows.map((r) => (statusOverrides[r.gid] ? { ...r, ...statusOverrides[r.gid] } : r));
   const totalCount = data?.data?.totalCount ?? 0;
 
-  const uploadRow  = rows.find((r) => r.gid === uploadRowId) ?? null;
+  // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
   const detailsRow = rows.find((r) => r.gid === detailsRowId) ?? null;
 
-  const onStatus   = (v: string) => { setStatus(v);   setPage(1); };
-  const onCurrency = (v: string) => { setCurrency(v); setPage(1); };
-  const onSearch   = (v: string) => { setSearch(v);   setPage(1); };
-  const onClear    = () => { setStatus("All"); setCurrency("All"); setSearch(""); setPage(1); };
-  const activeFilterCount = (status !== "All" ? 1 : 0) + (currency !== "All" ? 1 : 0);
+  const onSearch = (v: string) => { setSearch(v); setPage(1); };
 
-  const openUploadInvoice = (row: McaTransaction) => {
-    setUploadRowId(row.gid);
-    setUploadOpen(true);
+  const toggleFilter = (category: FilterCategoryKey, value: string) => {
+    const setter = category === "status" ? setStatusFilters : setCurrencyFilters;
+    setter((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+    setPage(1);
   };
+
+  const onClearFilters = () => {
+    setStatusFilters([]);
+    setCurrencyFilters([]);
+    setPage(1);
+  };
+
+  const activeFilterCount = statusFilters.length + currencyFilters.length;
+
+  // const openUploadInvoice = (row: McaTransaction) => {
+  //   setUploadRowId(row.gid);
+  //   setUploadOpen(true);
+  // };
 
   const openDetails = (row: McaTransaction) => {
     setDetailsRowId(row.gid);
@@ -167,19 +284,34 @@ export function McaTransactionTable() {
     }));
   };
 
-  const columns = buildMcaColumns(isPartnerUser, openUploadInvoice, openDetails);
+  const columns = buildMcaColumns(isPartnerUser, openDetails);
 
   return (
     <div className="space-y-3">
       {/* Search & filter container */}
       <div className="bg-card rounded-xl border border-border">
         <div className="relative flex flex-wrap items-center justify-between gap-3 px-4">
-          {/* View tabs — an underline-style shortcut onto the same `status`
-              filter state as the "Waiting for Invoice" pill inside the Filter
-              popover, not a separate filter axis. */}
+          {/* View tabs — an underline-style shortcut onto the same status
+              filter state as the "Invoice Pending" option inside the Filter
+              flyout, not a separate filter axis. */}
           <TransactionViewTabs
-            value={status === "DOCUMENT_PENDING" ? "waiting-for-invoice" : "all"}
-            onValueChange={(v) => onStatus(v === "waiting-for-invoice" ? "DOCUMENT_PENDING" : "All")}
+            value={
+              sameStatusSet(statusFilters, INVOICE_PENDING_STATUSES)
+                ? "invoice-pending"
+                : sameStatusSet(statusFilters, SETTLED_STATUSES)
+                  ? "settled"
+                  : "all"
+            }
+            onValueChange={(v) => {
+              setStatusFilters(
+                v === "invoice-pending"
+                  ? INVOICE_PENDING_STATUSES
+                  : v === "settled"
+                    ? SETTLED_STATUSES
+                    : []
+              );
+              setPage(1);
+            }}
           />
 
           {/* Search + Filter — right-aligned, wraps below the tabs on narrow screens. */}
@@ -209,66 +341,12 @@ export function McaTransactionTable() {
                   Filter
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-72">
-                <div className="space-y-3">
-                  <div>
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Status
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {MCA_STATUS_FILTERS.map((opt) => (
-                        <Button
-                          key={opt.value}
-                          variant={status === opt.value ? "primary" : "outline"}
-                          size="sm"
-                          onClick={() => onStatus(opt.value)}
-                          className={cn(
-                            "h-auto rounded-full px-2.5 py-1",
-                            status === opt.value
-                              ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
-                              : "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {opt.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      Currency
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                      {MCA_CURRENCY_FILTERS.map((opt) => (
-                        <Button
-                          key={opt.value}
-                          variant={currency === opt.value ? "primary" : "outline"}
-                          size="sm"
-                          onClick={() => onCurrency(opt.value)}
-                          className={cn(
-                            "h-auto rounded-full px-2.5 py-1",
-                            currency !== opt.value && "text-muted-foreground hover:text-foreground"
-                          )}
-                        >
-                          {opt.label}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {activeFilterCount > 0 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leftIcon={<Icon name="x" className="w-3 h-3" />}
-                      onClick={onClear}
-                      className="w-full justify-center text-muted-foreground hover:text-foreground"
-                    >
-                      Clear filters
-                    </Button>
-                  )}
-                </div>
+              <PopoverContent align="end" className="w-auto p-0">
+                <TransactionFilterPanel
+                  selected={{ status: statusFilters, currency: currencyFilters }}
+                  onToggle={toggleFilter}
+                  onClear={onClearFilters}
+                />
               </PopoverContent>
             </Popover>
           </div>
@@ -304,12 +382,15 @@ export function McaTransactionTable() {
         />
       )}
 
+      {/* Upload Invoice now opens the drawer's inline upload flow instead of
+          this modal — commented out, not deleted, so it can be restored.
       <UploadInvoiceModal
         row={uploadRow}
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         onUploaded={handleInvoiceSubmitted}
       />
+      */}
 
       <TransactionDetailsDrawer
         row={detailsRow}

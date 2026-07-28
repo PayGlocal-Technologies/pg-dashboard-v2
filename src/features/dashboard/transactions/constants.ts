@@ -35,7 +35,7 @@ export const PA_METHOD_FILTERS: FilterOption[] = [
 // ── MCA status pills ──────────────────────────────────────────────────────────
 export const MCA_STATUS_FILTERS: FilterOption[] = [
   { value: "All",              label: "All" },
-  { value: "DOCUMENT_PENDING", label: "Waiting for Invoice" },
+  { value: "DOCUMENT_PENDING", label: "Invoice Pending" },
   { value: "SENT_FOR_REVIEW",  label: "In Review" },
   { value: "SETTLED",          label: "Settled" },
   { value: "FIRC_SETTLED",     label: "FIRC Settled" },

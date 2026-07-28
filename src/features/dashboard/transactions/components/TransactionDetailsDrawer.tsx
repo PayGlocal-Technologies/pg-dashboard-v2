@@ -75,7 +75,7 @@ const SETTLED_STEP_INDEX = 5;
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
 
-// Index of "Waiting for invoice" within buildTimeline's `labels` array below —
+// Index of "Invoice pending" within buildTimeline's `labels` array below —
 // the step that's active (blue dot) while a transaction needs an invoice, and
 // the step the inline Upload Invoice form nests under.
 const WAITING_FOR_INVOICE_STEP_INDEX = 1;
@@ -88,8 +88,8 @@ const WAITING_FOR_INVOICE_STEP_INDEX = 1;
 function getCurrentStepIndex(row: McaTransaction): number {
   const { externalStatus, frmStatus } = row;
 
-  // Waiting for Invoice (DOCUMENT_PENDING) and Action Required (FRM pending)
-  // must always show "Waiting for invoice" as the active step, checked before
+  // Invoice Pending (DOCUMENT_PENDING) and Action Required (FRM pending)
+  // must always show "Invoice pending" as the active step, checked before
   // anything else — frmStatus can independently read APPROVED/REVIEW_IN_PROGRESS
   // for a transaction whose invoice still hasn't been submitted, which would
   // otherwise fast-forward the timeline past a step that hasn't happened yet.
@@ -117,7 +117,7 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
 
   const labels = [
     `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} received in virtual account`,
-    "Waiting for invoice",
+    "Invoice pending",
     "Invoice review",
     "Transfer initiated to PayGlocal's India partner bank",
     "Converted to INR",
