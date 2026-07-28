@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import {
   Alert,
   AlertDescription,
+  Badge,
   Button,
   Drawer,
   DrawerClose,
@@ -38,7 +39,39 @@ type StepStatus = "completed" | "current" | "upcoming";
 interface TimelineStep {
   label: string;
   status: StepStatus;
+  timestamp: string;
 }
+
+// Parses the app's "DD/MM/YYYY HH:mm:ss" display format. Date.parse can't be
+// trusted with slash-separated dates (it assumes MM/DD/YYYY in en-US), so this
+// is matched manually.
+function parseDisplayDateTime(display: string | undefined | null): Date | null {
+  if (!display) return null;
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy, hh, min, ss] = match;
+  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function pad(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+function formatDDMMYYYYHHmmss(date: Date): string {
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+// Minutes after the transaction's creation time each settlement step
+// realistically lands at — used to fill in a plausible, chronologically
+// increasing timestamp per step when the API doesn't expose per-substage
+// times (see getCurrentStepIndex's note on steps 3-5).
+const STEP_OFFSET_MINUTES = [0, 4, 95, 1440, 1470, 1500, 2820];
+
+// Index of the step whose timestamp represents "funds settled" for the
+// Settlement chip — the transfer to the merchant's bank account completing,
+// one step before FIRC issuance.
+const SETTLED_STEP_INDEX = 5;
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
 
@@ -92,9 +125,18 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
     "FIRC issuance",
   ];
 
+  // Anchor the whole timeline to the transaction's own creation time when it
+  // parses cleanly; otherwise fall back to a deterministic pseudo date (from
+  // the gid, like acctSuffix above) so the dummy timestamps stay stable
+  // across re-renders instead of drifting on every render.
+  const baseDate =
+    parseDisplayDateTime(row.formattedCreationDateTime) ??
+    new Date(2026, 0, 1 + (Number(acctDigits.slice(0, 2)) % 28), 9, 0, 0);
+
   return labels.map((label, i) => ({
     label,
     status: i < currentIndex ? "completed" : i === currentIndex ? "current" : "upcoming",
+    timestamp: formatDDMMYYYYHHmmss(new Date(baseDate.getTime() + STEP_OFFSET_MINUTES[i] * 60_000)),
   }));
 }
 
@@ -137,6 +179,7 @@ function TimelineItem({
         >
           {step.label}
         </p>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">{step.timestamp}</p>
         {content && (
           <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4">{content}</div>
         )}
@@ -246,6 +289,7 @@ function DrawerBody({
   const processingFee = convertedAmount * MCA_PROCESSING_FEE_RATE;
   const netAmount = convertedAmount - processingFee;
   const timeline = buildTimeline(row);
+  const settledOnTimestamp = timeline[SETTLED_STEP_INDEX]?.timestamp;
 
   return (
     <>
@@ -263,6 +307,11 @@ function DrawerBody({
             <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
             <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
           </p>
+          {isSettled && settledOnTimestamp && (
+            <Badge variant="secondary" size="sm">
+              Settled on: {settledOnTimestamp}
+            </Badge>
+          )}
         </div>
       </div>
 
