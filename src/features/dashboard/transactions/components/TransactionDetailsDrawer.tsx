@@ -1,24 +1,21 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import {
   Alert,
   AlertDescription,
   Badge,
   Button,
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerTitle,
   Separator,
   StatusBadge,
-  useBreakpoint,
   VisuallyHidden,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
+import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import {
@@ -74,6 +71,14 @@ const STEP_OFFSET_MINUTES = [0, 4, 95, 1440, 1470, 1500, 2820];
 const SETTLED_STEP_INDEX = 5;
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
+
+// Locks/restores the content area's own scroll while the drawer is open — a
+// plain DOM mutation, kept in its own function (rather than inline in the
+// effect) since the target element comes from a hook and React Compiler's
+// lint forbids mutating a hook-returned value directly.
+function setContentAreaOverflow(el: HTMLElement, value: string): void {
+  el.style.overflow = value;
+}
 
 // Index of "Invoice pending" within buildTimeline's `labels` array below —
 // the step that's active (blue dot) while a transaction needs an invoice, and
@@ -217,52 +222,68 @@ export function TransactionDetailsDrawer({
   onUploaded,
   isPartnerUser,
 }: TransactionDetailsDrawerProps) {
-  const { isMobile } = useBreakpoint();
+  // Portals into the dashboard's main content area (below the top nav, right
+  // of the sidebar — see ContentAreaContext) instead of document.body, so the
+  // drawer behaves as an overlay scoped to that region rather than a
+  // full-screen modal: the sidebar and top nav are never covered and stay
+  // interactive. `modal={false}` opts out of Radix's default document-wide
+  // scroll lock/pointer-blocking so it can be applied to just that region
+  // below instead.
+  const contentEl = useContentAreaElement();
+
+  useEffect(() => {
+    if (!contentEl || !open) return;
+    const previousOverflow = contentEl.style.overflow;
+    setContentAreaOverflow(contentEl, "hidden");
+    return () => {
+      setContentAreaOverflow(contentEl, previousOverflow);
+    };
+  }, [contentEl, open]);
+
+  if (!contentEl) return null;
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange} side={isMobile ? "bottom" : "right"}>
-      <DrawerContent
-        className={cn(
-          "flex flex-col gap-0 p-0",
-          // Desktop: fixed-width side panel. Mobile: the Drawer's own "bottom"
-          // side classes already provide w-full/max-h/rounded-t/border-t, so
-          // they're left untouched rather than fighting them with a width
-          // override meant for the right-side desktop layout.
-          !isMobile && "w-[92vw] sm:w-[560px] sm:max-w-[560px]",
-          // The design system's Drawer always renders its own close button
-          // (top-right, raw <button> + lucide icon) with no prop to disable
-          // it, so it's hidden here in favor of the standard Button + Icon
-          // close control used elsewhere in the app (see WidgetLibraryModal).
-          "[&>button:last-child]:hidden"
-        )}
-      >
-        <DrawerTitle asChild>
-          <VisuallyHidden>Transaction details</VisuallyHidden>
-        </DrawerTitle>
-
-        {/* Header container — close button + Transaction ID, horizontally aligned. */}
-        <div className="flex shrink-0 items-center justify-between px-6 pt-4 pb-3">
-          <DrawerClose asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label="Close"
-              className="-ml-2 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Icon name="x" className="h-4 w-4" />
-            </Button>
-          </DrawerClose>
-          {row && (
-            <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <span>Txn ID</span>
-              <CopyableText value={row.gid} />
-            </div>
+    <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
+      <Dialog.Portal container={contentEl}>
+        <Dialog.Overlay
+          onClick={() => onOpenChange(false)}
+          className="absolute inset-0 z-40 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        />
+        <Dialog.Content
+          className={cn(
+            "absolute inset-x-4 md:inset-x-6 bottom-0 z-50 flex max-h-[85%] flex-col gap-0 rounded-t-2xl border-t border-border bg-card shadow-xl transition-all duration-pg-normal ease-pg-standard",
+            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200",
+            "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
           )}
-        </div>
+        >
+          <Dialog.Title asChild>
+            <VisuallyHidden>Transaction details</VisuallyHidden>
+          </Dialog.Title>
 
-        {row && <DrawerBody row={row} onOpenChange={onOpenChange} onUploaded={onUploaded} isPartnerUser={isPartnerUser} />}
-      </DrawerContent>
-    </Drawer>
+          {/* Header container — close button + Transaction ID, horizontally aligned. */}
+          <div className="flex shrink-0 items-center justify-between px-6 pt-4 pb-3">
+            <Dialog.Close asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                aria-label="Close"
+                className="-ml-2 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Icon name="x" className="h-4 w-4" />
+              </Button>
+            </Dialog.Close>
+            {row && (
+              <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                <span>Txn ID</span>
+                <CopyableText value={row.gid} />
+              </div>
+            )}
+          </div>
+
+          {row && <DrawerBody row={row} onOpenChange={onOpenChange} onUploaded={onUploaded} isPartnerUser={isPartnerUser} />}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
