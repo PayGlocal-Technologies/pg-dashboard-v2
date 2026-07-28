@@ -49,7 +49,7 @@ export function CopyableText({ value, className, variant = "inline" }: CopyableT
                 className
               )}
             >
-              <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-foreground">
+              <span className="min-w-0 flex-1 truncate font-mono text-[13px] text-primary group-hover:underline">
                 {value}
               </span>
               <Icon
