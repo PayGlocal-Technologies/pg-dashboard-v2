@@ -140,12 +140,14 @@ export function buildMcaColumns(
     {
       key: "partnerMaskedCustomerFullName",
       header: "Remitter Name",
-      minWidth: 155,
+      minWidth: 200,
       render: (row) => {
         const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
         return (
           <RowClick row={row} onOpenDetails={onOpenDetails}>
-            <span className="text-[13px] text-foreground whitespace-nowrap">{name ?? "—"}</span>
+            <span className="block w-[170px] truncate text-[13px] text-foreground">
+              {name ?? "—"}
+            </span>
           </RowClick>
         );
       },
@@ -153,8 +155,12 @@ export function buildMcaColumns(
     {
       key: "gid",
       header: "Transaction ID",
-      minWidth: 170,
-      render: (row) => <CopyableText value={row.gid} />,
+      minWidth: 108,
+      render: (row) => (
+        <div className="w-[108px]">
+          <CopyableText value={row.gid} variant="cell" />
+        </div>
+      ),
     },
     {
       key: "formattedCreationDateTime",
