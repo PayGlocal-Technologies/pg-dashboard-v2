@@ -91,13 +91,16 @@ export function CountryCell({ iso2 }: { iso2?: string | null }) {
   const flagSrc = `https://static.payglocal.in/images/flags/${resolvedIso2.toLowerCase()}.svg`;
 
   return (
-    <div className="flex items-center gap-1.5">
+    // min-w-max: the cell's own natural (max-content) width is never allowed
+    // to shrink below the flag+name's combined width, so the column always
+    // widens to fit the longest country name instead of clipping it.
+    <div className="flex min-w-max items-center gap-1.5">
       <Image
         src={flagSrc}
         alt={name}
         width={20}
         height={14}
-        className="h-3.5 w-5 rounded-sm border border-border object-cover"
+        className="h-3.5 w-5 shrink-0 rounded-sm border border-border object-cover"
         unoptimized
       />
       <span className="text-[13px] text-muted-foreground whitespace-nowrap">{name}</span>
@@ -178,6 +181,10 @@ export function buildMcaColumns(
       key: "partnerCustomerCountry",
       header: "Country",
       minWidth: 140,
+      // DataTable's compact-density cells always add overflow-hidden; this
+      // column's content must never clip, so it's cancelled here specifically
+      // (min-w-max on CountryCell above is what actually grows the column).
+      cellClassName: "overflow-visible",
       render: (row) => (
         <RowClick row={row} onOpenDetails={onOpenDetails}>
           <CountryCell iso2={row.partnerCustomerCountry} />

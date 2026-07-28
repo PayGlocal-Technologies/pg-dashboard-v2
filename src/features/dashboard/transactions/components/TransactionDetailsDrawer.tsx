@@ -297,21 +297,23 @@ function DrawerBody({
       <div className="shrink-0 border-b border-border px-6 pt-1 pb-5">
         <div className="flex flex-col items-start gap-1.5">
           <CountryCell iso2={row.partnerCustomerCountry} />
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-[26px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(amount, currency, "en-US")}
-            </span>
-            <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
+          <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-[26px] font-semibold tabular-nums text-foreground">
+                {formatCurrency(amount, currency, "en-US")}
+              </span>
+              <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
+            </div>
+            {isSettled && settledOnTimestamp && (
+              <Badge variant="secondary" size="sm">
+                Settled on: {settledOnTimestamp}
+              </Badge>
+            )}
           </div>
           <p className="text-[13px] leading-snug">
             <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
             <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
           </p>
-          {isSettled && settledOnTimestamp && (
-            <Badge variant="secondary" size="sm">
-              Settled on: {settledOnTimestamp}
-            </Badge>
-          )}
         </div>
       </div>
 

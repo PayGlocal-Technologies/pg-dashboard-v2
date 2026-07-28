@@ -173,7 +173,7 @@ export function McaTransactionTable() {
     <div className="space-y-3">
       {/* Search & filter container */}
       <div className="bg-card rounded-xl border border-border">
-        <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-border px-4">
+        <div className="relative flex flex-wrap items-center justify-between gap-3 px-4">
           {/* View tabs — an underline-style shortcut onto the same `status`
               filter state as the "Waiting for Invoice" pill inside the Filter
               popover, not a separate filter axis. */}
