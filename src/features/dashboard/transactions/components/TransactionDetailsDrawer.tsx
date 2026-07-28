@@ -179,7 +179,9 @@ function TimelineItem({
         >
           {step.label}
         </p>
-        <p className="mt-0.5 text-[11px] text-muted-foreground">{step.timestamp}</p>
+        {step.status === "completed" && (
+          <p className="mt-0.5 text-[11px] text-muted-foreground">{step.timestamp}</p>
+        )}
         {content && (
           <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4">{content}</div>
         )}
