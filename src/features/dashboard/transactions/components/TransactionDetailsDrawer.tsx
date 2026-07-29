@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   Alert,
@@ -240,18 +240,43 @@ export function TransactionDetailsDrawer({
     };
   }, [contentEl, open]);
 
+  // Radix's own `Dialog.Overlay` only renders when `modal` is true (it
+  // returns null otherwise — see @radix-ui/react-dialog's DialogOverlay), so
+  // it can't be used here: `modal={true}` would also turn on Radix's
+  // document-wide focus trap/pointer-blocking, which is exactly what
+  // `modal={false}` above is opting out of to keep the sidebar and top nav
+  // interactive. This plain div reproduces the design system's own overlay
+  // (flux-ui's DialogOverlay: bg-black/50 + backdrop-blur-[2px]) and its
+  // enter/exit animation classes, staying mounted through the exit animation
+  // the same way Radix's Presence does, so it fades out in step with the
+  // drawer's slide-out instead of disappearing instantly.
+  const [overlayMounted, setOverlayMounted] = useState(open);
+  // Adjusting state during render (not in an effect) to reset it the instant
+  // `open` flips true — React's documented pattern for this exact case
+  // ("Storing information from previous renders"), which avoids the extra
+  // render-then-effect round trip a useEffect here would add.
+  if (open && !overlayMounted) {
+    setOverlayMounted(true);
+  }
+
   if (!contentEl) return null;
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <Dialog.Portal container={contentEl}>
-        <Dialog.Overlay
-          onClick={() => onOpenChange(false)}
-          className="absolute inset-0 z-40 bg-black/50 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-        />
+        {overlayMounted && (
+          <div
+            data-state={open ? "open" : "closed"}
+            onClick={() => onOpenChange(false)}
+            onAnimationEnd={() => {
+              if (!open) setOverlayMounted(false);
+            }}
+            className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+          />
+        )}
         <Dialog.Content
           className={cn(
-            "absolute inset-x-4 md:inset-x-6 bottom-0 z-50 flex max-h-[85%] flex-col gap-0 rounded-t-2xl border-t border-border bg-card shadow-xl transition-all duration-pg-normal ease-pg-standard",
+            "absolute inset-0 z-[101] flex flex-col gap-0 rounded-t-2xl border-t border-border bg-card shadow-xl transition-all duration-pg-normal ease-pg-standard",
             "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200",
             "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
           )}
