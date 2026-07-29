@@ -399,6 +399,7 @@ export function TransactionDetailsPage({
                   <DetailRow label="Settlement date" value={formatTransactionTimestamp(row.settlementDate)} />
                 )}
                 <DetailRow label="Payment method" value={<PaymentMethodPlaceholder gid={row.gid} />} />
+                <DetailRow label="Currency" value={currency} />
                 <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
               </div>
             </div>
@@ -410,7 +411,6 @@ export function TransactionDetailsPage({
               <div className="space-y-4">
                 <DetailRow label="Remitter name" value={counterpartyName} />
                 <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
-                <DetailRow label="Currency" value={currency} />
                 {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
               </div>
             </div>

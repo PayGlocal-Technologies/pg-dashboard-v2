@@ -217,13 +217,22 @@ export function formatTransactionDateTime(date: Date): string {
 }
 
 /**
- * Reformats one of the API's raw "DD/MM/YYYY HH:mm:ss" strings into
- * formatTransactionDateTime's display format; falls back to the raw string
- * when it doesn't match that shape rather than showing nothing.
+ * Reformats a transaction timestamp into formatTransactionDateTime's display
+ * format. The transactions API is inconsistent about the shape it sends
+ * these in — formattedCreationDateTime comes as "DD/MM/YYYY HH:mm:ss", but
+ * settlementDate comes as a raw ISO 8601 string (e.g.
+ * "2026-07-22T09:36:55.553580498Z") — so both are tried before falling back
+ * to the raw string rather than showing nothing.
  */
 export function formatTransactionTimestamp(raw: string | null | undefined): string {
-  const parsed = parseApiDateTime(raw);
-  return parsed ? formatTransactionDateTime(parsed) : (raw ?? "—");
+  if (!raw) return "—";
+  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  return parsed ? formatTransactionDateTime(parsed) : raw;
+}
+
+function parseIsoDateTime(raw: string): Date | null {
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function truncate(str: string, length: number): string {
