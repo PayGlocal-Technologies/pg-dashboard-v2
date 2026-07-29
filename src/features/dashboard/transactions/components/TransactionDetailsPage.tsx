@@ -259,148 +259,155 @@ export function TransactionDetailsPage({
         Back to Transactions
       </Button>
 
-      {/* CSS Grid (not flex) specifically so the Timeline and Sender Details
-          sections — placed in the same grid row via row-start-2 below — start
-          at exactly the same top, regardless of how tall the summary above
-          the Timeline ends up being. No vertical divider between the two
-          columns; they're separated by the grid gap alone. */}
-      <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[3fr_1fr]">
-        {/* Row 1, left column — transaction summary. Transaction ID now lives
-            in Sender Details, in the same label/value format as its fields. */}
-        <div className="lg:col-start-1 lg:row-start-1">
-          <div className="flex flex-col items-start gap-1.5">
-            <CountryCell iso2={row.partnerCustomerCountry} />
-            <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="text-[26px] font-semibold tabular-nums text-foreground">
-                  {formatCurrency(amount, currency, "en-US")}
-                </span>
-                <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
-              </div>
-              {isSettled && settledOnTimestamp && (
-                <Badge variant="secondary" size="sm">
-                  Settled on: {settledOnTimestamp}
-                </Badge>
-              )}
-            </div>
-            <p className="text-[13px] leading-snug">
-              <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
-              <span className="text-muted-foreground">at {formatTimestampDisplay(row.formattedCreationDateTime)}</span>
-            </p>
-          </div>
-
-          {isReversed && (
-            <Alert variant="error" className="mt-6">
-              <AlertDescription>
-                Funds for this transaction were reversed and returned to the remitter.
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-
-        {/* Row 2, left column — Settlement Timeline. Title sits outside the
-            card; only the steps and the contextual action panel (e.g. Upload
-            Invoice) are enclosed in it, and that panel collapses entirely when
-            no merchant action is currently required. */}
-        <section className="lg:col-start-1 lg:row-start-2">
-          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Settlement timeline
-          </h3>
-          <div className="overflow-hidden rounded-2xl border border-border">
-            <div className="flex flex-col md:flex-row">
-              <div className="min-w-0 flex-1 p-5">
-                {timeline.map((step, i) => (
-                  <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
-                ))}
-              </div>
-              {showActionPanel && (
-                <div className="border-t border-border p-5 md:w-[340px] md:shrink-0 md:border-t-0 md:border-l">
-                  <UploadInvoiceForm
-                    row={row}
-                    variant="inline"
-                    onSuccess={() => onUploaded?.(row)}
-                  />
+      {/* Single page surface — same bg-card/border/rounded-xl treatment used
+          elsewhere as the app's primary content container (see the
+          search/filter bar and error state in McaTransactionTable) — wraps
+          the entire details section so it all sits on one white surface
+          instead of the page background. */}
+      <div className="rounded-xl border border-border bg-card p-6">
+        {/* CSS Grid (not flex) specifically so the Timeline and Sender Details
+            sections — placed in the same grid row via row-start-2 below — start
+            at exactly the same top, regardless of how tall the summary above
+            the Timeline ends up being. No vertical divider between the two
+            columns; they're separated by the grid gap alone. */}
+        <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[3fr_1fr]">
+          {/* Row 1, left column — transaction summary. Transaction ID now lives
+              in Sender Details, in the same label/value format as its fields. */}
+          <div className="lg:col-start-1 lg:row-start-1">
+            <div className="flex flex-col items-start gap-1.5">
+              <CountryCell iso2={row.partnerCustomerCountry} />
+              <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="text-[26px] font-semibold tabular-nums text-foreground">
+                    {formatCurrency(amount, currency, "en-US")}
+                  </span>
+                  <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
                 </div>
-              )}
-            </div>
-          </div>
-        </section>
-
-        {/* Row 2, right column — Sender Details, top-aligned with the
-            Settlement timeline heading above (same grid row), no surrounding
-            card and no divider — separation comes from the grid gap only. */}
-        <div className="lg:col-start-2 lg:row-start-2">
-          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Sender Details
-          </h3>
-          <div className="space-y-4">
-            <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
-            {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
-            <DetailRow label="Remitter name" value={counterpartyName} />
-            <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
-            <DetailRow label="Currency" value={currency} />
-            <DetailRow label="Invoice type" value={row.invoiceType} />
-            {row.settlementAmount && (
-              <DetailRow
-                label="Settlement amount"
-                value={formatCurrency(
-                  parseFloat(row.settlementAmount),
-                  row.settlementCurrency ?? currency,
-                  "en-US"
+                {isSettled && settledOnTimestamp && (
+                  <Badge variant="secondary" size="sm">
+                    Settled on: {settledOnTimestamp}
+                  </Badge>
                 )}
-              />
-            )}
-            {row.settlementDate && (
-              <DetailRow label="Settlement date" value={formatTimestampDisplay(row.settlementDate)} />
+              </div>
+              <p className="text-[13px] leading-snug">
+                <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
+                <span className="text-muted-foreground">at {formatTimestampDisplay(row.formattedCreationDateTime)}</span>
+              </p>
+            </div>
+
+            {isReversed && (
+              <Alert variant="error" className="mt-6">
+                <AlertDescription>
+                  Funds for this transaction were reversed and returned to the remitter.
+                </AlertDescription>
+              </Alert>
             )}
           </div>
-        </div>
 
-        {isSettled && (
-          <section className="lg:col-start-1 lg:row-start-3">
+          {/* Row 2, left column — Settlement Timeline. Title sits outside the
+              card; only the steps and the contextual action panel (e.g. Upload
+              Invoice) are enclosed in it, and that panel collapses entirely when
+              no merchant action is currently required. */}
+          <section className="lg:col-start-1 lg:row-start-2">
             <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Payment breakdown
+              Settlement timeline
             </h3>
-            <div>
-              <div className="flex items-center justify-between gap-4 pb-2.5 text-[13px]">
-                <span className="text-muted-foreground">
-                  Payment amount
-                  <span className="ml-1 text-[11px]">(using live FX)</span>
-                </span>
-                <span className="font-medium tabular-nums text-foreground">
-                  {formatCurrency(convertedAmount, "INR", "en-IN")}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
-                <span className="flex items-center gap-1.5 text-muted-foreground">
-                  PayGlocal processing fee
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto min-h-0 px-0 py-0 text-[12px]"
-                    onClick={() => {
-                      // TODO: link to the processing-fee explainer once one exists.
-                    }}
-                  >
-                    Learn more
-                  </Button>
-                </span>
-                <span className="font-medium tabular-nums text-foreground">
-                  − {formatCurrency(processingFee, "INR", "en-IN")}
-                </span>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
-                <span className="font-semibold text-foreground">Net settlement amount</span>
-                <span className="font-semibold tabular-nums text-foreground">
-                  {formatCurrency(netAmount, "INR", "en-IN")}
-                </span>
+            <div className="overflow-hidden rounded-2xl border border-border">
+              <div className="flex flex-col md:flex-row">
+                <div className="min-w-0 flex-1 p-5">
+                  {timeline.map((step, i) => (
+                    <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
+                  ))}
+                </div>
+                {showActionPanel && (
+                  <div className="border-t border-border p-5 md:w-[340px] md:shrink-0 md:border-t-0 md:border-l">
+                    <UploadInvoiceForm
+                      row={row}
+                      variant="inline"
+                      onSuccess={() => onUploaded?.(row)}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </section>
-        )}
+
+          {/* Row 2, right column — Sender Details, top-aligned with the
+              Settlement timeline heading above (same grid row), no surrounding
+              card and no divider — separation comes from the grid gap only. */}
+          <div className="lg:col-start-2 lg:row-start-2">
+            <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Sender Details
+            </h3>
+            <div className="space-y-4">
+              <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
+              {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
+              <DetailRow label="Remitter name" value={counterpartyName} />
+              <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
+              <DetailRow label="Currency" value={currency} />
+              <DetailRow label="Invoice type" value={row.invoiceType} />
+              {row.settlementAmount && (
+                <DetailRow
+                  label="Settlement amount"
+                  value={formatCurrency(
+                    parseFloat(row.settlementAmount),
+                    row.settlementCurrency ?? currency,
+                    "en-US"
+                  )}
+                />
+              )}
+              {row.settlementDate && (
+                <DetailRow label="Settlement date" value={formatTimestampDisplay(row.settlementDate)} />
+              )}
+            </div>
+          </div>
+
+          {isSettled && (
+            <section className="lg:col-start-1 lg:row-start-3">
+              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Payment breakdown
+              </h3>
+              <div>
+                <div className="flex items-center justify-between gap-4 pb-2.5 text-[13px]">
+                  <span className="text-muted-foreground">
+                    Payment amount
+                    <span className="ml-1 text-[11px]">(using live FX)</span>
+                  </span>
+                  <span className="font-medium tabular-nums text-foreground">
+                    {formatCurrency(convertedAmount, "INR", "en-IN")}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    PayGlocal processing fee
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto min-h-0 px-0 py-0 text-[12px]"
+                      onClick={() => {
+                        // TODO: link to the processing-fee explainer once one exists.
+                      }}
+                    >
+                      Learn more
+                    </Button>
+                  </span>
+                  <span className="font-medium tabular-nums text-foreground">
+                    − {formatCurrency(processingFee, "INR", "en-IN")}
+                  </span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+                  <span className="font-semibold text-foreground">Net settlement amount</span>
+                  <span className="font-semibold tabular-nums text-foreground">
+                    {formatCurrency(netAmount, "INR", "en-IN")}
+                  </span>
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
       </div>
     </div>
   );
