@@ -203,7 +203,8 @@ export function McaTransactionTable() {
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
 
   const [search, setSearch]     = useState("");
-  const [statusFilters, setStatusFilters]     = useState<string[]>([]);
+  // Defaults to "Invoice Pending" (rather than "All") when the page loads.
+  const [statusFilters, setStatusFilters]     = useState<string[]>(INVOICE_PENDING_STATUSES);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [page, setPage]         = useState(1);
 

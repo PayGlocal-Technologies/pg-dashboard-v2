@@ -241,7 +241,11 @@ export function TransactionDetailsDrawer({
   // (flux-ui's DialogOverlay: bg-black/50 + backdrop-blur-[2px]) and its
   // enter/exit animation classes, staying mounted through the exit animation
   // the same way Radix's Presence does, so it fades out in step with the
-  // drawer's slide-out instead of disappearing instantly.
+  // drawer's slide-out instead of disappearing instantly. It's `fixed` (not
+  // `absolute`) so it covers the whole viewport — sidebar and top nav
+  // included — regardless of it being portaled into the content area rather
+  // than document.body; `fixed` positioning escapes to the viewport unless an
+  // ancestor sets a transform/filter, which none here do.
   const [overlayMounted, setOverlayMounted] = useState(open);
   // Adjusting state during render (not in an effect) to reset it the instant
   // `open` flips true — React's documented pattern for this exact case
@@ -263,7 +267,7 @@ export function TransactionDetailsDrawer({
             onAnimationEnd={() => {
               if (!open) setOverlayMounted(false);
             }}
-            className="absolute inset-0 z-[100] bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
           />
         )}
         <Dialog.Content
@@ -277,20 +281,21 @@ export function TransactionDetailsDrawer({
             <VisuallyHidden>Transaction details</VisuallyHidden>
           </Dialog.Title>
 
-          {/* Header container — close button only; Transaction ID now lives in
-              the left column, directly below the transaction summary. */}
-          <div className="flex shrink-0 items-center justify-end px-6 pt-4 pb-1">
-            <Dialog.Close asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                aria-label="Close"
-                className="h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                <Icon name="x" className="h-4 w-4" />
-              </Button>
-            </Dialog.Close>
-          </div>
+          {/* Close button — floats over the top-right corner instead of
+              occupying its own row, so the summary below can start flush
+              with the top of the drawer instead of leaving a blank row above
+              it. Dialog.Content is already positioned (absolute), so it's the
+              positioning context here without needing an extra `relative`. */}
+          <Dialog.Close asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label="Close"
+              className="absolute right-4 top-4 z-10 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Icon name="x" className="h-4 w-4" />
+            </Button>
+          </Dialog.Close>
 
           {row && <DrawerBody row={row} onOpenChange={onOpenChange} onUploaded={onUploaded} isPartnerUser={isPartnerUser} />}
         </Dialog.Content>
