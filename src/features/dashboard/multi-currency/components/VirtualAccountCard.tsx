@@ -32,11 +32,6 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
     setTimeout(() => setCopied(false), 1500);
   };
 
-  // The primary identifier (first detail) is shown bare, the way the
-  // wireframe shows the account number with no label above it. Any further
-  // identifiers get a short inline label instead — e.g. "ACH Routing" → "ACH".
-  const [primaryDetail, ...secondaryDetails] = account.details;
-
   return (
     <Card
       className={cn(
@@ -44,7 +39,7 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
         "shrink-0 overflow-hidden px-4 py-4 transition-shadow hover:shadow-md"
       )}
     >
-      <CardContent className="flex h-full min-w-0 flex-col gap-1.5 overflow-hidden">
+      <CardContent className="flex h-full min-w-0 flex-col gap-1 overflow-hidden">
         {/* Action pair in the top-right corner, as per the wireframe */}
         <TooltipProvider delayDuration={200}>
           <div className="flex items-center justify-end gap-0.5">
@@ -54,6 +49,7 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
                   aria-label={copied ? "Copied to clipboard" : `Copy ${account.accountName} details`}
                   variant="ghost"
                   size="xs"
+                  className="size-6 min-w-6"
                   onClick={handleCopy}
                 >
                   <Icon name={copied ? "check" : "copy"} className="h-3.5 w-3.5" />
@@ -69,6 +65,7 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
                   aria-label={`Share ${account.accountName}`}
                   variant="ghost"
                   size="xs"
+                  className="size-6 min-w-6"
                   onClick={() => onShare(account)}
                 >
                   <Icon name="share" className="h-3.5 w-3.5" />
@@ -81,25 +78,37 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
           </div>
         </TooltipProvider>
 
-        <CountryFlagAvatar iso2={account.iso2} countryName={account.countryName} />
+        <CountryFlagAvatar
+          iso2={account.iso2}
+          countryName={account.countryName}
+          className="h-8 w-8"
+        />
 
+        {/* Account name is the primary element after the flag — the only
+            bold/large text on the card. leading-none keeps the two-line
+            block compact so there's always room for the details below. */}
         <div className="min-w-0">
-          <p className="truncate text-base font-semibold leading-tight text-foreground">
+          <p className="truncate text-lg font-bold leading-none text-foreground">
             {account.accountName}
           </p>
-          <p className="truncate text-xs text-muted-foreground">{account.countryName}</p>
+          <p className="mt-1 truncate text-xs leading-none text-muted-foreground">
+            {account.countryName}
+          </p>
         </div>
 
-        <div className="mt-auto min-w-0 space-y-0.5">
-          <p className="truncate text-base font-bold leading-tight text-foreground">
-            {primaryDetail.value}
-          </p>
-          {secondaryDetails.map((detail) => (
-            <p key={detail.label} className="flex items-baseline gap-1.5 truncate">
-              <span className="shrink-0 text-xs font-bold uppercase tracking-wide text-foreground">
+        {/* Identifiers sit one level below the account name — every row uses
+            the same label/value size and weight, regardless of what it is
+            (account number, IBAN, ACH, SEPA, ...), for consistency. Sized to
+            always fit above the card's bottom padding, never clipped. */}
+        <div className="mt-auto min-w-0 space-y-1.5">
+          {account.details.map((detail) => (
+            <p key={detail.label} className="flex min-w-0 items-baseline gap-1.5 leading-none">
+              <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide leading-none text-muted-foreground">
                 {detail.label.split(" ")[0]}
               </span>
-              <span className="truncate text-sm font-bold text-foreground">{detail.value}</span>
+              <span className="truncate text-sm font-medium leading-none text-foreground">
+                {detail.value}
+              </span>
             </p>
           ))}
         </div>
