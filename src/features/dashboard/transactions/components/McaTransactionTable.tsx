@@ -228,6 +228,11 @@ export function McaTransactionTable() {
 
   const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen]   = useState(false);
+  // Set when navigating to a linked transaction that isn't part of the
+  // table's own currently-fetched page (see openLinkedTransaction below) —
+  // takes precedence over the rows.find lookup so the details page can show
+  // a transaction the table itself never fetched.
+  const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
 
   const body = buildTxnRequestBody(
     {
@@ -255,7 +260,7 @@ export function McaTransactionTable() {
   const totalCount = data?.data?.totalCount ?? 0;
 
   // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
-  const detailsRow = rows.find((r) => r.gid === detailsRowId) ?? null;
+  const detailsRow = detailsOverrideRow ?? rows.find((r) => r.gid === detailsRowId) ?? null;
 
   const onSearch = (v: string) => { setSearch(v); setPage(1); };
 
@@ -283,12 +288,27 @@ export function McaTransactionTable() {
   // so Back can restore it instead of the page opening at the top.
   const openDetails = (row: McaTransaction) => {
     if (contentEl) setScrollPosition(contentEl.scrollTop);
+    setDetailsOverrideRow(null);
     setDetailsRowId(row.gid);
     setDetailsOpen(true);
   };
 
   const closeDetails = () => {
     setDetailsOpen(false);
+    setDetailsOverrideRow(null);
+  };
+
+  // Clicking a row in the details page's own Linked Transactions section —
+  // replaces the currently shown transaction in place (same page, same
+  // layout) rather than going back to the table first. The clicked row
+  // comes from a separate query (see LinkedTransactionsSection), not the
+  // table's own fetched page, so it's stored directly instead of looked up
+  // by id. Resets scroll to the top since this reads as a fresh page, the
+  // same way clicking a different row from the Transactions table would.
+  const openLinkedTransaction = (row: McaTransaction) => {
+    setDetailsOverrideRow(row);
+    setDetailsRowId(row.gid);
+    if (contentEl) restoreScrollTop(contentEl, 0);
   };
 
   // Restores the table's scroll position after the details page unmounts and
@@ -324,6 +344,7 @@ export function McaTransactionTable() {
         row={detailsRow}
         onBack={closeDetails}
         onUploaded={handleInvoiceSubmitted}
+        onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}
       />
     );

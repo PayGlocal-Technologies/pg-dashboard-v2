@@ -20,6 +20,7 @@ import {
 } from "@/lib/utils/format";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
+import { LinkedTransactionsSection } from "@/features/dashboard/transactions/components/LinkedTransactionsSection";
 import {
   MCA_FX_RATES_TO_INR,
   MCA_PROCESSING_FEE_RATE,
@@ -30,6 +31,7 @@ interface TransactionDetailsPageProps {
   row: McaTransaction;
   onBack: () => void;
   onUploaded?: (row: McaTransaction) => void;
+  onOpenTransaction: (row: McaTransaction) => void;
   isPartnerUser: boolean;
 }
 
@@ -227,6 +229,7 @@ export function TransactionDetailsPage({
   row,
   onBack,
   onUploaded,
+  onOpenTransaction,
   isPartnerUser,
 }: TransactionDetailsPageProps) {
   const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
@@ -464,6 +467,21 @@ export function TransactionDetailsPage({
               </div>
             </section>
           )}
+        </div>
+
+        {/* Linked Transactions — a separate grid instance (not another row in
+            the one above) reusing the same lg:grid-cols-[3fr_1fr] split just
+            to constrain its width to the 3/4 column, with col2 left empty.
+            Keeping it out of the grid above avoids having to keep a
+            right-column row-span in sync with yet another row. */}
+        <div className="mt-9 grid lg:grid-cols-[3fr_1fr]">
+          <div className="lg:col-start-1">
+            <LinkedTransactionsSection
+              row={row}
+              isPartnerUser={isPartnerUser}
+              onOpenTransaction={onOpenTransaction}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -118,8 +118,10 @@ function handleViewInvoice(row: McaTransaction) {
 // onOpenDetails — see McaTransactionTable's commented-out modal wiring.
 export function buildMcaColumns(
   isPartnerUser: boolean,
-  onOpenDetails: (row: McaTransaction) => void
+  onOpenDetails: (row: McaTransaction) => void,
+  options: { showActions?: boolean } = {}
 ): Column<McaTransaction>[] {
+  const { showActions = true } = options;
   const cols: Column<McaTransaction>[] = [
     {
       key: "amount",
@@ -232,20 +234,23 @@ export function buildMcaColumns(
     },
   ];
 
-  if (!isPartnerUser) return cols;
+  if (isPartnerUser) {
+    cols.splice(4, 0, {
+      key: "merchantId",
+      header: "Merchant ID",
+      minWidth: 145,
+      render: (row) => (
+        <RowClick row={row} onOpenDetails={onOpenDetails}>
+          <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+            {row.merchantId ?? "—"}
+          </span>
+        </RowClick>
+      ),
+    });
+  }
 
-  cols.splice(4, 0, {
-    key: "merchantId",
-    header: "Merchant ID",
-    minWidth: 145,
-    render: (row) => (
-      <RowClick row={row} onOpenDetails={onOpenDetails}>
-        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-          {row.merchantId ?? "—"}
-        </span>
-      </RowClick>
-    ),
-  });
-
-  return cols;
+  // Linked Transactions (on the Transaction Details page) reuses these same
+  // columns without the Actions column — everything else (chips, formatting,
+  // ordering) stays identical to the Transactions page's own table.
+  return showActions ? cols : cols.filter((col) => col.key !== "action");
 }
