@@ -55,8 +55,23 @@ function pad(n: number): string {
   return String(n).padStart(2, "0");
 }
 
-function formatDDMMYYYYHHmmss(date: Date): string {
-  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// The single timestamp display format used everywhere in this drawer —
+// transaction summary, timeline steps, settlement date — e.g. "27 Jul '26, 09:35 AM".
+function formatDisplayDateTime(date: Date): string {
+  const hours24 = date.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const ampm = hours24 >= 12 ? "PM" : "AM";
+  return `${date.getDate()} ${MONTH_ABBR[date.getMonth()]} '${pad(date.getFullYear() % 100)}, ${pad(hours12)}:${pad(date.getMinutes())} ${ampm}`;
+}
+
+// Reformats one of the API's raw "DD/MM/YYYY HH:mm:ss" strings into the
+// display format above; falls back to the raw string when it doesn't match
+// that shape (e.g. a date-only value) rather than showing nothing.
+function formatTimestampDisplay(raw: string | null | undefined): string {
+  const parsed = parseDisplayDateTime(raw);
+  return parsed ? formatDisplayDateTime(parsed) : (raw ?? "—");
 }
 
 // Minutes after the transaction's creation time each settlement step
@@ -141,7 +156,7 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
   return labels.map((label, i) => ({
     label,
     status: i < currentIndex ? "completed" : i === currentIndex ? "current" : "upcoming",
-    timestamp: formatDDMMYYYYHHmmss(new Date(baseDate.getTime() + STEP_OFFSET_MINUTES[i] * 60_000)),
+    timestamp: formatDisplayDateTime(new Date(baseDate.getTime() + STEP_OFFSET_MINUTES[i] * 60_000)),
   }));
 }
 
@@ -187,6 +202,8 @@ function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean })
   );
 }
 
+// Label above, value below — no divider between rows; each field stands on
+// its own with vertical rhythm coming from the parent's spacing only.
 function DetailRow({
   label,
   value,
@@ -198,9 +215,9 @@ function DetailRow({
 }) {
   if (value == null || value === "") return null;
   return (
-    <div className={cn("flex items-center justify-between gap-4 px-4 py-3", className)}>
-      <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
-      <div className="flex min-w-0 items-center justify-end gap-1.5 text-[13px] font-medium text-foreground">
+    <div className={cn("flex flex-col gap-1", className)}>
+      <span className="text-[12px] text-muted-foreground">{label}</span>
+      <div className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-foreground">
         {value}
       </div>
     </div>
@@ -345,36 +362,28 @@ function DrawerBody({
           the Timeline ends up being. No vertical divider between the two
           columns; they're separated by the grid gap alone. */}
       <div className="grid gap-x-10 gap-y-6 px-6 py-6 lg:grid-cols-[3fr_1fr]">
-        {/* Row 1, left column — transaction summary with Transaction ID at the
-            top-right, aligned with it horizontally. */}
+        {/* Row 1, left column — transaction summary. Transaction ID now lives
+            in Sender Details, in the same label/value format as its fields. */}
         <div className="lg:col-start-1 lg:row-start-1">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex flex-col items-start gap-1.5">
-              <CountryCell iso2={row.partnerCustomerCountry} />
-              <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="text-[26px] font-semibold tabular-nums text-foreground">
-                    {formatCurrency(amount, currency, "en-US")}
-                  </span>
-                  <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
-                </div>
-                {isSettled && settledOnTimestamp && (
-                  <Badge variant="secondary" size="sm">
-                    Settled on: {settledOnTimestamp}
-                  </Badge>
-                )}
+          <div className="flex flex-col items-start gap-1.5">
+            <CountryCell iso2={row.partnerCustomerCountry} />
+            <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="text-[26px] font-semibold tabular-nums text-foreground">
+                  {formatCurrency(amount, currency, "en-US")}
+                </span>
+                <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
               </div>
-              <p className="text-[13px] leading-snug">
-                <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
-                <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
-              </p>
+              {isSettled && settledOnTimestamp && (
+                <Badge variant="secondary" size="sm">
+                  Settled on: {settledOnTimestamp}
+                </Badge>
+              )}
             </div>
-
-            {/* Transaction ID — top-right of this column, existing copy action. */}
-            <div className="flex shrink-0 items-center gap-1.5 text-[12px] text-muted-foreground">
-              <span>Txn ID</span>
-              <CopyableText value={row.gid} />
-            </div>
+            <p className="text-[13px] leading-snug">
+              <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
+              <span className="text-muted-foreground">at {formatTimestampDisplay(row.formattedCreationDateTime)}</span>
+            </p>
           </div>
 
           {isReversed && (
@@ -421,7 +430,8 @@ function DrawerBody({
           <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
             Sender Details
           </h3>
-          <div className="divide-y divide-border">
+          <div className="space-y-4">
+            <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
             {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
             <DetailRow label="Remitter name" value={counterpartyName} />
             <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
@@ -437,7 +447,9 @@ function DrawerBody({
                 )}
               />
             )}
-            {row.settlementDate && <DetailRow label="Settlement date" value={row.settlementDate} />}
+            {row.settlementDate && (
+              <DetailRow label="Settlement date" value={formatTimestampDisplay(row.settlementDate)} />
+            )}
           </div>
         </div>
 
