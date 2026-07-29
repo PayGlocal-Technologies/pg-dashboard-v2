@@ -348,21 +348,15 @@ export function TransactionDetailsPage({
               section after the transaction summary. Only rendered while the
               transaction actually needs merchant action; hidden entirely
               otherwise, which is what lets Settlement Timeline below move up
-              via timelineRowClass. Kept in its own bordered panel (a
-              functional container, not decorative) since it's now a
-              standalone action rather than the timeline's side panel. */}
+              via timelineRowClass. Sits directly on the page surface (no
+              enclosing card), capped at 500px so the form doesn't stretch
+              full-width on wide viewports. */}
           {showActionPanel && (
-            <section className="lg:col-start-1 lg:row-start-2">
+            <section className="max-w-[500px] lg:col-start-1 lg:row-start-2">
               <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Upload invoice
               </h3>
-              <div className="rounded-2xl border border-border p-5">
-                <UploadInvoiceForm
-                  row={row}
-                  variant="inline"
-                  onSuccess={() => onUploaded?.(row)}
-                />
-              </div>
+              <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
             </section>
           )}
 

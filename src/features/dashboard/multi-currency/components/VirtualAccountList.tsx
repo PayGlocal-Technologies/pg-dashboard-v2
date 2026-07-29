@@ -30,7 +30,7 @@ export function VirtualAccountList({
 }: VirtualAccountListProps) {
   if (isLoading) {
     return (
-      <div className="flex gap-4 overflow-hidden pb-2" aria-busy>
+      <div className="scrollbar-none flex gap-4 overflow-hidden pb-2" aria-busy>
         {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => (
           <VirtualAccountCardSkeleton key={i} />
         ))}
@@ -50,7 +50,7 @@ export function VirtualAccountList({
 
   return (
     <div
-      className="flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2"
+      className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2"
       role="list"
       aria-label="Virtual receiving accounts"
     >

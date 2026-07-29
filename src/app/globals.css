@@ -167,6 +167,17 @@ body {
   background: #6b7280;
 }
 
+/* Hides the scrollbar while leaving wheel/trackpad/touch scrolling intact —
+   used for the multi-currency account carousel, which scrolls via gesture
+   only and doesn't need a persistent visual scroll indicator. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ─── Overlay blur ───────────────────────────────────────────────────────────
    Flux's DrawerOverlay hardcodes `backdrop-blur-sm`. In Tailwind v4 an
    unlayered rule beats @layer utilities, so no !important needed.          */
