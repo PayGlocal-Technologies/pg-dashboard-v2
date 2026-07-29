@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
+import { type ReactNode } from "react";
 import {
   Alert,
   AlertDescription,
@@ -9,13 +8,11 @@ import {
   Button,
   Separator,
   StatusBadge,
-  VisuallyHidden,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import {
@@ -24,10 +21,9 @@ import {
 } from "@/features/dashboard/transactions/constants";
 import type { McaTransaction } from "@/features/dashboard/transactions/types";
 
-interface TransactionDetailsDrawerProps {
-  row: McaTransaction | null;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface TransactionDetailsPageProps {
+  row: McaTransaction;
+  onBack: () => void;
   onUploaded?: (row: McaTransaction) => void;
   isPartnerUser: boolean;
 }
@@ -86,14 +82,6 @@ const STEP_OFFSET_MINUTES = [0, 4, 95, 1440, 1470, 1500, 2820];
 const SETTLED_STEP_INDEX = 5;
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
-
-// Locks/restores the content area's own scroll while the drawer is open — a
-// plain DOM mutation, kept in its own function (rather than inline in the
-// effect) since the target element comes from a hook and React Compiler's
-// lint forbids mutating a hook-returned value directly.
-function setContentAreaOverflow(el: HTMLElement, value: string): void {
-  el.style.overflow = value;
-}
 
 // Index of "Invoice pending" within buildTimeline's `labels` array below —
 // the step that's active (blue dot) while a transaction needs an invoice, and
@@ -224,114 +212,18 @@ function DetailRow({
   );
 }
 
-export function TransactionDetailsDrawer({
+// Full-page transaction detail view — replaces the Transactions table in
+// place (see McaTransactionTable) rather than overlaying it, so this renders
+// as a plain page: no portal, no backdrop, no open/close animation. The Back
+// button is the only navigation affordance; the caller (McaTransactionTable)
+// keeps the table's own filter/sort/pagination state alive since switching
+// back just swaps which JSX this shares a parent with, no unmount involved.
+export function TransactionDetailsPage({
   row,
-  open,
-  onOpenChange,
+  onBack,
   onUploaded,
   isPartnerUser,
-}: TransactionDetailsDrawerProps) {
-  // Portals into the dashboard's main content area (below the top nav, right
-  // of the sidebar — see ContentAreaContext) instead of document.body, so the
-  // drawer behaves as an overlay scoped to that region rather than a
-  // full-screen modal: the sidebar and top nav are never covered and stay
-  // interactive. `modal={false}` opts out of Radix's default document-wide
-  // scroll lock/pointer-blocking so it can be applied to just that region
-  // below instead.
-  const contentEl = useContentAreaElement();
-
-  useEffect(() => {
-    if (!contentEl || !open) return;
-    const previousOverflow = contentEl.style.overflow;
-    setContentAreaOverflow(contentEl, "hidden");
-    return () => {
-      setContentAreaOverflow(contentEl, previousOverflow);
-    };
-  }, [contentEl, open]);
-
-  // Radix's own `Dialog.Overlay` only renders when `modal` is true (it
-  // returns null otherwise — see @radix-ui/react-dialog's DialogOverlay), so
-  // it can't be used here: `modal={true}` would also turn on Radix's
-  // document-wide focus trap/pointer-blocking, which is exactly what
-  // `modal={false}` above is opting out of to keep the sidebar and top nav
-  // interactive. This plain div reproduces the design system's own overlay
-  // (flux-ui's DialogOverlay: bg-black/50 + backdrop-blur-[2px]) and its
-  // enter/exit animation classes, staying mounted through the exit animation
-  // the same way Radix's Presence does, so it fades out in step with the
-  // drawer's slide-out instead of disappearing instantly. It's `fixed` (not
-  // `absolute`) so it covers the whole viewport — sidebar and top nav
-  // included — regardless of it being portaled into the content area rather
-  // than document.body; `fixed` positioning escapes to the viewport unless an
-  // ancestor sets a transform/filter, which none here do.
-  const [overlayMounted, setOverlayMounted] = useState(open);
-  // Adjusting state during render (not in an effect) to reset it the instant
-  // `open` flips true — React's documented pattern for this exact case
-  // ("Storing information from previous renders"), which avoids the extra
-  // render-then-effect round trip a useEffect here would add.
-  if (open && !overlayMounted) {
-    setOverlayMounted(true);
-  }
-
-  if (!contentEl) return null;
-
-  return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
-      <Dialog.Portal container={contentEl}>
-        {overlayMounted && (
-          <div
-            data-state={open ? "open" : "closed"}
-            onClick={() => onOpenChange(false)}
-            onAnimationEnd={() => {
-              if (!open) setOverlayMounted(false);
-            }}
-            className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
-          />
-        )}
-        <Dialog.Content
-          className={cn(
-            "absolute inset-0 z-[101] flex flex-col gap-0 rounded-t-2xl border-t border-border bg-card shadow-xl transition-all duration-pg-normal ease-pg-standard",
-            "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-200",
-            "data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom"
-          )}
-        >
-          <Dialog.Title asChild>
-            <VisuallyHidden>Transaction details</VisuallyHidden>
-          </Dialog.Title>
-
-          {/* Close button — floats over the top-right corner instead of
-              occupying its own row, so the summary below can start flush
-              with the top of the drawer instead of leaving a blank row above
-              it. Dialog.Content is already positioned (absolute), so it's the
-              positioning context here without needing an extra `relative`. */}
-          <Dialog.Close asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label="Close"
-              className="absolute right-4 top-4 z-10 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Icon name="x" className="h-4 w-4" />
-            </Button>
-          </Dialog.Close>
-
-          {row && <DrawerBody row={row} onOpenChange={onOpenChange} onUploaded={onUploaded} isPartnerUser={isPartnerUser} />}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
-  );
-}
-
-function DrawerBody({
-  row,
-  onOpenChange,
-  onUploaded,
-  isPartnerUser,
-}: {
-  row: McaTransaction;
-  onOpenChange: (open: boolean) => void;
-  onUploaded?: (row: McaTransaction) => void;
-  isPartnerUser: boolean;
-}) {
+}: TransactionDetailsPageProps) {
   const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
   const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
   const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
@@ -355,13 +247,24 @@ function DrawerBody({
   const showActionPanel = needsAction && !isReversed;
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
+        onClick={onBack}
+        className="-ml-2 mb-4 text-muted-foreground hover:text-foreground"
+      >
+        Back to Transactions
+      </Button>
+
       {/* CSS Grid (not flex) specifically so the Timeline and Sender Details
           sections — placed in the same grid row via row-start-2 below — start
           at exactly the same top, regardless of how tall the summary above
           the Timeline ends up being. No vertical divider between the two
           columns; they're separated by the grid gap alone. */}
-      <div className="grid gap-x-10 gap-y-6 px-6 py-6 lg:grid-cols-[3fr_1fr]">
+      <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[3fr_1fr]">
         {/* Row 1, left column — transaction summary. Transaction ID now lives
             in Sender Details, in the same label/value format as its fields. */}
         <div className="lg:col-start-1 lg:row-start-1">

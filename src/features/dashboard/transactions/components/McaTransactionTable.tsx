@@ -20,13 +20,14 @@ import { cn } from "@/lib/utils";
 import { usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
-// Upload Invoice now opens the drawer instead of this modal — import kept
-// commented out (not deleted) alongside the modal's usage below.
+// Upload Invoice now opens the details page instead of this modal — import
+// kept commented out (not deleted) alongside the modal's usage below.
 // import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
-import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
+import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
 import {
   MCA_STATUS_FILTERS,
   MCA_CURRENCY_FILTERS,
@@ -48,6 +49,13 @@ const SETTLED_STATUSES = ["SETTLED", "FIRC_SETTLED"];
 
 function sameStatusSet(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((v) => b.includes(v));
+}
+
+// Sets scrollTop via a standalone function (rather than inline in a
+// handler) since the element comes from useContentAreaElement, and React
+// Compiler's lint forbids mutating a hook-returned value directly.
+function restoreScrollTop(el: HTMLElement, value: number): void {
+  el.scrollTop = value;
 }
 
 // ── Filter categories — left column of the filter flyout. Adding a new
@@ -201,6 +209,8 @@ function TransactionViewTabs({
 export function McaTransactionTable() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
+  const contentEl = useContentAreaElement();
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   const [search, setSearch]     = useState("");
   // Defaults to "Invoice Pending" (rather than "All") when the page loads.
@@ -268,10 +278,28 @@ export function McaTransactionTable() {
   //   setUploadOpen(true);
   // };
 
+  // Captures the table's current scroll position (within the dashboard's
+  // scrollable content area) before switching to the full-page detail view,
+  // so Back can restore it instead of the page opening at the top.
   const openDetails = (row: McaTransaction) => {
+    if (contentEl) setScrollPosition(contentEl.scrollTop);
     setDetailsRowId(row.gid);
     setDetailsOpen(true);
   };
+
+  const closeDetails = () => {
+    setDetailsOpen(false);
+  };
+
+  // Restores the table's scroll position after the details page unmounts and
+  // the table re-renders in its place — deferred to an effect (rather than
+  // set inline in closeDetails) so it runs after the table's own content is
+  // back in the DOM, not while the details page is still on screen.
+  useEffect(() => {
+    if (!detailsOpen && contentEl) {
+      restoreScrollTop(contentEl, scrollPosition);
+    }
+  }, [detailsOpen, contentEl, scrollPosition]);
 
   // Optimistically moves a "waiting for invoice" row to "Sent for Review" once
   // its invoice is submitted. There's no real invoice-upload endpoint yet (see
@@ -286,6 +314,20 @@ export function McaTransactionTable() {
   };
 
   const columns = buildMcaColumns(isPartnerUser, openDetails);
+
+  // The details page replaces the table in place (same component instance,
+  // same closed-over search/filter/page state) rather than overlaying it —
+  // this is what makes Back restore the table's previous state for free.
+  if (detailsOpen && detailsRow) {
+    return (
+      <TransactionDetailsPage
+        row={detailsRow}
+        onBack={closeDetails}
+        onUploaded={handleInvoiceSubmitted}
+        isPartnerUser={isPartnerUser}
+      />
+    );
+  }
 
   return (
     <div className="space-y-3">
@@ -383,8 +425,9 @@ export function McaTransactionTable() {
         />
       )}
 
-      {/* Upload Invoice now opens the drawer's inline upload flow instead of
-          this modal — commented out, not deleted, so it can be restored.
+      {/* Upload Invoice now opens the details page's inline upload flow
+          instead of this modal — commented out, not deleted, so it can be
+          restored.
       <UploadInvoiceModal
         row={uploadRow}
         open={uploadOpen}
@@ -392,14 +435,6 @@ export function McaTransactionTable() {
         onUploaded={handleInvoiceSubmitted}
       />
       */}
-
-      <TransactionDetailsDrawer
-        row={detailsRow}
-        open={detailsOpen}
-        onOpenChange={setDetailsOpen}
-        onUploaded={handleInvoiceSubmitted}
-        isPartnerUser={isPartnerUser}
-      />
     </div>
   );
 }
