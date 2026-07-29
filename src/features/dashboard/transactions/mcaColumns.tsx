@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { type Column, StatusBadge, Button } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { Icon } from "@/components/icon";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { COUNTRY_NAME_MAP } from "@/features/dashboard/transactions/constants";
 import type { McaTransaction } from "@/features/dashboard/transactions/types";
@@ -162,7 +162,7 @@ export function buildMcaColumns(
       render: (row) => (
         <RowClick row={row} onOpenDetails={onOpenDetails}>
           <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-            {row.formattedCreationDateTime ?? "—"}
+            {formatTransactionTimestamp(row.formattedCreationDateTime)}
           </span>
         </RowClick>
       ),

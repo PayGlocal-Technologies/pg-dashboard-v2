@@ -187,6 +187,45 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
   return `${datePart}, ${timePart}`;
 }
 
+/**
+ * Parses the transactions API's "DD/MM/YYYY HH:mm:ss" display strings.
+ * Date.parse can't be trusted with slash-separated dates (it assumes
+ * MM/DD/YYYY in en-US), so this is matched manually. Returns null when the
+ * input doesn't match that shape (e.g. a date-only value).
+ */
+export function parseApiDateTime(display: string | null | undefined): Date | null {
+  if (!display) return null;
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy, hh, min, ss] = match;
+  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss));
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * The single transaction timestamp format used across the Transactions
+ * table and the Transaction Details page, e.g. "24 Jul '26, 03:32 PM".
+ */
+export function formatTransactionDateTime(date: Date): string {
+  const hours24 = date.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const ampm = hours24 >= 12 ? "PM" : "AM";
+  const yy = String(date.getFullYear() % 100).padStart(2, "0");
+  const hh = String(hours12).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}, ${hh}:${min} ${ampm}`;
+}
+
+/**
+ * Reformats one of the API's raw "DD/MM/YYYY HH:mm:ss" strings into
+ * formatTransactionDateTime's display format; falls back to the raw string
+ * when it doesn't match that shape rather than showing nothing.
+ */
+export function formatTransactionTimestamp(raw: string | null | undefined): string {
+  const parsed = parseApiDateTime(raw);
+  return parsed ? formatTransactionDateTime(parsed) : (raw ?? "—");
+}
+
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return `${str.slice(0, length)}...`;

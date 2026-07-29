@@ -12,7 +12,12 @@ import {
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/format";
+import {
+  formatCurrency,
+  formatTransactionDateTime,
+  formatTransactionTimestamp,
+  parseApiDateTime,
+} from "@/lib/utils/format";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import {
@@ -33,41 +38,6 @@ interface TimelineStep {
   label: string;
   status: StepStatus;
   timestamp: string;
-}
-
-// Parses the app's "DD/MM/YYYY HH:mm:ss" display format. Date.parse can't be
-// trusted with slash-separated dates (it assumes MM/DD/YYYY in en-US), so this
-// is matched manually.
-function parseDisplayDateTime(display: string | undefined | null): Date | null {
-  if (!display) return null;
-  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2}):(\d{2})$/);
-  if (!match) return null;
-  const [, dd, mm, yyyy, hh, min, ss] = match;
-  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss));
-  return Number.isNaN(date.getTime()) ? null : date;
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-// The single timestamp display format used everywhere in this drawer —
-// transaction summary, timeline steps, settlement date — e.g. "27 Jul '26, 09:35 AM".
-function formatDisplayDateTime(date: Date): string {
-  const hours24 = date.getHours();
-  const hours12 = hours24 % 12 || 12;
-  const ampm = hours24 >= 12 ? "PM" : "AM";
-  return `${date.getDate()} ${MONTH_ABBR[date.getMonth()]} '${pad(date.getFullYear() % 100)}, ${pad(hours12)}:${pad(date.getMinutes())} ${ampm}`;
-}
-
-// Reformats one of the API's raw "DD/MM/YYYY HH:mm:ss" strings into the
-// display format above; falls back to the raw string when it doesn't match
-// that shape (e.g. a date-only value) rather than showing nothing.
-function formatTimestampDisplay(raw: string | null | undefined): string {
-  const parsed = parseDisplayDateTime(raw);
-  return parsed ? formatDisplayDateTime(parsed) : (raw ?? "—");
 }
 
 // Minutes after the transaction's creation time each settlement step
@@ -138,13 +108,13 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
   // the gid, like acctSuffix above) so the dummy timestamps stay stable
   // across re-renders instead of drifting on every render.
   const baseDate =
-    parseDisplayDateTime(row.formattedCreationDateTime) ??
+    parseApiDateTime(row.formattedCreationDateTime) ??
     new Date(2026, 0, 1 + (Number(acctDigits.slice(0, 2)) % 28), 9, 0, 0);
 
   return labels.map((label, i) => ({
     label,
     status: i < currentIndex ? "completed" : i === currentIndex ? "current" : "upcoming",
-    timestamp: formatDisplayDateTime(new Date(baseDate.getTime() + STEP_OFFSET_MINUTES[i] * 60_000)),
+    timestamp: formatTransactionDateTime(new Date(baseDate.getTime() + STEP_OFFSET_MINUTES[i] * 60_000)),
   }));
 }
 
@@ -240,11 +210,18 @@ export function TransactionDetailsPage({
   const timeline = buildTimeline(row);
   const settledOnTimestamp = timeline[SETTLED_STEP_INDEX]?.timestamp;
 
-  // The contextual action panel appears beside the timeline only while the
-  // transaction actually needs merchant action; otherwise it collapses and
-  // the timeline uses the full row width — see WAITING_FOR_INVOICE_STEP_INDEX
-  // for which step this corresponds to.
+  // The Upload Invoice section appears above the timeline only while the
+  // transaction actually needs merchant action; otherwise it's hidden and
+  // the Settlement Timeline moves up to take its row — see
+  // WAITING_FOR_INVOICE_STEP_INDEX for which step this corresponds to.
   const showActionPanel = needsAction && !isReversed;
+
+  // Grid row numbers shift up by one when the Upload Invoice section is
+  // hidden, since it no longer occupies row 2. Sender Details stays pinned
+  // to row 2 either way, aligning with whichever section (Upload Invoice or
+  // Settlement Timeline) is first after the transaction summary.
+  const timelineRowClass = showActionPanel ? "lg:row-start-3" : "lg:row-start-2";
+  const paymentRowClass = showActionPanel ? "lg:row-start-4" : "lg:row-start-3";
 
   return (
     <div>
@@ -291,7 +268,7 @@ export function TransactionDetailsPage({
               </div>
               <p className="text-[13px] leading-snug">
                 <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
-                <span className="text-muted-foreground">at {formatTimestampDisplay(row.formattedCreationDateTime)}</span>
+                <span className="text-muted-foreground">at {formatTransactionTimestamp(row.formattedCreationDateTime)}</span>
               </p>
             </div>
 
@@ -304,66 +281,78 @@ export function TransactionDetailsPage({
             )}
           </div>
 
-          {/* Row 2, left column — Settlement Timeline. Title sits outside the
-              card; only the steps and the contextual action panel (e.g. Upload
-              Invoice) are enclosed in it, and that panel collapses entirely when
-              no merchant action is currently required. */}
-          <section className="lg:col-start-1 lg:row-start-2">
+          {/* Row 2, left column — Upload Invoice, the first actionable
+              section after the transaction summary. Only rendered while the
+              transaction actually needs merchant action; hidden entirely
+              otherwise, which is what lets Settlement Timeline below move up
+              via timelineRowClass. Kept in its own bordered panel (a
+              functional container, not decorative) since it's now a
+              standalone action rather than the timeline's side panel. */}
+          {showActionPanel && (
+            <section className="lg:col-start-1 lg:row-start-2">
+              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Upload invoice
+              </h3>
+              <div className="rounded-2xl border border-border p-5">
+                <UploadInvoiceForm
+                  row={row}
+                  variant="inline"
+                  onSuccess={() => onUploaded?.(row)}
+                />
+              </div>
+            </section>
+          )}
+
+          {/* Settlement Timeline — no enclosing card, sits directly on the
+              page surface. Row shifts up to row 2 when Upload Invoice above
+              is hidden. */}
+          <section className={cn("lg:col-start-1", timelineRowClass)}>
             <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Settlement timeline
             </h3>
-            <div className="overflow-hidden rounded-2xl border border-border">
-              <div className="flex flex-col md:flex-row">
-                <div className="min-w-0 flex-1 p-5">
-                  {timeline.map((step, i) => (
-                    <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
-                  ))}
-                </div>
-                {showActionPanel && (
-                  <div className="border-t border-border p-5 md:w-[340px] md:shrink-0 md:border-t-0 md:border-l">
-                    <UploadInvoiceForm
-                      row={row}
-                      variant="inline"
-                      onSuccess={() => onUploaded?.(row)}
-                    />
-                  </div>
-                )}
-              </div>
+            <div>
+              {timeline.map((step, i) => (
+                <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
+              ))}
             </div>
           </section>
 
-          {/* Row 2, right column — Sender Details, top-aligned with the
-              Settlement timeline heading above (same grid row), no surrounding
-              card and no divider — separation comes from the grid gap only. */}
+          {/* Row 2, right column — Sender Details + Payment Details,
+              top-aligned with whichever section leads row 2 in the left
+              column (Upload Invoice when present, otherwise Settlement
+              Timeline). No surrounding card and no divider within either
+              section — separation from the left column comes from the grid
+              gap alone; the 36px gap between the two sections is explicit
+              (mt-9) since that's wider than the space-y-4 used for fields
+              within a section. */}
           <div className="lg:col-start-2 lg:row-start-2">
-            <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Sender Details
-            </h3>
-            <div className="space-y-4">
-              <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
-              {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
-              <DetailRow label="Remitter name" value={counterpartyName} />
-              <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
-              <DetailRow label="Currency" value={currency} />
-              <DetailRow label="Invoice type" value={row.invoiceType} />
-              {row.settlementAmount && (
-                <DetailRow
-                  label="Settlement amount"
-                  value={formatCurrency(
-                    parseFloat(row.settlementAmount),
-                    row.settlementCurrency ?? currency,
-                    "en-US"
-                  )}
-                />
-              )}
-              {row.settlementDate && (
-                <DetailRow label="Settlement date" value={formatTimestampDisplay(row.settlementDate)} />
-              )}
+            <div>
+              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Sender Details
+              </h3>
+              <div className="space-y-4">
+                <DetailRow label="Remitter name" value={counterpartyName} />
+                <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
+                <DetailRow label="Currency" value={currency} />
+                {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
+              </div>
+            </div>
+
+            <div className="mt-9">
+              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Payment Details
+              </h3>
+              <div className="space-y-4">
+                {row.settlementDate && (
+                  <DetailRow label="Settlement date" value={formatTransactionTimestamp(row.settlementDate)} />
+                )}
+                <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
+              </div>
             </div>
           </div>
 
           {isSettled && (
-            <section className="lg:col-start-1 lg:row-start-3">
+            <section className={cn("lg:col-start-1", paymentRowClass)}>
               <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment breakdown
               </h3>
