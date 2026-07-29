@@ -288,7 +288,7 @@ export function TransactionDetailsPage({
         size="sm"
         leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
         onClick={onBack}
-        className="-ml-2 mb-4 text-muted-foreground hover:text-foreground"
+        className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
       >
         Back to Transactions
       </Button>
@@ -353,7 +353,7 @@ export function TransactionDetailsPage({
               standalone action rather than the timeline's side panel. */}
           {showActionPanel && (
             <section className="lg:col-start-1 lg:row-start-2">
-              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Upload invoice
               </h3>
               <div className="rounded-2xl border border-border p-5">
@@ -370,9 +370,10 @@ export function TransactionDetailsPage({
               page surface. Row shifts up to row 2 when Upload Invoice above
               is hidden. */}
           <section className={cn("lg:col-start-1", timelineRowClass)}>
-            <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Settlement timeline
             </h3>
+            <Separator className="mb-2" />
             <div>
               {timeline.map((step, i) => (
                 <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
@@ -390,9 +391,10 @@ export function TransactionDetailsPage({
               within a section. */}
           <div className={cn("lg:col-start-2 lg:row-start-2", detailsColumnRowSpanClass)}>
             <div>
-              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment Details
               </h3>
+              <Separator className="mb-2" />
               <div className="space-y-4">
                 <DetailRow label="Transaction date" value={formatTransactionTimestamp(row.formattedCreationDateTime)} />
                 {row.settlementDate && (
@@ -405,9 +407,10 @@ export function TransactionDetailsPage({
             </div>
 
             <div className="mt-9">
-              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Sender Details
               </h3>
+              <Separator className="mb-2" />
               <div className="space-y-4">
                 <DetailRow label="Remitter name" value={counterpartyName} />
                 <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
@@ -424,7 +427,7 @@ export function TransactionDetailsPage({
               whitespace) to here totals the requested 36px. */}
           {isSettled && (
             <section className={cn("lg:col-start-1 mt-3", paymentRowClass)}>
-              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment breakdown
               </h3>
               <div>
