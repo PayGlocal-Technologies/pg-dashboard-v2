@@ -93,9 +93,16 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
   const acctDigits = row.gid.replace(/\D/g, "");
   const acctSuffix = (acctDigits.slice(-4) || "7890").padStart(4, "0");
 
+  // Once the transaction has moved past the invoice step, its label reflects
+  // that the invoice has already been uploaded — same step, same index,
+  // purely a label swap based on where currentIndex already says the
+  // transaction is (no new state introduced).
+  const invoiceStepLabel =
+    currentIndex > WAITING_FOR_INVOICE_STEP_INDEX ? "Invoice submitted" : "Invoice pending";
+
   const labels = [
     `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} received in virtual account`,
-    "Invoice pending",
+    invoiceStepLabel,
     "Invoice review",
     "Transfer initiated to PayGlocal's India partner bank",
     "Converted to INR",
@@ -251,6 +258,25 @@ export function TransactionDetailsPage({
   const timelineRowClass = showActionPanel ? "lg:row-start-3" : "lg:row-start-2";
   const paymentRowClass = showActionPanel ? "lg:row-start-4" : "lg:row-start-3";
 
+  // The right column (Payment Details + Sender Details) doesn't span its own
+  // row — it shares rows 2..N with the left column's Timeline/Payment
+  // Breakdown. Without an explicit row-span, a grid row's height is always
+  // the max of every cell assigned to it, so if the right column is taller
+  // than the left column's content in that same row, the row stretches to
+  // fit it and the left column is left with dead space below its own
+  // content (the bug this fixes). Spanning the right column across every row
+  // the left column occupies lets the grid's sizing algorithm distribute
+  // that extra height across those rows instead of dumping it all into one,
+  // so any leftover space lands at the true bottom of the grid rather than
+  // as a gap in the middle of the left column.
+  const detailsColumnRowSpanClass = isSettled
+    ? showActionPanel
+      ? "lg:row-span-3"
+      : "lg:row-span-2"
+    : showActionPanel
+      ? "lg:row-span-2"
+      : "lg:row-span-1";
+
   return (
     <div>
       <Button
@@ -284,19 +310,11 @@ export function TransactionDetailsPage({
             content instead. */}
         <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[3fr_1fr] lg:items-start">
           {/* Row 1, left column — transaction summary. Remitter name lives in
-              Sender Details; Transaction Date sits in the top-right corner
-              for non-settled states. Settled transactions omit it entirely so
-              the header only shows Country/Amount/Status — the "Settled on"
-              chip below already communicates when it settled. */}
+              Sender Details; Transaction Date has moved to Payment Details
+              in the right column, so the header no longer shows a timestamp
+              at all, for any transaction state. */}
           <div className="lg:col-start-1 lg:row-start-1">
-            <div className="flex items-start justify-between gap-2.5">
-              <CountryCell iso2={row.partnerCustomerCountry} />
-              {!isSettled && (
-                <span className="shrink-0 text-[12px] text-muted-foreground">
-                  {formatTransactionTimestamp(row.formattedCreationDateTime)}
-                </span>
-              )}
-            </div>
+            <CountryCell iso2={row.partnerCustomerCountry} />
             <div className="mt-1.5 flex flex-col items-start gap-1.5">
               <div className="flex flex-wrap items-center gap-2.5">
                 <span className="text-[26px] font-semibold tabular-nums text-foreground">
@@ -359,7 +377,7 @@ export function TransactionDetailsPage({
             </div>
           </section>
 
-          {/* Row 2, right column — Sender Details + Payment Details,
+          {/* Row 2, right column — Payment Details then Sender Details,
               top-aligned with whichever section leads row 2 in the left
               column (Upload Invoice when present, otherwise Settlement
               Timeline). No surrounding card and no divider within either
@@ -367,20 +385,8 @@ export function TransactionDetailsPage({
               gap alone; the 36px gap between the two sections is explicit
               (mt-9) since that's wider than the space-y-4 used for fields
               within a section. */}
-          <div className="lg:col-start-2 lg:row-start-2">
+          <div className={cn("lg:col-start-2 lg:row-start-2", detailsColumnRowSpanClass)}>
             <div>
-              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Sender Details
-              </h3>
-              <div className="space-y-4">
-                <DetailRow label="Remitter name" value={counterpartyName} />
-                <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
-                <DetailRow label="Currency" value={currency} />
-                {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
-              </div>
-            </div>
-
-            <div className="mt-9">
               <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment Details
               </h3>
@@ -393,10 +399,28 @@ export function TransactionDetailsPage({
                 <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
               </div>
             </div>
+
+            <div className="mt-9">
+              <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Sender Details
+              </h3>
+              <div className="space-y-4">
+                <DetailRow label="Remitter name" value={counterpartyName} />
+                <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
+                <DetailRow label="Currency" value={currency} />
+                {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
+              </div>
+            </div>
           </div>
 
+          {/* This section only ever renders for settled transactions. The
+              grid's own row gap (gap-y-6 = 24px) already separates it from
+              Settlement Timeline above; mt-3 adds the remaining 12px so the
+              gap from the timeline's actual content (items-start keeps the
+              timeline section sized to its own content, no trailing
+              whitespace) to here totals the requested 36px. */}
           {isSettled && (
-            <section className={cn("lg:col-start-1", paymentRowClass)}>
+            <section className={cn("lg:col-start-1 mt-3", paymentRowClass)}>
               <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Payment breakdown
               </h3>
