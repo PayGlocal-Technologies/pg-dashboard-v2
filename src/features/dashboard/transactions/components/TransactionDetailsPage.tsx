@@ -1,10 +1,10 @@
 "use client";
 
+import Image from "next/image";
 import { type ReactNode } from "react";
 import {
   Alert,
   AlertDescription,
-  Badge,
   Button,
   Separator,
   StatusBadge,
@@ -160,6 +160,34 @@ function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean })
   );
 }
 
+// TODO: replace with the real payment method once the API exposes it for MCA
+// transactions — McaTransaction has no such field today (unlike PA's
+// paymentInstrument/cardBrand, see paColumns.tsx). Visa + a deterministic
+// pseudo last-4 (from the gid, same trick as buildTimeline's acctSuffix) is
+// shown purely as a temporary visual placeholder so the section isn't empty.
+function getMockCardLast4(gid: string): string {
+  const digits = gid.replace(/\D/g, "");
+  return (digits.slice(-4) || "4242").padStart(4, "0");
+}
+
+function PaymentMethodPlaceholder({ gid }: { gid: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="inline-flex h-5 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-white">
+        <Image
+          src="https://static.payglocal.in/images/network/visa.v2.svg"
+          alt="Visa"
+          width={32}
+          height={20}
+          unoptimized
+          className="h-3.5 w-5 object-contain"
+        />
+      </span>
+      <span className="font-mono text-[13px] font-medium text-foreground">•••• {getMockCardLast4(gid)}</span>
+    </div>
+  );
+}
+
 // Label above, value below — no divider between rows; each field stands on
 // its own with vertical rhythm coming from the parent's spacing only.
 function DetailRow({
@@ -246,30 +274,44 @@ export function TransactionDetailsPage({
             sections — placed in the same grid row via row-start-2 below — start
             at exactly the same top, regardless of how tall the summary above
             the Timeline ends up being. No vertical divider between the two
-            columns; they're separated by the grid gap alone. */}
-        <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[3fr_1fr]">
-          {/* Row 1, left column — transaction summary. Transaction ID now lives
-              in Sender Details, in the same label/value format as its fields. */}
+            columns; they're separated by the grid gap alone. lg:items-start
+            overrides the grid default of stretching every cell to the row's
+            tallest item — without it, the Settlement Timeline section (whose
+            own content is often shorter than Sender Details + Payment
+            Details together) stretches to match that height, leaving blank
+            space below the last timeline step and pushing Payment Breakdown
+            down with it. items-start lets each section size to its own
+            content instead. */}
+        <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[3fr_1fr] lg:items-start">
+          {/* Row 1, left column — transaction summary. Remitter name lives in
+              Sender Details; Transaction Date sits in the top-right corner
+              for non-settled states. Settled transactions omit it entirely so
+              the header only shows Country/Amount/Status — the "Settled on"
+              chip below already communicates when it settled. */}
           <div className="lg:col-start-1 lg:row-start-1">
-            <div className="flex flex-col items-start gap-1.5">
+            <div className="flex items-start justify-between gap-2.5">
               <CountryCell iso2={row.partnerCustomerCountry} />
-              <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="text-[26px] font-semibold tabular-nums text-foreground">
-                    {formatCurrency(amount, currency, "en-US")}
-                  </span>
-                  <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
-                </div>
-                {isSettled && settledOnTimestamp && (
-                  <Badge variant="secondary" size="sm">
-                    Settled on: {settledOnTimestamp}
-                  </Badge>
-                )}
+              {!isSettled && (
+                <span className="shrink-0 text-[12px] text-muted-foreground">
+                  {formatTransactionTimestamp(row.formattedCreationDateTime)}
+                </span>
+              )}
+            </div>
+            <div className="mt-1.5 flex flex-col items-start gap-1.5">
+              <div className="flex flex-wrap items-center gap-2.5">
+                <span className="text-[26px] font-semibold tabular-nums text-foreground">
+                  {formatCurrency(amount, currency, "en-US")}
+                </span>
+                <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
               </div>
-              <p className="text-[13px] leading-snug">
-                <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
-                <span className="text-muted-foreground">at {formatTransactionTimestamp(row.formattedCreationDateTime)}</span>
-              </p>
+              {/* Settled transactions replace the old remitter-name/date line
+                  beneath the amount with this chip instead; unsettled states
+                  simply have nothing there now. Neutral (muted) variant, no
+                  trailing icon — a quieter secondary chip than the primary
+                  Settlement Status badge above it. */}
+              {isSettled && settledOnTimestamp && (
+                <StatusBadge variant="muted" label={`Settled on ${settledOnTimestamp}`} size="sm" />
+              )}
             </div>
 
             {isReversed && (
@@ -343,9 +385,11 @@ export function TransactionDetailsPage({
                 Payment Details
               </h3>
               <div className="space-y-4">
+                <DetailRow label="Transaction date" value={formatTransactionTimestamp(row.formattedCreationDateTime)} />
                 {row.settlementDate && (
                   <DetailRow label="Settlement date" value={formatTransactionTimestamp(row.settlementDate)} />
                 )}
+                <DetailRow label="Payment method" value={<PaymentMethodPlaceholder gid={row.gid} />} />
                 <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
               </div>
             </div>
