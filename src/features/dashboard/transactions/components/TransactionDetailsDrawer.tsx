@@ -145,15 +145,10 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
   }));
 }
 
-function TimelineItem({
-  step,
-  isLast,
-  content,
-}: {
-  step: TimelineStep;
-  isLast: boolean;
-  content?: ReactNode;
-}) {
+// Communicates settlement progress only — merchant actions (e.g. the Upload
+// Invoice form) render beside the timeline, not nested inside a step, so
+// this component stays focused purely on step status/labels/timestamps.
+function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean }) {
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
@@ -186,9 +181,6 @@ function TimelineItem({
         </p>
         {step.status === "completed" && (
           <p className="mt-0.5 text-[11px] text-muted-foreground">{step.timestamp}</p>
-        )}
-        {content && (
-          <div className="mt-3 rounded-xl border border-border bg-muted/40 p-4">{content}</div>
         )}
       </div>
     </div>
@@ -285,24 +277,19 @@ export function TransactionDetailsDrawer({
             <VisuallyHidden>Transaction details</VisuallyHidden>
           </Dialog.Title>
 
-          {/* Header container — close button + Transaction ID, horizontally aligned. */}
-          <div className="flex shrink-0 items-center justify-between px-6 pt-4 pb-3">
+          {/* Header container — close button only; Transaction ID now lives in
+              the left column, directly below the transaction summary. */}
+          <div className="flex shrink-0 items-center justify-end px-6 pt-4 pb-1">
             <Dialog.Close asChild>
               <Button
                 type="button"
                 variant="ghost"
                 aria-label="Close"
-                className="-ml-2 h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="h-9 min-h-9 w-9 shrink-0 gap-0 rounded-lg border-0 bg-transparent px-0 text-muted-foreground hover:bg-muted hover:text-foreground"
               >
                 <Icon name="x" className="h-4 w-4" />
               </Button>
             </Dialog.Close>
-            {row && (
-              <div className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-                <span>Txn ID</span>
-                <CopyableText value={row.gid} />
-              </div>
-            )}
           </div>
 
           {row && <DrawerBody row={row} onOpenChange={onOpenChange} onUploaded={onUploaded} isPartnerUser={isPartnerUser} />}
@@ -339,52 +326,102 @@ function DrawerBody({
   const timeline = buildTimeline(row);
   const settledOnTimestamp = timeline[SETTLED_STEP_INDEX]?.timestamp;
 
+  // The contextual action panel appears beside the timeline only while the
+  // transaction actually needs merchant action; otherwise it collapses and
+  // the timeline uses the full row width — see WAITING_FOR_INVOICE_STEP_INDEX
+  // for which step this corresponds to.
+  const showActionPanel = needsAction && !isReversed;
+
   return (
-    <>
-      {/* Content container — Country → Amount → Date&Time, a single left-aligned stack. */}
-      <div className="shrink-0 border-b border-border px-6 pt-1 pb-5">
-        <div className="flex flex-col items-start gap-1.5">
-          <CountryCell iso2={row.partnerCustomerCountry} />
-          <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-[26px] font-semibold tabular-nums text-foreground">
-                {formatCurrency(amount, currency, "en-US")}
-              </span>
-              <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
+    <div className="flex-1 overflow-y-auto">
+      {/* CSS Grid (not flex) specifically so the Timeline and Sender Details
+          sections — placed in the same grid row via row-start-2 below — start
+          at exactly the same top, regardless of how tall the summary above
+          the Timeline ends up being. No vertical divider between the two
+          columns; they're separated by the grid gap alone. */}
+      <div className="grid gap-x-10 gap-y-6 px-6 py-6 lg:grid-cols-[3fr_1fr]">
+        {/* Row 1, left column — transaction summary with Transaction ID at the
+            top-right, aligned with it horizontally. */}
+        <div className="lg:col-start-1 lg:row-start-1">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col items-start gap-1.5">
+              <CountryCell iso2={row.partnerCustomerCountry} />
+              <div className="flex w-full flex-wrap items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="text-[26px] font-semibold tabular-nums text-foreground">
+                    {formatCurrency(amount, currency, "en-US")}
+                  </span>
+                  <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
+                </div>
+                {isSettled && settledOnTimestamp && (
+                  <Badge variant="secondary" size="sm">
+                    Settled on: {settledOnTimestamp}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-[13px] leading-snug">
+                <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
+                <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
+              </p>
             </div>
-            {isSettled && settledOnTimestamp && (
-              <Badge variant="secondary" size="sm">
-                Settled on: {settledOnTimestamp}
-              </Badge>
-            )}
+
+            {/* Transaction ID — top-right of this column, existing copy action. */}
+            <div className="flex shrink-0 items-center gap-1.5 text-[12px] text-muted-foreground">
+              <span>Txn ID</span>
+              <CopyableText value={row.gid} />
+            </div>
           </div>
-          <p className="text-[13px] leading-snug">
-            <span className="font-medium text-foreground">by {counterpartyName}</span>{" "}
-            <span className="text-muted-foreground">at {row.formattedCreationDateTime ?? "—"}</span>
-          </p>
+
+          {isReversed && (
+            <Alert variant="error" className="mt-6">
+              <AlertDescription>
+                Funds for this transaction were reversed and returned to the remitter.
+              </AlertDescription>
+            </Alert>
+          )}
         </div>
-      </div>
 
-      {/* Body — scrollable sections. */}
-      <div className="flex-1 space-y-6 overflow-y-auto px-6 pt-6 pb-5">
-        {isReversed && (
-          <Alert variant="error">
-            <AlertDescription>
-              Funds for this transaction were reversed and returned to the remitter.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* Transaction details — temporarily disabled, kept for later restoration.
-        <section>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Transaction details
+        {/* Row 2, left column — Settlement Timeline. Title sits outside the
+            card; only the steps and the contextual action panel (e.g. Upload
+            Invoice) are enclosed in it, and that panel collapses entirely when
+            no merchant action is currently required. */}
+        <section className="lg:col-start-1 lg:row-start-2">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Settlement timeline
           </h3>
-          <div className="divide-y divide-border rounded-xl border border-border">
+          <div className="overflow-hidden rounded-2xl border border-border">
+            <div className="flex flex-col md:flex-row">
+              <div className="min-w-0 flex-1 p-5">
+                {timeline.map((step, i) => (
+                  <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
+                ))}
+              </div>
+              {showActionPanel && (
+                <div className="border-t border-border p-5 md:w-[340px] md:shrink-0 md:border-t-0 md:border-l">
+                  <UploadInvoiceForm
+                    row={row}
+                    variant="inline"
+                    onSuccess={() => onUploaded?.(row)}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Row 2, right column — Sender Details, top-aligned with the
+            Settlement timeline heading above (same grid row), no surrounding
+            card and no divider — separation comes from the grid gap only. */}
+        <div className="lg:col-start-2 lg:row-start-2">
+          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Sender Details
+          </h3>
+          <div className="divide-y divide-border">
+            {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
             <DetailRow label="Remitter name" value={counterpartyName} />
             <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
             <DetailRow label="Currency" value={currency} />
-            {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
+            <DetailRow label="Invoice type" value={row.invoiceType} />
             {row.settlementAmount && (
               <DetailRow
                 label="Settlement amount"
@@ -397,14 +434,10 @@ function DrawerBody({
             )}
             {row.settlementDate && <DetailRow label="Settlement date" value={row.settlementDate} />}
           </div>
-        </section>
-        */}
+        </div>
 
         {isSettled && (
-          // mb-8 overrides the space-y-6 gap below this section (24px) to 32px —
-          // space-y's margin is applied via a zero-specificity :where() selector,
-          // so a direct margin utility here replaces it cleanly for this child only.
-          <section className="mb-8">
+          <section className="lg:col-start-1 lg:row-start-3">
             <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Payment breakdown
             </h3>
@@ -448,31 +481,7 @@ function DrawerBody({
             </div>
           </section>
         )}
-
-        <section>
-          <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Settlement timeline
-          </h3>
-          <div>
-            {timeline.map((step, i) => (
-              <TimelineItem
-                key={step.label}
-                step={step}
-                isLast={i === timeline.length - 1}
-                content={
-                  i === WAITING_FOR_INVOICE_STEP_INDEX && needsAction && !isReversed ? (
-                    <UploadInvoiceForm
-                      row={row}
-                      variant="inline"
-                      onSuccess={() => onUploaded?.(row)}
-                    />
-                  ) : undefined
-                }
-              />
-            ))}
-          </div>
-        </section>
       </div>
-    </>
+    </div>
   );
 }
