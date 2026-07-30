@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, PageHeader } from "@/components/ui";
+import { Button, Card, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
@@ -77,21 +77,26 @@ export function MultiCurrencyFeature() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader
-        title="Virtual accounts"
-        subtitle={PAGE_DESCRIPTION}
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleShareAll}
-            rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
-            disabled={isLoading || accounts.length === 0}
-          >
-            Share with clients
-          </Button>
-        }
-      />
+      <PageHeader title="Virtual accounts" />
+
+      {/* Hero information container — helper text and the page-level share
+          action, grouped into one surface separate from the account cards
+          below. flex-wrap lets the button drop under the text on narrow
+          viewports instead of forcing a squeeze, while both stay anchored to
+          their respective edges at any width that does fit on one line. */}
+      <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
+        <p className="min-w-0 flex-1 text-sm text-muted-foreground">{PAGE_DESCRIPTION}</p>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleShareAll}
+          rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
+          disabled={isLoading || accounts.length === 0}
+          className="shrink-0"
+        >
+          Share with clients
+        </Button>
+      </Card>
 
       <VirtualAccountList
         accounts={accounts}
