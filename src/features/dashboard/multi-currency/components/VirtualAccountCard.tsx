@@ -86,8 +86,11 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
 
         {/* Account name is the primary element after the flag — the only
             bold/large text on the card. leading-none keeps the two-line
-            block compact so there's always room for the details below. */}
-        <div className="min-w-0">
+            block compact so there's always room for the details below.
+            mt-3 (on top of CardContent's own gap-1) gives the flag more
+            breathing room before the name, since that gap was too tight for
+            the flag→name relationship specifically. */}
+        <div className="mt-3 min-w-0">
           <p className="truncate text-lg font-bold leading-none text-foreground">
             {account.accountName}
           </p>
@@ -98,15 +101,19 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
 
         {/* Identifiers sit one level below the account name — every row uses
             the same label/value size and weight, regardless of what it is
-            (account number, IBAN, ACH, SEPA, ...), for consistency. Sized to
-            always fit above the card's bottom padding, never clipped. */}
+            (account number, IBAN, ACH, SEPA, ...), for consistency. Label and
+            value now share identical typography (size/weight/case/tracking);
+            only the muted vs. foreground color tells them apart, so neither
+            outweighs the other while both stay secondary to the account
+            name above. Sized to always fit above the card's bottom padding,
+            never clipped. */}
         <div className="mt-auto min-w-0 space-y-1.5">
           {account.details.map((detail) => (
             <p key={detail.label} className="flex min-w-0 items-baseline gap-1.5 leading-none">
               <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide leading-none text-muted-foreground">
                 {detail.label.split(" ")[0]}
               </span>
-              <span className="truncate text-sm font-medium leading-none text-foreground">
+              <span className="truncate text-[10px] font-medium uppercase tracking-wide leading-none text-foreground">
                 {detail.value}
               </span>
             </p>
