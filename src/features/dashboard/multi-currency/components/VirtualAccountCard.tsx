@@ -1,19 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Card,
-  CardContent,
-  IconButton,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
-} from "@/components/ui";
+import { Button, Card, CardContent } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
-import { CARD_SIZE_CLASS, TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
+import { CARD_SIZE_CLASS } from "@/features/dashboard/multi-currency/constants";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 interface VirtualAccountCardProps {
@@ -24,60 +15,14 @@ interface VirtualAccountCardProps {
 }
 
 export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountCardProps) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    await onCopy(account);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-
   return (
     <Card
       className={cn(
         CARD_SIZE_CLASS,
-        "shrink-0 overflow-hidden px-4 py-4 transition-shadow hover:shadow-md"
+        "group relative shrink-0 overflow-hidden px-4 py-4 transition-shadow hover:shadow-md"
       )}
     >
       <CardContent className="flex h-full min-w-0 flex-col gap-1 overflow-hidden">
-        {/* Action pair in the top-right corner, as per the wireframe */}
-        <TooltipProvider delayDuration={200}>
-          <div className="flex items-center justify-end gap-0.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <IconButton
-                  aria-label={copied ? "Copied to clipboard" : `Copy ${account.accountName} details`}
-                  variant="ghost"
-                  size="xs"
-                  className="size-6 min-w-6"
-                  onClick={handleCopy}
-                >
-                  <Icon name={copied ? "check" : "copy"} className="h-3.5 w-3.5" />
-                </IconButton>
-              </TooltipTrigger>
-              <TooltipContent className={TOOLTIP_CONTENT_CLASS} sideOffset={4}>
-                {copied ? "Copied!" : "Copy account details"}
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <IconButton
-                  aria-label={`Share ${account.accountName}`}
-                  variant="ghost"
-                  size="xs"
-                  className="size-6 min-w-6"
-                  onClick={() => onShare(account)}
-                >
-                  <Icon name="share" className="h-3.5 w-3.5" />
-                </IconButton>
-              </TooltipTrigger>
-              <TooltipContent className={TOOLTIP_CONTENT_CLASS} sideOffset={4}>
-                Share with client
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        </TooltipProvider>
-
         <CountryFlagAvatar
           iso2={account.iso2}
           countryName={account.countryName}
@@ -120,6 +65,46 @@ export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountC
           ))}
         </div>
       </CardContent>
+
+      {/* Hover-revealed actions. Absolutely positioned so they overlay the
+          bottom of the card instead of participating in its flex layout —
+          appearing/disappearing never shifts the card's size or the
+          identifiers above it. stopPropagation keeps clicks scoped to the
+          button itself. group-focus-within mirrors the hover reveal for
+          keyboard users tabbing onto the buttons. */}
+      <div
+        className={cn(
+          "pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 px-4 py-4",
+          "bg-card opacity-0 transition-opacity duration-200",
+          "group-hover:pointer-events-auto group-hover:opacity-100",
+          "group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+        )}
+      >
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
+          rightIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            void onCopy(account);
+          }}
+        >
+          Copy
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className="flex-1"
+          rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            onShare(account);
+          }}
+        >
+          Share
+        </Button>
+      </div>
     </Card>
   );
 }
