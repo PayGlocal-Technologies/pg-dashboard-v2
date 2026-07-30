@@ -34,10 +34,11 @@ export function VirtualAccountList({
 }: VirtualAccountListProps) {
   if (isLoading) {
     return (
-      // p-2 (not just pb-2): overflow-x-auto forces the vertical axis to
-      // "auto" too per the CSS overflow spec, so without side/top padding the
-      // active card's ring-2 would clip against this container's edges.
-      <div className="scrollbar-none flex gap-4 overflow-hidden p-2" aria-busy>
+      // px-4/py-3 (not just pb-2): overflow-x-auto forces the vertical axis
+      // to "auto" too per the CSS overflow spec, so without padding on every
+      // side the first/last card's shadow, rounded corners, and the active
+      // card's ring-2 would all clip against this container's edges.
+      <div className="scrollbar-none flex gap-4 overflow-hidden px-4 py-3" aria-busy>
         {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => (
           <VirtualAccountCardSkeleton key={i} />
         ))}
@@ -57,7 +58,7 @@ export function VirtualAccountList({
 
   return (
     <div
-      className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth p-2"
+      className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth px-4 py-3"
       role="list"
       aria-label="Virtual receiving accounts"
     >

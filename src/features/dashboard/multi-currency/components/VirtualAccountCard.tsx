@@ -100,13 +100,17 @@ export function VirtualAccountCard({
           appearing/disappearing never shifts the card's size or the
           identifiers above it. stopPropagation keeps clicks scoped to the
           button itself. group-focus-within mirrors the hover reveal for
-          keyboard users tabbing onto the buttons. */}
+          keyboard users tabbing onto the buttons. Suppressed entirely while
+          selected — the active card shows only its border and the Plus
+          icon while the details section below is populated, not these. */}
       <div
         className={cn(
           "pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 px-4 py-4",
           "bg-card opacity-0 transition-opacity duration-200",
-          "group-hover:pointer-events-auto group-hover:opacity-100",
-          "group-focus-within:pointer-events-auto group-focus-within:opacity-100"
+          !isSelected && [
+            "group-hover:pointer-events-auto group-hover:opacity-100",
+            "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
+          ]
         )}
       >
         <Button

@@ -20,7 +20,15 @@ interface VirtualAccountDetailsProps {
  * their own content (grid-cols-3 inside a shrink-wrapped container resolves
  * `fr` tracks by content, not by the page), so the card — and the action
  * buttons below it, which share its width — never stretch to the full page
- * width the way a plain `w-full` card would.
+ * width the way a plain `w-full` card would. `max-w-[730px]` caps how far
+ * that natural sizing can grow.
+ *
+ * flux-ui's Card is itself a `flex flex-col` with a `gap-10` (40px) default
+ * between its direct children — CardContent, Separator, the helper text, and
+ * the button row all sit directly inside it, so that default gap was what
+ * actually set the vertical rhythm here, not per-element margins. Overriding
+ * it to `gap-4` on the Card is the one place that spacing needs to change;
+ * adding margins back on the individual elements would only double up with it.
  */
 export function VirtualAccountDetails({ account, onCopy, onShare }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
@@ -31,7 +39,7 @@ export function VirtualAccountDetails({ account, onCopy, onShare }: VirtualAccou
         {account.countryName} Account
       </h3>
 
-      <Card className="w-fit max-w-full px-6 py-6">
+      <Card className="w-fit max-w-[730px] gap-4 px-6 py-6">
         <CardContent>
           <dl className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-3">
             {fields.map((field) => (
@@ -45,9 +53,9 @@ export function VirtualAccountDetails({ account, onCopy, onShare }: VirtualAccou
           </dl>
         </CardContent>
 
-        <Separator className="my-5" />
+        <Separator />
 
-        <p className="mb-3 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Share a link or copy all fields for your client.
         </p>
 
