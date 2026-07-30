@@ -28,6 +28,7 @@ import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
 // kept commented out (not deleted) alongside the modal's usage below.
 // import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
 import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
+import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
 import {
   MCA_STATUS_FILTERS,
   MCA_CURRENCY_FILTERS,
@@ -226,7 +227,12 @@ export function McaTransactionTable() {
   // const [uploadRowId, setUploadRowId] = useState<string | null>(null);
   // const [uploadOpen, setUploadOpen]   = useState(false);
 
+  // detailsRowId identifies which transaction is being viewed; the drawer and
+  // the full page are two presentations of that same selection, so they share
+  // it. drawerOpen and detailsOpen are mutually exclusive: a row click opens
+  // the drawer, and Expand hands the same transaction off to the page.
   const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen]     = useState(false);
   const [detailsOpen, setDetailsOpen]   = useState(false);
   // Set when navigating to a linked transaction that isn't part of the
   // table's own currently-fetched page (see openLinkedTransaction below) —
@@ -283,13 +289,24 @@ export function McaTransactionTable() {
   //   setUploadOpen(true);
   // };
 
-  // Captures the table's current scroll position (within the dashboard's
-  // scrollable content area) before switching to the full-page detail view,
-  // so Back can restore it instead of the page opening at the top.
+  // Clicking a row opens the drawer, not the full page. The table stays
+  // mounted underneath it, so filters, sorting, pagination, and scroll are
+  // untouched for the whole time the drawer is open and after it closes.
   const openDetails = (row: McaTransaction) => {
-    if (contentEl) setScrollPosition(contentEl.scrollTop);
     setDetailsOverrideRow(null);
     setDetailsRowId(row.gid);
+    setDrawerOpen(true);
+  };
+
+  // Expand hands the drawer's current transaction off to the full page.
+  // detailsRowId/detailsOverrideRow already hold that selection, so the page
+  // renders exactly what the drawer was showing. The table's scroll position
+  // is captured here (rather than when the drawer opened) because this is the
+  // point the table actually leaves the screen and Back has to restore it.
+  const expandToPage = (row: McaTransaction) => {
+    if (contentEl) setScrollPosition(contentEl.scrollTop);
+    setDetailsRowId(row.gid);
+    setDrawerOpen(false);
     setDetailsOpen(true);
   };
 
@@ -298,17 +315,19 @@ export function McaTransactionTable() {
     setDetailsOverrideRow(null);
   };
 
-  // Clicking a row in the details page's own Linked Transactions section —
-  // replaces the currently shown transaction in place (same page, same
-  // layout) rather than going back to the table first. The clicked row
-  // comes from a separate query (see LinkedTransactionsSection), not the
-  // table's own fetched page, so it's stored directly instead of looked up
-  // by id. Resets scroll to the top since this reads as a fresh page, the
-  // same way clicking a different row from the Transactions table would.
+  // Clicking a row in the Linked Transactions section swaps the currently
+  // shown transaction in place, in whichever view is open (drawer or page),
+  // rather than closing back to the table first. The clicked row comes from a
+  // separate query (see LinkedTransactionsSection), not the table's own
+  // fetched page, so it's stored directly instead of looked up by id.
   const openLinkedTransaction = (row: McaTransaction) => {
     setDetailsOverrideRow(row);
     setDetailsRowId(row.gid);
-    if (contentEl) restoreScrollTop(contentEl, 0);
+    // Only meaningful for the full page, where contentEl is what scrolls and
+    // a new transaction should start at the top. The drawer scrolls its own
+    // container, so touching contentEl there would move the background
+    // table instead.
+    if (detailsOpen && contentEl) restoreScrollTop(contentEl, 0);
   };
 
   // Restores the table's scroll position after the details page unmounts and
@@ -456,6 +475,20 @@ export function McaTransactionTable() {
         onUploaded={handleInvoiceSubmitted}
       />
       */}
+
+      {/* Rendered alongside the table (not in place of it) so closing it
+          leaves the table exactly as it was. Shares the same handlers as the
+          full page, so the invoice upload flow and Linked Transactions
+          navigation behave identically in both. */}
+      <TransactionDetailsDrawer
+        row={detailsRow}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onExpand={expandToPage}
+        onUploaded={handleInvoiceSubmitted}
+        onOpenTransaction={openLinkedTransaction}
+        isPartnerUser={isPartnerUser}
+      />
     </div>
   );
 }

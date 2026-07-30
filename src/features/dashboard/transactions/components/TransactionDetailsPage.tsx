@@ -295,12 +295,192 @@ function DetailRow({
   );
 }
 
+// Below: one small component per section, each just the "title outside +
+// card inside" module on its own — no positioning classes. TransactionDetails
+// Content (further down) arranges these differently depending on layout: the
+// full page places them in a 2-column grid with explicit row placement,
+// while the drawer stacks them in a single column in document order. Sharing
+// these components (rather than duplicating their JSX per layout) is what
+// keeps the two views from drifting apart.
+
+function UploadInvoiceSection({
+  row,
+  onUploaded,
+}: {
+  row: McaTransaction;
+  onUploaded?: (row: McaTransaction) => void;
+}) {
+  return (
+    <section>
+      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Upload invoice
+      </h3>
+      <Card size="sm">
+        <CardContent>
+          <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function SettlementTimelineSection({ timeline }: { timeline: TimelineStep[] }) {
+  return (
+    <section>
+      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Settlement timeline
+      </h3>
+      <Card size="sm">
+        <CardContent>
+          {timeline.map((step, i) => (
+            <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
+          ))}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function PaymentBreakdownSection({
+  convertedAmount,
+  processingFee,
+  netAmount,
+}: {
+  convertedAmount: number;
+  processingFee: number;
+  netAmount: number;
+}) {
+  return (
+    <section>
+      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Payment breakdown
+      </h3>
+      <Card size="sm">
+        <CardContent>
+          <div className="flex items-center justify-between gap-4 pb-2.5 text-[13px]">
+            <span className="text-muted-foreground">
+              Payment amount
+              <span className="ml-1 text-[11px]">(using live FX)</span>
+            </span>
+            <span className="font-medium tabular-nums text-foreground">
+              {formatCurrency(convertedAmount, "INR", "en-IN")}
+            </span>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              PayGlocal processing fee
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto min-h-0 px-0 py-0 text-[12px]"
+                onClick={() => {
+                  // TODO: link to the processing-fee explainer once one exists.
+                }}
+              >
+                Learn more
+              </Button>
+            </span>
+            <span className="font-medium tabular-nums text-foreground">
+              − {formatCurrency(processingFee, "INR", "en-IN")}
+            </span>
+          </div>
+          <Separator />
+          <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
+            <span className="font-semibold text-foreground">Net settlement amount</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {formatCurrency(netAmount, "INR", "en-IN")}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+// floatTitle is only used by the full page's 2-column grid: for settled
+// transactions there, this section shares its row with the FIRA Received
+// banner, which has no title above its card, so its card starts flush at
+// the top of the row. Floating this title out of flow (rather than sitting
+// inline above the card) keeps this section's own box equal to just the
+// Card's box, so the two cards' top edges line up. The drawer's single
+// column has no such cross-column alignment to worry about, so it always
+// passes floatTitle={false} and gets the plain in-flow title.
+function PaymentDetailsSection({
+  row,
+  currency,
+  floatTitle,
+}: {
+  row: McaTransaction;
+  currency: string;
+  floatTitle: boolean;
+}) {
+  return (
+    <section className={cn(floatTitle && "relative")}>
+      <h3
+        className={cn(
+          "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+          floatTitle ? "absolute -top-7 left-0" : "mb-3"
+        )}
+      >
+        Payment Details
+      </h3>
+      <Card size="sm">
+        <CardContent className="space-y-4">
+          <DetailRow label="Transaction date" value={formatTransactionTimestamp(row.formattedCreationDateTime)} />
+          {/* Always shown, even pre-settlement — a "-" placeholder keeps the
+              field present across every transaction state instead of the
+              row disappearing until settlement. */}
+          <DetailRow
+            label="Settlement date"
+            value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
+          />
+          <DetailRow label="Payment method" value={<PaymentMethodPlaceholder gid={row.gid} />} />
+          <DetailRow label="Currency" value={currency} />
+          <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function SenderDetailsSection({
+  row,
+  counterpartyName,
+  isPartnerUser,
+}: {
+  row: McaTransaction;
+  counterpartyName: string;
+  isPartnerUser: boolean;
+}) {
+  return (
+    <section>
+      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Sender Details
+      </h3>
+      <Card size="sm">
+        <CardContent className="space-y-4">
+          <DetailRow label="Remitter name" value={counterpartyName} />
+          <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
+          {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
 // Full-page transaction detail view — replaces the Transactions table in
 // place (see McaTransactionTable) rather than overlaying it, so this renders
 // as a plain page: no portal, no backdrop, no open/close animation. The Back
 // button is the only navigation affordance; the caller (McaTransactionTable)
 // keeps the table's own filter/sort/pagination state alive since switching
 // back just swaps which JSX this shares a parent with, no unmount involved.
+//
+// The details themselves live in TransactionDetailsContent below, shared
+// verbatim with TransactionDetailsDrawer so the drawer and the full page stay
+// functionally identical. This wrapper only adds the page's own Back
+// navigation on top of it.
 export function TransactionDetailsPage({
   row,
   onBack,
@@ -308,6 +488,49 @@ export function TransactionDetailsPage({
   onOpenTransaction,
   isPartnerUser,
 }: TransactionDetailsPageProps) {
+  return (
+    <div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
+        onClick={onBack}
+        className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
+      >
+        Back to Transactions
+      </Button>
+
+      <TransactionDetailsContent
+        row={row}
+        onUploaded={onUploaded}
+        onOpenTransaction={onOpenTransaction}
+        isPartnerUser={isPartnerUser}
+      />
+    </div>
+  );
+}
+
+interface TransactionDetailsContentProps extends Omit<TransactionDetailsPageProps, "onBack"> {
+  /** "page" (default): 2-column grid, as on the full Transaction Details
+   * page. "drawer": single column, everything stacked in document order,
+   * for the narrower drawer viewport. */
+  layout?: "page" | "drawer";
+}
+
+// Every section of the transaction detail view: summary, FIRA banner, Upload
+// Invoice, Settlement Timeline, Payment Breakdown, Payment/Sender Details,
+// and Linked Transactions. Rendered as-is by both TransactionDetailsPage
+// (above) and TransactionDetailsDrawer, so neither view can drift from the
+// other in conditional states or behaviour. Only the arrangement (layout
+// prop) differs between them.
+export function TransactionDetailsContent({
+  row,
+  onUploaded,
+  onOpenTransaction,
+  isPartnerUser,
+  layout = "page",
+}: TransactionDetailsContentProps) {
   const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
   const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
   const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
@@ -337,6 +560,59 @@ export function TransactionDetailsPage({
   // needs merchant action.
   const showActionPanel = needsAction && !isReversed;
 
+  const summary = (
+    <div className={layout === "drawer" ? undefined : "mb-9"}>
+      <CountryCell iso2={row.partnerCustomerCountry} />
+      <div className="mt-1.5 flex flex-col items-start gap-1.5">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <span className="text-[26px] font-semibold tabular-nums text-foreground">
+            {formatCurrency(amount, currency, "en-US")}
+          </span>
+          <StatusBadge variant={variant} label={summaryStatusLabel} trailIcon={trailIcon} />
+        </div>
+        {/* Supporting context under the amount — lower emphasis than the
+            amount itself (text-[13px], muted label) but still clearly
+            readable, with the remitter name itself kept at foreground
+            weight so it doesn't disappear entirely. */}
+        <p className="text-[13px] text-muted-foreground">
+          Charged by <span className="font-medium text-foreground">{counterpartyName}</span>
+        </p>
+      </div>
+
+      {isReversed && (
+        <Alert variant="error" className="mt-6">
+          <AlertDescription>
+            Funds for this transaction were reversed and returned to the remitter.
+          </AlertDescription>
+        </Alert>
+      )}
+    </div>
+  );
+
+  if (layout === "drawer") {
+    // Single column, in document order: no grid, no row-start math, no
+    // floated titles. Every section keeps the same title-outside/card-inside
+    // structure as the page; only how they're arranged differs.
+    return (
+      <div className="space-y-9">
+        {summary}
+        {isSettled && <FiraReceivedBanner />}
+        {showActionPanel && <UploadInvoiceSection row={row} onUploaded={onUploaded} />}
+        <SettlementTimelineSection timeline={timeline} />
+        {isSettled && (
+          <PaymentBreakdownSection
+            convertedAmount={convertedAmount}
+            processingFee={processingFee}
+            netAmount={netAmount}
+          />
+        )}
+        <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
+        <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
+        <LinkedTransactionsSection row={row} isPartnerUser={isPartnerUser} onOpenTransaction={onOpenTransaction} />
+      </div>
+    );
+  }
+
   // Row numbers for the left column, within the 2-column grid that starts
   // below the full-width transaction summary. For settled transactions, the
   // FIRA Received banner leads at row 1, ahead of Settlement Timeline.
@@ -362,50 +638,11 @@ export function TransactionDetailsPage({
 
   return (
     <div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
-        onClick={onBack}
-        className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
-      >
-        Back to Transactions
-      </Button>
-
       {/* Transaction summary — full-width page header, standalone, no card,
           sitting above the 2-column layout entirely (not part of either
-          column). The primary focal point of the page. Sender Details still
-          carries the full Remitter name field; this "Charged by" line is
-          just supporting context directly under the amount. Transaction
-          Date lives in Payment Details — the header never shows a
-          timestamp. */}
-      <div className="mb-9">
-        <CountryCell iso2={row.partnerCustomerCountry} />
-        <div className="mt-1.5 flex flex-col items-start gap-1.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="text-[26px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(amount, currency, "en-US")}
-            </span>
-            <StatusBadge variant={variant} label={summaryStatusLabel} trailIcon={trailIcon} />
-          </div>
-          {/* Supporting context under the amount — lower emphasis than the
-              amount itself (text-[13px], muted label) but still clearly
-              readable, with the remitter name itself kept at foreground
-              weight so it doesn't disappear entirely. */}
-          <p className="text-[13px] text-muted-foreground">
-            Charged by <span className="font-medium text-foreground">{counterpartyName}</span>
-          </p>
-        </div>
-
-        {isReversed && (
-          <Alert variant="error" className="mt-6">
-            <AlertDescription>
-              Funds for this transaction were reversed and returned to the remitter.
-            </AlertDescription>
-          </Alert>
-        )}
-      </div>
+          column). The primary focal point of the page. Transaction Date
+          lives in Payment Details — the header never shows a timestamp. */}
+      {summary}
 
       {/* 2-column layout, below the summary. Left column sections use
           explicit row-start classes (rather than a plain space-y stack) so
@@ -427,86 +664,28 @@ export function TransactionDetailsPage({
           </div>
         )}
 
-        {/* Upload Invoice — title outside, form inside its own card. Only
-            rendered while the transaction actually needs merchant action;
-            always row 1 when present. */}
+        {/* Upload Invoice — always row 1 when present. */}
         {showActionPanel && (
-          <section className={cn("lg:col-start-1", ROW_START_CLASS[1])}>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Upload invoice
-            </h3>
-            <Card size="sm">
-              <CardContent>
-                <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
-              </CardContent>
-            </Card>
-          </section>
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[1])}>
+            <UploadInvoiceSection row={row} onUploaded={onUploaded} />
+          </div>
         )}
 
-        {/* Settlement Timeline — title outside, timeline inside its own
-            card. Right column's Payment Details card aligns with this
-            row. */}
-        <section className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
-          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Settlement timeline
-          </h3>
-          <Card size="sm">
-            <CardContent>
-              {timeline.map((step, i) => (
-                <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
-              ))}
-            </CardContent>
-          </Card>
-        </section>
+        {/* Settlement Timeline: right column's Payment Details card aligns
+            with this row. */}
+        <div className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
+          <SettlementTimelineSection timeline={timeline} />
+        </div>
 
-        {/* Payment Breakdown — only for settled transactions; same title
-            outside / card inside treatment as the other modules. */}
+        {/* Payment Breakdown — only for settled transactions. */}
         {isSettled && (
-          <section className={cn("lg:col-start-1", ROW_START_CLASS[breakdownRow])}>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Payment breakdown
-            </h3>
-            <Card size="sm">
-              <CardContent>
-                <div className="flex items-center justify-between gap-4 pb-2.5 text-[13px]">
-                  <span className="text-muted-foreground">
-                    Payment amount
-                    <span className="ml-1 text-[11px]">(using live FX)</span>
-                  </span>
-                  <span className="font-medium tabular-nums text-foreground">
-                    {formatCurrency(convertedAmount, "INR", "en-IN")}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
-                  <span className="flex items-center gap-1.5 text-muted-foreground">
-                    PayGlocal processing fee
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-auto min-h-0 px-0 py-0 text-[12px]"
-                      onClick={() => {
-                        // TODO: link to the processing-fee explainer once one exists.
-                      }}
-                    >
-                      Learn more
-                    </Button>
-                  </span>
-                  <span className="font-medium tabular-nums text-foreground">
-                    − {formatCurrency(processingFee, "INR", "en-IN")}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between gap-4 py-2.5 text-[13px]">
-                  <span className="font-semibold text-foreground">Net settlement amount</span>
-                  <span className="font-semibold tabular-nums text-foreground">
-                    {formatCurrency(netAmount, "INR", "en-IN")}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </section>
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[breakdownRow])}>
+            <PaymentBreakdownSection
+              convertedAmount={convertedAmount}
+              processingFee={processingFee}
+              netAmount={netAmount}
+            />
+          </div>
         )}
 
         {/* Linked Transactions — its own table already provides sufficient
@@ -520,13 +699,12 @@ export function TransactionDetailsPage({
           />
         </div>
 
-        {/* Right column: Payment Details then Sender Details, each its own
-            title-outside/card-inside module. Starts at whichever section
-            leads the left column: Upload Invoice's row for Invoice Pending
-            transactions, FIRA Received's row for settled transactions, and
-            Settlement Timeline's row otherwise. Spans through Linked
-            Transactions' row so its top aligns with whichever card it
-            starts at. */}
+        {/* Right column: Payment Details then Sender Details. Starts at
+            whichever section leads the left column: Upload Invoice's row for
+            Invoice Pending transactions, FIRA Received's row for settled
+            transactions, and Settlement Timeline's row otherwise. Spans
+            through Linked Transactions' row so its top aligns with whichever
+            card it starts at. */}
         <div
           className={cn(
             "space-y-9 lg:col-start-2",
@@ -534,58 +712,8 @@ export function TransactionDetailsPage({
             ROW_SPAN_CLASS[detailsColumnRowSpan]
           )}
         >
-          {/* For settled transactions, this section shares its row with the
-              FIRA Received banner, which has no title above its card — its
-              card starts flush at the top of the row. To keep the Payment
-              Details CARD's top edge aligned with the banner card's top
-              edge (not the "Payment Details" title), the title is taken out
-              of flow here and floated above the section instead of sitting
-              inline above the card; the section's only in-flow child is the
-              Card, so the section's box (and therefore the row-aligned top
-              edge) is exactly the Card's box. The -top-7 offset approximates
-              the same title-to-card gap the normal (title-in-flow) layout
-              below uses. For every other state, Payment Details shares its
-              row with Settlement Timeline, which does have a title above
-              its card, so the normal in-flow layout already aligns
-              correctly and this treatment isn't needed. */}
-          <section className={cn(isSettled && "relative")}>
-            <h3
-              className={cn(
-                "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
-                isSettled ? "absolute -top-7 left-0" : "mb-3"
-              )}
-            >
-              Payment Details
-            </h3>
-            <Card size="sm">
-              <CardContent className="space-y-4">
-                <DetailRow label="Transaction date" value={formatTransactionTimestamp(row.formattedCreationDateTime)} />
-                {/* Always shown, even pre-settlement — a "-" placeholder
-                    keeps the field present across every transaction state
-                    instead of the row disappearing until settlement. */}
-                <DetailRow
-                  label="Settlement date"
-                  value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
-                />
-                <DetailRow label="Payment method" value={<PaymentMethodPlaceholder gid={row.gid} />} />
-                <DetailRow label="Currency" value={currency} />
-                <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
-              </CardContent>
-            </Card>
-          </section>
-
-          <section>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-              Sender Details
-            </h3>
-            <Card size="sm">
-              <CardContent className="space-y-4">
-                <DetailRow label="Remitter name" value={counterpartyName} />
-                <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
-                {isPartnerUser && <DetailRow label="Merchant ID" value={row.merchantId} />}
-              </CardContent>
-            </Card>
-          </section>
+          <PaymentDetailsSection row={row} currency={currency} floatTitle={isSettled} />
+          <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
         </div>
       </div>
     </div>
