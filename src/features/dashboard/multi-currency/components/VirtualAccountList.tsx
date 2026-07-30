@@ -9,9 +9,10 @@ import { VirtualAccountCardSkeleton } from "@/features/dashboard/multi-currency/
 import { SKELETON_CARD_COUNT } from "@/features/dashboard/multi-currency/constants";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
-// How close to the end of the scrollable width counts as "there" — a few px
-// of slack for sub-pixel scroll positions rather than requiring an exact 0.
+// How close to either end of the scrollable width counts as "there" — a few
+// px of slack for sub-pixel scroll positions rather than requiring an exact 0.
 const END_OF_SCROLL_THRESHOLD_PX = 4;
+const START_OF_SCROLL_THRESHOLD_PX = 4;
 
 interface VirtualAccountListProps {
   accounts: VirtualAccount[];
@@ -42,17 +43,22 @@ export function VirtualAccountList({
   // Hidden once there's nothing left to scroll to — either the list never
   // overflowed in the first place, or the user has scrolled to the end.
   const [showEndFade, setShowEndFade] = useState(true);
+  // Hidden at the initial scroll position; appears once the user has
+  // actually scrolled right, meaning there are cards behind them again.
+  const [showStartFade, setShowStartFade] = useState(false);
 
-  const updateEndFade = (el: HTMLDivElement | null) => {
+  const updateFades = (el: HTMLDivElement | null) => {
     if (!el) return;
+    const atStart = el.scrollLeft <= START_OF_SCROLL_THRESHOLD_PX;
     const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - END_OF_SCROLL_THRESHOLD_PX;
+    setShowStartFade(!atStart);
     setShowEndFade(!atEnd);
   };
 
   // Re-check on mount and whenever the account count changes (e.g. once
   // real data replaces the mock list) — a short list may not overflow at all.
   useEffect(() => {
-    updateEndFade(scrollRef.current);
+    updateFades(scrollRef.current);
   }, [accounts.length]);
 
   if (isLoading) {
@@ -84,7 +90,7 @@ export function VirtualAccountList({
     <div className="relative">
       <div
         ref={scrollRef}
-        onScroll={(e: UIEvent<HTMLDivElement>) => updateEndFade(e.currentTarget)}
+        onScroll={(e: UIEvent<HTMLDivElement>) => updateFades(e.currentTarget)}
         className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth p-1"
         role="list"
         aria-label="Virtual receiving accounts"
@@ -105,6 +111,21 @@ export function VirtualAccountList({
           </div>
         ))}
       </div>
+
+      {/* Leading scroll affordance — the mirror image of the trailing one
+          below: fixed over the left edge, hidden at the initial scroll
+          position, and only fades in once the user has actually scrolled
+          right (so there are cards behind them to hint at). Same sibling
+          positioning and pointer-events-none reasoning as the trailing
+          gradient. */}
+      <div
+        aria-hidden
+        className={cn(
+          "pointer-events-none absolute inset-y-0 left-0 w-16 bg-gradient-to-r from-background to-transparent",
+          "transition-opacity duration-200",
+          showStartFade ? "opacity-100" : "opacity-0"
+        )}
+      />
 
       {/* Trailing scroll affordance: a fixed gradient over the right edge,
           hinting more cards sit off-screen. It's a sibling of the scroll

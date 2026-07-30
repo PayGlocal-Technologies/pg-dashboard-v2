@@ -220,24 +220,28 @@ function PaymentMethodPlaceholder({ gid }: { gid: string }) {
 // only, alongside Settlement Timeline/Linked Transactions, never spanning
 // into the Payment Details/Sender Details column. The illustration slot is
 // an empty, fixed-size placeholder reserved for a future asset,
-// intentionally not filled with interim art. The bottom-right referral
-// action is a lightweight footer, not a competing promo card, so it stays
-// last in visual priority behind the heading, chip, and Download FIRA CTA.
+// intentionally not filled with interim art. The referral action shares the
+// Download FIRA button's row (not a separate row) so it reads as a
+// lightweight, lower-priority inline action rather than a competing CTA.
 function FiraReceivedBanner() {
   return (
     <Card size="sm">
-      <CardContent className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start">
-          <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
+      <CardContent className="flex flex-col gap-4 md:flex-row md:items-start">
+        <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
 
-          <div className="flex-1 space-y-2">
-            <div className="flex items-baseline gap-2">
-              <h3 className="text-base font-semibold text-foreground">FIRA Received Instantly</h3>
-              <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
-            </div>
-            <p className="max-w-md text-[13px] text-muted-foreground">
-              Fast, seamless, and hassle-free documentation for your international payments.
-            </p>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-base font-semibold text-foreground">FIRA Received Instantly</h3>
+            <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
+          </div>
+          <p className="max-w-md text-[13px] text-muted-foreground">
+            Fast, seamless, and hassle-free documentation for your international payments.
+          </p>
+
+          {/* Download FIRA (left) and the referral action (right) share one
+              row instead of stacking, with gap-4 keeping them from crowding
+              each other; items-center puts them on the same baseline. */}
+          <div className="flex items-center justify-between gap-4">
             <Button
               type="button"
               leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
@@ -247,22 +251,22 @@ function FiraReceivedBanner() {
             >
               Download FIRA
             </Button>
-          </div>
-        </div>
 
-        <div className="flex items-center justify-end gap-2">
-          <span className="text-[12px] text-muted-foreground">Liking the product?</span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
-            onClick={() => {
-              // TODO: wire up once a referral flow exists.
-            }}
-          >
-            Refer and earn
-          </Button>
+            <div className="flex items-center gap-2">
+              <span className="text-[12px] text-muted-foreground">Liking the product?</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
+                onClick={() => {
+                  // TODO: wire up once a referral flow exists.
+                }}
+              >
+                Refer and earn
+              </Button>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>
