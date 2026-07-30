@@ -235,6 +235,27 @@ function parseIsoDateTime(raw: string): Date | null {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+/**
+ * Date-only variant of formatTransactionDateTime, e.g. "24 Jul '26" — same
+ * day/month/year formatting, no time-of-day portion.
+ */
+export function formatTransactionDate(date: Date): string {
+  const yy = String(date.getFullYear() % 100).padStart(2, "0");
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}`;
+}
+
+/**
+ * Reformats a transaction timestamp into formatTransactionDate's date-only
+ * display format; same dual DD/MM/YYYY-or-ISO parsing as
+ * formatTransactionTimestamp, since settlementDate can arrive in either
+ * shape.
+ */
+export function formatTransactionDateOnly(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  return parsed ? formatTransactionDate(parsed) : raw;
+}
+
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return `${str.slice(0, length)}...`;

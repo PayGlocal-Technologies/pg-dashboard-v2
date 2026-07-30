@@ -16,6 +16,7 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
 import {
   formatCurrency,
+  formatTransactionDateOnly,
   formatTransactionDateTime,
   formatTransactionTimestamp,
   parseApiDateTime,
@@ -49,11 +50,6 @@ interface TimelineStep {
 // increasing timestamp per step when the API doesn't expose per-substage
 // times (see getCurrentStepIndex's note on steps 3-5).
 const STEP_OFFSET_MINUTES = [0, 4, 95, 1440, 1470, 1500, 2820];
-
-// Index of the step whose timestamp represents "funds settled" for the
-// Settlement chip — the transfer to the merchant's bank account completing,
-// one step before FIRC issuance.
-const SETTLED_STEP_INDEX = 5;
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
 
@@ -264,7 +260,16 @@ export function TransactionDetailsPage({
   const processingFee = convertedAmount * MCA_PROCESSING_FEE_RATE;
   const netAmount = convertedAmount - processingFee;
   const timeline = buildTimeline(row);
-  const settledOnTimestamp = timeline[SETTLED_STEP_INDEX]?.timestamp;
+
+  // Only the SETTLED status (not FIRC_SETTLED, which already has its own
+  // distinct "FIRC Settled" label) gets its chip text swapped to include the
+  // settlement date — same green/success variant and check trailIcon
+  // getStatusMeta already returns, just a different label for this one
+  // status value.
+  const summaryStatusLabel =
+    row.externalStatus === "SETTLED" && row.settlementDate
+      ? `Settled on ${formatTransactionDateOnly(row.settlementDate)}`
+      : label;
 
   // The Upload Invoice section appears only while the transaction actually
   // needs merchant action.
@@ -305,9 +310,11 @@ export function TransactionDetailsPage({
 
       {/* Transaction summary — full-width page header, standalone, no card,
           sitting above the 2-column layout entirely (not part of either
-          column). The primary focal point of the page. Remitter name lives
-          in Sender Details; Transaction Date lives in Payment Details — the
-          header shows only Country, Amount, and Status. */}
+          column). The primary focal point of the page. Sender Details still
+          carries the full Remitter name field; this "Charged by" line is
+          just supporting context directly under the amount. Transaction
+          Date lives in Payment Details — the header never shows a
+          timestamp. */}
       <div className="mb-9">
         <CountryCell iso2={row.partnerCustomerCountry} />
         <div className="mt-1.5 flex flex-col items-start gap-1.5">
@@ -315,16 +322,15 @@ export function TransactionDetailsPage({
             <span className="text-[26px] font-semibold tabular-nums text-foreground">
               {formatCurrency(amount, currency, "en-US")}
             </span>
-            <StatusBadge variant={variant} label={label} trailIcon={trailIcon} />
+            <StatusBadge variant={variant} label={summaryStatusLabel} trailIcon={trailIcon} />
           </div>
-          {/* Settled transactions replace the old remitter-name/date line
-              beneath the amount with this chip instead; unsettled states
-              simply have nothing there now. Neutral (muted) variant, no
-              trailing icon — a quieter secondary chip than the primary
-              Settlement Status badge above it. */}
-          {isSettled && settledOnTimestamp && (
-            <StatusBadge variant="muted" label={`Settled on ${settledOnTimestamp}`} size="sm" />
-          )}
+          {/* Supporting context under the amount — lower emphasis than the
+              amount itself (text-[13px], muted label) but still clearly
+              readable, with the remitter name itself kept at foreground
+              weight so it doesn't disappear entirely. */}
+          <p className="text-[13px] text-muted-foreground">
+            Charged by <span className="font-medium text-foreground">{counterpartyName}</span>
+          </p>
         </div>
 
         {isReversed && (
