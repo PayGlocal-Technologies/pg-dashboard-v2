@@ -64,9 +64,12 @@ export function LinkedTransactionsSection({
 
   return (
     <section>
-      <h3 className="mb-4 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         Linked transactions
       </h3>
+      <p className="mb-4 mt-1 text-[13px] text-muted-foreground">
+        All transactions from the same remitter are displayed here.
+      </p>
       <DataTable
         columns={columns}
         data={rows}

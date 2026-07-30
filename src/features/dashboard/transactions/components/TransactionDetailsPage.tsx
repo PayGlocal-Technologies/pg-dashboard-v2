@@ -359,7 +359,7 @@ export function TransactionDetailsPage({
               Upload invoice
             </h3>
             <Card size="sm">
-              <CardContent className="max-w-[500px]">
+              <CardContent>
                 <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
               </CardContent>
             </Card>
@@ -464,9 +464,13 @@ export function TransactionDetailsPage({
             <Card size="sm">
               <CardContent className="space-y-4">
                 <DetailRow label="Transaction date" value={formatTransactionTimestamp(row.formattedCreationDateTime)} />
-                {row.settlementDate && (
-                  <DetailRow label="Settlement date" value={formatTransactionTimestamp(row.settlementDate)} />
-                )}
+                {/* Always shown, even pre-settlement — a "-" placeholder
+                    keeps the field present across every transaction state
+                    instead of the row disappearing until settlement. */}
+                <DetailRow
+                  label="Settlement date"
+                  value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
+                />
                 <DetailRow label="Payment method" value={<PaymentMethodPlaceholder gid={row.gid} />} />
                 <DetailRow label="Currency" value={currency} />
                 <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
