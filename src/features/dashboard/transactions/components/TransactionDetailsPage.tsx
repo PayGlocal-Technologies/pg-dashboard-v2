@@ -70,6 +70,7 @@ const ROW_START_CLASS: Record<number, string> = {
 const ROW_SPAN_CLASS: Record<number, string> = {
   2: "lg:row-span-2",
   3: "lg:row-span-3",
+  4: "lg:row-span-4",
 };
 
 // Index of "Invoice pending" within buildTimeline's `labels` array below —
@@ -278,15 +279,16 @@ export function TransactionDetailsPage({
   const breakdownRow = timelineRow + 1;
   const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
 
-  // The right column (Payment Details + Sender Details) starts at
-  // Settlement Timeline's row — not row 1 — so its top aligns with the
-  // Timeline card rather than Upload Invoice or the page top. It spans
-  // through to Linked Transactions' row so the grid's row-height algorithm
-  // distributes any extra height across those rows instead of forcing it
-  // all into Settlement Timeline's row alone (which would otherwise leave
-  // dead space below the timeline, the same issue solved in an earlier
-  // round).
-  const detailsColumnRowSpan = linkedRow - timelineRow + 1;
+  // The right column (Payment Details + Sender Details) aligns with Upload
+  // Invoice's row (row 1) when it's present — i.e. for Invoice Pending
+  // transactions specifically, since that's the only state showActionPanel
+  // is true — and with Settlement Timeline's row otherwise, unchanged from
+  // before. It spans through to Linked Transactions' row so the grid's
+  // row-height algorithm distributes any extra height across those rows
+  // instead of forcing it all into one row alone (which would otherwise
+  // leave dead space, the same issue solved in an earlier round).
+  const detailsColumnRowStart = showActionPanel ? 1 : timelineRow;
+  const detailsColumnRowSpan = linkedRow - detailsColumnRowStart + 1;
 
   return (
     <div>
@@ -436,13 +438,16 @@ export function TransactionDetailsPage({
         </div>
 
         {/* Right column — Payment Details then Sender Details, each its own
-            title-outside/card-inside module. Starts at Settlement
-            Timeline's row (not row 1) and spans through Linked
-            Transactions' row so its top aligns with the Timeline card. */}
+            title-outside/card-inside module. For Invoice Pending
+            transactions (showActionPanel true), starts at Upload Invoice's
+            row so Payment Details aligns with it instead of Settlement
+            Timeline; for every other state it starts at Settlement
+            Timeline's row as before. Spans through Linked Transactions'
+            row so its top aligns with whichever card it starts at. */}
         <div
           className={cn(
             "space-y-9 lg:col-start-2",
-            ROW_START_CLASS[timelineRow],
+            ROW_START_CLASS[detailsColumnRowStart],
             ROW_SPAN_CLASS[detailsColumnRowSpan]
           )}
         >
