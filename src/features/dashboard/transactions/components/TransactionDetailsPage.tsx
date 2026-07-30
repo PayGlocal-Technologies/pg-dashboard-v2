@@ -62,11 +62,13 @@ const ROW_START_CLASS: Record<number, string> = {
   2: "lg:row-start-2",
   3: "lg:row-start-3",
   4: "lg:row-start-4",
+  5: "lg:row-start-5",
 };
 const ROW_SPAN_CLASS: Record<number, string> = {
   2: "lg:row-span-2",
   3: "lg:row-span-3",
   4: "lg:row-span-4",
+  5: "lg:row-span-5",
 };
 
 // Index of "Invoice pending" within buildTimeline's `labels` array below —
@@ -78,7 +80,11 @@ const WAITING_FOR_INVOICE_STEP_INDEX = 1;
 // the API exposes today. Steps 3-5 (the three settlement-transfer
 // sub-stages) can't be individually resolved from available data — they
 // flip from upcoming to completed together once externalStatus reaches
-// SETTLED, since the API doesn't expose per-substage timestamps.
+// SETTLED, since the API doesn't expose per-substage timestamps. Both
+// SETTLED and FIRC_SETTLED return past the last step index (7, one past
+// "FIRC issuance" at index 6) so every step, including FIRC issuance, shows
+// as completed for any settled transaction — not just once FIRC_SETTLED is
+// reached.
 function getCurrentStepIndex(row: McaTransaction): number {
   const { externalStatus, frmStatus } = row;
 
@@ -91,8 +97,7 @@ function getCurrentStepIndex(row: McaTransaction): number {
     return WAITING_FOR_INVOICE_STEP_INDEX;
   }
 
-  if (externalStatus === "FIRC_SETTLED") return 7;
-  if (externalStatus === "SETTLED") return 6;
+  if (externalStatus === "FIRC_SETTLED" || externalStatus === "SETTLED") return 7;
   if (externalStatus === "SENT_FOR_SETTLEMENT" || externalStatus === "FUNDS_ON_HOLD") return 3;
   if (frmStatus === "APPROVED") return 3;
   if (frmStatus === "REVIEW_IN_PROGRESS" || externalStatus === "SENT_FOR_REVIEW") return 2;
@@ -211,6 +216,43 @@ function PaymentMethodPlaceholder({ gid }: { gid: string }) {
   );
 }
 
+// Rendered (see the isSettled check at the call site) in the left column
+// only, alongside Upload Invoice/Settlement Timeline/Linked Transactions —
+// never spanning into the Payment Details/Sender Details column. Left/right
+// slots are empty, fixed-size placeholders reserved for a future
+// illustration and a future promotional/contextual module respectively,
+// intentionally not filled with interim art or content.
+function FiraReceivedBanner() {
+  return (
+    <Card size="sm">
+      <CardContent className="flex flex-col items-center gap-6 md:flex-row">
+        <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
+
+        <div className="flex-1 space-y-3">
+          <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
+          <h3 className="text-base font-semibold text-foreground">FIRA Received</h3>
+          <p className="text-[13px] text-muted-foreground">
+            Your Foreign Inward Remittance Advice (FIRA) has been generated and is ready to download.
+          </p>
+          <Button
+            type="button"
+            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+            onClick={() => {
+              // TODO: wire up once a FIRA download endpoint exists.
+            }}
+          >
+            Download FIRA
+          </Button>
+        </div>
+
+        <Separator orientation="vertical" className="hidden h-24 md:block" />
+
+        <div className="h-24 w-full shrink-0 md:w-48" aria-hidden="true" />
+      </CardContent>
+    </Card>
+  );
+}
+
 // Label above, value below — no divider between rows; each field stands on
 // its own with vertical rhythm coming from the parent's spacing only.
 function DetailRow({
@@ -278,11 +320,12 @@ export function TransactionDetailsPage({
   // Row numbers for the left column, within the 2-column grid that starts
   // below the full-width transaction summary. Upload Invoice (when shown)
   // takes row 1; Settlement Timeline follows it, or leads if Upload Invoice
-  // is hidden. Payment Breakdown (settled only) and Linked Transactions
-  // stack after that, in order.
+  // is hidden. Payment Breakdown, the FIRA Received banner (both settled
+  // only), and Linked Transactions stack after that, in order.
   const timelineRow = showActionPanel ? 2 : 1;
   const breakdownRow = timelineRow + 1;
-  const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
+  const firaRow = breakdownRow + 1;
+  const linkedRow = (isSettled ? firaRow : timelineRow) + 1;
 
   // The right column (Payment Details + Sender Details) aligns with Upload
   // Invoice's row (row 1) when it's present — i.e. for Invoice Pending
@@ -430,6 +473,17 @@ export function TransactionDetailsPage({
               </CardContent>
             </Card>
           </section>
+        )}
+
+        {/* FIRA Received — left column only, same width as Upload
+            Invoice/Settlement Timeline/Linked Transactions (never spans
+            into the Payment Details/Sender Details column). Shown for every
+            settled transaction, below Payment Breakdown and above Linked
+            Transactions. */}
+        {isSettled && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[firaRow])}>
+            <FiraReceivedBanner />
+          </div>
         )}
 
         {/* Linked Transactions — its own table already provides sufficient
