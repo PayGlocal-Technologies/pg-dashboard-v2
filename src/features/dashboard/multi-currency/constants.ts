@@ -1,11 +1,13 @@
 /**
  * Fixed square footprint, shared by every card and by the loading skeleton —
- * the row never reflows when data arrives. Every account has exactly two
- * detail rows, sized to fit; anything that doesn't (an unusually long value)
- * is truncated rather than growing the card — see `overflow-hidden` +
- * `truncate` in VirtualAccountCard.
+ * the row never reflows when data arrives. Sized generously enough that the
+ * two standard-size ("sm") Copy/Share buttons revealed on hover sit with
+ * comfortable room on every side, not just enough to avoid wrapping. Every
+ * account has exactly two detail rows, sized to fit; anything that doesn't
+ * (an unusually long value) is truncated rather than growing the card — see
+ * `overflow-hidden` + `truncate` in VirtualAccountCard.
  */
-export const CARD_SIZE_CLASS = "w-[190px] h-[190px]";
+export const CARD_SIZE_CLASS = "w-60 h-60";
 
 /** Number of placeholder cards rendered while accounts are loading. */
 export const SKELETON_CARD_COUNT = 4;

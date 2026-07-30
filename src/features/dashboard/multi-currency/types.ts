@@ -14,6 +14,16 @@ export interface VirtualAccount {
   currency: string;
   /** Display name shown on the card, e.g. "USD Account". */
   accountName: string;
-  /** Region-appropriate identifiers, rendered in order. */
+  /** Region-appropriate identifiers shown on the compact card, in order
+   *  (e.g. "Account Number", "ACH Routing"). Reused as-is inside the full
+   *  details section below the carousel. */
   details: AccountDetail[];
+  /** Fields only shown in the expanded details section, not on the card. */
+  paymentMethod: string;
+  accountHolderName: string;
+  bankName: string;
+  beneficiaryAddress: string;
+  /** Machine-readable routing code type, e.g. "ach_routing_number". Not every
+   *  country's rail has one worth surfacing. */
+  routingCodeType?: string;
 }

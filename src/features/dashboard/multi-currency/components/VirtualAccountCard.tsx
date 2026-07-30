@@ -12,16 +12,45 @@ interface VirtualAccountCardProps {
   /** Performs the clipboard write and surfaces the toast; resolves when done. */
   onCopy: (account: VirtualAccount) => Promise<void> | void;
   onShare: (account: VirtualAccount) => void;
+  /** Whether this card's account is the one shown in the details section below. */
+  isSelected: boolean;
+  /** Selects this account as the one shown in the details section below. */
+  onSelect: (account: VirtualAccount) => void;
 }
 
-export function VirtualAccountCard({ account, onCopy, onShare }: VirtualAccountCardProps) {
+export function VirtualAccountCard({
+  account,
+  onCopy,
+  onShare,
+  isSelected,
+  onSelect,
+}: VirtualAccountCardProps) {
   return (
     <Card
+      role="button"
+      tabIndex={0}
+      aria-pressed={isSelected}
+      onClick={() => onSelect(account)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect(account);
+        }
+      }}
       className={cn(
         CARD_SIZE_CLASS,
-        "group relative shrink-0 overflow-hidden px-4 py-4 transition-shadow hover:shadow-md"
+        "group relative shrink-0 cursor-pointer overflow-hidden px-4 py-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+        isSelected && "border-primary ring-2 ring-primary"
       )}
     >
+      {/* Expand affordance only — not its own click target. No handler and no
+          stopPropagation, so a click here still bubbles up to the card and
+          selects it, same as clicking anywhere else. */}
+      <div className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border border-border text-muted-foreground">
+        <Icon name="plus" className="h-3.5 w-3.5" />
+      </div>
+
       <CardContent className="flex h-full min-w-0 flex-col gap-1 overflow-hidden">
         <CountryFlagAvatar
           iso2={account.iso2}

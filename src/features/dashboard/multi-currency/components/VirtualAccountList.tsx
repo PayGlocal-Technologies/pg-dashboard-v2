@@ -12,6 +12,8 @@ interface VirtualAccountListProps {
   isLoading?: boolean;
   onCopy: (account: VirtualAccount) => Promise<void> | void;
   onShare: (account: VirtualAccount) => void;
+  selectedAccountId: string | null;
+  onSelect: (account: VirtualAccount) => void;
 }
 
 /**
@@ -27,10 +29,15 @@ export function VirtualAccountList({
   isLoading = false,
   onCopy,
   onShare,
+  selectedAccountId,
+  onSelect,
 }: VirtualAccountListProps) {
   if (isLoading) {
     return (
-      <div className="scrollbar-none flex gap-4 overflow-hidden pb-2" aria-busy>
+      // p-2 (not just pb-2): overflow-x-auto forces the vertical axis to
+      // "auto" too per the CSS overflow spec, so without side/top padding the
+      // active card's ring-2 would clip against this container's edges.
+      <div className="scrollbar-none flex gap-4 overflow-hidden p-2" aria-busy>
         {Array.from({ length: SKELETON_CARD_COUNT }, (_, i) => (
           <VirtualAccountCardSkeleton key={i} />
         ))}
@@ -50,13 +57,19 @@ export function VirtualAccountList({
 
   return (
     <div
-      className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth pb-2"
+      className="scrollbar-none flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth p-2"
       role="list"
       aria-label="Virtual receiving accounts"
     >
       {accounts.map((account) => (
         <div key={account.id} role="listitem" className="snap-start">
-          <VirtualAccountCard account={account} onCopy={onCopy} onShare={onShare} />
+          <VirtualAccountCard
+            account={account}
+            onCopy={onCopy}
+            onShare={onShare}
+            isSelected={account.id === selectedAccountId}
+            onSelect={onSelect}
+          />
         </div>
       ))}
     </div>
