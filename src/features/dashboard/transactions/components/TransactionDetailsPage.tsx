@@ -217,20 +217,22 @@ function PaymentMethodPlaceholder({ gid }: { gid: string }) {
 }
 
 // Rendered (see the isSettled check at the call site) in the left column
-// only, alongside Upload Invoice/Settlement Timeline/Linked Transactions —
-// never spanning into the Payment Details/Sender Details column. Left/right
-// slots are empty, fixed-size placeholders reserved for a future
-// illustration and a future promotional/contextual module respectively,
-// intentionally not filled with interim art or content.
+// only, alongside Settlement Timeline/Linked Transactions, never spanning
+// into the Payment Details/Sender Details column. The left illustration slot
+// and the right promo card's own illustration slot are empty, fixed-size
+// placeholders reserved for future assets, intentionally not filled with
+// interim art or content.
 function FiraReceivedBanner() {
   return (
     <Card size="sm">
-      <CardContent className="flex flex-col items-center gap-6 md:flex-row">
+      <CardContent className="flex flex-col gap-6 md:flex-row md:items-center">
         <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
 
         <div className="flex-1 space-y-3">
-          <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
-          <h3 className="text-base font-semibold text-foreground">FIRA Received</h3>
+          <div className="flex items-center gap-2">
+            <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
+            <h3 className="text-base font-semibold text-foreground">FIRA Received</h3>
+          </div>
           <p className="text-[13px] text-muted-foreground">
             Your Foreign Inward Remittance Advice (FIRA) has been generated and is ready to download.
           </p>
@@ -247,7 +249,27 @@ function FiraReceivedBanner() {
 
         <Separator orientation="vertical" className="hidden h-24 md:block" />
 
-        <div className="h-24 w-full shrink-0 md:w-48" aria-hidden="true" />
+        {/* Reserved secondary promo module: placeholder content only,
+            structured so it can be swapped for a different card without
+            layout changes. */}
+        <div className="w-full space-y-2 md:w-56 md:shrink-0">
+          <div className="h-10 w-10 rounded-full bg-muted" aria-hidden="true" />
+          <h4 className="text-sm font-semibold text-foreground">Refer &amp; Earn $30</h4>
+          <p className="text-[12px] text-muted-foreground">
+            Love using our product? Invite a friend and earn $30 for every successful referral.
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
+            onClick={() => {
+              // TODO: wire up once a referral flow exists.
+            }}
+          >
+            Refer Now
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -318,14 +340,16 @@ export function TransactionDetailsPage({
   const showActionPanel = needsAction && !isReversed;
 
   // Row numbers for the left column, within the 2-column grid that starts
-  // below the full-width transaction summary. Upload Invoice (when shown)
-  // takes row 1; Settlement Timeline follows it, or leads if Upload Invoice
-  // is hidden. Payment Breakdown, the FIRA Received banner (both settled
-  // only), and Linked Transactions stack after that, in order.
-  const timelineRow = showActionPanel ? 2 : 1;
+  // below the full-width transaction summary. For settled transactions, the
+  // FIRA Received banner leads at row 1, ahead of Settlement Timeline.
+  // showActionPanel (Upload Invoice) is never true for a settled
+  // transaction, so there's no conflict over row 1 between the two. Payment
+  // Breakdown and Linked Transactions stack after Settlement Timeline, in
+  // order.
+  const firaRow = 1;
+  const timelineRow = isSettled ? firaRow + 1 : showActionPanel ? 2 : 1;
   const breakdownRow = timelineRow + 1;
-  const firaRow = breakdownRow + 1;
-  const linkedRow = (isSettled ? firaRow : timelineRow) + 1;
+  const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
 
   // The right column (Payment Details + Sender Details) aligns with Upload
   // Invoice's row (row 1) when it's present — i.e. for Invoice Pending
@@ -393,6 +417,18 @@ export function TransactionDetailsPage({
           section sized to its own content instead of stretching to match
           whichever column is taller in a shared row. */}
       <div className="grid gap-x-10 gap-y-9 lg:grid-cols-[3fr_1fr] lg:items-start">
+        {/* FIRA Received: left column only, same width as Settlement
+            Timeline/Linked Transactions (never spans into the Payment
+            Details/Sender Details column). Leads the column, ahead of
+            Settlement Timeline, for every settled transaction.
+            showActionPanel (Upload Invoice) is never true at the same time,
+            so there's no row-1 conflict between the two. */}
+        {isSettled && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[firaRow])}>
+            <FiraReceivedBanner />
+          </div>
+        )}
+
         {/* Upload Invoice — title outside, form inside its own card. Only
             rendered while the transaction actually needs merchant action;
             always row 1 when present. */}
@@ -473,17 +509,6 @@ export function TransactionDetailsPage({
               </CardContent>
             </Card>
           </section>
-        )}
-
-        {/* FIRA Received — left column only, same width as Upload
-            Invoice/Settlement Timeline/Linked Transactions (never spans
-            into the Payment Details/Sender Details column). Shown for every
-            settled transaction, below Payment Breakdown and above Linked
-            Transactions. */}
-        {isSettled && (
-          <div className={cn("lg:col-start-1", ROW_START_CLASS[firaRow])}>
-            <FiraReceivedBanner />
-          </div>
         )}
 
         {/* Linked Transactions — its own table already provides sufficient
