@@ -218,56 +218,50 @@ function PaymentMethodPlaceholder({ gid }: { gid: string }) {
 
 // Rendered (see the isSettled check at the call site) in the left column
 // only, alongside Settlement Timeline/Linked Transactions, never spanning
-// into the Payment Details/Sender Details column. The left illustration slot
-// and the right promo card's own illustration slot are empty, fixed-size
-// placeholders reserved for future assets, intentionally not filled with
-// interim art or content.
+// into the Payment Details/Sender Details column. The illustration slot is
+// an empty, fixed-size placeholder reserved for a future asset,
+// intentionally not filled with interim art. The bottom-right referral
+// action is a lightweight footer, not a competing promo card, so it stays
+// last in visual priority behind the heading, chip, and Download FIRA CTA.
 function FiraReceivedBanner() {
   return (
     <Card size="sm">
-      <CardContent className="flex flex-col gap-6 md:flex-row md:items-center">
-        <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
+      <CardContent className="space-y-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start">
+          <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
 
-        <div className="flex-1 space-y-3">
-          <div className="flex items-center gap-2">
-            <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
-            <h3 className="text-base font-semibold text-foreground">FIRA Received</h3>
+          <div className="flex-1 space-y-2">
+            <div className="flex items-baseline gap-2">
+              <h3 className="text-base font-semibold text-foreground">FIRA Received Instantly</h3>
+              <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
+            </div>
+            <p className="max-w-md text-[13px] text-muted-foreground">
+              Fast, seamless, and hassle-free documentation for your international payments.
+            </p>
+            <Button
+              type="button"
+              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+              onClick={() => {
+                // TODO: wire up once a FIRA download endpoint exists.
+              }}
+            >
+              Download FIRA
+            </Button>
           </div>
-          <p className="text-[13px] text-muted-foreground">
-            Your Foreign Inward Remittance Advice (FIRA) has been generated and is ready to download.
-          </p>
-          <Button
-            type="button"
-            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-            onClick={() => {
-              // TODO: wire up once a FIRA download endpoint exists.
-            }}
-          >
-            Download FIRA
-          </Button>
         </div>
 
-        <Separator orientation="vertical" className="hidden h-24 md:block" />
-
-        {/* Reserved secondary promo module: placeholder content only,
-            structured so it can be swapped for a different card without
-            layout changes. */}
-        <div className="w-full space-y-2 md:w-56 md:shrink-0">
-          <div className="h-10 w-10 rounded-full bg-muted" aria-hidden="true" />
-          <h4 className="text-sm font-semibold text-foreground">Refer &amp; Earn $30</h4>
-          <p className="text-[12px] text-muted-foreground">
-            Love using our product? Invite a friend and earn $30 for every successful referral.
-          </p>
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-[12px] text-muted-foreground">Liking the product?</span>
           <Button
             type="button"
-            variant="secondary"
+            variant="ghost"
             size="sm"
             rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
             onClick={() => {
               // TODO: wire up once a referral flow exists.
             }}
           >
-            Refer Now
+            Refer and earn
           </Button>
         </div>
       </CardContent>
@@ -351,15 +345,15 @@ export function TransactionDetailsPage({
   const breakdownRow = timelineRow + 1;
   const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
 
-  // The right column (Payment Details + Sender Details) aligns with Upload
-  // Invoice's row (row 1) when it's present — i.e. for Invoice Pending
-  // transactions specifically, since that's the only state showActionPanel
-  // is true — and with Settlement Timeline's row otherwise, unchanged from
-  // before. It spans through to Linked Transactions' row so the grid's
-  // row-height algorithm distributes any extra height across those rows
-  // instead of forcing it all into one row alone (which would otherwise
-  // leave dead space, the same issue solved in an earlier round).
-  const detailsColumnRowStart = showActionPanel ? 1 : timelineRow;
+  // The right column (Payment Details + Sender Details) aligns with
+  // whichever section leads the left column: Upload Invoice's row (row 1)
+  // for Invoice Pending transactions, FIRA Received's row (also row 1) for
+  // settled transactions, and Settlement Timeline's row otherwise. It spans
+  // through to Linked Transactions' row so the grid's row-height algorithm
+  // distributes any extra height across those rows instead of forcing it
+  // all into one row alone (which would otherwise leave dead space, the
+  // same issue solved in an earlier round).
+  const detailsColumnRowStart = isSettled ? firaRow : showActionPanel ? 1 : timelineRow;
   const detailsColumnRowSpan = linkedRow - detailsColumnRowStart + 1;
 
   return (
@@ -522,13 +516,13 @@ export function TransactionDetailsPage({
           />
         </div>
 
-        {/* Right column — Payment Details then Sender Details, each its own
-            title-outside/card-inside module. For Invoice Pending
-            transactions (showActionPanel true), starts at Upload Invoice's
-            row so Payment Details aligns with it instead of Settlement
-            Timeline; for every other state it starts at Settlement
-            Timeline's row as before. Spans through Linked Transactions'
-            row so its top aligns with whichever card it starts at. */}
+        {/* Right column: Payment Details then Sender Details, each its own
+            title-outside/card-inside module. Starts at whichever section
+            leads the left column: Upload Invoice's row for Invoice Pending
+            transactions, FIRA Received's row for settled transactions, and
+            Settlement Timeline's row otherwise. Spans through Linked
+            Transactions' row so its top aligns with whichever card it
+            starts at. */}
         <div
           className={cn(
             "space-y-9 lg:col-start-2",
@@ -536,8 +530,27 @@ export function TransactionDetailsPage({
             ROW_SPAN_CLASS[detailsColumnRowSpan]
           )}
         >
-          <section>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {/* For settled transactions, this section shares its row with the
+              FIRA Received banner, which has no title above its card — its
+              card starts flush at the top of the row. To keep the Payment
+              Details CARD's top edge aligned with the banner card's top
+              edge (not the "Payment Details" title), the title is taken out
+              of flow here and floated above the section instead of sitting
+              inline above the card; the section's only in-flow child is the
+              Card, so the section's box (and therefore the row-aligned top
+              edge) is exactly the Card's box. The -top-7 offset approximates
+              the same title-to-card gap the normal (title-in-flow) layout
+              below uses. For every other state, Payment Details shares its
+              row with Settlement Timeline, which does have a title above
+              its card, so the normal in-flow layout already aligns
+              correctly and this treatment isn't needed. */}
+          <section className={cn(isSettled && "relative")}>
+            <h3
+              className={cn(
+                "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+                isSettled ? "absolute -top-7 left-0" : "mb-3"
+              )}
+            >
               Payment Details
             </h3>
             <Card size="sm">
