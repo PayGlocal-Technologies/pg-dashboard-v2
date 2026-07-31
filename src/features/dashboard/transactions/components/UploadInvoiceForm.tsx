@@ -18,6 +18,7 @@ import {
   PurposeCodeCombobox,
   type PurposeCodeComboboxHandle,
 } from "@/features/dashboard/transactions/components/PurposeCodeCombobox";
+import { getRecommendedPurposeCode } from "@/features/dashboard/transactions/purposeCodes";
 import {
   InvoiceDropzone,
   type InvoiceUploadState,
@@ -61,7 +62,11 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
 
   const form = useForm({
     defaultValues: {
-      purposeCode: "",
+      // Pre-filled with the recommended code for this transaction so the
+      // field never opens empty; merchants can still open the combobox and
+      // pick a different one, and all existing required-field validation
+      // still applies since the value is a normal, editable field value.
+      purposeCode: getRecommendedPurposeCode(row),
       invoice: { status: "idle" } as InvoiceUploadState,
       generateFircWithInvoiceRemitterName: false,
     },

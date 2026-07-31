@@ -220,9 +220,10 @@ function PaymentMethodPlaceholder({ gid }: { gid: string }) {
 // only, alongside Settlement Timeline/Linked Transactions, never spanning
 // into the Payment Details/Sender Details column. The illustration slot is
 // an empty, fixed-size placeholder reserved for a future asset,
-// intentionally not filled with interim art. The referral action shares the
-// Download FIRA button's row (not a separate row) so it reads as a
-// lightweight, lower-priority inline action rather than a competing CTA.
+// intentionally not filled with interim art. The referral promotion is a
+// separate, lower-priority banner (see ReferEarnBanner below), not part of
+// this one, so this card stays focused purely on the FIRA outcome and its
+// download action.
 function FiraReceivedBanner() {
   return (
     <Card size="sm">
@@ -238,36 +239,46 @@ function FiraReceivedBanner() {
             Fast, seamless, and hassle-free documentation for your international payments.
           </p>
 
-          {/* Download FIRA (left) and the referral action (right) share one
-              row instead of stacking, with gap-4 keeping them from crowding
-              each other; items-center puts them on the same baseline. */}
-          <div className="flex items-center justify-between gap-4">
-            <Button
-              type="button"
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              onClick={() => {
-                // TODO: wire up once a FIRA download endpoint exists.
-              }}
-            >
-              Download FIRA
-            </Button>
-
-            <div className="flex items-center gap-2">
-              <span className="text-[12px] text-muted-foreground">Liking the product?</span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
-                onClick={() => {
-                  // TODO: wire up once a referral flow exists.
-                }}
-              >
-                Refer and earn
-              </Button>
-            </div>
-          </div>
+          <Button
+            type="button"
+            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+            onClick={() => {
+              // TODO: wire up once a FIRA download endpoint exists.
+            }}
+          >
+            Download FIRA
+          </Button>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Compact, lower-priority companion banner directly below FiraReceivedBanner:
+// no illustration, smaller type, and a ghost (not primary) CTA, so it reads
+// as a secondary promotion rather than competing with the FIRA outcome above
+// it for attention, while still being clearly visible and clickable.
+function ReferEarnBanner() {
+  return (
+    <Card size="sm">
+      <CardContent className="flex items-center justify-between gap-4 py-3">
+        <div>
+          <h3 className="text-[13px] font-semibold text-foreground">Refer & Earn</h3>
+          <p className="text-[12px] text-muted-foreground">
+            Invite other exporters to PayGlocal and earn rewards.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
+          onClick={() => {
+            // TODO: wire up once a referral flow exists.
+          }}
+        >
+          Refer Now
+        </Button>
       </CardContent>
     </Card>
   );
@@ -596,7 +607,12 @@ export function TransactionDetailsContent({
     return (
       <div className="space-y-9">
         {summary}
-        {isSettled && <FiraReceivedBanner />}
+        {isSettled && (
+          <>
+            <FiraReceivedBanner />
+            <ReferEarnBanner />
+          </>
+        )}
         {showActionPanel && <UploadInvoiceSection row={row} onUploaded={onUploaded} />}
         <SettlementTimelineSection timeline={timeline} />
         {isSettled && (
@@ -615,13 +631,14 @@ export function TransactionDetailsContent({
 
   // Row numbers for the left column, within the 2-column grid that starts
   // below the full-width transaction summary. For settled transactions, the
-  // FIRA Received banner leads at row 1, ahead of Settlement Timeline.
-  // showActionPanel (Upload Invoice) is never true for a settled
-  // transaction, so there's no conflict over row 1 between the two. Payment
-  // Breakdown and Linked Transactions stack after Settlement Timeline, in
-  // order.
+  // FIRA Received banner leads at row 1, its companion Refer & Earn banner
+  // immediately after it at row 2, then Settlement Timeline. showActionPanel
+  // (Upload Invoice) is never true for a settled transaction, so there's no
+  // conflict over row 1 between the two. Payment Breakdown and Linked
+  // Transactions stack after Settlement Timeline, in order.
   const firaRow = 1;
-  const timelineRow = isSettled ? firaRow + 1 : showActionPanel ? 2 : 1;
+  const referEarnRow = firaRow + 1;
+  const timelineRow = isSettled ? referEarnRow + 1 : showActionPanel ? 2 : 1;
   const breakdownRow = timelineRow + 1;
   const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
 
@@ -661,6 +678,16 @@ export function TransactionDetailsContent({
         {isSettled && (
           <div className={cn("lg:col-start-1", ROW_START_CLASS[firaRow])}>
             <FiraReceivedBanner />
+          </div>
+        )}
+
+        {/* Refer & Earn: immediately below the FIRA banner, above
+            Settlement Timeline. Lower visual priority than the FIRA banner
+            (see ReferEarnBanner's own compact styling) but still its own
+            row, not nested inside the FIRA card. */}
+        {isSettled && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[referEarnRow])}>
+            <ReferEarnBanner />
           </div>
         )}
 

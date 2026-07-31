@@ -19,3 +19,14 @@ export const PURPOSE_CODES: PurposeCode[] = [
   { code: "P1301", description: "Personal gifts and donations" },
   { code: "P1401", description: "Royalties, trademarks and licence fees" },
 ];
+
+// McaTransaction.invoiceType carries no documented set of values today (see
+// types.ts), so there's no real signal yet to map a transaction to a specific
+// purpose code. Until the backend documents invoiceType's possible values or
+// exposes a merchant-level recommendation, this defaults every transaction to
+// the most common code (software exports) so the field opens pre-filled
+// instead of guessing a mapping that isn't backed by real data.
+export function getRecommendedPurposeCode(row: { invoiceType?: string | null }): string {
+  void row;
+  return PURPOSE_CODES[0].code;
+}

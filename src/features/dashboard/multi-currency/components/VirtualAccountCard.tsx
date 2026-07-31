@@ -30,6 +30,14 @@ export function VirtualAccountCard({
       role="button"
       tabIndex={0}
       onClick={() => onSelect(account)}
+      // A mouse click on the card — or on the RadioGroupItem button nested
+      // inside it — would otherwise leave that element holding browser
+      // focus after selection, which keeps group-focus-within (below) true
+      // and the Copy/Share row visible with no hover involved at all.
+      // preventDefault here (it fires on the bubble phase before the
+      // browser applies the default focus) suppresses only that mouse-click
+      // focus; Tab/Enter/Space keyboard interaction is untouched.
+      onMouseDown={(e) => e.preventDefault()}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
