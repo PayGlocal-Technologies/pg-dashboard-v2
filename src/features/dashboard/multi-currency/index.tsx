@@ -6,7 +6,7 @@ import { Button, Card, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
-import { VirtualAccountTransactions } from "@/features/dashboard/multi-currency/components/VirtualAccountTransactions";
+import { VirtualAccountActionRequired } from "@/features/dashboard/multi-currency/components/VirtualAccountActionRequired";
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 import {
   formatAccount,
@@ -132,7 +132,7 @@ export function MultiCurrencyFeature() {
             onShare={handleShareFullAccount}
           />
           <div className="min-w-0 flex-1">
-            <VirtualAccountTransactions
+            <VirtualAccountActionRequired
               currency={expandedAccount.currency}
               countryName={expandedAccount.countryName}
             />

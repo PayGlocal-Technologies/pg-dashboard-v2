@@ -134,8 +134,8 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
     iso2: "ROW",
     countryName: "Rest of the World",
     // Transactions are filtered server-side by a single currency today (see
-    // VirtualAccountTransactions). A real SWIFT account receives many, so this
-    // will need a multi-currency / "everything else" filter once the API
+    // VirtualAccountActionRequired). A real SWIFT account receives many, so
+    // this will need a multi-currency / "everything else" filter once the API
     // supports it; CHF stands in meanwhile precisely because none of the seven
     // local accounts claim it, keeping this card's list distinct from theirs.
     currency: "CHF",
