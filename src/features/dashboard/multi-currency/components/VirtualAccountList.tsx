@@ -19,8 +19,9 @@ interface VirtualAccountListProps {
   isLoading?: boolean;
   onCopy: (account: VirtualAccount) => Promise<void> | void;
   onShare: (account: VirtualAccount) => void;
-  selectedAccountId: string | null;
-  onSelect: (account: VirtualAccount) => void;
+  /** id of the account whose details section is expanded, or null if none is. */
+  expandedAccountId: string | null;
+  onToggleExpand: (account: VirtualAccount) => void;
 }
 
 /**
@@ -36,8 +37,8 @@ export function VirtualAccountList({
   isLoading = false,
   onCopy,
   onShare,
-  selectedAccountId,
-  onSelect,
+  expandedAccountId,
+  onToggleExpand,
 }: VirtualAccountListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Hidden once there's nothing left to scroll to — either the list never
@@ -105,8 +106,8 @@ export function VirtualAccountList({
               account={account}
               onCopy={onCopy}
               onShare={onShare}
-              isSelected={account.id === selectedAccountId}
-              onSelect={onSelect}
+              isExpanded={account.id === expandedAccountId}
+              onToggleExpand={onToggleExpand}
             />
           </div>
         ))}

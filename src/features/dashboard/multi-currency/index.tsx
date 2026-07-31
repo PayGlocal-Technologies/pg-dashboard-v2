@@ -24,11 +24,15 @@ export function MultiCurrencyFeature() {
   const [accounts] = useState<VirtualAccount[]>(MOCK_VIRTUAL_ACCOUNTS);
   const isLoading = false;
 
-  // null = no explicit selection yet; falls back to the first account once
-  // accounts load, so the details section always has something to show.
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
-  const selectedAccount =
-    accounts.find((a) => a.id === selectedAccountId) ?? accounts[0] ?? null;
+  // null = nothing expanded, which is the initial state: only the card
+  // carousel shows until the user opens an account. Holding a single id here
+  // (rather than a per-card flag) is what enforces one-at-a-time expansion —
+  // expanding a new account implicitly collapses the previous one.
+  const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null);
+  const expandedAccount = accounts.find((a) => a.id === expandedAccountId) ?? null;
+
+  const toggleExpand = (account: VirtualAccount) =>
+    setExpandedAccountId((current) => (current === account.id ? null : account.id));
 
   const copyToClipboard = async (text: string, message: string) => {
     try {
@@ -104,8 +108,8 @@ export function MultiCurrencyFeature() {
         isLoading={isLoading}
         onCopy={handleCopyAccount}
         onShare={handleShareAccount}
-        selectedAccountId={selectedAccount?.id ?? null}
-        onSelect={(account) => setSelectedAccountId(account.id)}
+        expandedAccountId={expandedAccountId}
+        onToggleExpand={toggleExpand}
       />
 
       {/* Two-column layout: Account Details sizes to its own content
@@ -113,17 +117,24 @@ export function MultiCurrencyFeature() {
           whatever width is left. items-start keeps both top-aligned even
           though their heights differ; flex-wrap drops Transactions below
           Account Details on narrow viewports instead of squeezing either. */}
-      {selectedAccount && (
-        <div className="flex flex-wrap items-start gap-4">
+      {expandedAccount && (
+        // key remounts the whole section when a different account is
+        // expanded, so the fade replays on every switch (not just the first
+        // open) and the transactions table's own page/drawer state resets
+        // rather than carrying over from the previously expanded account.
+        <div
+          key={expandedAccount.id}
+          className="flex flex-wrap items-start gap-4 page-enter"
+        >
           <VirtualAccountDetails
-            account={selectedAccount}
+            account={expandedAccount}
             onCopy={handleCopyFullAccount}
             onShare={handleShareFullAccount}
           />
           <div className="min-w-0 flex-1">
             <VirtualAccountTransactions
-              currency={selectedAccount.currency}
-              countryName={selectedAccount.countryName}
+              currency={expandedAccount.currency}
+              countryName={expandedAccount.countryName}
             />
           </div>
         </div>

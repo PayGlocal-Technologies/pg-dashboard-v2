@@ -4,7 +4,8 @@ import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 const ACCOUNT_HOLDER_NAME = "Acme Exports Pvt Ltd";
 
 /**
- * Placeholder virtual accounts for the seven currently supported countries.
+ * Placeholder virtual accounts for the seven supported countries, plus the
+ * SWIFT-rail "Rest of the World" account.
  * Every value here is dummy data — replace this module with the real API
  * response once the virtual-accounts endpoint is available. The shape is
  * deliberately identical to what the card component consumes, so wiring the
@@ -122,5 +123,31 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
     bankName: "DBS Bank Ltd",
     beneficiaryAddress: "12 Marina View, Singapore 018961",
     routingCodeType: "fast_bank_code",
+  },
+  {
+    // Catch-all for senders outside the seven local-rail countries, received
+    // over SWIFT. `iso2` has no flag on the CDN by design — CountryFlagAvatar
+    // falls back to its globe glyph, which is the right mark for a region
+    // rather than a country. `accountName` doubles as the region name, so the
+    // card omits the country subtitle (see VirtualAccountCard).
+    id: "row-swift",
+    iso2: "ROW",
+    countryName: "Rest of the World",
+    // Transactions are filtered server-side by a single currency today (see
+    // VirtualAccountTransactions). A real SWIFT account receives many, so this
+    // will need a multi-currency / "everything else" filter once the API
+    // supports it; CHF stands in meanwhile precisely because none of the seven
+    // local accounts claim it, keeping this card's list distinct from theirs.
+    currency: "CHF",
+    accountName: "Rest of the World",
+    details: [
+      { label: "SWIFT BIC", value: "PGBLGB2LXXX" },
+      { label: "Account Number", value: "6041827395" },
+    ],
+    paymentMethod: "SWIFT",
+    accountHolderName: ACCOUNT_HOLDER_NAME,
+    bankName: "PayGlocal International Ltd",
+    beneficiaryAddress: "1 King Street, London, EC2V 8AU, UK",
+    routingCodeType: "swift_bic",
   },
 ];

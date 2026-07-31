@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, CardContent } from "@/components/ui";
+import { Button, Card, CardContent, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
@@ -12,44 +12,56 @@ interface VirtualAccountCardProps {
   /** Performs the clipboard write and surfaces the toast; resolves when done. */
   onCopy: (account: VirtualAccount) => Promise<void> | void;
   onShare: (account: VirtualAccount) => void;
-  /** Whether this card's account is the one shown in the details section below. */
-  isSelected: boolean;
-  /** Selects this account as the one shown in the details section below. */
-  onSelect: (account: VirtualAccount) => void;
+  /** Whether this account's details/transactions section is currently expanded. */
+  isExpanded: boolean;
+  /** Expands this account, or collapses it if it's already the expanded one. */
+  onToggleExpand: (account: VirtualAccount) => void;
 }
 
 export function VirtualAccountCard({
   account,
   onCopy,
   onShare,
-  isSelected,
-  onSelect,
+  isExpanded,
+  onToggleExpand,
 }: VirtualAccountCardProps) {
   return (
     <Card
       role="button"
       tabIndex={0}
-      aria-pressed={isSelected}
-      onClick={() => onSelect(account)}
+      aria-expanded={isExpanded}
+      onClick={() => onToggleExpand(account)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          onSelect(account);
+          onToggleExpand(account);
         }
       }}
       className={cn(
         CARD_SIZE_CLASS,
         "group relative shrink-0 cursor-pointer overflow-hidden px-4 py-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
-        isSelected && "border-primary ring-2 ring-primary"
+        isExpanded && "border-primary ring-2 ring-primary"
       )}
     >
-      {/* Expand affordance only — not its own click target. No handler and no
-          stopPropagation, so a click here still bubbles up to the card and
-          selects it, same as clicking anywhere else. */}
-      <div className="absolute right-3 top-3 flex h-6 w-6 items-center justify-center rounded-full border border-border text-muted-foreground">
-        <Icon name="plus" className="h-3.5 w-3.5" />
-      </div>
+      {/* Expand/collapse control. Sits outside the hover-revealed action row
+          below, so it's always visible and reachable regardless of hover
+          state. stopPropagation isn't needed for correctness (the card's own
+          click toggles the same thing) but is kept so the toggle fires once,
+          not twice, from a single click. */}
+      <IconButton
+        aria-label={isExpanded ? `Collapse ${account.accountName}` : `Expand ${account.accountName}`}
+        variant="outline"
+        size="xs"
+        rounded="full"
+        className="absolute right-3 top-3 z-10 size-6 min-w-6 text-muted-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleExpand(account);
+        }}
+      >
+        <Icon name={isExpanded ? "x" : "plus"} className="h-3.5 w-3.5" />
+      </IconButton>
 
       <CardContent className="flex h-full min-w-0 flex-col gap-1 overflow-hidden">
         <CountryFlagAvatar
@@ -68,9 +80,13 @@ export function VirtualAccountCard({
           <p className="truncate text-lg font-bold leading-none text-foreground">
             {account.accountName}
           </p>
-          <p className="mt-1 truncate text-xs leading-none text-muted-foreground">
-            {account.countryName}
-          </p>
+          {/* Skipped when it would just repeat the title verbatim — the
+              Rest of the World account's name already names its region. */}
+          {account.countryName !== account.accountName && (
+            <p className="mt-1 truncate text-xs leading-none text-muted-foreground">
+              {account.countryName}
+            </p>
+          )}
         </div>
 
         {/* Identifiers sit one level below the account name — every row uses
@@ -101,13 +117,13 @@ export function VirtualAccountCard({
           identifiers above it. stopPropagation keeps clicks scoped to the
           button itself. group-focus-within mirrors the hover reveal for
           keyboard users tabbing onto the buttons. Suppressed entirely while
-          selected — the active card shows only its border and the Plus
+          expanded — the active card shows only its border and the collapse
           icon while the details section below is populated, not these. */}
       <div
         className={cn(
           "pointer-events-none absolute inset-x-0 bottom-0 flex items-center gap-2 px-4 py-4",
           "bg-card opacity-0 transition-opacity duration-200",
-          !isSelected && [
+          !isExpanded && [
             "group-hover:pointer-events-auto group-hover:opacity-100",
             "group-focus-within:pointer-events-auto group-focus-within:opacity-100",
           ]
