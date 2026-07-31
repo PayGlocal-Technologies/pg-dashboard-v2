@@ -7,7 +7,7 @@ export function VirtualAccountCardSkeleton() {
   return (
     <Card className={cn(CARD_SIZE_CLASS, "shrink-0 overflow-hidden px-4 py-4")} aria-hidden>
       <CardContent className="flex h-full flex-col gap-1 overflow-hidden">
-        {/* Mirrors the card's own stack: the expand control sits top-right
+        {/* Mirrors the card's own stack: the radio indicator sits top-right
             (absolute there, a flex row here — same footprint either way),
             then flag, title/country, and the two identifier rows. */}
         <div className="flex items-start justify-between">

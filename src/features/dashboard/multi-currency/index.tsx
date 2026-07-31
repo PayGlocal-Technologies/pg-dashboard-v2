@@ -24,15 +24,13 @@ export function MultiCurrencyFeature() {
   const [accounts] = useState<VirtualAccount[]>(MOCK_VIRTUAL_ACCOUNTS);
   const isLoading = false;
 
-  // null = nothing expanded, which is the initial state: only the card
-  // carousel shows until the user opens an account. Holding a single id here
-  // (rather than a per-card flag) is what enforces one-at-a-time expansion —
-  // expanding a new account implicitly collapses the previous one.
-  const [expandedAccountId, setExpandedAccountId] = useState<string | null>(null);
-  const expandedAccount = accounts.find((a) => a.id === expandedAccountId) ?? null;
+  // Exactly one account is selected at all times — defaults to the first so
+  // Account Details/Action Required are populated immediately on load, not
+  // only after an explicit click.
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id ?? "");
+  const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? accounts[0] ?? null;
 
-  const toggleExpand = (account: VirtualAccount) =>
-    setExpandedAccountId((current) => (current === account.id ? null : account.id));
+  const selectAccount = (account: VirtualAccount) => setSelectedAccountId(account.id);
 
   const copyToClipboard = async (text: string, message: string) => {
     try {
@@ -108,33 +106,34 @@ export function MultiCurrencyFeature() {
         isLoading={isLoading}
         onCopy={handleCopyAccount}
         onShare={handleShareAccount}
-        expandedAccountId={expandedAccountId}
-        onToggleExpand={toggleExpand}
+        selectedAccountId={selectedAccount?.id ?? ""}
+        onSelect={selectAccount}
       />
 
       {/* Two-column layout: Account Details sizes to its own content
-          (capped at 730px — see VirtualAccountDetails), Transactions fills
-          whatever width is left. items-start keeps both top-aligned even
-          though their heights differ; flex-wrap drops Transactions below
-          Account Details on narrow viewports instead of squeezing either. */}
-      {expandedAccount && (
-        // key remounts the whole section when a different account is
-        // expanded, so the fade replays on every switch (not just the first
-        // open) and the transactions table's own page/drawer state resets
-        // rather than carrying over from the previously expanded account.
+          (capped at 730px — see VirtualAccountDetails), Action Required
+          fills whatever width is left. items-start keeps both top-aligned
+          even though their heights differ; flex-wrap drops Action Required
+          below Account Details on narrow viewports instead of squeezing
+          either. */}
+      {selectedAccount && (
+        // key remounts the whole section on every selection change, so the
+        // fade replays on every switch (not just the first render) and
+        // Action Required's own page/drawer state resets rather than
+        // carrying over from the previously selected account.
         <div
-          key={expandedAccount.id}
+          key={selectedAccount.id}
           className="flex flex-wrap items-start gap-4 page-enter"
         >
           <VirtualAccountDetails
-            account={expandedAccount}
+            account={selectedAccount}
             onCopy={handleCopyFullAccount}
             onShare={handleShareFullAccount}
           />
           <div className="min-w-0 flex-1">
             <VirtualAccountActionRequired
-              currency={expandedAccount.currency}
-              countryName={expandedAccount.countryName}
+              currency={selectedAccount.currency}
+              countryName={selectedAccount.countryName}
             />
           </div>
         </div>

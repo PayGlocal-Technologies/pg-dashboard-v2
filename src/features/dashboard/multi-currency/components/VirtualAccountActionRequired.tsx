@@ -1,13 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, EmptyState, Separator, Shimmer, StatusBadge } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  IconButton,
+  Separator,
+  Shimmer,
+  StatusBadge,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ICONS } from "@/components/icon/registry";
 import { usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
+import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { getStatusMeta, isWaitingForInvoice } from "@/features/dashboard/transactions/mcaColumns";
@@ -170,7 +183,12 @@ export function VirtualAccountActionRequired({
               return (
                 <div key={row.gid}>
                   {index > 0 && <Separator />}
-                  <div className="flex items-center justify-between gap-4 px-4 py-3">
+                  {/* @container establishes this row as the sizing context for
+                      the two Upload Invoice variants below — it's the row's
+                      own available width that decides which one shows, not
+                      the viewport, since this list sits beside the
+                      Account Details card and its width varies with that. */}
+                  <div className="@container flex items-center justify-between gap-4 px-4 py-3">
                     <div className="min-w-0">
                       {/* Amount leads, with the status chip inline beside it */}
                       <div className="flex flex-wrap items-center gap-2">
@@ -191,15 +209,39 @@ export function VirtualAccountActionRequired({
                       </p>
                     </div>
 
+                    {/* Full label+icon button once the row has room (@sm,
+                        384px of container width) to fit it without squeezing
+                        the amount/chip/date block on the left. */}
                     <Button
                       variant="outline"
                       size="sm"
-                      className="shrink-0"
+                      className="hidden shrink-0 @sm:inline-flex"
                       leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
                       onClick={() => openUploadFlow(row)}
                     >
                       Upload Invoice
                     </Button>
+                    {/* Icon-only fallback below that width — same action,
+                        same size, a tooltip standing in for the now-hidden
+                        label so the affordance stays discoverable. */}
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <IconButton
+                            aria-label="Upload Invoice"
+                            variant="outline"
+                            size="sm"
+                            className="shrink-0 @sm:hidden"
+                            onClick={() => openUploadFlow(row)}
+                          >
+                            <Icon name="upload" className="h-3.5 w-3.5" />
+                          </IconButton>
+                        </TooltipTrigger>
+                        <TooltipContent className={TOOLTIP_CONTENT_CLASS} sideOffset={4}>
+                          Upload Invoice
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 </div>
               );

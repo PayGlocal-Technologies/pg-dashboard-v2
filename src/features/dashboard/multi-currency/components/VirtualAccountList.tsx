@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, type UIEvent } from "react";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, RadioGroup } from "@/components/ui";
 import { ICONS } from "@/components/icon/registry";
 import { cn } from "@/lib/utils";
 import { VirtualAccountCard } from "@/features/dashboard/multi-currency/components/VirtualAccountCard";
@@ -19,9 +19,9 @@ interface VirtualAccountListProps {
   isLoading?: boolean;
   onCopy: (account: VirtualAccount) => Promise<void> | void;
   onShare: (account: VirtualAccount) => void;
-  /** id of the account whose details section is expanded, or null if none is. */
-  expandedAccountId: string | null;
-  onToggleExpand: (account: VirtualAccount) => void;
+  /** id of the currently selected account — always exactly one. */
+  selectedAccountId: string;
+  onSelect: (account: VirtualAccount) => void;
 }
 
 /**
@@ -37,8 +37,8 @@ export function VirtualAccountList({
   isLoading = false,
   onCopy,
   onShare,
-  expandedAccountId,
-  onToggleExpand,
+  selectedAccountId,
+  onSelect,
 }: VirtualAccountListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   // Hidden once there's nothing left to scroll to — either the list never
@@ -96,21 +96,37 @@ export function VirtualAccountList({
         role="list"
         aria-label="Virtual receiving accounts"
       >
-        {accounts.map((account, index) => (
-          <div
-            key={account.id}
-            role="listitem"
-            className={cn("snap-start", index === 0 && "ml-2")}
-          >
-            <VirtualAccountCard
-              account={account}
-              onCopy={onCopy}
-              onShare={onShare}
-              isExpanded={account.id === expandedAccountId}
-              onToggleExpand={onToggleExpand}
-            />
-          </div>
-        ))}
+        {/* One Radix radio-group context for every card's RadioGroupItem —
+            `contents` keeps it out of the box model entirely so it doesn't
+            interfere with the flex row above (each card div is still a
+            direct flex child of the scroll container). onValueChange is the
+            radio's own path to selecting an account, kept in sync with the
+            card's own onClick in VirtualAccountCard — either one lands on
+            the same account either way. */}
+        <RadioGroup
+          value={selectedAccountId}
+          onValueChange={(id) => {
+            const account = accounts.find((a) => a.id === id);
+            if (account) onSelect(account);
+          }}
+          className="contents"
+        >
+          {accounts.map((account, index) => (
+            <div
+              key={account.id}
+              role="listitem"
+              className={cn("snap-start", index === 0 && "ml-2")}
+            >
+              <VirtualAccountCard
+                account={account}
+                onCopy={onCopy}
+                onShare={onShare}
+                isSelected={account.id === selectedAccountId}
+                onSelect={onSelect}
+              />
+            </div>
+          ))}
+        </RadioGroup>
       </div>
 
       {/* Leading scroll affordance — the mirror image of the trailing one
