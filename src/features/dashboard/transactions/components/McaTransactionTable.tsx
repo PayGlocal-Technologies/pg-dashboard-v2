@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import {
   Badge,
   Button,
@@ -177,18 +177,23 @@ function TransactionFilterPanel({
 // Shared trigger styling for the Date/Amount/Status filter chips: dashed
 // outline + a leading plus icon, matching the "add a filter" affordance in
 // the reference design, with the plus swapped for a small count badge once
-// that chip has an active value.
-function FilterChipTrigger({
-  label,
-  active,
-  count,
-}: {
-  label: string;
-  active: boolean;
-  count?: number;
-}) {
+// that chip has an active value. The outline stays dashed even when active
+// (only its color and the leading icon change) so "active" reads as a color
+// change, not a shape change.
+//
+// Must forwardRef and spread the rest of its props onto the underlying
+// Button: PopoverTrigger's asChild clones its single child to inject
+// onClick/ref/aria-* (so the trigger is wired up and the popover anchors to
+// it). Without forwarding those through, this component silently swallowed
+// them, so the chips rendered but clicking did nothing: the click handler
+// Radix attached never reached a real DOM node.
+const FilterChipTrigger = forwardRef<
+  HTMLButtonElement,
+  { label: string; active: boolean; count?: number } & Omit<ComponentPropsWithoutRef<typeof Button>, "children">
+>(({ label, active, count, className, ...props }, ref) => {
   return (
     <Button
+      ref={ref}
       type="button"
       variant="outline"
       size="sm"
@@ -202,31 +207,56 @@ function FilterChipTrigger({
         )
       }
       className={cn(
-        "shrink-0 rounded-full text-muted-foreground hover:text-foreground",
-        active ? "border-solid border-primary/40 text-foreground" : "border-dashed"
+        "shrink-0 rounded-full border-dashed text-muted-foreground hover:text-foreground",
+        active && "border-primary/50 text-foreground",
+        className
       )}
+      {...props}
     >
       {label}
     </Button>
   );
-}
+});
+FilterChipTrigger.displayName = "FilterChipTrigger";
 
 interface DateRangeValue {
   from: string;
   to: string;
 }
 
+// Edits are staged in local `draft` state and only committed to `value` (the
+// query-affecting state in the parent) via Apply, per the "apply only after
+// confirmation" requirement. Status is the exception: its checkboxes still
+// filter immediately, matching the existing filtering model there.
+//
+// `open`/`onOpenChange` are lifted to the parent (rather than local state)
+// so only one of Date/Amount/Status can be open at a time: see
+// McaTransactionTable's openChip state, which every chip below shares.
 function DateFilterChip({
   value,
   onChange,
+  open,
+  onOpenChange,
 }: {
   value: DateRangeValue;
   onChange: (next: DateRangeValue) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
+  const [draft, setDraft] = useState<DateRangeValue>(value);
   const isActive = !!(value.from && value.to);
+  const isPartial = !!draft.from !== !!draft.to;
 
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        // Re-seed the draft from the last applied value every time the
+        // popover opens, so a discarded in-progress edit never leaks in.
+        if (next) setDraft(value);
+      }}
+    >
       <PopoverTrigger asChild>
         <FilterChipTrigger label="Date" active={isActive} count={isActive ? 1 : undefined} />
       </PopoverTrigger>
@@ -238,9 +268,9 @@ function DateFilterChip({
           <Input
             id="txn-date-from"
             type="date"
-            value={value.from}
-            max={value.to || undefined}
-            onChange={(e) => onChange({ ...value, from: e.target.value })}
+            value={draft.from}
+            max={draft.to || undefined}
+            onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
           />
         </div>
         <div className="space-y-1.5">
@@ -250,21 +280,39 @@ function DateFilterChip({
           <Input
             id="txn-date-to"
             type="date"
-            value={value.to}
-            min={value.from || undefined}
-            onChange={(e) => onChange({ ...value, to: e.target.value })}
+            value={draft.to}
+            min={draft.from || undefined}
+            onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
           />
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="x" className="w-3 h-3" />}
-          onClick={() => onChange({ from: "", to: "" })}
-          disabled={!value.from && !value.to}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          Clear
-        </Button>
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="x" className="w-3 h-3" />}
+            onClick={() => {
+              onChange({ from: "", to: "" });
+              setDraft({ from: "", to: "" });
+              onOpenChange(false);
+            }}
+            disabled={!draft.from && !draft.to}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={isPartial}
+            onClick={() => {
+              onChange(draft);
+              onOpenChange(false);
+            }}
+          >
+            Apply
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -280,18 +328,30 @@ interface AmountRangeValue {
 // buildRequestBody.ts), so this can't narrow the server-side result set or
 // totalCount the way the Date/Status filters do. Flagged here rather than
 // guessing an unsupported API field; revisit once a real range-query param
-// exists.
+// exists. Same staged draft + Apply pattern as DateFilterChip above, and the
+// same lifted open/onOpenChange so only one filter chip is open at a time.
 function AmountFilterChip({
   value,
   onChange,
+  open,
+  onOpenChange,
 }: {
   value: AmountRangeValue;
   onChange: (next: AmountRangeValue) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
+  const [draft, setDraft] = useState<AmountRangeValue>(value);
   const isActive = !!(value.min || value.max);
 
   return (
-    <Popover>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (next) setDraft(value);
+      }}
+    >
       <PopoverTrigger asChild>
         <FilterChipTrigger label="Amount" active={isActive} count={isActive ? 1 : undefined} />
       </PopoverTrigger>
@@ -305,8 +365,8 @@ function AmountFilterChip({
             type="number"
             inputMode="decimal"
             placeholder="0"
-            value={value.min}
-            onChange={(e) => onChange({ ...value, min: e.target.value })}
+            value={draft.min}
+            onChange={(e) => setDraft((d) => ({ ...d, min: e.target.value }))}
           />
         </div>
         <div className="space-y-1.5">
@@ -318,21 +378,38 @@ function AmountFilterChip({
             type="number"
             inputMode="decimal"
             placeholder="No limit"
-            value={value.max}
-            onChange={(e) => onChange({ ...value, max: e.target.value })}
+            value={draft.max}
+            onChange={(e) => setDraft((d) => ({ ...d, max: e.target.value }))}
           />
         </div>
         <p className="text-[11px] text-muted-foreground">Applies to the transactions currently loaded.</p>
-        <Button
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="x" className="w-3 h-3" />}
-          onClick={() => onChange({ min: "", max: "" })}
-          disabled={!value.min && !value.max}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          Clear
-        </Button>
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="x" className="w-3 h-3" />}
+            onClick={() => {
+              onChange({ min: "", max: "" });
+              setDraft({ min: "", max: "" });
+              onOpenChange(false);
+            }}
+            disabled={!draft.min && !draft.max}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              onChange(draft);
+              onOpenChange(false);
+            }}
+          >
+            Apply
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -342,15 +419,19 @@ function StatusFilterChip({
   selected,
   onToggle,
   onClear,
+  open,
+  onOpenChange,
 }: {
   selected: Record<FilterCategoryKey, string[]>;
   onToggle: (category: FilterCategoryKey, value: string) => void;
   onClear: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const count = selected.status.length + selected.currency.length;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <FilterChipTrigger label="Status" active={count > 0} count={count} />
       </PopoverTrigger>
@@ -440,6 +521,9 @@ export function McaTransactionTable() {
   // null until the merchant actually drags a column, at which point
   // DataTable renders that order instead of buildMcaColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  // Which of the Date/Amount/Status filter chip popovers is open, if any:
+  // shared so opening one closes whichever other one was open.
+  const [openChip, setOpenChip] = useState<"date" | "amount" | "status" | null>(null);
   const [page, setPage]         = useState(1);
 
   const [statusOverrides, setStatusOverrides] = useState<Record<string, Partial<McaTransaction>>>({});
@@ -653,12 +737,21 @@ export function McaTransactionTable() {
               setDateRange(next);
               setPage(1);
             }}
+            open={openChip === "date"}
+            onOpenChange={(next) => setOpenChip(next ? "date" : null)}
           />
-          <AmountFilterChip value={amountRange} onChange={setAmountRange} />
+          <AmountFilterChip
+            value={amountRange}
+            onChange={setAmountRange}
+            open={openChip === "amount"}
+            onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
+          />
           <StatusFilterChip
             selected={{ status: statusFilters, currency: currencyFilters }}
             onToggle={toggleFilter}
             onClear={onClearFilters}
+            open={openChip === "status"}
+            onOpenChange={(next) => setOpenChip(next ? "status" : null)}
           />
           <ReorderColumnsPopover
             columns={reorderableColumns}

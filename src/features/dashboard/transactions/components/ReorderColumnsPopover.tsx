@@ -81,7 +81,12 @@ export function ReorderColumnsPopover({ columns, order, onOrderChange }: Reorder
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" className="shrink-0 text-muted-foreground hover:text-foreground">
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
+          className="shrink-0 text-muted-foreground hover:text-foreground"
+        >
           Reorder Columns
         </Button>
       </PopoverTrigger>
