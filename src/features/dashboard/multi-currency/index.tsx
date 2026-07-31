@@ -6,6 +6,7 @@ import { Button, Card, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
+import { VirtualAccountTransactions } from "@/features/dashboard/multi-currency/components/VirtualAccountTransactions";
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 import {
   formatAccount,
@@ -107,12 +108,25 @@ export function MultiCurrencyFeature() {
         onSelect={(account) => setSelectedAccountId(account.id)}
       />
 
+      {/* Two-column layout: Account Details sizes to its own content
+          (capped at 730px — see VirtualAccountDetails), Transactions fills
+          whatever width is left. items-start keeps both top-aligned even
+          though their heights differ; flex-wrap drops Transactions below
+          Account Details on narrow viewports instead of squeezing either. */}
       {selectedAccount && (
-        <VirtualAccountDetails
-          account={selectedAccount}
-          onCopy={handleCopyFullAccount}
-          onShare={handleShareFullAccount}
-        />
+        <div className="flex flex-wrap items-start gap-4">
+          <VirtualAccountDetails
+            account={selectedAccount}
+            onCopy={handleCopyFullAccount}
+            onShare={handleShareFullAccount}
+          />
+          <div className="min-w-0 flex-1">
+            <VirtualAccountTransactions
+              currency={selectedAccount.currency}
+              countryName={selectedAccount.countryName}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
