@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Alert,
   AlertDescription,
   Button,
   Card,
   CardContent,
+  IconButton,
   Separator,
   StatusBadge,
 } from "@/components/ui";
@@ -16,6 +17,7 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
 import {
   formatCurrency,
+  formatFileSize,
   formatTransactionDateOnly,
   formatTransactionDateTime,
   formatTransactionTimestamp,
@@ -23,6 +25,7 @@ import {
 } from "@/lib/utils/format";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
+import { InvoicePreviewDialog } from "@/features/dashboard/transactions/components/InvoicePreviewDialog";
 import { LinkedTransactionsSection } from "@/features/dashboard/transactions/components/LinkedTransactionsSection";
 import {
   MCA_FX_RATES_TO_INR,
@@ -63,12 +66,14 @@ const ROW_START_CLASS: Record<number, string> = {
   3: "lg:row-start-3",
   4: "lg:row-start-4",
   5: "lg:row-start-5",
+  6: "lg:row-start-6",
 };
 const ROW_SPAN_CLASS: Record<number, string> = {
   2: "lg:row-span-2",
   3: "lg:row-span-3",
   4: "lg:row-span-4",
   5: "lg:row-span-5",
+  6: "lg:row-span-6",
 };
 
 // Index of "Invoice pending" within buildTimeline's `labels` array below —
@@ -196,6 +201,21 @@ function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean })
 function getMockCardLast4(gid: string): string {
   const digits = gid.replace(/\D/g, "");
   return (digits.slice(-4) || "4242").padStart(4, "0");
+}
+
+// TODO: replace with the real uploaded-invoice filename/size once the API
+// exposes it for MCA transactions. McaTransaction carries no such field
+// today, and no invoice-metadata fetch endpoint exists (see
+// InvoiceDropzone.tsx). Deterministic pseudo name/size (from the gid, same
+// trick as acctSuffix/getMockCardLast4 above) so the placeholder stays
+// stable across re-renders instead of changing on every render.
+function getMockUploadedInvoice(gid: string): { name: string; size: number } {
+  const digits = gid.replace(/\D/g, "");
+  const suffix = digits.slice(-6) || "100000";
+  return {
+    name: `invoice-${suffix}.pdf`,
+    size: 40_000 + (Number(suffix) % 200_000),
+  };
 }
 
 function PaymentMethodPlaceholder({ gid }: { gid: string }) {
@@ -348,6 +368,44 @@ function SettlementTimelineSection({ timeline }: { timeline: TimelineStep[] }) {
           ))}
         </CardContent>
       </Card>
+    </section>
+  );
+}
+
+// Shown once the timeline has moved past the invoice-pending step (see
+// showUploadedInvoice at the call site), meaning an invoice has actually been
+// submitted for this transaction. Shows only the latest uploaded file; a
+// replacement upload would overwrite the same underlying record rather than
+// appending one, so there's nothing here to list beyond the single current
+// file.
+function UploadedInvoiceSection({ row }: { row: McaTransaction }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const invoice = getMockUploadedInvoice(row.gid);
+
+  return (
+    <section>
+      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        Uploaded invoice
+      </h3>
+      <Card size="sm">
+        <CardContent className="flex items-center gap-3">
+          <Icon name="file-text" className="h-5 w-5 shrink-0 text-muted-foreground" />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium text-foreground">{invoice.name}</p>
+            <p className="text-[12px] text-muted-foreground">{formatFileSize(invoice.size)}</p>
+          </div>
+          <IconButton aria-label="Preview invoice" variant="ghost" size="sm" onClick={() => setPreviewOpen(true)}>
+            <Icon name="eye" className="h-3.5 w-3.5" />
+          </IconButton>
+        </CardContent>
+      </Card>
+
+      <InvoicePreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        fileName={invoice.name}
+        fileSize={invoice.size}
+      />
     </section>
   );
 }
@@ -547,6 +605,11 @@ export function TransactionDetailsContent({
   const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
   const isReversed = REVERSED_STATUSES.has(row.externalStatus);
   const isSettled = row.externalStatus === "SETTLED" || row.externalStatus === "FIRC_SETTLED";
+  // Invoice review is the step right after invoice-pending in buildTimeline's
+  // labels (see WAITING_FOR_INVOICE_STEP_INDEX). Once the timeline has moved
+  // past that step, an invoice has actually been submitted for this
+  // transaction, so the Uploaded Invoice section has something real to show.
+  const showUploadedInvoice = getCurrentStepIndex(row) > WAITING_FOR_INVOICE_STEP_INDEX;
 
   const counterpartyName = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName ?? "—";
   const amount = parseFloat(row.amount ?? "0");
@@ -615,6 +678,7 @@ export function TransactionDetailsContent({
         )}
         {showActionPanel && <UploadInvoiceSection row={row} onUploaded={onUploaded} />}
         <SettlementTimelineSection timeline={timeline} />
+        {showUploadedInvoice && <UploadedInvoiceSection row={row} />}
         {isSettled && (
           <PaymentBreakdownSection
             convertedAmount={convertedAmount}
@@ -634,13 +698,17 @@ export function TransactionDetailsContent({
   // FIRA Received banner leads at row 1, its companion Refer & Earn banner
   // immediately after it at row 2, then Settlement Timeline. showActionPanel
   // (Upload Invoice) is never true for a settled transaction, so there's no
-  // conflict over row 1 between the two. Payment Breakdown and Linked
-  // Transactions stack after Settlement Timeline, in order.
+  // conflict over row 1 between the two. Uploaded Invoice (once the
+  // timeline's past invoice-pending), Payment Breakdown, and Linked
+  // Transactions stack after Settlement Timeline in order, each row number
+  // only advancing past a section that's actually rendered.
   const firaRow = 1;
   const referEarnRow = firaRow + 1;
   const timelineRow = isSettled ? referEarnRow + 1 : showActionPanel ? 2 : 1;
-  const breakdownRow = timelineRow + 1;
-  const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
+  const uploadedInvoiceRow = timelineRow + 1;
+  const breakdownRow = (showUploadedInvoice ? uploadedInvoiceRow : timelineRow) + 1;
+  const linkedRow =
+    (isSettled ? breakdownRow : showUploadedInvoice ? uploadedInvoiceRow : timelineRow) + 1;
 
   // The right column (Payment Details + Sender Details) aligns with
   // whichever section leads the left column: Upload Invoice's row (row 1)
@@ -703,6 +771,15 @@ export function TransactionDetailsContent({
         <div className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
           <SettlementTimelineSection timeline={timeline} />
         </div>
+
+        {/* Uploaded Invoice: once the timeline's past invoice-pending,
+            directly below Settlement Timeline and ahead of Payment
+            Breakdown/Payment Details/Sender Details/Linked Transactions. */}
+        {showUploadedInvoice && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[uploadedInvoiceRow])}>
+            <UploadedInvoiceSection row={row} />
+          </div>
+        )}
 
         {/* Payment Breakdown — only for settled transactions. */}
         {isSettled && (
