@@ -27,38 +27,25 @@ export function VirtualAccountCard({
 }: VirtualAccountCardProps) {
   return (
     <Card
-      role="button"
-      tabIndex={0}
-      aria-expanded={isExpanded}
-      onClick={() => onToggleExpand(account)}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onToggleExpand(account);
-        }
-      }}
       className={cn(
         CARD_SIZE_CLASS,
-        "group relative shrink-0 cursor-pointer overflow-hidden px-4 py-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+        "group relative shrink-0 overflow-hidden px-4 py-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md",
         isExpanded && "border-primary ring-2 ring-primary"
       )}
     >
-      {/* Expand/collapse control. Sits outside the hover-revealed action row
-          below, so it's always visible and reachable regardless of hover
-          state. stopPropagation isn't needed for correctness (the card's own
-          click toggles the same thing) but is kept so the toggle fires once,
-          not twice, from a single click. */}
+      {/* The only control that expands/collapses this account. The card
+          itself is deliberately not clickable — no onClick, role, or
+          tabIndex on the Card — so the flag, title, identifiers, and
+          whitespace are purely informational; this button is the sole click
+          target for that action. Sits outside the hover-revealed action row
+          below, so it stays visible and reachable regardless of hover state. */}
       <IconButton
         aria-label={isExpanded ? `Collapse ${account.accountName}` : `Expand ${account.accountName}`}
         variant="outline"
         size="xs"
         rounded="full"
         className="absolute right-3 top-3 z-10 size-6 min-w-6 text-muted-foreground"
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleExpand(account);
-        }}
+        onClick={() => onToggleExpand(account)}
       >
         <Icon name={isExpanded ? "x" : "plus"} className="h-3.5 w-3.5" />
       </IconButton>
