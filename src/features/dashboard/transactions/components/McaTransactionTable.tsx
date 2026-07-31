@@ -6,6 +6,7 @@ import {
   Button,
   Checkbox,
   DataTable,
+  Input,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -13,6 +14,7 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  type Column,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -24,6 +26,7 @@ import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
+import { ReorderColumnsPopover } from "@/features/dashboard/transactions/components/ReorderColumnsPopover";
 // Upload Invoice now opens the details page instead of this modal — import
 // kept commented out (not deleted) alongside the modal's usage below.
 // import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
@@ -50,6 +53,30 @@ const SETTLED_STATUSES = ["SETTLED", "FIRC_SETTLED"];
 
 function sameStatusSet(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((v) => b.includes(v));
+}
+
+// yyyy-mm-dd (native <input type="date"> value) → start/end-of-day epoch ms,
+// what buildTxnRequestBody's startTime/endTime already expect.
+function toStartOfDayMs(dateStr: string): number {
+  return new Date(`${dateStr}T00:00:00`).getTime();
+}
+function toEndOfDayMs(dateStr: string): number {
+  return new Date(`${dateStr}T23:59:59.999`).getTime();
+}
+
+// Re-orders an already-built column list to match a saved key order (from
+// ReorderColumnsPopover), keeping "action" pinned last regardless of order:
+// it's a utility column, not a data field a merchant would want to move
+// around. Appends any column missing from `order` (e.g. Merchant ID, which
+// only exists for partner users) right before it.
+function reorderColumns<T>(cols: Column<T>[], order: string[] | null): Column<T>[] {
+  if (!order) return cols;
+  const actionCol = cols.find((c) => c.key === "action");
+  const reorderable = cols.filter((c) => c.key !== "action");
+  const byKey = new Map(reorderable.map((c) => [c.key, c]));
+  const ordered = order.map((k) => byKey.get(k)).filter((c): c is Column<T> => !!c);
+  const missing = reorderable.filter((c) => !order.includes(c.key));
+  return [...ordered, ...missing, ...(actionCol ? [actionCol] : [])];
 }
 
 // Sets scrollTop via a standalone function (rather than inline in a
@@ -147,6 +174,193 @@ function TransactionFilterPanel({
   );
 }
 
+// Shared trigger styling for the Date/Amount/Status filter chips: dashed
+// outline + a leading plus icon, matching the "add a filter" affordance in
+// the reference design, with the plus swapped for a small count badge once
+// that chip has an active value.
+function FilterChipTrigger({
+  label,
+  active,
+  count,
+}: {
+  label: string;
+  active: boolean;
+  count?: number;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      leftIcon={
+        active && count ? (
+          <Badge variant="default" size="sm" square>
+            {count}
+          </Badge>
+        ) : (
+          <Icon name="plus" className="h-3 w-3" />
+        )
+      }
+      className={cn(
+        "shrink-0 rounded-full text-muted-foreground hover:text-foreground",
+        active ? "border-solid border-primary/40 text-foreground" : "border-dashed"
+      )}
+    >
+      {label}
+    </Button>
+  );
+}
+
+interface DateRangeValue {
+  from: string;
+  to: string;
+}
+
+function DateFilterChip({
+  value,
+  onChange,
+}: {
+  value: DateRangeValue;
+  onChange: (next: DateRangeValue) => void;
+}) {
+  const isActive = !!(value.from && value.to);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <FilterChipTrigger label="Date" active={isActive} count={isActive ? 1 : undefined} />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 space-y-3 p-3">
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-medium text-muted-foreground" htmlFor="txn-date-from">
+            From
+          </label>
+          <Input
+            id="txn-date-from"
+            type="date"
+            value={value.from}
+            max={value.to || undefined}
+            onChange={(e) => onChange({ ...value, from: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-medium text-muted-foreground" htmlFor="txn-date-to">
+            To
+          </label>
+          <Input
+            id="txn-date-to"
+            type="date"
+            value={value.to}
+            min={value.from || undefined}
+            onChange={(e) => onChange({ ...value, to: e.target.value })}
+          />
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="x" className="w-3 h-3" />}
+          onClick={() => onChange({ from: "", to: "" })}
+          disabled={!value.from && !value.to}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Clear
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface AmountRangeValue {
+  min: string;
+  max: string;
+}
+
+// Filters only the rows already fetched for the current page: there's no
+// amount-range query parameter in TableReqBody today (see
+// buildRequestBody.ts), so this can't narrow the server-side result set or
+// totalCount the way the Date/Status filters do. Flagged here rather than
+// guessing an unsupported API field; revisit once a real range-query param
+// exists.
+function AmountFilterChip({
+  value,
+  onChange,
+}: {
+  value: AmountRangeValue;
+  onChange: (next: AmountRangeValue) => void;
+}) {
+  const isActive = !!(value.min || value.max);
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <FilterChipTrigger label="Amount" active={isActive} count={isActive ? 1 : undefined} />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 space-y-3 p-3">
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-medium text-muted-foreground" htmlFor="txn-amount-min">
+            Min amount
+          </label>
+          <Input
+            id="txn-amount-min"
+            type="number"
+            inputMode="decimal"
+            placeholder="0"
+            value={value.min}
+            onChange={(e) => onChange({ ...value, min: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-medium text-muted-foreground" htmlFor="txn-amount-max">
+            Max amount
+          </label>
+          <Input
+            id="txn-amount-max"
+            type="number"
+            inputMode="decimal"
+            placeholder="No limit"
+            value={value.max}
+            onChange={(e) => onChange({ ...value, max: e.target.value })}
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground">Applies to the transactions currently loaded.</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="x" className="w-3 h-3" />}
+          onClick={() => onChange({ min: "", max: "" })}
+          disabled={!value.min && !value.max}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Clear
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function StatusFilterChip({
+  selected,
+  onToggle,
+  onClear,
+}: {
+  selected: Record<FilterCategoryKey, string[]>;
+  onToggle: (category: FilterCategoryKey, value: string) => void;
+  onClear: () => void;
+}) {
+  const count = selected.status.length + selected.currency.length;
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <FilterChipTrigger label="Status" active={count > 0} count={count} />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-auto p-0">
+        <TransactionFilterPanel selected={selected} onToggle={onToggle} onClear={onClear} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // A single shared active indicator that slides between tabs, rather than each
 // tab drawing its own underline. Its position/width are measured from the DOM
 // (text-based tabs have different widths, so this can't be derived from
@@ -180,7 +394,11 @@ function TransactionViewTabs({
 
   return (
     <Tabs value={value} onValueChange={onValueChange}>
-      <TabsList className="h-auto justify-start gap-5 rounded-none border-0 bg-transparent p-0">
+      {/* relative here (not on some external wrapper) so the sliding
+          indicator's positioning context travels with this component
+          wherever it's rendered: it now sits directly on the page,
+          outside the controls container below. */}
+      <TabsList className="relative h-auto justify-start gap-5 rounded-none border-0 bg-transparent p-0">
         {VIEW_TABS.map((tab) => (
           <TabsTrigger
             key={tab.value}
@@ -217,6 +435,11 @@ export function McaTransactionTable() {
   // Defaults to "Invoice Pending" (rather than "All") when the page loads.
   const [statusFilters, setStatusFilters]     = useState<string[]>(INVOICE_PENDING_STATUSES);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
+  const [dateRange, setDateRange]     = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  // null until the merchant actually drags a column, at which point
+  // DataTable renders that order instead of buildMcaColumns' own default.
+  const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [page, setPage]         = useState(1);
 
   const [statusOverrides, setStatusOverrides] = useState<Record<string, Partial<McaTransaction>>>({});
@@ -244,6 +467,8 @@ export function McaTransactionTable() {
     {
       externalStatus: statusFilters.length ? statusFilters : undefined,
       currency: currencyFilters.length ? currencyFilters : undefined,
+      startTime: dateRange.from ? toStartOfDayMs(dateRange.from) : undefined,
+      endTime: dateRange.to ? toEndOfDayMs(dateRange.to) : undefined,
     },
     {
       searchQuery: search || undefined,
@@ -265,6 +490,21 @@ export function McaTransactionTable() {
   const rows       = rawRows.map((r) => (statusOverrides[r.gid] ? { ...r, ...statusOverrides[r.gid] } : r));
   const totalCount = data?.data?.totalCount ?? 0;
 
+  // Amount has no server-side range param (see AmountFilterChip's comment),
+  // so it narrows only the rows already on this page; totalCount/pagination
+  // below still reflect the server's unfiltered count.
+  const minAmount = amountRange.min ? parseFloat(amountRange.min) : undefined;
+  const maxAmount = amountRange.max ? parseFloat(amountRange.max) : undefined;
+  const tableRows =
+    minAmount == null && maxAmount == null
+      ? rows
+      : rows.filter((r) => {
+          const amt = parseFloat(r.amount ?? "0");
+          if (minAmount != null && amt < minAmount) return false;
+          if (maxAmount != null && amt > maxAmount) return false;
+          return true;
+        });
+
   // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
   const detailsRow = detailsOverrideRow ?? rows.find((r) => r.gid === detailsRowId) ?? null;
 
@@ -282,7 +522,6 @@ export function McaTransactionTable() {
     setPage(1);
   };
 
-  const activeFilterCount = statusFilters.length + currencyFilters.length;
 
   // const openUploadInvoice = (row: McaTransaction) => {
   //   setUploadRowId(row.gid);
@@ -352,7 +591,12 @@ export function McaTransactionTable() {
     }));
   };
 
-  const columns = buildMcaColumns(isPartnerUser, openDetails);
+  const baseColumns = buildMcaColumns(isPartnerUser, openDetails);
+  const columns = reorderColumns(baseColumns, columnOrder);
+  const reorderableColumns = baseColumns
+    .filter((c) => c.key !== "action")
+    .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
+  const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
   // The details page replaces the table in place (same component instance,
   // same closed-over search/filter/page state) rather than overlaying it —
@@ -370,69 +614,57 @@ export function McaTransactionTable() {
   }
 
   return (
-    <div className="space-y-3">
-      {/* Search & filter container */}
-      <div className="bg-card rounded-xl border border-border">
-        <div className="relative flex flex-wrap items-center justify-between gap-3 px-4">
-          {/* View tabs — an underline-style shortcut onto the same status
-              filter state as the "Invoice Pending" option inside the Filter
-              flyout, not a separate filter axis. */}
-          <TransactionViewTabs
-            value={
-              sameStatusSet(statusFilters, INVOICE_PENDING_STATUSES)
-                ? "invoice-pending"
-                : sameStatusSet(statusFilters, SETTLED_STATUSES)
-                  ? "settled"
-                  : "all"
-            }
-            onValueChange={(v) => {
-              setStatusFilters(
-                v === "invoice-pending"
-                  ? INVOICE_PENDING_STATUSES
-                  : v === "settled"
-                    ? SETTLED_STATUSES
-                    : []
-              );
+    <div className="space-y-4">
+      {/* Tab bar: page-level navigation, sits directly on the page with no
+          surrounding container. An underline-style shortcut onto the same
+          status filter state as the "Invoice Pending" option inside the
+          Status flyout, not a separate filter axis. */}
+      <TransactionViewTabs
+        value={
+          sameStatusSet(statusFilters, INVOICE_PENDING_STATUSES)
+            ? "invoice-pending"
+            : sameStatusSet(statusFilters, SETTLED_STATUSES)
+              ? "settled"
+              : "all"
+        }
+        onValueChange={(v) => {
+          setStatusFilters(
+            v === "invoice-pending" ? INVOICE_PENDING_STATUSES : v === "settled" ? SETTLED_STATUSES : []
+          );
+          setPage(1);
+        }}
+      />
+
+      {/* Controls container: search left, filter chips + Reorder Columns
+          right. Separate from the tab bar above so the tabs read as page
+          navigation and this reads as controls scoped to the table below. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+        <RotatingSearchInput
+          value={search}
+          onSearch={onSearch}
+          words={["remitter", "transaction ID", "UTR"]}
+          className="w-40 sm:w-56"
+        />
+
+        <div className="flex flex-wrap items-center gap-2">
+          <DateFilterChip
+            value={dateRange}
+            onChange={(next) => {
+              setDateRange(next);
               setPage(1);
             }}
           />
-
-          {/* Search + Filter — right-aligned, wraps below the tabs on narrow screens. */}
-          <div className="flex items-center gap-2 py-2">
-            <RotatingSearchInput
-              value={search}
-              onSearch={onSearch}
-              words={["remitter", "transaction ID", "UTR"]}
-              className="w-40 sm:w-56"
-            />
-
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="filter" className="h-3.5 w-3.5" />}
-                  rightIcon={
-                    activeFilterCount > 0 ? (
-                      <Badge variant="default" size="sm" square>
-                        {activeFilterCount}
-                      </Badge>
-                    ) : undefined
-                  }
-                  className="shrink-0 text-muted-foreground hover:text-foreground"
-                >
-                  Filter
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-auto p-0">
-                <TransactionFilterPanel
-                  selected={{ status: statusFilters, currency: currencyFilters }}
-                  onToggle={toggleFilter}
-                  onClear={onClearFilters}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
+          <AmountFilterChip value={amountRange} onChange={setAmountRange} />
+          <StatusFilterChip
+            selected={{ status: statusFilters, currency: currencyFilters }}
+            onToggle={toggleFilter}
+            onClear={onClearFilters}
+          />
+          <ReorderColumnsPopover
+            columns={reorderableColumns}
+            order={currentColumnOrder}
+            onOrderChange={setColumnOrder}
+          />
         </div>
       </div>
 
@@ -450,7 +682,7 @@ export function McaTransactionTable() {
       ) : (
         <DataTable
           columns={columns}
-          data={rows}
+          data={tableRows}
           isLoading={isPending}
           skeletonRows={8}
           emptyTitle="No transactions found"
