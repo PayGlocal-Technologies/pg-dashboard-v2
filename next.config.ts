@@ -23,9 +23,7 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     if (env) {
-      // UAT moved to pygcl.com; dev/test/prod stay on payglocal.in. This rewrite is a
-      // server-side proxy and stays same-origin for the browser, so it can be env-based
-      // rather than derived from the host the user is browsing.
+      // UAT has moved to pygcl.com; dev/test/prod stay on payglocal.in.
       const gccDomain = env === "uat" ? "pygcl.com" : "payglocal.in";
       const rules: { source: string; destination: string; basePath?: false }[] = [
         {

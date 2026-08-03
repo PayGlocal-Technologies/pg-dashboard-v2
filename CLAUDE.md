@@ -189,10 +189,10 @@ Every hit must either be a structural element (exempt per rule above) or have a 
 ## Environment / backend
 
 - `npm run dev` → connects to `gcc.dev.payglocal.in` backend
-- `npm run uat` → connects to `gcc.uat.pygcl.com` backend (UAT has migrated to `pygcl.com`; dev/test/prod stay on `payglocal.in`)
+- `npm run uat` → connects to `gcc.uat.pygcl.com` backend
+- UAT has migrated off `payglocal.in`: the base domain is `pygcl.com` for uat and `payglocal.in` for dev/test/prod. Any URL built from the base domain picks it with a `env === "uat" ? "pygcl.com" : "payglocal.in"` conditional, matching pg-dashboard.
 - Next.js rewrites proxy `/gcc/:path*` to the correct origin. The browser always stays same-origin.
-- Public key is fetched from `https://cdn.${NEXT_PUBLIC_ENV}.${getBaseDomain()}/public-key/key.txt`.
-- Any browser-visible URL built with the base domain must use `getBaseDomain()` from [src/lib/utils/getBaseDomain.ts](src/lib/utils/getBaseDomain.ts), never a hardcoded domain. Both domains are live during the migration, so the domain is read from `window.location.hostname` to keep redirects and CDN calls on whichever domain the user is browsing.
+- Public key is fetched from `https://cdn.uat.pygcl.com/public-key/key.txt` in uat, `https://cdn.dev.payglocal.in/...` in dev, and `https://cdn.payglocal.in/...` in prod.
 
 ## No secrets in code
 
