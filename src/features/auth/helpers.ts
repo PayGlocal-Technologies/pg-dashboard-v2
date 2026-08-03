@@ -3,6 +3,7 @@ import { getAuth, type Auth } from "firebase/auth";
 import { signInWithPopup, signInWithRedirect, type UserCredential } from "firebase/auth";
 import { authProvider } from "@/features/auth/login/single-sign-on/authProvider";
 import { useApp } from "@/stores/useApp";
+import { getBaseDomain } from "@/lib/utils/getBaseDomain";
 
 export function firebaseConfigProvider(): Auth {
   const firebaseConfig = {
@@ -32,7 +33,7 @@ function getKeyUrl(kid?: string): string {
   const base =
     env === "prod"
       ? "https://cdn.payglocal.in/public-key"
-      : `https://cdn.${env}.payglocal.in/public-key`;
+      : `https://cdn.${env}.${getBaseDomain()}/public-key`;
   return kid ? `${base}/kid.txt` : `${base}/key.txt`;
 }
 
