@@ -3,7 +3,6 @@ import { getAuth, type Auth } from "firebase/auth";
 import { signInWithPopup, signInWithRedirect, type UserCredential } from "firebase/auth";
 import { authProvider } from "@/features/auth/login/single-sign-on/authProvider";
 import { useApp } from "@/stores/useApp";
-import { getBaseDomain } from "@/lib/utils/getBaseDomain";
 
 export function firebaseConfigProvider(): Auth {
   const firebaseConfig = {
@@ -30,11 +29,11 @@ function getCdnEnv(): string {
 
 function getKeyUrl(kid?: string): string {
   const env = getCdnEnv();
-  const base =
-    env === "prod"
-      ? "https://cdn.payglocal.in/public-key"
-      : `https://cdn.${env}.${getBaseDomain()}/public-key`;
-  return kid ? `${base}/kid.txt` : `${base}/key.txt`;
+  if (env === "prod") {
+    return `https://cdn.payglocal.in/public-key/${kid ? "kid" : "key"}.txt`;
+  }
+  const cdnDomain = env === "uat" ? "pygcl.com" : "payglocal.in";
+  return `https://cdn.${env}.${cdnDomain}/public-key/${kid ? "kid" : "key"}.txt`;
 }
 
 async function fetchText(url: string): Promise<string> {
