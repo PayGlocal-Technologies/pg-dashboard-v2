@@ -877,7 +877,7 @@ export function McaTransactionTable() {
             }}
             className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
           >
-            Download
+            Report
           </Button>
         </div>
       </div>

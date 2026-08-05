@@ -20,6 +20,14 @@ const SHOW_DELAY_MS = 500;
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+// Collapsed: just wide enough for the header/close button and the five
+// emojis. Expanded: adds room for the Submit button once an emoji is picked.
+// Both are plain widths (not max-width), so the container itself grows
+// rather than an inner element reflowing within a fixed box, giving the
+// "single continuous interaction" the width and the Submit reveal share.
+const COLLAPSED_WIDTH = "14rem";
+const EXPANDED_WIDTH = "20rem";
+
 interface SettlementFeedbackSheetProps {
   /** This transaction's feedback was already submitted or dismissed in an
    * earlier drawer session, so skip the entrance entirely rather than
@@ -57,15 +65,21 @@ export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: Settleme
     <AnimatePresence>
       {shown && (
         <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={reduceMotion ? false : { opacity: 0, y: 12, width: COLLAPSED_WIDTH }}
+          animate={{ opacity: 1, y: 0, width: selected ? EXPANDED_WIDTH : COLLAPSED_WIDTH }}
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
-          transition={{ duration: 0.25, ease: EASE }}
-          // inset-x-0 + mx-auto centers this fixed-width card within the
-          // full-width absolute wrapper, rather than the card itself
-          // spanning the drawer. bottom-7 (28px) sits in the middle of the
-          // requested 24-32px margin.
-          className="absolute inset-x-0 bottom-7 mx-auto w-80 max-w-[calc(100%-3rem)] rounded-2xl border border-border bg-card px-4 py-3 shadow-xl"
+          transition={{
+            opacity: { duration: 0.25, ease: EASE },
+            y: { duration: 0.25, ease: EASE },
+            width: { duration: reduceMotion ? 0 : 0.3, ease: EASE },
+          }}
+          // inset-x-0 + mx-auto centers this card within the full-width
+          // absolute wrapper, rather than the card itself spanning the
+          // drawer. bottom-7 (28px) sits in the middle of the requested
+          // 24-32px margin. Width itself is animated (see COLLAPSED_WIDTH/
+          // EXPANDED_WIDTH above) rather than fixed, so overflow-hidden keeps
+          // the emoji row from spilling out mid-transition.
+          className="absolute inset-x-0 bottom-7 mx-auto max-w-[calc(100%-3rem)] overflow-hidden rounded-2xl border border-border bg-card px-4 py-3 shadow-xl"
         >
           <div className="flex items-start justify-between gap-2">
             <p className="text-[13px] font-semibold text-foreground">How are you liking our product?</p>
@@ -80,10 +94,10 @@ export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: Settleme
             </IconButton>
           </div>
 
-          {/* Emojis stay left-aligned; Submit only occupies the right side
-              once a rating is picked, fading/sliding in without resizing
-              this row (the card's width is fixed, so there's nothing to
-              jump). */}
+          {/* Emojis stay left-aligned and never move: only the card's own
+              width animates (see the motion.div above) to make room for
+              Submit, which then fades/slides in on the right once there's
+              space for it. */}
           <div className="mt-2.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
               {REACTIONS.map((reaction) => {
