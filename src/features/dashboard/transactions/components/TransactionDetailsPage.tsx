@@ -700,23 +700,32 @@ export function TransactionDetailsContent({
     // Single column, in document order: no grid, no row-start math, no
     // floated titles. Every section keeps the same title-outside/card-inside
     // structure as the page; only how they're arranged differs.
+    //
+    // Settled transactions lead with Payment Breakdown (financial summary
+    // first), then FIRA Received + Refer & Earn, then Settlement Timeline
+    // (with the uploaded invoice nested under its Invoice Submitted step).
+    // This ordering is drawer-only: the full page's 2-column grid below is
+    // untouched, and showActionPanel is never true for a settled
+    // transaction, so there's no conflict with the non-settled branch.
     return (
       <div className="space-y-9">
         {summary}
-        {isSettled && (
+        {isSettled ? (
           <>
+            <PaymentBreakdownSection
+              convertedAmount={convertedAmount}
+              processingFee={processingFee}
+              netAmount={netAmount}
+            />
             <FiraReceivedBanner />
             <ReferEarnBanner />
+            <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
           </>
-        )}
-        {showActionPanel && <UploadInvoiceSection row={row} onUploaded={onUploaded} />}
-        <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
-        {isSettled && (
-          <PaymentBreakdownSection
-            convertedAmount={convertedAmount}
-            processingFee={processingFee}
-            netAmount={netAmount}
-          />
+        ) : (
+          <>
+            {showActionPanel && <UploadInvoiceSection row={row} onUploaded={onUploaded} />}
+            <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
+          </>
         )}
         <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
         <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />

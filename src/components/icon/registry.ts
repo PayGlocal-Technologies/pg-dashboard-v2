@@ -28,7 +28,6 @@ import {
   CreditCard,
   Database,
   Download,
-  Expand,
   Eye,
   EyeOff,
   FileText,
@@ -52,8 +51,10 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Maximize2,
   Menu,
   MessageCircle,
+  Minimize2,
   Monitor,
   Moon,
   Paperclip,
@@ -74,7 +75,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShoppingCart,
-  Shrink,
   Smartphone,
   Sparkles,
   Square,
@@ -114,7 +114,12 @@ export const ICONS = {
   "credit-card": CreditCard,
   database: Database,
   download: Download,
-  expand: Expand,
+  // Two-arrow (diagonal, opposing-corners) expand/collapse pair, matching
+  // the rest of the product's iconography more closely than the previous
+  // four-arrow Expand/Shrink glyphs. Keys unchanged so existing <Icon
+  // name="expand"/"shrink"> call sites (drawer Expand, page Collapse) don't
+  // need to change, only what they render.
+  expand: Maximize2,
   eye: Eye,
   "eye-off": EyeOff,
   "file-text": FileText,
@@ -160,7 +165,7 @@ export const ICONS = {
   "shield-alert": ShieldAlert,
   "shield-check": ShieldCheck,
   "shopping-cart": ShoppingCart,
-  shrink: Shrink,
+  shrink: Minimize2,
   smartphone: Smartphone,
   sparkles: Sparkles,
   square: Square,

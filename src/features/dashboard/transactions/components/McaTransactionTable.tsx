@@ -854,13 +854,11 @@ export function McaTransactionTable() {
           />
         </div>
 
-        {/* Wider spacing either side of the divider than within either
-            group, so the two groups read as visually distinct. */}
-        <Separator orientation="vertical" className="mx-3 h-6" />
-
         {/* Action group: Reorder Columns, then Download. ml-auto pushes
             this group all the way to the right regardless of how much
-            space the search/filter groups take up. */}
+            space the search/filter groups take up. The resulting gap
+            (rather than a divider) is what separates it from the filter
+            chips. */}
         <div className="ml-auto flex items-center gap-2">
           <ReorderColumnsPopover
             columns={reorderableColumns}
