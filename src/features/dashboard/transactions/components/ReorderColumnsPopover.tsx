@@ -85,7 +85,10 @@ export function ReorderColumnsPopover({ columns, order, onOrderChange }: Reorder
           variant="outline"
           size="sm"
           leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
-          className="shrink-0 text-muted-foreground hover:text-foreground"
+          // h-auto/min-h-0/py-1: same compact height as the Upload Invoice
+          // button and the filter chips, instead of Button's default sm
+          // height (h-9).
+          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
         >
           Reorder Columns
         </Button>

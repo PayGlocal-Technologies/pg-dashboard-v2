@@ -1,6 +1,6 @@
 "use client";
 
-import { forwardRef, useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import {
   Badge,
   Button,
@@ -32,11 +32,7 @@ import { ReorderColumnsPopover } from "@/features/dashboard/transactions/compone
 // import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
 import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
 import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
-import {
-  MCA_STATUS_FILTERS,
-  MCA_CURRENCY_FILTERS,
-  TRANSACTIONS_PAGE_LIMIT,
-} from "@/features/dashboard/transactions/constants";
+import { MCA_STATUS_FILTERS, TRANSACTIONS_PAGE_LIMIT } from "@/features/dashboard/transactions/constants";
 import type { McaTransaction, McaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
 
 const VIEW_TABS = [
@@ -86,71 +82,35 @@ function restoreScrollTop(el: HTMLElement, value: number): void {
   el.scrollTop = value;
 }
 
-// ── Filter categories — left column of the filter flyout. Adding a new
-// filterable field is just one more entry here; the panel scales without
-// layout changes since options render in the shared right column. ──────────
-type FilterCategoryKey = "status" | "currency";
+// Status's own options. Currency used to live here as a second category
+// inside the same flyout; it's now its own independent chip (see
+// CurrencyFilterChip below), so this is a flat single-category list.
+const STATUS_OPTIONS = MCA_STATUS_FILTERS.filter((o) => o.value !== "All");
 
-const FILTER_CATEGORIES: { key: FilterCategoryKey; label: string; options: { value: string; label: string }[] }[] = [
-  { key: "status", label: "Status", options: MCA_STATUS_FILTERS.filter((o) => o.value !== "All") },
-  { key: "currency", label: "Currency", options: MCA_CURRENCY_FILTERS.filter((o) => o.value !== "All") },
-];
-
-// Two-column filter flyout: categories on the left (hover/click to preview),
-// that category's multi-select options on the right. Selections for every
-// category persist across hovers since state lives in the parent, not here.
-function TransactionFilterPanel({
+// Flat multi-select checkbox list for Status. Applies immediately on toggle
+// (no Apply step), matching the filtering model this already used before
+// Currency was split out.
+function StatusFilterPanel({
   selected,
   onToggle,
   onClear,
 }: {
-  selected: Record<FilterCategoryKey, string[]>;
-  onToggle: (category: FilterCategoryKey, value: string) => void;
+  selected: string[];
+  onToggle: (value: string) => void;
   onClear: () => void;
 }) {
-  const [activeCategory, setActiveCategory] = useState<FilterCategoryKey>("status");
-  const activeOptions = FILTER_CATEGORIES.find((c) => c.key === activeCategory)?.options ?? [];
-  const totalSelected = FILTER_CATEGORIES.reduce((sum, c) => sum + selected[c.key].length, 0);
-
   return (
-    <div className="w-72 p-3">
-      <div className="flex">
-        <div className="w-28 shrink-0 border-r border-border py-1.5">
-          {FILTER_CATEGORIES.map((category) => (
-            <button
-              key={category.key}
-              type="button"
-              onMouseEnter={() => setActiveCategory(category.key)}
-              onClick={() => setActiveCategory(category.key)}
-              className={cn(
-                "flex w-full items-center justify-between gap-2 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition-colors",
-                activeCategory === category.key
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              )}
-            >
-              <span>{category.label}</span>
-              {selected[category.key].length > 0 && (
-                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden />
-              )}
-            </button>
-          ))}
-        </div>
-
-        <div className="min-h-40 flex-1 py-1.5 pl-2">
-          {activeOptions.map((option) => (
-            <label
-              key={option.value}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
-            >
-              <Checkbox
-                checked={selected[activeCategory].includes(option.value)}
-                onCheckedChange={() => onToggle(activeCategory, option.value)}
-              />
-              {option.label}
-            </label>
-          ))}
-        </div>
+    <div className="w-56 p-3">
+      <div className="min-h-40 space-y-0.5">
+        {STATUS_OPTIONS.map((option) => (
+          <label
+            key={option.value}
+            className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
+          >
+            <Checkbox checked={selected.includes(option.value)} onCheckedChange={() => onToggle(option.value)} />
+            {option.label}
+          </label>
+        ))}
       </div>
 
       <Separator />
@@ -161,13 +121,13 @@ function TransactionFilterPanel({
           size="sm"
           leftIcon={<Icon name="x" className="w-3 h-3" />}
           onClick={onClear}
-          disabled={totalSelected === 0}
+          disabled={selected.length === 0}
           className="text-muted-foreground hover:text-foreground"
         >
           Clear filters
         </Button>
-        {totalSelected > 0 && (
-          <span className="pr-1 text-[11px] text-muted-foreground">{totalSelected} selected</span>
+        {selected.length > 0 && (
+          <span className="pr-1 text-[11px] text-muted-foreground">{selected.length} selected</span>
         )}
       </div>
     </div>
@@ -207,7 +167,11 @@ const FilterChipTrigger = forwardRef<
         )
       }
       className={cn(
-        "shrink-0 rounded-full border-dashed text-muted-foreground hover:text-foreground",
+        // h-auto/min-h-0/py-1 shrink this to the same compact height as the
+        // Upload Invoice button (mcaColumns.tsx) instead of Button's default
+        // sm height (h-9). px/text size are untouched, so the touch target
+        // width and typography stay put; only the vertical size shrinks.
+        "h-auto min-h-0 shrink-0 rounded-full border-dashed py-1 text-muted-foreground hover:text-foreground",
         active && "border-primary/50 text-foreground",
         className
       )}
@@ -422,21 +386,106 @@ function StatusFilterChip({
   open,
   onOpenChange,
 }: {
-  selected: Record<FilterCategoryKey, string[]>;
-  onToggle: (category: FilterCategoryKey, value: string) => void;
+  selected: string[];
+  onToggle: (value: string) => void;
   onClear: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const count = selected.status.length + selected.currency.length;
-
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <FilterChipTrigger label="Status" active={count > 0} count={count} />
+        <FilterChipTrigger label="Status" active={selected.length > 0} count={selected.length} />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-auto p-0">
-        <TransactionFilterPanel selected={selected} onToggle={onToggle} onClear={onClear} />
+        <StatusFilterPanel selected={selected} onToggle={onToggle} onClear={onClear} />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+interface CurrencyOption {
+  value: string;
+  label: string;
+}
+
+// Same staged draft + Apply/Clear pattern as Date/Amount above, and the same
+// lifted open/onOpenChange for the shared "only one chip open" behaviour.
+// Independent from Status now; it used to be a second category inside the
+// same flyout (see StatusFilterPanel's comment).
+function CurrencyFilterChip({
+  options,
+  value,
+  onChange,
+  open,
+  onOpenChange,
+}: {
+  options: CurrencyOption[];
+  value: string[];
+  onChange: (next: string[]) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [draft, setDraft] = useState<string[]>(value);
+  const isActive = value.length > 0;
+
+  const toggle = (code: string) => {
+    setDraft((prev) => (prev.includes(code) ? prev.filter((v) => v !== code) : [...prev, code]));
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (next) setDraft(value);
+      }}
+    >
+      <PopoverTrigger asChild>
+        <FilterChipTrigger label="Currency" active={isActive} count={value.length || undefined} />
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-56 p-3">
+        <div className="max-h-56 space-y-0.5 overflow-y-auto">
+          {options.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
+            >
+              <Checkbox checked={draft.includes(option.value)} onCheckedChange={() => toggle(option.value)} />
+              {option.label}
+            </label>
+          ))}
+        </div>
+
+        <Separator className="my-2" />
+
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="x" className="w-3 h-3" />}
+            onClick={() => {
+              onChange([]);
+              setDraft([]);
+              onOpenChange(false);
+            }}
+            disabled={!draft.length}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              onChange(draft);
+              onOpenChange(false);
+            }}
+          >
+            Apply
+          </Button>
+        </div>
       </PopoverContent>
     </Popover>
   );
@@ -508,6 +557,7 @@ function TransactionViewTabs({
 
 export function McaTransactionTable() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
+  const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
   const contentEl = useContentAreaElement();
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -521,9 +571,9 @@ export function McaTransactionTable() {
   // null until the merchant actually drags a column, at which point
   // DataTable renders that order instead of buildMcaColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
-  // Which of the Date/Amount/Status filter chip popovers is open, if any:
-  // shared so opening one closes whichever other one was open.
-  const [openChip, setOpenChip] = useState<"date" | "amount" | "status" | null>(null);
+  // Which of the Date/Amount/Status/Currency filter chip popovers is open,
+  // if any: shared so opening one closes whichever other one was open.
+  const [openChip, setOpenChip] = useState<"date" | "amount" | "status" | "currency" | null>(null);
   const [page, setPage]         = useState(1);
 
   const [statusOverrides, setStatusOverrides] = useState<Record<string, Partial<McaTransaction>>>({});
@@ -594,17 +644,31 @@ export function McaTransactionTable() {
 
   const onSearch = (v: string) => { setSearch(v); setPage(1); };
 
-  const toggleFilter = (category: FilterCategoryKey, value: string) => {
-    const setter = category === "status" ? setStatusFilters : setCurrencyFilters;
-    setter((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  const toggleStatusFilter = (value: string) => {
+    setStatusFilters((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
     setPage(1);
   };
 
-  const onClearFilters = () => {
+  const onClearStatusFilter = () => {
     setStatusFilters([]);
-    setCurrencyFilters([]);
     setPage(1);
   };
+
+  // Real, backend-driven currency list (countryCurrencyMap, already the
+  // source of truth CountryCell uses) rather than the smaller illustrative
+  // set in MCA_CURRENCY_FILTERS. Avoids guessing at currencies the backend
+  // doesn't actually support.
+  const currencyOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const options: CurrencyOption[] = [];
+    for (const c of countryCurrencyMap) {
+      if (c.currencyCode && !seen.has(c.currencyCode)) {
+        seen.add(c.currencyCode);
+        options.push({ value: c.currencyCode, label: c.currencyCode });
+      }
+    }
+    return options.sort((a, b) => a.value.localeCompare(b.value));
+  }, [countryCurrencyMap]);
 
 
   // const openUploadInvoice = (row: McaTransaction) => {
@@ -730,34 +794,70 @@ export function McaTransactionTable() {
           className="w-40 sm:w-56"
         />
 
-        <div className="flex flex-wrap items-center gap-2">
-          <DateFilterChip
-            value={dateRange}
-            onChange={(next) => {
-              setDateRange(next);
-              setPage(1);
-            }}
-            open={openChip === "date"}
-            onOpenChange={(next) => setOpenChip(next ? "date" : null)}
-          />
-          <AmountFilterChip
-            value={amountRange}
-            onChange={setAmountRange}
-            open={openChip === "amount"}
-            onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
-          />
-          <StatusFilterChip
-            selected={{ status: statusFilters, currency: currencyFilters }}
-            onToggle={toggleFilter}
-            onClear={onClearFilters}
-            open={openChip === "status"}
-            onOpenChange={(next) => setOpenChip(next ? "status" : null)}
-          />
-          <ReorderColumnsPopover
-            columns={reorderableColumns}
-            order={currentColumnOrder}
-            onOrderChange={setColumnOrder}
-          />
+        <div className="flex flex-wrap items-center">
+          {/* Filter group: Date, Amount, Status, Currency read as one
+              cohesive filtering control, so the gap within it is tight. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <DateFilterChip
+              value={dateRange}
+              onChange={(next) => {
+                setDateRange(next);
+                setPage(1);
+              }}
+              open={openChip === "date"}
+              onOpenChange={(next) => setOpenChip(next ? "date" : null)}
+            />
+            <AmountFilterChip
+              value={amountRange}
+              onChange={setAmountRange}
+              open={openChip === "amount"}
+              onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
+            />
+            <StatusFilterChip
+              selected={statusFilters}
+              onToggle={toggleStatusFilter}
+              onClear={onClearStatusFilter}
+              open={openChip === "status"}
+              onOpenChange={(next) => setOpenChip(next ? "status" : null)}
+            />
+            <CurrencyFilterChip
+              options={currencyOptions}
+              value={currencyFilters}
+              onChange={(next) => {
+                setCurrencyFilters(next);
+                setPage(1);
+              }}
+              open={openChip === "currency"}
+              onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
+            />
+          </div>
+
+          {/* Wider spacing either side of the divider than within either
+              group, so the two groups read as visually distinct. */}
+          <Separator orientation="vertical" className="mx-3 h-6" />
+
+          {/* Action group: Reorder Columns, then Download. */}
+          <div className="flex items-center gap-2">
+            <ReorderColumnsPopover
+              columns={reorderableColumns}
+              order={currentColumnOrder}
+              onOrderChange={setColumnOrder}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+              onClick={() => {
+                // TODO: wire up once a transactions export endpoint exists,
+                // same gap as the page-level "Export Report" button in
+                // index.tsx and "Download FIRA" in TransactionDetailsPage.tsx.
+              }}
+              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+            >
+              Download
+            </Button>
+          </div>
         </div>
       </div>
 
