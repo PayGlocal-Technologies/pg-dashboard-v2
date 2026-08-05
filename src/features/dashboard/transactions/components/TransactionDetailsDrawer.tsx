@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -9,7 +10,11 @@ import {
   VisuallyHidden,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { TransactionDetailsContent } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
+import {
+  TransactionDetailsContent,
+  isSettledTransaction,
+} from "@/features/dashboard/transactions/components/TransactionDetailsPage";
+import { SettlementFeedbackSheet } from "@/features/dashboard/transactions/components/SettlementFeedbackSheet";
 import type { McaTransaction } from "@/features/dashboard/transactions/types";
 
 interface TransactionDetailsDrawerProps {
@@ -32,6 +37,13 @@ export function TransactionDetailsDrawer({
   onOpenTransaction,
   isPartnerUser,
 }: TransactionDetailsDrawerProps) {
+  // Transaction gids whose settlement feedback has already been submitted or
+  // dismissed this session. Persists across the drawer closing and
+  // reopening (this component itself never unmounts), so feedback doesn't
+  // reappear for a transaction once it's been resolved once.
+  const [resolvedFeedbackIds, setResolvedFeedbackIds] = useState<Set<string>>(() => new Set());
+  const showFeedback = open && !!row && isSettledTransaction(row);
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       {/*
@@ -50,6 +62,15 @@ export function TransactionDetailsDrawer({
           hidden rather than reimplementing the drawer to omit it. It's the
           last direct child, after the children passed in here.
       */}
+      {/* No "relative" here: DrawerContent's base class is already `fixed`
+          (see flux-ui's drawer.tsx), and cn()/twMerge treats "relative" as a
+          conflicting position utility, silently dropping "fixed" in favor of
+          whichever comes later in the merge. That regression made the whole
+          drawer lose its fixed positioning (and with it, its slide-in
+          animation and inset-y-0/right-0/h-full sizing), so only the overlay
+          rendered. "fixed" alone already establishes a containing block for
+          the feedback sheet's `absolute` positioning below, so no extra
+          position class is needed here at all. */}
       <DrawerContent className="w-full sm:w-[32rem] sm:max-w-[92vw] [&>button:last-child]:hidden">
         <DrawerTitle asChild>
           <VisuallyHidden>Transaction details</VisuallyHidden>
@@ -92,6 +113,23 @@ export function TransactionDetailsDrawer({
             />
           )}
         </div>
+
+        {/* Floats above the content above (absolute against DrawerContent's
+            fixed positioning) rather than reserving its own layout space, so
+            it reads as a temporary overlay, not part of the drawer's
+            document flow. Settled transactions only, drawer only (see
+            isSettledTransaction and the "drawer" layout passed above), never
+            shown on the full page. key={row.gid} gives each transaction its
+            own mount, and alreadyResolved (backed by resolvedFeedbackIds
+            above) keeps it from reappearing once resolved, even across the
+            drawer closing and reopening for the same transaction. */}
+        {showFeedback && (
+          <SettlementFeedbackSheet
+            key={row.gid}
+            alreadyResolved={resolvedFeedbackIds.has(row.gid)}
+            onResolve={() => setResolvedFeedbackIds((prev) => new Set(prev).add(row.gid))}
+          />
+        )}
       </DrawerContent>
     </Drawer>
   );

@@ -1,0 +1,134 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Button, IconButton } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
+
+const REACTIONS = [
+  { emoji: "😡", label: "Very dissatisfied" },
+  { emoji: "😕", label: "Dissatisfied" },
+  { emoji: "😐", label: "Neutral" },
+  { emoji: "🙂", label: "Satisfied" },
+  { emoji: "😄", label: "Very satisfied" },
+] as const;
+
+// Delay before the tray fades in, so it doesn't compete with the drawer's
+// own open animation for attention.
+const SHOW_DELAY_MS = 500;
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+interface SettlementFeedbackSheetProps {
+  /** This transaction's feedback was already submitted or dismissed in an
+   * earlier drawer session, so skip the entrance entirely rather than
+   * showing it again. */
+  alreadyResolved: boolean;
+  /** Called once, the moment feedback is submitted or the tray is
+   * dismissed, so the parent can remember not to show it again for this
+   * transaction. */
+  onResolve: () => void;
+}
+
+// A floating card, not a full-width bottom sheet: it sits above the drawer's
+// scrollable content with margin on every side (see the className below),
+// closer to a toast/"unsaved changes" tray than an attached panel.
+export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: SettlementFeedbackSheetProps) {
+  const [visible, setVisible] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (alreadyResolved) return;
+    const timer = setTimeout(() => setVisible(true), SHOW_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [alreadyResolved]);
+
+  const shown = visible && !closed && !alreadyResolved;
+
+  const resolve = () => {
+    setClosed(true);
+    onResolve();
+  };
+
+  return (
+    <AnimatePresence>
+      {shown && (
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
+          transition={{ duration: 0.25, ease: EASE }}
+          // inset-x-0 + mx-auto centers this fixed-width card within the
+          // full-width absolute wrapper, rather than the card itself
+          // spanning the drawer. bottom-7 (28px) sits in the middle of the
+          // requested 24-32px margin.
+          className="absolute inset-x-0 bottom-7 mx-auto w-80 max-w-[calc(100%-3rem)] rounded-2xl border border-border bg-card px-4 py-3 shadow-xl"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <p className="text-[13px] font-semibold text-foreground">How are you liking our product?</p>
+            <IconButton
+              aria-label="Dismiss feedback"
+              variant="ghost"
+              size="sm"
+              onClick={resolve}
+              className="-mr-1 -mt-1 shrink-0"
+            >
+              <Icon name="x" className="h-3.5 w-3.5" />
+            </IconButton>
+          </div>
+
+          {/* Emojis stay left-aligned; Submit only occupies the right side
+              once a rating is picked, fading/sliding in without resizing
+              this row (the card's width is fixed, so there's nothing to
+              jump). */}
+          <div className="mt-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1">
+              {REACTIONS.map((reaction) => {
+                const isSelected = selected === reaction.label;
+                return (
+                  <button
+                    key={reaction.label}
+                    type="button"
+                    aria-label={reaction.label}
+                    aria-pressed={isSelected}
+                    onClick={() => setSelected(reaction.label)}
+                    className="flex items-center justify-center rounded-lg p-1 transition-colors hover:bg-muted/50"
+                  >
+                    <motion.span
+                      animate={{ scale: isSelected ? 1.2 : 1 }}
+                      transition={{ duration: 0.2, ease: EASE }}
+                      className={cn(
+                        "text-xl leading-none transition-[filter,opacity] duration-200",
+                        !isSelected && "opacity-60 grayscale"
+                      )}
+                    >
+                      {reaction.emoji}
+                    </motion.span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <AnimatePresence>
+              {selected && (
+                <motion.div
+                  initial={reduceMotion ? false : { opacity: 0, x: 8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
+                  transition={{ duration: 0.2, ease: EASE }}
+                >
+                  <Button type="button" variant="primary" size="sm" onClick={resolve}>
+                    Submit
+                  </Button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}

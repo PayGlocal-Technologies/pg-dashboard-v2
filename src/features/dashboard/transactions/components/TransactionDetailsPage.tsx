@@ -58,6 +58,14 @@ const STEP_OFFSET_MINUTES = [0, 4, 95, 1440, 1470, 1500, 2820];
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
 
+// Exported so other consumers of a transaction row (e.g. the drawer's
+// settlement feedback prompt) can check the same "is this settled" condition
+// TransactionDetailsContent uses below, instead of re-deriving it and
+// risking drift between the two.
+export function isSettledTransaction(row: McaTransaction): boolean {
+  return row.externalStatus === "SETTLED" || row.externalStatus === "FIRC_SETTLED";
+}
+
 // Literal Tailwind row-start/row-span classes, looked up by number rather
 // than interpolated into a template string — Tailwind's build-time class
 // scanner needs each full class name to appear verbatim in the source, which
@@ -637,7 +645,7 @@ export function TransactionDetailsContent({
   const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
   const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
   const isReversed = REVERSED_STATUSES.has(row.externalStatus);
-  const isSettled = row.externalStatus === "SETTLED" || row.externalStatus === "FIRC_SETTLED";
+  const isSettled = isSettledTransaction(row);
   // Invoice review is the step right after invoice-pending in buildTimeline's
   // labels (see WAITING_FOR_INVOICE_STEP_INDEX). Once the timeline has moved
   // past that step, an invoice has actually been submitted for this
