@@ -33,7 +33,7 @@ export const regularNavigation: NavGroup[] = [
     label: "Payments",
     items: [
       {
-        label: "Transactions",
+        label: "MCA Transactions",
         href: "/transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
@@ -207,7 +207,7 @@ export const globalNavigation: NavGroup[] = [
     label: "Payments",
     items: [
       {
-        label: "Transactions",
+        label: "MCA Transactions",
         href: "/transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],

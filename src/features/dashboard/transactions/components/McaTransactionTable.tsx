@@ -158,13 +158,21 @@ const FilterChipTrigger = forwardRef<
       variant="outline"
       size="sm"
       leftIcon={
-        active && count ? (
-          <Badge variant="default" size="sm" square>
-            {count}
-          </Badge>
-        ) : (
-          <Icon name="plus" className="h-3 w-3" />
-        )
+        // Fixed h-3.5/w-3.5 box around both the plus icon and the active
+        // count badge: Badge's own padding/border make it taller than a bare
+        // h-3 icon, and since this button is h-auto, that extra height was
+        // reaching the button itself, so the chip visibly grew once a
+        // filter was applied. Pinning both to the same box keeps the
+        // button's height identical in both states.
+        <span className="flex h-3.5 w-3.5 items-center justify-center">
+          {active && count ? (
+            <Badge variant="default" size="sm" square className="h-3.5 min-h-0 px-1 py-0 leading-none">
+              {count}
+            </Badge>
+          ) : (
+            <Icon name="plus" className="h-3 w-3" />
+          )}
+        </span>
       }
       className={cn(
         // h-auto/min-h-0/py-1 shrink this to the same compact height as the
@@ -783,10 +791,13 @@ export function McaTransactionTable() {
         }}
       />
 
-      {/* Controls container: search left, filter chips + Reorder Columns
-          right. Separate from the tab bar above so the tabs read as page
-          navigation and this reads as controls scoped to the table below. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3">
+      {/* Controls container: search, then the filter chip group, sit
+          together on the left with tight spacing; the Reorder
+          Columns/Download action group is pushed to the far right (ml-auto
+          below) rather than spread apart via justify-between, so the chips
+          read as immediately following search instead of floating in the
+          middle of a wide gap. */}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
         <RotatingSearchInput
           value={search}
           onSearch={onSearch}
@@ -794,70 +805,70 @@ export function McaTransactionTable() {
           className="w-40 sm:w-56"
         />
 
-        <div className="flex flex-wrap items-center">
-          {/* Filter group: Date, Amount, Status, Currency read as one
-              cohesive filtering control, so the gap within it is tight. */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <DateFilterChip
-              value={dateRange}
-              onChange={(next) => {
-                setDateRange(next);
-                setPage(1);
-              }}
-              open={openChip === "date"}
-              onOpenChange={(next) => setOpenChip(next ? "date" : null)}
-            />
-            <AmountFilterChip
-              value={amountRange}
-              onChange={setAmountRange}
-              open={openChip === "amount"}
-              onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
-            />
-            <StatusFilterChip
-              selected={statusFilters}
-              onToggle={toggleStatusFilter}
-              onClear={onClearStatusFilter}
-              open={openChip === "status"}
-              onOpenChange={(next) => setOpenChip(next ? "status" : null)}
-            />
-            <CurrencyFilterChip
-              options={currencyOptions}
-              value={currencyFilters}
-              onChange={(next) => {
-                setCurrencyFilters(next);
-                setPage(1);
-              }}
-              open={openChip === "currency"}
-              onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
-            />
-          </div>
+        {/* Filter group: Date, Amount, Status, Currency read as one
+            cohesive filtering control, so the gap within it is tight. */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <DateFilterChip
+            value={dateRange}
+            onChange={(next) => {
+              setDateRange(next);
+              setPage(1);
+            }}
+            open={openChip === "date"}
+            onOpenChange={(next) => setOpenChip(next ? "date" : null)}
+          />
+          <AmountFilterChip
+            value={amountRange}
+            onChange={setAmountRange}
+            open={openChip === "amount"}
+            onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
+          />
+          <StatusFilterChip
+            selected={statusFilters}
+            onToggle={toggleStatusFilter}
+            onClear={onClearStatusFilter}
+            open={openChip === "status"}
+            onOpenChange={(next) => setOpenChip(next ? "status" : null)}
+          />
+          <CurrencyFilterChip
+            options={currencyOptions}
+            value={currencyFilters}
+            onChange={(next) => {
+              setCurrencyFilters(next);
+              setPage(1);
+            }}
+            open={openChip === "currency"}
+            onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
+          />
+        </div>
 
-          {/* Wider spacing either side of the divider than within either
-              group, so the two groups read as visually distinct. */}
-          <Separator orientation="vertical" className="mx-3 h-6" />
+        {/* Wider spacing either side of the divider than within either
+            group, so the two groups read as visually distinct. */}
+        <Separator orientation="vertical" className="mx-3 h-6" />
 
-          {/* Action group: Reorder Columns, then Download. */}
-          <div className="flex items-center gap-2">
-            <ReorderColumnsPopover
-              columns={reorderableColumns}
-              order={currentColumnOrder}
-              onOrderChange={setColumnOrder}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              onClick={() => {
-                // TODO: wire up once a transactions export endpoint exists,
-                // same gap as the page-level "Export Report" button in
-                // index.tsx and "Download FIRA" in TransactionDetailsPage.tsx.
-              }}
-              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-            >
-              Download
-            </Button>
-          </div>
+        {/* Action group: Reorder Columns, then Download. ml-auto pushes
+            this group all the way to the right regardless of how much
+            space the search/filter groups take up. */}
+        <div className="ml-auto flex items-center gap-2">
+          <ReorderColumnsPopover
+            columns={reorderableColumns}
+            order={currentColumnOrder}
+            onOrderChange={setColumnOrder}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+            onClick={() => {
+              // TODO: wire up once a transactions export endpoint exists,
+              // same gap as the page-level "Export Report" button in
+              // index.tsx and "Download FIRA" in TransactionDetailsPage.tsx.
+            }}
+            className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+          >
+            Download
+          </Button>
         </div>
       </div>
 
