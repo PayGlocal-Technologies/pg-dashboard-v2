@@ -25,7 +25,6 @@ import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/const
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { getStatusMeta, isWaitingForInvoice } from "@/features/dashboard/transactions/mcaColumns";
-import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
 import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
 import type {
   McaTransaction,
@@ -43,6 +42,22 @@ const INVOICE_PENDING_STATUSES = ["DOCUMENT_PENDING"];
  *  footer rather than silently dropped. */
 const ACTION_REQUIRED_LIMIT = 10;
 
+/**
+ * Everything the page-level TransactionDetailsPage (rendered by
+ * MultiCurrencyFeature itself, not by this component — see onExpandedChange
+ * below) needs for one expanded transaction: the row plus this component's
+ * own onBack/onCollapse/onUploaded/onOpenTransaction closures, so clicking
+ * those buttons on the parent-rendered page still runs this component's own
+ * (unmoved, still-mounted) state transitions.
+ */
+export interface ExpandedTransactionConfig {
+  row: McaTransaction;
+  onBack: () => void;
+  onCollapse: () => void;
+  onUploaded: (row: McaTransaction) => void;
+  onOpenTransaction: (row: McaTransaction) => void;
+}
+
 interface VirtualAccountActionRequiredProps {
   /** Selected virtual account's currency — the server-side filter for this list. */
   currency: string;
@@ -50,6 +65,15 @@ interface VirtualAccountActionRequiredProps {
   /** Selected virtual account's country — every row's flag, since the whole
    *  list belongs to that one receiving account. */
   iso2: string;
+  /**
+   * Called with a config object when Expand should show the full-page
+   * Transaction Details view, and with null when that view should close
+   * (Back or Collapse). The page itself renders TransactionDetailsPage — not
+   * this component — so it can replace the entire content area below the
+   * "Virtual accounts" heading (carousel included) rather than being confined
+   * to this panel's own column width.
+   */
+  onExpandedChange: (config: ExpandedTransactionConfig | null) => void;
 }
 
 /**
@@ -62,6 +86,7 @@ export function VirtualAccountActionRequired({
   currency,
   countryName,
   iso2,
+  onExpandedChange,
 }: VirtualAccountActionRequiredProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
@@ -113,15 +138,28 @@ export function VirtualAccountActionRequired({
     setDrawerOpen(true);
   };
 
+  // Bundles this render's row plus this component's own (still-mounted, so
+  // still valid whenever the buttons on the parent-rendered page are
+  // actually clicked) state-transition closures, for onExpandedChange below.
+  const expandedConfig = (row: McaTransaction): ExpandedTransactionConfig => ({
+    row,
+    onBack: closeDetails,
+    onCollapse: collapseToDrawer,
+    onUploaded: handleInvoiceSubmitted,
+    onOpenTransaction: openLinkedTransaction,
+  });
+
   const expandToPage = (row: McaTransaction) => {
     setDetailsRowId(row.gid);
     setDrawerOpen(false);
     setDetailsOpen(true);
+    onExpandedChange(expandedConfig(row));
   };
 
   const closeDetails = () => {
     setDetailsOpen(false);
     setDetailsOverrideRow(null);
+    onExpandedChange(null);
   };
 
   // Collapse reverses expandToPage: closes the full page and reopens the
@@ -130,32 +168,25 @@ export function VirtualAccountActionRequired({
   const collapseToDrawer = () => {
     setDetailsOpen(false);
     setDrawerOpen(true);
+    onExpandedChange(null);
   };
 
   const openLinkedTransaction = (row: McaTransaction) => {
     setDetailsOverrideRow(row);
     setDetailsRowId(row.gid);
+    // onOpenTransaction is shared by both the drawer and the full page (see
+    // TransactionDetailsContent) — only re-announce to the parent when a
+    // linked transaction is opened from the full page (already expanded);
+    // opening one from the drawer must keep showing the drawer, not force an
+    // expand that was never requested.
+    if (detailsOpen) {
+      onExpandedChange(expandedConfig(row));
+    }
   };
 
   const handleInvoiceSubmitted = (row: McaTransaction) => {
     setUploadedIds((prev) => (prev.includes(row.gid) ? prev : [...prev, row.gid]));
   };
-
-  // Same in-place swap McaTransactionTable uses: Expand replaces this
-  // section's own content rather than opening a new route, so the carousel and
-  // Account Details beside it stay exactly as they were.
-  if (detailsOpen && detailsRow) {
-    return (
-      <TransactionDetailsPage
-        row={detailsRow}
-        onBack={closeDetails}
-        onCollapse={collapseToDrawer}
-        onUploaded={handleInvoiceSubmitted}
-        onOpenTransaction={openLinkedTransaction}
-        isPartnerUser={isPartnerUser}
-      />
-    );
-  }
 
   return (
     <section>

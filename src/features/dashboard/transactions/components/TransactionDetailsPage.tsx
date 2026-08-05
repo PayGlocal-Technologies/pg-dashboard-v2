@@ -41,6 +41,11 @@ interface TransactionDetailsPageProps {
   onUploaded?: (row: McaTransaction) => void;
   onOpenTransaction: (row: McaTransaction) => void;
   isPartnerUser: boolean;
+  /** Label for the onBack button — this view is shared by more than one
+   *  entry point (the Transactions table and Multi Currency Accounts'
+   *  Action Required list), so the copy names wherever `onBack` actually
+   *  returns to for the caller currently rendering it. */
+  backLabel?: string;
 }
 
 type StepStatus = "completed" | "current" | "upcoming";
@@ -573,6 +578,7 @@ export function TransactionDetailsPage({
   onUploaded,
   onOpenTransaction,
   isPartnerUser,
+  backLabel = "Back to Transactions",
 }: TransactionDetailsPageProps) {
   return (
     <div>
@@ -585,7 +591,7 @@ export function TransactionDetailsPage({
           onClick={onBack}
           className="text-muted-foreground hover:text-foreground"
         >
-          Back to Transactions
+          {backLabel}
         </Button>
         <Button
           type="button"

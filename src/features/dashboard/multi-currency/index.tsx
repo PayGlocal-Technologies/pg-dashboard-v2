@@ -13,10 +13,15 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { useApp } from "@/stores/useApp";
+import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
-import { VirtualAccountActionRequired } from "@/features/dashboard/multi-currency/components/VirtualAccountActionRequired";
+import {
+  VirtualAccountActionRequired,
+  type ExpandedTransactionConfig,
+} from "@/features/dashboard/multi-currency/components/VirtualAccountActionRequired";
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 import {
   formatAccount,
@@ -29,6 +34,8 @@ const PAGE_DESCRIPTION =
   "Your clients automatically receive the correct international account details based on their location.";
 
 export function MultiCurrencyFeature() {
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
+
   // Dummy data for now. Swapping these two for the real query's `data` /
   // `isLoading` is the only change needed once the endpoint exists.
   const [accounts] = useState<VirtualAccount[]>(MOCK_VIRTUAL_ACCOUNTS);
@@ -41,6 +48,13 @@ export function MultiCurrencyFeature() {
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? accounts[0] ?? null;
 
   const selectAccount = (account: VirtualAccount) => setSelectedAccountId(account.id);
+
+  // Set by VirtualAccountActionRequired's Expand (and cleared by its own
+  // Back/Collapse) — see ExpandedTransactionConfig. Rendering the full page
+  // here, not inside VirtualAccountActionRequired, is what lets it replace
+  // the entire content area below the "Virtual accounts" heading (carousel
+  // included) instead of being confined to that panel's own column.
+  const [expandedTxn, setExpandedTxn] = useState<ExpandedTransactionConfig | null>(null);
 
   const copyToClipboard = async (text: string, message: string) => {
     try {
@@ -129,44 +143,71 @@ export function MultiCurrencyFeature() {
         }
       />
 
-      <VirtualAccountList
-        accounts={accounts}
-        isLoading={isLoading}
-        onCopy={handleCopyAccount}
-        onShare={handleShareAccount}
-        selectedAccountId={selectedAccount?.id ?? ""}
-        onSelect={selectAccount}
-      />
-
-      {/* Two-column layout: Account Details sizes to its own content
-          (capped at 730px — see VirtualAccountDetails), Action Required
-          fills whatever width is left. items-start keeps both top-aligned
-          even though their heights differ; flex-wrap drops Action Required
-          below Account Details on narrow viewports instead of squeezing
-          either. */}
-      {selectedAccount && (
-        // key remounts the whole section on every selection change, so the
-        // fade replays on every switch (not just the first render) and
-        // Action Required's own page/drawer state resets rather than
-        // carrying over from the previously selected account.
-        <div
-          key={selectedAccount.id}
-          className="flex flex-wrap items-start gap-4 page-enter"
-        >
-          <VirtualAccountDetails
-            account={selectedAccount}
-            onCopy={handleCopyFullAccount}
-            onShare={handleShareFullAccount}
-          />
-          <div className="min-w-0 flex-1">
-            <VirtualAccountActionRequired
-              currency={selectedAccount.currency}
-              countryName={selectedAccount.countryName}
-              iso2={selectedAccount.iso2}
-            />
-          </div>
-        </div>
+      {/* Expanded transaction takes over everything below the heading above
+          — carousel included — exactly how McaTransactionTable's own Expand
+          replaces the whole Transactions page below its heading. "Back to
+          Virtual Accounts" is this entry point's own copy for the same
+          onBack callback McaTransactionTable's Back to Transactions uses. */}
+      {expandedTxn && (
+        <TransactionDetailsPage
+          row={expandedTxn.row}
+          onBack={expandedTxn.onBack}
+          onCollapse={expandedTxn.onCollapse}
+          onUploaded={expandedTxn.onUploaded}
+          onOpenTransaction={expandedTxn.onOpenTransaction}
+          isPartnerUser={isPartnerUser}
+          backLabel="Back to Virtual Accounts"
+        />
       )}
+
+      {/* Hidden (not unmounted) rather than conditionally rendered while a
+          transaction is expanded above: VirtualAccountActionRequired's own
+          detailsRowId/drawerOpen state has to survive underneath so that
+          Collapse — which the expanded page above calls straight through to
+          this component's own collapseToDrawer — can reopen the drawer for
+          the same transaction and land back on the same selected account,
+          instead of that state having been wiped by an unmount. */}
+      <div className={cn(expandedTxn && "hidden")}>
+        <VirtualAccountList
+          accounts={accounts}
+          isLoading={isLoading}
+          onCopy={handleCopyAccount}
+          onShare={handleShareAccount}
+          selectedAccountId={selectedAccount?.id ?? ""}
+          onSelect={selectAccount}
+        />
+
+        {/* Two-column layout: Account Details sizes to its own content
+            (capped at 730px — see VirtualAccountDetails), Action Required
+            fills whatever width is left. items-start keeps both top-aligned
+            even though their heights differ; flex-wrap drops Action Required
+            below Account Details on narrow viewports instead of squeezing
+            either. */}
+        {selectedAccount && (
+          // key remounts the whole section on every selection change, so the
+          // fade replays on every switch (not just the first render) and
+          // Action Required's own page/drawer state resets rather than
+          // carrying over from the previously selected account.
+          <div
+            key={selectedAccount.id}
+            className="mt-4 flex flex-wrap items-start gap-4 page-enter"
+          >
+            <VirtualAccountDetails
+              account={selectedAccount}
+              onCopy={handleCopyFullAccount}
+              onShare={handleShareFullAccount}
+            />
+            <div className="min-w-0 flex-1">
+              <VirtualAccountActionRequired
+                currency={selectedAccount.currency}
+                countryName={selectedAccount.countryName}
+                iso2={selectedAccount.iso2}
+                onExpandedChange={setExpandedTxn}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
