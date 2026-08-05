@@ -134,6 +134,7 @@ export function MultiCurrencyFeature() {
             <VirtualAccountActionRequired
               currency={selectedAccount.currency}
               countryName={selectedAccount.countryName}
+              iso2={selectedAccount.iso2}
             />
           </div>
         </div>

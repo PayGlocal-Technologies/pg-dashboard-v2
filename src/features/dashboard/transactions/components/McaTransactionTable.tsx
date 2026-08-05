@@ -710,6 +710,17 @@ export function McaTransactionTable() {
     setDetailsOverrideRow(null);
   };
 
+  // Collapse reverses Expand: closes the full page and reopens the same
+  // transaction in the drawer. Deliberately doesn't touch detailsRowId or
+  // detailsOverrideRow (unlike closeDetails), so whichever transaction was
+  // showing, including one reached via Linked Transactions, stays showing;
+  // the scroll-restore effect below puts the table back where expandToPage
+  // found it, same as if Expand had never been clicked.
+  const collapseToDrawer = () => {
+    setDetailsOpen(false);
+    setDrawerOpen(true);
+  };
+
   // Clicking a row in the Linked Transactions section swaps the currently
   // shown transaction in place, in whichever view is open (drawer or page),
   // rather than closing back to the table first. The clicked row comes from a
@@ -762,6 +773,7 @@ export function McaTransactionTable() {
       <TransactionDetailsPage
         row={detailsRow}
         onBack={closeDetails}
+        onCollapse={collapseToDrawer}
         onUploaded={handleInvoiceSubmitted}
         onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}

@@ -36,6 +36,8 @@ import type { McaTransaction } from "@/features/dashboard/transactions/types";
 interface TransactionDetailsPageProps {
   row: McaTransaction;
   onBack: () => void;
+  /** Closes the full page and reopens the same transaction in the drawer. */
+  onCollapse: () => void;
   onUploaded?: (row: McaTransaction) => void;
   onOpenTransaction: (row: McaTransaction) => void;
   isPartnerUser: boolean;
@@ -151,10 +153,20 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
   }));
 }
 
-// Communicates settlement progress only — merchant actions (e.g. the Upload
-// Invoice form) render beside the timeline, not nested inside a step, so
-// this component stays focused purely on step status/labels/timestamps.
-function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean }) {
+// Communicates settlement progress, plus an optional `children` slot for
+// content that belongs to a specific step rather than the timeline as a
+// whole (see SettlementTimelineSection's use of it for the uploaded invoice
+// row, nested under the "Invoice submitted" step). Merchant actions like the
+// Upload Invoice form still render beside the timeline, not inside a step.
+function TimelineItem({
+  step,
+  isLast,
+  children,
+}: {
+  step: TimelineStep;
+  isLast: boolean;
+  children?: ReactNode;
+}) {
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
@@ -188,6 +200,7 @@ function TimelineItem({ step, isLast }: { step: TimelineStep; isLast: boolean })
         {step.status === "completed" && (
           <p className="mt-0.5 text-[11px] text-muted-foreground">{step.timestamp}</p>
         )}
+        {children}
       </div>
     </div>
   );
@@ -355,7 +368,50 @@ function UploadInvoiceSection({
   );
 }
 
-function SettlementTimelineSection({ timeline }: { timeline: TimelineStep[] }) {
+// Nested inside the "Invoice submitted" TimelineItem (see
+// SettlementTimelineSection below) once an invoice has actually been
+// submitted for this transaction, rather than shown as its own section: a
+// compact bordered row, not a full Card, so it reads as part of that step
+// instead of a sibling module. Shows only the latest uploaded file; a
+// replacement upload would overwrite the same underlying record rather than
+// appending one, so there's nothing here to list beyond the single current
+// file.
+function UploadedInvoiceRow({ row }: { row: McaTransaction }) {
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const invoice = getMockUploadedInvoice(row.gid);
+
+  return (
+    <>
+      <div className="mt-2 flex items-center gap-2.5 rounded-md border border-border bg-muted/30 px-2.5 py-2">
+        <Icon name="file-text" className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[12.5px] font-medium text-foreground">{invoice.name}</p>
+          <p className="text-[11px] text-muted-foreground">{formatFileSize(invoice.size)}</p>
+        </div>
+        <IconButton aria-label="Preview invoice" variant="ghost" size="sm" onClick={() => setPreviewOpen(true)}>
+          <Icon name="eye" className="h-3.5 w-3.5" />
+        </IconButton>
+      </div>
+
+      <InvoicePreviewDialog
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        fileName={invoice.name}
+        fileSize={invoice.size}
+      />
+    </>
+  );
+}
+
+function SettlementTimelineSection({
+  timeline,
+  row,
+  showUploadedInvoice,
+}: {
+  timeline: TimelineStep[];
+  row: McaTransaction;
+  showUploadedInvoice: boolean;
+}) {
   return (
     <section>
       <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -364,48 +420,12 @@ function SettlementTimelineSection({ timeline }: { timeline: TimelineStep[] }) {
       <Card size="sm">
         <CardContent>
           {timeline.map((step, i) => (
-            <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1} />
+            <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1}>
+              {showUploadedInvoice && i === WAITING_FOR_INVOICE_STEP_INDEX && <UploadedInvoiceRow row={row} />}
+            </TimelineItem>
           ))}
         </CardContent>
       </Card>
-    </section>
-  );
-}
-
-// Shown once the timeline has moved past the invoice-pending step (see
-// showUploadedInvoice at the call site), meaning an invoice has actually been
-// submitted for this transaction. Shows only the latest uploaded file; a
-// replacement upload would overwrite the same underlying record rather than
-// appending one, so there's nothing here to list beyond the single current
-// file.
-function UploadedInvoiceSection({ row }: { row: McaTransaction }) {
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const invoice = getMockUploadedInvoice(row.gid);
-
-  return (
-    <section>
-      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        Uploaded invoice
-      </h3>
-      <Card size="sm">
-        <CardContent className="flex items-center gap-3">
-          <Icon name="file-text" className="h-5 w-5 shrink-0 text-muted-foreground" />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-medium text-foreground">{invoice.name}</p>
-            <p className="text-[12px] text-muted-foreground">{formatFileSize(invoice.size)}</p>
-          </div>
-          <IconButton aria-label="Preview invoice" variant="ghost" size="sm" onClick={() => setPreviewOpen(true)}>
-            <Icon name="eye" className="h-3.5 w-3.5" />
-          </IconButton>
-        </CardContent>
-      </Card>
-
-      <InvoicePreviewDialog
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-        fileName={invoice.name}
-        fileSize={invoice.size}
-      />
     </section>
   );
 }
@@ -553,22 +573,35 @@ function SenderDetailsSection({
 export function TransactionDetailsPage({
   row,
   onBack,
+  onCollapse,
   onUploaded,
   onOpenTransaction,
   isPartnerUser,
 }: TransactionDetailsPageProps) {
   return (
     <div>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
-        onClick={onBack}
-        className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
-      >
-        Back to Transactions
-      </Button>
+      <div className="-ml-2 mb-2 flex items-center gap-1">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
+          onClick={onBack}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Back to Transactions
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="shrink" className="h-4 w-4" />}
+          onClick={onCollapse}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          Collapse
+        </Button>
+      </div>
 
       <TransactionDetailsContent
         row={row}
@@ -580,7 +613,7 @@ export function TransactionDetailsPage({
   );
 }
 
-interface TransactionDetailsContentProps extends Omit<TransactionDetailsPageProps, "onBack"> {
+interface TransactionDetailsContentProps extends Omit<TransactionDetailsPageProps, "onBack" | "onCollapse"> {
   /** "page" (default): 2-column grid, as on the full Transaction Details
    * page. "drawer": single column, everything stacked in document order,
    * for the narrower drawer viewport. */
@@ -677,8 +710,7 @@ export function TransactionDetailsContent({
           </>
         )}
         {showActionPanel && <UploadInvoiceSection row={row} onUploaded={onUploaded} />}
-        <SettlementTimelineSection timeline={timeline} />
-        {showUploadedInvoice && <UploadedInvoiceSection row={row} />}
+        <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
         {isSettled && (
           <PaymentBreakdownSection
             convertedAmount={convertedAmount}
@@ -698,17 +730,16 @@ export function TransactionDetailsContent({
   // FIRA Received banner leads at row 1, its companion Refer & Earn banner
   // immediately after it at row 2, then Settlement Timeline. showActionPanel
   // (Upload Invoice) is never true for a settled transaction, so there's no
-  // conflict over row 1 between the two. Uploaded Invoice (once the
-  // timeline's past invoice-pending), Payment Breakdown, and Linked
-  // Transactions stack after Settlement Timeline in order, each row number
-  // only advancing past a section that's actually rendered.
+  // conflict over row 1 between the two. Payment Breakdown and Linked
+  // Transactions stack after Settlement Timeline in order. The uploaded
+  // invoice no longer takes its own row: it's nested inside Settlement
+  // Timeline's card (see SettlementTimelineSection), under the "Invoice
+  // submitted" step.
   const firaRow = 1;
   const referEarnRow = firaRow + 1;
   const timelineRow = isSettled ? referEarnRow + 1 : showActionPanel ? 2 : 1;
-  const uploadedInvoiceRow = timelineRow + 1;
-  const breakdownRow = (showUploadedInvoice ? uploadedInvoiceRow : timelineRow) + 1;
-  const linkedRow =
-    (isSettled ? breakdownRow : showUploadedInvoice ? uploadedInvoiceRow : timelineRow) + 1;
+  const breakdownRow = timelineRow + 1;
+  const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
 
   // The right column (Payment Details + Sender Details) aligns with
   // whichever section leads the left column: Upload Invoice's row (row 1)
@@ -767,19 +798,12 @@ export function TransactionDetailsContent({
         )}
 
         {/* Settlement Timeline: right column's Payment Details card aligns
-            with this row. */}
+            with this row. The uploaded invoice (once the timeline's past
+            invoice-pending) renders nested inside this card, under the
+            "Invoice submitted" step, not as a sibling row. */}
         <div className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
-          <SettlementTimelineSection timeline={timeline} />
+          <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
         </div>
-
-        {/* Uploaded Invoice: once the timeline's past invoice-pending,
-            directly below Settlement Timeline and ahead of Payment
-            Breakdown/Payment Details/Sender Details/Linked Transactions. */}
-        {showUploadedInvoice && (
-          <div className={cn("lg:col-start-1", ROW_START_CLASS[uploadedInvoiceRow])}>
-            <UploadedInvoiceSection row={row} />
-          </div>
-        )}
 
         {/* Payment Breakdown — only for settled transactions. */}
         {isSettled && (

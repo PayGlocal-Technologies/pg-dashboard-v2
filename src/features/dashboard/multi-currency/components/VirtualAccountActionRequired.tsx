@@ -20,6 +20,7 @@ import { usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
+import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
@@ -46,6 +47,9 @@ interface VirtualAccountActionRequiredProps {
   /** Selected virtual account's currency — the server-side filter for this list. */
   currency: string;
   countryName: string;
+  /** Selected virtual account's country — every row's flag, since the whole
+   *  list belongs to that one receiving account. */
+  iso2: string;
 }
 
 /**
@@ -57,6 +61,7 @@ interface VirtualAccountActionRequiredProps {
 export function VirtualAccountActionRequired({
   currency,
   countryName,
+  iso2,
 }: VirtualAccountActionRequiredProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
@@ -119,6 +124,14 @@ export function VirtualAccountActionRequired({
     setDetailsOverrideRow(null);
   };
 
+  // Collapse reverses expandToPage: closes the full page and reopens the
+  // same transaction in the drawer, same as McaTransactionTable's own
+  // collapseToDrawer.
+  const collapseToDrawer = () => {
+    setDetailsOpen(false);
+    setDrawerOpen(true);
+  };
+
   const openLinkedTransaction = (row: McaTransaction) => {
     setDetailsOverrideRow(row);
     setDetailsRowId(row.gid);
@@ -136,6 +149,7 @@ export function VirtualAccountActionRequired({
       <TransactionDetailsPage
         row={detailsRow}
         onBack={closeDetails}
+        onCollapse={collapseToDrawer}
         onUploaded={handleInvoiceSubmitted}
         onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}
@@ -187,8 +201,13 @@ export function VirtualAccountActionRequired({
                       the two Upload Invoice variants below — it's the row's
                       own available width that decides which one shows, not
                       the viewport, since this list sits beside the
-                      Account Details card and its width varies with that. */}
-                  <div className="@container flex items-center justify-between gap-4 px-4 py-3">
+                      Account Details card and its width varies with that.
+                      min-w-[190px] keeps the row (and so the panel around it)
+                      from ever shrinking past the point where the amount,
+                      chip, flag, and date/remitter line stop being legible;
+                      above that it's free to grow with whatever width the
+                      flex-wrap layout in the page gives this panel. */}
+                  <div className="@container flex min-w-[190px] items-center justify-between gap-4 px-4 py-3">
                     <div className="min-w-0">
                       {/* Amount leads, with the status chip inline beside it */}
                       <div className="flex flex-wrap items-center gap-2">
@@ -202,11 +221,21 @@ export function VirtualAccountActionRequired({
                           size="sm"
                         />
                       </div>
-                      {/* Secondary line: when it happened and who sent it */}
-                      <p className="mt-1 truncate text-xs text-muted-foreground">
-                        {formatTransactionTimestamp(row.formattedCreationDateTime)}
-                        {remitter && <> &bull; {remitter}</>}
-                      </p>
+                      {/* Secondary line: the receiving country's flag leads
+                          it — quick visual context without competing with
+                          the amount above — then when it happened and who
+                          sent it. */}
+                      <div className="mt-1 flex min-w-0 items-center gap-1.5">
+                        <CountryFlagAvatar
+                          iso2={iso2}
+                          countryName={countryName}
+                          className="h-4 w-4 shrink-0"
+                        />
+                        <p className="truncate text-xs text-muted-foreground">
+                          {formatTransactionTimestamp(row.formattedCreationDateTime)}
+                          {remitter && <> &bull; {remitter}</>}
+                        </p>
+                      </div>
                     </div>
 
                     {/* Full label+icon button once the row has room (@sm,
