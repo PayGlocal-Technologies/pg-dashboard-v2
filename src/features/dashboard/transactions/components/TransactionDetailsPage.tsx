@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import {
   Alert,
@@ -15,6 +14,7 @@ import {
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
+import { useApp } from "@/stores/useApp";
 import {
   formatCurrency,
   formatFileSize,
@@ -214,21 +214,11 @@ function TimelineItem({
   );
 }
 
-// TODO: replace with the real payment method once the API exposes it for MCA
-// transactions — McaTransaction has no such field today (unlike PA's
-// paymentInstrument/cardBrand, see paColumns.tsx). Visa + a deterministic
-// pseudo last-4 (from the gid, same trick as buildTimeline's acctSuffix) is
-// shown purely as a temporary visual placeholder so the section isn't empty.
-function getMockCardLast4(gid: string): string {
-  const digits = gid.replace(/\D/g, "");
-  return (digits.slice(-4) || "4242").padStart(4, "0");
-}
-
 // TODO: replace with the real uploaded-invoice filename/size once the API
 // exposes it for MCA transactions. McaTransaction carries no such field
 // today, and no invoice-metadata fetch endpoint exists (see
 // InvoiceDropzone.tsx). Deterministic pseudo name/size (from the gid, same
-// trick as acctSuffix/getMockCardLast4 above) so the placeholder stays
+// trick as acctSuffix above) so the placeholder stays
 // stable across re-renders instead of changing on every render.
 function getMockUploadedInvoice(gid: string): { name: string; size: number } {
   const digits = gid.replace(/\D/g, "");
@@ -239,22 +229,17 @@ function getMockUploadedInvoice(gid: string): { name: string; size: number } {
   };
 }
 
-function PaymentMethodPlaceholder({ gid }: { gid: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="inline-flex h-5 w-8 shrink-0 items-center justify-center overflow-hidden rounded border border-border bg-white">
-        <Image
-          src="https://static.payglocal.in/images/network/visa.v2.svg"
-          alt="Visa"
-          width={32}
-          height={20}
-          unoptimized
-          className="h-3.5 w-5 object-contain"
-        />
-      </span>
-      <span className="font-mono text-[13px] font-medium text-foreground">•••• {getMockCardLast4(gid)}</span>
-    </div>
+// Resolves the receiving virtual account's country from the transaction's
+// settlement currency via the live countryCurrencyMap (from useApp, fetched
+// from the countryCurrencyMap API), so the label reflects whichever virtual
+// account actually received the funds instead of a fixed/guessed country.
+// Falls back to the raw currency code if the map has no matching entry.
+function useReceivingAccountLabel(currency: string): string {
+  const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
+  const entry = countryCurrencyMap.find(
+    (c) => c.currencyCode.toUpperCase() === currency.toUpperCase()
   );
+  return `${entry?.countryName ?? currency} Account`;
 }
 
 // Rendered (see the isSettled check at the call site) in the left column
@@ -496,14 +481,15 @@ function PaymentBreakdownSection({
   );
 }
 
-// floatTitle is only used by the full page's 2-column grid: for settled
-// transactions there, this section shares its row with the FIRA Received
-// banner, which has no title above its card, so its card starts flush at
-// the top of the row. Floating this title out of flow (rather than sitting
-// inline above the card) keeps this section's own box equal to just the
-// Card's box, so the two cards' top edges line up. The drawer's single
-// column has no such cross-column alignment to worry about, so it always
-// passes floatTitle={false} and gets the plain in-flow title.
+// floatTitle exists for the full page's 2-column grid, for a case where this
+// section's row is shared with a left-column section that has no title
+// above its own card, so its card starts flush at the top of the row.
+// Floating this title out of flow keeps this section's own box equal to
+// just the Card's box, aligning the two cards' top edges. Both current call
+// sites pass floatTitle={false}: Payment Breakdown, which now leads the
+// settled left column (see TransactionDetailsContent), has its own in-flow
+// title just like Payment Details does, so no floating is needed there
+// either. Left in place for a future row-1 section that lacks a title.
 function PaymentDetailsSection({
   row,
   currency,
@@ -513,6 +499,8 @@ function PaymentDetailsSection({
   currency: string;
   floatTitle: boolean;
 }) {
+  const receivingAccountLabel = useReceivingAccountLabel(currency);
+
   return (
     <section className={cn(floatTitle && "relative")}>
       <h3
@@ -533,7 +521,7 @@ function PaymentDetailsSection({
             label="Settlement date"
             value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
           />
-          <DetailRow label="Payment method" value={<PaymentMethodPlaceholder gid={row.gid} />} />
+          <DetailRow label="Receiving Account" value={receivingAccountLabel} />
           <DetailRow label="Currency" value={currency} />
           <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
         </CardContent>
@@ -743,30 +731,30 @@ export function TransactionDetailsContent({
   }
 
   // Row numbers for the left column, within the 2-column grid that starts
-  // below the full-width transaction summary. For settled transactions, the
-  // FIRA Received banner leads at row 1, its companion Refer & Earn banner
-  // immediately after it at row 2, then Settlement Timeline. showActionPanel
+  // below the full-width transaction summary. For settled transactions,
+  // Payment Breakdown now leads at row 1 (financial summary first, same
+  // priority as the drawer's own settled ordering), then FIRA Received, its
+  // companion Refer & Earn banner, then Settlement Timeline. showActionPanel
   // (Upload Invoice) is never true for a settled transaction, so there's no
-  // conflict over row 1 between the two. Payment Breakdown and Linked
-  // Transactions stack after Settlement Timeline in order. The uploaded
-  // invoice no longer takes its own row: it's nested inside Settlement
-  // Timeline's card (see SettlementTimelineSection), under the "Invoice
-  // submitted" step.
-  const firaRow = 1;
+  // conflict over row 1 between the two. Linked Transactions stacks after
+  // Settlement Timeline. The uploaded invoice no longer takes its own row:
+  // it's nested inside Settlement Timeline's card (see
+  // SettlementTimelineSection), under the "Invoice submitted" step.
+  const breakdownRow = 1;
+  const firaRow = isSettled ? breakdownRow + 1 : 1;
   const referEarnRow = firaRow + 1;
   const timelineRow = isSettled ? referEarnRow + 1 : showActionPanel ? 2 : 1;
-  const breakdownRow = timelineRow + 1;
-  const linkedRow = (isSettled ? breakdownRow : timelineRow) + 1;
+  const linkedRow = timelineRow + 1;
 
   // The right column (Payment Details + Sender Details) aligns with
   // whichever section leads the left column: Upload Invoice's row (row 1)
-  // for Invoice Pending transactions, FIRA Received's row (also row 1) for
-  // settled transactions, and Settlement Timeline's row otherwise. It spans
-  // through to Linked Transactions' row so the grid's row-height algorithm
-  // distributes any extra height across those rows instead of forcing it
-  // all into one row alone (which would otherwise leave dead space, the
-  // same issue solved in an earlier round).
-  const detailsColumnRowStart = isSettled ? firaRow : showActionPanel ? 1 : timelineRow;
+  // for Invoice Pending transactions, Payment Breakdown's row (also row 1)
+  // for settled transactions, and Settlement Timeline's row otherwise. It
+  // spans through to Linked Transactions' row so the grid's row-height
+  // algorithm distributes any extra height across those rows instead of
+  // forcing it all into one row alone (which would otherwise leave dead
+  // space, the same issue solved in an earlier round).
+  const detailsColumnRowStart = isSettled ? breakdownRow : showActionPanel ? 1 : timelineRow;
   const detailsColumnRowSpan = linkedRow - detailsColumnRowStart + 1;
 
   return (
@@ -785,12 +773,24 @@ export function TransactionDetailsContent({
           section sized to its own content instead of stretching to match
           whichever column is taller in a shared row. */}
       <div className="grid gap-x-10 gap-y-9 lg:grid-cols-[3fr_1fr] lg:items-start">
+        {/* Payment Breakdown leads for settled transactions: financial
+            summary first, ahead of the settlement-progress sections below
+            it, matching the drawer's own settled ordering. */}
+        {isSettled && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[breakdownRow])}>
+            <PaymentBreakdownSection
+              convertedAmount={convertedAmount}
+              processingFee={processingFee}
+              netAmount={netAmount}
+            />
+          </div>
+        )}
+
         {/* FIRA Received: left column only, same width as Settlement
             Timeline/Linked Transactions (never spans into the Payment
-            Details/Sender Details column). Leads the column, ahead of
-            Settlement Timeline, for every settled transaction.
-            showActionPanel (Upload Invoice) is never true at the same time,
-            so there's no row-1 conflict between the two. */}
+            Details/Sender Details column). showActionPanel (Upload Invoice)
+            is never true at the same time, so there's no row conflict
+            between the two. */}
         {isSettled && (
           <div className={cn("lg:col-start-1", ROW_START_CLASS[firaRow])}>
             <FiraReceivedBanner />
@@ -814,24 +814,14 @@ export function TransactionDetailsContent({
           </div>
         )}
 
-        {/* Settlement Timeline: right column's Payment Details card aligns
-            with this row. The uploaded invoice (once the timeline's past
-            invoice-pending) renders nested inside this card, under the
+        {/* Settlement Timeline: for non-settled transactions, the right
+            column's Payment Details card aligns with this row instead (see
+            detailsColumnRowStart). The uploaded invoice (once the timeline's
+            past invoice-pending) renders nested inside this card, under the
             "Invoice submitted" step, not as a sibling row. */}
         <div className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
           <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
         </div>
-
-        {/* Payment Breakdown — only for settled transactions. */}
-        {isSettled && (
-          <div className={cn("lg:col-start-1", ROW_START_CLASS[breakdownRow])}>
-            <PaymentBreakdownSection
-              convertedAmount={convertedAmount}
-              processingFee={processingFee}
-              netAmount={netAmount}
-            />
-          </div>
-        )}
 
         {/* Linked Transactions — its own table already provides sufficient
             visual separation, so it gets no title-outside/card treatment
@@ -846,7 +836,7 @@ export function TransactionDetailsContent({
 
         {/* Right column: Payment Details then Sender Details. Starts at
             whichever section leads the left column: Upload Invoice's row for
-            Invoice Pending transactions, FIRA Received's row for settled
+            Invoice Pending transactions, Payment Breakdown's row for settled
             transactions, and Settlement Timeline's row otherwise. Spans
             through Linked Transactions' row so its top aligns with whichever
             card it starts at. */}
@@ -857,7 +847,7 @@ export function TransactionDetailsContent({
             ROW_SPAN_CLASS[detailsColumnRowSpan]
           )}
         >
-          <PaymentDetailsSection row={row} currency={currency} floatTitle={isSettled} />
+          <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
           <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
         </div>
       </div>

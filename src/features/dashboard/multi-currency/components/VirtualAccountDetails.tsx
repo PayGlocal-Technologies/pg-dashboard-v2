@@ -61,20 +61,20 @@ export function VirtualAccountDetails({ account, onCopy, onShare }: VirtualAccou
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <Button
-            variant="primary"
-            className="flex-1"
-            leftIcon={<Icon name="copy" className="h-4 w-4" />}
-            onClick={() => onCopy(account)}
-          >
-            Copy account details
-          </Button>
-          <Button
             variant="outline"
             className="flex-1"
             leftIcon={<Icon name="share" className="h-4 w-4" />}
             onClick={() => onShare(account)}
           >
             Share
+          </Button>
+          <Button
+            variant="primary"
+            className="flex-1"
+            leftIcon={<Icon name="copy" className="h-4 w-4" />}
+            onClick={() => onCopy(account)}
+          >
+            Copy account details
           </Button>
         </div>
       </Card>

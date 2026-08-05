@@ -41,10 +41,18 @@ export function isWaitingForInvoice(row: McaTransaction): boolean {
 }
 
 // ── Row-click wrapper ──────────────────────────────────────────────────────────
-// Wraps non-interactive cell content so clicking anywhere in the cell opens the
-// transaction details drawer. Deliberately not used on the Actions column —
-// it already carries its own click targets (upload/view invoice) and
-// shouldn't compete with a row-level click.
+// Wraps every cell's content, including the Actions column, so the whole row
+// (not just its rendered text) is a click target. DataTable's own <td> owns
+// the cell's padding (px-3 py-2.5 at this table's density, see flux-ui's
+// data-table.tsx cellPad), which sits outside whatever this component
+// renders, so clicking that padding/whitespace would otherwise do nothing.
+// The negative margin + matching padding below pushes this div's box out to
+// the cell's edges and re-adds the same padding from inside it, making the
+// entire cell (whitespace included) clickable without changing where its
+// content visually sits. h-full stretches it to the row's full height too.
+// Buttons rendered inside (Upload Invoice/View Invoice in the Actions
+// column) stop propagation in their own onClick so they keep performing only
+// their own action instead of also triggering this row-level click.
 function RowClick({
   row,
   onOpenDetails,
@@ -60,9 +68,9 @@ function RowClick({
     <div
       onClick={() => onOpenDetails(row)}
       className={cn(
-        "cursor-pointer",
-        align === "right" && "flex justify-end",
-        align === "center" && "flex justify-center"
+        "-mx-3 -my-2.5 flex h-full min-h-[44px] cursor-pointer items-center px-3 py-2.5",
+        align === "right" && "justify-end",
+        align === "center" && "justify-center"
       )}
     >
       {children}
@@ -206,29 +214,39 @@ export function buildMcaColumns(
       render: (row) => {
         if (isWaitingForInvoice(row)) {
           return (
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="upload" className="w-3 h-3" />}
-              onClick={() => onOpenDetails(row)}
-              className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-            >
-              Upload Invoice
-            </Button>
+            <RowClick row={row} onOpenDetails={onOpenDetails}>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Icon name="upload" className="w-3 h-3" />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenDetails(row);
+                }}
+                className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+              >
+                Upload Invoice
+              </Button>
+            </RowClick>
           );
         }
         return (
-          // Hidden until the row is hovered/focused — opacity-only (no
-          // display/width change) so revealing it never shifts the layout.
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon name="eye" className="w-3 h-3" />}
-            onClick={() => handleViewInvoice(row)}
-            className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-          >
-            View Invoice
-          </Button>
+          <RowClick row={row} onOpenDetails={onOpenDetails}>
+            {/* Hidden until the row is hovered/focused, opacity-only (no
+                display/width change) so revealing it never shifts the layout. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon name="eye" className="w-3 h-3" />}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewInvoice(row);
+              }}
+              className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              View Invoice
+            </Button>
+          </RowClick>
         );
       },
     },

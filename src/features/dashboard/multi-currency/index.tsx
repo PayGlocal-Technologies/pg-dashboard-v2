@@ -2,8 +2,18 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, Card, PageHeader } from "@/components/ui";
+import {
+  Button,
+  IconButton,
+  PageHeader,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
+import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { VirtualAccountActionRequired } from "@/features/dashboard/multi-currency/components/VirtualAccountActionRequired";
@@ -80,26 +90,44 @@ export function MultiCurrencyFeature() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader title="Virtual accounts" />
-
-      {/* Hero information container — helper text and the page-level share
-          action, grouped into one surface separate from the account cards
-          below. flex-wrap lets the button drop under the text on narrow
-          viewports instead of forcing a squeeze, while both stay anchored to
-          their respective edges at any width that does fit on one line. */}
-      <Card className="flex-row flex-wrap items-center justify-between gap-3 px-5 py-4">
-        <p className="min-w-0 flex-1 text-sm text-muted-foreground">{PAGE_DESCRIPTION}</p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleShareAll}
-          rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
-          disabled={isLoading || accounts.length === 0}
-          className="shrink-0"
-        >
-          Share with clients
-        </Button>
-      </Card>
+      <PageHeader
+        title="Virtual accounts"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleShareAll}
+              rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
+              disabled={isLoading || accounts.length === 0}
+            >
+              Share with clients
+            </Button>
+            {/* Carries the helper copy the old banner used to show
+                persistently — same information, now on demand next to the
+                action it explains, so it no longer occupies page space. */}
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <IconButton
+                    aria-label="About virtual accounts"
+                    variant="ghost"
+                    size="sm"
+                  >
+                    <Icon name="info" className="h-4 w-4" />
+                  </IconButton>
+                </TooltipTrigger>
+                <TooltipContent
+                  className={cn(TOOLTIP_CONTENT_CLASS, "max-w-xs")}
+                  sideOffset={4}
+                >
+                  {PAGE_DESCRIPTION}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </>
+        }
+      />
 
       <VirtualAccountList
         accounts={accounts}
