@@ -115,7 +115,7 @@ export function VirtualAccountList({
             <div
               key={account.id}
               role="listitem"
-              className={cn("snap-start", index === 0 && "ml-2")}
+              className={index === 0 ? "ml-0":""}
             >
               <VirtualAccountCard
                 account={account}
