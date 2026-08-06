@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { type Column, StatusBadge, Button } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { Icon } from "@/components/icon";
@@ -10,6 +9,7 @@ import { COUNTRY_NAME_MAP } from "@/features/dashboard/transactions/constants";
 import type { McaTransaction } from "@/features/dashboard/transactions/types";
 import { useApp } from "@/stores/useApp";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { RowClick } from "@/components/common/table/RowClick";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -38,44 +38,6 @@ export function getStatusMeta(raw: string, isFrmPending: boolean): StatusMeta {
 export function isWaitingForInvoice(row: McaTransaction): boolean {
   const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
   return !isFrmPending && row.externalStatus === "DOCUMENT_PENDING";
-}
-
-// ── Row-click wrapper ──────────────────────────────────────────────────────────
-// Wraps every cell's content, including the Actions column, so the whole row
-// (not just its rendered text) is a click target. DataTable's own <td> owns
-// the cell's padding (px-3 py-2.5 at this table's density, see flux-ui's
-// data-table.tsx cellPad), which sits outside whatever this component
-// renders, so clicking that padding/whitespace would otherwise do nothing.
-// The negative margin + matching padding below pushes this div's box out to
-// the cell's edges and re-adds the same padding from inside it, making the
-// entire cell (whitespace included) clickable without changing where its
-// content visually sits. h-full stretches it to the row's full height too.
-// Buttons rendered inside (Upload Invoice/View Invoice in the Actions
-// column) stop propagation in their own onClick so they keep performing only
-// their own action instead of also triggering this row-level click.
-function RowClick({
-  row,
-  onOpenDetails,
-  align,
-  children,
-}: {
-  row: McaTransaction;
-  onOpenDetails: (row: McaTransaction) => void;
-  align?: "left" | "right" | "center";
-  children: ReactNode;
-}) {
-  return (
-    <div
-      onClick={() => onOpenDetails(row)}
-      className={cn(
-        "-mx-3 -my-2.5 flex h-full min-h-[44px] cursor-pointer items-center px-3 py-2.5",
-        align === "right" && "justify-end",
-        align === "center" && "justify-center"
-      )}
-    >
-      {children}
-    </div>
-  );
 }
 
 // ── Country cell ──────────────────────────────────────────────────────────────
@@ -132,7 +94,7 @@ export function buildMcaColumns(
         const amount = parseFloat(row.amount ?? "0");
         const currency = row.currency ?? "USD";
         return (
-          <RowClick row={row} onOpenDetails={onOpenDetails} align="right">
+          <RowClick onClick={() => onOpenDetails(row)} align="right">
             <div className="flex items-baseline gap-1.5 whitespace-nowrap justify-end">
               <span className="font-semibold text-foreground tabular-nums text-[13px]">
                 {formatCurrency(amount, currency, "en-US")}
@@ -151,7 +113,7 @@ export function buildMcaColumns(
         const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
         const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
         return (
-          <RowClick row={row} onOpenDetails={onOpenDetails}>
+          <RowClick onClick={() => onOpenDetails(row)}>
             <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />
           </RowClick>
         );
@@ -162,7 +124,7 @@ export function buildMcaColumns(
       header: "Date & Time",
       minWidth: 150,
       render: (row) => (
-        <RowClick row={row} onOpenDetails={onOpenDetails}>
+        <RowClick onClick={() => onOpenDetails(row)}>
           <span className="text-[13px] text-muted-foreground whitespace-nowrap">
             {formatTransactionTimestamp(row.formattedCreationDateTime)}
           </span>
@@ -178,7 +140,7 @@ export function buildMcaColumns(
       // (min-w-max on CountryCell above is what actually grows the column).
       cellClassName: "overflow-visible",
       render: (row) => (
-        <RowClick row={row} onOpenDetails={onOpenDetails}>
+        <RowClick onClick={() => onOpenDetails(row)}>
           <CountryCell iso2={row.partnerCustomerCountry} />
         </RowClick>
       ),
@@ -190,7 +152,7 @@ export function buildMcaColumns(
       render: (row) => {
         const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
         return (
-          <RowClick row={row} onOpenDetails={onOpenDetails}>
+          <RowClick onClick={() => onOpenDetails(row)}>
             <span className="block w-[150px] truncate text-[13px] text-foreground">
               {name ?? "—"}
             </span>
@@ -206,7 +168,7 @@ export function buildMcaColumns(
       render: (row) => {
         if (isWaitingForInvoice(row)) {
           return (
-            <RowClick row={row} onOpenDetails={onOpenDetails}>
+            <RowClick onClick={() => onOpenDetails(row)}>
               <Button
                 variant="outline"
                 size="sm"
@@ -223,7 +185,7 @@ export function buildMcaColumns(
           );
         }
         return (
-          <RowClick row={row} onOpenDetails={onOpenDetails}>
+          <RowClick onClick={() => onOpenDetails(row)}>
             {/* Hidden until the row is hovered/focused, opacity-only (no
                 display/width change) so revealing it never shifts the layout. */}
             <Button
@@ -250,7 +212,7 @@ export function buildMcaColumns(
       header: "Merchant ID",
       minWidth: 145,
       render: (row) => (
-        <RowClick row={row} onOpenDetails={onOpenDetails}>
+        <RowClick onClick={() => onOpenDetails(row)}>
           <span className="text-[13px] text-muted-foreground whitespace-nowrap">
             {row.merchantId ?? "—"}
           </span>
