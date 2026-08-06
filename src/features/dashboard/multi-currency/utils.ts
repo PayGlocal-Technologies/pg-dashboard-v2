@@ -45,3 +45,29 @@ export function formatFullAccount(account: VirtualAccount) {
   ];
   return lines.join("\n");
 }
+
+// Deterministic per account id (not Math.random/Date.now — see CLAUDE.md's
+// purity rules) so the same account always resolves to the same placeholder
+// id instead of a new one on every render.
+function mockShareId(accountId: string): number {
+  let hash = 0;
+  for (const ch of accountId) {
+    hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  }
+  return 1_000_000 + (hash % 9_000_000);
+}
+
+/**
+ * Placeholder shareable-link URL for one account. There's no share-link
+ * endpoint yet, so this is a stand-in: same host-naming convention the rest
+ * of the app uses (see CLAUDE.md's "Environment / backend" section — uat
+ * resolves to pygcl.com, dev/prod to payglocal.in), with a deterministic
+ * mock id in place of a real backend-issued one. Replace with the real URL
+ * once that endpoint exists.
+ */
+export function buildShareUrl(account: VirtualAccount): string {
+  const env = process.env.NEXT_PUBLIC_ENV;
+  const domain = env === "uat" ? "pygcl.com" : "payglocal.in";
+  const host = env === "prod" ? `dashboard.${domain}` : `${env ?? "dev"}.dashboard.${domain}`;
+  return `https://${host}/app/multi-currency-accounts-shared/${mockShareId(account.id)}`;
+}

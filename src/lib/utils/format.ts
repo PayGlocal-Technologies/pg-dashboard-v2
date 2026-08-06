@@ -120,6 +120,17 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 };
 
 /**
+ * The bare symbol for a currency code, e.g. "EUR" → "€". Falls back to the
+ * code itself when there's no symbol for it, so callers never render an empty
+ * string. Exposed for the few places that show a symbol beside a code rather
+ * than beside an amount (the Create MCA Link currency selector); anything
+ * rendering an amount should use formatCurrency below instead.
+ */
+export function currencySymbol(currency: string): string {
+  return CURRENCY_SYMBOLS[currency] ?? currency;
+}
+
+/**
  * Single source of truth for currency formatting (replaces the ~8 ad-hoc
  * symbol ternaries that existed in the prototype). Symbol + grouped amount.
  */

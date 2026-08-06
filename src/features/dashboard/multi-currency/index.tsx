@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { PageHeader } from "@/components/ui";
+import { Button, PageHeader } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
+import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
 import {
   VirtualAccountActionRequired,
   type ExpandedTransactionConfig,
@@ -38,6 +40,8 @@ export function MultiCurrencyFeature() {
   // the entire content area below the "Virtual accounts" heading (carousel
   // included) instead of being confined to that panel's own column.
   const [expandedTxn, setExpandedTxn] = useState<ExpandedTransactionConfig | null>(null);
+
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const copyToClipboard = async (text: string, message: string) => {
     try {
@@ -83,7 +87,32 @@ export function MultiCurrencyFeature() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader title="Virtual accounts" />
+      <PageHeader
+        title="Virtual accounts"
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShareModalOpen(true)}
+            rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
+            disabled={!selectedAccount}
+          >
+            Share with clients
+          </Button>
+        }
+      />
+
+      {selectedAccount && (
+        <ShareAccountDetailsModal
+          open={shareModalOpen}
+          onOpenChange={setShareModalOpen}
+          account={selectedAccount}
+          accounts={accounts}
+          onCopyLink={(url) => copyToClipboard(url, "Link copied")}
+          onCopyFullAccount={handleCopyFullAccount}
+          onShareFullAccount={handleShareFullAccount}
+        />
+      )}
 
       {/* Expanded transaction takes over everything below the heading above
           — carousel included — exactly how McaTransactionTable's own Expand

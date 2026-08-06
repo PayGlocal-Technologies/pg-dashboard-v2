@@ -55,7 +55,7 @@ function timestampMs(raw: string | null | undefined): number | null {
  * request body (mirroring buildTxnRequestBody) and a usePostQuery call; the
  * chips, tabs, and columns above and below it need no changes.
  */
-export function McaLinkTable() {
+export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   const [search, setSearch] = useState("");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
@@ -152,12 +152,6 @@ export function McaLinkTable() {
     }
   };
 
-  const handleCreateLink = () => {
-    // TODO: wire up once the Create MCA Link flow exists — same gap as the
-    // Report button below.
-    toast.message("Create MCA Link", { description: "This flow isn't available yet." });
-  };
-
   const baseColumns = buildMcaLinkColumns(openDetails, (row) => void copyLink(row));
   const columns = reorderColumns(baseColumns, columnOrder);
   const reorderableColumns = baseColumns
@@ -193,7 +187,7 @@ export function McaLinkTable() {
             variant="primary"
             size="sm"
             leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-            onClick={handleCreateLink}
+            onClick={onCreateLink}
           >
             Create MCA Link
           </Button>
