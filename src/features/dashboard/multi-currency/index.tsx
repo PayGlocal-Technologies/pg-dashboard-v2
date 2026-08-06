@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, PageHeader } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { PageHeader } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
@@ -87,20 +86,7 @@ export function MultiCurrencyFeature() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader
-        title="Virtual accounts"
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShareModalOpen(true)}
-            rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
-            disabled={!selectedAccount}
-          >
-            Share with clients
-          </Button>
-        }
-      />
+      <PageHeader title="Virtual accounts" />
 
       {selectedAccount && (
         <ShareAccountDetailsModal
@@ -166,7 +152,7 @@ export function MultiCurrencyFeature() {
             <VirtualAccountDetails
               account={selectedAccount}
               onCopy={handleCopyFullAccount}
-              onShare={handleShareFullAccount}
+              onShare={() => setShareModalOpen(true)}
             />
             <div className="min-w-0 flex-1">
               <VirtualAccountActionRequired

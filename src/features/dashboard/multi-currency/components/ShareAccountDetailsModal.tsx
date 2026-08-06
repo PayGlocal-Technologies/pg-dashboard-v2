@@ -113,18 +113,23 @@ export function ShareAccountDetailsModal({
         }
       }}
     >
-      <DialogContent className="max-w-[min(100%,64rem)] max-h-[min(90vh,760px)]">
+      {/* pt-3 replaces the default pt-10 (reserved for the close button
+          sitting below it, out of the flow): TabsList below is what now
+          occupies that band, at the same top-3 offset as Close, so the two
+          read as one header row instead of tabs getting their own row
+          underneath it. */}
+      <DialogContent className="max-w-[min(100%,64rem)] max-h-[min(90vh,760px)] pt-3">
         <DialogTitle asChild>
           <VisuallyHidden>Share account details</VisuallyHidden>
         </DialogTitle>
 
         <Tabs defaultValue="link">
-          <TabsList>
+          <TabsList className="mb-6">
             <TabsTrigger value="link">Share via link</TabsTrigger>
             <TabsTrigger value="email">Share via email</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="link" className="space-y-6">
+          <TabsContent value="link" className="mt-0 space-y-6">
             {/* Header: selected account on the left, the share link + Copy
                 Link action on the right. flex-wrap drops the link block
                 under the account summary on narrow viewports instead of
@@ -219,7 +224,7 @@ export function ShareAccountDetailsModal({
             </div>
           </TabsContent>
 
-          <TabsContent value="email" className="space-y-5">
+          <TabsContent value="email" className="mt-0 space-y-5">
             <AccountSummary account={account} title="Send account details" />
             <Separator />
 
