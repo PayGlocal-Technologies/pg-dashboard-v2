@@ -2,7 +2,6 @@
 
 import { forwardRef, useEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import {
-  Badge,
   Button,
   Checkbox,
   DataTable,
@@ -134,12 +133,19 @@ function StatusFilterPanel({
   );
 }
 
-// Shared trigger styling for the Date/Amount/Status filter chips: dashed
-// outline + a leading plus icon, matching the "add a filter" affordance in
-// the reference design, with the plus swapped for a small count badge once
-// that chip has an active value. The outline stays dashed even when active
-// (only its color and the leading icon change) so "active" reads as a color
-// change, not a shape change.
+// Shared trigger styling for the Date/Amount/Status/Currency filter chips:
+// dashed outline + a leading plus icon, matching the "add a filter"
+// affordance in the reference design. Once that chip has an active value the
+// plus becomes an X and a single coloured dot follows the label. The dot is
+// purely an on/off state marker: unlike the numeric badge it replaced, it
+// deliberately does not encode how many values are selected. The outline
+// stays dashed even when active (only its colour, leading icon, and the dot
+// change) so "active" reads as a colour change, not a shape change.
+//
+// Composed from Flux's Button + Icon rather than a dedicated Flux filter-chip
+// component, because Flux ships none: its nearest chip primitive is Tag,
+// which renders a <span> and so would give up the real <button> semantics
+// (tab focus, Enter/Space activation) this trigger gets for free today.
 //
 // Must forwardRef and spread the rest of its props onto the underlying
 // Button: PopoverTrigger's asChild clones its single child to inject
@@ -149,8 +155,8 @@ function StatusFilterPanel({
 // Radix attached never reached a real DOM node.
 const FilterChipTrigger = forwardRef<
   HTMLButtonElement,
-  { label: string; active: boolean; count?: number } & Omit<ComponentPropsWithoutRef<typeof Button>, "children">
->(({ label, active, count, className, ...props }, ref) => {
+  { label: string; active: boolean } & Omit<ComponentPropsWithoutRef<typeof Button>, "children">
+>(({ label, active, className, ...props }, ref) => {
   return (
     <Button
       ref={ref}
@@ -158,21 +164,24 @@ const FilterChipTrigger = forwardRef<
       variant="outline"
       size="sm"
       leftIcon={
-        // Fixed h-3.5/w-3.5 box around both the plus icon and the active
-        // count badge: Badge's own padding/border make it taller than a bare
-        // h-3 icon, and since this button is h-auto, that extra height was
-        // reaching the button itself, so the chip visibly grew once a
-        // filter was applied. Pinning both to the same box keeps the
-        // button's height identical in both states.
+        // Fixed h-3.5/w-3.5 box around whichever icon is showing, so swapping
+        // plus for X can never change the chip's height (this button is
+        // h-auto, so its height follows its content).
         <span className="flex h-3.5 w-3.5 items-center justify-center">
-          {active && count ? (
-            <Badge variant="default" size="sm" square className="h-3.5 min-h-0 px-1 py-0 leading-none">
-              {count}
-            </Badge>
-          ) : (
-            <Icon name="plus" className="h-3 w-3" />
-          )}
+          <Icon name={active ? "x" : "plus"} className="h-3 w-3" />
         </span>
+      }
+      rightIcon={
+        // Same fixed box on the trailing side: the dot occupies it when
+        // active and it stays empty otherwise, so the chip's width shift
+        // between states is just the dot itself, with no reflow of the label.
+        active ? (
+          <span className="flex h-3.5 w-3.5 items-center justify-center">
+            {/* Drawn the way Flux's own Badge draws its dot: same size-1.5
+                rounded-full fill, in the primary accent. */}
+            <span className="size-1.5 rounded-full bg-primary" aria-hidden />
+          </span>
+        ) : undefined
       }
       className={cn(
         // h-auto/min-h-0/py-1 shrink this to the same compact height as the
@@ -230,7 +239,7 @@ function DateFilterChip({
       }}
     >
       <PopoverTrigger asChild>
-        <FilterChipTrigger label="Date" active={isActive} count={isActive ? 1 : undefined} />
+        <FilterChipTrigger label="Date" active={isActive} />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-3 p-3">
         <div className="space-y-1.5">
@@ -325,7 +334,7 @@ function AmountFilterChip({
       }}
     >
       <PopoverTrigger asChild>
-        <FilterChipTrigger label="Amount" active={isActive} count={isActive ? 1 : undefined} />
+        <FilterChipTrigger label="Amount" active={isActive} />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-3 p-3">
         <div className="space-y-1.5">
@@ -403,7 +412,7 @@ function StatusFilterChip({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <FilterChipTrigger label="Status" active={selected.length > 0} count={selected.length} />
+        <FilterChipTrigger label="Status" active={selected.length > 0} />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-auto p-0">
         <StatusFilterPanel selected={selected} onToggle={onToggle} onClear={onClear} />
@@ -450,7 +459,7 @@ function CurrencyFilterChip({
       }}
     >
       <PopoverTrigger asChild>
-        <FilterChipTrigger label="Currency" active={isActive} count={value.length || undefined} />
+        <FilterChipTrigger label="Currency" active={isActive} />
       </PopoverTrigger>
       <PopoverContent align="end" className="w-56 p-3">
         <div className="max-h-56 space-y-0.5 overflow-y-auto">
@@ -864,6 +873,7 @@ export function McaTransactionTable() {
             columns={reorderableColumns}
             order={currentColumnOrder}
             onOrderChange={setColumnOrder}
+            onReset={() => setColumnOrder(null)}
           />
           <Button
             type="button"

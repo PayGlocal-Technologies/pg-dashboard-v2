@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Button, IconButton } from "@/components/ui";
+import { Button, IconButton, Textarea } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -13,6 +13,12 @@ const REACTIONS = [
   { emoji: "🙂", label: "Satisfied" },
   { emoji: "😄", label: "Very satisfied" },
 ] as const;
+
+// Ratings at or below this index (the first three reactions) are the ones
+// worth asking a follow-up question about: a low or neutral score says
+// something went wrong without saying what. The top two need no prompt, so
+// they go straight to Submit.
+const LOWEST_POSITIVE_INDEX = 3;
 
 // Delay before the tray fades in, so it doesn't compete with the drawer's
 // own open animation for attention.
@@ -45,7 +51,10 @@ interface SettlementFeedbackSheetProps {
 export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: SettlementFeedbackSheetProps) {
   const [visible, setVisible] = useState(false);
   const [closed, setClosed] = useState(false);
-  const [selected, setSelected] = useState<string | null>(null);
+  // Index into REACTIONS rather than the label, since whether to ask for a
+  // comment depends on where the rating sits on the scale.
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [comment, setComment] = useState("");
   const reduceMotion = useReducedMotion();
 
   useEffect(() => {
@@ -55,7 +64,12 @@ export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: Settleme
   }, [alreadyResolved]);
 
   const shown = visible && !closed && !alreadyResolved;
+  const hasSelection = selectedIndex !== null;
+  const wantsComment = selectedIndex !== null && selectedIndex < LOWEST_POSITIVE_INDEX;
 
+  // TODO: post the rating and comment once a settlement-feedback endpoint
+  // exists. There is none today, so submitting and dismissing both just close
+  // the tray for this transaction (see the parent's resolved-id tracking).
   const resolve = () => {
     setClosed(true);
     onResolve();
@@ -66,7 +80,7 @@ export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: Settleme
       {shown && (
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12, width: COLLAPSED_WIDTH }}
-          animate={{ opacity: 1, y: 0, width: selected ? EXPANDED_WIDTH : COLLAPSED_WIDTH }}
+          animate={{ opacity: 1, y: 0, width: hasSelection ? EXPANDED_WIDTH : COLLAPSED_WIDTH }}
           exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 12 }}
           transition={{
             opacity: { duration: 0.25, ease: EASE },
@@ -97,18 +111,20 @@ export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: Settleme
           {/* Emojis stay left-aligned and never move: only the card's own
               width animates (see the motion.div above) to make room for
               Submit, which then fades/slides in on the right once there's
-              space for it. */}
+              space for it. For low and neutral ratings Submit moves below a
+              comment field instead (see the block after this row), so the
+              inline one is suppressed in that case rather than duplicated. */}
           <div className="mt-2.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-1">
-              {REACTIONS.map((reaction) => {
-                const isSelected = selected === reaction.label;
+              {REACTIONS.map((reaction, i) => {
+                const isSelected = selectedIndex === i;
                 return (
                   <button
                     key={reaction.label}
                     type="button"
                     aria-label={reaction.label}
                     aria-pressed={isSelected}
-                    onClick={() => setSelected(reaction.label)}
+                    onClick={() => setSelectedIndex(i)}
                     className="flex items-center justify-center rounded-lg p-1 transition-colors hover:bg-muted/50"
                   >
                     <motion.span
@@ -127,7 +143,7 @@ export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: Settleme
             </div>
 
             <AnimatePresence>
-              {selected && (
+              {hasSelection && !wantsComment && (
                 <motion.div
                   initial={reduceMotion ? false : { opacity: 0, x: 8 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -141,6 +157,43 @@ export function SettlementFeedbackSheet({ alreadyResolved, onResolve }: Settleme
               )}
             </AnimatePresence>
           </div>
+
+          {/* Follow-up prompt for the bottom three ratings only. Animating
+              height to/from auto (rather than just fading) means the card's own
+              growth is smooth and continuous with the width expansion already
+              running, instead of the tray snapping to a taller box. The outer
+              overflow-hidden is what keeps this clipped while it collapses. */}
+          <AnimatePresence>
+            {wantsComment && (
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={reduceMotion ? { opacity: 0, height: 0 } : { opacity: 0, height: 0 }}
+                transition={{ duration: reduceMotion ? 0 : 0.28, ease: EASE }}
+                className="overflow-hidden"
+              >
+                <div className="mt-2.5 space-y-2">
+                  <Textarea
+                    rows={3}
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="What could we improve?"
+                    aria-label="What could we improve?"
+                    className="min-h-0 resize-none text-[12.5px]"
+                  />
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    onClick={resolve}
+                    className="w-full"
+                  >
+                    Submit
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.div>
       )}
     </AnimatePresence>

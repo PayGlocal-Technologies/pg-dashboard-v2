@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import {
   Alert,
   AlertDescription,
+  Badge,
   Button,
   Card,
   CardContent,
@@ -24,6 +26,7 @@ import {
   parseApiDateTime,
 } from "@/lib/utils/format";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
+import { flagSrc } from "@/features/dashboard/multi-currency/utils";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import { InvoicePreviewDialog } from "@/features/dashboard/transactions/components/InvoicePreviewDialog";
 import { LinkedTransactionsSection } from "@/features/dashboard/transactions/components/LinkedTransactionsSection";
@@ -194,6 +197,14 @@ function TimelineItem({
           {step.status === "completed" && (
             <Icon name="check" className="h-3 w-3 text-white" strokeWidth={3} />
           )}
+          {/* In-progress step reads as a donut: the blue disc with a small
+              white circle centred in it, so it's distinguishable at a glance
+              from both a completed step's blue-green check disc and an
+              upcoming step's hollow outline. Drawn as an inner element rather
+              than a hollow ring via border-width, so the marker keeps the same
+              20px footprint every other step has and the timeline's connector
+              line stays aligned. */}
+          {step.status === "current" && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
         </span>
         {!isLast && (
           <span
@@ -234,17 +245,16 @@ function getMockUploadedInvoice(gid: string): { name: string; size: number } {
   };
 }
 
-// Resolves the receiving virtual account's country from the transaction's
-// settlement currency via the live countryCurrencyMap (from useApp, fetched
-// from the countryCurrencyMap API), so the label reflects whichever virtual
-// account actually received the funds instead of a fixed/guessed country.
-// Falls back to the raw currency code if the map has no matching entry.
-function useReceivingAccountLabel(currency: string): string {
+// Resolves a transaction's settlement currency to the country that issues it,
+// via the live countryCurrencyMap (from useApp, fetched from the
+// countryCurrencyMap API). Both the Receiving Account label and the Currency
+// chip below read from this one lookup, so they can never disagree about which
+// country a currency belongs to. Returns undefined when the map has no entry
+// for the currency, which callers fall back from rather than guessing a
+// country the backend never reported.
+function useCurrencyCountry(currency: string) {
   const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
-  const entry = countryCurrencyMap.find(
-    (c) => c.currencyCode.toUpperCase() === currency.toUpperCase()
-  );
-  return `${entry?.countryName ?? currency} Account`;
+  return countryCurrencyMap.find((c) => c.currencyCode.toUpperCase() === currency.toUpperCase());
 }
 
 // Rendered (see the isSettled check at the call site) in the left column
@@ -255,7 +265,46 @@ function useReceivingAccountLabel(currency: string): string {
 // separate, lower-priority banner (see ReferEarnBanner below), not part of
 // this one, so this card stays focused purely on the FIRA outcome and its
 // download action.
-function FiraReceivedBanner() {
+function FiraReceivedBanner({ layout }: { layout: "page" | "drawer" }) {
+  const downloadButton = (
+    <Button
+      type="button"
+      leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+      onClick={() => {
+        // TODO: wire up once a FIRA download endpoint exists.
+      }}
+    >
+      Download FIRA
+    </Button>
+  );
+
+  // On the full page the banner has far more horizontal room than its content
+  // needs, so the download action moves out to the far right (its own column,
+  // pushed over by the text column's flex-1) and the copy is free to run
+  // wider. The drawer is too narrow for a side-by-side split, so there the
+  // button stays stacked under the copy as before.
+  if (layout === "page") {
+    return (
+      <Card size="sm">
+        <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
+
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="flex flex-wrap items-baseline gap-2">
+              <h3 className="text-base font-semibold text-foreground">FIRA Received Instantly</h3>
+              <StatusBadge variant="success" label="Success" trailIcon="check" size="sm" />
+            </div>
+            <p className="text-[13px] text-muted-foreground">
+              Fast, seamless, and hassle-free documentation for your international payments.
+            </p>
+          </div>
+
+          <div className="shrink-0 sm:ml-4">{downloadButton}</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card size="sm">
       <CardContent className="flex flex-col gap-4 md:flex-row md:items-start">
@@ -270,15 +319,7 @@ function FiraReceivedBanner() {
             Fast, seamless, and hassle-free documentation for your international payments.
           </p>
 
-          <Button
-            type="button"
-            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-            onClick={() => {
-              // TODO: wire up once a FIRA download endpoint exists.
-            }}
-          >
-            Download FIRA
-          </Button>
+          {downloadButton}
         </div>
       </CardContent>
     </Card>
@@ -504,7 +545,7 @@ function PaymentDetailsSection({
   currency: string;
   floatTitle: boolean;
 }) {
-  const receivingAccountLabel = useReceivingAccountLabel(currency);
+  const currencyCountry = useCurrencyCountry(currency);
 
   return (
     <section className={cn(floatTitle && "relative")}>
@@ -526,8 +567,41 @@ function PaymentDetailsSection({
             label="Settlement date"
             value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
           />
-          <DetailRow label="Receiving Account" value={receivingAccountLabel} />
-          <DetailRow label="Currency" value={currency} />
+          <DetailRow
+            label="Receiving Account"
+            value={`${currencyCountry?.countryName ?? currency} Account`}
+          />
+          {/* Flag + code chip rather than bare text, so the currency is
+              recognisable at a glance. Flux's Badge is the chip primitive
+              here, with the flag in its leftIcon slot and the flag asset
+              itself coming from the shared flagSrc helper (the same CDN
+              source CountryCell and CountryFlagAvatar use). The flag is
+              decorative beside the code it labels, hence the empty alt; if
+              countryCurrencyMap has no country for this currency the chip
+              shows the code alone instead of a guessed flag. */}
+          <DetailRow
+            label="Currency"
+            value={
+              <Badge
+                variant="secondary"
+                size="md"
+                leftIcon={
+                  currencyCountry ? (
+                    <Image
+                      src={flagSrc(currencyCountry.iso2CountryCode)}
+                      alt=""
+                      width={20}
+                      height={14}
+                      className="h-3.5 w-5 rounded-sm border border-border object-cover"
+                      unoptimized
+                    />
+                  ) : undefined
+                }
+              >
+                {currency}
+              </Badge>
+            }
+          />
           <DetailRow label="Transaction ID" value={<CopyableText value={row.gid} />} />
         </CardContent>
       </Card>
@@ -719,7 +793,7 @@ export function TransactionDetailsContent({
               processingFee={processingFee}
               netAmount={netAmount}
             />
-            <FiraReceivedBanner />
+            <FiraReceivedBanner layout="drawer" />
             <ReferEarnBanner />
             <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
           </>
@@ -799,7 +873,7 @@ export function TransactionDetailsContent({
             between the two. */}
         {isSettled && (
           <div className={cn("lg:col-start-1", ROW_START_CLASS[firaRow])}>
-            <FiraReceivedBanner />
+            <FiraReceivedBanner layout="page" />
           </div>
         )}
 

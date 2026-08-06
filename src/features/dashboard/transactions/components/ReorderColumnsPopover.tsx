@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
+import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +30,11 @@ interface ReorderColumnsPopoverProps {
   columns: ReorderableColumn[];
   order: string[];
   onOrderChange: (order: string[]) => void;
+  /** Discards any saved order so the table falls back to the column order
+   *  buildMcaColumns declares. Separate from onOrderChange rather than
+   *  passing the default order through it, since "no saved order" is its own
+   *  state in the caller, not just another arrangement. */
+  onReset: () => void;
 }
 
 // Same @dnd-kit drag pattern as the dashboard's widget reordering (see
@@ -61,13 +66,22 @@ function SortableColumnRow({ id, label }: { id: string; label: string }) {
   );
 }
 
-export function ReorderColumnsPopover({ columns, order, onOrderChange }: ReorderColumnsPopoverProps) {
+export function ReorderColumnsPopover({
+  columns,
+  order,
+  onOrderChange,
+  onReset,
+}: ReorderColumnsPopoverProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
   const byKey = new Map(columns.map((c) => [c.key, c]));
   const orderedColumns = order.map((k) => byKey.get(k)).filter((c): c is ReorderableColumn => !!c);
+  // `columns` arrives in buildMcaColumns' declared order, which is exactly
+  // what resetting falls back to, so comparing against it tells us whether
+  // there's a custom arrangement to reset at all.
+  const isCustomOrder = order.join("|") !== columns.map((c) => c.key).join("|");
 
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -84,7 +98,9 @@ export function ReorderColumnsPopover({ columns, order, onOrderChange }: Reorder
         <Button
           variant="outline"
           size="sm"
-          leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
+          // Same grip glyph the draggable rows inside the popover use (see
+          // SortableColumnRow), so the button names the gesture it opens.
+          leftIcon={<Icon name="grip-vertical" className="h-3.5 w-3.5" />}
           // h-auto/min-h-0/py-1: same compact height as the Upload Invoice
           // button and the filter chips, instead of Button's default sm
           // height (h-9).
@@ -104,6 +120,23 @@ export function ReorderColumnsPopover({ columns, order, onOrderChange }: Reorder
             </div>
           </SortableContext>
         </DndContext>
+
+        {/* Secondary action, below the list and divided off from it so it
+            reads as an escape hatch rather than another draggable row.
+            Disabled while the order already is the default, so the button
+            never suggests there's something to undo when there isn't. */}
+        <Separator className="my-2" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="refresh" className="h-3 w-3" />}
+          onClick={onReset}
+          disabled={!isCustomOrder}
+          className="w-full justify-start text-muted-foreground hover:text-foreground"
+        >
+          Reset to defaults
+        </Button>
       </PopoverContent>
     </Popover>
   );

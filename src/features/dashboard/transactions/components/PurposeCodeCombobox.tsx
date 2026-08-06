@@ -2,7 +2,6 @@
 
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import {
-  Button,
   Command,
   CommandEmpty,
   CommandGroup,
@@ -10,7 +9,6 @@ import {
   CommandItem,
   CommandList,
   Popover,
-  PopoverAnchor,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui";
@@ -38,11 +36,10 @@ export const PurposeCodeCombobox = forwardRef<PurposeCodeComboboxHandle, Purpose
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const selectedRowRef = useRef<HTMLDivElement>(null);
 
   useImperativeHandle(forwardedRef, () => ({
     focus: () => {
-      (triggerRef.current ?? selectedRowRef.current)?.focus();
+      triggerRef.current?.focus();
     },
   }));
 
@@ -100,54 +97,11 @@ export const PurposeCodeCombobox = forwardRef<PurposeCodeComboboxHandle, Purpose
     }
   };
 
-  if (selected) {
-    return (
-      <Popover open={open} onOpenChange={handleOpenChange}>
-        <PopoverAnchor asChild>
-          <div
-            ref={selectedRowRef}
-            id={id}
-            tabIndex={-1}
-            className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3.5 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-          >
-            <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
-              <span className="font-medium">{selected.code}</span>
-              <span className="text-muted-foreground"> — {selected.description}</span>
-            </span>
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="shrink-0 px-1 py-0 text-[13px]"
-              onClick={() => setOpen(true)}
-            >
-              Change
-            </Button>
-          </div>
-        </PopoverAnchor>
-        <PopoverContent
-          align="start"
-          className="w-[min(24rem,calc(100vw-3rem))] p-0"
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          <ComboboxList
-            id={id}
-            listboxId={listboxId}
-            inputRef={inputRef}
-            search={search}
-            onSearchChange={updateSearch}
-            onKeyDown={handleKeyDown}
-            filtered={filtered}
-            highlightedIndex={highlightedIndex}
-            activeOptionId={activeOptionId}
-            value={value}
-            onSelect={selectOption}
-          />
-        </PopoverContent>
-      </Popover>
-    );
-  }
-
+  // One trigger for both states, rather than a separate "selected" layout
+  // carrying its own Change action beside the value: the whole field is the
+  // dropdown, so clicking anywhere on it opens the selector and the trailing
+  // chevron is the only affordance in either state. Only the label inside
+  // differs between having a selection and not.
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
@@ -162,16 +116,24 @@ export const PurposeCodeCombobox = forwardRef<PurposeCodeComboboxHandle, Purpose
           aria-invalid={invalid || undefined}
           aria-describedby={invalid ? errorId : undefined}
           className={cn(
-            "flex h-10 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-[13px] text-muted-foreground shadow-sm",
+            "flex h-10 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-left text-[13px] shadow-sm",
             "transition-colors duration-150",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+            selected ? "text-foreground" : "text-muted-foreground",
             invalid ? "border-destructive" : "border-border"
           )}
         >
-          <span className="flex items-center gap-2">
-            <Icon name="search" className="h-3.5 w-3.5 shrink-0" />
-            Search by code or keyword
-          </span>
+          {selected ? (
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium">{selected.code}</span>
+              <span className="text-muted-foreground"> {selected.description}</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              <Icon name="search" className="h-3.5 w-3.5 shrink-0" />
+              Search by code or keyword
+            </span>
+          )}
           <Icon
             name="chevron-down"
             className={cn("h-3.5 w-3.5 shrink-0 opacity-70 transition-transform", open && "rotate-180")}
