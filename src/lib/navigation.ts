@@ -33,18 +33,13 @@ export const regularNavigation: NavGroup[] = [
     label: "Payments",
     items: [
       {
-        label: "MCA Transactions",
-        href: "/transactions",
-        icon: "repeat",
-        permission: ["getTxnSearchResults"],
-      },
-      {
         label: "Payment Products",
         href: "/payment-products",
         icon: "shopping-cart",
         permission: [],
         children: [
           { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
+          { label: "MCA Transactions", href: "/transactions", permission: ["getTxnSearchResults"] },
           { label: "MCA Links", href: "/mca-links", permission: [] },
           { label: "Payment Links", href: "/payment-links", permission: [] },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },

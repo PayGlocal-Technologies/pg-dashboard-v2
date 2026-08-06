@@ -2,20 +2,10 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Button,
-  IconButton,
-  PageHeader,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { PageHeader } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { TransactionDetailsPage } from "@/features/dashboard/transactions/components/TransactionDetailsPage";
-import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import {
@@ -23,15 +13,8 @@ import {
   type ExpandedTransactionConfig,
 } from "@/features/dashboard/multi-currency/components/VirtualAccountActionRequired";
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
-import {
-  formatAccount,
-  formatAllAccounts,
-  formatFullAccount,
-} from "@/features/dashboard/multi-currency/utils";
+import { formatAccount, formatFullAccount } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
-
-const PAGE_DESCRIPTION =
-  "Your clients automatically receive the correct international account details based on their location.";
 
 export function MultiCurrencyFeature() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
@@ -98,50 +81,9 @@ export function MultiCurrencyFeature() {
     void share(`${account.countryName} Account`, formatFullAccount(account));
   };
 
-  const handleShareAll = () => {
-    void share("Virtual account details", formatAllAccounts(accounts));
-  };
-
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader
-        title="Virtual accounts"
-        actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleShareAll}
-              rightIcon={<Icon name="share" className="h-3.5 w-3.5" />}
-              disabled={isLoading || accounts.length === 0}
-            >
-              Share with clients
-            </Button>
-            {/* Carries the helper copy the old banner used to show
-                persistently — same information, now on demand next to the
-                action it explains, so it no longer occupies page space. */}
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <IconButton
-                    aria-label="About virtual accounts"
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <Icon name="info" className="h-4 w-4" />
-                  </IconButton>
-                </TooltipTrigger>
-                <TooltipContent
-                  className={cn(TOOLTIP_CONTENT_CLASS, "max-w-xs")}
-                  sideOffset={4}
-                >
-                  {PAGE_DESCRIPTION}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </>
-        }
-      />
+      <PageHeader title="Virtual accounts" />
 
       {/* Expanded transaction takes over everything below the heading above
           — carousel included — exactly how McaTransactionTable's own Expand
