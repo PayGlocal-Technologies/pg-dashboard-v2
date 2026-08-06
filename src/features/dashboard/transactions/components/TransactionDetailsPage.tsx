@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useState, type ReactNode } from "react";
 import {
   Alert,
@@ -26,7 +25,7 @@ import {
   parseApiDateTime,
 } from "@/lib/utils/format";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
-import { flagSrc } from "@/features/dashboard/multi-currency/utils";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import { InvoicePreviewDialog } from "@/features/dashboard/transactions/components/InvoicePreviewDialog";
 import { LinkedTransactionsSection } from "@/features/dashboard/transactions/components/LinkedTransactionsSection";
@@ -573,10 +572,12 @@ function PaymentDetailsSection({
           />
           {/* Flag + code chip rather than bare text, so the currency is
               recognisable at a glance. Flux's Badge is the chip primitive
-              here, with the flag in its leftIcon slot and the flag asset
-              itself coming from the shared flagSrc helper (the same CDN
-              source CountryCell and CountryFlagAvatar use). The flag is
-              decorative beside the code it labels, hence the empty alt; if
+              here, with the flag in its leftIcon slot. CountryFlag is the
+              same small-flag component every other country chip in the
+              product uses (the Transactions table's Country column, the
+              Currency filter's own options below), so this one can't drift
+              from them in asset, size, or border. The flag is decorative
+              beside the code it labels, hence the empty alt; if
               countryCurrencyMap has no country for this currency the chip
               shows the code alone instead of a guessed flag. */}
           <DetailRow
@@ -585,18 +586,7 @@ function PaymentDetailsSection({
               <Badge
                 variant="secondary"
                 size="md"
-                leftIcon={
-                  currencyCountry ? (
-                    <Image
-                      src={flagSrc(currencyCountry.iso2CountryCode)}
-                      alt=""
-                      width={20}
-                      height={14}
-                      className="h-3.5 w-5 rounded-sm border border-border object-cover"
-                      unoptimized
-                    />
-                  ) : undefined
-                }
+                leftIcon={currencyCountry ? <CountryFlag iso2={currencyCountry.iso2CountryCode} /> : undefined}
               >
                 {currency}
               </Badge>

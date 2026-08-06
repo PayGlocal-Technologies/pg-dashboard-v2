@@ -1,10 +1,11 @@
 "use client";
 
-import { forwardRef, useEffect, useMemo, useRef, useState, type ComponentPropsWithoutRef } from "react";
+import { forwardRef, useEffect, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import {
   Button,
   Checkbox,
   DataTable,
+  DatePicker,
   Input,
   Popover,
   PopoverContent,
@@ -26,6 +27,8 @@ import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
 import { ReorderColumnsPopover } from "@/features/dashboard/transactions/components/ReorderColumnsPopover";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 // Upload Invoice now opens the details page instead of this modal — import
 // kept commented out (not deleted) alongside the modal's usage below.
 // import { UploadInvoiceModal } from "@/features/dashboard/transactions/components/UploadInvoiceModal";
@@ -86,6 +89,26 @@ function restoreScrollTop(el: HTMLElement, value: number): void {
 // CurrencyFilterChip below), so this is a flat single-category list.
 const STATUS_OPTIONS = MCA_STATUS_FILTERS.filter((o) => o.value !== "All");
 
+// Restricted to the seven currencies MCA actually has a receiving account
+// for, plus a Rest of the World catch-all, sourced straight from
+// MOCK_VIRTUAL_ACCOUNTS (the same list the Virtual Account cards render, see
+// VirtualAccountCard/VirtualAccountActionRequired), not the much larger set
+// of every currency countryCurrencyMap knows about. Most of those have no
+// MCA account behind them, so offering them here would just be dead filter
+// options with an empty guaranteed result.
+const CURRENCY_FILTER_OPTIONS: CurrencyOption[] = MOCK_VIRTUAL_ACCOUNTS.map((account) =>
+  account.iso2 === "ROW"
+    ? // Rest of the World has no single real currency to filter by: the
+      // account receives many over SWIFT (see mock-data.ts's own comment on
+      // this entry). `account.currency` is a placeholder ("CHF", chosen only
+      // because none of the seven local accounts claim it) standing in until
+      // the API supports an actual "everything else" filter; filtering by it
+      // today will under-match rather than show every non-local-rail
+      // transaction.
+      { value: account.currency, label: "Rest of the World" }
+    : { value: account.currency, label: account.currency, iso2: account.iso2 }
+);
+
 // Flat multi-select checkbox list for Status. Applies immediately on toggle
 // (no Apply step), matching the filtering model this already used before
 // Currency was split out.
@@ -133,27 +156,68 @@ function StatusFilterPanel({
   );
 }
 
-// Shared trigger styling for the Date/Amount/Status/Currency filter chips:
-// dashed outline + a leading plus icon, matching the "add a filter"
-// affordance in the reference design. Once that chip has an active value the
-// plus becomes an X and a single coloured dot follows the label. The dot is
-// purely an on/off state marker: unlike the numeric badge it replaced, it
-// deliberately does not encode how many values are selected. The outline
-// stays dashed even when active (only its colour, leading icon, and the dot
-// change) so "active" reads as a colour change, not a shape change.
-//
-// Composed from Flux's Button + Icon rather than a dedicated Flux filter-chip
-// component, because Flux ships none: its nearest chip primitive is Tag,
-// which renders a <span> and so would give up the real <button> semantics
-// (tab focus, Enter/Space activation) this trigger gets for free today.
+// Every filter chip (Date/Amount/Status/Currency) is built from three
+// pieces below: a visual shell (the dashed pill), a label trigger that opens
+// the popover, and, only once the filter has a value, a separate clear
+// button to its left. They're two independent <button>s sitting side by
+// side inside the shell rather than one button whose leading icon doubles
+// as a clear action, because clicking × must clear without opening the
+// popover, and a real <button> can't nest inside another <button>. Keeping
+// them siblings means stopping the clear click from also opening the
+// popover needs no stopPropagation gymnastics: they're just two separate
+// click targets.
+
+// The dashed-outline pill itself. Purely structural, no click handler, no
+// interactive semantics of its own, so it's a plain div rather than a
+// flux-ui component; the actual clicking happens in the two children it
+// wraps. Only its border colour reacts to `active`, matching the "colour
+// change, not a shape change" active state the chips already had.
+function FilterChipShell({ active, children }: { active: boolean; children: ReactNode }) {
+  return (
+    <div
+      className={cn(
+        "inline-flex h-auto shrink-0 items-center rounded-full border border-dashed border-border bg-card shadow-sm",
+        active && "border-primary/50"
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Leading × segment, rendered only when the filter is active. A real Button
+// (not IconButton) so its height overrides via h-auto/min-h-0 behave the
+// same way the label trigger's already do: IconButton's size classes use
+// Tailwind's `size-*` utility, which doesn't reliably get overridden by a
+// plain `h-auto`/`w-auto` the way Button's `h-9` does.
+function FilterChipClearButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-label={`Clear ${label} filter`}
+      onClick={onClick}
+      className="h-auto min-h-0 shrink-0 rounded-full border border-transparent px-2 py-1 text-muted-foreground hover:text-foreground"
+    >
+      <Icon name="x" className="h-3 w-3" />
+    </Button>
+  );
+}
+
+// Trailing label segment: this is the actual PopoverTrigger target (see each
+// filter chip below). Shows a leading plus only while inactive, since once
+// active the separate clear button to its left already carries that leading
+// icon; a trailing dot then marks "active" instead of the numeric badge this
+// used to show, deliberately not a count, just on/off.
 //
 // Must forwardRef and spread the rest of its props onto the underlying
 // Button: PopoverTrigger's asChild clones its single child to inject
 // onClick/ref/aria-* (so the trigger is wired up and the popover anchors to
 // it). Without forwarding those through, this component silently swallowed
-// them, so the chips rendered but clicking did nothing: the click handler
+// them, so the chip rendered but clicking did nothing: the click handler
 // Radix attached never reached a real DOM node.
-const FilterChipTrigger = forwardRef<
+const FilterChipLabelTrigger = forwardRef<
   HTMLButtonElement,
   { label: string; active: boolean } & Omit<ComponentPropsWithoutRef<typeof Button>, "children">
 >(({ label, active, className, ...props }, ref) => {
@@ -161,35 +225,28 @@ const FilterChipTrigger = forwardRef<
     <Button
       ref={ref}
       type="button"
-      variant="outline"
+      variant="ghost"
       size="sm"
       leftIcon={
-        // Fixed h-3.5/w-3.5 box around whichever icon is showing, so swapping
-        // plus for X can never change the chip's height (this button is
-        // h-auto, so its height follows its content).
-        <span className="flex h-3.5 w-3.5 items-center justify-center">
-          <Icon name={active ? "x" : "plus"} className="h-3 w-3" />
-        </span>
+        !active ? (
+          <span className="flex h-3.5 w-3.5 items-center justify-center">
+            <Icon name="plus" className="h-3 w-3" />
+          </span>
+        ) : undefined
       }
       rightIcon={
-        // Same fixed box on the trailing side: the dot occupies it when
-        // active and it stays empty otherwise, so the chip's width shift
-        // between states is just the dot itself, with no reflow of the label.
         active ? (
           <span className="flex h-3.5 w-3.5 items-center justify-center">
             {/* Drawn the way Flux's own Badge draws its dot: same size-1.5
-                rounded-full fill, in the primary accent. */}
+                rounded-full fill, in the primary accent. Purely a state
+                marker, not a count. */}
             <span className="size-1.5 rounded-full bg-primary" aria-hidden />
           </span>
         ) : undefined
       }
       className={cn(
-        // h-auto/min-h-0/py-1 shrink this to the same compact height as the
-        // Upload Invoice button (mcaColumns.tsx) instead of Button's default
-        // sm height (h-9). px/text size are untouched, so the touch target
-        // width and typography stay put; only the vertical size shrinks.
-        "h-auto min-h-0 shrink-0 rounded-full border-dashed py-1 text-muted-foreground hover:text-foreground",
-        active && "border-primary/50 text-foreground",
+        "h-auto min-h-0 shrink-0 rounded-full border border-transparent py-1 text-muted-foreground hover:text-foreground",
+        active ? "pl-1.5 pr-2.5" : "pl-2.5 pr-2.5",
         className
       )}
       {...props}
@@ -198,7 +255,7 @@ const FilterChipTrigger = forwardRef<
     </Button>
   );
 });
-FilterChipTrigger.displayName = "FilterChipTrigger";
+FilterChipLabelTrigger.displayName = "FilterChipLabelTrigger";
 
 interface DateRangeValue {
   from: string;
@@ -228,6 +285,12 @@ function DateFilterChip({
   const isActive = !!(value.from && value.to);
   const isPartial = !!draft.from !== !!draft.to;
 
+  const clear = () => {
+    onChange({ from: "", to: "" });
+    setDraft({ from: "", to: "" });
+    onOpenChange(false);
+  };
+
   return (
     <Popover
       open={open}
@@ -238,44 +301,36 @@ function DateFilterChip({
         if (next) setDraft(value);
       }}
     >
-      <PopoverTrigger asChild>
-        <FilterChipTrigger label="Date" active={isActive} />
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-64 space-y-3 p-3">
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-medium text-muted-foreground" htmlFor="txn-date-from">
-            From
-          </label>
-          <Input
-            id="txn-date-from"
-            type="date"
-            value={draft.from}
-            max={draft.to || undefined}
-            onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <label className="text-[11px] font-medium text-muted-foreground" htmlFor="txn-date-to">
-            To
-          </label>
-          <Input
-            id="txn-date-to"
-            type="date"
-            value={draft.to}
-            min={draft.from || undefined}
-            onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))}
-          />
-        </div>
+      <FilterChipShell active={isActive}>
+        {isActive && <FilterChipClearButton label="Date" onClick={clear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label="Date" active={isActive} />
+        </PopoverTrigger>
+      </FilterChipShell>
+      <PopoverContent align="end" className="w-72 space-y-3 p-3">
+        {/* Flux's DatePicker is a single-date field (there's no dedicated
+            Flux date-*range* component), a From/To pair of them is the
+            closest real reuse of it rather than a bespoke range widget. Each
+            manages its own calendar popup/portal independently. */}
+        <DatePicker
+          label="From"
+          value={draft.from}
+          onChange={(v) => setDraft((d) => ({ ...d, from: v }))}
+          placeholder="Select start date"
+        />
+        <DatePicker
+          label="To"
+          value={draft.to}
+          onChange={(v) => setDraft((d) => ({ ...d, to: v }))}
+          min={draft.from || undefined}
+          placeholder="Select end date"
+        />
         <div className="flex items-center justify-between gap-2 pt-1">
           <Button
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="x" className="w-3 h-3" />}
-            onClick={() => {
-              onChange({ from: "", to: "" });
-              setDraft({ from: "", to: "" });
-              onOpenChange(false);
-            }}
+            onClick={clear}
             disabled={!draft.from && !draft.to}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -325,6 +380,12 @@ function AmountFilterChip({
   const [draft, setDraft] = useState<AmountRangeValue>(value);
   const isActive = !!(value.min || value.max);
 
+  const clear = () => {
+    onChange({ min: "", max: "" });
+    setDraft({ min: "", max: "" });
+    onOpenChange(false);
+  };
+
   return (
     <Popover
       open={open}
@@ -333,9 +394,12 @@ function AmountFilterChip({
         if (next) setDraft(value);
       }}
     >
-      <PopoverTrigger asChild>
-        <FilterChipTrigger label="Amount" active={isActive} />
-      </PopoverTrigger>
+      <FilterChipShell active={isActive}>
+        {isActive && <FilterChipClearButton label="Amount" onClick={clear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label="Amount" active={isActive} />
+        </PopoverTrigger>
+      </FilterChipShell>
       <PopoverContent align="end" className="w-64 space-y-3 p-3">
         <div className="space-y-1.5">
           <label className="text-[11px] font-medium text-muted-foreground" htmlFor="txn-amount-min">
@@ -369,11 +433,7 @@ function AmountFilterChip({
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="x" className="w-3 h-3" />}
-            onClick={() => {
-              onChange({ min: "", max: "" });
-              setDraft({ min: "", max: "" });
-              onOpenChange(false);
-            }}
+            onClick={clear}
             disabled={!draft.min && !draft.max}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -409,11 +469,24 @@ function StatusFilterChip({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const isActive = selected.length > 0;
+
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <PopoverTrigger asChild>
-        <FilterChipTrigger label="Status" active={selected.length > 0} />
-      </PopoverTrigger>
+      <FilterChipShell active={isActive}>
+        {isActive && (
+          <FilterChipClearButton
+            label="Status"
+            onClick={() => {
+              onClear();
+              onOpenChange(false);
+            }}
+          />
+        )}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label="Status" active={isActive} />
+        </PopoverTrigger>
+      </FilterChipShell>
       <PopoverContent align="end" className="w-auto p-0">
         <StatusFilterPanel selected={selected} onToggle={onToggle} onClear={onClear} />
       </PopoverContent>
@@ -424,6 +497,9 @@ function StatusFilterChip({
 interface CurrencyOption {
   value: string;
   label: string;
+  /** ISO2 for the flag beside the label. Absent for "Rest of the World",
+   *  which shows a globe glyph instead of a country flag. */
+  iso2?: string;
 }
 
 // Same staged draft + Apply/Clear pattern as Date/Amount above, and the same
@@ -450,6 +526,12 @@ function CurrencyFilterChip({
     setDraft((prev) => (prev.includes(code) ? prev.filter((v) => v !== code) : [...prev, code]));
   };
 
+  const clear = () => {
+    onChange([]);
+    setDraft([]);
+    onOpenChange(false);
+  };
+
   return (
     <Popover
       open={open}
@@ -458,9 +540,12 @@ function CurrencyFilterChip({
         if (next) setDraft(value);
       }}
     >
-      <PopoverTrigger asChild>
-        <FilterChipTrigger label="Currency" active={isActive} />
-      </PopoverTrigger>
+      <FilterChipShell active={isActive}>
+        {isActive && <FilterChipClearButton label="Currency" onClick={clear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label="Currency" active={isActive} />
+        </PopoverTrigger>
+      </FilterChipShell>
       <PopoverContent align="end" className="w-56 p-3">
         <div className="max-h-56 space-y-0.5 overflow-y-auto">
           {options.map((option) => (
@@ -469,6 +554,11 @@ function CurrencyFilterChip({
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
             >
               <Checkbox checked={draft.includes(option.value)} onCheckedChange={() => toggle(option.value)} />
+              {option.iso2 ? (
+                <CountryFlag iso2={option.iso2} />
+              ) : (
+                <Icon name="globe" className="h-3.5 w-5 shrink-0 text-muted-foreground" />
+              )}
               {option.label}
             </label>
           ))}
@@ -481,11 +571,7 @@ function CurrencyFilterChip({
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="x" className="w-3 h-3" />}
-            onClick={() => {
-              onChange([]);
-              setDraft([]);
-              onOpenChange(false);
-            }}
+            onClick={clear}
             disabled={!draft.length}
             className="text-muted-foreground hover:text-foreground"
           >
@@ -574,7 +660,6 @@ function TransactionViewTabs({
 
 export function McaTransactionTable() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
-  const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
   const contentEl = useContentAreaElement();
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -670,23 +755,6 @@ export function McaTransactionTable() {
     setStatusFilters([]);
     setPage(1);
   };
-
-  // Real, backend-driven currency list (countryCurrencyMap, already the
-  // source of truth CountryCell uses) rather than the smaller illustrative
-  // set in MCA_CURRENCY_FILTERS. Avoids guessing at currencies the backend
-  // doesn't actually support.
-  const currencyOptions = useMemo(() => {
-    const seen = new Set<string>();
-    const options: CurrencyOption[] = [];
-    for (const c of countryCurrencyMap) {
-      if (c.currencyCode && !seen.has(c.currencyCode)) {
-        seen.add(c.currencyCode);
-        options.push({ value: c.currencyCode, label: c.currencyCode });
-      }
-    }
-    return options.sort((a, b) => a.value.localeCompare(b.value));
-  }, [countryCurrencyMap]);
-
 
   // const openUploadInvoice = (row: McaTransaction) => {
   //   setUploadRowId(row.gid);
@@ -852,7 +920,7 @@ export function McaTransactionTable() {
             onOpenChange={(next) => setOpenChip(next ? "status" : null)}
           />
           <CurrencyFilterChip
-            options={currencyOptions}
+            options={CURRENCY_FILTER_OPTIONS}
             value={currencyFilters}
             onChange={(next) => {
               setCurrencyFilters(next);

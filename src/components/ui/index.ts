@@ -24,6 +24,7 @@ export {
   CommandItem,
   DataTable,
   type Column,
+  DatePicker,
   Dialog,
   DialogTrigger,
   DialogPortal,

@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import type { ReactNode } from "react";
 import { type Column, StatusBadge, Button } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
@@ -10,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { COUNTRY_NAME_MAP } from "@/features/dashboard/transactions/constants";
 import type { McaTransaction } from "@/features/dashboard/transactions/types";
 import { useApp } from "@/stores/useApp";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -87,21 +87,13 @@ export function CountryCell({ iso2 }: { iso2?: string | null }) {
 
   const resolvedIso2 = entry?.iso2CountryCode ?? iso2;
   const name = entry?.countryName ?? COUNTRY_NAME_MAP[upper] ?? iso2;
-  const flagSrc = `https://static.payglocal.in/images/flags/${resolvedIso2.toLowerCase()}.svg`;
 
   return (
     // min-w-max: the cell's own natural (max-content) width is never allowed
     // to shrink below the flag+name's combined width, so the column always
     // widens to fit the longest country name instead of clipping it.
     <div className="flex min-w-max items-center gap-1.5">
-      <Image
-        src={flagSrc}
-        alt={name}
-        width={20}
-        height={14}
-        className="h-3.5 w-5 shrink-0 rounded-sm border border-border object-cover"
-        unoptimized
-      />
+      <CountryFlag iso2={resolvedIso2} alt={name} />
       <span className="text-[13px] text-muted-foreground whitespace-nowrap">{name}</span>
     </div>
   );
