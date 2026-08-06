@@ -15,7 +15,6 @@ import {
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
-import { useApp } from "@/stores/useApp";
 import {
   formatCurrency,
   formatFileSize,
@@ -26,6 +25,7 @@ import {
 } from "@/lib/utils/format";
 import { CountryCell, getStatusMeta } from "@/features/dashboard/transactions/mcaColumns";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import { InvoicePreviewDialog } from "@/features/dashboard/transactions/components/InvoicePreviewDialog";
 import { LinkedTransactionsSection } from "@/features/dashboard/transactions/components/LinkedTransactionsSection";
@@ -244,16 +244,25 @@ function getMockUploadedInvoice(gid: string): { name: string; size: number } {
   };
 }
 
-// Resolves a transaction's settlement currency to the country that issues it,
-// via the live countryCurrencyMap (from useApp, fetched from the
-// countryCurrencyMap API). Both the Receiving Account label and the Currency
-// chip below read from this one lookup, so they can never disagree about which
-// country a currency belongs to. Returns undefined when the map has no entry
-// for the currency, which callers fall back from rather than guessing a
-// country the backend never reported.
-function useCurrencyCountry(currency: string) {
-  const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
-  return countryCurrencyMap.find((c) => c.currencyCode.toUpperCase() === currency.toUpperCase());
+// Resolves a transaction's settlement currency to the MCA receiving account
+// that holds it, via MOCK_VIRTUAL_ACCOUNTS, the same canonical list the
+// Virtual Account cards and the Currency filter's options already read from
+// (see CURRENCY_FILTER_OPTIONS in McaTransactionTable.tsx). Both the
+// Receiving Account label and the Currency chip below read from this one
+// lookup, so they can never disagree about which country a currency belongs
+// to, and both show the same country every other "USD"/"GBP"/etc chip in the
+// product does.
+//
+// Deliberately not sourced from useApp's countryCurrencyMap: that's a live
+// country→currency map with one row per country, and several countries
+// share the same currency (multiple USD/EUR-using countries, for instance),
+// so .find()-ing it by currency code alone returns whichever country the API
+// happens to list first for that code, not necessarily the one MCA's
+// receiving account actually represents. That mismatch was the bug behind
+// this fix: the Currency chip could end up showing an arbitrary other
+// USD-using country's flag instead of the United States'.
+function getCurrencyCountry(currency: string) {
+  return MOCK_VIRTUAL_ACCOUNTS.find((a) => a.currency.toUpperCase() === currency.toUpperCase());
 }
 
 // Rendered (see the isSettled check at the call site) in the left column
@@ -544,7 +553,7 @@ function PaymentDetailsSection({
   currency: string;
   floatTitle: boolean;
 }) {
-  const currencyCountry = useCurrencyCountry(currency);
+  const currencyCountry = getCurrencyCountry(currency);
 
   return (
     <section className={cn(floatTitle && "relative")}>
@@ -577,8 +586,8 @@ function PaymentDetailsSection({
               product uses (the Transactions table's Country column, the
               Currency filter's own options below), so this one can't drift
               from them in asset, size, or border. The flag is decorative
-              beside the code it labels, hence the empty alt; if
-              countryCurrencyMap has no country for this currency the chip
+              beside the code it labels, hence the empty alt; if this
+              currency has no matching MOCK_VIRTUAL_ACCOUNTS entry the chip
               shows the code alone instead of a guessed flag. */}
           <DetailRow
             label="Currency"
@@ -586,7 +595,7 @@ function PaymentDetailsSection({
               <Badge
                 variant="secondary"
                 size="md"
-                leftIcon={currencyCountry ? <CountryFlag iso2={currencyCountry.iso2CountryCode} /> : undefined}
+                leftIcon={currencyCountry ? <CountryFlag iso2={currencyCountry.iso2} /> : undefined}
               >
                 {currency}
               </Badge>
