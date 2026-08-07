@@ -456,10 +456,18 @@ function SettlementTimelineSection({
   timeline,
   row,
   showUploadedInvoice,
+  uploadInvoiceSlot,
 }: {
   timeline: TimelineStep[];
   row: McaTransaction;
   showUploadedInvoice: boolean;
+  /** Rendered nested under the same "Invoice pending" step as
+   *  UploadedInvoiceRow, in place of it: a transaction is either still
+   *  waiting on an invoice (this slot) or has already submitted one
+   *  (UploadedInvoiceRow), never both, so the two never render together.
+   *  Drawer-only: the full page keeps Upload Invoice as its own standalone
+   *  section (see UploadInvoiceSection) rather than nesting it here. */
+  uploadInvoiceSlot?: ReactNode;
 }) {
   return (
     <section>
@@ -471,6 +479,9 @@ function SettlementTimelineSection({
           {timeline.map((step, i) => (
             <TimelineItem key={step.label} step={step} isLast={i === timeline.length - 1}>
               {showUploadedInvoice && i === WAITING_FOR_INVOICE_STEP_INDEX && <UploadedInvoiceRow row={row} />}
+              {uploadInvoiceSlot && i === WAITING_FOR_INVOICE_STEP_INDEX && (
+                <div className="mt-3">{uploadInvoiceSlot}</div>
+              )}
             </TimelineItem>
           ))}
         </CardContent>
@@ -808,15 +819,20 @@ export function TransactionDetailsContent({
 
   if (layout === "drawer") {
     // Single column, in document order: no grid, no row-start math, no
-    // floated titles. Every section keeps the same title-outside/card-inside
-    // structure as the page; only how they're arranged differs.
+    // floated titles. The drawer is deliberately a lighter view than the full
+    // page: Payment Details and Sender Details don't render here at all (see
+    // PaymentDetailsSection/SenderDetailsSection below, page-only), and
+    // Upload Invoice isn't its own section either, it's nested inside
+    // Settlement Timeline's "Invoice pending" step (via uploadInvoiceSlot)
+    // instead of standing beside it, the same way an already-submitted
+    // invoice nests there via UploadedInvoiceRow. Both changes are
+    // drawer-only: the full page's 2-column grid below keeps its own
+    // standalone UploadInvoiceSection and both detail sections, untouched.
     //
     // Settled transactions lead with Payment Breakdown (financial summary
-    // first), then FIRA Received + Refer & Earn, then Settlement Timeline
-    // (with the uploaded invoice nested under its Invoice Submitted step).
-    // This ordering is drawer-only: the full page's 2-column grid below is
-    // untouched, and showActionPanel is never true for a settled
-    // transaction, so there's no conflict with the non-settled branch.
+    // first), then FIRA Received + Refer & Earn, then Settlement Timeline.
+    // showActionPanel is never true for a settled transaction, so there's no
+    // conflict with the non-settled branch.
     return (
       <div className="space-y-9">
         {summary}
@@ -832,13 +848,17 @@ export function TransactionDetailsContent({
             <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
           </>
         ) : (
-          <>
-            {showActionPanel && <UploadInvoiceSection row={row} onUploaded={onUploaded} />}
-            <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
-          </>
+          <SettlementTimelineSection
+            timeline={timeline}
+            row={row}
+            showUploadedInvoice={showUploadedInvoice}
+            uploadInvoiceSlot={
+              showActionPanel ? (
+                <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
+              ) : undefined
+            }
+          />
         )}
-        <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
-        <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
       </div>
     );
   }

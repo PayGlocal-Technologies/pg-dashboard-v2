@@ -10,6 +10,7 @@ import {
   VisuallyHidden,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { CopyableText } from "@/components/common/CopyableText";
 import {
   TransactionDetailsContent,
   isSettledTransaction,
@@ -76,22 +77,18 @@ export function TransactionDetailsDrawer({
           <VisuallyHidden>Transaction details</VisuallyHidden>
         </DrawerTitle>
 
-        {/* Transaction ID to the left of Close/Expand: value only, no
+        {/* Close and Expand stay grouped together on the left, adjacent to
+            one another, same interactions as before. Transaction ID moves to
+            the far right instead (see CopyableText below): value only, no
             label, secondary colour/size so it stays subordinate to the two
-            actions beside it. Close stays the leading action of the two,
-            with Expand discoverable immediately beside it but secondary. */}
-        {/* ml-auto on the button group (rather than justify-between on this
-            row) keeps Close/Expand pinned to the right even when row is
-            momentarily null (e.g. mid close-animation) and the transaction
-            ID span below doesn't render at all: justify-between would
-            otherwise snap a single remaining child back to the left. */}
+            actions across from it, with the existing copy icon and
+            copied-feedback reused as-is rather than rebuilt. ml-auto on the
+            CopyableText (not justify-between on the row) keeps Close/Expand
+            pinned left even when row is momentarily null, e.g. mid
+            close-animation, since there's nothing to push right at that
+            point. */}
         <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
-          {row && (
-            <span className="min-w-0 truncate font-mono text-[13px] text-muted-foreground" title={row.gid}>
-              {row.gid}
-            </span>
-          )}
-          <div className="ml-auto flex shrink-0 items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <IconButton
               aria-label="Close"
               variant="ghost"
@@ -111,6 +108,9 @@ export function TransactionDetailsDrawer({
               <Icon name="expand" className="h-4 w-4" />
             </IconButton>
           </div>
+          {row && (
+            <CopyableText value={row.gid} valueClassName="text-muted-foreground" className="ml-auto" />
+          )}
         </DrawerHeader>
 
         {/* Only this region scrolls, so the header's close/expand stay

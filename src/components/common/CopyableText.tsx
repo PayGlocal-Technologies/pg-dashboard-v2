@@ -16,9 +16,13 @@ interface CopyableTextProps {
    * whole element (not just the icon) is the click target.
    */
   variant?: "inline" | "cell";
+  /** "inline" variant only, overrides the value span's default
+   *  text-foreground, e.g. text-muted-foreground for a secondary/subordinate
+   *  placement (see TransactionDetailsDrawer's header). */
+  valueClassName?: string;
 }
 
-export function CopyableText({ value, className, variant = "inline" }: CopyableTextProps) {
+export function CopyableText({ value, className, variant = "inline", valueClassName }: CopyableTextProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -71,7 +75,9 @@ export function CopyableText({ value, className, variant = "inline" }: CopyableT
 
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <span className="font-mono text-[13px] text-foreground whitespace-nowrap">{value}</span>
+      <span className={cn("font-mono text-[13px] text-foreground whitespace-nowrap", valueClassName)}>
+        {value}
+      </span>
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>
