@@ -199,11 +199,15 @@ export function McaTransactionTable() {
     setDrawerOpen(true);
   };
 
-  // Clicking a row in the Linked Transactions section swaps the currently
-  // shown transaction in place, in whichever view is open (drawer or page),
-  // rather than closing back to the table first. The clicked row comes from a
-  // separate query (see LinkedTransactionsSection), not the table's own
-  // fetched page, so it's stored directly instead of looked up by id.
+  // Passed through as onOpenTransaction to TransactionDetailsPage/Drawer:
+  // swaps the currently shown transaction in place, in whichever view is
+  // open (drawer or page), rather than closing back to the table first. Not
+  // currently invoked from within the details view itself (the Linked
+  // Transactions section that used to call it has been removed), but kept
+  // as the mechanism for any future "jump to another transaction" entry
+  // point, so the row is stored directly rather than looked up by id, in
+  // case such an entry point surfaces a transaction outside the table's own
+  // fetched page.
   const openLinkedTransaction = (row: McaTransaction) => {
     setDetailsOverrideRow(row);
     setDetailsRowId(row.gid);

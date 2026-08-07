@@ -28,7 +28,6 @@ import { CountryFlag } from "@/features/dashboard/multi-currency/components/Coun
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import { InvoicePreviewDialog } from "@/features/dashboard/transactions/components/InvoicePreviewDialog";
-import { LinkedTransactionsSection } from "@/features/dashboard/transactions/components/LinkedTransactionsSection";
 import {
   MCA_FX_RATES_TO_INR,
   MCA_PROCESSING_FEE_RATE,
@@ -144,7 +143,13 @@ function buildTimeline(row: McaTransaction): TimelineStep[] {
     currentIndex > WAITING_FOR_INVOICE_STEP_INDEX ? "Invoice submitted" : "Invoice pending";
 
   const labels = [
-    `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} received in virtual account`,
+    // "[Amount] received in [Currency] Account", e.g. "USD 1.00 received in
+    // USD Account", the receiving account named by its currency code, same
+    // short form Payment Breakdown and the Currency chip use, not the full
+    // country name (see getCurrencyCountry, used for the longer "Receiving
+    // Account" field in Payment Details, which this step intentionally
+    // doesn't match).
+    `${currency} ${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} received in ${currency} Account`,
     invoiceStepLabel,
     "Invoice review",
     "Transfer initiated to PayGlocal's India partner bank",
@@ -185,25 +190,22 @@ function TimelineItem({
   return (
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
+        {/* Completed: a bare green checkmark, no surrounding circle at all.
+            Current: a small solid blue dot, no ring or outer disc. Upcoming:
+            unchanged, a hollow bordered circle. All three keep the same h-5
+            w-5 outer box (border-2, transparent for completed/current) so the
+            connector line above/below never shifts between states; only
+            what's drawn inside the box changes. */}
         <span
           className={cn(
             "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-            step.status === "completed" && "border-green-600 bg-green-600",
-            step.status === "current" && "border-primary bg-primary",
-            step.status === "upcoming" && "border-border bg-card"
+            step.status === "upcoming" ? "border-border bg-card" : "border-transparent"
           )}
         >
           {step.status === "completed" && (
-            <Icon name="check" className="h-3 w-3 text-white" strokeWidth={3} />
+            <Icon name="check" className="h-4 w-4 text-green-600" strokeWidth={3} />
           )}
-          {/* In-progress step reads as a donut: the blue disc with a small
-              white circle centred in it, so it's distinguishable at a glance
-              from both a completed step's blue-green check disc and an
-              upcoming step's hollow outline. Drawn as an inner element rather
-              than a hollow ring via border-width, so the marker keeps the same
-              20px footprint every other step has and the timeline's connector
-              line stays aligned. */}
-          {step.status === "current" && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+          {step.status === "current" && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
         </span>
         {!isLast && (
           <span
@@ -696,15 +698,22 @@ interface TransactionDetailsContentProps extends Omit<TransactionDetailsPageProp
 }
 
 // Every section of the transaction detail view: summary, FIRA banner, Upload
-// Invoice, Settlement Timeline, Payment Breakdown, Payment/Sender Details,
-// and Linked Transactions. Rendered as-is by both TransactionDetailsPage
-// (above) and TransactionDetailsDrawer, so neither view can drift from the
-// other in conditional states or behaviour. Only the arrangement (layout
-// prop) differs between them.
+// Invoice, Settlement Timeline, Payment Breakdown, and Payment/Sender
+// Details. Rendered as-is by both TransactionDetailsPage (above) and
+// TransactionDetailsDrawer, so neither view can drift from the other in
+// conditional states or behaviour. Only the arrangement (layout prop)
+// differs between them.
+//
+// onOpenTransaction isn't destructured here (unlike the other props) since
+// Linked Transactions, its only consumer, no longer renders, it's left in
+// TransactionDetailsContentProps/TransactionDetailsPageProps rather than
+// removed there, since callers (TransactionDetailsDrawer, McaTransactionTable,
+// VirtualAccountActionRequired) still thread it through for a possible future
+// "jump to another transaction" entry point, and dropping it from the shared
+// prop contract now would mean re-adding it later across every call site.
 export function TransactionDetailsContent({
   row,
   onUploaded,
-  onOpenTransaction,
   isPartnerUser,
   layout = "page",
 }: TransactionDetailsContentProps) {
@@ -744,21 +753,46 @@ export function TransactionDetailsContent({
 
   const summary = (
     <div className={layout === "drawer" ? undefined : "mb-9"}>
-      <CountryCell iso2={row.partnerCustomerCountry} />
-      <div className="mt-1.5 flex flex-col items-start gap-1.5">
-        <div className="flex flex-wrap items-center gap-2.5">
-          <span className="text-[26px] font-semibold tabular-nums text-foreground">
-            {formatCurrency(amount, currency, "en-US")}
-          </span>
-          <StatusBadge variant={variant} label={summaryStatusLabel} trailIcon={trailIcon} />
+      {/* flex-wrap rather than a hard breakpoint: the metadata stack drops
+          below the amount block on its own once the row runs out of width
+          (the drawer's narrower viewport), instead of being hidden outright. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <CountryCell iso2={row.partnerCustomerCountry} />
+          <div className="mt-1.5 flex flex-col items-start gap-1.5">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-[26px] font-semibold tabular-nums text-foreground">
+                {formatCurrency(amount, currency, "en-US")}
+              </span>
+              <StatusBadge variant={variant} label={summaryStatusLabel} trailIcon={trailIcon} />
+            </div>
+            {/* Supporting context under the amount, lower emphasis than the
+                amount itself (text-[13px], muted label) but still clearly
+                readable, with the remitter name itself kept at foreground
+                weight so it doesn't disappear entirely. */}
+            <p className="text-[13px] text-muted-foreground">
+              Charged by <span className="font-medium text-foreground">{counterpartyName}</span>
+            </p>
+          </div>
         </div>
-        {/* Supporting context under the amount — lower emphasis than the
-            amount itself (text-[13px], muted label) but still clearly
-            readable, with the remitter name itself kept at foreground
-            weight so it doesn't disappear entirely. */}
-        <p className="text-[13px] text-muted-foreground">
-          Charged by <span className="font-medium text-foreground">{counterpartyName}</span>
-        </p>
+
+        {/* Compact metadata stack, top-aligned with the amount block via the
+            row's items-start. Same DetailRow label/value hierarchy used
+            throughout the rest of this view, just right-aligned instead of
+            left so it reads as a corner annotation rather than another
+            left-aligned field. */}
+        <div className="flex shrink-0 flex-col gap-2">
+          <DetailRow
+            label="Transaction ID"
+            value={<CopyableText value={row.gid} />}
+            className="items-end text-right"
+          />
+          <DetailRow
+            label="Transaction Date"
+            value={formatTransactionTimestamp(row.formattedCreationDateTime)}
+            className="items-end text-right"
+          />
+        </div>
       </div>
 
       {isReversed && (
@@ -804,7 +838,6 @@ export function TransactionDetailsContent({
         )}
         <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
         <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
-        <LinkedTransactionsSection row={row} isPartnerUser={isPartnerUser} onOpenTransaction={onOpenTransaction} />
       </div>
     );
   }
@@ -813,28 +846,25 @@ export function TransactionDetailsContent({
   // below the full-width transaction summary. For settled transactions,
   // Payment Breakdown now leads at row 1 (financial summary first, same
   // priority as the drawer's own settled ordering), then FIRA Received, its
-  // companion Refer & Earn banner, then Settlement Timeline. showActionPanel
-  // (Upload Invoice) is never true for a settled transaction, so there's no
-  // conflict over row 1 between the two. Linked Transactions stacks after
-  // Settlement Timeline. The uploaded invoice no longer takes its own row:
-  // it's nested inside Settlement Timeline's card (see
+  // companion Refer & Earn banner, then Settlement Timeline, which is the
+  // last row in the left column. The uploaded invoice no longer takes its
+  // own row: it's nested inside Settlement Timeline's card (see
   // SettlementTimelineSection), under the "Invoice submitted" step.
   const breakdownRow = 1;
   const firaRow = isSettled ? breakdownRow + 1 : 1;
   const referEarnRow = firaRow + 1;
   const timelineRow = isSettled ? referEarnRow + 1 : showActionPanel ? 2 : 1;
-  const linkedRow = timelineRow + 1;
 
   // The right column (Payment Details + Sender Details) aligns with
   // whichever section leads the left column: Upload Invoice's row (row 1)
   // for Invoice Pending transactions, Payment Breakdown's row (also row 1)
   // for settled transactions, and Settlement Timeline's row otherwise. It
-  // spans through to Linked Transactions' row so the grid's row-height
-  // algorithm distributes any extra height across those rows instead of
-  // forcing it all into one row alone (which would otherwise leave dead
-  // space, the same issue solved in an earlier round).
+  // spans through to Settlement Timeline's row (the left column's last) so
+  // the grid's row-height algorithm distributes any extra height across
+  // those rows instead of forcing it all into one row alone (which would
+  // otherwise leave dead space, the same issue solved in an earlier round).
   const detailsColumnRowStart = isSettled ? breakdownRow : showActionPanel ? 1 : timelineRow;
-  const detailsColumnRowSpan = linkedRow - detailsColumnRowStart + 1;
+  const detailsColumnRowSpan = timelineRow - detailsColumnRowStart + 1;
 
   return (
     <div>
@@ -900,17 +930,6 @@ export function TransactionDetailsContent({
             "Invoice submitted" step, not as a sibling row. */}
         <div className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
           <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
-        </div>
-
-        {/* Linked Transactions — its own table already provides sufficient
-            visual separation, so it gets no title-outside/card treatment
-            here; the table itself is the module boundary. */}
-        <div className={cn("lg:col-start-1", ROW_START_CLASS[linkedRow])}>
-          <LinkedTransactionsSection
-            row={row}
-            isPartnerUser={isPartnerUser}
-            onOpenTransaction={onOpenTransaction}
-          />
         </div>
 
         {/* Right column: Payment Details then Sender Details. Starts at
