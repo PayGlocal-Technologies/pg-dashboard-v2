@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   Alert,
   AlertDescription,
@@ -72,6 +71,26 @@ const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_N
 export function isSettledTransaction(row: McaTransaction): boolean {
   return row.externalStatus === "SETTLED" || row.externalStatus === "FIRC_SETTLED";
 }
+
+// Literal Tailwind row-start/row-span classes, looked up by number rather
+// than interpolated into a template string — Tailwind's build-time class
+// scanner needs each full class name to appear verbatim in the source, which
+// a computed string like `lg:row-start-${n}` would not satisfy.
+const ROW_START_CLASS: Record<number, string> = {
+  1: "lg:row-start-1",
+  2: "lg:row-start-2",
+  3: "lg:row-start-3",
+  4: "lg:row-start-4",
+  5: "lg:row-start-5",
+  6: "lg:row-start-6",
+};
+const ROW_SPAN_CLASS: Record<number, string> = {
+  2: "lg:row-span-2",
+  3: "lg:row-span-3",
+  4: "lg:row-span-4",
+  5: "lg:row-span-5",
+  6: "lg:row-span-6",
+};
 
 // Index of "Invoice pending" within buildTimeline's `labels` array below —
 // the step that's active (blue dot) while a transaction needs an invoice, and
@@ -628,13 +647,11 @@ export function TransactionDetailsPage({
 }: TransactionDetailsPageProps) {
   return (
     <div>
-      {/* Back and Collapse stay grouped together on the left; no other
-          content shares this row (Transaction ID doesn't render here on the
-          expanded page, unlike the drawer's own header, see
-          TransactionDetailsDrawer.tsx). -ml-2 pulls the ghost Button's own
-          padding back so its label text aligns with the page content below
-          it instead of sitting inset from it. */}
-      <div className="-ml-2 mb-2 flex items-center gap-1">
+      {/* Back/Collapse only, both left-aligned and adjacent to each other.
+          No Transaction ID here (unlike the drawer's Expand/Close row, see
+          TransactionDetailsDrawer.tsx). The expanded page drops it entirely
+          rather than relocating it. */}
+      <div className="mb-2 flex items-center gap-1">
         <Button
           type="button"
           variant="ghost"
@@ -674,46 +691,6 @@ interface TransactionDetailsContentProps extends Omit<TransactionDetailsPageProp
   layout?: "page" | "drawer";
 }
 
-// Ease-in-out, ~300ms: shared by every section wrapper below and by
-// TransactionDetailsPanel's own outer shell, so the per-section reflow and
-// the panel's own expand/collapse move at the same rate and read as one
-// continuous motion rather than two separately-timed animations.
-const SECTION_TRANSITION = { duration: 0.3, ease: "easeInOut" } as const;
-
-// Every top-level section (Payment Breakdown, FIRA banner, Refer & Earn,
-// Settlement Timeline) is wrapped in one of these rather than a plain <div>.
-// `layout` alone (no layoutId) is enough to FLIP-animate a section between
-// the drawer's single-column stack and the page's 2-column grid, as long as
-// the section stays mounted (same component instance) while `isPage`/
-// `gridRow` change, which is exactly what happens inside
-// TransactionDetailsPanel, the only caller that ever toggles `layout` on an
-// already-mounted TransactionDetailsContent. TransactionDetailsDrawer and
-// the Multi Currency Accounts entry point each still mount their own
-// separate, single-purpose instance (layout fixed at "drawer" or "page" for
-// that instance's whole lifetime), where this is inert: nothing to
-// transition between, since the value never changes there. It's kept
-// unconditional so the section markup doesn't fork into two versions.
-function DetailsSection({
-  isPage,
-  gridRow,
-  children,
-}: {
-  isPage: boolean;
-  gridRow?: number;
-  children: ReactNode;
-}) {
-  return (
-    <motion.div
-      layout
-      transition={SECTION_TRANSITION}
-      className={cn(isPage && "lg:col-start-1")}
-      style={isPage && gridRow ? { gridRowStart: gridRow } : undefined}
-    >
-      {children}
-    </motion.div>
-  );
-}
-
 // Every section of the transaction detail view: summary, FIRA banner, Upload
 // Invoice, Settlement Timeline, Payment Breakdown, and Payment/Sender
 // Details. Rendered as-is by both TransactionDetailsPage (above) and
@@ -739,7 +716,6 @@ export function TransactionDetailsContent({
   const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
   const isReversed = REVERSED_STATUSES.has(row.externalStatus);
   const isSettled = isSettledTransaction(row);
-  const isPage = layout === "page";
   // Invoice review is the step right after invoice-pending in buildTimeline's
   // labels (see WAITING_FOR_INVOICE_STEP_INDEX). Once the timeline has moved
   // past that step, an invoice has actually been submitted for this
@@ -769,20 +745,8 @@ export function TransactionDetailsContent({
   // needs merchant action.
   const showActionPanel = needsAction && !isReversed;
 
-  // Row placement, page layout only: Payment Breakdown/FIRA/Refer & Earn
-  // lead in that order for settled transactions, Settlement Timeline follows
-  // (or leads alone, at row 1, when not settled). Plain numbers passed
-  // through inline `style` on DetailsSection below rather than static
-  // Tailwind row-start-N classes (the old ROW_START_CLASS/ROW_SPAN_CLASS
-  // lookup existed only to work around Tailwind's class scanner missing a
-  // computed class string, an inline style has no such scanning problem).
-  const breakdownRow = 1;
-  const firaRow = breakdownRow + 1;
-  const referEarnRow = firaRow + 1;
-  const timelineRow = isSettled ? referEarnRow + 1 : 1;
-
   const summary = (
-    <div className={isPage ? "mb-9" : undefined}>
+    <div className={layout === "drawer" ? undefined : "mb-9"}>
       {/* flex-wrap rather than a hard breakpoint: the date drops below the
           amount block on its own once the row runs out of width (the
           drawer's narrower viewport), instead of being hidden outright. */}
@@ -807,13 +771,12 @@ export function TransactionDetailsContent({
         </div>
 
         {/* Drawer only: opposite the amount stack, top-aligned with it via
-            the row's items-start. Value only, no label. The expanded page
-            doesn't show this at all (see TransactionDetailsPage) or a
-            Transaction ID here either (that only lives in the drawer's own
-            header, see TransactionDetailsDrawer.tsx/TransactionDetailsPanel).
-            The page's amount section is just the left content, nothing
-            opposite it. */}
-        {!isPage && (
+            the row's items-start. Value only, no label. Transaction ID
+            lives in the drawer's own header row beside Expand/Close (see
+            TransactionDetailsDrawer.tsx). The expanded page shows neither
+            the transaction date nor the transaction ID here: both are
+            dropped there entirely, not relocated. */}
+        {layout === "drawer" && (
           <span className="shrink-0 text-[13px] text-muted-foreground">
             {formatTransactionTimestamp(row.formattedCreationDateTime)}
           </span>
@@ -830,78 +793,36 @@ export function TransactionDetailsContent({
     </div>
   );
 
-  // One tree, not two early-returned ones: every section below is mounted
-  // regardless of `layout`, wrapped in DetailsSection (a motion.div with the
-  // `layout` prop). Only each wrapper's own className/style, grid
-  // column/row placement for the page, nothing for the drawer's plain
-  // space-y stack, changes between the two. That's what lets
-  // TransactionDetailsPanel toggle `layout` on an already-mounted instance
-  // of this component and get a real FLIP transition per section instead of
-  // swapping between two unrelated trees. See DetailsSection's own comment.
-  return (
-    <div>
-      {/* Transaction summary: full-width, standalone, sitting above the
-          columns below (not part of either). The primary focal point of the
-          view. Transaction Date lives here on the drawer only, and
-          Transaction ID never lives here at all (see the header comment
-          above), the page shows neither in this position. */}
-      <motion.div layout transition={SECTION_TRANSITION}>
+  if (layout === "drawer") {
+    // Single column, in document order: no grid, no row-start math, no
+    // floated titles. The drawer is deliberately a lighter view than the full
+    // page: Payment Details and Sender Details don't render here at all (see
+    // PaymentDetailsSection/SenderDetailsSection below, page-only). Upload
+    // Invoice isn't its own section, it's nested inside Settlement
+    // Timeline's "Invoice pending" step (via uploadInvoiceSlot) instead of
+    // standing beside it, the same way an already-submitted invoice nests
+    // there via UploadedInvoiceRow. The full page's 2-column grid below
+    // does the same nesting, just inside its own grid row.
+    //
+    // Settled transactions lead with Payment Breakdown (financial summary
+    // first), then FIRA Received + Refer & Earn, then Settlement Timeline.
+    // showActionPanel is never true for a settled transaction, so there's no
+    // conflict with the non-settled branch.
+    return (
+      <div className="space-y-9">
         {summary}
-      </motion.div>
-
-      {/* Page: 2-column grid, explicit row placement via each
-          DetailsSection's style so the right column can start at Settlement
-          Timeline's row instead of row 1 (aligning Payment Details with the
-          Timeline card, not the top of the page). Drawer: plain single-column
-          stack, document order. */}
-      <div
-        className={cn(
-          isPage ? "grid gap-x-10 gap-y-9 lg:grid-cols-[3fr_1fr] lg:items-start" : "mt-9 space-y-9"
-        )}
-      >
-        {/* Payment Breakdown leads for settled transactions: financial
-            summary first, ahead of the settlement-progress sections below
-            it. Settled-only in both layouts. */}
-        {isSettled && (
-          <DetailsSection isPage={isPage} gridRow={breakdownRow}>
+        {isSettled ? (
+          <>
             <PaymentBreakdownSection
               convertedAmount={convertedAmount}
               processingFee={processingFee}
               netAmount={netAmount}
             />
-          </DetailsSection>
-        )}
-
-        {/* FIRA Received: left column only on the page (never spans into
-            Payment Details/Sender Details). showActionPanel (Upload
-            Invoice) is never true at the same time isSettled is, so there's
-            no conflict between the two. */}
-        {isSettled && (
-          <DetailsSection isPage={isPage} gridRow={firaRow}>
-            <FiraReceivedBanner layout={layout} />
-          </DetailsSection>
-        )}
-
-        {/* Refer & Earn: immediately below the FIRA banner, above
-            Settlement Timeline. Lower visual priority than the FIRA banner
-            (see ReferEarnBanner's own compact styling) but still its own
-            row, not nested inside the FIRA card. */}
-        {isSettled && (
-          <DetailsSection isPage={isPage} gridRow={referEarnRow}>
+            <FiraReceivedBanner layout="drawer" />
             <ReferEarnBanner />
-          </DetailsSection>
-        )}
-
-        {/* Settlement Timeline: always present, in both layouts and both
-            settled states. On the page, the right column's Payment Details
-            card aligns with this same row. Two mutually-exclusive nested
-            states live inside its "Invoice pending" step: the Upload
-            Invoice form itself (uploadInvoiceSlot, while showActionPanel)
-            or, once the timeline's past that step, the already-submitted
-            invoice (UploadedInvoiceRow, driven by showUploadedInvoice),
-            identical in both layouts, so neither keeps Upload Invoice as a
-            standalone section anymore. */}
-        <DetailsSection isPage={isPage} gridRow={timelineRow}>
+            <SettlementTimelineSection timeline={timeline} row={row} showUploadedInvoice={showUploadedInvoice} />
+          </>
+        ) : (
           <SettlementTimelineSection
             timeline={timeline}
             row={row}
@@ -912,35 +833,120 @@ export function TransactionDetailsContent({
               ) : undefined
             }
           />
-        </DetailsSection>
+        )}
+      </div>
+    );
+  }
 
-        {/* Right column: Payment Details then Sender Details. Page only:
-            the drawer never shows either section (see PaymentDetailsSection/
-            SenderDetailsSection's call sites, both gated on isPage here).
-            AnimatePresence fades this column in/out rather than popping it,
-            since it has no drawer counterpart to morph from/to when `layout`
-            flips inside TransactionDetailsPanel. Starts at row 1 and spans
-            through Settlement Timeline's row (the left column's last) so the
-            grid's row-height algorithm distributes any extra height across
-            those rows instead of forcing it all into one (the same issue
-            solved in an earlier round). */}
-        <AnimatePresence>
-          {isPage && (
-            <motion.div
-              key="details-column"
-              layout
-              transition={SECTION_TRANSITION}
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-9 lg:col-start-2"
-              style={{ gridRowStart: 1, gridRowEnd: `span ${timelineRow}` }}
-            >
-              <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
-              <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
-            </motion.div>
+  // Row numbers for the left column, within the 2-column grid that starts
+  // below the full-width transaction summary. For settled transactions,
+  // Payment Breakdown now leads at row 1 (financial summary first, same
+  // priority as the drawer's own settled ordering), then FIRA Received, its
+  // companion Refer & Earn banner, then Settlement Timeline, which is the
+  // last row in the left column. Upload Invoice no longer takes its own row
+  // here either: like the uploaded-invoice row, it's nested inside
+  // Settlement Timeline's card (see SettlementTimelineSection), under the
+  // "Invoice pending" step, the same embedding the drawer already used.
+  const breakdownRow = 1;
+  const firaRow = isSettled ? breakdownRow + 1 : 1;
+  const referEarnRow = firaRow + 1;
+  const timelineRow = isSettled ? referEarnRow + 1 : 1;
+
+  // The right column (Payment Details + Sender Details) aligns with
+  // whichever section leads the left column: Settlement Timeline's row
+  // (row 1, Upload Invoice included) for Invoice Pending transactions, or
+  // Payment Breakdown's row for settled transactions. It spans through to
+  // Settlement Timeline's row (the left column's last) so the grid's
+  // row-height algorithm distributes any extra height across those rows
+  // instead of forcing it all into one row alone (which would otherwise
+  // leave dead space, the same issue solved in an earlier round).
+  const detailsColumnRowStart = isSettled ? breakdownRow : timelineRow;
+  const detailsColumnRowSpan = timelineRow - detailsColumnRowStart + 1;
+
+  return (
+    <div>
+      {/* Transaction summary — full-width page header, standalone, no card,
+          sitting above the 2-column layout entirely (not part of either
+          column). The primary focal point of the page. Transaction Date
+          lives in Payment Details — the header never shows a timestamp. */}
+      {summary}
+
+      {/* 2-column layout, below the summary. Left column sections use
+          explicit row-start classes (rather than a plain space-y stack) so
+          the right column can start at whichever row leads the left column
+          instead of always row 1. items-start keeps each section sized to
+          its own content instead of stretching to match whichever column is
+          taller in a shared row. */}
+      <div className="grid gap-x-10 gap-y-9 lg:grid-cols-[3fr_1fr] lg:items-start">
+        {/* Payment Breakdown leads for settled transactions: financial
+            summary first, ahead of the settlement-progress sections below
+            it, matching the drawer's own settled ordering. */}
+        {isSettled && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[breakdownRow])}>
+            <PaymentBreakdownSection
+              convertedAmount={convertedAmount}
+              processingFee={processingFee}
+              netAmount={netAmount}
+            />
+          </div>
+        )}
+
+        {/* FIRA Received: left column only, same width as Settlement
+            Timeline/Linked Transactions (never spans into the Payment
+            Details/Sender Details column). showActionPanel (Upload Invoice)
+            is never true at the same time, so there's no row conflict
+            between the two. */}
+        {isSettled && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[firaRow])}>
+            <FiraReceivedBanner layout="page" />
+          </div>
+        )}
+
+        {/* Refer & Earn: immediately below the FIRA banner, above
+            Settlement Timeline. Lower visual priority than the FIRA banner
+            (see ReferEarnBanner's own compact styling) but still its own
+            row, not nested inside the FIRA card. */}
+        {isSettled && (
+          <div className={cn("lg:col-start-1", ROW_START_CLASS[referEarnRow])}>
+            <ReferEarnBanner />
+          </div>
+        )}
+
+        {/* Settlement Timeline: for non-settled transactions, the right
+            column's Payment Details card aligns with this row instead (see
+            detailsColumnRowStart). Upload Invoice (while still pending) and
+            the uploaded invoice (once past invoice-pending) both render
+            nested inside this card, under the matching timeline step, not
+            as sibling rows, see uploadInvoiceSlot below. */}
+        <div className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
+          <SettlementTimelineSection
+            timeline={timeline}
+            row={row}
+            showUploadedInvoice={showUploadedInvoice}
+            uploadInvoiceSlot={
+              showActionPanel ? (
+                <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
+              ) : undefined
+            }
+          />
+        </div>
+
+        {/* Right column: Payment Details then Sender Details. Starts at
+            whichever section leads the left column: Payment Breakdown's row
+            for settled transactions, Settlement Timeline's row otherwise
+            (Upload Invoice included, it's nested inside that same card).
+            Spans through to that row so its top aligns with whichever card
+            it starts at. */}
+        <div
+          className={cn(
+            "space-y-9 lg:col-start-2",
+            ROW_START_CLASS[detailsColumnRowStart],
+            ROW_SPAN_CLASS[detailsColumnRowSpan]
           )}
-        </AnimatePresence>
+        >
+          <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
+          <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
+        </div>
       </div>
     </div>
   );

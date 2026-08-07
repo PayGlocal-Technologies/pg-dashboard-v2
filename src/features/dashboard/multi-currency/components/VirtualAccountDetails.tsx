@@ -75,10 +75,14 @@ export function VirtualAccountDetails({
       <Card className={cn("w-fit max-w-[730px] gap-4 px-6 py-6", className)}>
         {headerPlacement === "inside" && (
           <div className="flex items-center gap-3">
+            {/* Rectangular rather than the circular avatar the compact account
+                cards use — matches the flag shape RegionSelector and every
+                table cell in the product render. CountryFlagAvatar (not
+                CountryFlag) for its globe fallback on regions with no flag. */}
             <CountryFlagAvatar
               iso2={account.iso2}
               countryName={account.countryName}
-              className="h-10 w-10"
+              className="h-8 w-11 rounded-md"
             />
             <div className="min-w-0">
               <p className="truncate text-base font-semibold text-foreground">

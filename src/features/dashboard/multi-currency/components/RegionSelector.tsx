@@ -26,12 +26,12 @@ interface RegionSelectorProps {
  * hand-rolling a list — flag, region name, and a chevron marking the selected
  * row.
  *
- * Rows are flux-ui Buttons, not a hand-rolled list: `secondary` is the design
- * system's own selected surface and `ghost` its resting one, so the selected
- * state here is the same one every other selectable control in the product
- * uses. The chevron only appears on the selected row — it points at the
- * details panel the row is currently driving, so showing it on every row
- * would read as six separate affordances instead of one pointer.
+ * Rows are flux-ui Buttons, not a hand-rolled list: `ghost` is the design
+ * system's resting surface and `outline` — card fill, border, shadow — the
+ * one that lifts the selected row off the muted panel it sits on. The chevron
+ * only appears on the selected row: it points at the details panel that row is
+ * currently driving, so showing it on every row would read as six separate
+ * affordances instead of one pointer.
  */
 export function RegionSelector({
   accounts,
@@ -51,24 +51,30 @@ export function RegionSelector({
             type="button"
             role="listitem"
             aria-current={isSelected}
-            variant={isSelected ? "secondary" : "ghost"}
+            variant={isSelected ? "outline" : "ghost"}
             size={size}
             // flux-ui's Button lays leftIcon / label / rightIcon out as three
             // direct flex children, so the chevron would otherwise sit
             // immediately after the region name. Letting the label span take
             // the free space pushes it to the far right of the row instead.
             className={cn(
-              "w-full justify-start gap-2 [&>span]:flex-1 [&>span]:text-left",
-              // `secondary` already carries the selected surface; the primary
-              // tint on top is what makes the selected region readable at a
-              // glance in a list where every row shares the same shape.
+              "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
+              // `outline` already carries the raised selected surface; the
+              // primary tint on top is what makes the selected region readable
+              // at a glance in a list where every row shares the same shape.
               isSelected && "text-primary font-semibold"
             )}
+            // Rectangular, not the circular avatar the account cards use:
+            // flags read as flags at this size, and it's the same shape
+            // CountryFlag gives every flag elsewhere in the product. Going
+            // through CountryFlagAvatar rather than CountryFlag is what keeps
+            // the globe fallback for regions with no flag on the CDN (Rest of
+            // the World, and the EU entry on some environments).
             leftIcon={
               <CountryFlagAvatar
                 iso2={account.iso2}
                 countryName={account.countryName}
-                className="h-5 w-5"
+                className="h-5 w-7 rounded-md"
               />
             }
             rightIcon={
