@@ -19,6 +19,14 @@ import { cn } from "@/lib/utils";
  * Buttons rendered inside (Upload Invoice, Copy Link, …) must stop
  * propagation in their own onClick so they keep performing only their own
  * action instead of also triggering this row-level click.
+ *
+ * tabIndex/role/onKeyDown make this a real focusable, keyboard-operable
+ * target rather than a plain div only mouse users can activate, the same
+ * "div acting as a button" pattern CopyableText's own cell variant uses.
+ * This also matters for the Transaction Details drawer: clicking a cell
+ * actually moves DOM focus onto it (a plain non-tabbable div never would),
+ * which is what lets Radix's Dialog restore focus back here on close
+ * without this component needing to know anything about the drawer itself.
  */
 export function RowClick({
   onClick,
@@ -31,9 +39,17 @@ export function RowClick({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onClick();
+        }
+      }}
       className={cn(
-        "-mx-3 -my-2.5 flex h-full min-h-[44px] cursor-pointer items-center px-3 py-2.5",
+        "-mx-3 -my-2.5 flex h-full min-h-[44px] cursor-pointer items-center px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35 focus-visible:ring-inset",
         align === "right" && "justify-end",
         align === "center" && "justify-center"
       )}

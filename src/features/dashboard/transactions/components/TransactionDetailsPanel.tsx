@@ -130,10 +130,14 @@ export function TransactionDetailsPanel({
                 opacity-animated (rather than conditionally rendered)
                 whenever the panel is open at all, so it fades out
                 progressively as the panel grows into the page instead of
-                popping away the instant `mode` flips. pointer-events follow
-                the same rule so page-mode clicks never land on it. */}
+                popping away the instant `mode` flips, and removes together
+                with (not before/after) the panel itself when closing
+                entirely, since both are driven by the same AnimatePresence
+                exit. backdrop-blur-sm matches flux-ui's own DrawerOverlay.
+                pointer-events follow the drawer/page split so page-mode
+                clicks never land on it. */}
             <motion.div
-              className="fixed inset-0 z-40 bg-black/50"
+              className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
               initial={{ opacity: 0 }}
               animate={{ opacity: isDrawer ? 1 : 0 }}
               exit={{ opacity: 0 }}
@@ -147,14 +151,23 @@ export function TransactionDetailsPanel({
               onInteractOutside={(e) => { if (!isDrawer) e.preventDefault(); }}
               asChild
             >
+              {/* x slide only ever plays on true mount/unmount (entering
+                  "drawer" from fully closed, or leaving it entirely).
+                  Framer Motion's initial/exit don't apply to the
+                  drawer<->page morph, which is driven by the `layout` prop
+                  and the animate/style changes above instead, while this
+                  component stays mounted throughout. Square corners
+                  (0 border-radius) in both modes now, not just page mode:
+                  a side-docked, flush-to-the-edge panel reads as a native
+                  side panel rather than a floating card. */}
               <motion.div
                 layout
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1, borderRadius: isDrawer ? 16 : 0 }}
-                exit={{ opacity: 0 }}
+                initial={{ opacity: 0, x: "100%" }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: "100%" }}
                 transition={TRANSITION}
                 className={cn(
-                  "fixed z-50 flex flex-col overflow-hidden shadow-xl transition-colors duration-300 ease-in-out",
+                  "fixed z-50 flex flex-col overflow-hidden rounded-none shadow-xl transition-colors duration-300 ease-in-out",
                   isDrawer
                     ? "inset-y-0 right-0 w-full border-l border-border bg-card sm:w-[32rem] sm:max-w-[92vw]"
                     : "border-0 bg-background shadow-none"
