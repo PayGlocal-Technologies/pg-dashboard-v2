@@ -48,12 +48,14 @@ function accountSubtitle(account: VirtualAccount) {
  * width the way a plain `w-full` card would. `max-w-[730px]` caps how far
  * that natural sizing can grow.
  *
- * flux-ui's Card is itself a `flex flex-col` with a `gap-10` (40px) default
- * between its direct children — CardContent, Separator, the helper text, and
- * the button row all sit directly inside it, so that default gap was what
- * actually set the vertical rhythm here, not per-element margins. Overriding
- * it to `gap-4` on the Card is the one place that spacing needs to change;
- * adding margins back on the individual elements would only double up with it.
+ * flux-ui's Card is itself a `flex flex-col` with a gap between its direct
+ * children — CardContent, Separator, the helper text, and the button row all
+ * sit directly inside it, so that gap is what sets the vertical rhythm here,
+ * not per-element margins. `size="sm"` supplies the 28px padding every module
+ * on the Transaction Details page uses; `gap-4` narrows its 24px default to
+ * the 16px this card wants between divider → helper text → actions. The one
+ * step that needs to be wider than that rhythm (header → metadata) adds its
+ * own margin on top of the gap rather than fighting it.
  */
 export function VirtualAccountDetails({
   account,
@@ -72,7 +74,7 @@ export function VirtualAccountDetails({
         </h3>
       )}
 
-      <Card className={cn("w-fit max-w-[730px] gap-4 px-6 py-6", className)}>
+      <Card size="sm" className={cn("w-fit max-w-[730px] gap-4", className)}>
         {headerPlacement === "inside" && (
           <div className="flex items-center gap-3">
             {/* Rectangular rather than the circular avatar the compact account
@@ -88,17 +90,27 @@ export function VirtualAccountDetails({
               <p className="truncate text-base font-semibold text-foreground">
                 {account.accountName}
               </p>
-              <p className="truncate text-xs text-muted-foreground">{accountSubtitle(account)}</p>
+              <p className="truncate text-[13px] text-muted-foreground">
+                {accountSubtitle(account)}
+              </p>
             </div>
           </div>
         )}
 
-        <CardContent>
-          <dl className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-3">
+        {/* mt-2 on top of the Card's own gap-4 opens the header → metadata
+            step to 24px, a clear grouping break above a block whose internal
+            rows are 24px apart, without widening every other step in the
+            card. Only needed where there is a header inside to separate. */}
+        <CardContent className={cn(headerPlacement === "inside" && "mt-2")}>
+          {/* Label and value carry the same tokens the Transaction Details
+              page's own detail fields use: the label sits a size down and
+              muted, the value a size up at medium weight, so the value leads
+              without the two competing. */}
+          <dl className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-3">
             {fields.map((field) => (
               <div key={field.label} className="min-w-[160px] space-y-1">
-                <dt className="text-xs text-muted-foreground">{field.label}</dt>
-                <dd className="break-words text-sm font-semibold text-foreground">
+                <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
+                <dd className="break-words text-[13px] font-medium text-foreground">
                   {field.value}
                 </dd>
               </div>
@@ -108,7 +120,7 @@ export function VirtualAccountDetails({
 
         <Separator />
 
-        <p className="text-xs text-muted-foreground">
+        <p className="text-[13px] text-muted-foreground">
           Share a link or copy all fields for your client.
         </p>
 

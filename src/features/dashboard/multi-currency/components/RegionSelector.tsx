@@ -27,11 +27,15 @@ interface RegionSelectorProps {
  * row.
  *
  * Rows are flux-ui Buttons, not a hand-rolled list: `ghost` is the design
- * system's resting surface and `outline` — card fill, border, shadow — the
- * one that lifts the selected row off the muted panel it sits on. The chevron
- * only appears on the selected row: it points at the details panel that row is
- * currently driving, so showing it on every row would read as six separate
- * affordances instead of one pointer.
+ * system's resting surface and `secondary` its selected one, so the selection
+ * here is indicated exactly the way every other selectable control in the
+ * product indicates it. Both call sites sit the list on a card-coloured
+ * surface, which is why the selected row is the filled one — a bordered white
+ * row on a white card would read as a nested card instead of a selection.
+ *
+ * The chevron only appears on the selected row: it points at the details panel
+ * that row is currently driving, so showing it on every row would read as six
+ * separate affordances instead of one pointer.
  */
 export function RegionSelector({
   accounts,
@@ -51,7 +55,7 @@ export function RegionSelector({
             type="button"
             role="listitem"
             aria-current={isSelected}
-            variant={isSelected ? "outline" : "ghost"}
+            variant={isSelected ? "secondary" : "ghost"}
             size={size}
             // flux-ui's Button lays leftIcon / label / rightIcon out as three
             // direct flex children, so the chevron would otherwise sit
@@ -59,9 +63,9 @@ export function RegionSelector({
             // the free space pushes it to the far right of the row instead.
             className={cn(
               "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
-              // `outline` already carries the raised selected surface; the
-              // primary tint on top is what makes the selected region readable
-              // at a glance in a list where every row shares the same shape.
+              // `secondary` already carries the selected surface; the primary
+              // tint on top is what makes the selected region readable at a
+              // glance in a list where every row shares the same shape.
               isSelected && "text-primary font-semibold"
             )}
             // Rectangular, not the circular avatar the account cards use:

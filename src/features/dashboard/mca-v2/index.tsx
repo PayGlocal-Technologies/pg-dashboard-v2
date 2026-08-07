@@ -12,15 +12,11 @@ import { formatFullAccount } from "@/features/dashboard/multi-currency/utils";
 import { MCA_V2_REGIONS } from "@/features/dashboard/mca-v2/constants";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
-/**
- * The heading row each column opens with. `min-h-9` (36px) is the taller of
- * the two rows' natural heights — set by the "How it works?" link's own
- * padding on the right — so pinning both to it, rather than letting each size
- * to its own content, is what puts the two cards below them on one line.
- * `min-h-` rather than `h-`: the right row still grows when it wraps on a
- * narrow viewport, where the columns are stacked and alignment is moot anyway.
- */
-const HEADER_ROW = "flex min-h-9 items-center";
+/** Module title — the step below the page's own h1, shared by both columns. */
+const MODULE_TITLE = "text-base font-semibold text-foreground";
+
+/** Supporting copy under a module title, and secondary text inside a module. */
+const MODULE_SUBTITLE = "text-[13px] text-muted-foreground";
 
 /**
  * MCA v2 — receiving account details, one client region at a time.
@@ -76,8 +72,14 @@ export function McaV2Feature() {
   };
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader title="Multi Currency Accounts" />
+    <div className="mx-auto max-w-[1400px] page-enter">
+      {/* mb-8 widens PageHeader's own mb-6 to the 32px this page puts between
+          the page header and the first module. */}
+      <PageHeader
+        title="MCA v2"
+        subtitle="Receive international payments using your virtual accounts."
+        className="mb-8"
+      />
 
       {selectedAccount && (
         <ShareAccountDetailsModal
@@ -91,62 +93,71 @@ export function McaV2Feature() {
         />
       )}
 
-      {/* Two columns: a fixed-width region selector and everything it drives.
-          items-start keeps both top-aligned even though the right column is
-          much taller; flex-wrap stacks them on narrow viewports rather than
-          squeezing the selector below its readable width.
+      {/* Both columns are titled modules of the same shape: a title block, then
+          a white surface carrying that module's content.
 
-          Both columns open with a header row of the same height (HEADER_ROW,
-          above) followed by the same mt-3, so the region Card and the Account
-          Details card start on one line. Neither header can set that height on
-          its own: the left one is a bare 16px caption, while the right one is
-          36px tall because the "How it works?" link's own padding drives it. */}
-      <div className="flex flex-wrap items-start gap-6">
-        <div className="w-full shrink-0 lg:w-[268px]">
-          <div className={HEADER_ROW}>
-            <h2 className="text-xs font-medium text-muted-foreground">Select Client Region</h2>
-          </div>
+          Explicit col-start/row-start rather than one wrapper div per column —
+          the same placement technique TransactionDetailsPage's own two-column
+          grid uses. Putting both title blocks in grid row 1 makes the row size
+          to the taller of the two, so the region Card and the Account Details
+          card below them start on exactly the same line no matter how many
+          lines each title's supporting copy wraps to. Two column wrappers
+          could not do that without hard-coding a header height.
 
-          {/* Muted fill, unlike every other Card on the page: this is the panel
-              the rows sit on rather than a surface in its own right, so the
-              selected row's card-coloured `outline` variant is what reads as
-              raised against it. */}
-          <Card className="mt-3 gap-0 bg-muted/40 p-2">
-            <RegionSelector
-              accounts={accounts}
-              selectedAccountId={selectedAccountId}
-              onSelect={(account) => setSelectedAccountId(account.id)}
-              label="Select client region"
-              size="md"
-            />
-          </Card>
+          DOM order stays title → content → title → content, so the stacked
+          single-column layout below `lg` (where every explicit placement drops
+          out) still reads in the right order. gap-x-10 is the gutter, gap-y-5
+          the 20px title → content step. */}
+      <div className="grid gap-x-10 gap-y-5 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
+        <div className="lg:col-start-1 lg:row-start-1">
+          <h2 className={MODULE_TITLE}>Select Client Region</h2>
+          <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+            Choose the region your customer is sending payment from.
+          </p>
         </div>
 
+        {/* p-3 rather than Card's own 28px inset: the rows carry their own
+            px-5, so the card's padding only has to keep them clear of its
+            edge — anything more and the region names sit adrift of the title
+            above the card. */}
+        <Card size="sm" className="gap-0 p-3 lg:col-start-1 lg:row-start-2">
+          <RegionSelector
+            accounts={accounts}
+            selectedAccountId={selectedAccountId}
+            onSelect={(account) => setSelectedAccountId(account.id)}
+            label="Select client region"
+            size="md"
+          />
+        </Card>
+
         {selectedAccount && (
-          // key remounts the column on every region change so the fade
-          // replays on each switch, not just the first render.
-          <div key={selectedAccount.id} className="min-w-0 flex-1 page-enter">
-            <div className={cn(HEADER_ROW, "flex-wrap justify-between gap-2")}>
-              <h2 className="text-base font-semibold text-foreground">
+          <>
+            <div className="flex flex-wrap items-start justify-between gap-2 lg:col-start-2 lg:row-start-1">
+              <h2 className={MODULE_TITLE}>
                 Receive payments from {selectedAccount.countryName}
               </h2>
-              {/* No help article exists yet — the toast is the stand-in until
-                  there's somewhere real to point at. -mr-2 cancels the link
-                  variant's own horizontal padding so the label's right edge
-                  lines up with the card edge below it. */}
+              {/* Tertiary action: the link variant carries no fill or border,
+                  so it reads as one step below the module title it sits
+                  beside. -mr-2 cancels the variant's own horizontal padding so
+                  the label's right edge lines up with the card edge below it,
+                  and -mt-1 pulls it back onto the title's own line after
+                  items-start has top-aligned the row. */}
               <Button
                 variant="link"
-                className="-mr-2 text-sm underline"
+                className="-mr-2 -mt-1 text-[13px] underline"
                 onClick={() => toast.info("Help article coming soon")}
               >
                 How it works?
               </Button>
             </div>
 
-            {/* mt-3 matches the region Card's, so both cards start on the same
-                line; space-y-4 is this column's own rhythm between the two
-                cards below. */}
-            <div className="mt-3 space-y-4">
+            {/* key remounts the content on every region change so the fade
+                replays on each switch, not just the first render. space-y-6 is
+                the 24px module → module step. */}
+            <div
+              key={selectedAccount.id}
+              className="space-y-6 page-enter lg:col-start-2 lg:row-start-2"
+            >
               {/* Same Account Details card the Virtual Accounts page and the
                   share modal render — `inside` moves the flag/name/subtitle
                   into the card (there's no carousel here naming the account),
@@ -160,12 +171,26 @@ export function McaV2Feature() {
                 className="w-full max-w-none"
               />
 
-              <Card className="flex-row flex-wrap items-center justify-between gap-4 px-6 py-4">
-                <p className="text-sm text-muted-foreground">Need proof of account ownership?</p>
+              {/* Secondary module: same surface and padding as the card above
+                  it, but its copy sits at supporting weight rather than the
+                  module-title weight, so it reads as the lesser of the two. */}
+              <Card
+                size="sm"
+                className="flex-row flex-wrap items-center justify-between gap-4 py-6"
+              >
+                <div className="min-w-0 space-y-1">
+                  <p className="text-[13px] font-medium text-foreground">
+                    Need proof of account ownership?
+                  </p>
+                  <p className={MODULE_SUBTITLE}>
+                    Download an official document confirming ownership of this receiving account.
+                  </p>
+                </div>
                 {/* Placeholder until the proof-of-account document endpoint
                     exists — same stand-in treatment as How it works? above. */}
                 <Button
                   variant="outline"
+                  className="shrink-0"
                   rightIcon={<Icon name="download" className="h-4 w-4" />}
                   onClick={() => toast.info("Proof of account ownership will be available soon")}
                 >
@@ -173,7 +198,7 @@ export function McaV2Feature() {
                 </Button>
               </Card>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
