@@ -44,7 +44,7 @@ export const regularNavigation: NavGroup[] = [
           { label: "Payment Links", href: "/payment-links", permission: [] },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },
-          { label: "MCA v2", href: "/mca-v2", permission: [] },
+          { label: "Virtual Accounts", href: "/mca-v2", permission: [] },
         ],
       },
       {
