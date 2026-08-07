@@ -76,28 +76,41 @@ export function TransactionDetailsDrawer({
           <VisuallyHidden>Transaction details</VisuallyHidden>
         </DrawerTitle>
 
-        {/* Close first, then Expand: close stays the leading (primary)
-            affordance, with Expand discoverable immediately beside it but
-            secondary to it. */}
-        <DrawerHeader className="flex shrink-0 items-center gap-1 py-3">
-          <IconButton
-            aria-label="Close"
-            variant="ghost"
-            size="sm"
-            onClick={() => onOpenChange(false)}
-          >
-            <Icon name="x" className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            aria-label="Expand to full page"
-            variant="ghost"
-            size="sm"
-            onClick={() => {
-              if (row) onExpand(row);
-            }}
-          >
-            <Icon name="expand" className="h-4 w-4" />
-          </IconButton>
+        {/* Transaction ID to the left of Close/Expand: value only, no
+            label, secondary colour/size so it stays subordinate to the two
+            actions beside it. Close stays the leading action of the two,
+            with Expand discoverable immediately beside it but secondary. */}
+        {/* ml-auto on the button group (rather than justify-between on this
+            row) keeps Close/Expand pinned to the right even when row is
+            momentarily null (e.g. mid close-animation) and the transaction
+            ID span below doesn't render at all: justify-between would
+            otherwise snap a single remaining child back to the left. */}
+        <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
+          {row && (
+            <span className="min-w-0 truncate font-mono text-[13px] text-muted-foreground" title={row.gid}>
+              {row.gid}
+            </span>
+          )}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <IconButton
+              aria-label="Close"
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+            >
+              <Icon name="x" className="h-4 w-4" />
+            </IconButton>
+            <IconButton
+              aria-label="Expand to full page"
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (row) onExpand(row);
+              }}
+            >
+              <Icon name="expand" className="h-4 w-4" />
+            </IconButton>
+          </div>
         </DrawerHeader>
 
         {/* Only this region scrolls, so the header's close/expand stay

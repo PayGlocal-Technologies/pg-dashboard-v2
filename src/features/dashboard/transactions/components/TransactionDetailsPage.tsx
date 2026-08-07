@@ -191,21 +191,21 @@ function TimelineItem({
     <div className="flex gap-3">
       <div className="flex flex-col items-center">
         {/* Completed: a bare green checkmark, no surrounding circle at all.
-            Current: a small solid blue dot, no ring or outer disc. Upcoming:
-            unchanged, a hollow bordered circle. All three keep the same h-5
-            w-5 outer box (border-2, transparent for completed/current) so the
-            connector line above/below never shifts between states; only
-            what's drawn inside the box changes. */}
-        <span
-          className={cn(
-            "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2",
-            step.status === "upcoming" ? "border-border bg-card" : "border-transparent"
-          )}
-        >
+            Current: a small solid blue dot. Upcoming: a hollow bordered
+            circle at the same h-2.5 w-2.5 diameter as the current dot, so
+            every unvisited step reads as the same size, differing only in
+            fill/border once a step becomes current or completed. The outer
+            h-5 w-5 box is purely an alignment slot (no border/fill of its
+            own), sized the same for all three states so the connector line
+            above/below never shifts. */}
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center">
           {step.status === "completed" && (
             <Icon name="check" className="h-4 w-4 text-green-600" strokeWidth={3} />
           )}
           {step.status === "current" && <span className="h-2.5 w-2.5 rounded-full bg-primary" />}
+          {step.status === "upcoming" && (
+            <span className="h-2.5 w-2.5 rounded-full border-2 border-border bg-card" />
+          )}
         </span>
         {!isLast && (
           <span
@@ -657,27 +657,36 @@ export function TransactionDetailsPage({
 }: TransactionDetailsPageProps) {
   return (
     <div>
-      <div className="-ml-2 mb-2 flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
-          onClick={onBack}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          {backLabel}
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="shrink" className="h-4 w-4" />}
-          onClick={onCollapse}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          Collapse
-        </Button>
+      {/* Transaction ID sits to the left of Back/Collapse, this page's
+          equivalent of the drawer's Expand/Close row (see
+          TransactionDetailsDrawer.tsx), value only, no label, secondary
+          colour/size so it stays subordinate to the two actions beside it. */}
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate font-mono text-[13px] text-muted-foreground" title={row.gid}>
+          {row.gid}
+        </span>
+        <div className="-mr-2 flex shrink-0 items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
+            onClick={onBack}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            {backLabel}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="shrink" className="h-4 w-4" />}
+            onClick={onCollapse}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Collapse
+          </Button>
+        </div>
       </div>
 
       <TransactionDetailsContent
@@ -753,9 +762,9 @@ export function TransactionDetailsContent({
 
   const summary = (
     <div className={layout === "drawer" ? undefined : "mb-9"}>
-      {/* flex-wrap rather than a hard breakpoint: the metadata stack drops
-          below the amount block on its own once the row runs out of width
-          (the drawer's narrower viewport), instead of being hidden outright. */}
+      {/* flex-wrap rather than a hard breakpoint: the date drops below the
+          amount block on its own once the row runs out of width (the
+          drawer's narrower viewport), instead of being hidden outright. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
           <CountryCell iso2={row.partnerCustomerCountry} />
@@ -776,23 +785,15 @@ export function TransactionDetailsContent({
           </div>
         </div>
 
-        {/* Compact metadata stack, top-aligned with the amount block via the
-            row's items-start. Same DetailRow label/value hierarchy used
-            throughout the rest of this view, just right-aligned instead of
-            left so it reads as a corner annotation rather than another
-            left-aligned field. */}
-        <div className="flex shrink-0 flex-col gap-2">
-          <DetailRow
-            label="Transaction ID"
-            value={<CopyableText value={row.gid} />}
-            className="items-end text-right"
-          />
-          <DetailRow
-            label="Transaction Date"
-            value={formatTransactionTimestamp(row.formattedCreationDateTime)}
-            className="items-end text-right"
-          />
-        </div>
+        {/* Opposite the amount stack, top-aligned with it via the row's
+            items-start. Value only, no label. Transaction ID has moved to
+            the header row beside Expand/Close (drawer) or Back/Collapse
+            (page), see TransactionDetailsDrawer.tsx and
+            TransactionDetailsPage below, so this is the only field left
+            here. */}
+        <span className="shrink-0 text-[13px] text-muted-foreground">
+          {formatTransactionTimestamp(row.formattedCreationDateTime)}
+        </span>
       </div>
 
       {isReversed && (
