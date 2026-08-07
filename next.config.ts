@@ -23,10 +23,12 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     if (env) {
+      // UAT has moved to pygcl.com; dev/test/prod stay on payglocal.in.
+      const gccDomain = env === "uat" ? "pygcl.com" : "payglocal.in";
       const rules: { source: string; destination: string; basePath?: false }[] = [
         {
           source: "/gcc/:path*",
-          destination: `https://gcc.${env}.payglocal.in/gcc/:path*`,
+          destination: `https://gcc.${env}.${gccDomain}/gcc/:path*`,
           basePath: false,
         },
       ];
