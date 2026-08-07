@@ -26,6 +26,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
+import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
 import { buildShareUrl } from "@/features/dashboard/multi-currency/utils";
@@ -189,29 +190,13 @@ export function ShareAccountDetailsModal({
                   Account Details section the page itself uses on the right —
                   reused verbatim, not reimplemented. */}
               <div className="mt-4 flex flex-wrap items-start gap-4 rounded-xl border border-border bg-muted/20 p-4">
-                <div className="w-full shrink-0 space-y-1 sm:w-56" role="list" aria-label="Select a region to preview">
-                  {accounts.map((a) => {
-                    const isSelected = a.id === previewAccountId;
-                    return (
-                      <Button
-                        key={a.id}
-                        type="button"
-                        variant={isSelected ? "secondary" : "ghost"}
-                        size="sm"
-                        className="w-full justify-start gap-2"
-                        leftIcon={
-                          <CountryFlagAvatar iso2={a.iso2} countryName={a.countryName} className="h-5 w-5" />
-                        }
-                        rightIcon={
-                          isSelected ? <Icon name="chevron-right" className="h-3.5 w-3.5" /> : undefined
-                        }
-                        onClick={() => setPreviewAccountId(a.id)}
-                      >
-                        <span className="truncate">{a.countryName}</span>
-                      </Button>
-                    );
-                  })}
-                </div>
+                <RegionSelector
+                  accounts={accounts}
+                  selectedAccountId={previewAccountId}
+                  onSelect={(a) => setPreviewAccountId(a.id)}
+                  label="Select a region to preview"
+                  className="w-full shrink-0 sm:w-56"
+                />
 
                 <div className="min-w-0 flex-1">
                   <VirtualAccountDetails

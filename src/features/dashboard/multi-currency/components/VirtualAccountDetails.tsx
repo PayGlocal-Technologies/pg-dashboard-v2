@@ -2,6 +2,8 @@
 
 import { Button, Card, CardContent, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
+import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
@@ -9,6 +11,29 @@ interface VirtualAccountDetailsProps {
   account: VirtualAccount;
   onCopy: (account: VirtualAccount) => Promise<void> | void;
   onShare: (account: VirtualAccount) => void;
+  /**
+   * Where the account is named.
+   *
+   * - `"above"` (default) — a small uppercase caption above the card, for the
+   *   Virtual Accounts page and the share modal, where the carousel/region
+   *   list already carries the flag and the card is one of several stacked
+   *   elements.
+   * - `"inside"` — flag, account name and a "For clients in …" subtitle as the
+   *   card's own first row, for MCA v2, where the card is the only thing in
+   *   its column and has to identify itself.
+   */
+  headerPlacement?: "above" | "inside";
+  /** Merged onto the Card — e.g. to override its default shrink-wrapped width. */
+  className?: string;
+}
+
+/** "For clients in United States". Regions whose name is already the account
+ *  name (Rest of the World) would read as "For clients in Rest of the World",
+ *  so they get the region-neutral wording instead. */
+function accountSubtitle(account: VirtualAccount) {
+  return account.countryName === account.accountName
+    ? "For clients in all other regions"
+    : `For clients in ${account.countryName}`;
 }
 
 /**
@@ -30,16 +55,40 @@ interface VirtualAccountDetailsProps {
  * it to `gap-4` on the Card is the one place that spacing needs to change;
  * adding margins back on the individual elements would only double up with it.
  */
-export function VirtualAccountDetails({ account, onCopy, onShare }: VirtualAccountDetailsProps) {
+export function VirtualAccountDetails({
+  account,
+  onCopy,
+  onShare,
+  headerPlacement = "above",
+  className,
+}: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
 
   return (
     <section aria-live="polite">
-      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-        {account.countryName} Account
-      </h3>
+      {headerPlacement === "above" && (
+        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {account.countryName} Account
+        </h3>
+      )}
 
-      <Card className="w-fit max-w-[730px] gap-4 px-6 py-6">
+      <Card className={cn("w-fit max-w-[730px] gap-4 px-6 py-6", className)}>
+        {headerPlacement === "inside" && (
+          <div className="flex items-center gap-3">
+            <CountryFlagAvatar
+              iso2={account.iso2}
+              countryName={account.countryName}
+              className="h-10 w-10"
+            />
+            <div className="min-w-0">
+              <p className="truncate text-base font-semibold text-foreground">
+                {account.accountName}
+              </p>
+              <p className="truncate text-xs text-muted-foreground">{accountSubtitle(account)}</p>
+            </div>
+          </div>
+        )}
+
         <CardContent>
           <dl className="grid grid-cols-1 gap-x-10 gap-y-5 sm:grid-cols-3">
             {fields.map((field) => (
