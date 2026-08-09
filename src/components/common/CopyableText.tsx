@@ -7,6 +7,14 @@ import { cn } from "@/lib/utils";
 
 interface CopyableTextProps {
   value: string;
+  /**
+   * What to show in place of `value` — an elided form of it, typically from
+   * `truncateMiddle`. Display only: the clipboard, the tooltip and the
+   * accessible name all still carry the full `value`, so shortening what's on
+   * screen never shortens what the user actually walks away with.
+   * "inline" variant only; defaults to `value`.
+   */
+  displayValue?: string;
   className?: string;
   /**
    * "inline" (default): value always visible, its own copy icon+button always
@@ -22,7 +30,13 @@ interface CopyableTextProps {
   valueClassName?: string;
 }
 
-export function CopyableText({ value, className, variant = "inline", valueClassName }: CopyableTextProps) {
+export function CopyableText({
+  value,
+  displayValue,
+  className,
+  variant = "inline",
+  valueClassName,
+}: CopyableTextProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -73,10 +87,19 @@ export function CopyableText({ value, className, variant = "inline", valueClassN
     );
   }
 
+  const shown = displayValue ?? value;
+  const isElided = shown !== value;
+
   return (
     <div className={cn("flex items-center gap-1", className)}>
-      <span className={cn("font-mono text-[13px] text-foreground whitespace-nowrap", valueClassName)}>
-        {value}
+      <span
+        // Native title only where characters are actually hidden, so the full
+        // value stays reachable on hover without every ordinary field growing
+        // a tooltip it doesn't need.
+        title={isElided ? value : undefined}
+        className={cn("font-mono text-[13px] text-foreground whitespace-nowrap", valueClassName)}
+      >
+        {shown}
       </span>
       <TooltipProvider delayDuration={200}>
         <Tooltip>
@@ -95,7 +118,9 @@ export function CopyableText({ value, className, variant = "inline", valueClassN
             className="rounded-lg bg-popover text-popover-foreground border border-border text-xs px-2 py-1 shadow-md z-[200]"
             sideOffset={4}
           >
-            {copied ? "Copied!" : "Copy"}
+            {/* The elided case names what will land on the clipboard, since
+                the row itself no longer shows it in full. */}
+            {copied ? "Copied!" : isElided ? `Copy ${value}` : "Copy"}
           </TooltipContent>
         </Tooltip>
       </TooltipProvider>

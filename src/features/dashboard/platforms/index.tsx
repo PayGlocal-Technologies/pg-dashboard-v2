@@ -16,7 +16,7 @@ import {
   Separator,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
+import { cn, truncateMiddle } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
@@ -123,7 +123,20 @@ export function PlatformsFeature() {
                         // row shares the same shape.
                         isSelected && "text-primary font-semibold"
                       )}
-                      leftIcon={<Icon name={platform.logo} className="text-[22px]" />}
+                      // The platform's own brand mark, sized by the box rather
+                      // than by the file so all five sit on the same optical
+                      // line whatever padding each PNG carries. object-contain
+                      // keeps every mark inside its footprint uncropped. Same
+                      // treatment the Platforms v1 platform cards give it.
+                      leftIcon={
+                        <Image
+                          src={platform.logoSrc}
+                          alt=""
+                          width={90}
+                          height={60}
+                          className="h-6 w-9 shrink-0 object-contain"
+                        />
+                      }
                       // Only on the selected row: it points at the tutorial
                       // that row is currently driving, so showing it on every
                       // row would read as five affordances instead of one
@@ -232,42 +245,48 @@ export function PlatformsFeature() {
             <>
               {/* Quick Access — the three fields a merchant has to paste into
                   the platform, lifted out of the full account details so they
-                  don't have to leave this page to find them. A tinted surface
-                  rather than the default card fill: it's a utility strip above
-                  the walkthrough, not one of the numbered steps. */}
-              <Card
-                size="sm"
-                className="gap-0 border-transparent bg-muted/45 p-6 shadow-none dark:bg-muted/25"
-              >
-                <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:gap-10">
-                  <div className="min-w-0 xl:w-[210px] xl:shrink-0">
-                    <p className="text-[15px] font-semibold text-foreground">Quick Access</p>
-                    <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-                      Copy these details to set up PayGlocal on {selectedPlatform.name}.
-                    </p>
-                  </div>
+                  don't have to leave this page to find them.
 
-                  <dl className="grid min-w-0 flex-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-                    {quickAccessFields(selectedAccount).map((field) => (
-                      <div key={field.label} className="min-w-0 space-y-1.5">
-                        <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
-                        <dd>
-                          {/* The product's own copyable field, sat on a card
-                              surface so it reads as an input-shaped chip
-                              against the tinted container. Values wrap rather
-                              than truncate — an IBAN the merchant can't read
-                              in full defeats the point of surfacing it here. */}
-                          <CopyableText
-                            value={field.value}
-                            className="items-start rounded-lg border border-border bg-card px-3 py-1.5"
-                            valueClassName="min-w-0 flex-1 whitespace-normal break-all font-medium text-primary"
-                          />
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
+                  No surface of its own: it sits directly on the page between
+                  the header rule and the walkthrough, so the only boxes in
+                  this column are the copyable fields themselves and the
+                  screenshot frames below. A container here would read as a
+                  fourth kind of module competing with those two. */}
+              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:gap-10">
+                <div className="min-w-0 xl:w-[210px] xl:shrink-0">
+                  <p className="text-[15px] font-semibold text-foreground">Quick Access</p>
+                  <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+                    Copy these details to set up PayGlocal on {selectedPlatform.name}.
+                  </p>
                 </div>
-              </Card>
+
+                <dl className="grid min-w-0 flex-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                  {quickAccessFields(selectedAccount).map((field) => (
+                    <div key={field.label} className="min-w-0 space-y-1.5">
+                      <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
+                      <dd>
+                        {/* The product's own copyable field, bordered so it
+                            still reads as an input-shaped chip now that
+                            nothing tinted sits behind it.
+
+                            Long identifiers are elided from the middle rather
+                            than the end: the head says which bank and rail the
+                            account is on, the tail is what a merchant checks
+                            against the details they already hold, and the
+                            middle carries neither. The full value is what gets
+                            copied, what the tooltip names, and what a hover
+                            reveals — see CopyableText's `displayValue`. */}
+                        <CopyableText
+                          value={field.value}
+                          displayValue={truncateMiddle(field.value)}
+                          className="rounded-lg border border-border bg-card px-3 py-1.5"
+                          valueClassName="min-w-0 flex-1 truncate font-medium text-primary"
+                        />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
 
               {/* The walkthrough itself. Instruction left, screenshot right,
                   every step the same shape so the sequence scans as one column

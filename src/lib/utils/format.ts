@@ -272,6 +272,29 @@ export function truncate(str: string, length: number): string {
   return `${str.slice(0, length)}...`;
 }
 
+/**
+ * Shortens from the middle, keeping the head and tail visible, e.g. an IBAN
+ * as "DE89 3704 00…130 00".
+ *
+ * The right shape for identifiers a user verifies rather than reads: with an
+ * account number or an IBAN, the leading characters say which rail and bank
+ * it is and the trailing ones are what a merchant eyeballs against the copy
+ * they already hold, while the middle carries neither. `truncate` above drops
+ * the tail entirely, which loses exactly the half that does the checking.
+ *
+ * Returns the string untouched unless eliding it hides a worthwhile number of
+ * characters. A bare `length > head + tail` guard isn't enough: a 20-character
+ * account holder's name against a head of 12 and a tail of 6 would come back
+ * one character shorter and unreadable, having traded a whole word for an
+ * ellipsis. MIN_ELIDED below is what buys that case out.
+ */
+const MIN_ELIDED = 4;
+
+export function truncateMiddle(str: string, head = 12, tail = 6): string {
+  if (str.length <= head + tail + MIN_ELIDED) return str;
+  return `${str.slice(0, head)}…${str.slice(-tail)}`;
+}
+
 /** Byte count -> human readable size, e.g. 245_000 -> "245 KB", 3_400_000 -> "3.4 MB". */
 export function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
