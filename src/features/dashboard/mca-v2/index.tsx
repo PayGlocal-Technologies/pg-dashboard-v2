@@ -107,9 +107,15 @@ export function McaV2Feature() {
 
           DOM order stays left title → left content → right content, so the
           stacked single-column layout below `lg` (where every explicit
-          placement drops out) still reads in the right order. gap-x-10 is the
-          gutter, gap-y-5 the 20px title → content step. */}
-      <div className="grid gap-x-10 gap-y-5 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
+          placement drops out) still reads in the right order.
+
+          gap-x-10 is the gutter. The row gap is the only vertical step between
+          the title block and the row both columns start on, so it is what sets
+          how far below the page header the summary cards sit: 10px at `lg` and
+          up, where that row gap is pure whitespace beside the title. It stays
+          at 20px on the stacked layout below `lg`, where the same gap is doing
+          real work separating the region Card from the summary cards. */}
+      <div className="grid gap-x-10 gap-y-5 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start lg:gap-y-2.5">
         <div className="lg:col-start-1 lg:row-start-1">
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
           <p className={cn(MODULE_SUBTITLE, "mt-1")}>

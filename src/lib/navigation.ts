@@ -41,6 +41,7 @@ export const regularNavigation: NavGroup[] = [
           { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
           { label: "MCA Transactions", href: "/transactions", permission: ["getTxnSearchResults"] },
           { label: "MCA Links", href: "/mca-links", permission: [] },
+          { label: "Platforms", href: "/platforms", permission: [] },
           { label: "Payment Links", href: "/payment-links", permission: [] },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },

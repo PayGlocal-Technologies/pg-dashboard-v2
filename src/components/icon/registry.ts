@@ -91,6 +91,11 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+import { AmazonLogo } from "@/components/icon/AmazonLogo";
+import { DeelLogo } from "@/components/icon/DeelLogo";
+import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
+import { ToptalLogo } from "@/components/icon/ToptalLogo";
+import { UpworkLogo } from "@/components/icon/UpworkLogo";
 
 export const ICONS = {
   activity: Activity,
@@ -182,6 +187,15 @@ export const ICONS = {
   wallet: Wallet,
   x: X,
 
+  // ─── Platform brand marks (Platforms tutorial page) ────────────────────────
+  // Placeholder artwork until the official assets land — see each file's own
+  // note. Registered here, like every other SVG in the product, so call sites
+  // stay `<Icon name="…" />` and never reference an asset path.
+  "amazon-logo": AmazonLogo as unknown as LucideIcon,
+  "deel-logo": DeelLogo as unknown as LucideIcon,
+  "freelancer-logo": FreelancerLogo as unknown as LucideIcon,
+  "toptal-logo": ToptalLogo as unknown as LucideIcon,
+  "upwork-logo": UpworkLogo as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
