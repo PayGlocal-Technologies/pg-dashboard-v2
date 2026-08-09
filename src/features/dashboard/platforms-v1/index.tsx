@@ -17,14 +17,10 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
-import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
-import { formatFullAccount } from "@/features/dashboard/multi-currency/utils";
 import {
   SUPPORTED_PLATFORMS,
   accountsForPlatform,
 } from "@/features/dashboard/platforms/constants";
-import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 /** Module title — the step below the page's own h1, shared by every module
  *  here. Same tokens MCA v2 and Platforms use, so the three read as one
@@ -37,49 +33,48 @@ const MODULE_SUBTITLE = "text-[13px] text-muted-foreground";
 /**
  * Footprint every step's screenshot frame holds, art or no art.
  *
- * Wider than the 16:10 the sidebar-layout Platforms page reserves, because a
- * screenshot here spans the full content width rather than sharing a row with
- * its instruction — at 16:10 a single step would fill more than a viewport.
- * Reserving the ratio now is what lets a real screenshot drop into
- * `constants.ts` later without the step sequence reflowing.
+ * 5:3 — taller than a wide banner crop, so a screenshot of a real settings
+ * page has room for its vertical content, and still short enough that a step
+ * and its art read as one unit on screen. Reserving the ratio now is what lets
+ * a real screenshot drop into `constants.ts` later without the step sequence
+ * reflowing.
  */
-const STEP_SCREENSHOT_ASPECT_CLASS = "aspect-[16/7] w-full";
+const STEP_SCREENSHOT_ASPECT_CLASS = "aspect-[5/3] w-full";
 
 /**
- * Platforms v1 — the same walkthrough content as the Platforms page, laid out
- * top-down instead of side-by-side.
+ * Platforms v1 — the walkthrough for pointing a PayGlocal receiving account at
+ * the marketplace or freelancing platform that pays you.
  *
- * The page reads as one funnel: pick a platform, pick the currency you want to
- * be paid in, read the receiving account those two resolve to, then follow the
- * numbered steps that put that account on the platform. Documents sit beside
- * the account details as the one supporting aside, because that is where a
- * merchant reaches for them — mid-setup, not before it.
+ * The page reads as one funnel: pick a platform, pick the currency you're being
+ * paid in where the platform lets you choose, then work down the numbered
+ * steps. Documents sit beside the walkthrough as the one supporting aside,
+ * because that is where a merchant reaches for them — mid-setup, not before it.
  *
- * Nothing here is a new component. The platform row is a flux-ui RadioGroup of
- * Cards (the treatment the Virtual Accounts carousel uses), the account module
- * is Multi Currency Accounts' own VirtualAccountDetails, and every screenshot
- * frame is a Card. Content lives in `@/features/dashboard/platforms/constants`,
- * shared with the Platforms page, so a new platform or a new screenshot is one
- * data change that lands on both pages at once.
+ * Nothing here is a new component. The platform row is a list of flux-ui Cards
+ * in the selected treatment the Virtual Accounts carousel uses, the currency
+ * control is flux-ui's Select, and every screenshot frame is a Card. Content
+ * lives in `@/features/dashboard/platforms/constants`, shared with the
+ * Platforms page, so a new platform or a new screenshot is one data change that
+ * lands on both pages at once.
  */
 export function PlatformsV1Feature() {
   const platforms = SUPPORTED_PLATFORMS;
 
   // Exactly one platform is selected at all times — defaults to Amazon (the
-  // first entry) so the account, documents and steps are populated on load,
-  // not only after a click.
+  // first entry) so the steps and documents are populated on load, not only
+  // after a click.
   const [selectedPlatformId, setSelectedPlatformId] = useState(platforms[0]?.id ?? "");
   const selectedPlatform =
     platforms.find((p) => p.id === selectedPlatformId) ?? platforms[0] ?? null;
 
-  // The currency selection is stored as an account id and *resolved* against
-  // whichever platform is selected, rather than being reset by an effect when
-  // the platform changes (see CLAUDE.md's no-setState-in-effect rule). On a
-  // platform that offers the choice, a currency it also supports survives the
-  // switch and one it can't pay out in falls back to its first account. On a
-  // platform that offers no choice the first account simply wins outright —
-  // there's no visible control there, so a currency carried over from Amazon
-  // would be details the merchant never asked for and can't change back.
+  // Which of the platform's receiving accounts the walkthrough is scoped to.
+  //
+  // Stored as an account id and *resolved* against whichever platform is
+  // selected, rather than being reset by an effect when the platform changes
+  // (see CLAUDE.md's no-setState-in-effect rule). On a platform that offers
+  // the choice, a currency it also supports survives the switch and one it
+  // can't pay out in falls back to its first account. On a platform that
+  // offers no choice the first account simply wins outright.
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const accounts = selectedPlatform ? accountsForPlatform(selectedPlatform) : [];
   const selectedAccount =
@@ -88,38 +83,6 @@ export function PlatformsV1Feature() {
       : undefined) ??
     accounts[0] ??
     null;
-
-  const [shareModalOpen, setShareModalOpen] = useState(false);
-
-  const copyToClipboard = async (text: string, message: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast.success(message);
-    } catch {
-      toast.error("Couldn't copy to clipboard");
-    }
-  };
-
-  const handleCopyAccount = (account: VirtualAccount) =>
-    copyToClipboard(formatFullAccount(account), `${account.countryName} account details copied`);
-
-  /**
-   * Uses the OS share sheet where the browser exposes one, and falls back to
-   * putting the same text on the clipboard elsewhere — identical to the
-   * Virtual Accounts page's own fallback.
-   */
-  const handleShareAccount = async (account: VirtualAccount) => {
-    const text = formatFullAccount(account);
-    if (typeof navigator !== "undefined" && navigator.share) {
-      try {
-        await navigator.share({ title: `${account.countryName} Account`, text });
-        return;
-      } catch {
-        // User dismissed the sheet, or the browser refused — fall through to copy.
-      }
-    }
-    await copyToClipboard(text, "Account details copied — ready to send to your client");
-  };
 
   if (!selectedPlatform) return null;
 
@@ -133,28 +96,15 @@ export function PlatformsV1Feature() {
         className="mb-8"
       />
 
-      {selectedAccount && (
-        <ShareAccountDetailsModal
-          open={shareModalOpen}
-          onOpenChange={setShareModalOpen}
-          account={selectedAccount}
-          accounts={accounts}
-          onCopyLink={(url) => copyToClipboard(url, "Link copied")}
-          onCopyFullAccount={handleCopyAccount}
-          onShareFullAccount={(account) => void handleShareAccount(account)}
-        />
-      )}
-
-      {/* space-y-8 is the module → module step for the page's three bands:
-          platform selection, the account/documents row, and the walkthrough. */}
+      {/* space-y-8 is the module → module step for the page's two bands:
+          platform selection, then the walkthrough/documents row it drives. */}
       <div className="space-y-8">
         {/* ─── Platform selection ──────────────────────────────────────── */}
+        {/* No module title above the row: the cards are the first thing under
+            the page header and are self-evidently the choice being offered, so
+            a heading would only restate them. The list keeps its aria-label,
+            which is what a screen reader announces in place of that heading. */}
         <section>
-          <h2 className={MODULE_TITLE}>Select a platform</h2>
-          <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-            Choose the platform you want to receive payouts from.
-          </p>
-
           {/* All five platforms sit on one horizontal row spanning the content
               width, each card an equal share of it — no scrolling, nothing
               hidden past an edge, so the full set of choices is visible at a
@@ -170,7 +120,7 @@ export function PlatformsV1Feature() {
           <div
             role="list"
             aria-label="Select a platform"
-            className="mt-4 grid grid-cols-2 gap-3 p-1 sm:grid-cols-3 lg:grid-cols-5"
+            className="grid grid-cols-2 gap-3 p-1 sm:grid-cols-3 lg:grid-cols-5"
           >
             {platforms.map((platform) => {
               const isSelected = platform.id === selectedPlatform.id;
@@ -228,77 +178,112 @@ export function PlatformsV1Feature() {
         {/* Everything below is derived from the selected platform. key
             remounts it on every platform change so the fade replays on each
             switch, not just the first render. */}
-        <div key={selectedPlatform.id} className="page-enter space-y-8">
-          {/* ─── Currency ───────────────────────────────────────────────── */}
-          {/* Only on platforms that actually let the merchant choose which
-              account they're paid into — Amazon, today. Elsewhere the account
-              below is the platform's only one, and a dropdown that can't
-              change anything would read as a decision the merchant still has
-              to make. */}
-          {selectedPlatform.offersCurrencyChoice && selectedAccount && (
-            <Select value={selectedAccount.id} onValueChange={setSelectedAccountId}>
-              <SelectTrigger className="w-[140px]" aria-label="Receiving currency">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {accounts.map((account) => (
-                  <SelectItem key={account.id} value={account.id}>
-                    <span className="flex items-center gap-2">
-                      {/* A SWIFT-rail catch-all account has no single country
-                          behind it, so it shows a globe instead of a flag —
-                          same fallback the MCA link builder's currency select
-                          uses. */}
-                      {account.iso2 === "ROW" ? (
-                        <Icon name="globe" className="h-3.5 w-5 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <CountryFlag iso2={account.iso2} />
-                      )}
-                      {account.currency}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {/* ─── Account details + documents ─────────────────────────────── */}
-          {/* Account details lead and take whatever width is left; documents
-              sit in a fixed 320px column beside them, wide enough for a
-              two-line card and narrow enough to read as the aside it is.
-              Below `lg` the template drops out and the two stack in DOM order:
-              account details first, documents under them.
+        <div key={selectedPlatform.id} className="page-enter">
+          {/* ─── Connection steps + documents ───────────────────────────── */}
+          {/* The walkthrough leads and takes whatever width is left; documents
+              sit in a fixed 320px column beside it, wide enough for a two-line
+              card and narrow enough to read as the aside it is. Below `lg` the
+              template drops out and the two stack in DOM order: steps first,
+              documents under them.
 
               Explicit col-start/row-start rather than one wrapper div per
               column — the same placement technique MCA v2's two-column grid
               uses. Row 1 carries both module titles, so row 2 is where both
-              cards begin: their top edges land on each other whatever height
-              the taller title block resolves to. */}
-          <div className="grid gap-x-8 gap-y-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-            {selectedAccount && (
-              <>
-                <div className="lg:col-start-1 lg:row-start-1">
-                  <h2 className={MODULE_TITLE}>
-                    Receive payments from {selectedPlatform.name}
-                  </h2>
-                  <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-                    Use these details when {selectedPlatform.name} asks for your bank account.
-                  </p>
-                </div>
+              columns' content begins: the first document card's top edge lands
+              on Step 1's, whatever height the taller title block resolves to.
 
-                {/* Same Account Details card Multi Currency Accounts, MCA v2
-                    and the share modal render — `inside` moves the flag, name
-                    and subtitle into the card (nothing else on this row names
-                    the account), and the width override drops its default
-                    shrink-wrapping so it fills the column. */}
-                <VirtualAccountDetails
-                  account={selectedAccount}
-                  onCopy={handleCopyAccount}
-                  onShare={() => setShareModalOpen(true)}
-                  headerPlacement="inside"
-                  className="w-full max-w-none lg:col-start-1 lg:row-start-2"
-                />
-              </>
-            )}
+              items-start keeps the documents column at its own natural height
+              instead of stretching it down the length of a six-step
+              walkthrough. */}
+          <div className="grid gap-x-8 gap-y-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+            {/* Title block and the currency control share one row: the
+                dropdown scopes the steps beneath it, so sitting on their
+                heading's line is what says so. flex-wrap drops it under the
+                title on a narrow column rather than squeezing the heading, and
+                items-start keeps the trigger aligned to the title's own line
+                instead of centring against a two-line block. */}
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 lg:col-start-1 lg:row-start-1">
+              <div className="min-w-0">
+                <h2 className={MODULE_TITLE}>Connect your account to {selectedPlatform.name}</h2>
+                <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+                  Follow these steps in {selectedPlatform.name} to start receiving payouts.
+                </p>
+              </div>
+
+              {/* Only on platforms that actually let the merchant choose which
+                  account they're paid into — Amazon, today, where the
+                  walkthrough is per marketplace. Elsewhere there's a single
+                  account behind the steps, and a dropdown that can't change
+                  anything would read as a decision the merchant still has to
+                  make. */}
+              {selectedPlatform.offersCurrencyChoice && selectedAccount && (
+                <Select value={selectedAccount.id} onValueChange={setSelectedAccountId}>
+                  <SelectTrigger className="w-[140px] shrink-0" aria-label="Receiving currency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {accounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        <span className="flex items-center gap-2">
+                          {/* A SWIFT-rail catch-all account has no single
+                              country behind it, so it shows a globe instead of
+                              a flag — same fallback the MCA link builder's
+                              currency select uses. */}
+                          {account.iso2 === "ROW" ? (
+                            <Icon
+                              name="globe"
+                              className="h-3.5 w-5 shrink-0 text-muted-foreground"
+                            />
+                          ) : (
+                            <CountryFlag iso2={account.iso2} />
+                          )}
+                          {account.currency}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Step number → instruction → screenshot, in that order, every
+                step the same shape so the sequence scans as one column. */}
+            <ol className="mt-3 space-y-10 lg:col-start-1 lg:row-start-2">
+              {selectedPlatform.steps.map((step, index) => (
+                <li key={step.instruction}>
+                  <p className="text-[12px] font-medium text-muted-foreground">Step {index + 1}</p>
+                  <p className="mt-1 text-[15px] font-medium text-foreground">
+                    {step.instruction}
+                  </p>
+
+                  {/* The screenshot frame — a single Card, not a Card wrapped
+                      around an inner surface: one border, one radius, nothing
+                      matted around the art. It holds its footprint whether or
+                      not there's a screenshot in it, so dropping one into
+                      `constants.ts` later swaps the contents without moving a
+                      single step. p-0 so the image meets the frame's own edge;
+                      object-contain rather than cover so a screenshot of any
+                      ratio is letterboxed inside it instead of being cropped. */}
+                  <Card
+                    size="sm"
+                    className={cn(
+                      STEP_SCREENSHOT_ASPECT_CLASS,
+                      "mt-4 gap-0 overflow-hidden p-0"
+                    )}
+                  >
+                    {step.screenshotSrc && (
+                      <Image
+                        src={step.screenshotSrc}
+                        alt={step.screenshotAlt ?? ""}
+                        width={1280}
+                        height={768}
+                        className="h-full w-full object-contain"
+                      />
+                    )}
+                  </Card>
+                </li>
+              ))}
+            </ol>
 
             <div className="lg:col-start-2 lg:row-start-1">
               <h2 className={MODULE_TITLE}>Documents you might need</h2>
@@ -309,8 +294,10 @@ export function PlatformsV1Feature() {
 
             {/* One card per document rather than rows inside a single card:
                 each is its own action target, and the list is short enough
-                that the extra separation reads as clarity, not clutter. */}
-            <div className="space-y-3 lg:col-start-2 lg:row-start-2">
+                that the extra separation reads as clarity, not clutter.
+                mt-3 matches the walkthrough's own title → content step so both
+                columns start on the same line. */}
+            <div className="mt-3 space-y-3 lg:col-start-2 lg:row-start-2">
               {selectedPlatform.documents.map((doc) => (
                 <Card
                   key={doc.title}
@@ -337,55 +324,6 @@ export function PlatformsV1Feature() {
               ))}
             </div>
           </div>
-
-          {/* ─── Connection steps ───────────────────────────────────────── */}
-          <section>
-            <h2 className={MODULE_TITLE}>Connect your account to {selectedPlatform.name}</h2>
-            <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-              Follow these steps in {selectedPlatform.name} to start receiving payouts.
-            </p>
-
-            {/* Step number → instruction → screenshot, in that order, every
-                step the same shape so the sequence scans as one column. */}
-            <ol className="mt-6 space-y-10">
-              {selectedPlatform.steps.map((step, index) => (
-                <li key={step.instruction}>
-                  <p className="text-[12px] font-medium text-muted-foreground">Step {index + 1}</p>
-                  <p className="mt-1 text-[15px] font-medium text-foreground">
-                    {step.instruction}
-                  </p>
-
-                  {/* The screenshot frame. It holds its footprint whether or
-                      not there's art in it, so dropping a real screenshot into
-                      `constants.ts` later swaps the contents without moving a
-                      single step. object-contain rather than cover so a
-                      screenshot of any ratio is letterboxed inside the frame
-                      instead of being cropped. */}
-                  <Card
-                    size="sm"
-                    className="mt-4 gap-0 overflow-hidden border-transparent bg-muted/45 p-3 shadow-none dark:bg-muted/25"
-                  >
-                    <div
-                      className={cn(
-                        STEP_SCREENSHOT_ASPECT_CLASS,
-                        "overflow-hidden rounded-lg border border-border bg-card"
-                      )}
-                    >
-                      {step.screenshotSrc && (
-                        <Image
-                          src={step.screenshotSrc}
-                          alt={step.screenshotAlt ?? ""}
-                          width={1280}
-                          height={560}
-                          className="h-full w-full object-contain"
-                        />
-                      )}
-                    </div>
-                  </Card>
-                </li>
-              ))}
-            </ol>
-          </section>
         </div>
       </div>
     </div>
