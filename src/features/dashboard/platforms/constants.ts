@@ -43,7 +43,12 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     id: "amazon",
     name: "Amazon",
     logo: "amazon-logo",
+    logoSrc: "/assets/Platform/Amazon.png",
     accountIds: ["us-usd", "gb-gbp", "eu-eur", "ca-cad", "au-aud"],
+    // Amazon pays out per marketplace, so the merchant picks which currency
+    // this walkthrough is describing. No other platform here offers that
+    // choice — see `offersCurrencyChoice` on the Platform type.
+    offersCurrencyChoice: true,
     steps: [
       { instruction: "Log in to Amazon Seller Central" },
       { instruction: "Open 'Settings' and select 'Account Info'" },
@@ -58,6 +63,7 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     id: "freelancer",
     name: "Freelancer",
     logo: "freelancer-logo",
+    logoSrc: "/assets/Platform/Freelancer.png",
     accountIds: ["us-usd", "gb-gbp", "eu-eur", "au-aud"],
     steps: [
       { instruction: "Log in to your Freelancer account" },
@@ -73,6 +79,7 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     id: "upwork",
     name: "Upwork",
     logo: "upwork-logo",
+    logoSrc: "/assets/Platform/Upwork.png",
     accountIds: ["us-usd", "gb-gbp", "eu-eur", "ca-cad", "au-aud", "sg-sgd"],
     steps: [
       { instruction: "Log in to your Upwork account" },
@@ -88,6 +95,7 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     id: "toptal",
     name: "Toptal",
     logo: "toptal-logo",
+    logoSrc: "/assets/Platform/Toptal.png",
     accountIds: ["us-usd", "gb-gbp", "eu-eur"],
     steps: [
       { instruction: "Log in to your Toptal account" },
@@ -102,6 +110,7 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     id: "deel",
     name: "Deel",
     logo: "deel-logo",
+    logoSrc: "/assets/Platform/Deel.png",
     accountIds: ["us-usd", "gb-gbp", "eu-eur", "ae-aed", "sg-sgd"],
     steps: [
       { instruction: "Log in to your Deel account" },

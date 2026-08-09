@@ -33,12 +33,32 @@ export interface Platform {
   /** Registry icon name for the platform's brand mark. */
   logo: IconName;
   /**
+   * Raster brand mark under `public/assets/Platform`, 3:2.
+   *
+   * The icon registry is the rule for SVG brand assets (see CLAUDE.md), and
+   * `logo` above is that entry. These are supplied as PNGs, which can't be a
+   * `forwardRef` SVG component, so they're served from `public` through
+   * `next/image` instead — the documented exception rather than a second way
+   * of doing the same thing. Swap this for the registry mark if SVG versions
+   * ever arrive.
+   */
+  logoSrc: string;
+  /**
    * Virtual accounts this platform can pay out to, in the order the currency
    * selector should offer them. Ids reference MOCK_VIRTUAL_ACCOUNTS, so the
    * account details shown here are the same ones Virtual Accounts renders
    * rather than a second copy that can drift.
    */
   accountIds: string[];
+  /**
+   * Whether the merchant picks which of those accounts to be paid into.
+   *
+   * Only true where the platform genuinely lets you choose the payout currency
+   * per marketplace. Everywhere else the first entry in `accountIds` is the
+   * account, and Platforms v1 renders no currency control at all rather than a
+   * dropdown with one real answer in it.
+   */
+  offersCurrencyChoice?: boolean;
   steps: PlatformStep[];
   documents: PlatformDocument[];
 }

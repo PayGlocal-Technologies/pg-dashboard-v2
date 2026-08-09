@@ -8,8 +8,6 @@ import {
   CardContent,
   IconButton,
   PageHeader,
-  RadioGroup,
-  RadioGroupItem,
   Select,
   SelectContent,
   SelectItem,
@@ -76,13 +74,20 @@ export function PlatformsV1Feature() {
 
   // The currency selection is stored as an account id and *resolved* against
   // whichever platform is selected, rather than being reset by an effect when
-  // the platform changes (see CLAUDE.md's no-setState-in-effect rule). A
-  // currency both platforms support survives the switch; one the new platform
-  // can't pay out in falls back to its first account instead of rendering
-  // details for an account that isn't on offer.
+  // the platform changes (see CLAUDE.md's no-setState-in-effect rule). On a
+  // platform that offers the choice, a currency it also supports survives the
+  // switch and one it can't pay out in falls back to its first account. On a
+  // platform that offers no choice the first account simply wins outright —
+  // there's no visible control there, so a currency carried over from Amazon
+  // would be details the merchant never asked for and can't change back.
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const accounts = selectedPlatform ? accountsForPlatform(selectedPlatform) : [];
-  const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? accounts[0] ?? null;
+  const selectedAccount =
+    (selectedPlatform?.offersCurrencyChoice
+      ? accounts.find((a) => a.id === selectedAccountId)
+      : undefined) ??
+    accounts[0] ??
+    null;
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
@@ -150,17 +155,22 @@ export function PlatformsV1Feature() {
             Choose the platform you want to receive payouts from.
           </p>
 
-          {/* One horizontal row at any width: overflow-x-auto plus shrink-0
-              cards keeps every platform on one line and lets the row scroll
-              rather than wrap into a ragged grid on a narrow viewport — the
-              same treatment the Virtual Accounts carousel uses. p-1 keeps
-              overflow-x-auto (which per the CSS overflow spec also clips the
-              vertical axis) from cutting the selected card's ring. */}
-          <RadioGroup
-            value={selectedPlatform.id}
-            onValueChange={setSelectedPlatformId}
+          {/* All five platforms sit on one horizontal row spanning the content
+              width, each card an equal share of it — no scrolling, nothing
+              hidden past an edge, so the full set of choices is visible at a
+              glance. The column count steps down on narrower viewports rather
+              than letting five cards squeeze to an unreadable width. p-1 keeps
+              the selected card's ring-2 clear of the row's own bounds.
+
+              A `role="list"` of card-shaped buttons rather than a radio group:
+              with no radio indicator drawn on the card, the brand mark and the
+              selected ring are what carry the state, and this is the same
+              treatment RegionSelector gives every other one-of-many list in
+              the product. */}
+          <div
+            role="list"
             aria-label="Select a platform"
-            className="scrollbar-none mt-4 flex gap-3 overflow-x-auto p-1"
+            className="mt-4 grid grid-cols-2 gap-3 p-1 sm:grid-cols-3 lg:grid-cols-5"
           >
             {platforms.map((platform) => {
               const isSelected = platform.id === selectedPlatform.id;
@@ -168,15 +178,14 @@ export function PlatformsV1Feature() {
                 <Card
                   key={platform.id}
                   size="sm"
-                  role="button"
+                  role="listitem"
                   tabIndex={0}
                   aria-current={isSelected}
                   onClick={() => setSelectedPlatformId(platform.id)}
-                  // A mouse click on the card — or on the RadioGroupItem
-                  // nested inside it — would otherwise leave that element
-                  // holding browser focus after selection, showing a focus
-                  // ring nobody asked for. preventDefault suppresses only
-                  // that mouse-click focus; Tab/Enter/Space are untouched.
+                  // A mouse click would otherwise leave the card holding
+                  // browser focus after selection, showing a focus ring nobody
+                  // asked for. preventDefault suppresses only that mouse-click
+                  // focus; Tab/Enter/Space are untouched.
                   onMouseDown={(e) => e.preventDefault()}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
@@ -185,22 +194,22 @@ export function PlatformsV1Feature() {
                     }
                   }}
                   className={cn(
-                    "w-[200px] shrink-0 cursor-pointer gap-0 p-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md",
+                    "min-w-0 cursor-pointer gap-0 p-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md",
                     isSelected && "border-primary ring-2 ring-primary"
                   )}
                 >
                   <CardContent className="flex min-w-0 items-center gap-3">
-                    {/* Radio indicator, not a separate control — the card
-                        itself is the click target (onClick/role/tabIndex
-                        above); this reflects that state and, because it sits
-                        inside the RadioGroup, selects the same platform when
-                        clicked directly. */}
-                    <RadioGroupItem
-                      value={platform.id}
-                      aria-label={`Select ${platform.name}`}
-                      className="shrink-0"
+                    {/* The platform's own brand mark, sized by the box rather
+                        than by the file so all five sit on the same optical
+                        line whatever padding each PNG carries. object-contain
+                        keeps every mark inside its 3:2 footprint uncropped. */}
+                    <Image
+                      src={platform.logoSrc}
+                      alt=""
+                      width={90}
+                      height={60}
+                      className="h-6 w-9 shrink-0 object-contain"
                     />
-                    <Icon name={platform.logo} className="shrink-0 text-[22px]" />
                     <span
                       className={cn(
                         "min-w-0 truncate text-[14px] text-foreground",
@@ -213,7 +222,7 @@ export function PlatformsV1Feature() {
                 </Card>
               );
             })}
-          </RadioGroup>
+          </div>
         </section>
 
         {/* Everything below is derived from the selected platform. key
@@ -221,7 +230,12 @@ export function PlatformsV1Feature() {
             switch, not just the first render. */}
         <div key={selectedPlatform.id} className="page-enter space-y-8">
           {/* ─── Currency ───────────────────────────────────────────────── */}
-          {selectedAccount && (
+          {/* Only on platforms that actually let the merchant choose which
+              account they're paid into — Amazon, today. Elsewhere the account
+              below is the platform's only one, and a dropdown that can't
+              change anything would read as a decision the merchant still has
+              to make. */}
+          {selectedPlatform.offersCurrencyChoice && selectedAccount && (
             <Select value={selectedAccount.id} onValueChange={setSelectedAccountId}>
               <SelectTrigger className="w-[140px]" aria-label="Receiving currency">
                 <SelectValue />
