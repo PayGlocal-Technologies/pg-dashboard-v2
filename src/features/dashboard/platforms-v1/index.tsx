@@ -88,17 +88,21 @@ export function PlatformsV1Feature() {
 
   return (
     <div className="mx-auto max-w-[1400px] page-enter">
-      {/* mb-8 widens PageHeader's own mb-6 to the 32px this page puts between
-          the page header and the first module — same step as MCA v2. */}
+      {/* No margin override: PageHeader's own mb-6 is the step this page wants
+          between the description and the platform cards. The 32px other pages
+          add on top of it opens a gap wide enough that the cards read as their
+          own block rather than as the header's answer. Title → subtitle stays
+          the component's own mt-0.5, the tightest step on the page. */}
       <PageHeader
         title="Platforms v1"
         subtitle="Connect your PayGlocal receiving account to the platforms that pay you."
-        className="mb-8"
       />
 
-      {/* space-y-8 is the module → module step for the page's two bands:
-          platform selection, then the walkthrough/documents row it drives. */}
-      <div className="space-y-8">
+      {/* 40px — the page's largest step, and the only place it appears. The
+          platform row is one closed group; this is the break between choosing
+          a platform and working through it, so it has to out-measure both the
+          24px above it and the 32px between individual steps below. */}
+      <div className="space-y-10">
         {/* ─── Platform selection ──────────────────────────────────────── */}
         {/* No module title above the row: the cards are the first thing under
             the page header and are self-evidently the choice being offered, so
@@ -194,8 +198,15 @@ export function PlatformsV1Feature() {
 
               items-start keeps the documents column at its own natural height
               instead of stretching it down the length of a six-step
-              walkthrough. */}
-          <div className="grid gap-x-8 gap-y-3 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+              walkthrough.
+
+              gap-y-4 is the row gap, and it is the only thing separating each
+              column's title block from its content — 16px, the medium step of
+              description → first item. Both columns inherit it from the same
+              grid, which is what makes the walkthrough and the documents start
+              on exactly the same line without either one carrying a margin of
+              its own to be kept in sync. */}
+          <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
             {/* Title block and the currency control share one row: the
                 dropdown scopes the steps beneath it, so sitting on their
                 heading's line is what says so. flex-wrap drops it under the
@@ -247,8 +258,15 @@ export function PlatformsV1Feature() {
             </div>
 
             {/* Step number → instruction → screenshot, in that order, every
-                step the same shape so the sequence scans as one column. */}
-            <ol className="mt-3 space-y-10 lg:col-start-1 lg:row-start-2">
+                step the same shape so the sequence scans as one column.
+
+                space-y-8 between steps against the 12px that holds an
+                instruction to its own screenshot: a step and its art sit
+                closer to each other than any step does to the next one, which
+                is what gives the sequence its rhythm rather than reading as
+                six evenly spaced blocks. No top margin — the grid's row gap
+                above already places this against the title block. */}
+            <ol className="space-y-8 lg:col-start-1 lg:row-start-2">
               {selectedPlatform.steps.map((step, index) => (
                 <li key={step.instruction}>
                   <p className="text-[12px] font-medium text-muted-foreground">Step {index + 1}</p>
@@ -268,7 +286,7 @@ export function PlatformsV1Feature() {
                     size="sm"
                     className={cn(
                       STEP_SCREENSHOT_ASPECT_CLASS,
-                      "mt-4 gap-0 overflow-hidden p-0"
+                      "mt-3 gap-0 overflow-hidden p-0"
                     )}
                   >
                     {step.screenshotSrc && (
@@ -285,7 +303,13 @@ export function PlatformsV1Feature() {
               ))}
             </ol>
 
-            <div className="lg:col-start-2 lg:row-start-1">
+            {/* mt-6 only below `lg`, where the grid has collapsed to one
+                column and this heading follows the last screenshot: on top of
+                the 16px row gap it makes the same 40px section break the
+                platform row gets, so the documents don't read as a seventh
+                step. At `lg` the two columns are side by side and the row
+                placement handles it. */}
+            <div className="mt-6 lg:col-start-2 lg:row-start-1 lg:mt-0">
               <h2 className={MODULE_TITLE}>Documents you might need</h2>
               <p className={cn(MODULE_SUBTITLE, "mt-1")}>
                 Statements {selectedPlatform.name} may ask you for.
@@ -293,11 +317,12 @@ export function PlatformsV1Feature() {
             </div>
 
             {/* One card per document rather than rows inside a single card:
-                each is its own action target, and the list is short enough
-                that the extra separation reads as clarity, not clutter.
-                mt-3 matches the walkthrough's own title → content step so both
-                columns start on the same line. */}
-            <div className="mt-3 space-y-3 lg:col-start-2 lg:row-start-2">
+                each is its own action target. space-y-2 is the tightest step
+                on the page: each card already carries its own border, so 8px
+                is enough to separate them, and holding the pair that close is
+                what makes the documents read as one compact aside rather than
+                as a second column of content competing with the steps. */}
+            <div className="space-y-2 lg:col-start-2 lg:row-start-2">
               {selectedPlatform.documents.map((doc) => (
                 <Card
                   key={doc.title}
