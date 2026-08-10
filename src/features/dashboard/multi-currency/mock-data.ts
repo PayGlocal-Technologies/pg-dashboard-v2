@@ -190,6 +190,8 @@ export const TOTAL_EARNING_TREND: MetricSparklinePoint[] = [
 export const MULTI_CURRENCY_SUMMARY = {
   totalEarnings: {
     value: "128,400 USD",
+    // INR conversion, shown as supporting text under the USD amount.
+    valueInr: "1,22,31,384.00 INR",
     trendLabel: "+8.6% vs last period",
   },
   outstanding: {

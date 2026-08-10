@@ -166,14 +166,24 @@ export function MultiCurrencyFeature() {
                   {MULTI_CURRENCY_SUMMARY.totalEarnings.value}
                 </div>
 
-                <div className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                {/* Secondary to the USD figure above it: smaller size, muted
+                    colour, same left edge — supporting context, not a second
+                    headline. */}
+                <div className="mt-1 text-sm tabular-nums text-muted-foreground">
+                  {MULTI_CURRENCY_SUMMARY.totalEarnings.valueInr}
+                </div>
+
+                {/* Own row below the INR line (not sharing its baseline) so
+                    the indicator reads as a distinct, lower-priority step,
+                    right-aligned per the reference. */}
+                <div className="mt-2 flex items-center justify-end gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                   <Icon name="trending-up" className="h-3.5 w-3.5 shrink-0" />
                   <span>{MULTI_CURRENCY_SUMMARY.totalEarnings.trendLabel}</span>
                 </div>
 
-                <div className="mt-4 h-36 w-full">
+                <div className="mt-6 h-36 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={TOTAL_EARNING_TREND} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <AreaChart data={TOTAL_EARNING_TREND} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id={settledAmountGradientId} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
