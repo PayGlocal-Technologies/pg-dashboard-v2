@@ -21,6 +21,8 @@ export interface VirtualAccount {
   /** Fields only shown in the expanded details section, not on the card. */
   paymentMethod: string;
   accountHolderName: string;
+  /** e.g. "Business checking account" — shown in the expanded details section. */
+  accountType: string;
   bankName: string;
   beneficiaryAddress: string;
   /** Machine-readable routing code type, e.g. "ach_routing_number". Not every

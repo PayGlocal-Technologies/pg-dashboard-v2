@@ -20,20 +20,29 @@ export function formatAllAccounts(accounts: VirtualAccount[]) {
 
 /**
  * Every field shown in the expanded details section below the carousel, in
- * display order. Built from the account rather than stored on it directly so
- * the compact card's `details` (Account Number, ACH Routing, ...) stay the
- * single source of truth for those fields instead of being duplicated.
+ * display order — grouped into rows of three (Payment Method/primary
+ * identifier/Bank Name, then Account Holder Name/Account Type/Beneficiary
+ * Address, then the remaining identifiers) to match the customer-facing
+ * layout this section mirrors. Built from the account rather than stored on
+ * it directly so the compact card's `details` (Account Number, ACH Routing,
+ * ...) stay the single source of truth for those fields instead of being
+ * duplicated. `details[0]` is always the primary identifier (Account
+ * Number/IBAN/...); anything from `details[1]` on — the routing-style
+ * identifiers — trails after Beneficiary Address, alongside Routing Code Type.
  */
 export function buildFullAccountDetails(account: VirtualAccount): AccountDetail[] {
+  const [primaryIdentifier, ...otherIdentifiers] = account.details;
   return [
     { label: "Payment Method", value: account.paymentMethod },
+    ...(primaryIdentifier ? [primaryIdentifier] : []),
+    { label: "Bank Name", value: account.bankName },
     { label: "Account Holder Name", value: account.accountHolderName },
-    ...account.details,
+    { label: "Account Type", value: account.accountType },
+    { label: "Beneficiary Address", value: account.beneficiaryAddress },
+    ...otherIdentifiers,
     ...(account.routingCodeType
       ? [{ label: "Routing Code Type", value: account.routingCodeType }]
       : []),
-    { label: "Bank Name", value: account.bankName },
-    { label: "Beneficiary Address", value: account.beneficiaryAddress },
   ];
 }
 

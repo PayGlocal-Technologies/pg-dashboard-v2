@@ -23,6 +23,15 @@ interface VirtualAccountDetailsProps {
    *   its column and has to identify itself.
    */
   headerPlacement?: "above" | "inside";
+  /**
+   * Whether the Share button (and its "Share a link or copy all fields for
+   * your client" helper line) renders alongside Copy. Off for the
+   * customer-facing embedded preview inside ShareAccountDetailsModal — a
+   * customer receiving these details has nothing of their own to share, so
+   * that copy/action would be talking to the wrong audience; Copy account
+   * details becomes the sole, full-width action instead.
+   */
+  showShare?: boolean;
   /** Merged onto the Card — e.g. to override its default shrink-wrapped width. */
   className?: string;
 }
@@ -62,6 +71,7 @@ export function VirtualAccountDetails({
   onCopy,
   onShare,
   headerPlacement = "above",
+  showShare = true,
   className,
 }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
@@ -120,22 +130,26 @@ export function VirtualAccountDetails({
 
         <Separator />
 
-        <p className="text-[13px] text-muted-foreground">
-          Share a link or copy all fields for your client.
-        </p>
+        {showShare && (
+          <p className="text-[13px] text-muted-foreground">
+            Share a link or copy all fields for your client.
+          </p>
+        )}
 
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <Button
-            variant="outline"
-            className="flex-1"
-            leftIcon={<Icon name="share" className="h-4 w-4" />}
-            onClick={() => onShare(account)}
-          >
-            Share
-          </Button>
+        <div className={cn("flex flex-col gap-3", showShare && "sm:flex-row")}>
+          {showShare && (
+            <Button
+              variant="outline"
+              className="flex-1"
+              leftIcon={<Icon name="share" className="h-4 w-4" />}
+              onClick={() => onShare(account)}
+            >
+              Share
+            </Button>
+          )}
           <Button
             variant="primary"
-            className="flex-1"
+            className={cn(showShare ? "flex-1" : "w-full")}
             leftIcon={<Icon name="copy" className="h-4 w-4" />}
             onClick={() => onCopy(account)}
           >

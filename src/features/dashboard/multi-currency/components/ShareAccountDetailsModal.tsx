@@ -26,7 +26,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
-import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
+import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
 import { buildShareUrl } from "@/features/dashboard/multi-currency/utils";
@@ -186,25 +186,39 @@ export function ShareAccountDetailsModal({
                 </TooltipProvider>
               </div>
 
-              {/* Embedded preview: region selector on the left, the same
-                  Account Details section the page itself uses on the right —
-                  reused verbatim, not reimplemented. */}
-              <div className="mt-4 flex flex-wrap items-start gap-4 rounded-xl border border-border bg-muted/20 p-4">
-                <RegionSelector
+              {/* Embedded preview: a simulated rendering of the actual
+                  customer-facing page, reusing the same carousel and Account
+                  Details section the Multi Currency Accounts page itself
+                  renders — verbatim, not reimplemented — rather than a
+                  region-picker list plus a details panel side by side. */}
+              <div className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
+                <h2 className="text-lg font-bold text-foreground">
+                  Account details for payers in {previewAccount.countryName}
+                </h2>
+
+                <VirtualAccountList
                   accounts={accounts}
+                  onCopy={onCopyFullAccount}
+                  onShare={onShareFullAccount}
                   selectedAccountId={previewAccountId}
                   onSelect={(a) => setPreviewAccountId(a.id)}
-                  label="Select a region to preview"
-                  className="w-full shrink-0 sm:w-56"
                 />
 
-                <div className="min-w-0 flex-1">
-                  <VirtualAccountDetails
-                    account={previewAccount}
-                    onCopy={onCopyFullAccount}
-                    onShare={onShareFullAccount}
-                  />
-                </div>
+                {/* headerPlacement="inside" moves the flag/name/subtitle into
+                    the card — this preview has no carousel-adjacent caption
+                    naming the account the way the real page's "above"
+                    placement assumes. showShare={false}: a customer
+                    receiving these details has nothing of their own to
+                    share, so Copy account details is the page's sole,
+                    full-width action. */}
+                <VirtualAccountDetails
+                  account={previewAccount}
+                  onCopy={onCopyFullAccount}
+                  onShare={onShareFullAccount}
+                  headerPlacement="inside"
+                  showShare={false}
+                  className="mt-4 w-full max-w-none"
+                />
               </div>
             </div>
           </TabsContent>
