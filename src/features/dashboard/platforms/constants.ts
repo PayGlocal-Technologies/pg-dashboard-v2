@@ -54,7 +54,7 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
       { instruction: "Open 'Settings' and select 'Account Info'" },
       { instruction: "Under 'Payment Information', choose 'Deposit Methods'" },
       { instruction: "Pick the marketplace you want to be paid for" },
-      { instruction: "Enter the account details from Quick Access above" },
+      { instruction: "Enter the account details from Quick Access below", quickAccess: true },
       { instruction: "Submit the account and wait for Amazon to verify it" },
     ],
     documents: defaultDocuments("Amazon"),

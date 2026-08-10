@@ -12,6 +12,18 @@ export interface PlatformStep {
   screenshotSrc?: string;
   /** Alt text for `screenshotSrc`. Required once a screenshot exists. */
   screenshotAlt?: string;
+  /**
+   * Whether this step carries a Quick Access panel — the account's own
+   * identifiers, each with a copy action, sat between the instruction and the
+   * screenshot.
+   *
+   * Set it on the one step that asks the merchant to type those identifiers
+   * into the platform, so the values are under the instruction that needs them
+   * rather than somewhere else on the page. Platforms v1 reads this; the
+   * sidebar-layout Platforms page carries its own Quick Access strip above the
+   * whole walkthrough and ignores it.
+   */
+  quickAccess?: boolean;
 }
 
 /** A document card in the sidebar's "Documents you might need" list. */

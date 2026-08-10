@@ -16,6 +16,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
   SUPPORTED_PLATFORMS,
@@ -273,6 +274,51 @@ export function PlatformsV1Feature() {
                   <p className="mt-1 text-[15px] font-medium text-foreground">
                     {step.instruction}
                   </p>
+
+                  {/* Quick Access — the identifiers this step asks the merchant
+                      to type into the platform, sat between the instruction
+                      that names them and the screenshot showing where they go,
+                      so they're on screen at the moment they're needed rather
+                      than in a panel elsewhere on the page.
+
+                      Which step carries it is data (`quickAccess` on the step),
+                      not a step index, so moving it is a constants change.
+
+                      The fields are the account's own `details` — the same two
+                      rows the account card shows, keeping their rail-specific
+                      labels ("Account Number"/"ACH Routing" on a US account,
+                      "IBAN"/"SEPA BIC" in Europe) rather than being flattened
+                      into generic ones that would be wrong on half the rails.
+                      They follow the currency selector above, so switching
+                      currency reprints these values. */}
+                  {step.quickAccess && selectedAccount && (
+                    <Card
+                      size="sm"
+                      className="mt-3 flex-row flex-wrap items-center justify-between gap-x-8 gap-y-4 p-6"
+                    >
+                      <p className="text-[15px] font-semibold text-foreground">Quick access</p>
+
+                      <dl className="flex flex-wrap items-start gap-x-6 gap-y-4">
+                        {selectedAccount.details.map((field) => (
+                          <div key={field.label} className="min-w-0 space-y-1.5">
+                            <dt className="text-[12px] text-muted-foreground">{field.label}:</dt>
+                            <dd>
+                              {/* The product's own copyable field, sat on a
+                                  bordered surface so it reads as an
+                                  input-shaped chip — the same treatment the
+                                  Platforms page gives its Quick Access
+                                  values. */}
+                              <CopyableText
+                                value={field.value}
+                                className="rounded-lg border border-border px-3 py-1.5"
+                                valueClassName="font-medium"
+                              />
+                            </dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </Card>
+                  )}
 
                   {/* The screenshot frame — a single Card, not a Card wrapped
                       around an inner surface: one border, one radius, nothing
