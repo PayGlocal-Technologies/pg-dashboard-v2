@@ -6,7 +6,6 @@ import {
   CardHeader,
   CardAction,
   CardContent,
-  Separator,
   Button,
   Tabs,
   TabsList,
@@ -26,14 +25,16 @@ type AnalyticsMode = "amount" | "count";
 // Show more.
 const VISIBLE_COUNT = 4;
 
-function formatUsdShort(value: number): string {
+/** Shared with OutstandingAmountCard so both cards format USD figures identically. */
+export function formatUsdShort(value: number): string {
   return value >= 1000 ? `$${(value / 1000).toFixed(1)}K` : `$${value}`;
 }
 
 /**
  * Settlement analytics card for the Transactions page: a KPI (top-left) and
- * an Amount settled/Transactions toggle (top-right, same row), a divider,
- * then a ranked horizontal bar per virtual account. A single accent
+ * an Amount settled/Transactions toggle (top-right, same row), then a ranked
+ * horizontal bar per virtual account, directly below with no divider between
+ * them. A single accent
  * gradient (chart-1 to chart-3, the same pair flux-ui's own
  * RankedBarListTemplate uses) fills every bar regardless of rank: this is
  * one series (settled volume) ranked by account, not eight distinct
@@ -62,7 +63,7 @@ export function SettlementAnalyticsCard() {
   const canExpand = rows.length > VISIBLE_COUNT;
 
   return (
-    <Card size="sm" className="w-full max-w-2xl">
+    <Card size="sm" className="w-full">
       {/* KPI (left) and the mode toggle (right), on the same row: CardHeader
           switches to a 2-column grid on its own once it sees a CardAction
           child, so no layout classes are needed here beyond that. */}
@@ -93,8 +94,6 @@ export function SettlementAnalyticsCard() {
           </Tabs>
         </CardAction>
       </CardHeader>
-
-      <Separator />
 
       <CardContent>
         {/* Supporting tier: kept visually restrained (thin h-2 tracks, small

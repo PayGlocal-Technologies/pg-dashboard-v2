@@ -37,3 +37,8 @@ export const SETTLEMENT_ANALYTICS_TOTALS = {
   settledInrLabel: "₹1,22,31,384.00",
   transactionCountLabel: "3,842",
 };
+
+/** Received from customers but not yet settled (see OutstandingAmountCard).
+ *  Its INR line is derived from this at render time via MCA_FX_RATES_TO_INR,
+ *  not stored as a second literal, so it can never drift from the USD figure. */
+export const OUTSTANDING_AMOUNT_USD = 14_200;
