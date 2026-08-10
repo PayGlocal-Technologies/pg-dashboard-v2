@@ -69,13 +69,17 @@ export function SettlementAnalyticsCard() {
           child, so no layout classes are needed here beyond that. */}
       <CardHeader>
         <div>
-          <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+          {/* Label belongs to the KPI beneath it, not the other way round:
+              it introduces the number rather than captioning it after the
+              fact, the same order OutstandingAmountCard and SavedAmountCard
+              both use for their own KPI blocks. */}
+          <p className="text-sm font-semibold text-foreground">
+            {isAmountMode ? "Total settled amount" : "Total transactions"}
+          </p>
+          <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
             {isAmountMode
               ? SETTLEMENT_ANALYTICS_TOTALS.settledUsdLabel
               : SETTLEMENT_ANALYTICS_TOTALS.transactionCountLabel}
-          </p>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            {isAmountMode ? "Total settled amount" : "Total transactions"}
           </p>
           {/* Tertiary, amount mode only: a transaction count has no
               currency to convert. */}

@@ -38,7 +38,22 @@ export const SETTLEMENT_ANALYTICS_TOTALS = {
   transactionCountLabel: "3,842",
 };
 
+/** Derived from SETTLEMENT_ANALYTICS_BY_ACCOUNT rather than a third literal
+ *  next to SETTLEMENT_ANALYTICS_TOTALS, so OutstandingAmountCard's
+ *  settlement-progress bar can never drift out of sync with the per-account
+ *  figures it's computed from. */
+export const TOTAL_SETTLED_USD = SETTLEMENT_ANALYTICS_BY_ACCOUNT.reduce(
+  (sum, row) => sum + row.settledUsd,
+  0
+);
+
 /** Received from customers but not yet settled (see OutstandingAmountCard).
  *  Its INR line is derived from this at render time via MCA_FX_RATES_TO_INR,
  *  not stored as a second literal, so it can never drift from the USD figure. */
 export const OUTSTANDING_AMOUNT_USD = 14_200;
+
+/** Outstanding transactions still awaiting settlement (see OutstandingAmountCard's KPI row). */
+export const PENDING_TRANSACTIONS_COUNT = 12;
+
+/** SavedAmountCard's single KPI. */
+export const SAVED_AMOUNT_INR_LABEL = "₹8,240.25";
