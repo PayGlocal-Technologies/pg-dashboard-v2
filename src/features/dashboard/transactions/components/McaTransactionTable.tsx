@@ -278,138 +278,152 @@ export function McaTransactionTable() {
 
   return (
     <div className="space-y-4">
-      {/* Tab bar: page-level navigation, sits directly on the page with no
-          surrounding container. An underline-style shortcut onto the same
-          status filter state as the "Invoice Pending" option inside the
-          Status flyout, not a separate filter axis. */}
-      <UnderlineTabs
-        tabs={VIEW_TABS}
-        value={
-          sameStatusSet(statusFilters, INVOICE_PENDING_STATUSES)
-            ? "invoice-pending"
-            : sameStatusSet(statusFilters, SETTLED_STATUSES)
-              ? "settled"
-              : "all"
-        }
-        onValueChange={(v) => {
-          setStatusFilters(
-            v === "invoice-pending" ? INVOICE_PENDING_STATUSES : v === "settled" ? SETTLED_STATUSES : []
-          );
-          setPage(1);
-        }}
-      />
-
-      {/* Controls container: search, then the filter chip group, sit
-          together on the left with tight spacing; the Reorder
-          Columns/Download action group is pushed to the far right (ml-auto
-          below) rather than spread apart via justify-between, so the chips
-          read as immediately following search instead of floating in the
-          middle of a wide gap. */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
-        <RotatingSearchInput
-          value={search}
-          onSearch={onSearch}
-          words={["remitter", "transaction ID", "UTR"]}
-          className="w-40 sm:w-56"
-        />
-
-        {/* Filter group: Date, Amount, Status, Currency read as one
-            cohesive filtering control, so the gap within it is tight. */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <DateFilterChip
-            value={dateRange}
-            onChange={(next) => {
-              setDateRange(next);
+      {/* Tab bar, search/filters, and the table itself all share one
+          bordered surface (rounded-xl border border-border bg-card,
+          matching every other card on this page) instead of each drawing
+          its own box. DataTable's own border/radius/background are
+          neutralised below
+          (className="rounded-none border-0") since this wrapper already
+          provides them; a border-b under each of the first two rows stands
+          in for the border that would otherwise separate them. */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card">
+        {/* Tab bar: page-level navigation. An underline-style shortcut onto
+            the same status filter state as the "Invoice Pending" option
+            inside the Status flyout, not a separate filter axis. No bottom
+            padding here: TabsTrigger's own py-2.5 already clears the
+            border-b below before the sliding indicator meets it. */}
+        <div className="border-b border-border px-4 pt-3">
+          <UnderlineTabs
+            tabs={VIEW_TABS}
+            value={
+              sameStatusSet(statusFilters, INVOICE_PENDING_STATUSES)
+                ? "invoice-pending"
+                : sameStatusSet(statusFilters, SETTLED_STATUSES)
+                  ? "settled"
+                  : "all"
+            }
+            onValueChange={(v) => {
+              setStatusFilters(
+                v === "invoice-pending" ? INVOICE_PENDING_STATUSES : v === "settled" ? SETTLED_STATUSES : []
+              );
               setPage(1);
             }}
-            open={openChip === "date"}
-            onOpenChange={(next) => setOpenChip(next ? "date" : null)}
-          />
-          <AmountFilterChip
-            value={amountRange}
-            onChange={setAmountRange}
-            open={openChip === "amount"}
-            onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
-            idPrefix="txn-amount"
-            hint="Applies to the transactions currently loaded."
-          />
-          <StatusFilterChip
-            options={STATUS_OPTIONS}
-            selected={statusFilters}
-            onToggle={toggleStatusFilter}
-            onClear={onClearStatusFilter}
-            open={openChip === "status"}
-            onOpenChange={(next) => setOpenChip(next ? "status" : null)}
-          />
-          <CurrencyFilterChip
-            options={CURRENCY_FILTER_OPTIONS}
-            value={currencyFilters}
-            onChange={(next) => {
-              setCurrencyFilters(next);
-              setPage(1);
-            }}
-            open={openChip === "currency"}
-            onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
           />
         </div>
 
-        {/* Action group: Reorder Columns, then Download. ml-auto pushes
-            this group all the way to the right regardless of how much
-            space the search/filter groups take up. The resulting gap
-            (rather than a divider) is what separates it from the filter
-            chips. */}
-        <div className="ml-auto flex items-center gap-2">
-          <ReorderColumnsPopover
-            columns={reorderableColumns}
-            order={currentColumnOrder}
-            onOrderChange={setColumnOrder}
-            onReset={() => setColumnOrder(null)}
+        {/* Controls row: search, then the filter chip group, sit together
+            on the left with tight spacing; the Reorder Columns/Download
+            action group is pushed to the far right (ml-auto below) rather
+            than spread apart via justify-between, so the chips read as
+            immediately following search instead of floating in the middle
+            of a wide gap. */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <RotatingSearchInput
+            value={search}
+            onSearch={onSearch}
+            words={["remitter", "transaction ID", "UTR"]}
+            className="w-40 sm:w-56"
           />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-            onClick={() => {
-              // TODO: wire up once a transactions export endpoint exists,
-              // same gap as the page-level "Export Report" button in
-              // index.tsx and "Download FIRA" in TransactionDetailsPage.tsx.
-            }}
-            className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-          >
-            Report
-          </Button>
-        </div>
-      </div>
 
-      {isError ? (
-        <div className="bg-card rounded-xl border border-border p-10 flex flex-col items-center gap-3 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
-            <Icon name="alert-circle" size={22} />
-          </span>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">Couldn&apos;t load transactions</h3>
-            <p className="text-xs text-muted-foreground mt-0.5">Something went wrong while fetching data.</p>
+          {/* Filter group: Date, Amount, Status, Currency read as one
+              cohesive filtering control, so the gap within it is tight. */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <DateFilterChip
+              value={dateRange}
+              onChange={(next) => {
+                setDateRange(next);
+                setPage(1);
+              }}
+              open={openChip === "date"}
+              onOpenChange={(next) => setOpenChip(next ? "date" : null)}
+            />
+            <AmountFilterChip
+              value={amountRange}
+              onChange={setAmountRange}
+              open={openChip === "amount"}
+              onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
+              idPrefix="txn-amount"
+              hint="Applies to the transactions currently loaded."
+            />
+            <StatusFilterChip
+              options={STATUS_OPTIONS}
+              selected={statusFilters}
+              onToggle={toggleStatusFilter}
+              onClear={onClearStatusFilter}
+              open={openChip === "status"}
+              onOpenChange={(next) => setOpenChip(next ? "status" : null)}
+            />
+            <CurrencyFilterChip
+              options={CURRENCY_FILTER_OPTIONS}
+              value={currencyFilters}
+              onChange={(next) => {
+                setCurrencyFilters(next);
+                setPage(1);
+              }}
+              open={openChip === "currency"}
+              onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
+            />
           </div>
-          <Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
+
+          {/* Action group: Reorder Columns, then Download. ml-auto pushes
+              this group all the way to the right regardless of how much
+              space the search/filter groups take up. The resulting gap
+              (rather than a divider) is what separates it from the filter
+              chips. */}
+          <div className="ml-auto flex items-center gap-2">
+            <ReorderColumnsPopover
+              columns={reorderableColumns}
+              order={currentColumnOrder}
+              onOrderChange={setColumnOrder}
+              onReset={() => setColumnOrder(null)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+              onClick={() => {
+                // TODO: wire up once a transactions export endpoint exists,
+                // same gap as the page-level "Export Report" button in
+                // index.tsx and "Download FIRA" in TransactionDetailsPage.tsx.
+              }}
+              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+            >
+              Report
+            </Button>
+          </div>
         </div>
-      ) : (
-        <DataTable
-          columns={columns}
-          data={tableRows}
-          isLoading={isPending}
-          skeletonRows={8}
-          emptyTitle="No transactions found"
-          emptyDescription="Try adjusting your filters or search query"
-          rowKey={(row) => row.gid}
-          pageSize={TRANSACTIONS_PAGE_LIMIT}
-          totalRows={totalCount}
-          page={page}
-          onPageChange={setPage}
-          tableLayout="content"
-          density="compact"
-        />
-      )}
+
+        {isError ? (
+          <div className="flex flex-col items-center gap-3 p-10 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
+              <Icon name="alert-circle" size={22} />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Couldn&apos;t load transactions</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Something went wrong while fetching data.</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
+          </div>
+        ) : (
+          <DataTable
+            className="rounded-none border-0"
+            columns={columns}
+            data={tableRows}
+            isLoading={isPending}
+            skeletonRows={8}
+            emptyTitle="No transactions found"
+            emptyDescription="Try adjusting your filters or search query"
+            rowKey={(row) => row.gid}
+            pageSize={TRANSACTIONS_PAGE_LIMIT}
+            totalRows={totalCount}
+            page={page}
+            onPageChange={setPage}
+            tableLayout="content"
+            density="compact"
+          />
+        )}
+      </div>
 
       {/* Upload Invoice now opens the details page's inline upload flow
           instead of this modal — commented out, not deleted, so it can be
