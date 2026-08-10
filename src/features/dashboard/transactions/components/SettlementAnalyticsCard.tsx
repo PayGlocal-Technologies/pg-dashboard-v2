@@ -21,9 +21,9 @@ import {
 
 type AnalyticsMode = "amount" | "count";
 
-// Matches the reference: four rows visible by default, the rest behind
+// Matches the reference: five rows visible by default, the rest behind
 // Show more.
-const VISIBLE_COUNT = 4;
+const VISIBLE_COUNT = 5;
 
 /** Shared with OutstandingAmountCard so both cards format USD figures identically. */
 export function formatUsdShort(value: number): string {
@@ -76,24 +76,29 @@ export function SettlementAnalyticsCard() {
           <p className="text-sm font-semibold text-foreground">
             {isAmountMode ? "Total settled amount" : "Total transactions"}
           </p>
-          <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-            {isAmountMode
-              ? SETTLEMENT_ANALYTICS_TOTALS.settledUsdLabel
-              : SETTLEMENT_ANALYTICS_TOTALS.transactionCountLabel}
-          </p>
-          {/* Tertiary, amount mode only: a transaction count has no
-              currency to convert. */}
-          {isAmountMode && (
-            <p className="mt-2 text-sm tabular-nums text-muted-foreground">
-              {SETTLEMENT_ANALYTICS_TOTALS.settledInrLabel}
+          {/* items-baseline (not center) so the much smaller INR figure
+              sits on the same text baseline as the big number beside it,
+              rather than looking vertically adrift against it. */}
+          <div className="mt-1 flex flex-wrap items-baseline gap-2">
+            <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+              {isAmountMode
+                ? SETTLEMENT_ANALYTICS_TOTALS.settledUsdLabel
+                : SETTLEMENT_ANALYTICS_TOTALS.transactionCountLabel}
             </p>
-          )}
+            {/* Tertiary, amount mode only: a transaction count has no
+                currency to convert. */}
+            {isAmountMode && (
+              <p className="text-sm tabular-nums text-muted-foreground">
+                {SETTLEMENT_ANALYTICS_TOTALS.settledInrLabel}
+              </p>
+            )}
+          </div>
         </div>
         <CardAction>
           <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
             <TabsList>
               <TabsTrigger value="amount">Amount settled</TabsTrigger>
-              <TabsTrigger value="count">Transactions</TabsTrigger>
+              <TabsTrigger value="count">No. of transactions</TabsTrigger>
             </TabsList>
           </Tabs>
         </CardAction>
