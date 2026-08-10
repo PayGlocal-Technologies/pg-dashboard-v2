@@ -5,6 +5,7 @@ import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import {
   Button,
+  Card,
   Dialog,
   DialogContent,
   DialogTitle,
@@ -106,6 +107,13 @@ export function ShareAccountDetailsModal({
 
   const [primaryIdentifier, secondaryIdentifier] = account.details;
 
+  // The white preview window stands in for the customer-facing page for one
+  // payer country at a time — every other receiving account is irrelevant to
+  // whichever customer would land on it, so only the currently previewed
+  // account and the SWIFT catch-all (every other country's actual fallback)
+  // show up here, not the full carousel the real page renders.
+  const previewCards = accounts.filter((a) => a.id === previewAccountId || a.id === "row-swift");
+
   return (
     <Dialog
       open={open}
@@ -141,8 +149,20 @@ export function ShareAccountDetailsModal({
                 squeezing either. */}
             <div className="flex flex-wrap items-center justify-between gap-4">
               <AccountSummary account={account} title="Copy account details" />
-              <div className="flex min-w-0 flex-1 items-center gap-2 sm:min-w-[380px] sm:flex-none">
-                <Input readOnly value={shareUrl} className="min-w-0 text-xs" />
+
+              {/* One shared grey pill rather than an Input and a Button that
+                  merely sit beside each other: the Input loses its own
+                  border/background (bg-transparent border-0 shadow-none) so
+                  it reads as text sitting directly on the pill's surface, and
+                  the pill's own p-1.5 is what gives Copy Link breathing room
+                  from that surface's edge instead of the button floating
+                  outside it as a separate action. */}
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-muted/40 p-1.5 sm:min-w-[380px] sm:flex-none">
+                <Input
+                  readOnly
+                  value={shareUrl}
+                  className="min-w-0 border-0 bg-transparent text-xs shadow-none focus-visible:ring-0"
+                />
                 <Button
                   variant="primary"
                   size="sm"
@@ -157,7 +177,12 @@ export function ShareAccountDetailsModal({
 
             <Separator />
 
-            <div>
+            {/* Grey Preview container: title/description/Preview full page
+                now live inside it (previously a separate row above it), so
+                the whole thing — header and the white preview window below —
+                reads as one module instead of a caption floating over an
+                unrelated box. */}
+            <div className="rounded-xl bg-muted/40 p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Preview</h3>
@@ -190,18 +215,30 @@ export function ShareAccountDetailsModal({
                 </TooltipProvider>
               </div>
 
-              {/* Embedded preview: a simulated rendering of the actual
-                  customer-facing page, reusing the same carousel and Account
-                  Details section the Multi Currency Accounts page itself
-                  renders — verbatim, not reimplemented — rather than a
-                  region-picker list plus a details panel side by side. */}
-              <div className="mt-4 rounded-xl border border-border bg-muted/20 p-4">
+              {/* The actual white preview window — the same Card component
+                  (border/rounded-xl/shadow-sm) used everywhere else in the
+                  product, not a hand-styled substitute, so "consistent with
+                  the design system" means literally reusing its elevation
+                  rather than picking new shadow/radius values. size="sm"
+                  gives it real internal spacing (28px) and gap-6 between the
+                  heading/carousel/details below, so nothing is flush against
+                  the grey module's own edge on any side — the "doesn't span
+                  edge-to-edge" inset. max-h/overflow-y-auto scrolls only
+                  this window, the same viewport-into-the-real-page treatment
+                  the actual client-facing page will have, if its content
+                  runs taller than the space available here. */}
+              <Card size="sm" className="mt-4 max-h-[420px] overflow-y-auto">
                 <h2 className="text-lg font-bold text-foreground">
                   Account details for payers in {previewAccount.countryName}
                 </h2>
 
+                {/* Only the account this preview represents, plus the SWIFT
+                    catch-all every other payer country actually falls back
+                    to — not the full 8-account carousel the real page
+                    renders, which would name countries this simulated
+                    customer was never going to pay from. */}
                 <VirtualAccountList
-                  accounts={accounts}
+                  accounts={previewCards}
                   onCopy={onCopyFullAccount}
                   onShare={onShareFullAccount}
                   selectedAccountId={previewAccountId}
@@ -221,9 +258,9 @@ export function ShareAccountDetailsModal({
                   onShare={onShareFullAccount}
                   headerPlacement="inside"
                   showShare={false}
-                  className="mt-4 w-full max-w-none"
+                  className="w-full max-w-none"
                 />
-              </div>
+              </Card>
             </div>
           </TabsContent>
 
