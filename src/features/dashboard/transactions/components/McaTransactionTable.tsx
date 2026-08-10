@@ -94,6 +94,13 @@ export function McaTransactionTable() {
   const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen]     = useState(false);
   const [detailsOpen, setDetailsOpen]   = useState(false);
+  // Transaction gids whose settlement feedback has already been submitted or
+  // dismissed. Owned here (rather than by the drawer or the page) since
+  // Expand/Collapse swap those two components in and out of the tree, and
+  // state either one held locally would be lost the moment the other took
+  // over. Both read and write this same set, so a transaction resolved in
+  // one is never shown again in the other.
+  const [resolvedFeedbackIds, setResolvedFeedbackIds] = useState<Set<string>>(() => new Set());
   // Set when navigating to a linked transaction that isn't part of the
   // table's own currently-fetched page (see openLinkedTransaction below) —
   // takes precedence over the rows.find lookup so the details page can show
@@ -240,6 +247,10 @@ export function McaTransactionTable() {
     }));
   };
 
+  const handleFeedbackResolved = (gid: string) => {
+    setResolvedFeedbackIds((prev) => new Set(prev).add(gid));
+  };
+
   const baseColumns = buildMcaColumns(isPartnerUser, openDetails);
   const columns = reorderColumns(baseColumns, columnOrder);
   const reorderableColumns = baseColumns
@@ -259,6 +270,8 @@ export function McaTransactionTable() {
         onUploaded={handleInvoiceSubmitted}
         onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}
+        resolvedFeedbackIds={resolvedFeedbackIds}
+        onFeedbackResolved={handleFeedbackResolved}
       />
     );
   }
@@ -421,6 +434,8 @@ export function McaTransactionTable() {
         onUploaded={handleInvoiceSubmitted}
         onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}
+        resolvedFeedbackIds={resolvedFeedbackIds}
+        onFeedbackResolved={handleFeedbackResolved}
       />
     </div>
   );

@@ -28,6 +28,7 @@ import { CountryFlag } from "@/features/dashboard/multi-currency/components/Coun
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 import { UploadInvoiceForm } from "@/features/dashboard/transactions/components/UploadInvoiceForm";
 import { InvoicePreviewDialog } from "@/features/dashboard/transactions/components/InvoicePreviewDialog";
+import { SettlementFeedbackSheet } from "@/features/dashboard/transactions/components/SettlementFeedbackSheet";
 import {
   MCA_FX_RATES_TO_INR,
   MCA_PROCESSING_FEE_RATE,
@@ -47,6 +48,15 @@ interface TransactionDetailsPageProps {
    *  Action Required list), so the copy names wherever `onBack` actually
    *  returns to for the caller currently rendering it. */
   backLabel?: string;
+  /** Transaction gids whose settlement feedback has already been submitted
+   *  or dismissed, shared verbatim with TransactionDetailsDrawer via the
+   *  same parent (McaTransactionTable) rather than tracked separately here.
+   *  Both views render the same SettlementFeedbackSheet against the same
+   *  set, so submitting (or dismissing) it in one hides it in the other,
+   *  including across Expand/Collapse for the same transaction. */
+  resolvedFeedbackIds: Set<string>;
+  /** Marks a transaction's feedback as resolved in that shared set. */
+  onFeedbackResolved: (gid: string) => void;
 }
 
 type StepStatus = "completed" | "current" | "upcoming";
@@ -644,7 +654,11 @@ export function TransactionDetailsPage({
   onOpenTransaction,
   isPartnerUser,
   backLabel = "Back to Transactions",
+  resolvedFeedbackIds,
+  onFeedbackResolved,
 }: TransactionDetailsPageProps) {
+  const showFeedback = isSettledTransaction(row);
+
   return (
     <div>
       {/* Back/Collapse only, both left-aligned and adjacent to each other.
@@ -680,11 +694,34 @@ export function TransactionDetailsPage({
         onOpenTransaction={onOpenTransaction}
         isPartnerUser={isPartnerUser}
       />
+
+      {/* Same SettlementFeedbackSheet the drawer renders, against the same
+          shared resolvedFeedbackIds set (see TransactionDetailsPageProps),
+          so a transaction resolved in the drawer never shows it again here,
+          and vice versa after Collapse. The sheet itself is unchanged: it's
+          absolutely positioned (inset-x-0 bottom-7) expecting a positioned
+          ancestor the size of its intended container, which the drawer gets
+          for free from DrawerContent's own `fixed` sizing. This page has no
+          such ancestor (it's a plain scrolling page, not a fixed panel), so
+          this wrapper reproduces the same floating-toast placement via a
+          viewport-fixed box capped to the drawer's own width (32rem) and
+          centered, rather than pinning the sheet to the bottom of the full,
+          possibly much taller, page. */}
+      {showFeedback && (
+        <div className="fixed inset-x-0 bottom-0 z-40 mx-auto max-w-[32rem]">
+          <SettlementFeedbackSheet
+            key={row.gid}
+            alreadyResolved={resolvedFeedbackIds.has(row.gid)}
+            onResolve={() => onFeedbackResolved(row.gid)}
+          />
+        </div>
+      )}
     </div>
   );
 }
 
-interface TransactionDetailsContentProps extends Omit<TransactionDetailsPageProps, "onBack" | "onCollapse"> {
+interface TransactionDetailsContentProps
+  extends Omit<TransactionDetailsPageProps, "onBack" | "onCollapse" | "resolvedFeedbackIds" | "onFeedbackResolved"> {
   /** "page" (default): 2-column grid, as on the full Transaction Details
    * page. "drawer": single column, everything stacked in document order,
    * for the narrower drawer viewport. */

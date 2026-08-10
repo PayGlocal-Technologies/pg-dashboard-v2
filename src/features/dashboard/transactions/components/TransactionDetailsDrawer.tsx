@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -27,6 +26,15 @@ interface TransactionDetailsDrawerProps {
   onUploaded?: (row: McaTransaction) => void;
   onOpenTransaction: (row: McaTransaction) => void;
   isPartnerUser: boolean;
+  /** Transaction gids whose settlement feedback has already been submitted
+   *  or dismissed. Lifted up to the shared parent (McaTransactionTable)
+   *  rather than owned here, since this drawer and TransactionDetailsPage
+   *  are separate component instances that swap in and out of the tree on
+   *  Expand/Collapse. State owned locally by either one would be lost the
+   *  moment the other took over. */
+  resolvedFeedbackIds: Set<string>;
+  /** Marks a transaction's feedback as resolved in that shared set. */
+  onFeedbackResolved: (gid: string) => void;
 }
 
 export function TransactionDetailsDrawer({
@@ -37,12 +45,9 @@ export function TransactionDetailsDrawer({
   onUploaded,
   onOpenTransaction,
   isPartnerUser,
+  resolvedFeedbackIds,
+  onFeedbackResolved,
 }: TransactionDetailsDrawerProps) {
-  // Transaction gids whose settlement feedback has already been submitted or
-  // dismissed this session. Persists across the drawer closing and
-  // reopening (this component itself never unmounts), so feedback doesn't
-  // reappear for a transaction once it's been resolved once.
-  const [resolvedFeedbackIds, setResolvedFeedbackIds] = useState<Set<string>>(() => new Set());
   const showFeedback = open && !!row && isSettledTransaction(row);
 
   return (
@@ -130,17 +135,16 @@ export function TransactionDetailsDrawer({
         {/* Floats above the content above (absolute against DrawerContent's
             fixed positioning) rather than reserving its own layout space, so
             it reads as a temporary overlay, not part of the drawer's
-            document flow. Settled transactions only, drawer only (see
-            isSettledTransaction and the "drawer" layout passed above), never
-            shown on the full page. key={row.gid} gives each transaction its
-            own mount, and alreadyResolved (backed by resolvedFeedbackIds
-            above) keeps it from reappearing once resolved, even across the
-            drawer closing and reopening for the same transaction. */}
+            document flow. Settled transactions only (see isSettledTransaction).
+            key={row.gid} gives each transaction its own mount, and
+            alreadyResolved (backed by the shared resolvedFeedbackIds prop)
+            keeps it from reappearing once resolved from either this drawer
+            or the expanded page for the same transaction. */}
         {showFeedback && (
           <SettlementFeedbackSheet
             key={row.gid}
             alreadyResolved={resolvedFeedbackIds.has(row.gid)}
-            onResolve={() => setResolvedFeedbackIds((prev) => new Set(prev).add(row.gid))}
+            onResolve={() => onFeedbackResolved(row.gid)}
           />
         )}
       </DrawerContent>
