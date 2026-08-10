@@ -155,6 +155,10 @@ export function quickAccessFields(account: VirtualAccount) {
  * Fixed 16:10 footprint for every tutorial screenshot, applied to the empty
  * placeholder and to the real image alike. Reserving the ratio now is what lets
  * a screenshot drop in later without the step sequence reflowing, and it keeps
- * every step's right column the same height whether or not it has art yet.
+ * every step the same height whether or not it has art yet.
+ *
+ * The frame spans the tutorial column's full width — the instruction sits above
+ * it rather than beside it — so the ratio is the only thing deciding how tall a
+ * step is. Widen it if the real screenshots turn out shorter than this reserves.
  */
 export const SCREENSHOT_ASPECT_CLASS = "aspect-[16/10] w-full";

@@ -290,39 +290,46 @@ export function PlatformsFeature() {
                 </div>
               </Card>
 
-              {/* The walkthrough itself. Instruction left, screenshot right,
-                  every step the same shape so the sequence scans as one column
-                  of art with a caption beside each frame. */}
-              <ol className="space-y-8 pt-2">
+              {/* The walkthrough itself. Step number → instruction →
+                  screenshot, stacked, every step the same shape so the sequence
+                  scans as one column.
+
+                  Stacked rather than instruction-beside-screenshot: an
+                  instruction is a single short line, so reserving a column for
+                  it spent a fifth of the width on mostly-empty space and
+                  narrowed the art — which is the part a merchant is actually
+                  reading — by the same amount. Full-bleed frames also mean a
+                  UI screenshot renders near its native scale instead of being
+                  shrunk to fit a column. space-y-10 rather than 8: with nothing
+                  beside them, the only thing separating one step from the next
+                  is the gap. */}
+              <ol className="space-y-10 pt-2">
                 {selectedPlatform.steps.map((step, index) => (
-                  <li
-                    key={step.instruction}
-                    className="grid gap-4 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)] md:gap-8"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-[12px] font-medium text-muted-foreground">
-                        Step {index + 1}
-                      </p>
-                      <p className="mt-1.5 text-[15px] text-foreground">{step.instruction}</p>
-                    </div>
+                  <li key={step.instruction}>
+                    <p className="text-[12px] font-medium text-muted-foreground">
+                      Step {index + 1}
+                    </p>
+                    <p className="mt-1 text-[15px] font-medium text-foreground">
+                      {step.instruction}
+                    </p>
 
                     {/* The screenshot frame — one Card, sized to the art, with
                         no tinted container wrapped around it. The frame is the
                         placeholder rather than something sitting inside a
-                        placeholder, so a step is an instruction beside a single
+                        placeholder, so a step is an instruction above a single
                         surface, not a box within a box.
 
-                        It holds its 16:10 footprint whether or not there's art
-                        in it, so dropping a real screenshot into `constants.ts`
-                        later swaps the contents without moving a single step.
-                        p-0 hands the whole surface to the image; overflow-hidden
-                        is what keeps it clipped to the Card's own radius.
+                        It holds its footprint whether or not there's art in it,
+                        so dropping a real screenshot into `constants.ts` later
+                        swaps the contents without moving a single step. p-0
+                        hands the whole surface to the image; overflow-hidden is
+                        what keeps it clipped to the Card's own radius.
                         object-contain rather than cover so a screenshot of any
                         ratio is letterboxed inside the frame instead of being
                         cropped. */}
                     <Card
                       size="sm"
-                      className={cn(SCREENSHOT_ASPECT_CLASS, "gap-0 overflow-hidden p-0")}
+                      className={cn(SCREENSHOT_ASPECT_CLASS, "mt-4 gap-0 overflow-hidden p-0")}
                     >
                       {step.screenshotSrc && (
                         <Image
