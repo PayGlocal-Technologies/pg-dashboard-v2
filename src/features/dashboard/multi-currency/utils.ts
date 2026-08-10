@@ -46,6 +46,13 @@ export function buildFullAccountDetails(account: VirtualAccount): AccountDetail[
   ];
 }
 
+/** "AUD" → "Australian Dollar" — for the email-share preview's Currency
+ *  line. Intl's own currency-name table, not a lookup we'd have to maintain. */
+export function currencyDisplayName(currencyCode: string): string {
+  const name = new Intl.DisplayNames(["en"], { type: "currency" }).of(currencyCode) ?? currencyCode;
+  return name.replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
 /** Plain-text block of every field in the expanded details section. */
 export function formatFullAccount(account: VirtualAccount) {
   const lines = [

@@ -17,7 +17,6 @@ import {
   TabsContent,
   TabsList,
   TabsTrigger,
-  Textarea,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -25,27 +24,20 @@ import {
   VisuallyHidden,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useApp } from "@/stores/useApp";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
-import { buildShareUrl } from "@/features/dashboard/multi-currency/utils";
+import { buildShareUrl, currencyDisplayName } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-function parseEmails(raw: string): string[] {
-  return raw
-    .split(/[,;\s]+/)
-    .map((email) => email.trim())
-    .filter(Boolean);
-}
-
-function validateEmails(raw: string): string | undefined {
-  const emails = parseEmails(raw);
-  if (emails.length === 0) return "Enter at least one recipient email";
-  const invalid = emails.find((email) => !EMAIL_RE.test(email));
-  return invalid ? `"${invalid}" isn't a valid email` : undefined;
+function validateEmail(value: string, required: boolean): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return required ? "Enter an email address" : undefined;
+  return EMAIL_RE.test(trimmed) ? undefined : "Enter a valid email address";
 }
 
 interface ShareAccountDetailsModalProps {
@@ -90,18 +82,29 @@ export function ShareAccountDetailsModal({
   const previewAccount = accounts.find((a) => a.id === previewAccountId) ?? account;
   const shareUrl = buildShareUrl(account);
 
+  const senderEmail = useApp((s) => s.profile?.emailId) ?? "you@company.com";
+
+  // Both live above the Tabs, not inside either TabsContent, so switching
+  // tabs — which only changes which panel renders — never resets them:
+  // entered client/Cc/Bcc details and the Cc/Bcc toggle survive a trip back
+  // to Share via link and forward again.
+  const [showCcBcc, setShowCcBcc] = useState(false);
   const emailForm = useForm({
-    defaultValues: { recipients: "", message: "" },
+    defaultValues: { clientName: "", clientEmail: "", cc: "", bcc: "" },
     onSubmit: async ({ value }) => {
-      const error = validateEmails(value.recipients);
-      if (error) return;
+      if (validateEmail(value.clientEmail, true) || validateEmail(value.cc, false) || validateEmail(value.bcc, false)) {
+        return;
+      }
       // No email-send endpoint exists yet — mirrors Copy Link's own
       // client-side-only stand-in until a real one does.
-      toast.success(`Account details sent to ${parseEmails(value.recipients).length} recipient(s)`);
+      toast.success(`Account details sent to ${value.clientEmail}`);
       emailForm.reset();
+      setShowCcBcc(false);
       onOpenChange(false);
     },
   });
+
+  const [primaryIdentifier, secondaryIdentifier] = account.details;
 
   return (
     <Dialog
@@ -111,6 +114,7 @@ export function ShareAccountDetailsModal({
         if (!next) {
           setPreviewAccountId(account.id);
           emailForm.reset();
+          setShowCcBcc(false);
         }
       }}
     >
@@ -223,60 +227,179 @@ export function ShareAccountDetailsModal({
             </div>
           </TabsContent>
 
-          <TabsContent value="email" className="mt-0 space-y-5">
-            <AccountSummary account={account} title="Send account details" />
-            <Separator />
+          <TabsContent value="email" className="mt-0">
+            {/* Fixed-width form column, flexible preview column — the same
+                sidebar/content split mca-v2's own layout uses elsewhere in
+                this feature. */}
+            <div className="grid gap-6 sm:grid-cols-[280px_minmax(0,1fr)]">
+              <div>
+                <AccountSummary account={account} title="Send Account Details" />
+                <Separator className="my-4" />
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void emailForm.handleSubmit();
-              }}
-              className="space-y-5"
-              noValidate
-            >
-              <emailForm.Field
-                name="recipients"
-                validators={{ onBlur: ({ value }) => validateEmails(value) }}
-              >
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="recipients">Recipient email(s)</FieldLabel>
-                    <Input
-                      id="recipients"
-                      placeholder="client@company.com, partner@company.com"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                    />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                )}
-              </emailForm.Field>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void emailForm.handleSubmit();
+                  }}
+                  className="space-y-4"
+                  noValidate
+                >
+                  <emailForm.Field name="clientName">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor="clientName">Client Name</FieldLabel>
+                        <Input
+                          id="clientName"
+                          placeholder="Enter client name"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                        />
+                      </Field>
+                    )}
+                  </emailForm.Field>
 
-              <emailForm.Field name="message">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="message">Message (optional)</FieldLabel>
-                    <Textarea
-                      id="message"
-                      placeholder="Add a note for your client"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                    />
-                  </Field>
-                )}
-              </emailForm.Field>
+                  <emailForm.Field
+                    name="clientEmail"
+                    validators={{ onBlur: ({ value }) => validateEmail(value, true) }}
+                  >
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor="clientEmail">Client Email</FieldLabel>
+                        <Input
+                          id="clientEmail"
+                          type="email"
+                          placeholder="Enter client email"
+                          aria-invalid={field.state.meta.errors.length > 0}
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          onBlur={field.handleBlur}
+                        />
+                        <FieldError>{field.state.meta.errors[0]}</FieldError>
+                      </Field>
+                    )}
+                  </emailForm.Field>
 
-              <Button
-                type="submit"
-                className="w-full"
-                leftIcon={<Icon name="send-horizontal" className="h-4 w-4" />}
-              >
-                Send
-              </Button>
-            </form>
+                  {showCcBcc ? (
+                    <div className="space-y-4">
+                      <emailForm.Field
+                        name="cc"
+                        validators={{ onBlur: ({ value }) => validateEmail(value, false) }}
+                      >
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor="cc">Cc</FieldLabel>
+                            <Input
+                              id="cc"
+                              type="email"
+                              placeholder="cc@company.com"
+                              aria-invalid={field.state.meta.errors.length > 0}
+                              value={field.state.value}
+                              onChange={(e) => field.handleChange(e.target.value)}
+                              onBlur={field.handleBlur}
+                            />
+                            <FieldError>{field.state.meta.errors[0]}</FieldError>
+                          </Field>
+                        )}
+                      </emailForm.Field>
+                      <emailForm.Field
+                        name="bcc"
+                        validators={{ onBlur: ({ value }) => validateEmail(value, false) }}
+                      >
+                        {(field) => (
+                          <Field>
+                            <FieldLabel htmlFor="bcc">Bcc</FieldLabel>
+                            <Input
+                              id="bcc"
+                              type="email"
+                              placeholder="bcc@company.com"
+                              aria-invalid={field.state.meta.errors.length > 0}
+                              value={field.state.value}
+                              onChange={(e) => field.handleChange(e.target.value)}
+                              onBlur={field.handleBlur}
+                            />
+                            <FieldError>{field.state.meta.errors[0]}</FieldError>
+                          </Field>
+                        )}
+                      </emailForm.Field>
+                    </div>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto px-0 text-muted-foreground"
+                      leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                      onClick={() => setShowCcBcc(true)}
+                    >
+                      Add Cc Bcc
+                    </Button>
+                  )}
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    leftIcon={<Icon name="send-horizontal" className="h-4 w-4" />}
+                  >
+                    Send Email
+                  </Button>
+                </form>
+              </div>
+
+              {/* Preview: a simulated rendering of the actual email the
+                  client receives, using this account's real fields — not a
+                  hand-authored mockup — so it can never drift from what
+                  Send Email actually sends. */}
+              <div className="rounded-xl border border-border bg-muted/20 p-4">
+                <h3 className="text-lg font-bold text-foreground">Preview</h3>
+                <p className="text-xs text-muted-foreground">This is what your clients will see</p>
+
+                <div className="mt-4 space-y-4 rounded-lg border border-border bg-card p-5 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <p className="min-w-0 truncate">
+                      <span className="font-semibold text-foreground">From: </span>
+                      <span className="text-muted-foreground">{senderEmail}</span>
+                    </p>
+                    <p className="shrink-0 text-xs text-muted-foreground">Cc&nbsp;&nbsp;Bcc</p>
+                  </div>
+                  <Separator />
+                  <p>
+                    <span className="font-semibold text-foreground">Subject: </span>
+                    <span className="text-foreground">New Bank Account Details for Payments</span>
+                  </p>
+                  <Separator />
+
+                  <div className="space-y-3 text-muted-foreground">
+                    <p>Dear Client,</p>
+                    <p>Please find below our account details for your upcoming payment:</p>
+                    <div>
+                      <p>
+                        Account Holder Name:{" "}
+                        <span className="text-foreground">{account.accountHolderName}</span>
+                      </p>
+                      <p>
+                        Bank Name: <span className="text-foreground">{account.bankName}</span>
+                      </p>
+                      <p>
+                        Account Number / IBAN:{" "}
+                        <span className="text-foreground">{primaryIdentifier?.value}</span>
+                      </p>
+                      <p>
+                        Routing Code:{" "}
+                        <span className="text-foreground">{secondaryIdentifier?.value}</span>
+                      </p>
+                      <p>
+                        Currency:{" "}
+                        <span className="text-foreground">{currencyDisplayName(account.currency)}</span>
+                      </p>
+                    </div>
+                    <p>
+                      Kindly use the above details to complete the transfer. Once the payment is
+                      initiated, please share the transaction reference for our records.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </TabsContent>
         </Tabs>
       </DialogContent>
