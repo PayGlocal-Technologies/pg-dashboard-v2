@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { MetricSparklineCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
@@ -20,6 +29,10 @@ export function MultiCurrencyFeature() {
   // `isLoading` is the only change needed once the endpoint exists.
   const [accounts] = useState<VirtualAccount[]>(MOCK_VIRTUAL_ACCOUNTS);
   const isLoading = false;
+
+  // Unique per mount so the Settled Amount chart's fill gradient doesn't
+  // collide with another <linearGradient> id elsewhere on the page.
+  const settledAmountGradientId = useId().replace(/:/g, "");
 
   // Exactly one account is selected at all times — defaults to the first so
   // Account Details is populated immediately on load, not only after an
@@ -134,14 +147,79 @@ export function MultiCurrencyFeature() {
               &nbsp;
             </div>
             <div className="space-y-4">
-              <MetricSparklineCard
-                title="Total Earnings"
-                icon={<Icon name="bar-chart" />}
-                value={MULTI_CURRENCY_SUMMARY.totalEarnings.value}
-                trend={{ direction: "up", label: MULTI_CURRENCY_SUMMARY.totalEarnings.trendLabel }}
-                data={TOTAL_EARNING_TREND}
-                onInfoClick={() => toast.info(MULTI_CURRENCY_SUMMARY.totalEarnings.info)}
-              />
+              {/* Not MetricSparklineCard: that renders its sparkline as a
+                  tiny borderless corner overlay with no axes, which can't
+                  satisfy this card's "line + area chart with monthly
+                  X-axis labels and USD Y-axis values" requirement. Built
+                  from the same card shell (rounded-xl border bg-card p-5
+                  shadow-sm) and the same recharts primitives/styling flux-ui
+                  itself uses in DashboardAreaChartTemplate, so it stays
+                  visually consistent with Outstanding below and with the
+                  rest of the app's charts without introducing a new chart
+                  abstraction. */}
+              <div className="rounded-xl border border-border bg-card p-5 text-card-foreground shadow-sm">
+                <span className="truncate text-sm font-semibold text-foreground">
+                  Settled amount in USD
+                </span>
+
+                <div className="mt-3 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+                  {MULTI_CURRENCY_SUMMARY.totalEarnings.value}
+                </div>
+
+                <div className="mt-1 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <Icon name="trending-up" className="h-3.5 w-3.5 shrink-0" />
+                  <span>{MULTI_CURRENCY_SUMMARY.totalEarnings.trendLabel}</span>
+                </div>
+
+                <div className="mt-4 h-36 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={TOTAL_EARNING_TREND} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id={settledAmountGradientId} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="color-mix(in srgb, var(--border) 65%, transparent)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="x"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                        tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`)}
+                        width={44}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 10,
+                          border: "1px solid var(--border)",
+                          fontSize: 12,
+                          background: "var(--popover)",
+                          color: "var(--popover-foreground)",
+                        }}
+                        formatter={(v) => [`$${Number(v).toLocaleString("en-US")}`, "Settled"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="y"
+                        stroke="var(--chart-4)"
+                        strokeWidth={2}
+                        fill={`url(#${settledAmountGradientId})`}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
               <MetricSparklineCard
                 title="Outstanding"
                 icon={<Icon name="clock" />}

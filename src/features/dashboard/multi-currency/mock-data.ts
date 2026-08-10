@@ -170,31 +170,27 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
  */
 
 /**
- * Twelve points of a gently rising series behind Total Earnings. Hard-coded
- * rather than generated: `Math.random()` during render is a purity violation
- * (see CLAUDE.md), and a fixed series also keeps the card's shape stable
- * across re-renders instead of redrawing on every one.
+ * Monthly settled-amount series (USD) behind the Settled Amount card, Jan
+ * through Jul. Hard-coded rather than generated: `Math.random()` during
+ * render is a purity violation (see CLAUDE.md), and a fixed series also
+ * keeps the card's shape stable across re-renders instead of redrawing on
+ * every one. Last point matches `totalEarnings.value` below so the chart's
+ * endpoint agrees with the headline figure above it.
  */
 export const TOTAL_EARNING_TREND: MetricSparklinePoint[] = [
-  { x: 1, y: 42 },
-  { x: 2, y: 46 },
-  { x: 3, y: 44 },
-  { x: 4, y: 53 },
-  { x: 5, y: 51 },
-  { x: 6, y: 59 },
-  { x: 7, y: 57 },
-  { x: 8, y: 66 },
-  { x: 9, y: 63 },
-  { x: 10, y: 71 },
-  { x: 11, y: 69 },
-  { x: 12, y: 78 },
+  { x: "Jan", y: 92_000 },
+  { x: "Feb", y: 89_500 },
+  { x: "Mar", y: 98_200 },
+  { x: "Apr", y: 95_400 },
+  { x: "May", y: 105_800 },
+  { x: "Jun", y: 115_600 },
+  { x: "Jul", y: 128_400 },
 ];
 
 export const MULTI_CURRENCY_SUMMARY = {
   totalEarnings: {
     value: "128,400 USD",
-    trendLabel: "+8.4% vs last month",
-    info: "Total received across every virtual account in the last 30 days.",
+    trendLabel: "+8.6% vs last period",
   },
   outstanding: {
     value: "14,200 USD",
