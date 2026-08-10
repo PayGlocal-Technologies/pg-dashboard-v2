@@ -13,7 +13,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Separator,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn, truncateMiddle } from "@/lib/utils";
@@ -238,8 +237,6 @@ export function PlatformsFeature() {
               </Select>
             )}
           </div>
-
-          <Separator />
 
           {selectedAccount && (
             <>
