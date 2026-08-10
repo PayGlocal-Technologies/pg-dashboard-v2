@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
 import { MidGuard } from "@/components/common/MidGuard";
 import { McaTransactionTable } from "@/features/dashboard/transactions/components/McaTransactionTable";
+import { SettlementAnalyticsCard } from "@/features/dashboard/transactions/components/SettlementAnalyticsCard";
 import { SEGMENT_MCA } from "@/features/dashboard/transactions/constants";
 
 // The Payment Gateway/Multi-Currency Accounts segment toggle (and the PA
@@ -21,6 +22,7 @@ export function TransactionsFeature() {
 
       {isMCAEnabled ? (
         <MidGuard productType="PACB">
+          <SettlementAnalyticsCard />
           <McaTransactionTable />
         </MidGuard>
       ) : (
