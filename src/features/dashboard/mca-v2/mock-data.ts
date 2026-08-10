@@ -1,11 +1,14 @@
 import type { MetricSparklinePoint } from "@/components/ui";
 
 /**
- * Placeholder figures for the two summary cards above the two-column section.
- * Every value here is dummy data — replace this module with the real API
- * response once a summary endpoint exists. The shapes are deliberately what
- * the cards already consume, so wiring the backend up means swapping the
+ * Placeholder figures for the settled-amount card at the top of the right
+ * column. Every value here is dummy data — replace this module with the real
+ * API response once a summary endpoint exists. The shape is deliberately what
+ * the card already consumes, so wiring the backend up means swapping the
  * source rather than touching the UI.
+ *
+ * Outstanding beside it has no entry here: OutstandingAmountCard is
+ * self-contained and reads the Transactions feature's own mock data.
  */
 
 /** One currency's settled-amount card: the figures and the series behind them. */
@@ -119,15 +122,3 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
     ],
   },
 };
-
-/**
- * Outstanding spans every account rather than the selected one, so unlike the
- * settled card it isn't keyed by currency.
- */
-export const MCA_V2_SUMMARY = {
-  outstanding: {
-    value: "14,200 USD",
-    note: "3 payers · ACH/Fedwire usually clears in 1–3 business days",
-    info: "Payments your clients have initiated that have not settled yet.",
-  },
-} as const;

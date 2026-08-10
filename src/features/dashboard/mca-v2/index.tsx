@@ -11,16 +11,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Button, Card, MetricSparklineCard, PageHeader } from "@/components/ui";
+import { Button, Card, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { currencySymbol, formatCurrency } from "@/lib/utils/format";
+import { OutstandingAmountCard } from "@/features/dashboard/transactions/components/OutstandingAmountCard";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { formatFullAccount } from "@/features/dashboard/multi-currency/utils";
 import { MCA_V2_REGIONS } from "@/features/dashboard/mca-v2/constants";
-import { MCA_V2_SUMMARY, SETTLED_AMOUNT_BY_CURRENCY } from "@/features/dashboard/mca-v2/mock-data";
+import { SETTLED_AMOUNT_BY_CURRENCY } from "@/features/dashboard/mca-v2/mock-data";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 /** Module title — the step below the page's own h1, shared by both columns. */
@@ -174,7 +175,11 @@ export function McaV2Feature() {
             Mirrors the settled-amount card on the Multi Currency Accounts
             page, with every figure keyed off the selected region's currency
             rather than fixed to USD. */}
-            <Card className="gap-0 p-5">
+            {/* size="sm" rather than the p-5 the Multi Currency Accounts
+                page's copy of this card uses: OutstandingAmountCard beside it
+                is a size="sm" Card, and two adjacent cards with different
+                insets read as a mistake. */}
+            <Card size="sm" className="gap-0">
               <span className="truncate text-sm font-semibold text-foreground">
                 Settled amount in {currency}
               </span>
@@ -255,16 +260,12 @@ export function McaV2Feature() {
               </div>
             </Card>
 
-            <MetricSparklineCard
-              title="Outstanding"
-              icon={<Icon name="clock" />}
-              value={MCA_V2_SUMMARY.outstanding.value}
-              // "flat" is what keeps this note at muted body colour — it is
-              // supporting context, not a movement against a prior period.
-              trend={{ direction: "flat", label: MCA_V2_SUMMARY.outstanding.note }}
-              data={[]}
-              onInfoClick={() => toast.info(MCA_V2_SUMMARY.outstanding.info)}
-            />
+            {/* The same Outstanding card the Transactions page renders, not a
+                second take on it: title, amount, pending-count badge, INR
+                conversion, one-line explanation. It takes no props — the
+                figure spans every account rather than the selected region, so
+                it doesn't change as regions are picked. */}
+            <OutstandingAmountCard />
           </div>
 
           {selectedAccount && (
