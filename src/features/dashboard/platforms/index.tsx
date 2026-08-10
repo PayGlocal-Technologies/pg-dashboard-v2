@@ -247,46 +247,51 @@ export function PlatformsFeature() {
                   the platform, lifted out of the full account details so they
                   don't have to leave this page to find them.
 
-                  No surface of its own: it sits directly on the page between
-                  the header rule and the walkthrough, so the only boxes in
-                  this column are the copyable fields themselves and the
-                  screenshot frames below. A container here would read as a
-                  fourth kind of module competing with those two. */}
-              <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:gap-10">
-                <div className="min-w-0 xl:w-[210px] xl:shrink-0">
-                  <p className="text-[15px] font-semibold text-foreground">Quick Access</p>
-                  <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-                    Copy these details to set up PayGlocal on {selectedPlatform.name}.
-                  </p>
+                  Its own module: a Card carrying its title, its supporting
+                  copy and its fields, on the same default surface the sidebar's
+                  platform list and document cards use. That makes it the one
+                  bounded object in this column — the steps below it are bare
+                  instructions beside bare screenshot frames — so the page reads
+                  as "here are your details, now here is what to do with them"
+                  rather than as one undifferentiated run of content. */}
+              <Card size="sm" className="gap-0 p-6">
+                <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:gap-0">
+                  <div className="min-w-0 xl:w-[210px] xl:shrink-0">
+                    <p className="text-[15px] font-semibold text-foreground">Quick Access</p>
+                    <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+                      Copy these details to set up PayGlocal on {selectedPlatform.name}.
+                    </p>
+                  </div>
+
+                  <dl className="grid min-w-0 flex-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+                    {quickAccessFields(selectedAccount).map((field) => (
+                      <div key={field.label} className="min-w-0 space-y-1.5">
+                        <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
+                        <dd>
+                          {/* The product's own copyable field. Tinted rather
+                              than card-coloured now that a card sits behind it
+                              — a white chip on a white surface would rely on
+                              its border alone to read as something you act on.
+
+                              Long identifiers are elided from the middle rather
+                              than the end: the head says which bank and rail the
+                              account is on, the tail is what a merchant checks
+                              against the details they already hold, and the
+                              middle carries neither. The full value is what gets
+                              copied, what the tooltip names, and what a hover
+                              reveals — see CopyableText's `displayValue`. */}
+                          <CopyableText
+                            value={field.value}
+                            displayValue={truncateMiddle(field.value)}
+                            className="rounded-lg border border-border bg-muted/40 px-3 py-1.5 dark:bg-muted/20"
+                            valueClassName="min-w-0 flex-1 truncate font-medium text-primary"
+                          />
+                        </dd>
+                      </div>
+                    ))}
+                  </dl>
                 </div>
-
-                <dl className="grid min-w-0 flex-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-                  {quickAccessFields(selectedAccount).map((field) => (
-                    <div key={field.label} className="min-w-0 space-y-1.5">
-                      <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
-                      <dd>
-                        {/* The product's own copyable field, bordered so it
-                            still reads as an input-shaped chip now that
-                            nothing tinted sits behind it.
-
-                            Long identifiers are elided from the middle rather
-                            than the end: the head says which bank and rail the
-                            account is on, the tail is what a merchant checks
-                            against the details they already hold, and the
-                            middle carries neither. The full value is what gets
-                            copied, what the tooltip names, and what a hover
-                            reveals — see CopyableText's `displayValue`. */}
-                        <CopyableText
-                          value={field.value}
-                          displayValue={truncateMiddle(field.value)}
-                          className="rounded-lg border border-border bg-card px-3 py-1.5"
-                          valueClassName="min-w-0 flex-1 truncate font-medium text-primary"
-                        />
-                      </dd>
-                    </div>
-                  ))}
-                </dl>
-              </div>
+              </Card>
 
               {/* The walkthrough itself. Instruction left, screenshot right,
                   every step the same shape so the sequence scans as one column
@@ -304,32 +309,33 @@ export function PlatformsFeature() {
                       <p className="mt-1.5 text-[15px] text-foreground">{step.instruction}</p>
                     </div>
 
-                    {/* The screenshot frame. It holds its 16:10 footprint
-                        whether or not there's art in it, so dropping a real
-                        screenshot into `constants.ts` later swaps the contents
-                        without moving a single step. object-contain rather
-                        than cover so a screenshot of any ratio is letterboxed
-                        inside the frame instead of being cropped. */}
+                    {/* The screenshot frame — one Card, sized to the art, with
+                        no tinted container wrapped around it. The frame is the
+                        placeholder rather than something sitting inside a
+                        placeholder, so a step is an instruction beside a single
+                        surface, not a box within a box.
+
+                        It holds its 16:10 footprint whether or not there's art
+                        in it, so dropping a real screenshot into `constants.ts`
+                        later swaps the contents without moving a single step.
+                        p-0 hands the whole surface to the image; overflow-hidden
+                        is what keeps it clipped to the Card's own radius.
+                        object-contain rather than cover so a screenshot of any
+                        ratio is letterboxed inside the frame instead of being
+                        cropped. */}
                     <Card
                       size="sm"
-                      className="gap-0 overflow-hidden border-transparent bg-muted/45 p-3 shadow-none dark:bg-muted/25"
+                      className={cn(SCREENSHOT_ASPECT_CLASS, "gap-0 overflow-hidden p-0")}
                     >
-                      <div
-                        className={cn(
-                          SCREENSHOT_ASPECT_CLASS,
-                          "overflow-hidden rounded-lg border border-border bg-card"
-                        )}
-                      >
-                        {step.screenshotSrc && (
-                          <Image
-                            src={step.screenshotSrc}
-                            alt={step.screenshotAlt ?? ""}
-                            width={1280}
-                            height={800}
-                            className="h-full w-full object-contain"
-                          />
-                        )}
-                      </div>
+                      {step.screenshotSrc && (
+                        <Image
+                          src={step.screenshotSrc}
+                          alt={step.screenshotAlt ?? ""}
+                          width={1280}
+                          height={800}
+                          className="h-full w-full object-contain"
+                        />
+                      )}
                     </Card>
                   </li>
                 ))}

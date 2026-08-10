@@ -80,6 +80,25 @@ export function ShareAccountDetailsModal({
   // page's own selection, so browsing regions here never changes what's
   // selected on the Multi Currency Accounts page underneath.
   const [previewAccountId, setPreviewAccountId] = useState(account.id);
+  // useState's initializer only runs on first mount — if this modal instance
+  // stays mounted across two different Share clicks (no key change on the
+  // caller's side) with previewAccountId still pointing at whichever account
+  // was previewed last time, the preview would keep showing that stale
+  // account instead of the one this modal was just reopened for.
+  //
+  // Adjusted during render (not in an effect — see CLAUDE.md's purity rules
+  // on synchronous setState in an effect body) via the React-documented
+  // "store the last prop you rendered with, compare, and setState inline if
+  // it changed" pattern: this re-render happens before the browser paints,
+  // so there's no stale-preview flash the way an effect-based reset would
+  // produce, and it's what keeps "the account selected in the Share modal"
+  // and "the account the preview shows" from ever diverging regardless of
+  // how the caller mounts this component.
+  const [syncedAccountId, setSyncedAccountId] = useState(account.id);
+  if (account.id !== syncedAccountId) {
+    setSyncedAccountId(account.id);
+    setPreviewAccountId(account.id);
+  }
   const previewAccount = accounts.find((a) => a.id === previewAccountId) ?? account;
   const shareUrl = buildShareUrl(account);
 
@@ -126,12 +145,15 @@ export function ShareAccountDetailsModal({
         }
       }}
     >
-      {/* pt-3 replaces the default pt-10 (reserved for the close button
-          sitting below it, out of the flow): TabsList below is what now
-          occupies that band, at the same top-3 offset as Close, so the two
-          read as one header row instead of tabs getting their own row
-          underneath it. */}
-      <DialogContent className="max-w-[min(100%,64rem)] max-h-[min(90vh,760px)] pt-3">
+      {/* p-6 replaces the default p-6 pt-10 (that extra top padding exists
+          to reserve space for the close button sitting above the content,
+          out of the flow) — p-6 alone is one consistent 24px on every side,
+          with TabsList and Close now landing at the same offset a different
+          way: [&>button:last-child]:top-6 moves the dialog's own built-in
+          close button (its last rendered child, see flux-ui's dialog.tsx)
+          down from its default top-3 to top-6, matching the content's own
+          24px inset instead of the content moving up to match the button. */}
+      <DialogContent className="max-w-[min(100%,64rem)] max-h-[min(90vh,760px)] p-6 [&>button:last-child]:top-6">
         <DialogTitle asChild>
           <VisuallyHidden>Share account details</VisuallyHidden>
         </DialogTitle>
@@ -197,8 +219,17 @@ export function ShareAccountDetailsModal({
                 window's own edge to the grey surface's edge below it — stays
                 noticeably tighter, which is what actually reads as "the white
                 window sits inset in here" rather than "these two boxes happen
-                to be near each other." */}
-            <div className="mt-8 rounded-xl bg-muted/40 p-4 pb-3">
+                to be near each other."
+
+                max-h/overflow-hidden is what makes this a viewport rather
+                than a plain wrapper: the white Card below is left to its own
+                natural height (no cap, no scrollbar of its own), so on a
+                tall account it genuinely extends past this box's fixed
+                height — and this box's overflow-hidden is what cuts that
+                overflow off cleanly at its own bottom edge, the same way a
+                real browser viewport clips a page that's taller than the
+                window rather than shrinking the page to fit. */}
+            <div className="mt-8 max-h-[440px] overflow-hidden rounded-xl bg-muted/40 p-4 pb-3">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Preview</h3>
@@ -238,11 +269,10 @@ export function ShareAccountDetailsModal({
                   elevation rather than picking stronger new values. mt-4
                   (medium) is the "Preview heading → client preview" step —
                   closer than the large step above it, since both belong to
-                  this one Preview section. max-h/overflow-y-auto scrolls only
-                  this window, the same viewport-into-the-real-page treatment
-                  the actual client-facing page will have, if its content
-                  runs taller than the space available here. */}
-              <Card size="sm" className="mt-4 max-h-[380px] overflow-y-auto">
+                  this one Preview section. No max-h/overflow of its own —
+                  it renders at whatever height its content actually needs;
+                  the grey box around it (above) is what clips it. */}
+              <Card size="sm" className="mt-4">
                 {/* The same muted, uppercase caption style
                     VirtualAccountDetails uses for its own "{Country} Account"
                     label elsewhere in this product — not the bold text-lg
@@ -273,13 +303,17 @@ export function ShareAccountDetailsModal({
                     placement assumes. showShare={false}: a customer
                     receiving these details has nothing of their own to
                     share, so Copy account details is the page's sole,
-                    full-width action. */}
+                    full-width action. flagShape="circle": the same circular
+                    treatment every other flag in the product uses — this
+                    card's own default rectangular flag is specifically for
+                    MCA v2's real Account Details card, not this preview. */}
                 <VirtualAccountDetails
                   account={previewAccount}
                   onCopy={onCopyFullAccount}
                   onShare={onShareFullAccount}
                   headerPlacement="inside"
                   showShare={false}
+                  flagShape="circle"
                   className="w-full max-w-none"
                 />
               </Card>
@@ -289,12 +323,17 @@ export function ShareAccountDetailsModal({
           <TabsContent value="email" className="mt-0">
             {/* Fixed-width form column, flexible preview column — the same
                 sidebar/content split mca-v2's own layout uses elsewhere in
-                this feature. gap-8 (large) is the "left form → right
-                preview" step — the same scale as the link tab's own large
-                step between its two stacked sections. items-start keeps the
-                left Card at its own natural height instead of stretching to
-                match the (usually taller) preview column. */}
-            <div className="grid gap-8 sm:grid-cols-[280px_minmax(0,1fr)] sm:items-start">
+                this feature. 336px = 280px × 1.2 — a ~20% wider form column
+                (and so ~20% wider Client Name/Client Email inputs, both
+                w-full within it) without touching the modal's own max-width;
+                minmax(0,1fr) on the preview column absorbs the difference
+                and still never overflows at any viewport width. gap-8
+                (large) is the "left form → right preview" step — the same
+                scale as the link tab's own large step between its two
+                stacked sections. items-start keeps the left Card at its own
+                natural height instead of stretching to match the (usually
+                taller) preview column. */}
+            <div className="grid gap-8 sm:grid-cols-[336px_minmax(0,1fr)] sm:items-start">
               {/* The form, in its own Card — the strongest, most prominent
                   block in this tab, same elevation treatment the link tab's
                   account/link Card gets: it's the only content sitting

@@ -32,6 +32,17 @@ interface VirtualAccountDetailsProps {
    * details becomes the sole, full-width action instead.
    */
   showShare?: boolean;
+  /**
+   * Shape of the "inside" header's flag (no effect on `"above"`, which
+   * doesn't render one here at all).
+   *
+   * - `"rectangle"` (default) — matches RegionSelector and every table cell
+   *   in the product, for MCA v2's own real Account Details card.
+   * - `"circle"` — the same circular treatment CountryFlagAvatar gives every
+   *   other flag in the product, for ShareAccountDetailsModal's embedded
+   *   preview, which is a smaller, secondary rendering of this same card.
+   */
+  flagShape?: "rectangle" | "circle";
   /** Merged onto the Card — e.g. to override its default shrink-wrapped width. */
   className?: string;
 }
@@ -72,6 +83,7 @@ export function VirtualAccountDetails({
   onShare,
   headerPlacement = "above",
   showShare = true,
+  flagShape = "rectangle",
   className,
 }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
@@ -87,14 +99,12 @@ export function VirtualAccountDetails({
       <Card size="sm" className={cn("w-fit max-w-[730px] gap-4", className)}>
         {headerPlacement === "inside" && (
           <div className="flex items-center gap-3">
-            {/* Rectangular rather than the circular avatar the compact account
-                cards use — matches the flag shape RegionSelector and every
-                table cell in the product render. CountryFlagAvatar (not
-                CountryFlag) for its globe fallback on regions with no flag. */}
+            {/* CountryFlagAvatar (not CountryFlag) for its globe fallback on
+                regions with no flag, either shape. */}
             <CountryFlagAvatar
               iso2={account.iso2}
               countryName={account.countryName}
-              className="h-8 w-11 rounded-md"
+              className={flagShape === "circle" ? "h-10 w-10" : "h-8 w-11 rounded-md"}
             />
             <div className="min-w-0">
               <p className="truncate text-base font-semibold text-foreground">
