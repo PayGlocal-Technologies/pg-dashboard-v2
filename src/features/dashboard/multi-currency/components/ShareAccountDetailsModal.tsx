@@ -137,52 +137,68 @@ export function ShareAccountDetailsModal({
         </DialogTitle>
 
         <Tabs defaultValue="link">
-          <TabsList className="mb-6">
+          {/* mb-4 (medium): tightened from mb-6 — this is the "tabs → first
+              section" step, which should read as closer than the "large" step
+              further down into Preview, not the same distance. */}
+          <TabsList className="mb-4">
             <TabsTrigger value="link">Share via link</TabsTrigger>
             <TabsTrigger value="email">Share via email</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="link" className="mt-0 space-y-6">
-            {/* Header: selected account on the left, the share link + Copy
-                Link action on the right. flex-wrap drops the link block
-                under the account summary on narrow viewports instead of
-                squeezing either. */}
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <AccountSummary account={account} title="Copy account details" />
+          <TabsContent value="link" className="mt-0">
+            {/* Account/link section, in its own Card — the strongest block in
+                the modal: it's the only content sitting directly on the
+                dialog's plain background (everything below lives inside the
+                muted Preview surface), so its border/shadow reads as real
+                elevation instead of competing with an equally-elevated
+                neighbour. gap-2 (tight) between the account summary and the
+                link pill — two halves of one block, not two separate ones —
+                versus the large gap to Preview below. */}
+            <Card size="sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <AccountSummary account={account} title="Copy account details" />
 
-              {/* One shared grey pill rather than an Input and a Button that
-                  merely sit beside each other: the Input loses its own
-                  border/background (bg-transparent border-0 shadow-none) so
-                  it reads as text sitting directly on the pill's surface, and
-                  the pill's own p-1.5 is what gives Copy Link breathing room
-                  from that surface's edge instead of the button floating
-                  outside it as a separate action. */}
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-muted/40 p-1.5 sm:min-w-[380px] sm:flex-none">
-                <Input
-                  readOnly
-                  value={shareUrl}
-                  className="min-w-0 border-0 bg-transparent text-xs shadow-none focus-visible:ring-0"
-                />
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="shrink-0"
-                  leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
-                  onClick={() => onCopyLink(shareUrl)}
-                >
-                  Copy Link
-                </Button>
+                {/* One shared grey pill rather than an Input and a Button that
+                    merely sit beside each other: the Input loses its own
+                    border/background (bg-transparent border-0 shadow-none) so
+                    it reads as text sitting directly on the pill's surface, and
+                    the pill's own p-1.5 is what gives Copy Link breathing room
+                    from that surface's edge instead of the button floating
+                    outside it as a separate action. */}
+                <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-muted/40 p-1.5 sm:min-w-[380px] sm:flex-none">
+                  <Input
+                    readOnly
+                    value={shareUrl}
+                    className="min-w-0 border-0 bg-transparent text-xs shadow-none focus-visible:ring-0"
+                  />
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="shrink-0"
+                    leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
+                    onClick={() => onCopyLink(shareUrl)}
+                  >
+                    Copy Link
+                  </Button>
+                </div>
               </div>
-            </div>
+            </Card>
 
-            <Separator />
+            {/* mt-8 (large): the clearest step in the modal — this is where
+                attention should visibly shift from "the thing being shared"
+                to "a reference for what it looks like". The Card border above
+                already marks that section's own edge, so no separate rule is
+                needed here to double-mark the same boundary.
 
-            {/* Grey Preview container: title/description/Preview full page
-                now live inside it (previously a separate row above it), so
-                the whole thing — header and the white preview window below —
-                reads as one module instead of a caption floating over an
-                unrelated box. */}
-            <div className="rounded-xl bg-muted/40 p-4">
+                pb-3 (small) on top of the shared p-4 (rather than p-4 on every
+                side) is the one place padding is intentionally asymmetric:
+                the top/sides still give the Preview heading and its button
+                room to breathe, but the bottom — measured from the white
+                window's own edge to the grey surface's edge below it — stays
+                noticeably tighter, which is what actually reads as "the white
+                window sits inset in here" rather than "these two boxes happen
+                to be near each other." */}
+            <div className="mt-8 rounded-xl bg-muted/40 p-4 pb-3">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Preview</h3>
@@ -217,18 +233,24 @@ export function ShareAccountDetailsModal({
 
               {/* The actual white preview window — the same Card component
                   (border/rounded-xl/shadow-sm) used everywhere else in the
-                  product, not a hand-styled substitute, so "consistent with
-                  the design system" means literally reusing its elevation
-                  rather than picking new shadow/radius values. size="sm"
-                  gives it real internal spacing (28px) and gap-6 between the
-                  heading/carousel/details below, so nothing is flush against
-                  the grey module's own edge on any side — the "doesn't span
-                  edge-to-edge" inset. max-h/overflow-y-auto scrolls only
+                  product, not a hand-styled substitute, so "a subtle,
+                  Flux-compatible shadow/border" means literally reusing its
+                  elevation rather than picking stronger new values. mt-4
+                  (medium) is the "Preview heading → client preview" step —
+                  closer than the large step above it, since both belong to
+                  this one Preview section. max-h/overflow-y-auto scrolls only
                   this window, the same viewport-into-the-real-page treatment
                   the actual client-facing page will have, if its content
                   runs taller than the space available here. */}
-              <Card size="sm" className="mt-4 max-h-[420px] overflow-y-auto">
-                <h2 className="text-lg font-bold text-foreground">
+              <Card size="sm" className="mt-4 max-h-[380px] overflow-y-auto">
+                {/* The same muted, uppercase caption style
+                    VirtualAccountDetails uses for its own "{Country} Account"
+                    label elsewhere in this product — not the bold text-lg
+                    heading this used before, which was reading as more
+                    prominent than "Copy account details" above (a sm/
+                    semibold label) despite this whole window being the
+                    lowest-priority content in the modal. */}
+                <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                   Account details for payers in {previewAccount.countryName}
                 </h2>
 
