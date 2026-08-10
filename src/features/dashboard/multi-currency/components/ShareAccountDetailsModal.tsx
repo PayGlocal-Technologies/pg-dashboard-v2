@@ -289,10 +289,25 @@ export function ShareAccountDetailsModal({
           <TabsContent value="email" className="mt-0">
             {/* Fixed-width form column, flexible preview column — the same
                 sidebar/content split mca-v2's own layout uses elsewhere in
-                this feature. */}
-            <div className="grid gap-6 sm:grid-cols-[280px_minmax(0,1fr)]">
-              <div>
+                this feature. gap-8 (large) is the "left form → right
+                preview" step — the same scale as the link tab's own large
+                step between its two stacked sections. items-start keeps the
+                left Card at its own natural height instead of stretching to
+                match the (usually taller) preview column. */}
+            <div className="grid gap-8 sm:grid-cols-[280px_minmax(0,1fr)] sm:items-start">
+              {/* The form, in its own Card — the strongest, most prominent
+                  block in this tab, same elevation treatment the link tab's
+                  account/link Card gets: it's the only content sitting
+                  directly on the dialog's plain background, so "account
+                  being shared → form fields → Send Email" reads as one
+                  cohesive group rather than three loose pieces. gap-0 hands
+                  spacing control to the explicit margins below instead of
+                  the Card's own default gap. */}
+              <Card size="sm" className="gap-0">
                 <AccountSummary account={account} title="Send Account Details" />
+                {/* my-4 (medium) is "account block → divider" and "divider →
+                    Client Name" at once — the same physical gap split evenly
+                    above/below the rule itself. */}
                 <Separator className="my-4" />
 
                 <form
@@ -300,6 +315,10 @@ export function ShareAccountDetailsModal({
                     e.preventDefault();
                     void emailForm.handleSubmit();
                   }}
+                  // space-y-4 (medium) is every "field → field" and "Cc/Bcc →
+                  // Send Email" step at once — Client Name, Client Email, the
+                  // Cc/Bcc toggle/fields, and Send Email are all direct
+                  // children of this form.
                   className="space-y-4"
                   noValidate
                 >
@@ -402,17 +421,27 @@ export function ShareAccountDetailsModal({
                     Send Email
                   </Button>
                 </form>
-              </div>
+              </Card>
 
-              {/* Preview: a simulated rendering of the actual email the
-                  client receives, using this account's real fields — not a
+              {/* Preview: secondary, on the same muted grey surface (and the
+                  same p-4/pb-3 asymmetric inset) the link tab's own Preview
+                  container uses, so both tabs read "form/action is primary,
+                  this grey surface is a supporting reference" the same way.
+                  A simulated rendering of the actual email the client
+                  receives, using this account's real fields — not a
                   hand-authored mockup — so it can never drift from what
                   Send Email actually sends. */}
-              <div className="rounded-xl border border-border bg-muted/20 p-4">
-                <h3 className="text-lg font-bold text-foreground">Preview</h3>
+              <div className="rounded-xl bg-muted/40 p-4 pb-3">
+                <h3 className="text-sm font-semibold text-foreground">Preview</h3>
                 <p className="text-xs text-muted-foreground">This is what your clients will see</p>
 
-                <div className="mt-4 space-y-4 rounded-lg border border-border bg-card p-5 text-sm">
+                {/* mt-4 (medium): "description → email preview" — matches
+                    the link tab's own "Preview heading → client preview"
+                    step. gap-4 keeps every row inside at the same medium
+                    rhythm; the tighter groups below (metadata rows, body
+                    paragraphs) override it locally with their own
+                    space-y-1/space-y-2. */}
+                <Card size="sm" className="mt-4 gap-4">
                   <div className="flex items-center justify-between gap-4">
                     <p className="min-w-0 truncate">
                       <span className="font-semibold text-foreground">From: </span>
@@ -427,10 +456,16 @@ export function ShareAccountDetailsModal({
                   </p>
                   <Separator />
 
-                  <div className="space-y-3 text-muted-foreground">
+                  {/* space-y-2 (tight): the email body's own paragraph
+                      rhythm — greeting, intro line, the metadata block, and
+                      the closing note. */}
+                  <div className="space-y-2 text-muted-foreground">
                     <p>Dear Client,</p>
                     <p>Please find below our account details for your upcoming payment:</p>
-                    <div>
+                    {/* space-y-1 (tight): consecutive metadata rows sit
+                        close together — each row's own label → value is
+                        already tight, being inline on one line. */}
+                    <div className="space-y-1">
                       <p>
                         Account Holder Name:{" "}
                         <span className="text-foreground">{account.accountHolderName}</span>
@@ -456,7 +491,7 @@ export function ShareAccountDetailsModal({
                       initiated, please share the transaction reference for our records.
                     </p>
                   </div>
-                </div>
+                </Card>
               </div>
             </div>
           </TabsContent>
