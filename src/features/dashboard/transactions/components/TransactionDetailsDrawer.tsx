@@ -7,8 +7,10 @@ import {
   DrawerTitle,
   IconButton,
   VisuallyHidden,
+  useBreakpoint,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
 import {
   TransactionDetailsContent,
@@ -50,8 +52,20 @@ export function TransactionDetailsDrawer({
 }: TransactionDetailsDrawerProps) {
   const showFeedback = open && !!row && isSettledTransaction(row);
 
+  // Below md this becomes a bottom sheet instead of a right-side drawer, via
+  // flux-ui's own Drawer side="bottom" (which supplies the inset-x-0/bottom-0
+  // placement, the rounded-t-2xl top corners, the max-h-[85vh] cap, and the
+  // slide-in-from-bottom animation) rather than a second component. Tablet
+  // (md) and desktop keep the right-side drawer exactly as before.
+  //
+  // A breakpoint read here can't cause a hydration mismatch: with open=false
+  // Radix renders no portal and no content at all, so `side` has no effect on
+  // the DOM until a row is clicked, which is client-only by definition.
+  const { isBelow } = useBreakpoint();
+  const isBottomSheet = isBelow("md");
+
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
+    <Drawer open={open} onOpenChange={onOpenChange} side={isBottomSheet ? "bottom" : "right"}>
       {/*
         Two overrides on the shared DrawerContent, both deliberate:
 
@@ -77,7 +91,16 @@ export function TransactionDetailsDrawer({
           rendered. "fixed" alone already establishes a containing block for
           the feedback sheet's `absolute` positioning below, so no extra
           position class is needed here at all. */}
-      <DrawerContent className="w-full sm:w-[32rem] sm:max-w-[92vw] [&>button:last-child]:hidden">
+      {/* The width overrides apply to the right-side drawer only: as a bottom
+          sheet the content already spans the full width via side="bottom"'s
+          own inset-x-0/w-full, and sm:w-[32rem] would otherwise still narrow
+          it between sm and md, where this is still a sheet. */}
+      <DrawerContent
+        className={cn(
+          "[&>button:last-child]:hidden",
+          !isBottomSheet && "w-full sm:w-[32rem] sm:max-w-[92vw]"
+        )}
+      >
         <DrawerTitle asChild>
           <VisuallyHidden>Transaction details</VisuallyHidden>
         </DrawerTitle>
@@ -102,16 +125,23 @@ export function TransactionDetailsDrawer({
             >
               <Icon name="x" className="h-4 w-4" />
             </IconButton>
-            <IconButton
-              aria-label="Expand to full page"
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                if (row) onExpand(row);
-              }}
-            >
-              <Icon name="expand" className="h-4 w-4" />
-            </IconButton>
+            {/* Not rendered at all as a bottom sheet (rather than hidden with
+                a class): there is no expanded view in the mobile flow, which
+                is card to sheet and back, so the action has nothing to point
+                at there. Close stays the only way out, same interaction as
+                everywhere else. */}
+            {!isBottomSheet && (
+              <IconButton
+                aria-label="Expand to full page"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  if (row) onExpand(row);
+                }}
+              >
+                <Icon name="expand" className="h-4 w-4" />
+              </IconButton>
+            )}
           </div>
           {row && (
             <CopyableText value={row.gid} valueClassName="text-muted-foreground" className="ml-auto" />

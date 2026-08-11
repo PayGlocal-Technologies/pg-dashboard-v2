@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent, Badge } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { formatUsdShort } from "@/features/dashboard/transactions/components/SettlementAnalyticsCard";
 import { MCA_FX_RATES_TO_INR } from "@/features/dashboard/transactions/constants";
@@ -18,11 +19,11 @@ import {
  * both for that reason and because its fixed p-5 padding wouldn't match
  * Card size="sm"'s px-7 py-7 next to it).
  */
-export function OutstandingAmountCard() {
+export function OutstandingAmountCard({ className }: { className?: string }) {
   const inrValue = OUTSTANDING_AMOUNT_USD * (MCA_FX_RATES_TO_INR.USD ?? 1);
 
   return (
-    <Card size="sm" className="w-full">
+    <Card size="sm" className={cn("w-full", className)}>
       <CardContent>
         <p className="text-sm font-semibold text-foreground">Outstanding amount</p>
 

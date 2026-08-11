@@ -403,7 +403,12 @@ export function McaTransactionTable() {
             search on a row that never wraps (search takes the flexible
             remaining width). Filter chips move to their own row directly
             beneath, scrolling horizontally on one line instead of wrapping,
-            since there's no room to show all four at once next to search. */}
+            since there's no room to show all four at once next to search.
+            That row's scrollbar is hidden (scrollbar-none, the same utility
+            the multi-currency account carousel uses) so the chips read as a
+            row of controls rather than a scroll region: the gesture still
+            works, there's just no persistent indicator, and no custom one
+            replaces it. */}
         <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
           <div className="flex flex-nowrap items-center gap-2">
             <RotatingSearchInput
@@ -424,7 +429,9 @@ export function McaTransactionTable() {
             </Button>
           </div>
 
-          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">{filterChips}</div>
+          <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+            {filterChips}
+          </div>
         </div>
 
         {isError ? (

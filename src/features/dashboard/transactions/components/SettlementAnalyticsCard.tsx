@@ -115,7 +115,13 @@ export function SettlementAnalyticsCard() {
         <ul className="space-y-3">
           {visibleRows.map((row) => (
             <li key={row.accountId} className="flex items-center gap-3 text-sm">
-              <div className="flex w-36 min-w-0 shrink-0 items-center gap-2">
+              {/* w-24 below sm: as a carousel page the card is narrower than
+                  the viewport, and the label column, the value column, and
+                  the card's own padding are all fixed width, so a 144px
+                  label would leave the bar (the only flexible element in the
+                  row) too narrow to read as a bar at all. Account names are
+                  short enough to still fit, and truncate covers the rest. */}
+              <div className="flex w-24 min-w-0 shrink-0 items-center gap-2 sm:w-36">
                 <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-6 w-6" />
                 <span className="truncate font-medium text-foreground">{row.label}</span>
               </div>
