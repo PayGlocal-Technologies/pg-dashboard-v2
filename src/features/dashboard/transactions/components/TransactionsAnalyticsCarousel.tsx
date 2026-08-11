@@ -23,8 +23,11 @@ const LAST_PAGE = PAGE_LABELS.length - 1;
 // snap-start lands the next page's left edge exactly at the container's right
 // edge, so there's no residual peek from it either.
 //
-// md:w-auto hands sizing back to the grid column from md up.
-const PAGE_CLASSES = "w-full shrink-0 snap-start md:w-auto";
+// lg:w-auto hands sizing back to the grid column from lg up: the same
+// breakpoint McaTransactionTable switches its own table/card-list and
+// controls at, so the whole page moves to its "mobile" presentation at one
+// width instead of the analytics section switching early on its own.
+const PAGE_CLASSES = "w-full shrink-0 snap-start lg:w-auto";
 
 // Both of these take the element as a parameter rather than reading
 // scrollRef.current inline, matching restoreScrollTop in McaTransactionTable:
@@ -49,13 +52,16 @@ function scrollToPage(el: HTMLDivElement, index: number): void {
  * The Transactions page's analytics summary, in two layouts over the same two
  * children so neither is duplicated:
  *
- * - Below md, a horizontally scrolling carousel of two snap pages (Settlement
+ * - Below lg, a horizontally scrolling carousel of two snap pages (Settlement
  *   Analytics, then the Outstanding + Saved stack) with a ProgressIndicator
- *   beneath it.
- * - From md up, the existing grid: one column at md, then Settlement Analytics
- *   as the wider card at lg with the other two as a stacked secondary column.
- *   No carousel and no indicator there, so nothing about tablet or desktop
- *   changes.
+ *   beneath it. Same breakpoint McaTransactionTable's own table/card-list
+ *   switch uses, so the analytics summary and the transaction list below it
+ *   both flip to their mobile presentation together, not at two different
+ *   widths.
+ * - From lg up, the grid: Settlement Analytics as the wider card beside the
+ *   Outstanding + Saved stack as a secondary column, both filling the same
+ *   overall height. No carousel and no indicator there, so desktop layout is
+ *   unchanged beyond that column split and height match.
  */
 export function TransactionsAnalyticsCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -78,24 +84,34 @@ export function TransactionsAnalyticsCarousel() {
         // scrollport and widen the peek past the 16px PAGE_CLASSES budgets
         // for, and shadow-sm spreads too little sideways to need it.
         className="scrollbar-none -my-1 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth py-1
-                   md:my-0 md:grid md:overflow-visible md:py-0
-                   lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]"
+                   lg:my-0 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] lg:overflow-visible lg:py-0"
         onScroll={(e: UIEvent<HTMLDivElement>) => setActivePage(pageFromScroll(e.currentTarget))}
       >
+        {/* lg:h-full only: from lg up the two page wrappers are grid items in
+            the same row, and CSS Grid's default align-items: stretch already
+            stretches both of them to that row's height (the taller of the
+            two sides' natural content) with no class needed for that part.
+            h-full then makes the Card itself, not just its invisible
+            wrapper, actually fill that stretched height, matching the same
+            fix on the right below. Below lg the wrapper is a plain carousel
+            page instead (see PAGE_CLASSES), where the card's own height is
+            left alone, unchanged from before. */}
         <div className={PAGE_CLASSES}>
-          <SettlementAnalyticsCard />
+          <SettlementAnalyticsCard className="lg:h-full" />
         </div>
 
         {/* grow (not flex-1, whose 0 basis would force both cards to the same
-            height and clip the taller one) lets the two split whatever height
-            the taller Settlement Analytics page sets, so the stack reads as
-            one page of equivalent weight beside it. Only below md: from md up
-            these are grid items again, where the column already stretches and
-            the cards should stay at their natural heights, exactly as
-            before. */}
+            height as each other and clip the taller one) fills whatever
+            height this wrapper ends up stretched to, the same role h-full
+            plays on Settlement Analytics above, just expressed as a flex
+            child here since this wrapper's own two cards are a flex-col
+            stack rather than a single element. Together the two sides always
+            end up the same total height, whichever one is naturally taller:
+            below lg via the carousel's own row-direction flex (which
+            stretches by the same default), from lg up via the grid. */}
         <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
-          <OutstandingAmountCard className="grow md:grow-0" />
-          <SavedAmountCard className="grow md:grow-0" />
+          <OutstandingAmountCard className="grow" />
+          <SavedAmountCard className="grow" />
         </div>
       </div>
 
@@ -105,7 +121,7 @@ export function TransactionsAnalyticsCarousel() {
           Clicking or arrow-keying a dot scrolls to that page, and scrolling
           moves the indicator, so the two stay in sync whichever one the reader
           drives. */}
-      <div className="flex justify-center md:hidden">
+      <div className="flex justify-center lg:hidden">
         <ProgressIndicator
           aria-label="Analytics pages"
           size="sm"

@@ -379,15 +379,15 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
 
   return (
     <div className="flex flex-col gap-4">
-      {/* mb-4 below md, giving 32px (this margin plus the flex gap) between
+      {/* mb-4 below lg, giving 32px (this margin plus the flex gap) between
           the analytics summary and the transaction section below it, against
           the 8px between the carousel and its indicator: a clear break
           between the summary metrics and the transaction data, without the
           indicator drifting away from the carousel it belongs to. Collapses
-          at md, where the analytics summary switches from the carousel (with
-          its indicator) to the plain grid and the flex gap alone matches the
-          previous spacing. */}
-      {analyticsSection && <div className="mb-4 md:mb-0">{analyticsSection}</div>}
+          at lg, the same breakpoint TransactionsAnalyticsCarousel itself
+          switches from the carousel (with its indicator) to the plain grid,
+          where the flex gap alone matches the previous spacing. */}
+      {analyticsSection && <div className="mb-4 lg:mb-0">{analyticsSection}</div>}
 
       {/* Tab bar, search/filters, and the table itself all share one
           bordered surface (rounded-xl border border-border bg-card,

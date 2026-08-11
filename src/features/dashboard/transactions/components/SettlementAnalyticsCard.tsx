@@ -9,8 +9,10 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
+  useBreakpoint,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
 import {
@@ -40,10 +42,15 @@ export function formatUsdShort(value: number): string {
  * categories, so color stays uniform and the account label alone carries
  * identity.
  */
-export function SettlementAnalyticsCard() {
+export function SettlementAnalyticsCard({ className }: { className?: string }) {
   const [mode, setMode] = useState<AnalyticsMode>("amount");
   const [expanded, setExpanded] = useState(false);
   const isAmountMode = mode === "amount";
+  // true from lg up: the same breakpoint the analytics row switches from the
+  // mobile carousel to the side-by-side grid at (see
+  // TransactionsAnalyticsCarousel), and where Outstanding + Saved's combined
+  // height sets this card's target height instead of its own content.
+  const { isDesktop } = useBreakpoint();
 
   const rows = SETTLEMENT_ANALYTICS_BY_ACCOUNT.map((entry) => {
     const account = MOCK_VIRTUAL_ACCOUNTS.find((a) => a.id === entry.accountId);
@@ -58,11 +65,15 @@ export function SettlementAnalyticsCard() {
   }).sort((a, b) => b.value - a.value);
 
   const maxValue = rows[0]?.value ?? 0;
-  const visibleRows = expanded ? rows : rows.slice(0, VISIBLE_COUNT);
-  const canExpand = rows.length > VISIBLE_COUNT;
+  // At lg and up every account row renders unconditionally: that's the extra
+  // vertical space Outstanding + Saved's combined height gives this card, put
+  // to use as more rows instead of sitting as blank space below a truncated
+  // five. Below lg (the carousel), the Show more/less toggle is unchanged.
+  const visibleRows = isDesktop ? rows : expanded ? rows : rows.slice(0, VISIBLE_COUNT);
+  const canExpand = !isDesktop && rows.length > VISIBLE_COUNT;
 
   return (
-    <Card size="sm" className="w-full">
+    <Card size="sm" className={cn("w-full", className)}>
       {/* KPI and the mode toggle: below sm, CardHeader's own two-row grid
           (no CardAction child here, so its has-data-[slot=card-action]
           column split never triggers) stacks them, toggle after the amount,
@@ -109,7 +120,12 @@ export function SettlementAnalyticsCard() {
         </div>
       </CardHeader>
 
-      <CardContent>
+      {/* flex-1: when className carries h-full (see TransactionsAnalyticsCarousel,
+          which stretches this card to match the grid row's height at lg and
+          up), CardHeader keeps its own intrinsic height and this region
+          absorbs whatever's left, the same split flex-col Cards use anywhere
+          else a header sits above a variable-height body. */}
+      <CardContent className="flex flex-1 flex-col">
         {/* Supporting tier: kept visually restrained (thin h-2 tracks, small
             text) so the KPI above stays the strongest element on the card. */}
         <ul className="space-y-3">
