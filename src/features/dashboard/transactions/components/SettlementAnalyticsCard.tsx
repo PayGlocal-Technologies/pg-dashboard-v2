@@ -4,7 +4,6 @@ import { useState } from "react";
 import {
   Card,
   CardHeader,
-  CardAction,
   CardContent,
   Button,
   Tabs,
@@ -64,10 +63,12 @@ export function SettlementAnalyticsCard() {
 
   return (
     <Card size="sm" className="w-full">
-      {/* KPI (left) and the mode toggle (right), on the same row: CardHeader
-          switches to a 2-column grid on its own once it sees a CardAction
-          child, so no layout classes are needed here beyond that. */}
-      <CardHeader>
+      {/* KPI and the mode toggle: below sm, CardHeader's own two-row grid
+          (no CardAction child here, so its has-data-[slot=card-action]
+          column split never triggers) stacks them, toggle after the amount,
+          matching the mobile reference. At sm and up, grid-cols-[1fr_auto]
+          puts the toggle back beside the KPI as before. */}
+      <CardHeader className="sm:grid-cols-[1fr_auto]">
         <div>
           {/* Label belongs to the KPI beneath it, not the other way round:
               it introduces the number rather than captioning it after the
@@ -94,14 +95,18 @@ export function SettlementAnalyticsCard() {
             )}
           </div>
         </div>
-        <CardAction>
+        <div className="sm:justify-self-end">
           <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
-            <TabsList>
-              <TabsTrigger value="amount">Amount settled</TabsTrigger>
-              <TabsTrigger value="count">No. of transactions</TabsTrigger>
+            <TabsList className="w-full sm:w-auto">
+              <TabsTrigger value="amount" className="flex-1 sm:flex-initial">
+                Amount settled
+              </TabsTrigger>
+              <TabsTrigger value="count" className="flex-1 sm:flex-initial">
+                No. of transactions
+              </TabsTrigger>
             </TabsList>
           </Tabs>
-        </CardAction>
+        </div>
       </CardHeader>
 
       <CardContent>
