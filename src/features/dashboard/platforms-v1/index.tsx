@@ -4,6 +4,10 @@ import { useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
   Card,
   CardContent,
   IconButton,
@@ -18,6 +22,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/utils";
 import {
   SUPPORTED_PLATFORMS,
   accountsForPlatform,
@@ -349,50 +354,116 @@ export function PlatformsV1Feature() {
               ))}
             </ol>
 
-            {/* mt-6 only below `lg`, where the grid has collapsed to one
-                column and this heading follows the last screenshot: on top of
-                the 16px row gap it makes the same 40px section break the
-                platform row gets, so the documents don't read as a seventh
-                step. At `lg` the two columns are side by side and the row
-                placement handles it. */}
-            <div className="mt-6 lg:col-start-2 lg:row-start-1 lg:mt-0">
-              <h2 className={MODULE_TITLE}>Documents you might need</h2>
-              <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-                Statements {selectedPlatform.name} may ask you for.
-              </p>
-            </div>
+            {/* ─── Sidebar: account details, then documents ─────────────── */}
+            {/* One cell spanning both of the grid's rows rather than two
+                separately placed blocks: the sidebar is now a stack of two
+                modules whose own order matters more than lining either one up
+                with a particular row of the walkthrough, and row-span-1 each
+                would have tied the documents' top edge to Step 1 no matter how
+                tall the account panel grew when expanded.
 
-            {/* One card per document rather than rows inside a single card:
-                each is its own action target. space-y-2 is the tightest step
-                on the page: each card already carries its own border, so 8px
-                is enough to separate them, and holding the pair that close is
-                what makes the documents read as one compact aside rather than
-                as a second column of content competing with the steps. */}
-            <div className="space-y-2 lg:col-start-2 lg:row-start-2">
-              {selectedPlatform.documents.map((doc) => (
-                <Card
-                  key={doc.title}
-                  size="sm"
-                  className="flex-row items-center justify-between gap-3 p-4"
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-[12px] text-muted-foreground">{doc.caption}</p>
-                    <p className="truncate text-[13px] font-medium text-foreground">{doc.title}</p>
-                  </div>
-                  {/* Placeholder until the document endpoints exist — the same
-                      stand-in treatment MCA v2 gives its proof-of-ownership
-                      download. */}
-                  <IconButton
-                    aria-label={doc.actionLabel}
-                    variant="ghost"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => toast.info(`${doc.title} will be available soon`)}
-                  >
-                    <Icon name={doc.actionIcon} className="h-4 w-4" />
-                  </IconButton>
+                It still starts on row 1, so the sidebar's top edge lands on the
+                walkthrough heading's. items-start on the grid keeps this column
+                at its natural height, so expanding the accordion grows the
+                sidebar downward and the page scrolls — the tutorial column
+                never moves, and nothing is pushed horizontally.
+
+                space-y-4 is the medium step between the two modules. mt-6 only
+                below `lg`, where the grid has collapsed to one column and this
+                follows the last screenshot: on top of the 16px row gap it makes
+                the same 40px section break the platform row gets, so the
+                sidebar doesn't read as a seventh step. */}
+            <div className="mt-6 space-y-4 lg:col-start-2 lg:row-start-1 lg:row-span-2 lg:mt-0">
+              {/* Account Details — reference material for the steps beside it,
+                  collapsed by default so it costs a header's height until it's
+                  wanted. flux-ui's Accordion supplies the disclosure and the
+                  rotating chevron; `collapsible` is what lets the only item be
+                  closed, which is the state it opens in.
+
+                  Read-only by design: no Share or Copy actions, so it stays
+                  subordinate to the walkthrough rather than becoming a second
+                  thing to act on. The values are `buildFullAccountDetails` —
+                  the same builder the Virtual Accounts card and the share
+                  modal render, so these fields can't drift from the ones the
+                  rest of the product shows, and they follow the platform and
+                  currency selections above.
+
+                  px-5 py-0 rather than Card's own inset: the trigger and
+                  content carry their own vertical padding, so the card only has
+                  to hold them clear of its side edges — anything more and the
+                  collapsed row sits adrift inside its own surface. */}
+              {selectedAccount && (
+                <Card size="sm" className="gap-0 px-5 py-0">
+                  <Accordion type="single" collapsible>
+                    <AccordionItem value="account-details" className="border-b-0">
+                      <AccordionTrigger className="text-base font-semibold">
+                        Account Details
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {/* Label above value, one field per row — the same
+                            tokens the Virtual Accounts details card uses, in a
+                            single column because 320px can't carry that card's
+                            three without wrapping every value. space-y-1
+                            inside a field against space-y-4 between them is
+                            what keeps each label bound to its own value. */}
+                        <dl className="space-y-4">
+                          {buildFullAccountDetails(selectedAccount).map((field) => (
+                            <div key={field.label} className="space-y-1">
+                              <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
+                              <dd className="break-words text-[13px] font-medium text-foreground">
+                                {field.value}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
                 </Card>
-              ))}
+              )}
+
+              <div>
+                <h2 className={MODULE_TITLE}>Documents you might need</h2>
+                <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+                  Statements {selectedPlatform.name} may ask you for.
+                </p>
+
+                {/* One card per document rather than rows inside a single card:
+                    each is its own action target. space-y-2 is the tightest
+                    step on the page: each card already carries its own border,
+                    so 8px is enough to separate them, and holding the pair that
+                    close is what makes the documents read as one compact aside
+                    rather than a second column of content competing with the
+                    steps. */}
+                <div className="mt-3 space-y-2">
+                  {selectedPlatform.documents.map((doc) => (
+                    <Card
+                      key={doc.title}
+                      size="sm"
+                      className="flex-row items-center justify-between gap-3 p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-[12px] text-muted-foreground">{doc.caption}</p>
+                        <p className="truncate text-[13px] font-medium text-foreground">
+                          {doc.title}
+                        </p>
+                      </div>
+                      {/* Placeholder until the document endpoints exist — the
+                          same stand-in treatment MCA v2 gives its
+                          proof-of-ownership download. */}
+                      <IconButton
+                        aria-label={doc.actionLabel}
+                        variant="ghost"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => toast.info(`${doc.title} will be available soon`)}
+                      >
+                        <Icon name={doc.actionIcon} className="h-4 w-4" />
+                      </IconButton>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
