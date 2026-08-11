@@ -161,102 +161,120 @@ export function McaV2Feature() {
             the column would no longer start level with that Card. */}
         <div className="mt-5 space-y-8 lg:col-start-2 lg:row-start-2 lg:mt-0">
           {/* Summary row: the first thing in this column, so its top edge
-              lands on the region Card's. items-start lets each card keep its
-              own height — stretching the short Outstanding card to the settled
-              card's chart height would leave a block of dead space inside it. */}
-          <div className="grid items-start gap-4 md:grid-cols-2">
+              lands on the region Card's. The settled card takes the wider
+              track because it carries a chart as well as its KPI stack; no
+              items-start, so the grid's default stretch gives both cards the
+              same height and therefore a shared top and bottom edge. */}
+          <div className="grid gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
             {/* Not MetricSparklineCard: that renders its sparkline as a tiny
-            borderless corner overlay with no axes, which can't carry this
-            card's monthly X axis and settled-amount Y axis. Built on the same
-            flux-ui Card as every other module here, with the recharts
-            primitives and styling flux-ui itself uses in
-            DashboardAreaChartTemplate, so it stays consistent with Outstanding
-            beside it without introducing a chart abstraction of its own.
-            Mirrors the settled-amount card on the Multi Currency Accounts
-            page, with every figure keyed off the selected region's currency
-            rather than fixed to USD. */}
-            {/* size="sm" rather than the p-5 the Multi Currency Accounts
-                page's copy of this card uses: OutstandingAmountCard beside it
-                is a size="sm" Card, and two adjacent cards with different
-                insets read as a mistake. */}
+                borderless corner overlay with no axes, which can't carry this
+                card's monthly X axis and settled-amount Y axis. Built on the
+                same flux-ui Card as OutstandingAmountCard beside it — same
+                size="sm" inset, border, radius and elevation — with the
+                recharts primitives and styling flux-ui itself uses in
+                DashboardAreaChartTemplate, so the two read as a deliberate
+                pair without introducing a chart abstraction of its own. Every
+                figure is keyed off the selected region's currency rather than
+                fixed to USD. */}
             <Card size="sm" className="gap-0">
-              <span className="truncate text-sm font-semibold text-foreground">
-                Settled amount in {currency}
-              </span>
+              {/* KPI stack left, chart right, so the card spends the width it
+                  has rather than stacking into extra height. items-center
+                  keeps the two balanced against each other when the KPI stack
+                  is the shorter of the two; below `sm` they stack, which is
+                  the only width where there isn't room for both. */}
+              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    Settled amount in {currency}
+                  </p>
 
-              <div className="mt-3 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-                {settled.value}
-              </div>
+                  {/* Same size and weight as OutstandingAmountCard's own
+                      figure — the two headline numbers have to carry equal
+                      visual weight for the cards to read as a pair. */}
+                  <p className="mt-3 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                    {settled.value}
+                  </p>
 
-              {/* Secondary to the figure above it: smaller size, muted colour,
-              same left edge — supporting context, not a second headline. */}
-              <div className="mt-1 text-sm tabular-nums text-muted-foreground">
-                {settled.valueInr}
-              </div>
+                  {/* Secondary to the figure above it: smaller size, muted
+                      colour, same left edge — supporting context, not a second
+                      headline. */}
+                  <p className="mt-2 text-sm tabular-nums text-muted-foreground">
+                    {settled.valueInr}
+                  </p>
 
-              {/* Own row below the INR line (not sharing its baseline) so the
-              indicator reads as a distinct, lower-priority step. */}
-              <div className="mt-2 flex items-center justify-end gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                <Icon name="trending-up" className="h-3.5 w-3.5 shrink-0" />
-                <span>{settled.trendLabel}</span>
-              </div>
+                  {/* Supporting metric, the lowest step in this stack. Left
+                      aligned with everything above it. */}
+                  <p className="mt-4 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    <Icon name="trending-up" className="h-3.5 w-3.5 shrink-0" />
+                    <span>{settled.trendLabel}</span>
+                  </p>
+                </div>
 
-              <div className="mt-6 h-36 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={settled.trend}
-                    margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
-                  >
-                    <defs>
-                      <linearGradient id={settledGradientId} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
-                        <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="color-mix(in srgb, var(--border) 65%, transparent)"
-                      vertical={false}
-                    />
-                    <XAxis
-                      dataKey="x"
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                      interval="preserveStartEnd"
-                    />
-                    {/* Axis and tooltip both read in the selected currency, so the
-                    chart never contradicts the headline figure above it. */}
-                    <YAxis
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                      tickFormatter={(v: number) =>
-                        v >= 1000
-                          ? `${currencySymbol(currency)}${(v / 1000).toFixed(0)}K`
-                          : `${currencySymbol(currency)}${v}`
-                      }
-                      width={52}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius: 10,
-                        border: "1px solid var(--border)",
-                        fontSize: 12,
-                        background: "var(--popover)",
-                        color: "var(--popover-foreground)",
-                      }}
-                      formatter={(v) => [formatCurrency(Number(v), currency, "en-US"), "Settled"]}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="y"
-                      stroke="var(--chart-4)"
-                      strokeWidth={2}
-                      fill={`url(#${settledGradientId})`}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
+                {/* h-36 (144px) is just under the height OutstandingAmountCard
+                    resolves to on its own, so the chart fills the card without
+                    being what sets the pair's height — the Outstanding card is
+                    never stretched to accommodate it. */}
+                <div className="h-36 min-w-0 flex-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={settled.trend}
+                      margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                    >
+                      <defs>
+                        <linearGradient id={settledGradientId} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
+                          <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="color-mix(in srgb, var(--border) 65%, transparent)"
+                        vertical={false}
+                      />
+                      <XAxis
+                        dataKey="x"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                        interval="preserveStartEnd"
+                      />
+                      {/* Axis and tooltip both read in the selected currency, so
+                        the chart never contradicts the headline figure above
+                        it. width=64 is sized for the widest label this can
+                        produce — CHF's symbol is the three-letter code rather
+                        than a glyph, so "CHF140K" is what has to fit without
+                        being clipped, not "$140K". */}
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                        tickFormatter={(v: number) =>
+                          v >= 1000
+                            ? `${currencySymbol(currency)}${(v / 1000).toFixed(0)}K`
+                            : `${currencySymbol(currency)}${v}`
+                        }
+                        width={64}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          borderRadius: 10,
+                          border: "1px solid var(--border)",
+                          fontSize: 12,
+                          background: "var(--popover)",
+                          color: "var(--popover-foreground)",
+                        }}
+                        formatter={(v) => [formatCurrency(Number(v), currency, "en-US"), "Settled"]}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="y"
+                        stroke="var(--chart-4)"
+                        strokeWidth={2}
+                        fill={`url(#${settledGradientId})`}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </Card>
 
