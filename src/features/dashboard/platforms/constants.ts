@@ -17,6 +17,7 @@ function defaultDocuments(platformName: string): PlatformDocument[] {
       title: "Generate Settlement Statement",
       actionIcon: "file-text",
       actionLabel: `Generate a ${platformName} settlement statement`,
+      opensSettlementForm: true,
     },
     {
       caption: "Last 3 months",

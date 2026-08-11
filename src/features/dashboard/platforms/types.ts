@@ -35,6 +35,12 @@ export interface PlatformDocument {
   actionIcon: IconName;
   /** Accessible name for that button — the caption/title alone aren't enough. */
   actionLabel: string;
+  /**
+   * Whether the row's action opens the settlement statement form instead of
+   * downloading something directly. Platforms v1 opens that form in a drawer;
+   * rows without it keep the placeholder toast until their endpoint exists.
+   */
+  opensSettlementForm?: boolean;
 }
 
 /** A payout platform a merchant can point a PayGlocal virtual account at. */

@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/utils";
+import { SettlementStatementDrawer } from "@/features/dashboard/platforms-v1/components/SettlementStatementDrawer";
 import {
   SUPPORTED_PLATFORMS,
   accountsForPlatform,
@@ -90,6 +91,8 @@ export function PlatformsV1Feature() {
     accounts[0] ??
     null;
 
+  const [settlementDrawerOpen, setSettlementDrawerOpen] = useState(false);
+
   if (!selectedPlatform) return null;
 
   return (
@@ -103,6 +106,22 @@ export function PlatformsV1Feature() {
         title="Platforms v1"
         subtitle="Connect your PayGlocal receiving account to the platforms that pay you."
       />
+
+      {/* Opened by the Generate Settlement Statement document row. The key
+          remounts it whenever the platform or the currency changes, so the form
+          always opens on the account the page is showing rather than on
+          whatever it was last left holding. Closing it leaves the page exactly
+          as it was — nothing out here reads back out of the drawer. */}
+      {selectedAccount && (
+        <SettlementStatementDrawer
+          key={`${selectedPlatform.id}-${selectedAccount.id}`}
+          platformName={selectedPlatform.name}
+          accounts={accounts}
+          defaultAccountId={selectedAccount.id}
+          open={settlementDrawerOpen}
+          onOpenChange={setSettlementDrawerOpen}
+        />
+      )}
 
       {/* 40px — the page's largest step, and the only place it appears. The
           platform row is one closed group; this is the break between choosing
@@ -450,15 +469,20 @@ export function PlatformsV1Feature() {
                         {doc.title}
                       </p>
                     </div>
-                    {/* Placeholder until the document endpoints exist — the
-                        same stand-in treatment MCA v2 gives its
-                        proof-of-ownership download. */}
+                    {/* Which rows open the settlement form is data, not a
+                        title match. The rest stay placeholders until their
+                        endpoints exist — the same stand-in treatment MCA v2
+                        gives its proof-of-ownership download. */}
                     <IconButton
                       aria-label={doc.actionLabel}
                       variant="ghost"
                       size="sm"
                       className="shrink-0"
-                      onClick={() => toast.info(`${doc.title} will be available soon`)}
+                      onClick={() =>
+                        doc.opensSettlementForm
+                          ? setSettlementDrawerOpen(true)
+                          : toast.info(`${doc.title} will be available soon`)
+                      }
                     >
                       <Icon name={doc.actionIcon} className="h-4 w-4" />
                     </IconButton>

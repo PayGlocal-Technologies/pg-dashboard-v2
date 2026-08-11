@@ -29,8 +29,15 @@ export function OutstandingAmountCard() {
         {/* Primary KPI (left) and the pending-transactions count (right),
             same row, items-start so the compact badge sits near the top of
             the row rather than centering against the much taller figure
-            beside it. */}
-        <div className="mt-3 flex items-start justify-between gap-2">
+            beside it.
+
+            flex-wrap lets the badge drop onto its own line once the row is
+            too narrow to hold both. Without it the badge's shrink-0 would
+            hold its width and squeeze the amount instead — and the amount is
+            the one element on this card that must never be compressed. On its
+            own line justify-between leaves it flush left, under the amount,
+            and gap-2 supplies the 8px between the two rows. */}
+        <div className="mt-3 flex flex-wrap items-start justify-between gap-2">
           <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
             {formatUsdShort(OUTSTANDING_AMOUNT_USD)}
           </p>

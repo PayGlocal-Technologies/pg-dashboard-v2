@@ -183,7 +183,7 @@ export function McaV2Feature() {
                   is the shorter of the two; below `sm` they stack, which is
                   the only width where there isn't room for both. */}
               <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 sm:basis-2/5">
                   <p className="text-sm font-semibold text-foreground">
                     Settled amount in {currency}
                   </p>
@@ -213,8 +213,13 @@ export function McaV2Feature() {
                 {/* h-36 (144px) is just under the height OutstandingAmountCard
                     resolves to on its own, so the chart fills the card without
                     being what sets the pair's height — the Outstanding card is
-                    never stretched to accommodate it. */}
-                <div className="h-36 min-w-0 flex-1">
+                    never stretched to accommodate it.
+
+                    3/5 against the KPI stack's 2/5, rather than the even split
+                    the two flex-1s alone would give: the plot area loses a
+                    fixed 64px to the Y axis, so the widest track is worth more
+                    to the chart than to a stack of left-aligned text. */}
+                <div className="h-36 min-w-0 flex-1 sm:basis-3/5">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={settled.trend}
