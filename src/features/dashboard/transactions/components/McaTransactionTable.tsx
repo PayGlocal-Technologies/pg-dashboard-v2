@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -60,7 +60,15 @@ function restoreScrollTop(el: HTMLElement, value: number): void {
 // CurrencyFilterChip), so this is a flat single-category list.
 const STATUS_OPTIONS = MCA_STATUS_FILTERS.filter((o) => o.value !== "All");
 
-export function McaTransactionTable() {
+interface McaTransactionTableProps {
+  /** The page's analytics summary (see TransactionsAnalyticsCarousel),
+   *  composed by the page but positioned here: below md the search/Report and
+   *  filter-chip controls sit above it, and this component is what owns those.
+   *  Rendered first at md and up, so tablet and desktop are unaffected. */
+  analyticsSection?: ReactNode;
+}
+
+export function McaTransactionTable({ analyticsSection }: McaTransactionTableProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
   const contentEl = useContentAreaElement();
@@ -311,6 +319,45 @@ export function McaTransactionTable() {
     </>
   );
 
+  // Search + Report on one row that never wraps (search takes the flexible
+  // remaining width), then the filter chips on their own row beneath,
+  // scrolling horizontally on a single line since there's no room to show all
+  // four at once next to search. Its scrollbar is hidden (scrollbar-none, the
+  // same utility the multi-currency account carousel uses) so the chips read
+  // as a row of controls rather than a scroll region: the gesture still works,
+  // there's just no persistent indicator, and no custom one replaces it.
+  //
+  // No Reorder Columns at either width: there's no table to reorder columns
+  // on below lg, just the card list.
+  //
+  // Rendered only at md to lg, as a row inside the table's own container.
+  const compactControls = (
+    <>
+      <div className="flex flex-nowrap items-center gap-2">
+        <RotatingSearchInput
+          value={search}
+          onSearch={onSearch}
+          words={["remitter", "transaction ID", "UTR"]}
+          className="min-w-0 flex-1"
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+          onClick={handleReport}
+          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+        >
+          Report
+        </Button>
+      </div>
+
+      <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+        {filterChips}
+      </div>
+    </>
+  );
+
   // The details page replaces the table in place (same component instance,
   // same closed-over search/filter/page state) rather than overlaying it —
   // this is what makes Back restore the table's previous state for free.
@@ -330,7 +377,15 @@ export function McaTransactionTable() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
+      {/* mb-4 below md, giving 32px (this margin plus the flex gap) between
+          the analytics summary and the transaction list, against the 8px
+          between the carousel and its indicator: a clear break between the
+          summary metrics and the transaction data, without the indicator
+          drifting away from the carousel it belongs to. Collapses at md,
+          where the flex gap alone matches the previous spacing. */}
+      {analyticsSection && <div className="mb-4 md:mb-0">{analyticsSection}</div>}
+
       {/* Tab bar, search/filters, and the table itself all share one
           bordered surface (rounded-xl border border-border bg-card,
           matching every other card on this page) instead of each drawing
@@ -397,41 +452,10 @@ export function McaTransactionTable() {
           </div>
         </div>
 
-        {/* Tablet + mobile (below lg): no Reorder Columns at all here (no
-            table to reorder columns on, see the card list below). Report
-            keeps its full label/icon, same as desktop, and sits beside
-            search on a row that never wraps (search takes the flexible
-            remaining width). Filter chips move to their own row directly
-            beneath, scrolling horizontally on one line instead of wrapping,
-            since there's no room to show all four at once next to search.
-            That row's scrollbar is hidden (scrollbar-none, the same utility
-            the multi-currency account carousel uses) so the chips read as a
-            row of controls rather than a scroll region: the gesture still
-            works, there's just no persistent indicator, and no custom one
-            replaces it. */}
-        <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
-          <div className="flex flex-nowrap items-center gap-2">
-            <RotatingSearchInput
-              value={search}
-              onSearch={onSearch}
-              words={["remitter", "transaction ID", "UTR"]}
-              className="min-w-0 flex-1"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              onClick={handleReport}
-              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-            >
-              Report
-            </Button>
-          </div>
-
-          <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-            {filterChips}
-          </div>
+        {/* Tablet only (md to lg): the compact search/filter controls, as a
+            row inside this container. Not shown below md or at lg and up. */}
+        <div className="hidden flex-col gap-2 border-b border-border px-4 py-3 md:flex lg:hidden">
+          {compactControls}
         </div>
 
         {isError ? (

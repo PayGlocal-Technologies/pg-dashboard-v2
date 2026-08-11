@@ -56,6 +56,8 @@ export {
   PopoverTrigger,
   PopoverContent,
   Progress,
+  ProgressIndicator,
+  type ProgressIndicatorProps,
   RadioGroup,
   RadioGroupItem,
   type RadioGroupItemProps,
