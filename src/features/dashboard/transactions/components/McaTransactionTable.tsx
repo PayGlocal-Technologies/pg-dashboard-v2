@@ -62,9 +62,9 @@ const STATUS_OPTIONS = MCA_STATUS_FILTERS.filter((o) => o.value !== "All");
 
 interface McaTransactionTableProps {
   /** The page's analytics summary (see TransactionsAnalyticsCarousel),
-   *  composed by the page but positioned here: below md the search/Report and
-   *  filter-chip controls sit above it, and this component is what owns those.
-   *  Rendered first at md and up, so tablet and desktop are unaffected. */
+   *  composed by the page but rendered here, above this component's own
+   *  search/filter controls and table/card list, so the two stay in this
+   *  fixed order at every width. */
   analyticsSection?: ReactNode;
 }
 
@@ -330,7 +330,8 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   // No Reorder Columns at either width: there's no table to reorder columns
   // on below lg, just the card list.
   //
-  // Rendered only at md to lg, as a row inside the table's own container.
+  // Rendered below lg, as a row inside the table's own container, directly
+  // above the card list it filters.
   const compactControls = (
     <>
       <div className="flex flex-nowrap items-center gap-2">
@@ -379,11 +380,13 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   return (
     <div className="flex flex-col gap-4">
       {/* mb-4 below md, giving 32px (this margin plus the flex gap) between
-          the analytics summary and the transaction list, against the 8px
-          between the carousel and its indicator: a clear break between the
-          summary metrics and the transaction data, without the indicator
-          drifting away from the carousel it belongs to. Collapses at md,
-          where the flex gap alone matches the previous spacing. */}
+          the analytics summary and the transaction section below it, against
+          the 8px between the carousel and its indicator: a clear break
+          between the summary metrics and the transaction data, without the
+          indicator drifting away from the carousel it belongs to. Collapses
+          at md, where the analytics summary switches from the carousel (with
+          its indicator) to the plain grid and the flex gap alone matches the
+          previous spacing. */}
       {analyticsSection && <div className="mb-4 md:mb-0">{analyticsSection}</div>}
 
       {/* Tab bar, search/filters, and the table itself all share one
@@ -452,9 +455,12 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
           </div>
         </div>
 
-        {/* Tablet only (md to lg): the compact search/filter controls, as a
-            row inside this container. Not shown below md or at lg and up. */}
-        <div className="hidden flex-col gap-2 border-b border-border px-4 py-3 md:flex lg:hidden">
+        {/* Tablet + mobile (below lg): the compact search/filter controls,
+            directly above the card list they filter, inside this same
+            bordered container, below the tab bar. No Reorder Columns here at
+            either width: there's no table to reorder columns on below lg,
+            just the card list. */}
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
           {compactControls}
         </div>
 

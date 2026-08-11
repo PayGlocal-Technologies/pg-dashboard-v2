@@ -2,6 +2,7 @@
 
 import { useRef, useState, type UIEvent } from "react";
 import { ProgressIndicator } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { SettlementAnalyticsCard } from "@/features/dashboard/transactions/components/SettlementAnalyticsCard";
 import { OutstandingAmountCard } from "@/features/dashboard/transactions/components/OutstandingAmountCard";
 import { SavedAmountCard } from "@/features/dashboard/transactions/components/SavedAmountCard";
@@ -10,6 +11,20 @@ import { SavedAmountCard } from "@/features/dashboard/transactions/components/Sa
 // accessible labels, so the two can't fall out of step with each other.
 const PAGE_LABELS = ["Total settled analytics", "Outstanding and saved amount"];
 const LAST_PAGE = PAGE_LABELS.length - 1;
+
+// One width for every page, applied through this shared constant rather than
+// repeated per page, so the two can't end up different sizes and snap
+// inconsistently.
+//
+// w-full, not something narrower: each page fills the whole scroll container,
+// which itself carries no horizontal padding, so the active page is flush
+// with the page's own margins with nothing of the next page in view. The
+// gap-4 between pages (below) only shows as dead space mid-swipe. At rest,
+// snap-start lands the next page's left edge exactly at the container's right
+// edge, so there's no residual peek from it either.
+//
+// md:w-auto hands sizing back to the grid column from md up.
+const PAGE_CLASSES = "w-full shrink-0 snap-start md:w-auto";
 
 // Both of these take the element as a parameter rather than reading
 // scrollRef.current inline, matching restoreScrollTop in McaTransactionTable:
@@ -56,19 +71,18 @@ export function TransactionsAnalyticsCarousel() {
       <div
         ref={scrollRef}
         // Same scrollbar-none/snap treatment as the multi-currency account
-        // carousel, and the same p-1 there (offset by -m-1 so the cards still
-        // line up with the rest of the page) so overflow-x-auto's implicit
-        // vertical clip doesn't shave each card's rounded corners or shadow.
-        className="scrollbar-none -m-1 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth p-1
-                   md:m-0 md:grid md:overflow-visible md:p-0
+        // carousel. py-1 (offset by -my-1, so the cards still sit where they
+        // would with no padding at all) keeps overflow-x-auto's implicit
+        // vertical clip off each card's shadow. Vertical only, unlike that
+        // carousel's uniform p-1: horizontal padding would sit inside the
+        // scrollport and widen the peek past the 16px PAGE_CLASSES budgets
+        // for, and shadow-sm spreads too little sideways to need it.
+        className="scrollbar-none -my-1 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth py-1
+                   md:my-0 md:grid md:overflow-visible md:py-0
                    lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)]"
         onScroll={(e: UIEvent<HTMLDivElement>) => setActivePage(pageFromScroll(e.currentTarget))}
       >
-        {/* calc(100% - 2.5rem), not 100%: leaves a sliver of the next page in
-            view as the affordance that there's a second one, so the carousel
-            doesn't look like a single card that happens to be inset.
-            md:w-auto hands sizing back to the grid column. */}
-        <div className="w-[calc(100%-2.5rem)] shrink-0 snap-start md:w-auto">
+        <div className={PAGE_CLASSES}>
           <SettlementAnalyticsCard />
         </div>
 
@@ -79,7 +93,7 @@ export function TransactionsAnalyticsCarousel() {
             these are grid items again, where the column already stretches and
             the cards should stay at their natural heights, exactly as
             before. */}
-        <div className="flex w-[calc(100%-2.5rem)] shrink-0 snap-start flex-col gap-4 md:w-auto">
+        <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
           <OutstandingAmountCard className="grow md:grow-0" />
           <SavedAmountCard className="grow md:grow-0" />
         </div>
