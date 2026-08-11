@@ -3,24 +3,26 @@ import type { Platform, PlatformDocument } from "@/features/dashboard/platforms/
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 /**
- * Every platform's document list opens with the same two rows: the merchant's
- * own settlement statement, and a statement generated on the platform side.
- * Only the second is platform-specific, so it's built per platform rather than
+ * Every platform's document list carries the same two rows: a statement
+ * generated on the platform side, then the merchant's own bank settlement
+ * statement. The platform-side one leads because it's the document the
+ * merchant has to go and produce, where the bank statement already exists.
+ * Only the first is platform-specific, so it's built per platform rather than
  * repeated five times in SUPPORTED_PLATFORMS.
  */
 function defaultDocuments(platformName: string): PlatformDocument[] {
   return [
     {
-      caption: "Last 3 months",
-      title: "Bank settlement statement",
-      actionIcon: "download",
-      actionLabel: "Download the last 3 months' bank settlement statement",
-    },
-    {
       caption: platformName,
       title: "Generate Settlement Statement",
       actionIcon: "file-text",
       actionLabel: `Generate a ${platformName} settlement statement`,
+    },
+    {
+      caption: "Last 3 months",
+      title: "Bank settlement statement",
+      actionIcon: "download",
+      actionLabel: "Download the last 3 months' bank settlement statement",
     },
   ];
 }
