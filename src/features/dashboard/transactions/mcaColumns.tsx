@@ -70,7 +70,11 @@ export function CountryCell({ iso2 }: { iso2?: string | null }) {
 }
 
 // TODO: wire up the invoice viewing flow once the API/route is available.
-function handleViewInvoice(row: McaTransaction) {
+// Exported so TransactionCardList's mobile card action can call the same
+// (currently no-op) handler as the table's own View Invoice button below,
+// rather than each declaring its own stub that would need updating twice
+// once this is wired up for real.
+export function handleViewInvoice(row: McaTransaction) {
   void row;
 }
 

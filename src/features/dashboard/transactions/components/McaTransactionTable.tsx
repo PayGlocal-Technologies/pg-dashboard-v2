@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, DataTable, IconButton } from "@/components/ui";
+import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
@@ -21,6 +21,7 @@ import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
 import { ReorderColumnsPopover } from "@/features/dashboard/transactions/components/ReorderColumnsPopover";
+import { TransactionCardList } from "@/features/dashboard/transactions/components/TransactionCardList";
 import { CURRENCY_FILTER_OPTIONS } from "@/features/dashboard/multi-currency/constants";
 import { reorderColumns } from "@/lib/utils/columns";
 // Upload Invoice now opens the details page instead of this modal — import
@@ -264,11 +265,14 @@ export function McaTransactionTable() {
     // "Download FIRA" in TransactionDetailsPage.tsx.
   };
 
-  // Date/Amount/Status/Currency read as one cohesive filtering control
-  // (tight gap), shared verbatim between the desktop and tablet/mobile
-  // control row layouts below so the two can never drift out of sync.
+  // Date/Amount/Status/Currency read as one cohesive filtering control,
+  // shared verbatim between the desktop and tablet/mobile control row
+  // layouts below so the two can never drift out of sync. Just the chip
+  // elements, not their wrapping div: desktop wraps them onto a new line if
+  // needed, while mobile scrolls them horizontally on a single line
+  // instead, so each layout below supplies its own container.
   const filterChips = (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <>
       <DateFilterChip
         value={dateRange}
         onChange={(next) => {
@@ -304,7 +308,7 @@ export function McaTransactionTable() {
         open={openChip === "currency"}
         onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
       />
-    </div>
+    </>
   );
 
   // The details page replaces the table in place (same component instance,
@@ -371,7 +375,7 @@ export function McaTransactionTable() {
             className="w-40 sm:w-56"
           />
 
-          {filterChips}
+          <div className="flex flex-wrap items-center gap-1.5">{filterChips}</div>
 
           <div className="ml-auto flex items-center gap-2">
             <ReorderColumnsPopover
@@ -393,11 +397,13 @@ export function McaTransactionTable() {
           </div>
         </div>
 
-        {/* Tablet + mobile (below lg): Reorder Columns and Report shrink to
-            icon-only buttons (no room for their labels beside a flexible
-            search field) and sit on the same row as search, which never
-            wraps. Filter chips move to their own row directly beneath,
-            rather than trying to also fit them into that first row. */}
+        {/* Tablet + mobile (below lg): no Reorder Columns at all here (no
+            table to reorder columns on, see the card list below). Report
+            keeps its full label/icon, same as desktop, and sits beside
+            search on a row that never wraps (search takes the flexible
+            remaining width). Filter chips move to their own row directly
+            beneath, scrolling horizontally on one line instead of wrapping,
+            since there's no room to show all four at once next to search. */}
         <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
           <div className="flex flex-nowrap items-center gap-2">
             <RotatingSearchInput
@@ -406,25 +412,19 @@ export function McaTransactionTable() {
               words={["remitter", "transaction ID", "UTR"]}
               className="min-w-0 flex-1"
             />
-            <ReorderColumnsPopover
-              columns={reorderableColumns}
-              order={currentColumnOrder}
-              onOrderChange={setColumnOrder}
-              onReset={() => setColumnOrder(null)}
-              triggerVariant="icon"
-            />
-            <IconButton
-              aria-label="Report"
+            <Button
+              type="button"
               variant="outline"
               size="sm"
+              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
               onClick={handleReport}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
             >
-              <Icon name="download" className="h-3.5 w-3.5" />
-            </IconButton>
+              Report
+            </Button>
           </div>
 
-          {filterChips}
+          <div className="flex flex-nowrap items-center gap-1.5 overflow-x-auto">{filterChips}</div>
         </div>
 
         {isError ? (
@@ -439,22 +439,44 @@ export function McaTransactionTable() {
             <Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
           </div>
         ) : (
-          <DataTable
-            className="rounded-none border-0"
-            columns={columns}
-            data={tableRows}
-            isLoading={isPending}
-            skeletonRows={8}
-            emptyTitle="No transactions found"
-            emptyDescription="Try adjusting your filters or search query"
-            rowKey={(row) => row.gid}
-            pageSize={TRANSACTIONS_PAGE_LIMIT}
-            totalRows={totalCount}
-            page={page}
-            onPageChange={setPage}
-            tableLayout="content"
-            density="compact"
-          />
+          <>
+            {/* Desktop (lg+): the full table, columns and all. */}
+            <DataTable
+              className="hidden rounded-none border-0 lg:block"
+              columns={columns}
+              data={tableRows}
+              isLoading={isPending}
+              skeletonRows={8}
+              emptyTitle="No transactions found"
+              emptyDescription="Try adjusting your filters or search query"
+              rowKey={(row) => row.gid}
+              pageSize={TRANSACTIONS_PAGE_LIMIT}
+              totalRows={totalCount}
+              page={page}
+              onPageChange={setPage}
+              tableLayout="content"
+              density="compact"
+            />
+
+            {/* Tablet + mobile (below lg): a vertical list of transaction
+                cards instead of table columns/header. `tableRows` is
+                already just this server-paginated page's rows (the same
+                array DataTable's own controlled `page`/`data` above
+                consumes), so this reads it directly rather than re-slicing
+                or re-fetching anything. */}
+            <TransactionCardList
+              className="lg:hidden"
+              rows={tableRows}
+              isLoading={isPending}
+              onOpenDetails={openDetails}
+              page={page}
+              onPageChange={setPage}
+              totalRows={totalCount}
+              pageSize={TRANSACTIONS_PAGE_LIMIT}
+              emptyTitle="No transactions found"
+              emptyDescription="Try adjusting your filters or search query"
+            />
+          </>
         )}
       </div>
 
