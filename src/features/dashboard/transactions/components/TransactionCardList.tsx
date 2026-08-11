@@ -10,15 +10,14 @@ import type { McaTransaction } from "@/features/dashboard/transactions/types";
 
 function TransactionCardSkeleton() {
   return (
-    <div className="flex flex-col gap-2.5 rounded-xl border border-border bg-card px-4 py-3.5">
-      <div className="flex items-center gap-2.5">
-        <Shimmer className="h-8 w-8" rounded="full" />
+    <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
+      <div className="flex items-center gap-2">
+        <Shimmer className="h-7 w-7" rounded="full" />
         <Shimmer className="h-5 w-16" />
-        <Shimmer className="h-5 w-24" rounded="full" />
-        <Shimmer className="ml-auto h-8 w-8" rounded="lg" />
+        <Shimmer className="ml-auto h-5 w-24" rounded="full" />
       </div>
-      <Shimmer className="h-3 w-32" />
-      <Shimmer className="h-3 w-28" />
+      <Shimmer className="mt-1.5 h-3 w-32" />
+      <Shimmer className="mt-2.5 h-3 w-28" />
     </div>
   );
 }
@@ -26,7 +25,7 @@ function TransactionCardSkeleton() {
 // Same row data and action as buildMcaColumns' amount/status/action columns
 // and RowClick, just laid out as a stacked card instead of table cells: the
 // whole card opens the drawer (see TransactionCardList's own role="button"
-// treatment below), while the leading upload/view action stops propagation
+// treatment below), while the View/Upload invoice action stops propagation
 // so it fires its own handler instead of also opening the drawer.
 function TransactionCard({
   row,
@@ -53,35 +52,32 @@ function TransactionCard({
           onOpenDetails(row);
         }
       }}
-      className="flex cursor-pointer flex-col gap-2.5 rounded-xl border border-border bg-card px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+      className="flex cursor-pointer flex-col rounded-xl border border-border bg-card px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
     >
-      <div className="flex items-center gap-2.5">
+      {/* Primary row: flag kept compact (h-7, not the h-8+ it might otherwise
+          get) so it doesn't compete with the amount, gap-2 (not 2.5) so flag,
+          amount, and chip read as one tight cluster. The amount is bumped to
+          text-xl (from text-lg) to make it the strongest element on the
+          card; the chip stays StatusBadge's own compact size, secondary by
+          construction next to that larger figure. */}
+      <div className="flex items-center gap-2">
         <CountryFlagAvatar
           iso2={row.partnerCustomerCountry ?? ""}
           countryName={row.partnerCustomerCountry ?? "Remitter country"}
-          className="h-8 w-8 shrink-0"
+          className="h-7 w-7 shrink-0"
         />
-        <span className="text-lg font-semibold tabular-nums text-foreground">
+        <span className="text-xl font-semibold tabular-nums tracking-tight text-foreground">
           {formatCurrency(amount, currency, "en-US")}
         </span>
         <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />
 
-        {/* Independent of the card's own click: e.stopPropagation() keeps
-            this from also opening the drawer. */}
-        <div className="ml-auto shrink-0">
-          {showUpload ? (
-            <IconButton
-              aria-label="Upload invoice"
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenDetails(row);
-              }}
-            >
-              <Icon name="upload" className="h-3.5 w-3.5" />
-            </IconButton>
-          ) : (
+        {/* View invoice stays here, icon-only, independent of the card's own
+            click (e.stopPropagation()). Upload invoice moves to its own
+            bottom-right row below instead of this slot: unlike View, it's a
+            labelled action, and a label here would fight the amount for
+            room on this row. */}
+        {!showUpload && (
+          <div className="ml-auto shrink-0">
             <IconButton
               aria-label="View invoice"
               variant="ghost"
@@ -93,16 +89,49 @@ function TransactionCard({
             >
               <Icon name="eye" className="h-3.5 w-3.5" />
             </IconButton>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <p className="text-[13px] text-muted-foreground">
-        Charged by <span className="font-medium text-foreground">{counterpartyName}</span>
+      {/* mt-1.5 (not the primary row's own gap-2): tighter than the rest of
+          the card's rhythm, since this sits directly under the amount it
+          describes. "Charged by" stays muted; the name is bumped to
+          font-semibold (from font-medium) so it still reads as the second
+          strongest text on the card, after the amount but above the date. */}
+      <p className="mt-1.5 text-[13px] text-muted-foreground">
+        Charged by <span className="font-semibold text-foreground">{counterpartyName}</span>
       </p>
-      <p className="text-[12px] text-muted-foreground">
-        {formatTransactionTimestamp(row.formattedCreationDateTime)}
-      </p>
+
+      {/* mt-2.5: a slightly wider beat than the one above, separating the
+          remitter line from this trailing metadata/action row. Timestamp and
+          Upload invoice share this row, button at the far right, instead of
+          the button sitting on its own row below: matches the reference,
+          where the button lines up with the date rather than hanging beneath
+          it. items-center keeps the single-line timestamp and the button's
+          own height vertically centered against each other. Still
+          independent of the card's own onClick via e.stopPropagation(), same
+          as View invoice above; same upload flow as before (opens the
+          drawer's inline upload), just a fuller button. */}
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <p className="text-[12px] text-muted-foreground">
+          {formatTransactionTimestamp(row.formattedCreationDateTime)}
+        </p>
+        {showUpload && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenDetails(row);
+            }}
+            className="h-auto min-h-0 shrink-0 gap-1.5 py-1.5"
+          >
+            Upload invoice
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
