@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, DataTable } from "@/components/ui";
+import { Button, DataTable, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
@@ -258,6 +258,55 @@ export function McaTransactionTable() {
     .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
+  const handleReport = () => {
+    // TODO: wire up once a transactions export endpoint exists, same gap
+    // as the page-level "Export Report" button in index.tsx and
+    // "Download FIRA" in TransactionDetailsPage.tsx.
+  };
+
+  // Date/Amount/Status/Currency read as one cohesive filtering control
+  // (tight gap), shared verbatim between the desktop and tablet/mobile
+  // control row layouts below so the two can never drift out of sync.
+  const filterChips = (
+    <div className="flex flex-wrap items-center gap-1.5">
+      <DateFilterChip
+        value={dateRange}
+        onChange={(next) => {
+          setDateRange(next);
+          setPage(1);
+        }}
+        open={openChip === "date"}
+        onOpenChange={(next) => setOpenChip(next ? "date" : null)}
+      />
+      <AmountFilterChip
+        value={amountRange}
+        onChange={setAmountRange}
+        open={openChip === "amount"}
+        onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
+        idPrefix="txn-amount"
+        hint="Applies to the transactions currently loaded."
+      />
+      <StatusFilterChip
+        options={STATUS_OPTIONS}
+        selected={statusFilters}
+        onToggle={toggleStatusFilter}
+        onClear={onClearStatusFilter}
+        open={openChip === "status"}
+        onOpenChange={(next) => setOpenChip(next ? "status" : null)}
+      />
+      <CurrencyFilterChip
+        options={CURRENCY_FILTER_OPTIONS}
+        value={currencyFilters}
+        onChange={(next) => {
+          setCurrencyFilters(next);
+          setPage(1);
+        }}
+        open={openChip === "currency"}
+        onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
+      />
+    </div>
+  );
+
   // The details page replaces the table in place (same component instance,
   // same closed-over search/filter/page state) rather than overlaying it —
   // this is what makes Back restore the table's previous state for free.
@@ -311,13 +360,10 @@ export function McaTransactionTable() {
           />
         </div>
 
-        {/* Controls row: search, then the filter chip group, sit together
-            on the left with tight spacing; the Reorder Columns/Download
-            action group is pushed to the far right (ml-auto below) rather
-            than spread apart via justify-between, so the chips read as
-            immediately following search instead of floating in the middle
-            of a wide gap. */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+        {/* Desktop (lg+): search, filter chips, and the Reorder
+            Columns/Report actions all share one row, actions pushed to the
+            far right via ml-auto. Unchanged from before. */}
+        <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
           <RotatingSearchInput
             value={search}
             onSearch={onSearch}
@@ -325,51 +371,8 @@ export function McaTransactionTable() {
             className="w-40 sm:w-56"
           />
 
-          {/* Filter group: Date, Amount, Status, Currency read as one
-              cohesive filtering control, so the gap within it is tight. */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <DateFilterChip
-              value={dateRange}
-              onChange={(next) => {
-                setDateRange(next);
-                setPage(1);
-              }}
-              open={openChip === "date"}
-              onOpenChange={(next) => setOpenChip(next ? "date" : null)}
-            />
-            <AmountFilterChip
-              value={amountRange}
-              onChange={setAmountRange}
-              open={openChip === "amount"}
-              onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
-              idPrefix="txn-amount"
-              hint="Applies to the transactions currently loaded."
-            />
-            <StatusFilterChip
-              options={STATUS_OPTIONS}
-              selected={statusFilters}
-              onToggle={toggleStatusFilter}
-              onClear={onClearStatusFilter}
-              open={openChip === "status"}
-              onOpenChange={(next) => setOpenChip(next ? "status" : null)}
-            />
-            <CurrencyFilterChip
-              options={CURRENCY_FILTER_OPTIONS}
-              value={currencyFilters}
-              onChange={(next) => {
-                setCurrencyFilters(next);
-                setPage(1);
-              }}
-              open={openChip === "currency"}
-              onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
-            />
-          </div>
+          {filterChips}
 
-          {/* Action group: Reorder Columns, then Download. ml-auto pushes
-              this group all the way to the right regardless of how much
-              space the search/filter groups take up. The resulting gap
-              (rather than a divider) is what separates it from the filter
-              chips. */}
           <div className="ml-auto flex items-center gap-2">
             <ReorderColumnsPopover
               columns={reorderableColumns}
@@ -382,16 +385,46 @@ export function McaTransactionTable() {
               variant="outline"
               size="sm"
               leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              onClick={() => {
-                // TODO: wire up once a transactions export endpoint exists,
-                // same gap as the page-level "Export Report" button in
-                // index.tsx and "Download FIRA" in TransactionDetailsPage.tsx.
-              }}
+              onClick={handleReport}
               className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
             >
               Report
             </Button>
           </div>
+        </div>
+
+        {/* Tablet + mobile (below lg): Reorder Columns and Report shrink to
+            icon-only buttons (no room for their labels beside a flexible
+            search field) and sit on the same row as search, which never
+            wraps. Filter chips move to their own row directly beneath,
+            rather than trying to also fit them into that first row. */}
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
+          <div className="flex flex-nowrap items-center gap-2">
+            <RotatingSearchInput
+              value={search}
+              onSearch={onSearch}
+              words={["remitter", "transaction ID", "UTR"]}
+              className="min-w-0 flex-1"
+            />
+            <ReorderColumnsPopover
+              columns={reorderableColumns}
+              order={currentColumnOrder}
+              onOrderChange={setColumnOrder}
+              onReset={() => setColumnOrder(null)}
+              triggerVariant="icon"
+            />
+            <IconButton
+              aria-label="Report"
+              variant="outline"
+              size="sm"
+              onClick={handleReport}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <Icon name="download" className="h-3.5 w-3.5" />
+            </IconButton>
+          </div>
+
+          {filterChips}
         </div>
 
         {isError ? (

@@ -17,7 +17,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from "@/components/ui";
+import { Button, IconButton, Popover, PopoverContent, PopoverTrigger, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +35,11 @@ interface ReorderColumnsPopoverProps {
    *  passing the default order through it, since "no saved order" is its own
    *  state in the caller, not just another arrangement. */
   onReset: () => void;
+  /** "text" (default): a labelled Button, used on wider layouts with room
+   *  for it. "icon": a compact IconButton with no label, for the
+   *  tablet/mobile control row where it sits beside a flexible search
+   *  field. Only the trigger changes; the popover content is identical. */
+  triggerVariant?: "text" | "icon";
 }
 
 // Same @dnd-kit drag pattern as the dashboard's widget reordering (see
@@ -71,6 +76,7 @@ export function ReorderColumnsPopover({
   order,
   onOrderChange,
   onReset,
+  triggerVariant = "text",
 }: ReorderColumnsPopoverProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -95,19 +101,30 @@ export function ReorderColumnsPopover({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          // Same grip glyph the draggable rows inside the popover use (see
-          // SortableColumnRow), so the button names the gesture it opens.
-          leftIcon={<Icon name="grip-vertical" className="h-3.5 w-3.5" />}
-          // h-auto/min-h-0/py-1: same compact height as the Upload Invoice
-          // button and the filter chips, instead of Button's default sm
-          // height (h-9).
-          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-        >
-          Reorder Columns
-        </Button>
+        {triggerVariant === "icon" ? (
+          <IconButton
+            aria-label="Reorder columns"
+            variant="outline"
+            size="sm"
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+          >
+            <Icon name="grip-vertical" className="h-3.5 w-3.5" />
+          </IconButton>
+        ) : (
+          <Button
+            variant="outline"
+            size="sm"
+            // Same grip glyph the draggable rows inside the popover use (see
+            // SortableColumnRow), so the button names the gesture it opens.
+            leftIcon={<Icon name="grip-vertical" className="h-3.5 w-3.5" />}
+            // h-auto/min-h-0/py-1: same compact height as the Upload Invoice
+            // button and the filter chips, instead of Button's default sm
+            // height (h-9).
+            className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+          >
+            Reorder Columns
+          </Button>
+        )}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-56 p-2">
         <p className="px-2 pb-1.5 text-[11px] font-medium text-muted-foreground">Drag to reorder</p>
