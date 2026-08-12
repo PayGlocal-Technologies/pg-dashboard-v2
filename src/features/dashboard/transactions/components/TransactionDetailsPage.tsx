@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import Image from "next/image";
 import {
   Alert,
   AlertDescription,
@@ -279,12 +280,40 @@ function getCurrencyCountry(currency: string) {
 
 // Rendered (see the isSettled check at the call site) in the left column
 // only, alongside Settlement Timeline/Linked Transactions, never spanning
-// into the Payment Details/Sender Details column. The illustration slot is
-// an empty, fixed-size placeholder reserved for a future asset,
-// intentionally not filled with interim art. The referral promotion is a
-// separate, lower-priority banner (see ReferEarnBanner below), not part of
-// this one, so this card stays focused purely on the FIRA outcome and its
-// download action.
+// into the Payment Details/Sender Details column. The referral promotion is
+// a separate, lower-priority banner (see ReferEarnBanner below), not part
+// of this one, so this card stays focused purely on the FIRA outcome and
+// its download action.
+//
+// FIRA_ILLUSTRATION_WIDTH/HEIGHT hold public/assets/Fira.png's own aspect
+// ratio (1545x1078), scaled to 80% of the original 96px-tall footprint (the
+// card's own h-24 unit) rather than forcing it into a square and cropping
+// or distorting it. It's a plain public/ file loaded via next/image with an
+// explicit width/height (not the SVG icon registry): a photorealistic,
+// multi-gradient 3D render like this isn't the flat vector line art that
+// pattern is for, and it already ships as a transparent PNG, so no
+// background container wraps it here the way the old bg-muted placeholder
+// had one.
+const FIRA_ILLUSTRATION_HEIGHT = Math.round(96 * 0.8);
+const FIRA_ILLUSTRATION_WIDTH = Math.round((1545 / 1078) * FIRA_ILLUSTRATION_HEIGHT);
+
+function FiraIllustration() {
+  return (
+    <Image
+      src="/assets/Fira.png"
+      alt=""
+      width={FIRA_ILLUSTRATION_WIDTH}
+      height={FIRA_ILLUSTRATION_HEIGHT}
+      // pr-4: the smaller image no longer visually meets the text column at
+      // the same distance the surrounding gap-4 rows use, so this adds a
+      // second gap-4 unit (not an arbitrary value) on its trailing edge to
+      // keep the image-to-text spacing consistent with the rest of the
+      // card's rhythm.
+      className="shrink-0 pr-4"
+    />
+  );
+}
+
 function FiraReceivedBanner({ layout }: { layout: "page" | "drawer" }) {
   const downloadButton = (
     <Button
@@ -307,7 +336,7 @@ function FiraReceivedBanner({ layout }: { layout: "page" | "drawer" }) {
     return (
       <Card size="sm">
         <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
+          <FiraIllustration />
 
           <div className="min-w-0 flex-1 space-y-1.5">
             <div className="flex flex-wrap items-baseline gap-2">
@@ -328,7 +357,7 @@ function FiraReceivedBanner({ layout }: { layout: "page" | "drawer" }) {
   return (
     <Card size="sm">
       <CardContent className="flex flex-col gap-4 md:flex-row md:items-start">
-        <div className="h-24 w-24 shrink-0 rounded-lg bg-muted" aria-hidden="true" />
+        <FiraIllustration />
 
         <div className="flex-1 space-y-2">
           <div className="flex items-baseline gap-2">
