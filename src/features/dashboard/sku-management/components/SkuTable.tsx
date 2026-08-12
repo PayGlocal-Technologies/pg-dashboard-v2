@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import { DataTable } from "@/components/ui";
-import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
+import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SkuCardList } from "@/features/dashboard/sku-management/components/SkuCardList";
 import {
   SKU_PAGE_LIMIT,
+  SKU_SEARCH_HINTS,
   SKU_TAB_TYPE,
   SKU_VIEW_TABS,
   type SkuViewTab,
@@ -19,16 +20,24 @@ export function SkuTable() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
+  const query = search.trim().toLowerCase();
+
   // Tab and search both narrow the same list, and both reset paging (below),
   // so this is derived during render rather than held in state. There is no
   // catalogue endpoint yet — MOCK_SKU_PRODUCTS stands in for one — so the
   // filtering is client-side; swapping in a real query means replacing the
-  // source array and moving these two predicates into the request body.
+  // source array and moving these predicates into the request body.
   const filteredRows = MOCK_SKU_PRODUCTS.filter((product) => {
     if (tab !== "all" && product.type !== SKU_TAB_TYPE[tab]) return false;
-    // Product name only: the page has no other search axis (no filter chips,
-    // no HSN/description search), per the spec for this table.
-    return product.name.toLowerCase().includes(search.trim().toLowerCase());
+    if (!query) return true;
+    // Matches either field the placeholder cycles through (SKU_SEARCH_HINTS),
+    // the same way the Transactions search spans remitter/transaction ID/UTR:
+    // one box, no mode to pick, a hit on either counts. Description stays
+    // unsearchable — the hint never offers it.
+    return (
+      product.name.toLowerCase().includes(query) ||
+      product.hsnSac.toLowerCase().includes(query)
+    );
   });
 
   const totalCount = filteredRows.length;
@@ -61,8 +70,8 @@ export function SkuTable() {
         <RotatingSearchInput
           value={search}
           onSearch={onSearch}
-          words={["product name"]}
-          ariaLabel="Search products"
+          words={SKU_SEARCH_HINTS}
+          ariaLabel="Search products by name or HSN/SAC"
           className="w-full sm:w-56"
         />
       </div>

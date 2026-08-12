@@ -44,3 +44,12 @@ export const SKU_TYPE_LABEL: Record<SkuProductType, string> = {
   GOODS: "Goods",
   SERVICES: "Services",
 };
+
+/**
+ * The hints the search box cycles through, exactly as the Transactions page
+ * cycles remitter/transaction ID/UTR: each one names a field the query is
+ * matched against, and the query hits any of them (see SkuTable's filter).
+ * Rendered as "Search by " + hint, so these are lowercase phrases except
+ * HSN/SAC, which is an initialism.
+ */
+export const SKU_SEARCH_HINTS = ["product name", "HSN/SAC"];
