@@ -50,6 +50,13 @@ export const regularNavigation: NavGroup[] = [
         ],
       },
       {
+        label: "SKU Management",
+        href: "/sku-management",
+        icon: "package",
+        badge: "NEW",
+        permission: [],
+      },
+      {
         label: "Manage Mandates",
         href: "/manage-mandates",
         icon: "credit-card",

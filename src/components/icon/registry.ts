@@ -57,6 +57,7 @@ import {
   Minimize2,
   Monitor,
   Moon,
+  Package,
   Paperclip,
   PanelLeftClose,
   PanelLeftOpen,
@@ -88,6 +89,7 @@ import {
   UserPlus,
   Users,
   Wallet,
+  Wrench,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -153,6 +155,7 @@ export const ICONS = {
   "message-circle": MessageCircle,
   monitor: Monitor,
   moon: Moon,
+  package: Package,
   paperclip: Paperclip,
   "panel-left-close": PanelLeftClose,
   "panel-left-open": PanelLeftOpen,
@@ -185,6 +188,7 @@ export const ICONS = {
   "user-plus": UserPlus,
   users: Users,
   wallet: Wallet,
+  wrench: Wrench,
   x: X,
 
   // ─── Platform brand marks (Platforms tutorial page) ────────────────────────
