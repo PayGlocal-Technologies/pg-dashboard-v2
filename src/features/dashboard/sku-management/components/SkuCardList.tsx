@@ -4,7 +4,7 @@ import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
-import { SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
+import { SKU_PRICE_LOCALE, SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
@@ -44,10 +44,10 @@ function SkuCard({ row }: { row: SkuProduct }) {
             trail it as muted metadata on the same line. */}
         <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span className="text-[15px] font-semibold tabular-nums text-foreground">
-            {formatCurrency(row.sellingPrice, row.currency)}
+            {formatCurrency(row.sellingPrice, row.currency, SKU_PRICE_LOCALE)}
           </span>
           <span className="text-[12px] tabular-nums text-muted-foreground">
-            Cost {formatCurrency(row.productCost, row.currency)}
+            Cost {formatCurrency(row.productCost, row.currency, SKU_PRICE_LOCALE)}
           </span>
           <span className="text-[12px] tabular-nums text-muted-foreground">
             HSN/SAC {row.hsnSac}

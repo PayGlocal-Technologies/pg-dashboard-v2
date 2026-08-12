@@ -1,7 +1,30 @@
-import type { SkuProductType } from "@/features/dashboard/sku-management/types";
+import type { SkuCurrency, SkuProductType } from "@/features/dashboard/sku-management/types";
 
 /** Rows per page — matches TRANSACTIONS_PAGE_LIMIT so both tables page alike. */
 export const SKU_PAGE_LIMIT = 10;
+
+/**
+ * Runtime list of the SkuCurrency union — the same seven the merchant holds
+ * local receiving accounts for (see MOCK_VIRTUAL_ACCOUNTS in
+ * multi-currency/mock-data.ts). Typed as SkuCurrency[] so adding a code here
+ * that isn't in the union is a compile error, not a silent divergence.
+ */
+export const SKU_CURRENCIES: readonly SkuCurrency[] = [
+  "USD",
+  "GBP",
+  "EUR",
+  "CAD",
+  "AED",
+  "AUD",
+  "SGD",
+];
+
+/**
+ * Locale used to group the digits in both price columns. Fixed to en-US
+ * (not the formatCurrency default of en-IN) since none of SKU_CURRENCIES is
+ * INR: these should read 1,850.00, never the 1,85,0.00 lakh grouping.
+ */
+export const SKU_PRICE_LOCALE = "en-US";
 
 export const SKU_VIEW_TABS = [
   { value: "all", label: "All" },

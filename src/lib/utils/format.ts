@@ -63,7 +63,10 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   BYN: "Br",
   ALL: "L",
   // Middle Eastern Currencies
-  AED: "د.إ",
+  // Latin code rather than the د.إ glyph: the dashboard is LTR throughout, and
+  // the RTL mark reorders badly against the Latin digits it prefixes. Also
+  // affects the AED figures on Multi-Currency and Transactions.
+  AED: "AED ",
   SAR: "﷼",
   BHD: ".د.ب",
   QAR: "﷼",

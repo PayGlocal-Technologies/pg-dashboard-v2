@@ -2,7 +2,7 @@
 
 import { type Column, StatusBadge } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils/format";
-import { SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
+import { SKU_PRICE_LOCALE, SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
@@ -15,14 +15,27 @@ export function buildSkuColumns(): Column<SkuProduct>[] {
     {
       key: "name",
       header: "Product",
-      minWidth: 280,
+      // The floor, not the final width: `tableLayout="content"` sizes this
+      // column to its widest cell, and min-w-max below keeps that measurement
+      // honest, so the longest product name sets the column width. 340 covers
+      // the 70px thumbnail plus a typical name, so the column doesn't jump
+      // around while the table is still filling in.
+      minWidth: 340,
+      // Compact density puts overflow-hidden on every cell, which would clip
+      // the un-wrapped name back to the column's current width and defeat the
+      // min-w-max measurement — cancelled here, same as mcaColumns does for
+      // its Country cell.
+      cellClassName: "overflow-visible",
       render: (row) => (
-        <div className="flex items-center gap-3">
+        // min-w-max: the cell never shrinks below thumbnail + full name, so
+        // the column widens to fit rather than truncating or wrapping.
+        <div className="flex min-w-max items-center gap-3">
           <ProductThumbnail product={row} className="shrink-0" />
-          <span className="text-[13px] font-medium text-foreground">{row.name}</span>
+          <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
+            {row.name}
+          </span>
         </div>
       ),
-      wrap: true,
     },
     {
       key: "type",
@@ -53,7 +66,7 @@ export function buildSkuColumns(): Column<SkuProduct>[] {
       align: "right",
       render: (row) => (
         <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap text-foreground">
-          {formatCurrency(row.sellingPrice, row.currency)}
+          {formatCurrency(row.sellingPrice, row.currency, SKU_PRICE_LOCALE)}
         </span>
       ),
     },
@@ -64,7 +77,7 @@ export function buildSkuColumns(): Column<SkuProduct>[] {
       align: "right",
       render: (row) => (
         <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
-          {formatCurrency(row.productCost, row.currency)}
+          {formatCurrency(row.productCost, row.currency, SKU_PRICE_LOCALE)}
         </span>
       ),
     },
