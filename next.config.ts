@@ -1,18 +1,18 @@
 import type { NextConfig } from "next";
-import path from "node:path";
 
 const env = process.env.NEXT_PUBLIC_ENV;
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
-  // @payglocal_ui/lumen is a `file:../lumen` dependency, so npm symlinks it into
-  // node_modules with a real path *outside* pg-dashboard-v2. Turbopack bounds module
-  // resolution to its inferred project root (this folder, picked from the lockfile),
-  // so the symlinked package fails to resolve ("Module not found"). Pointing the root
-  // at the parent dir that contains both packages lets Turbopack follow the symlink.
+  // Pin the workspace root to this project folder. Without this, Turbopack
+  // auto-detects the root by walking up looking for lockfiles and will pick
+  // up any stray lockfile in an ancestor directory (e.g. one sitting
+  // directly in the user's home/Desktop folder), which can point it at a
+  // directory outside this project — and, on macOS, one the OS may refuse
+  // to let the dev server read at all.
   turbopack: {
-    root: path.join(__dirname, ".."),
+    root: __dirname,
   },
   transpilePackages: ["@payglocal_ui/flux-ui", "@payglocal_ui/lumen"],
   env: {

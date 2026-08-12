@@ -5,16 +5,6 @@ export interface FilterOption {
 
 export const TRANSACTIONS_PAGE_LIMIT = 15;
 
-// ── Segment values — mirror pg-dashboard's product keys ────────────────────
-export const SEGMENT_PA  = "CARDS_UPI_NETBANKING";
-export const SEGMENT_MCA = "GLOBAL_FUND_TRANSFER";
-
-// ── PA product flags (from merchantEnabledProducts.pgProducts) ──────────────
-export const PA_PRODUCT_FLAGS = [
-  "INTERNATIONAL_CARDS_AND_ALT_PAYS",
-  "DOMESTIC_CARDS_UPI_AND_INB",
-] as const;
-
 // ── PA status pills shown in the filter bar ──────────────────────────────────
 export const PA_STATUS_FILTERS: FilterOption[] = [
   { value: "All",              label: "All" },
@@ -31,6 +21,17 @@ export const PA_METHOD_FILTERS: FilterOption[] = [
   { value: "UPI",        label: "UPI" },
   { value: "NETBANKING", label: "Net Banking" },
 ];
+
+// ── Status segmented control (coarse buckets shown below the toolbar) ───────
+export const PA_STATUS_SEGMENTS = [
+  { value: "All",      label: "All" },
+  { value: "success",  label: "Success" },
+  { value: "refunded", label: "Refunded" },
+  { value: "failed",   label: "Failed" },
+] as const;
+
+// ── PA currency options (for the Currency filter chip) ───────────────────────
+export const PA_CURRENCY_OPTIONS = ["INR", "USD", "EUR", "GBP", "AED", "SGD"];
 
 // ── MCA status pills ──────────────────────────────────────────────────────────
 export const MCA_STATUS_FILTERS: FilterOption[] = [

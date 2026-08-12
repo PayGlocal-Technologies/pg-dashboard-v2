@@ -1,9 +1,13 @@
 import type { IconName } from "@/components/icon";
+import type { ProductType } from "@/lib/hooks/useResolvedMids";
 
 export type NavChild = {
   label: string;
   href: string;
   permission?: string[];
+  /** Only shown while the header's product context matches, see
+   * useProductContext.ts. Omit for items shared by both products. */
+  product?: ProductType;
 };
 
 export type NavItem = {
@@ -44,9 +48,8 @@ export const regularNavigation: NavGroup[] = [
         icon: "shopping-cart",
         permission: [],
         children: [
-          { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
-          { label: "MCA Links", href: "/mca-links", permission: [] },
-          { label: "Payment Links", href: "/payment-links", permission: [] },
+          { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
+          { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },
         ],

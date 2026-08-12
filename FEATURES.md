@@ -13,3 +13,4 @@ Status meaning:
 | Feature | Design branch | Designer | Status | Date | Summary |
 |---------|---------------|----------|--------|------|---------|
 | _example: payment-links_ | `design/payment-links` | Demo User | Ready for integration | 2026-07-22 | Create-link screen with all states |
+| cards-transactions | `design/cards-transactions` | Nidhi | Ready for integration | 2026-08-12 | Settlement reports for MCA and team management screens |
