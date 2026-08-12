@@ -178,11 +178,12 @@ export function McaV2Feature() {
                 fixed to USD. */}
             <Card size="sm" className="gap-0">
               {/* KPI stack left, chart right, so the card spends the width it
-                  has rather than stacking into extra height. items-center
-                  keeps the two balanced against each other when the KPI stack
-                  is the shorter of the two; below `sm` they stack, which is
+                  has rather than stacking into extra height. flex-1 makes this
+                  row fill the Card, which the grid above has already stretched
+                  to the taller of the pair; items-stretch then hands that full
+                  height down to the chart. Below `sm` the two stack, which is
                   the only width where there isn't room for both. */}
-              <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+              <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
                 <div className="min-w-0 flex-1 sm:basis-2/5">
                   <p className="text-sm font-semibold text-foreground">
                     Settled amount in {currency}
@@ -210,16 +211,21 @@ export function McaV2Feature() {
                   </p>
                 </div>
 
-                {/* h-36 (144px) is just under the height OutstandingAmountCard
-                    resolves to on its own, so the chart fills the card without
-                    being what sets the pair's height — the Outstanding card is
-                    never stretched to accommodate it.
+                {/* No fixed height: items-stretch on the row above sizes this
+                    to the Card's full content height, so the chart runs from
+                    the top of the title beside it to the bottom of the trend
+                    line. min-h-36 is only a floor for the stacked layout below
+                    `sm`, where there is no row height to stretch to and
+                    ResponsiveContainer would otherwise collapse to nothing.
+                    Because the height is inherited rather than set here, the
+                    chart can never be what makes this card taller than
+                    OutstandingAmountCard beside it.
 
                     3/5 against the KPI stack's 2/5, rather than the even split
                     the two flex-1s alone would give: the plot area loses a
                     fixed 64px to the Y axis, so the widest track is worth more
                     to the chart than to a stack of left-aligned text. */}
-                <div className="h-36 min-w-0 flex-1 sm:basis-3/5">
+                <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={settled.trend}
