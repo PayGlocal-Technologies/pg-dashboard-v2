@@ -23,6 +23,31 @@ export function clientAmountLocale(currency: string): string {
   return currency === "INR" ? "en-IN" : "en-US";
 }
 
+/** Rows per page in the Client Details view's transactions section. Smaller
+ *  than the Transactions page's own limit: this is one client's recent
+ *  activity inside a details view, not the full transaction list. */
+export const CLIENT_TRANSACTIONS_PAGE_LIMIT = 5;
+
+export interface ClientInvoiceMetrics {
+  total: number;
+  paid: number;
+  outstanding: number;
+}
+
+/**
+ * The three figures the Client Details view's KPI row shows. Outstanding is
+ * derived here rather than stored on the client (see Client.paidInvoices), so
+ * the three can never contradict each other, and clamped at zero so a bad
+ * record can't render a negative count.
+ */
+export function clientInvoiceMetrics(client: Client): ClientInvoiceMetrics {
+  return {
+    total: client.totalInvoices,
+    paid: client.paidInvoices,
+    outstanding: Math.max(0, client.totalInvoices - client.paidInvoices),
+  };
+}
+
 /**
  * The Country chip's options, derived from the clients themselves rather than
  * a fixed country list: the filter should only ever offer countries the

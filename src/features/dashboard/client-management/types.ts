@@ -29,4 +29,16 @@ export interface Client {
   outstandingCurrency: string;
   /** ISO 8601 timestamp the client record was created. */
   createdAt: string;
+  /**
+   * Completed invoices raised against this client, whatever their payment
+   * state — the "Total completed invoices" KPI on the details view.
+   */
+  totalInvoices: number;
+  /**
+   * How many of those the client has actually paid. The outstanding count is
+   * the difference between the two (see clientInvoiceMetrics) rather than a
+   * third stored field, so the three figures can never disagree with each
+   * other.
+   */
+  paidInvoices: number;
 }

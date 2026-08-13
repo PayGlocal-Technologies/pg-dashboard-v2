@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DataTable } from "@/components/ui";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import {
   CountryFilterChip,
   DateFilterChip,
@@ -15,6 +16,7 @@ import { reorderColumns } from "@/lib/utils/columns";
 import { buildClientColumns } from "@/features/dashboard/client-management/columns";
 import { ClientCardList } from "@/features/dashboard/client-management/components/ClientCardList";
 import { ClientDetailsDrawer } from "@/features/dashboard/client-management/components/ClientDetailsDrawer";
+import { ClientDetailsPage } from "@/features/dashboard/client-management/components/ClientDetailsPage";
 import {
   CLIENT_PAGE_LIMIT,
   CLIENT_SEARCH_HINTS,
@@ -22,7 +24,18 @@ import {
 } from "@/features/dashboard/client-management/constants";
 import { MOCK_CLIENTS } from "@/features/dashboard/client-management/mock-data";
 
+// Sets scrollTop via a standalone function (rather than inline in a handler)
+// since the element comes from useContentAreaElement, and React Compiler's
+// lint forbids mutating a hook-returned value directly. Same helper, same
+// reason, as McaTransactionTable's.
+function restoreScrollTop(el: HTMLElement, value: number): void {
+  el.scrollTop = value;
+}
+
 export function ClientTable() {
+  const contentEl = useContentAreaElement();
+  const [scrollPosition, setScrollPosition] = useState(0);
+
   const [search, setSearch] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
   const [countryFilters, setCountryFilters] = useState<string[]>([]);
@@ -36,11 +49,15 @@ export function ClientTable() {
   // so opening one closes whichever other one was open.
   const [openChip, setOpenChip] = useState<"email" | "country" | "date" | null>(null);
 
-  // The client whose details panel is open. Held as an id (not the row) so it
-  // survives the source list changing underneath it once a real endpoint
-  // replaces MOCK_CLIENTS.
+  // The client whose details are being viewed. Held as an id (not the row) so
+  // it survives the source list changing underneath it once a real endpoint
+  // replaces MOCK_CLIENTS. The drawer and the expanded page are two
+  // presentations of that same selection, so they share it: drawerOpen and
+  // detailsOpen are mutually exclusive — a row click opens the drawer, and
+  // Expand hands the same client off to the page.
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const query = search.trim().toLowerCase();
   const emailQuery = emailFilter.trim().toLowerCase();
@@ -94,10 +111,44 @@ export function ClientTable() {
   // in, so it can never narrow to an empty table (see clientCountryOptions).
   const countryOptions = clientCountryOptions(MOCK_CLIENTS);
 
+  // Clicking a row opens the drawer, not the full page. The table stays
+  // mounted underneath it, so filters, paging, and scroll are untouched for
+  // the whole time the drawer is open and after it closes.
   const openDetails = (row: { id: string }) => {
     setDetailsId(row.id);
     setDrawerOpen(true);
   };
+
+  // Expand hands the drawer's current client off to the full page. detailsId
+  // already holds that selection, so the page renders exactly what the drawer
+  // was showing. The table's scroll position is captured here (rather than
+  // when the drawer opened) because this is the point the table actually
+  // leaves the screen and Back has to restore it.
+  const expandToPage = (client: { id: string }) => {
+    if (contentEl) setScrollPosition(contentEl.scrollTop);
+    setDetailsId(client.id);
+    setDrawerOpen(false);
+    setDetailsOpen(true);
+  };
+
+  // Collapse reverses Expand: closes the full page and reopens the same client
+  // in the drawer. Deliberately doesn't touch detailsId, so whichever client
+  // was showing stays showing, and the scroll-restore effect below puts the
+  // table back where expandToPage found it.
+  const collapseToDrawer = () => {
+    setDetailsOpen(false);
+    setDrawerOpen(true);
+  };
+
+  // Restores the table's scroll position after the details page unmounts and
+  // the table re-renders in its place — deferred to an effect (rather than set
+  // inline in the handler) so it runs after the table's own content is back in
+  // the DOM, not while the details page is still on screen.
+  useEffect(() => {
+    if (!detailsOpen && contentEl) {
+      restoreScrollTop(contentEl, scrollPosition);
+    }
+  }, [detailsOpen, contentEl, scrollPosition]);
 
   const baseColumns = buildClientColumns(openDetails);
   const columns = reorderColumns(baseColumns, columnOrder);
@@ -150,6 +201,20 @@ export function ClientTable() {
       />
     </>
   );
+
+  // The details page replaces the table in place (same component instance,
+  // same closed-over search/filter/page state) rather than overlaying it —
+  // this is what makes Back restore the table's previous state for free, the
+  // same arrangement McaTransactionTable uses for transactions.
+  if (detailsOpen && detailsRow) {
+    return (
+      <ClientDetailsPage
+        client={detailsRow}
+        onBack={() => setDetailsOpen(false)}
+        onCollapse={collapseToDrawer}
+      />
+    );
+  }
 
   return (
     // Search/filters and the table share one bordered surface, matching the
@@ -242,7 +307,12 @@ export function ClientTable() {
 
       {/* Rendered alongside the table (not in place of it) so closing it leaves
           the table's search, filters, and page exactly as they were. */}
-      <ClientDetailsDrawer row={detailsRow} open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <ClientDetailsDrawer
+        client={detailsRow}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onExpand={expandToPage}
+      />
     </div>
   );
 }

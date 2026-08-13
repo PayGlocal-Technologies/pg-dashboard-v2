@@ -140,11 +140,33 @@ export function McaV2Feature() {
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
         </div>
 
+        {/* Below `lg` the two columns collapse into one stack, where a full
+            vertical list of regions would push the account details most of a
+            screen down. The tiles scroll horizontally instead, so the details
+            stay near the fold. Each tile is its own surface, so this variant
+            needs no Card around it — unlike the list below.
+
+            Two renderings toggled by `hidden`, not one set of rows bent into
+            both shapes with responsive classes: the layouts differ in
+            direction, in what the selected state looks like, and in whether
+            there's a chevron at all. `display: none` also keeps whichever one
+            is inactive out of the tab order and the accessibility tree, so
+            there is never a second, invisible copy of these controls to land
+            on. */}
+        <RegionSelector
+          accounts={accounts}
+          selectedAccountId={selectedAccountId}
+          onSelect={(account) => setSelectedAccountId(account.id)}
+          label="Select client region"
+          variant="cards"
+          className="-mx-1 lg:hidden"
+        />
+
         {/* p-3 rather than Card's own 28px inset: the rows carry their own
             px-5, so the card's padding only has to keep them clear of its
             edge — anything more and the region names sit adrift of the title
             above the card. */}
-        <Card size="sm" className="gap-0 p-3 lg:col-start-1 lg:row-start-2">
+        <Card size="sm" className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex">
           <RegionSelector
             accounts={accounts}
             selectedAccountId={selectedAccountId}
@@ -161,11 +183,20 @@ export function McaV2Feature() {
             the column would no longer start level with that Card. */}
         <div className="mt-5 space-y-8 lg:col-start-2 lg:row-start-2 lg:mt-0">
           {/* Summary row: the first thing in this column, so its top edge
-              lands on the region Card's. The settled card takes the wider
-              track because it carries a chart as well as its KPI stack; no
-              items-start, so the grid's default stretch gives both cards the
-              same height and therefore a shared top and bottom edge. */}
-          <div className="grid gap-4 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+              lands on the region Card's.
+
+              flex-wrap rather than a grid, because grid tracks cannot wrap.
+              Flexbox decides line breaks from each item's hypothetical main
+              size, which for `flex-1`-style items is their min-width — so the
+              row holds both cards while 470 + 300 + the gap fits, and drops
+              Outstanding onto its own full-width line the moment the settled
+              card would be squeezed below its 470px floor. Neither card ever
+              shrinks past the width its content needs.
+
+              No items-* override, so the default stretch gives both cards the
+              same height on a shared line, and therefore a shared top and
+              bottom edge. */}
+          <div className="flex flex-wrap gap-4">
             {/* Not MetricSparklineCard: that renders its sparkline as a tiny
                 borderless corner overlay with no axes, which can't carry this
                 card's monthly X axis and settled-amount Y axis. Built on the
@@ -176,7 +207,18 @@ export function McaV2Feature() {
                 pair without introducing a chart abstraction of its own. Every
                 figure is keyed off the selected region's currency rather than
                 fixed to USD. */}
-            <Card size="sm" className="gap-0">
+            {/* min() rather than a bare min-w-[470px]: 470px is the floor
+                wherever there is room for it, but a min-width that large would
+                otherwise push the card past the viewport on a narrow screen,
+                and min-width beats max-width in the cascade so `max-w-full`
+                could not rein it back in. 100% is measured against the flex
+                line, so the card fills the row instead of overflowing it.
+
+                flex-[1.6] against Outstanding's flex-1: while both share a
+                line, the extra width goes to the card that has a chart to put
+                it in. Once they wrap, each is alone on its line and grows to
+                the full width regardless. */}
+            <Card size="sm" className="min-w-[min(470px,100%)] flex-[1.6] gap-0">
               {/* KPI stack left, chart right, so the card spends the width it
                   has rather than stacking into extra height. flex-1 makes this
                   row fill the Card, which the grid above has already stretched
@@ -184,22 +226,35 @@ export function McaV2Feature() {
                   height down to the chart. Below `sm` the two stack, which is
                   the only width where there isn't room for both. */}
               <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
-                <div className="min-w-0 flex-1 sm:basis-2/5">
+                {/* No min-w-0 here, unlike the chart beside it: the default
+                    `min-width: auto` floors this column at its own min-content
+                    width, which the nowrap amount below now sets. That is what
+                    makes the guarantee hold under pressure — when the card is
+                    squeezed, the chart gives up width and the figure keeps
+                    every pixel it needs. */}
+                <div className="flex-1 sm:basis-2/5">
                   <p className="text-sm font-semibold text-foreground">
                     Settled amount in {currency}
                   </p>
 
                   {/* Same size and weight as OutstandingAmountCard's own
                       figure — the two headline numbers have to carry equal
-                      visual weight for the cards to read as a pair. */}
-                  <p className="mt-3 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                      visual weight for the cards to read as a pair.
+                      whitespace-nowrap keeps the amount and its currency code
+                      on one line: "128,400 USD" breaking before the code would
+                      read as two separate facts. */}
+                  <p className="mt-3 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
                     {settled.value}
                   </p>
 
                   {/* Secondary to the figure above it: smaller size, muted
                       colour, same left edge — supporting context, not a second
                       headline. */}
-                  <p className="mt-2 text-sm tabular-nums text-muted-foreground">
+                  {/* nowrap for the same reason as the figure above it, and
+                      it costs nothing: at text-sm this line is narrower than
+                      the text-3xl amount, so the amount is still what sets the
+                      column's floor. */}
+                  <p className="mt-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
                     {settled.valueInr}
                   </p>
 
@@ -294,7 +349,13 @@ export function McaV2Feature() {
                 conversion, one-line explanation. It takes no props — the
                 figure spans every account rather than the selected region, so
                 it doesn't change as regions are picked. */}
-            <OutstandingAmountCard />
+            {/* Its own min-width is the other half of the wrap rule: it's what
+                the flex line adds to the settled card's 470px to decide
+                whether both still fit. 300px is roughly what this card's
+                content — the amount beside its pending-count chip — needs
+                before it starts looking cramped, so the row breaks rather than
+                letting it get there. */}
+            <OutstandingAmountCard className="min-w-[min(300px,100%)] flex-1" />
           </div>
 
           {selectedAccount && (
