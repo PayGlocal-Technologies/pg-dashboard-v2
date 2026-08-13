@@ -10,6 +10,9 @@ import {
   PopoverContent,
   PopoverTrigger,
   Separator,
+  Tabs,
+  TabsList,
+  TabsTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -131,6 +134,55 @@ export interface DateRangeValue {
   to: string;
 }
 
+/** "Last N weeks/days/hours/minutes", counted back from now. Mirrors
+ *  pg-dashboard's linearRange date filter, which its request builder turns
+ *  into a startTime/endTime pair at apply time. */
+export interface RelativeRangeValue {
+  weeks: string;
+  days: string;
+  hours: string;
+  minutes: string;
+}
+
+export const EMPTY_RELATIVE_RANGE: RelativeRangeValue = {
+  weeks: "",
+  days: "",
+  hours: "",
+  minutes: "",
+};
+
+const RELATIVE_UNITS: { key: keyof RelativeRangeValue; label: string; seconds: number }[] = [
+  { key: "weeks", label: "Weeks", seconds: 7 * 24 * 60 * 60 },
+  { key: "days", label: "Days", seconds: 24 * 60 * 60 },
+  { key: "hours", label: "Hours", seconds: 60 * 60 },
+  { key: "minutes", label: "Minutes", seconds: 60 },
+];
+
+function relativeRangeSeconds(value: RelativeRangeValue): number {
+  return RELATIVE_UNITS.reduce((total, unit) => {
+    const parsed = parseInt(value[unit.key] || "0", 10);
+    return total + (Number.isNaN(parsed) ? 0 : parsed) * unit.seconds;
+  }, 0);
+}
+
+export function hasRelativeRange(value: RelativeRangeValue | undefined): boolean {
+  return !!value && relativeRangeSeconds(value) > 0;
+}
+
+/**
+ * Resolves a relative range to absolute epoch millis, evaluated at call time.
+ * Deliberately not memoised or computed during render: "last 2 days" means
+ * two days before *now*, and now moves.
+ */
+export function relativeRangeToEpochMs(
+  value: RelativeRangeValue
+): { startTime: number; endTime: number } | null {
+  const seconds = relativeRangeSeconds(value);
+  if (seconds <= 0) return null;
+  const endTime = Date.now();
+  return { startTime: endTime - seconds * 1000, endTime };
+}
+
 // yyyy-mm-dd (native <input type="date"> value) → start/end-of-day epoch ms,
 // what the OpenSearch request bodies' startTime/endTime already expect.
 export function toStartOfDayMs(dateStr: string): number {
@@ -151,32 +203,64 @@ export function toEndOfDayMs(dateStr: string): number {
 export function DateFilterChip({
   value,
   onChange,
+  relativeValue = EMPTY_RELATIVE_RANGE,
+  onRelativeChange,
   open,
   onOpenChange,
 }: {
   value: DateRangeValue;
   onChange: (next: DateRangeValue) => void;
+  /** Omit both relative props to keep this an absolute-range-only chip. */
+  relativeValue?: RelativeRangeValue;
+  onRelativeChange?: (next: RelativeRangeValue) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const supportsRelative = !!onRelativeChange;
   const [draft, setDraft] = useState<DateRangeValue>(value);
-  const isActive = !!(value.from && value.to);
+  const [relativeDraft, setRelativeDraft] = useState<RelativeRangeValue>(relativeValue);
+  const [mode, setMode] = useState<"absolute" | "relative">(
+    hasRelativeRange(relativeValue) ? "relative" : "absolute"
+  );
+
+  const isActive = !!(value.from && value.to) || hasRelativeRange(relativeValue);
   const isPartial = !!draft.from !== !!draft.to;
 
+  // The two modes are mutually exclusive — applying one clears the other, so
+  // the request never carries a start/end pair from both sources at once.
   const clear = () => {
     onChange({ from: "", to: "" });
+    onRelativeChange?.(EMPTY_RELATIVE_RANGE);
     setDraft({ from: "", to: "" });
+    setRelativeDraft(EMPTY_RELATIVE_RANGE);
     onOpenChange(false);
   };
+
+  const apply = () => {
+    if (mode === "relative") {
+      onChange({ from: "", to: "" });
+      onRelativeChange?.(relativeDraft);
+    } else {
+      onRelativeChange?.(EMPTY_RELATIVE_RANGE);
+      onChange(draft);
+    }
+    onOpenChange(false);
+  };
+
+  const canApply = mode === "relative" ? hasRelativeRange(relativeDraft) : !isPartial;
 
   return (
     <Popover
       open={open}
       onOpenChange={(next) => {
         onOpenChange(next);
-        // Re-seed the draft from the last applied value every time the
+        // Re-seed both drafts from the last applied values every time the
         // popover opens, so a discarded in-progress edit never leaks in.
-        if (next) setDraft(value);
+        if (next) {
+          setDraft(value);
+          setRelativeDraft(relativeValue);
+          setMode(hasRelativeRange(relativeValue) ? "relative" : "absolute");
+        }
       }}
     >
       <FilterChipShell active={isActive}>
@@ -186,44 +270,77 @@ export function DateFilterChip({
         </PopoverTrigger>
       </FilterChipShell>
       <PopoverContent align="end" className="w-72 space-y-3 p-3">
-        {/* Flux's DatePicker is a single-date field (there's no dedicated
-            Flux date-*range* component), a From/To pair of them is the
-            closest real reuse of it rather than a bespoke range widget. Each
-            manages its own calendar popup/portal independently. */}
-        <DatePicker
-          label="From"
-          value={draft.from}
-          onChange={(v) => setDraft((d) => ({ ...d, from: v }))}
-          placeholder="Select start date"
-        />
-        <DatePicker
-          label="To"
-          value={draft.to}
-          onChange={(v) => setDraft((d) => ({ ...d, to: v }))}
-          min={draft.from || undefined}
-          placeholder="Select end date"
-        />
+        {supportsRelative && (
+          <Tabs value={mode} onValueChange={(v) => setMode(v as "absolute" | "relative")}>
+            <TabsList className="w-full">
+              <TabsTrigger value="absolute" className="flex-1">
+                Date range
+              </TabsTrigger>
+              <TabsTrigger value="relative" className="flex-1">
+                Last…
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
+
+        {mode === "absolute" || !supportsRelative ? (
+          <>
+            {/* Flux's DatePicker is a single-date field (there's no dedicated
+                Flux date-*range* component), a From/To pair of them is the
+                closest real reuse of it rather than a bespoke range widget.
+                Each manages its own calendar popup/portal independently. */}
+            <DatePicker
+              label="From"
+              value={draft.from}
+              onChange={(v) => setDraft((d) => ({ ...d, from: v }))}
+              placeholder="Select start date"
+            />
+            <DatePicker
+              label="To"
+              value={draft.to}
+              onChange={(v) => setDraft((d) => ({ ...d, to: v }))}
+              min={draft.from || undefined}
+              placeholder="Select end date"
+            />
+          </>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {RELATIVE_UNITS.map((unit) => (
+              <div key={unit.key} className="space-y-1.5">
+                <label
+                  className="text-[11px] font-medium text-muted-foreground"
+                  htmlFor={`date-relative-${unit.key}`}
+                >
+                  {unit.label}
+                </label>
+                <Input
+                  id={`date-relative-${unit.key}`}
+                  type="number"
+                  min={0}
+                  inputMode="numeric"
+                  placeholder="0"
+                  value={relativeDraft[unit.key]}
+                  onChange={(e) =>
+                    setRelativeDraft((prev) => ({ ...prev, [unit.key]: e.target.value }))
+                  }
+                />
+              </div>
+            ))}
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-2 pt-1">
           <Button
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="x" className="w-3 h-3" />}
             onClick={clear}
-            disabled={!draft.from && !draft.to}
+            disabled={!draft.from && !draft.to && !hasRelativeRange(relativeDraft)}
             className="text-muted-foreground hover:text-foreground"
           >
             Clear
           </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            disabled={isPartial}
-            onClick={() => {
-              onChange(draft);
-              onOpenChange(false);
-            }}
-          >
+          <Button type="button" variant="primary" size="sm" disabled={!canApply} onClick={apply}>
             Apply
           </Button>
         </div>
@@ -339,49 +456,53 @@ export function AmountFilterChip({
   );
 }
 
-// Flat multi-select checkbox list for Status. Applies immediately on toggle
-// (no Apply step), matching the filtering model this has always used.
+// Flat multi-select checkbox list for Status. Edits are staged and committed
+// on Apply, the same as Date and Currency — a filter that re-queried on every
+// checkbox tick fired a request per click and behaved unlike its neighbours,
+// which is exactly the inconsistency this shape avoids.
 function StatusFilterPanel({
   options,
-  selected,
+  draft,
   onToggle,
   onClear,
+  onApply,
 }: {
   options: FilterChipOption[];
-  selected: string[];
+  draft: string[];
   onToggle: (value: string) => void;
   onClear: () => void;
+  onApply: () => void;
 }) {
   return (
     <div className="w-56 p-3">
-      <div className="min-h-40 space-y-0.5">
+      <div className="max-h-64 space-y-0.5 overflow-y-auto">
         {options.map((option) => (
           <label
             key={option.value}
             className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
           >
-            <Checkbox checked={selected.includes(option.value)} onCheckedChange={() => onToggle(option.value)} />
+            <Checkbox checked={draft.includes(option.value)} onCheckedChange={() => onToggle(option.value)} />
             {option.label}
           </label>
         ))}
       </div>
 
-      <Separator />
+      <Separator className="my-2" />
 
-      <div className="flex items-center justify-between px-1 pt-2">
+      <div className="flex items-center justify-between gap-2">
         <Button
           variant="ghost"
           size="sm"
           leftIcon={<Icon name="x" className="w-3 h-3" />}
           onClick={onClear}
-          disabled={selected.length === 0}
+          disabled={draft.length === 0}
           className="text-muted-foreground hover:text-foreground"
         >
-          Clear filters
+          Clear
         </Button>
-        {selected.length > 0 && (
-          <span className="pr-1 text-[11px] text-muted-foreground">{selected.length} selected</span>
-        )}
+        <Button type="button" variant="primary" size="sm" onClick={onApply}>
+          Apply
+        </Button>
       </div>
     </div>
   );
@@ -390,38 +511,54 @@ function StatusFilterPanel({
 export function StatusFilterChip({
   options,
   selected,
-  onToggle,
-  onClear,
+  onChange,
   open,
   onOpenChange,
 }: {
   options: FilterChipOption[];
   selected: string[];
-  onToggle: (value: string) => void;
-  onClear: () => void;
+  onChange: (next: string[]) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const [draft, setDraft] = useState<string[]>(selected);
   const isActive = selected.length > 0;
 
+  const toggle = (value: string) => {
+    setDraft((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
+  };
+
+  const clear = () => {
+    onChange([]);
+    setDraft([]);
+    onOpenChange(false);
+  };
+
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (next) setDraft(selected);
+      }}
+    >
       <FilterChipShell active={isActive}>
-        {isActive && (
-          <FilterChipClearButton
-            label="Status"
-            onClick={() => {
-              onClear();
-              onOpenChange(false);
-            }}
-          />
-        )}
+        {isActive && <FilterChipClearButton label="Status" onClick={clear} />}
         <PopoverTrigger asChild>
           <FilterChipLabelTrigger label="Status" active={isActive} />
         </PopoverTrigger>
       </FilterChipShell>
       <PopoverContent align="end" className="w-auto p-0">
-        <StatusFilterPanel options={options} selected={selected} onToggle={onToggle} onClear={onClear} />
+        <StatusFilterPanel
+          options={options}
+          draft={draft}
+          onToggle={toggle}
+          onClear={clear}
+          onApply={() => {
+            onChange(draft);
+            onOpenChange(false);
+          }}
+        />
       </PopoverContent>
     </Popover>
   );
@@ -524,5 +661,71 @@ export function CurrencyFilterChip({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+// Date, Status and Currency as one unit — the three filters pg-dashboard's
+// MCA table offers, and no others. Each owns the "which popover is open" state
+// itself rather than taking it as a prop.
+//
+// That ownership is the point. A table that renders this row twice — once in
+// its desktop control bar and once in its narrow-viewport one, with CSS
+// deciding which is visible — has both copies mounted at all times. Lifting
+// `openChip` above them would make a click on the visible chip also open its
+// display:none twin, and a Radix popover anchored to a hidden trigger never
+// positions: it stays translated off-screen while still stacking above the
+// real one and competing for focus, so the visible popover appeared to do
+// nothing at all. Each instance holding its own state means the hidden copy
+// simply never opens.
+export function FilterChipsRow({
+  dateRange,
+  onDateRangeChange,
+  relativeDateRange,
+  onRelativeDateRangeChange,
+  statusOptions,
+  statusFilters,
+  onStatusFiltersChange,
+  currencyOptions,
+  currencyFilters,
+  onCurrencyFiltersChange,
+}: {
+  dateRange: DateRangeValue;
+  onDateRangeChange: (next: DateRangeValue) => void;
+  relativeDateRange?: RelativeRangeValue;
+  onRelativeDateRangeChange?: (next: RelativeRangeValue) => void;
+  statusOptions: FilterChipOption[];
+  statusFilters: string[];
+  onStatusFiltersChange: (next: string[]) => void;
+  currencyOptions: CurrencyOption[];
+  currencyFilters: string[];
+  onCurrencyFiltersChange: (next: string[]) => void;
+}) {
+  const [openChip, setOpenChip] = useState<"date" | "status" | "currency" | null>(null);
+
+  return (
+    <>
+      <DateFilterChip
+        value={dateRange}
+        onChange={onDateRangeChange}
+        relativeValue={relativeDateRange}
+        onRelativeChange={onRelativeDateRangeChange}
+        open={openChip === "date"}
+        onOpenChange={(next) => setOpenChip(next ? "date" : null)}
+      />
+      <StatusFilterChip
+        options={statusOptions}
+        selected={statusFilters}
+        onChange={onStatusFiltersChange}
+        open={openChip === "status"}
+        onOpenChange={(next) => setOpenChip(next ? "status" : null)}
+      />
+      <CurrencyFilterChip
+        options={currencyOptions}
+        value={currencyFilters}
+        onChange={onCurrencyFiltersChange}
+        open={openChip === "currency"}
+        onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
+      />
+    </>
   );
 }

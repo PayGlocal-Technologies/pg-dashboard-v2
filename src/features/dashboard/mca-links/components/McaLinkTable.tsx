@@ -14,7 +14,7 @@ import {
   toEndOfDayMs,
   toStartOfDayMs,
 } from "@/components/common/filters/FilterChips";
-import { ReorderColumnsPopover } from "@/features/dashboard/transactions/components/ReorderColumnsPopover";
+import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { CURRENCY_FILTER_OPTIONS } from "@/features/dashboard/multi-currency/constants";
 import { reorderColumns } from "@/lib/utils/columns";
 import { parseApiDateTime } from "@/lib/utils/format";
@@ -125,16 +125,6 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
     setPage(1);
   };
 
-  const toggleStatusFilter = (value: string) => {
-    setStatusFilters((prev) => (prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]));
-    setPage(1);
-  };
-
-  const onClearStatusFilter = () => {
-    setStatusFilters([]);
-    setPage(1);
-  };
-
   // Clicking a row opens the details drawer; the table stays mounted
   // underneath it, so filters, ordering, paging, and scroll are untouched for
   // the whole time it's open and after it closes.
@@ -234,8 +224,10 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
           <StatusFilterChip
             options={MCA_LINK_STATUS_FILTERS}
             selected={statusFilters}
-            onToggle={toggleStatusFilter}
-            onClear={onClearStatusFilter}
+            onChange={(next) => {
+              setStatusFilters(next);
+              setPage(1);
+            }}
             open={openChip === "status"}
             onOpenChange={(next) => setOpenChip(next ? "status" : null)}
           />

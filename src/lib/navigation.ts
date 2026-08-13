@@ -39,7 +39,11 @@ export const regularNavigation: NavGroup[] = [
         permission: [],
         children: [
           { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
-          { label: "MCA Transactions", href: "/transactions", permission: ["getTxnSearchResults"] },
+          // Two separate entries, both labelled "Transactions": the first is
+          // the MCA table, the second the PA (Cards/UPI/NetBanking) one. They
+          // used to be a single item whose page carried a segment toggle.
+          { label: "Transactions", href: "/mca-transactions", permission: ["getTxnSearchResults"] },
+          { label: "Transactions", href: "/pa-transactions", permission: ["getTxnSearchResults"] },
           { label: "MCA Links", href: "/mca-links", permission: [] },
           { label: "Platforms", href: "/platforms", permission: [] },
           { label: "Platforms v1", href: "/platforms-v1", permission: [] },
@@ -156,8 +160,14 @@ export const partnerNavigation: NavGroup[] = [
     items: [
       { label: "Merchant Activation", href: "/my-merchants", icon: "users", permission: [] },
       {
-        label: "Transaction Overview",
-        href: "/transactions",
+        label: "Transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
@@ -205,8 +215,14 @@ export const globalNavigation: NavGroup[] = [
     label: "Payments",
     items: [
       {
-        label: "MCA Transactions",
-        href: "/transactions",
+        label: "Transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },

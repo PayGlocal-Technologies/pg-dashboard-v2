@@ -5,7 +5,7 @@ import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
 import { RowClick } from "@/components/common/table/RowClick";
-import { CountryCell } from "@/features/dashboard/transactions/mcaColumns";
+import { CountryCell } from "@/features/dashboard/mca-transactions/columns";
 import type { McaLink, McaLinkStatus } from "@/features/dashboard/mca-links/types";
 
 // ── Status mapping: raw value → display meta ─────────────────────────────────

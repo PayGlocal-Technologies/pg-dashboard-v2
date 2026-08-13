@@ -303,3 +303,20 @@ export function formatFileSize(bytes: number): string {
   const mb = kb / 1024;
   return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
 }
+
+/**
+ * Hands a blob to the browser as a file download. The API returns exports as
+ * a blob rather than a URL, so there is nothing to navigate to — an anchor is
+ * synthesised, clicked, and torn down. The object URL is revoked afterwards
+ * so the blob can be garbage collected.
+ */
+export function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+}

@@ -55,6 +55,7 @@ import {
   Menu,
   MessageCircle,
   Minimize2,
+  MoreHorizontal,
   Monitor,
   Moon,
   Paperclip,
@@ -68,6 +69,8 @@ import {
   Receipt,
   RefreshCw,
   Repeat2,
+  RotateCcw,
+  Send,
   Scale,
   Search,
   SendHorizontal,
@@ -94,6 +97,7 @@ import {
 import { AmazonLogo } from "@/components/icon/AmazonLogo";
 import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
+import { MdrOfferIcon } from "@/components/icon/MdrOfferIcon";
 import { ToptalLogo } from "@/components/icon/ToptalLogo";
 import { UpworkLogo } from "@/components/icon/UpworkLogo";
 
@@ -151,6 +155,7 @@ export const ICONS = {
   "map-pin": MapPin,
   menu: Menu,
   "message-circle": MessageCircle,
+  "more-horizontal": MoreHorizontal,
   monitor: Monitor,
   moon: Moon,
   paperclip: Paperclip,
@@ -163,6 +168,8 @@ export const ICONS = {
   plus: Plus,
   receipt: Receipt,
   refresh: RefreshCw,
+  "rotate-ccw": RotateCcw,
+  send: Send,
   repeat: Repeat2,
   scale: Scale,
   search: Search,
@@ -194,6 +201,7 @@ export const ICONS = {
   "amazon-logo": AmazonLogo as unknown as LucideIcon,
   "deel-logo": DeelLogo as unknown as LucideIcon,
   "freelancer-logo": FreelancerLogo as unknown as LucideIcon,
+  "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
   "toptal-logo": ToptalLogo as unknown as LucideIcon,
   "upwork-logo": UpworkLogo as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
