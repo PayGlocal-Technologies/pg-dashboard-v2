@@ -26,6 +26,7 @@ import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/uti
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms-v1/components/SettlementStatementDrawer";
 import {
   SUPPORTED_PLATFORMS,
+  accountOptionLabel,
   accountsForPlatform,
 } from "@/features/dashboard/platforms/constants";
 
@@ -254,7 +255,10 @@ export function PlatformsV1Feature() {
                   make. */}
               {selectedPlatform.offersCurrencyChoice && selectedAccount && (
                 <Select value={selectedAccount.id} onValueChange={setSelectedAccountId}>
-                  <SelectTrigger className="w-[140px] shrink-0" aria-label="Receiving currency">
+                  {/* Wide enough for the longest marketplace name the options
+                      carry ("amazon.com.au") beside its flag, so no row is
+                      truncated in the trigger. */}
+                  <SelectTrigger className="w-[190px] shrink-0" aria-label="Receiving currency">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -273,7 +277,12 @@ export function PlatformsV1Feature() {
                           ) : (
                             <CountryFlag iso2={account.iso2} />
                           )}
-                          {account.currency}
+                          {/* The platform's marketplace for this account where
+                              it runs one, the currency code where it doesn't.
+                              Plain text, not a link: it names which payout the
+                              walkthrough is about, and a dropdown option is no
+                              place to navigate away from. */}
+                          {accountOptionLabel(selectedPlatform, account)}
                         </span>
                       </SelectItem>
                     ))}

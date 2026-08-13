@@ -48,6 +48,20 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     logo: "amazon-logo",
     logoSrc: "/assets/Platform/Amazon.png",
     accountIds: ["us-usd", "gb-gbp", "eu-eur", "ca-cad", "au-aud"],
+    // One Amazon storefront per country, so the currency picker names the
+    // marketplace rather than the currency. eu-eur is deliberately absent:
+    // there is no single EU storefront, so it falls back to "EUR" (the merchant
+    // uses a specific marketplace such as amazon.de). ae-aed and sg-sgd are
+    // listed for when those accounts join `accountIds` above; a label for an
+    // account the platform doesn't offer is simply never read.
+    marketplaceLabels: {
+      "us-usd": "amazon.com",
+      "gb-gbp": "amazon.co.uk",
+      "ca-cad": "amazon.ca",
+      "au-aud": "amazon.com.au",
+      "ae-aed": "amazon.ae",
+      "sg-sgd": "amazon.sg",
+    },
     // Amazon pays out per marketplace, so the merchant picks which currency
     // this walkthrough is describing. No other platform here offers that
     // choice — see `offersCurrencyChoice` on the Platform type.
@@ -136,6 +150,17 @@ export function accountsForPlatform(platform: Platform): VirtualAccount[] {
   return platform.accountIds
     .map((id) => MOCK_VIRTUAL_ACCOUNTS.find((account) => account.id === id))
     .filter((account): account is VirtualAccount => Boolean(account));
+}
+
+/**
+ * What the currency picker calls one of a platform's receiving accounts: the
+ * platform's own marketplace for that account where it runs one
+ * ("amazon.com"), and the plain currency code where it doesn't ("EUR" — the EU
+ * has no single Amazon storefront, so the merchant picks a specific
+ * marketplace such as amazon.de).
+ */
+export function accountOptionLabel(platform: Platform, account: VirtualAccount): string {
+  return platform.marketplaceLabels?.[account.id] ?? account.currency;
 }
 
 /**

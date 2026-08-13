@@ -69,6 +69,21 @@ export interface Platform {
    */
   accountIds: string[];
   /**
+   * The platform's own marketplace per receiving account, keyed by account id —
+   * `{ "us-usd": "amazon.com" }`.
+   *
+   * Where a platform runs a separate storefront per country, naming that
+   * storefront tells the merchant which payout this currency is for better than
+   * the currency code alone does. Plain text, deliberately not a link: it
+   * identifies the marketplace, it isn't somewhere to navigate to from a
+   * dropdown.
+   *
+   * Accounts with no entry fall back to their currency code, which is what a
+   * region with no single storefront (the EU) wants — see
+   * `accountOptionLabel`.
+   */
+  marketplaceLabels?: Record<string, string>;
+  /**
    * Whether the merchant picks which of those accounts to be paid into.
    *
    * Only true where the platform genuinely lets you choose the payout currency
