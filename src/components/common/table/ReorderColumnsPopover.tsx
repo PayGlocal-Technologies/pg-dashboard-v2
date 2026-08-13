@@ -21,6 +21,12 @@ import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from "@/co
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
+// Shared by every table whose columns a merchant can rearrange (MCA
+// Transactions, Client Management). It sits here beside RowClick rather than
+// inside one of those features for the same reason FilterChips does: the
+// gesture, the popover, and "Reset to defaults" should be one implementation,
+// not a copy per table.
+
 interface ReorderableColumn {
   key: string;
   label: string;
@@ -30,8 +36,8 @@ interface ReorderColumnsPopoverProps {
   columns: ReorderableColumn[];
   order: string[];
   onOrderChange: (order: string[]) => void;
-  /** Discards any saved order so the table falls back to the column order
-   *  buildMcaColumns declares. Separate from onOrderChange rather than
+  /** Discards any saved order so the table falls back to the column order its
+   *  own column builder declares. Separate from onOrderChange rather than
    *  passing the default order through it, since "no saved order" is its own
    *  state in the caller, not just another arrangement. */
   onReset: () => void;
@@ -78,7 +84,7 @@ export function ReorderColumnsPopover({
   );
   const byKey = new Map(columns.map((c) => [c.key, c]));
   const orderedColumns = order.map((k) => byKey.get(k)).filter((c): c is ReorderableColumn => !!c);
-  // `columns` arrives in buildMcaColumns' declared order, which is exactly
+  // `columns` arrives in the column builder's declared order, which is exactly
   // what resetting falls back to, so comparing against it tells us whether
   // there's a custom arrangement to reset at all.
   const isCustomOrder = order.join("|") !== columns.map((c) => c.key).join("|");

@@ -14,7 +14,7 @@ import {
   toEndOfDayMs,
   toStartOfDayMs,
 } from "@/components/common/filters/FilterChips";
-import { ReorderColumnsPopover } from "@/features/dashboard/transactions/components/ReorderColumnsPopover";
+import { ReorderColumnsPopover } from "@/components/common/table/ReorderColumnsPopover";
 import { CURRENCY_FILTER_OPTIONS } from "@/features/dashboard/multi-currency/constants";
 import { reorderColumns } from "@/lib/utils/columns";
 import { parseApiDateTime } from "@/lib/utils/format";

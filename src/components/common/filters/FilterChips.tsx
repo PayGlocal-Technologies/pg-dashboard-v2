@@ -15,11 +15,13 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 
-// The Date/Amount/Status/Currency filter toolbar shared by every table that
-// filters the same four axes (MCA Transactions, MCA Links). It lives here
-// rather than inside one of those features so both render literally the same
-// chips — same shell, same popovers, same Apply/Clear semantics — instead of
-// two copies that drift apart.
+// The Date/Amount/Status/Currency/Email/Country filter toolbar shared by every
+// table that filters the same axes (MCA Transactions, MCA Links, Client
+// Management). It lives here rather than inside one of those features so they
+// all render literally the same chips — same shell, same popovers, same
+// Apply/Clear semantics — instead of copies that drift apart. Which chips a
+// table shows is the table's choice; how any one of them behaves is decided
+// once, here.
 
 export interface FilterChipOption {
   value: string;
@@ -153,11 +155,16 @@ export function DateFilterChip({
   onChange,
   open,
   onOpenChange,
+  label = "Date",
 }: {
   value: DateRangeValue;
   onChange: (next: DateRangeValue) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** What the date being filtered on is called on this table, e.g. "Creation
+   *  date" on Client Management. Only the chip's wording changes; the range
+   *  picker and its Apply/Clear semantics are identical everywhere. */
+  label?: string;
 }) {
   const [draft, setDraft] = useState<DateRangeValue>(value);
   const isActive = !!(value.from && value.to);
@@ -180,9 +187,9 @@ export function DateFilterChip({
       }}
     >
       <FilterChipShell active={isActive}>
-        {isActive && <FilterChipClearButton label="Date" onClick={clear} />}
+        {isActive && <FilterChipClearButton label={label} onClick={clear} />}
         <PopoverTrigger asChild>
-          <FilterChipLabelTrigger label="Date" active={isActive} />
+          <FilterChipLabelTrigger label={label} active={isActive} />
         </PopoverTrigger>
       </FilterChipShell>
       <PopoverContent align="end" className="w-72 space-y-3 p-3">
@@ -318,6 +325,203 @@ export function AmountFilterChip({
             leftIcon={<Icon name="x" className="w-3 h-3" />}
             onClick={clear}
             disabled={!draft.min && !draft.max}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              onChange(draft);
+              onOpenChange(false);
+            }}
+          >
+            Apply
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// Free-text chip: a single value the caller matches rows against however it
+// needs to (Client Management treats it as a substring match on the client's
+// email). Same staged draft + Apply/Clear pattern as Date/Amount above, plus
+// Enter as a keyboard shortcut for Apply, since a one-field popover is
+// otherwise a mouse round-trip for what is really just typing.
+export function EmailFilterChip({
+  value,
+  onChange,
+  open,
+  onOpenChange,
+  label = "Email",
+  idPrefix = "email",
+  placeholder = "name@company.com",
+  hint,
+}: {
+  value: string;
+  onChange: (next: string) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  label?: string;
+  /** Disambiguates the input's id when more than one of these renders. */
+  idPrefix?: string;
+  placeholder?: string;
+  hint?: string;
+}) {
+  const [draft, setDraft] = useState<string>(value);
+  const isActive = !!value.trim();
+
+  const clear = () => {
+    onChange("");
+    setDraft("");
+    onOpenChange(false);
+  };
+
+  const apply = () => {
+    onChange(draft.trim());
+    onOpenChange(false);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (next) setDraft(value);
+      }}
+    >
+      <FilterChipShell active={isActive}>
+        {isActive && <FilterChipClearButton label={label} onClick={clear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label={label} active={isActive} />
+        </PopoverTrigger>
+      </FilterChipShell>
+      <PopoverContent align="end" className="w-64 space-y-3 p-3">
+        <div className="space-y-1.5">
+          <label className="text-[11px] font-medium text-muted-foreground" htmlFor={`${idPrefix}-value`}>
+            {label} contains
+          </label>
+          <Input
+            id={`${idPrefix}-value`}
+            type="text"
+            inputMode="email"
+            autoComplete="off"
+            placeholder={placeholder}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                apply();
+              }
+            }}
+          />
+        </div>
+        {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+        <div className="flex items-center justify-between gap-2 pt-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="x" className="w-3 h-3" />}
+            onClick={clear}
+            disabled={!draft}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Clear
+          </Button>
+          <Button type="button" variant="primary" size="sm" onClick={apply}>
+            Apply
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export interface CountryFilterOption {
+  /** Whatever the caller keys its rows by — an ISO2 code in every current
+   *  call site, which is why `iso2` below defaults to it. */
+  value: string;
+  label: string;
+  /** ISO2 for the flag beside the label, when it differs from `value`.
+   *  Falling back to `value` keeps the common case a two-field option. */
+  iso2?: string;
+}
+
+// Multi-select country list, the same shape and behaviour as
+// CurrencyFilterChip below it — staged draft, Apply/Clear, lifted
+// open/onOpenChange — with the product's standard inline flag treatment
+// (CountryFlag, exactly as the Transactions table's Country column renders
+// it) beside each name. Scrolls internally rather than growing the popover,
+// since a country list is open-ended in a way a currency list isn't.
+export function CountryFilterChip({
+  options,
+  value,
+  onChange,
+  open,
+  onOpenChange,
+  label = "Country",
+}: {
+  options: CountryFilterOption[];
+  value: string[];
+  onChange: (next: string[]) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  label?: string;
+}) {
+  const [draft, setDraft] = useState<string[]>(value);
+  const isActive = value.length > 0;
+
+  const toggle = (code: string) => {
+    setDraft((prev) => (prev.includes(code) ? prev.filter((v) => v !== code) : [...prev, code]));
+  };
+
+  const clear = () => {
+    onChange([]);
+    setDraft([]);
+    onOpenChange(false);
+  };
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (next) setDraft(value);
+      }}
+    >
+      <FilterChipShell active={isActive}>
+        {isActive && <FilterChipClearButton label={label} onClick={clear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label={label} active={isActive} />
+        </PopoverTrigger>
+      </FilterChipShell>
+      <PopoverContent align="end" className="w-60 p-3">
+        <div className="max-h-64 space-y-0.5 overflow-y-auto">
+          {options.map((option) => (
+            <label
+              key={option.value}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
+            >
+              <Checkbox checked={draft.includes(option.value)} onCheckedChange={() => toggle(option.value)} />
+              <CountryFlag iso2={option.iso2 ?? option.value} />
+              <span className="truncate">{option.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <Separator className="my-2" />
+
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="x" className="w-3 h-3" />}
+            onClick={clear}
+            disabled={!draft.length}
             className="text-muted-foreground hover:text-foreground"
           >
             Clear

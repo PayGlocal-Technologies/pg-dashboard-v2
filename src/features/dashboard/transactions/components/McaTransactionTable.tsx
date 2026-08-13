@@ -20,7 +20,7 @@ import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
-import { ReorderColumnsPopover } from "@/features/dashboard/transactions/components/ReorderColumnsPopover";
+import { ReorderColumnsPopover } from "@/components/common/table/ReorderColumnsPopover";
 import { TransactionCardList } from "@/features/dashboard/transactions/components/TransactionCardList";
 import { CURRENCY_FILTER_OPTIONS } from "@/features/dashboard/multi-currency/constants";
 import { reorderColumns } from "@/lib/utils/columns";
