@@ -24,6 +24,7 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/utils";
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms-v1/components/SettlementStatementDrawer";
+import type { PlatformDocument } from "@/features/dashboard/platforms/types";
 import {
   SUPPORTED_PLATFORMS,
   accountOptionLabel,
@@ -93,6 +94,21 @@ export function PlatformsV1Feature() {
     null;
 
   const [settlementDrawerOpen, setSettlementDrawerOpen] = useState(false);
+
+  /**
+   * What a document row does when it's activated — from the card, from its icon
+   * button, or from the keyboard. Which rows open the settlement form is data
+   * (`opensSettlementForm`), not a title match; the rest stay placeholders until
+   * their endpoints exist, the same stand-in treatment MCA v2 gives its
+   * proof-of-ownership download.
+   */
+  const handleDocumentAction = (doc: PlatformDocument) => {
+    if (doc.opensSettlementForm) {
+      setSettlementDrawerOpen(true);
+      return;
+    }
+    toast.info(`${doc.title} will be available soon`);
+  };
 
   if (!selectedPlatform) return null;
 
@@ -467,10 +483,30 @@ export function PlatformsV1Feature() {
                   a second column of content competing with the steps. */}
               <div className="mt-3 space-y-2">
                 {selectedPlatform.documents.map((doc) => (
+                  // The whole card is the target, not just the icon: the card
+                  // carries one action, so anywhere on it should trigger it
+                  // rather than asking for a hit on a 32px button. role/tabIndex
+                  // and the Enter/Space handler are what make that reachable by
+                  // keyboard too; the accessible name comes from the card's own
+                  // caption and title text.
+                  //
+                  // No preventDefault on mousedown here (unlike the platform
+                  // cards): the card should keep browser focus after a click, so
+                  // that closing the drawer returns focus to the row that opened
+                  // it.
                   <Card
                     key={doc.title}
                     size="sm"
-                    className="flex-row items-center justify-between gap-3 p-4"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleDocumentAction(doc)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleDocumentAction(doc);
+                      }
+                    }}
+                    className="flex-row items-center justify-between gap-3 p-4 cursor-pointer transition-[box-shadow,border-color] duration-150 hover:shadow-md"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-[12px] text-muted-foreground">{doc.caption}</p>
@@ -478,20 +514,19 @@ export function PlatformsV1Feature() {
                         {doc.title}
                       </p>
                     </div>
-                    {/* Which rows open the settlement form is data, not a
-                        title match. The rest stay placeholders until their
-                        endpoints exist — the same stand-in treatment MCA v2
-                        gives its proof-of-ownership download. */}
+                    {/* Kept as an affordance — it says the row does something —
+                        but it now runs the same handler the card does.
+                        stopPropagation so a click on the icon fires that
+                        handler once, not twice. */}
                     <IconButton
                       aria-label={doc.actionLabel}
                       variant="ghost"
                       size="sm"
                       className="shrink-0"
-                      onClick={() =>
-                        doc.opensSettlementForm
-                          ? setSettlementDrawerOpen(true)
-                          : toast.info(`${doc.title} will be available soon`)
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDocumentAction(doc);
+                      }}
                     >
                       <Icon name={doc.actionIcon} className="h-4 w-4" />
                     </IconButton>
