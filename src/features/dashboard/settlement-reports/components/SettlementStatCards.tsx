@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, Card, StatCardSkeleton, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import {
+  Button,
+  Card,
+  StatCardSkeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { TotalSettledCard } from "@/features/dashboard/settlement-reports/components/TotalSettledCard";
@@ -21,7 +29,11 @@ function SettlementBreakupRow({ label, value, emphasis }: SettlementBreakupRowPr
       <span className={emphasis ? "font-semibold text-foreground" : "text-muted-foreground"}>
         {label}
       </span>
-      <span className={emphasis ? "font-semibold tabular-nums text-foreground" : "tabular-nums text-foreground"}>
+      <span
+        className={
+          emphasis ? "font-semibold tabular-nums text-foreground" : "tabular-nums text-foreground"
+        }
+      >
         {value}
       </span>
     </div>
@@ -148,7 +160,10 @@ export function SettlementStatCards({
             <TooltipProvider delayDuration={200}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="link" className="h-auto w-fit justify-start p-0 text-xs font-semibold">
+                  <Button
+                    variant="link"
+                    className="h-auto w-fit justify-start p-0 text-xs font-semibold"
+                  >
                     Settlement breakup
                   </Button>
                 </TooltipTrigger>
@@ -157,7 +172,11 @@ export function SettlementStatCards({
                   <SettlementBreakupRow label="Tax" value={`−${previousSettledTaxLabel}`} />
                   <SettlementBreakupRow label="Fee" value={`−${previousSettledFeeLabel}`} />
                   <div className="border-t border-border pt-1.5">
-                    <SettlementBreakupRow label="Net amount" value={previousSettledLabel} emphasis />
+                    <SettlementBreakupRow
+                      label="Net amount"
+                      value={previousSettledLabel}
+                      emphasis
+                    />
                   </div>
                 </TooltipContent>
               </Tooltip>
@@ -169,7 +188,8 @@ export function SettlementStatCards({
             className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
           <p className="text-xs text-muted-foreground">
-            {previousSettledDateLabel}, {previousSettledTimeLabel} · {previousSettledTransactionCount} transactions
+            {previousSettledDateLabel}, {previousSettledTimeLabel} ·{" "}
+            {previousSettledTransactionCount} transactions
           </p>
           <UtrCopyButton utrNumber={previousSettledUtrNumber} />
         </Card>
@@ -189,8 +209,8 @@ export function SettlementStatCards({
             <div className="mt-1 flex flex-col gap-1.5 border-t border-(--primary-border) pt-2.5">
               <p className="text-[11px] text-muted-foreground">
                 {pendingInvoiceCount} transaction{pendingInvoiceCount === 1 ? "" : "s"} need
-                {pendingInvoiceCount === 1 ? "s" : ""} an invoice uploaded before {pendingInvoiceCount === 1 ? "it" : "they"}{" "}
-                can be included in this settlement.
+                {pendingInvoiceCount === 1 ? "s" : ""} an invoice uploaded before{" "}
+                {pendingInvoiceCount === 1 ? "it" : "they"} can be included in this settlement.
               </p>
               <Button
                 type="button"

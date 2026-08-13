@@ -11,7 +11,8 @@ import type { NonWorkingDayReason } from "@/features/dashboard/settlement-report
  * per-product "is this actually done" check. There is no "failed" state,
  * every settlement in this mock dataset eventually completes.
  */
-export type SettlementStatus = "settled" | "processing" | "sent_for_settlement" | "mca_settled" | "firc";
+export type SettlementStatus =
+  "settled" | "processing" | "sent_for_settlement" | "mca_settled" | "firc";
 
 export type BankTransferStatus = "pending" | "completed";
 
@@ -133,4 +134,54 @@ export interface SettlementDetail {
   mcaPayments?: McaSettlementPayment[];
   /** Only present when one or more transactions in this settlement are on hold. */
   heldFunds: HeldFundsSummary | null;
+}
+
+// ── Real API contracts (ported verbatim from pg-dashboard reports/types.ts) ──
+// These are the ONLY settlement shapes the backend actually returns. Both the
+// PA and FFMS summaries are intentionally thin: a settlement date, an amount,
+// a transaction count and the UTR(s). Everything richer on SettlementRow above
+// (bankAccount, bankTransferStatus, non-working-day info, the summary StatCards
+// and the per-settlement SettlementDetail) has NO backing endpoint yet and is
+// flagged // BACKEND GAP where it is consumed.
+
+/** PA (Payments) settlement summary row. Amount/count are strings, nullable. */
+export interface PaSettlementView {
+  settlementDate: string | null;
+  settlementAmount: string | null;
+  numberOfTransactions: string | null;
+  utrNumbers: string[];
+}
+
+export interface PaSettlementResponse {
+  data: {
+    views: PaSettlementView[];
+  };
+}
+
+/** FFMS (PACB) settlement summary row. Note: `totalSettlementAmount`, not `settlementAmount`. */
+export interface FfmsSettlementSummaryRow {
+  settlementDate: string | null;
+  totalSettlementAmount: string | null;
+  numberOfTransactions: string | null;
+  utrNumbers: string[];
+}
+
+export interface FfmsSettlementResponse {
+  data: {
+    summary: FfmsSettlementSummaryRow[];
+  };
+}
+
+export interface PaSettlementDownloadResponse {
+  data: {
+    downloadUrl: string;
+  };
+  message?: string;
+}
+
+export interface FfmsSettlementDownloadResponse {
+  data: {
+    presignedUrl: string;
+  };
+  message?: string;
 }

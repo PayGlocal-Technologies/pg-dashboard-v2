@@ -140,7 +140,10 @@ export function SettlementCalendarButton({ rows }: SettlementCalendarButtonProps
   const containerRef = useRef<HTMLDivElement>(null);
 
   const settledRowByDate = useMemo(
-    () => new Map(rows.filter((r) => isSettlementComplete(r.status)).map((r) => [r.date.slice(0, 10), r])),
+    () =>
+      new Map(
+        rows.filter((r) => isSettlementComplete(r.status)).map((r) => [r.date.slice(0, 10), r])
+      ),
     [rows]
   );
 
@@ -217,7 +220,8 @@ export function SettlementCalendarButton({ rows }: SettlementCalendarButtonProps
                   </p>
                   <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300/90">
                     {nextSettlementInfo.reason ? `${nextSettlementInfo.reason} · ` : ""}
-                    Next settlement: {formatShortDate(nextSettlementInfo.date)} · in {daysUntilNextSettlement} days
+                    Next settlement: {formatShortDate(nextSettlementInfo.date)} · in{" "}
+                    {daysUntilNextSettlement} days
                   </p>
                 </div>
               </div>

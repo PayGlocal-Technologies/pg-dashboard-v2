@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button, Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -37,7 +45,9 @@ function TotalSettledTooltip({
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
       <p className="font-medium text-muted-foreground">{point.x}</p>
-      <p className="font-semibold tabular-nums text-foreground">₹{point.y.toLocaleString("en-IN")}</p>
+      <p className="font-semibold tabular-nums text-foreground">
+        ₹{point.y.toLocaleString("en-IN")}
+      </p>
     </div>
   );
 }
@@ -73,7 +83,9 @@ export function TotalSettledCard({
           <div
             className={cn(
               "mt-2 flex items-center gap-1 text-xs font-medium",
-              trendPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+              trendPositive
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400"
             )}
           >
             <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />

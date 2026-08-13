@@ -37,11 +37,13 @@ export function SettlementReportInfoPanel({ onClose, settlement }: SettlementRep
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Icon name="file-text" size={16} />
         </span>
-        <p className="text-sm font-semibold text-foreground">What does &quot;Available&quot; mean for this report?</p>
+        <p className="text-sm font-semibold text-foreground">
+          What does &quot;Available&quot; mean for this report?
+        </p>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          This report is generated as soon as the transactions in this settlement cycle are finalized, even before
-          the bank transfer completes. It includes the same amount breakdown and payment list shown below,
-          whether or not the transfer has gone through yet.
+          This report is generated as soon as the transactions in this settlement cycle are
+          finalized, even before the bank transfer completes. It includes the same amount breakdown
+          and payment list shown below, whether or not the transfer has gone through yet.
         </p>
       </div>
 
@@ -61,18 +63,21 @@ export function SettlementReportInfoPanel({ onClose, settlement }: SettlementRep
         </p>
       </div>
 
-      {!isSettled && settlement.affectedByNonWorkingDay && settlement.nonWorkingDayDate && settlement.nonWorkingDayReason && (
-        <>
-          <Separator />
-          <NonWorkingDayExplanation
-            paymentReceivedDate={settlement.paymentReceivedAt.slice(0, 10)}
-            nonWorkingDayDate={settlement.nonWorkingDayDate}
-            nonWorkingDayReason={settlement.nonWorkingDayReason}
-            nonWorkingDayName={settlement.nonWorkingDayName}
-            settlementDate={settlement.date.slice(0, 10)}
-          />
-        </>
-      )}
+      {!isSettled &&
+        settlement.affectedByNonWorkingDay &&
+        settlement.nonWorkingDayDate &&
+        settlement.nonWorkingDayReason && (
+          <>
+            <Separator />
+            <NonWorkingDayExplanation
+              paymentReceivedDate={settlement.paymentReceivedAt.slice(0, 10)}
+              nonWorkingDayDate={settlement.nonWorkingDayDate}
+              nonWorkingDayReason={settlement.nonWorkingDayReason}
+              nonWorkingDayName={settlement.nonWorkingDayName}
+              settlementDate={settlement.date.slice(0, 10)}
+            />
+          </>
+        )}
     </Card>
   );
 }

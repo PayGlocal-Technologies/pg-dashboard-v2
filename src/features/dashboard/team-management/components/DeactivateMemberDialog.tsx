@@ -10,7 +10,11 @@ interface DeactivateMemberDialogProps {
   onConfirm: (id: string) => void;
 }
 
-export function DeactivateMemberDialog({ row, onOpenChange, onConfirm }: DeactivateMemberDialogProps) {
+export function DeactivateMemberDialog({
+  row,
+  onOpenChange,
+  onConfirm,
+}: DeactivateMemberDialogProps) {
   return (
     <Dialog open={!!row} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-100 gap-0 p-0">
@@ -23,7 +27,8 @@ export function DeactivateMemberDialog({ row, onOpenChange, onConfirm }: Deactiv
               <div>
                 <DialogTitle>Deactivate team member?</DialogTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {row.firstName} {row.lastName} will immediately lose access to this account until reactivated.
+                  {row.firstName} {row.lastName} will immediately lose access to this account until
+                  reactivated.
                 </p>
               </div>
             </div>

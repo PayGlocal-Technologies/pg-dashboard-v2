@@ -1,42 +1,113 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button, Card, DataTable, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
+import { useApp } from "@/stores/useApp";
+import { useAccountSetup } from "@/stores/useAccountSetup";
+import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { teamMemberColumns } from "@/features/dashboard/team-management/columns";
 import { TeamMemberRowActions } from "@/features/dashboard/team-management/components/TeamMemberRowActions";
 import { AddTeamMemberModal } from "@/features/dashboard/team-management/components/AddTeamMemberModal";
-import { EditMemberRoleDialog } from "@/features/dashboard/team-management/components/EditMemberRoleDialog";
 import { DeactivateMemberDialog } from "@/features/dashboard/team-management/components/DeactivateMemberDialog";
+import { LimitedTimeAccessDrawer } from "@/features/dashboard/team-management/components/LimitedTimeAccessDrawer";
 import {
-  ROLE_OPTIONS,
+  buildRoleOptions,
   TEAM_MEMBERS_PAGE_LIMIT,
   TEAM_STATUS_FILTERS,
 } from "@/features/dashboard/team-management/constants";
-import { teamMemberRows as initialTeamMemberRows } from "@/features/dashboard/team-management/mock-data";
-import type { TeamMemberRole, TeamMemberRow } from "@/features/dashboard/team-management/types";
-
-// TODO(integration): this screen is mock data only (see mock-data.ts). Wire it
-// up to the real team/user-management endpoints per the CLAUDE.md migration
-// checklist before shipping, endpoint URL, request payload and response
-// statuses must all be copied from pg-dashboard, not guessed.
+import {
+  activateDeactivateUserApi,
+  merchantTeamListApi,
+  partnerTeamListApi,
+  resendVerificationApi,
+} from "@/features/dashboard/team-management/services";
+import {
+  mapPartnerRecordToRow,
+  mapUserRecordToRow,
+} from "@/features/dashboard/team-management/helper";
+import type {
+  MerchantTeamResponse,
+  PartnerTeamResponse,
+  TeamMemberRow,
+  UserTableReqBody,
+} from "@/features/dashboard/team-management/types";
+import type { TableReqBody } from "@/features/dashboard/transactions/types";
 
 export function TeamManagementFeature() {
-  // Held in state (not the plain mock-data export) so a newly invited member
-  // actually shows up in the table and metrics, see AddTeamMemberModal.
-  const [rows, setRows] = useState<TeamMemberRow[]>(initialTeamMemberRows);
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const profile = useApp((s) => s.profile);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+
+  // Team management is scoped to a single MID (the caller's account or the
+  // explicitly-selected sub-MID), not a product filter — so it reads the MID
+  // directly rather than through useResolvedMids (see plan risk note).
+  const mid = selectedMid || profile?.mid || "";
+  const midType = profile?.midType ?? "";
 
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("All");
   const [roleFilter, setRoleFilter] = useState<string[] | undefined>(undefined);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [editingRow, setEditingRow] = useState<TeamMemberRow | null>(null);
   const [deactivatingRow, setDeactivatingRow] = useState<TeamMemberRow | null>(null);
+  const [limitedTimeRow, setLimitedTimeRow] = useState<TeamMemberRow | null>(null);
+
+  const enabled = !!mid && !isGuestUser;
+  const invalidateKey: QueryKey[] = isPartnerUser ? [["team-partner"]] : [["team-merchant"]];
+
+  // ── Merchant team (OpenSearch /search/users) ────────────────────────────────
+  const merchantBody: TableReqBody = {
+    pageLimit: TEAM_MEMBERS_PAGE_LIMIT,
+    from: 0,
+    searchFilterType: mid ? "FILTER_TYPE" : "DEFAULT",
+    ...(mid ? { fieldSearch: { mid: [mid] } } : {}),
+  };
+  const merchantQuery = usePostQuery<MerchantTeamResponse, TableReqBody>(
+    ["team-merchant", mid],
+    merchantTeamListApi,
+    merchantBody,
+    undefined,
+    !isPartnerUser && enabled
+  );
+
+  // ── Partner team (IAM /iam/users/<mid>) ──────────────────────────────────────
+  const partnerBody: UserTableReqBody = {
+    ascending: true,
+    pageLimit: 25,
+    exclusiveStartKey: null,
+    userViewFilter: "DEFAULT",
+    midType: "GLOCAL",
+    from: 0,
+  };
+  const partnerQuery = usePostQuery<PartnerTeamResponse, UserTableReqBody>(
+    ["team-partner", mid],
+    partnerTeamListApi(mid),
+    partnerBody,
+    undefined,
+    isPartnerUser && enabled
+  );
+
+  const rows: TeamMemberRow[] = useMemo(() => {
+    if (isPartnerUser) {
+      return (partnerQuery.data?.data?.listOfUsers ?? []).map(mapPartnerRecordToRow);
+    }
+    return (merchantQuery.data?.data?.data ?? []).map(mapUserRecordToRow);
+  }, [isPartnerUser, merchantQuery.data, partnerQuery.data]);
+
+  const isPending = isPartnerUser ? partnerQuery.isPending : merchantQuery.isPending;
+  const isError = isPartnerUser ? partnerQuery.isError : merchantQuery.isError;
+  const refetch = isPartnerUser ? partnerQuery.refetch : merchantQuery.refetch;
+
+  // Role filter options come from the roles actually present in the list
+  // (roles are dynamic — there is no static universe).
+  const roleOptions = useMemo(() => buildRoleOptions(rows.map((r) => r.role)), [rows]);
 
   const onSearch = (v: string) => setSearch(v);
   const onStatusFilter = (v: string) => setStatusFilter(v);
@@ -63,22 +134,43 @@ export function TeamManagementFeature() {
     });
   }, [rows, search, statusFilter, roleFilter]);
 
-  function handleInvited(row: TeamMemberRow) {
-    setRows((prev) => [row, ...prev]);
-    toast.success("Invite sent");
+  // ── Mutations ────────────────────────────────────────────────────────────────
+  const { mutate: activateDeactivate } = usePut<unknown, { dynamicUrl: string }>("", {
+    invalidateQueries: invalidateKey,
+  });
+  const { mutate: resendLink } = usePost<unknown, { phoneNumber: string }>(resendVerificationApi);
+
+  function confirmDeactivate() {
+    const row = deactivatingRow;
+    if (!row) return;
+    activateDeactivate(
+      { dynamicUrl: activateDeactivateUserApi(row.merchantId, "deactivate", row.username) },
+      {
+        onSuccess: () => toast.success("Team member deactivated"),
+        onError: (error) => toast.error(error.message),
+      }
+    );
   }
 
-  function handleSaveRole(id: string, role: TeamMemberRole) {
-    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, role } : row)));
-    toast.success("Role updated");
+  function reactivate(row: TeamMemberRow) {
+    activateDeactivate(
+      { dynamicUrl: activateDeactivateUserApi(row.merchantId, "activate", row.username) },
+      {
+        onSuccess: () => toast.success("Team member reactivated"),
+        onError: (error) => toast.error(error.message),
+      }
+    );
   }
 
-  function handleDeactivate(id: string) {
-    setRows((prev) => prev.map((row) => (row.id === id ? { ...row, status: "INACTIVE" } : row)));
-    toast.success("Team member deactivated");
+  function resend(row: TeamMemberRow) {
+    resendLink(
+      { phoneNumber: `${row.phoneCountryCode}${row.phone}` },
+      {
+        onSuccess: () => toast.success("Registration link resent"),
+        onError: (error) => toast.error(error.message),
+      }
+    );
   }
-
-  const columns = teamMemberColumns;
 
   return (
     <div className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden">
@@ -91,23 +183,22 @@ export function TeamManagementFeature() {
             size="sm"
             leftIcon={<Icon name="user-plus" className="h-3.5 w-3.5" />}
             onClick={() => setAddOpen(true)}
+            disabled={!mid || isPartnerUser}
           >
             Add Team Member
           </Button>
         }
       />
 
-      {/* Single cohesive card: title, status tabs, then the filter bar, all
-       * sharing one border/rounded container, the table sits directly
-       * beneath with only a top border, same hierarchy as the Transactions,
-       * Settlement Reports and Payment Links tables. */}
       <Card className="gap-0 overflow-hidden p-0">
         <div className="pl-5 pr-3 pb-3 pt-5">
           <div className="space-y-3">
-            <SegmentedTabs options={TEAM_STATUS_FILTERS} value={statusFilter} onChange={onStatusFilter} />
+            <SegmentedTabs
+              options={TEAM_STATUS_FILTERS}
+              value={statusFilter}
+              onChange={onStatusFilter}
+            />
 
-            {/* Thin top divider separates the filter bar from the tabs
-             * above instead of its own bordered/boxed container. */}
             <div className="border-t border-border pt-3 flex items-center gap-2.5 flex-wrap">
               <RotatingSearchInput
                 value={search}
@@ -121,7 +212,7 @@ export function TeamManagementFeature() {
               <div className="flex items-center gap-2 flex-wrap">
                 <MultiSelectChipFilter
                   value={roleFilter}
-                  options={ROLE_OPTIONS}
+                  options={roleOptions}
                   onChange={setRoleFilter}
                   placeholder="Role"
                 />
@@ -142,32 +233,65 @@ export function TeamManagementFeature() {
           </div>
         </div>
 
-        <DataTable
-          columns={columns}
-          data={filteredRows}
-          emptyTitle="No team members found"
-          emptyDescription="Try adjusting your filters or search query"
-          rowKey={(row) => row.id}
-          pageSize={TEAM_MEMBERS_PAGE_LIMIT}
-          density="compact"
-          tableLayout="content"
-          className="rounded-none border-0 border-t border-border"
-          rowAction={(row) => (
-            <TeamMemberRowActions row={row} onEditRole={setEditingRow} onDeactivate={setDeactivatingRow} />
-          )}
-        />
+        {isError ? (
+          <div className="flex flex-col items-center gap-3 border-t border-border p-10 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
+              <Icon name="alert-circle" size={22} />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">
+                Couldn&apos;t load team members
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Something went wrong while fetching data.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void refetch()}>
+              Retry
+            </Button>
+          </div>
+        ) : (
+          <DataTable
+            columns={teamMemberColumns}
+            data={filteredRows}
+            isLoading={isPending}
+            skeletonRows={8}
+            emptyTitle="No team members found"
+            emptyDescription="Try adjusting your filters or search query"
+            rowKey={(row) => row.id}
+            pageSize={TEAM_MEMBERS_PAGE_LIMIT}
+            density="compact"
+            tableLayout="content"
+            className="rounded-none border-0 border-t border-border"
+            rowAction={(row) => (
+              <TeamMemberRowActions
+                row={row}
+                onDeactivate={setDeactivatingRow}
+                onReactivate={reactivate}
+                onResend={resend}
+                onSetLimitedTime={setLimitedTimeRow}
+              />
+            )}
+          />
+        )}
       </Card>
 
-      <AddTeamMemberModal open={addOpen} onOpenChange={setAddOpen} onInvited={handleInvited} />
-      <EditMemberRoleDialog
-        row={editingRow}
-        onOpenChange={(open) => !open && setEditingRow(null)}
-        onSave={handleSaveRole}
+      <AddTeamMemberModal
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        mid={mid}
+        midType={midType}
+        invalidateKey={invalidateKey}
       />
       <DeactivateMemberDialog
         row={deactivatingRow}
         onOpenChange={(open) => !open && setDeactivatingRow(null)}
-        onConfirm={handleDeactivate}
+        onConfirm={() => confirmDeactivate()}
+      />
+      <LimitedTimeAccessDrawer
+        row={limitedTimeRow}
+        onOpenChange={(open) => !open && setLimitedTimeRow(null)}
+        invalidateKey={invalidateKey}
       />
     </div>
   );

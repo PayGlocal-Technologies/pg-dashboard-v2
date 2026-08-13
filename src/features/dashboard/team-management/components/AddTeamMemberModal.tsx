@@ -1,6 +1,8 @@
 "use client";
 
 import { useForm } from "@tanstack/react-form";
+import type { QueryKey } from "@tanstack/react-query";
+import { toast } from "sonner";
 import {
   Button,
   Dialog,
@@ -17,31 +19,30 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Switch,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { ROLE_OPTIONS } from "@/features/dashboard/team-management/constants";
-import { TEAM_MERCHANT_ID } from "@/features/dashboard/team-management/mock-data";
-import type { TeamMemberRole, TeamMemberRow } from "@/features/dashboard/team-management/types";
+import { useGet, usePost } from "@/lib/api/hooks";
+import { buildDepartmentOptions } from "@/features/dashboard/team-management/constants";
+import { iamRolesApi, inviteTempUserApi } from "@/features/dashboard/team-management/services";
+import type { InviteTempUserBody, RolesResponse } from "@/features/dashboard/team-management/types";
 
 interface AddTeamMemberFormValues {
   firstName: string;
   lastName: string;
   username: string;
-  role: TeamMemberRole;
+  /** Holds the selected role's `department` string (see submit mapping). */
+  department: string;
   email: string;
   phone: string;
-  whatsappEchoEnabled: boolean;
 }
 
 const DEFAULT_VALUES: AddTeamMemberFormValues = {
   firstName: "",
   lastName: "",
   username: "",
-  role: "VIEW_ONLY",
+  department: "",
   email: "",
   phone: "",
-  whatsappEchoEnabled: false,
 };
 
 function isValidEmail(email: string): boolean {
@@ -51,51 +52,78 @@ function isValidEmail(email: string): boolean {
 function computeIsValid(v: AddTeamMemberFormValues): boolean {
   return Boolean(
     v.firstName.trim() &&
-      v.lastName.trim() &&
-      v.username.trim() &&
-      isValidEmail(v.email) &&
-      v.phone.replace(/\D/g, "").length >= 7
+    v.lastName.trim() &&
+    v.username.trim() &&
+    v.department.trim() &&
+    isValidEmail(v.email) &&
+    v.phone.replace(/\D/g, "").length >= 7
   );
-}
-
-/** Only called from the submit handler (an event handler, not render), safe
- * per this project's hooks-purity rule against Math.random/Date math during
- * render, see CreatePaymentLinkModal's identical note. */
-function generateShortId(): string {
-  return Math.random().toString(36).slice(2, 8);
-}
-
-function nowIso(): string {
-  return new Date().toISOString();
 }
 
 interface AddTeamMemberModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onInvited: (row: TeamMemberRow) => void;
+  /** MID the invited user is attached to. */
+  mid: string;
+  /** midType passed into the invite body + roles lookup. */
+  midType: string;
+  /** List query key(s) to invalidate on a successful invite. */
+  invalidateKey: QueryKey[];
 }
 
-export function AddTeamMemberModal({ open, onOpenChange, onInvited }: AddTeamMemberModalProps) {
+export function AddTeamMemberModal({
+  open,
+  onOpenChange,
+  mid,
+  midType,
+  invalidateKey,
+}: AddTeamMemberModalProps) {
+  // Roles/departments are fetched live (dynamic on the backend). Enabled only
+  // while the dialog is open — the dialog mounts on open, so no lazy refetch
+  // dance is needed (unlike pg-dashboard's enabled:false + refetch).
+  const rolesQuery = useGet<RolesResponse>(["iam-roles", mid, midType], iamRolesApi(mid, midType), {
+    enabled: open && !!mid,
+  });
+  const roles = rolesQuery.data?.data?.roles ?? [];
+  const departmentOptions = buildDepartmentOptions(roles);
+
+  const { mutate: invite, isPending } = usePost<unknown, InviteTempUserBody>(inviteTempUserApi, {
+    invalidateQueries: invalidateKey,
+  });
+
   const form = useForm({
     defaultValues: DEFAULT_VALUES,
     onSubmit: async ({ value }) => {
-      const row: TeamMemberRow = {
-        id: `usr_${generateShortId()}`,
+      // Old dashboard mapping: the dropdown shows `department`, submits it as
+      // `department`, and sends the matching role's `name` as `role`.
+      const selectedRole = roles.find((r) => r.department === value.department);
+      const body: InviteTempUserBody = {
         firstName: value.firstName.trim(),
         lastName: value.lastName.trim(),
-        username: value.username.trim(),
-        role: value.role,
-        merchantId: TEAM_MERCHANT_ID,
-        status: "INVITE_SENT",
-        phoneCountryCode: "+91",
-        phone: value.phone.trim(),
-        email: value.email.trim(),
-        whatsappEchoEnabled: value.whatsappEchoEnabled,
-        invitedAt: nowIso(),
+        emailId: value.email.trim(),
+        // NOTE: domestic default. Global-tenant calling-code selection is an
+        // open follow-up (see plan) — pg-dashboard branches on isGlobalTenant.
+        regionCode: "+91",
+        phoneNumber: value.phone.trim(),
+        department: value.department,
+        newMid: false,
+        limitedTimeAccessUser: false,
+        midType,
+        role: selectedRole?.name ?? "",
+        userName: value.username.trim(),
+        parentMid: mid || "payglocal_mid",
+        mid,
+        limitedTimeAccessHours: false,
+        limitedTimeAccessMinutes: false,
       };
-      onOpenChange(false);
-      form.reset();
-      onInvited(row);
+      invite(body, {
+        onSuccess: () => {
+          toast.success("Teammate invited successfully");
+          onOpenChange(false);
+          form.reset();
+        },
+        onError: (error) => toast.error(error.message),
+      });
     },
   });
 
@@ -167,16 +195,18 @@ export function AddTeamMemberModal({ open, onOpenChange, onInvited }: AddTeamMem
               )}
             </form.Field>
 
-            <form.Field name="role">
+            <form.Field name="department">
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="role">Role</FieldLabel>
-                  <Select value={field.state.value} onValueChange={(v) => field.handleChange(v as TeamMemberRole)}>
+                  <FieldLabel htmlFor="role">Role / Department</FieldLabel>
+                  <Select value={field.state.value} onValueChange={(v) => field.handleChange(v)}>
                     <SelectTrigger id="role">
-                      <SelectValue />
+                      <SelectValue
+                        placeholder={rolesQuery.isPending ? "Loading roles…" : "Select a role"}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {ROLE_OPTIONS.map((opt) => (
+                      {departmentOptions.map((opt) => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.label}
                         </SelectItem>
@@ -219,20 +249,6 @@ export function AddTeamMemberModal({ open, onOpenChange, onInvited }: AddTeamMem
                 </Field>
               )}
             </form.Field>
-
-            <form.Field name="whatsappEchoEnabled">
-              {(field) => (
-                <div className="flex items-center justify-between gap-4 rounded-xl border border-border p-4">
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Enable Echo on WhatsApp</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Send this member account activity updates over WhatsApp.
-                    </p>
-                  </div>
-                  <Switch checked={field.state.value} onCheckedChange={field.handleChange} />
-                </div>
-              )}
-            </form.Field>
           </div>
 
           <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
@@ -245,7 +261,7 @@ export function AddTeamMemberModal({ open, onOpenChange, onInvited }: AddTeamMem
                   type="submit"
                   variant="primary"
                   size="sm"
-                  disabled={!computeIsValid(values) || isSubmitting}
+                  disabled={!computeIsValid(values) || isSubmitting || isPending}
                   leftIcon={<Icon name="send-horizontal" className="h-3.5 w-3.5" />}
                 >
                   Send Invite

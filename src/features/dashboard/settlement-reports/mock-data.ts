@@ -41,7 +41,10 @@ export const hasUpcomingHoliday = isHolidayWithinDays(SETTLEMENT_CALENDAR_TODAY,
 // from 2026-03-12 lands on the 2026-03-13 bank holiday (see bankHolidays
 // above), which is exactly what pushes it to Monday below, not a hardcoded
 // date.
-const upcomingSettlementSchedule = computeSettlementSchedule(SETTLEMENT_CALENDAR_TODAY, bankHolidays);
+const upcomingSettlementSchedule = computeSettlementSchedule(
+  SETTLEMENT_CALENDAR_TODAY,
+  bankHolidays
+);
 
 export const settlementSummary = {
   totalSettled: 507000,
@@ -360,7 +363,11 @@ export const mcaSettlementRows: SettlementRow[] = [
 const PLATFORM_FEE_RATE_OF_NET = 1200 / 98420;
 const GST_RATE_OF_FEE = 380 / 1200;
 
-function deriveAmountBreakdown(netAmount: number): { grossAmount: number; gst: number; platformFee: number } {
+function deriveAmountBreakdown(netAmount: number): {
+  grossAmount: number;
+  gst: number;
+  platformFee: number;
+} {
   const platformFee = Math.round(netAmount * PLATFORM_FEE_RATE_OF_NET * 100) / 100;
   const gst = Math.round(platformFee * GST_RATE_OF_FEE * 100) / 100;
   const grossAmount = Math.round((netAmount + gst + platformFee) * 100) / 100;
@@ -373,7 +380,11 @@ const PAYMENT_METHOD_CYCLE = ["UPI", "Card", "Net Banking"];
  * cleared in time to be included in this settlement, see the "Released from
  * hold" chip on the detail page's Payments table. */
 const RELEASED_HOLD_SETTLEMENT_ID = "stl_e5f6g7h8";
-const RELEASED_HOLD_REASONS = ["Compliance Review", "Business Verification Pending", "High Risk Transaction"];
+const RELEASED_HOLD_REASONS = [
+  "Compliance Review",
+  "Business Verification Pending",
+  "High Risk Transaction",
+];
 
 /** `11:35` + `offsetMinutes` → `"HH:MM:00"`, wrapping past midnight. Plain
  * arithmetic (no Date object) so every settlement's payment list stays
@@ -435,16 +446,46 @@ function buildPayments(
 // before it can be bundled into an MCA settlement, so unlike buildPayments
 // above (which always sums back to the settlement's own gross/net), these
 // don't need to reconcile to the settlement total, see McaSettlementPayment.
-const MCA_REMITTERS: { name: string; countryCode: string; countryName: string; currency: string; amount: number }[] = [
+const MCA_REMITTERS: {
+  name: string;
+  countryCode: string;
+  countryName: string;
+  currency: string;
+  amount: number;
+}[] = [
   { name: "frm2", countryCode: "CA", countryName: "Canada", currency: "CAD", amount: 0.5 },
   { name: "frm", countryCode: "US", countryName: "United States", currency: "USD", amount: 1 },
   { name: "puneethv", countryCode: "CA", countryName: "Canada", currency: "CAD", amount: 20 },
-  { name: "puneethv", countryCode: "US", countryName: "United States", currency: "USD", amount: 20 },
-  { name: "apple", countryCode: "US", countryName: "United States", currency: "USD", amount: 10000 },
+  {
+    name: "puneethv",
+    countryCode: "US",
+    countryName: "United States",
+    currency: "USD",
+    amount: 20,
+  },
+  {
+    name: "apple",
+    countryCode: "US",
+    countryName: "United States",
+    currency: "USD",
+    amount: 10000,
+  },
   { name: "test", countryCode: "US", countryName: "United States", currency: "USD", amount: 10 },
   { name: "EEFC", countryCode: "US", countryName: "United States", currency: "USD", amount: 50 },
-  { name: "puneethv", countryCode: "US", countryName: "United States", currency: "USD", amount: 12 },
-  { name: "puneethv", countryCode: "US", countryName: "United States", currency: "USD", amount: 11 },
+  {
+    name: "puneethv",
+    countryCode: "US",
+    countryName: "United States",
+    currency: "USD",
+    amount: 12,
+  },
+  {
+    name: "puneethv",
+    countryCode: "US",
+    countryName: "United States",
+    currency: "USD",
+    amount: 11,
+  },
   { name: "test", countryCode: "CA", countryName: "Canada", currency: "CAD", amount: 11 },
   { name: "test", countryCode: "CA", countryName: "Canada", currency: "CAD", amount: 150 },
 ];
@@ -459,7 +500,9 @@ const MCA_REMITTERS: { name: string; countryCode: string; countryName: string; c
  * mcaSettlementSummary.pendingInvoiceCount instead.
  */
 function buildMcaPayments(settlement: SettlementRow, dateOnly: string): McaSettlementPayment[] {
-  const status: McaSettlementPayment["status"] = isSettlementComplete(settlement.status) ? "settled" : "processing";
+  const status: McaSettlementPayment["status"] = isSettlementComplete(settlement.status)
+    ? "settled"
+    : "processing";
 
   return Array.from({ length: settlement.transactionCount }, (_, i) => {
     const remitter = MCA_REMITTERS[i % MCA_REMITTERS.length]!;
@@ -529,7 +572,9 @@ function buildSettlementDetail(settlement: SettlementRow): SettlementDetail {
   const depositedAt = isSettlementComplete(settlement.status) ? expectedAt : null;
 
   const heldFunds = settlement.id === HELD_FUNDS_SETTLEMENT_ID ? buildHeldFunds() : null;
-  const complianceReviewAt = heldFunds ? `${settlementDateOnly}T${timeAtOffset(11, 35, 35)}+05:30` : null;
+  const complianceReviewAt = heldFunds
+    ? `${settlementDateOnly}T${timeAtOffset(11, 35, 35)}+05:30`
+    : null;
   const isMca = settlement.id.startsWith("mca_");
 
   return {

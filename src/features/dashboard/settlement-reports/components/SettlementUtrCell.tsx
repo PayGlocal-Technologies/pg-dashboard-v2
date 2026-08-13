@@ -49,7 +49,9 @@ export function SettlementUtrCell({ row }: SettlementUtrCellProps) {
 
   return (
     <div className="flex items-center gap-1">
-      <span className="whitespace-nowrap font-mono text-[13px] text-muted-foreground">{row.utrNumber}</span>
+      <span className="whitespace-nowrap font-mono text-[13px] text-muted-foreground">
+        {row.utrNumber}
+      </span>
       <TooltipProvider delayDuration={200}>
         <Tooltip>
           <TooltipTrigger asChild>

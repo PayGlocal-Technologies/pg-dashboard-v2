@@ -1,6 +1,9 @@
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatWeekdayDate, type NonWorkingDayReason } from "@/features/dashboard/settlement-reports/calendarUtils";
+import {
+  formatWeekdayDate,
+  type NonWorkingDayReason,
+} from "@/features/dashboard/settlement-reports/calendarUtils";
 
 interface NonWorkingDayExplanationProps {
   /** YYYY-MM-DD, "Day 0". */
@@ -36,21 +39,28 @@ export function NonWorkingDayExplanation({
   settlementDate,
   settlementComplete = false,
 }: NonWorkingDayExplanationProps) {
-  const nonWorkingLabel = nonWorkingDayReason === "holiday" ? (nonWorkingDayName ?? "Bank holiday") : "Non-working day";
+  const nonWorkingLabel =
+    nonWorkingDayReason === "holiday" ? (nonWorkingDayName ?? "Bank holiday") : "Non-working day";
 
   const steps: { label: string; date: string; tone: StepTone }[] = [
     { label: "Payment received", date: paymentReceivedDate, tone: "complete" },
     { label: nonWorkingLabel, date: nonWorkingDayDate, tone: "skipped" },
-    { label: "Settlement", date: settlementDate, tone: settlementComplete ? "complete" : "pending" },
+    {
+      label: "Settlement",
+      date: settlementDate,
+      tone: settlementComplete ? "complete" : "pending",
+    },
   ];
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/30 p-3">
       <div>
-        <p className="text-sm font-semibold text-foreground">Why is my settlement scheduled for the next working day?</p>
+        <p className="text-sm font-semibold text-foreground">
+          Why is my settlement scheduled for the next working day?
+        </p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Payments received on weekends and bank holidays are processed on the next working day because banks do not
-          process transfers on non-working days.
+          Payments received on weekends and bank holidays are processed on the next working day
+          because banks do not process transfers on non-working days.
         </p>
       </div>
 
@@ -69,7 +79,9 @@ export function NonWorkingDayExplanation({
               >
                 {step.tone === "complete" && <Icon name="check" size={11} strokeWidth={3} />}
                 {step.tone === "pending" && <Icon name="clock" size={10} />}
-                {step.tone === "skipped" && <span className="h-1.5 w-3 rounded-full bg-muted-foreground/50" />}
+                {step.tone === "skipped" && (
+                  <span className="h-1.5 w-3 rounded-full bg-muted-foreground/50" />
+                )}
               </span>
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-foreground">{step.label}</p>

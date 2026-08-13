@@ -3,7 +3,10 @@ import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import { SettlementUtrCell } from "@/features/dashboard/settlement-reports/components/SettlementUtrCell";
-import type { SettlementRow, SettlementStatus } from "@/features/dashboard/settlement-reports/types";
+import type {
+  SettlementRow,
+  SettlementStatus,
+} from "@/features/dashboard/settlement-reports/types";
 
 /** "stl_a1b2c3d4" -> "stl_....c3d4", first 4 / last 4 characters. */
 function truncateId(value: string): string {
@@ -83,7 +86,14 @@ function buildColumn(key: string): Column<SettlementRow> | null {
         minWidth: 120,
         render: (row) => {
           const meta = SETTLEMENT_STATUS_META[row.status];
-          return <StatusBadge variant={meta.variant} label={meta.label} trailIcon={meta.trailIcon} size="sm" />;
+          return (
+            <StatusBadge
+              variant={meta.variant}
+              label={meta.label}
+              trailIcon={meta.trailIcon}
+              size="sm"
+            />
+          );
         },
       };
     case "transactionCount":
@@ -110,7 +120,9 @@ function buildColumn(key: string): Column<SettlementRow> | null {
         header: "Date",
         minWidth: 150,
         render: (row) => (
-          <span className="whitespace-nowrap text-[13px] text-muted-foreground">{formatDate(row.date)}</span>
+          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+            {formatDate(row.date)}
+          </span>
         ),
       };
     default:

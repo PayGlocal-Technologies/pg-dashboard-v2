@@ -40,8 +40,29 @@ export interface SettlementSchedule {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const WEEKDAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const WEEKDAY_NAMES = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+const MONTH_ABBR = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 function parseDateKey(dateKey: string): Date {
   const [year, month, day] = dateKey.split("-").map(Number);
@@ -81,7 +102,10 @@ export function diffInDays(fromKey: string, toKey: string): number {
  * that's the day that changed the outcome (see the module-level doc comment
  * on SettlementSchedule for the worked Friday/Monday-holiday example).
  */
-export function computeSettlementSchedule(paymentDateKey: string, holidays: HolidayInfo[]): SettlementSchedule {
+export function computeSettlementSchedule(
+  paymentDateKey: string,
+  holidays: HolidayInfo[]
+): SettlementSchedule {
   const holidayMap = new Map(holidays.map((h) => [h.date, h.name]));
 
   let candidate = addDays(paymentDateKey, 1);
@@ -128,7 +152,10 @@ export function computeSettlementSchedule(paymentDateKey: string, holidays: Holi
  * weekends included, used by the settlement calendar widget's "next
  * settlement" marker. Thin wrapper over computeSettlementSchedule() that
  * keeps its older, narrower return shape. */
-export function computeNextSettlement(todayKey: string, holidays: HolidayInfo[]): NextSettlementInfo {
+export function computeNextSettlement(
+  todayKey: string,
+  holidays: HolidayInfo[]
+): NextSettlementInfo {
   const schedule = computeSettlementSchedule(todayKey, holidays);
   const reason =
     schedule.nonWorkingDayReason === "holiday"
@@ -144,7 +171,11 @@ export function computeNextSettlement(todayKey: string, holidays: HolidayInfo[])
   };
 }
 
-export function isHolidayWithinDays(todayKey: string, holidays: HolidayInfo[], withinDays: number): boolean {
+export function isHolidayWithinDays(
+  todayKey: string,
+  holidays: HolidayInfo[],
+  withinDays: number
+): boolean {
   return holidays.some((h) => {
     const diff = diffInDays(todayKey, h.date);
     return diff >= 0 && diff <= withinDays;
@@ -152,7 +183,10 @@ export function isHolidayWithinDays(todayKey: string, holidays: HolidayInfo[], w
 }
 
 export function formatMonthLabel(year: number, monthIndex: number): string {
-  return new Date(year, monthIndex, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  return new Date(year, monthIndex, 1).toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
 }
 
 export function formatShortDate(dateKey: string): string {
@@ -189,16 +223,28 @@ export function buildMonthGrid(year: number, monthIndex: number): CalendarCell[]
 
   for (let i = startWeekday - 1; i >= 0; i--) {
     const day = daysInPrevMonth - i;
-    cells.push({ dateKey: formatDateKey(new Date(year, monthIndex - 1, day)), day, inCurrentMonth: false });
+    cells.push({
+      dateKey: formatDateKey(new Date(year, monthIndex - 1, day)),
+      day,
+      inCurrentMonth: false,
+    });
   }
 
   for (let day = 1; day <= daysInMonth; day++) {
-    cells.push({ dateKey: formatDateKey(new Date(year, monthIndex, day)), day, inCurrentMonth: true });
+    cells.push({
+      dateKey: formatDateKey(new Date(year, monthIndex, day)),
+      day,
+      inCurrentMonth: true,
+    });
   }
 
   const trailingCount = 42 - cells.length;
   for (let day = 1; day <= trailingCount; day++) {
-    cells.push({ dateKey: formatDateKey(new Date(year, monthIndex + 1, day)), day, inCurrentMonth: false });
+    cells.push({
+      dateKey: formatDateKey(new Date(year, monthIndex + 1, day)),
+      day,
+      inCurrentMonth: false,
+    });
   }
 
   return cells;

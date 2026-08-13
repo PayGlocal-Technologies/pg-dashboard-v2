@@ -9,7 +9,10 @@ import {
   type DateRangeValue,
   type DurationPickMode,
 } from "@/components/common/DateRangeCalendarPicker";
-import { formatDateKey, formatShortDate } from "@/features/dashboard/settlement-reports/calendarUtils";
+import {
+  formatDateKey,
+  formatShortDate,
+} from "@/features/dashboard/settlement-reports/calendarUtils";
 
 export interface SettlementDurationValue {
   mode: DurationPickMode;
@@ -30,7 +33,9 @@ function parseDateKey(dateKey: string): Date {
 
 function durationLabel(value: SettlementDurationValue): string {
   if (value.mode === "single") return formatShortDate(value.from);
-  return value.to ? `${formatShortDate(value.from)} – ${formatShortDate(value.to)}` : formatShortDate(value.from);
+  return value.to
+    ? `${formatShortDate(value.from)} – ${formatShortDate(value.to)}`
+    : formatShortDate(value.from);
 }
 
 export function SettlementDurationFilter({ value, onChange }: SettlementDurationFilterProps) {
@@ -45,7 +50,10 @@ export function SettlementDurationFilter({ value, onChange }: SettlementDuration
       // every time it opens (not via an effect — see CLAUDE.md hooks rules).
       if (value?.mode === "range") {
         setMode("range");
-        setRange({ from: parseDateKey(value.from), to: value.to ? parseDateKey(value.to) : undefined });
+        setRange({
+          from: parseDateKey(value.from),
+          to: value.to ? parseDateKey(value.to) : undefined,
+        });
         setSingleDate(undefined);
       } else if (value?.mode === "single") {
         setMode("single");
@@ -66,7 +74,11 @@ export function SettlementDurationFilter({ value, onChange }: SettlementDuration
     } else {
       onChange(
         range?.from
-          ? { mode: "range", from: formatDateKey(range.from), to: range.to ? formatDateKey(range.to) : undefined }
+          ? {
+              mode: "range",
+              from: formatDateKey(range.from),
+              to: range.to ? formatDateKey(range.to) : undefined,
+            }
           : undefined
       );
     }

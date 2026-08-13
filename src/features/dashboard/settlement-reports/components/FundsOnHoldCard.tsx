@@ -1,5 +1,14 @@
 import Link from "next/link";
-import { Button, Card, Separator, StatusBadge, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Separator,
+  StatusBadge,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import type { HeldFundsSummary } from "@/features/dashboard/settlement-reports/types";
@@ -38,9 +47,9 @@ export function FundsOnHoldCard({ heldFunds, currency }: FundsOnHoldCardProps) {
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="top" className="max-w-60 text-xs">
-                Funds are held during risk or compliance review. Some flagged transactions need supporting
-                documents, others are under manual review and need no action from you. Open a transaction below to
-                see what it needs.
+                Funds are held during risk or compliance review. Some flagged transactions need
+                supporting documents, others are under manual review and need no action from you.
+                Open a transaction below to see what it needs.
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>

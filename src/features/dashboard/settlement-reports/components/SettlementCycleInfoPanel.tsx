@@ -53,11 +53,13 @@ export function SettlementCycleInfoPanel({
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Icon name="building-2" size={16} />
         </span>
-        <p className="text-sm font-semibold text-foreground">What does &quot;Previous settled&quot; include?</p>
+        <p className="text-sm font-semibold text-foreground">
+          What does &quot;Previous settled&quot; include?
+        </p>
         <p className="text-xs leading-relaxed text-muted-foreground">
           The net payout from your most recently completed settlement cycle, gross value across{" "}
-          {previousSettledTransactionCount} transactions, minus tax and platform fees. It was credited to your bank
-          account on {previousSettledDateLabel} at {previousSettledTimeLabel}.
+          {previousSettledTransactionCount} transactions, minus tax and platform fees. It was
+          credited to your bank account on {previousSettledDateLabel} at {previousSettledTimeLabel}.
         </p>
       </div>
 
@@ -67,10 +69,12 @@ export function SettlementCycleInfoPanel({
         <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Icon name="clock" size={16} />
         </span>
-        <p className="text-sm font-semibold text-foreground">What does a T+1 settlement cycle mean?</p>
+        <p className="text-sm font-semibold text-foreground">
+          What does a T+1 settlement cycle mean?
+        </p>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Funds captured from a customer on one business day are transferred to your bank account the very next
-          business day.
+          Funds captured from a customer on one business day are transferred to your bank account
+          the very next business day.
         </p>
 
         <div className="mt-1 flex items-start gap-2">

@@ -26,10 +26,20 @@ import { CopyableValue } from "@/components/common/CopyableValue";
 import { SettlementReportInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementReportInfoPanel";
 import { ReleasedFromHoldInfoPanel } from "@/features/dashboard/settlement-reports/components/ReleasedFromHoldInfoPanel";
 import { FundsOnHoldCard } from "@/features/dashboard/settlement-reports/components/FundsOnHoldCard";
-import { SETTLEMENT_STATUS_META, isSettlementComplete } from "@/features/dashboard/settlement-reports/columns";
+import {
+  SETTLEMENT_STATUS_META,
+  isSettlementComplete,
+} from "@/features/dashboard/settlement-reports/columns";
 import { settlementDetailsById } from "@/features/dashboard/settlement-reports/mock-data";
-import { processingBannerCopy, utrPendingReason } from "@/features/dashboard/settlement-reports/settlementCopy";
-import type { McaPaymentStatus, McaSettlementPayment, SettlementPayment } from "@/features/dashboard/settlement-reports/types";
+import {
+  processingBannerCopy,
+  utrPendingReason,
+} from "@/features/dashboard/settlement-reports/settlementCopy";
+import type {
+  McaPaymentStatus,
+  McaSettlementPayment,
+  SettlementPayment,
+} from "@/features/dashboard/settlement-reports/types";
 
 const LIST_PATH = "/reports/settlement-report";
 
@@ -54,7 +64,11 @@ function BreakupRow({ label, value, muted, negative, emphasis, indent }: Breakup
       <span
         className={cn(
           "text-sm",
-          emphasis ? "font-semibold text-foreground" : muted ? "text-muted-foreground" : "font-medium text-foreground"
+          emphasis
+            ? "font-semibold text-foreground"
+            : muted
+              ? "text-muted-foreground"
+              : "font-medium text-foreground"
         )}
       >
         {label}
@@ -62,7 +76,11 @@ function BreakupRow({ label, value, muted, negative, emphasis, indent }: Breakup
       <span
         className={cn(
           "tabular-nums text-sm",
-          emphasis ? "font-semibold text-foreground" : muted ? "text-muted-foreground" : "font-medium text-foreground"
+          emphasis
+            ? "font-semibold text-foreground"
+            : muted
+              ? "text-muted-foreground"
+              : "font-medium text-foreground"
         )}
       >
         {negative ? "−" : ""}
@@ -74,79 +92,81 @@ function BreakupRow({ label, value, muted, negative, emphasis, indent }: Breakup
 
 function buildPaymentColumns(onReleasedInfoClick: () => void): Column<SettlementPayment>[] {
   return [
-  {
-    key: "createdOn",
-    header: "Created on",
-    minWidth: 160,
-    cellClassName: "pl-5",
-    render: (p) => (
-      <span className="whitespace-nowrap text-[13px] text-muted-foreground">{formatDate(p.createdOn)}</span>
-    ),
-  },
-  {
-    key: "id",
-    header: "Transaction ID",
-    minWidth: 190,
-    render: (p) => (
-      <div className="flex flex-col items-start gap-1">
-        <span className="whitespace-nowrap font-mono text-[13px] text-primary/80">{p.id}</span>
-        {p.releasedFromHold && (
-          <div className="flex items-center gap-1">
-            <StatusBadge variant="info" label="Released from hold" trailIcon="check" size="sm" />
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onReleasedInfoClick}
-              aria-label="About released holds"
-              className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
-            >
-              <Icon name="info" size={11} />
-            </Button>
-          </div>
-        )}
-      </div>
-    ),
-  },
-  {
-    key: "paymentMethod",
-    header: "Payment method",
-    minWidth: 130,
-    render: (p) => <span className="text-[13px] text-muted-foreground">{p.paymentMethod}</span>,
-  },
-  {
-    key: "grossAmount",
-    header: "Gross amount",
-    minWidth: 130,
-    align: "right",
-    render: (p) => (
-      <span className="whitespace-nowrap tabular-nums text-[13px] font-medium text-foreground">
-        {formatCurrency(p.grossAmount, "INR")}
-      </span>
-    ),
-  },
-  {
-    key: "deductions",
-    header: "Deductions",
-    minWidth: 130,
-    align: "right",
-    render: (p) => (
-      <span className="whitespace-nowrap tabular-nums text-[13px] text-foreground">
-        −{formatCurrency(p.deductions, "INR")}
-      </span>
-    ),
-  },
-  {
-    key: "netAmount",
-    header: "Net amount",
-    minWidth: 130,
-    align: "right",
-    cellClassName: "pr-5",
-    render: (p) => (
-      <span className="whitespace-nowrap tabular-nums text-[13px] font-semibold text-foreground">
-        {formatCurrency(p.netAmount, "INR")}
-      </span>
-    ),
-  },
+    {
+      key: "createdOn",
+      header: "Created on",
+      minWidth: 160,
+      cellClassName: "pl-5",
+      render: (p) => (
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {formatDate(p.createdOn)}
+        </span>
+      ),
+    },
+    {
+      key: "id",
+      header: "Transaction ID",
+      minWidth: 190,
+      render: (p) => (
+        <div className="flex flex-col items-start gap-1">
+          <span className="whitespace-nowrap font-mono text-[13px] text-primary/80">{p.id}</span>
+          {p.releasedFromHold && (
+            <div className="flex items-center gap-1">
+              <StatusBadge variant="info" label="Released from hold" trailIcon="check" size="sm" />
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onReleasedInfoClick}
+                aria-label="About released holds"
+                className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
+              >
+                <Icon name="info" size={11} />
+              </Button>
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: "paymentMethod",
+      header: "Payment method",
+      minWidth: 130,
+      render: (p) => <span className="text-[13px] text-muted-foreground">{p.paymentMethod}</span>,
+    },
+    {
+      key: "grossAmount",
+      header: "Gross amount",
+      minWidth: 130,
+      align: "right",
+      render: (p) => (
+        <span className="whitespace-nowrap tabular-nums text-[13px] font-medium text-foreground">
+          {formatCurrency(p.grossAmount, "INR")}
+        </span>
+      ),
+    },
+    {
+      key: "deductions",
+      header: "Deductions",
+      minWidth: 130,
+      align: "right",
+      render: (p) => (
+        <span className="whitespace-nowrap tabular-nums text-[13px] text-foreground">
+          −{formatCurrency(p.deductions, "INR")}
+        </span>
+      ),
+    },
+    {
+      key: "netAmount",
+      header: "Net amount",
+      minWidth: 130,
+      align: "right",
+      cellClassName: "pr-5",
+      render: (p) => (
+        <span className="whitespace-nowrap tabular-nums text-[13px] font-semibold text-foreground">
+          {formatCurrency(p.netAmount, "INR")}
+        </span>
+      ),
+    },
   ];
 }
 
@@ -197,7 +217,14 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
       minWidth: 150,
       render: (p) => {
         const meta = MCA_PAYMENT_STATUS_META[p.status];
-        return <StatusBadge variant={meta.variant} label={meta.label} trailIcon={meta.trailIcon} size="sm" />;
+        return (
+          <StatusBadge
+            variant={meta.variant}
+            label={meta.label}
+            trailIcon={meta.trailIcon}
+            size="sm"
+          />
+        );
       },
     },
     {
@@ -205,7 +232,9 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
       header: "Date & Time",
       minWidth: 160,
       render: (p) => (
-        <span className="whitespace-nowrap text-[13px] text-muted-foreground">{formatDate(p.createdOn)}</span>
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {formatDate(p.createdOn)}
+        </span>
       ),
     },
     {
@@ -223,7 +252,9 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
       header: "Remitter Name",
       minWidth: 130,
       cellClassName: "pr-5",
-      render: (p) => <span className="whitespace-nowrap text-[13px] text-foreground">{p.remitterName}</span>,
+      render: (p) => (
+        <span className="whitespace-nowrap text-[13px] text-foreground">{p.remitterName}</span>
+      ),
     },
   ];
 }
@@ -293,7 +324,9 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
   // endpoint once it exists, see the list page's "Export" action, which is
   // the same mock-only placeholder.
   function handleDownloadReport(format: "CSV" | "Excel" | "PDF") {
-    toast.success("Download started", { description: `Preparing ${format} report for ${settlement.id}` });
+    toast.success("Download started", {
+      description: `Preparing ${format} report for ${settlement.id}`,
+    });
   }
 
   // A report can exist mid-processing (see settlement.reportAvailable), it's
@@ -304,7 +337,12 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
   const downloadReportButton = settlement.reportAvailable ? (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="outline" size="sm" leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+        >
           Download Report
         </Button>
       </DropdownMenuTrigger>
@@ -371,8 +409,15 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
                 {isSettled ? "Settlement amount" : "Expected settlement amount"}
               </p>
               <div className="mt-1 flex items-center gap-3">
-                <p className="text-4xl font-bold tracking-tight text-foreground tabular-nums">{netAmountLabel}</p>
-                <StatusBadge variant={statusMeta.variant} label={statusMeta.label} trailIcon={statusMeta.trailIcon} size="sm" />
+                <p className="text-4xl font-bold tracking-tight text-foreground tabular-nums">
+                  {netAmountLabel}
+                </p>
+                <StatusBadge
+                  variant={statusMeta.variant}
+                  label={statusMeta.label}
+                  trailIcon={statusMeta.trailIcon}
+                  size="sm"
+                />
               </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
                 {isSettled ? (
@@ -528,8 +573,20 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
                 <BreakupRow label="Gross Settlements" value={grossAmount} />
                 <BreakupRow label="Payment" value={grossAmount} muted />
                 <BreakupRow label="Deductions" value={gst + platformFee} negative />
-                <BreakupRow label="Goods and services tax (GST)" value={gst} muted negative indent />
-                <BreakupRow label="Platform fee charged on payments" value={platformFee} muted negative indent />
+                <BreakupRow
+                  label="Goods and services tax (GST)"
+                  value={gst}
+                  muted
+                  negative
+                  indent
+                />
+                <BreakupRow
+                  label="Platform fee charged on payments"
+                  value={platformFee}
+                  muted
+                  negative
+                  indent
+                />
                 <BreakupRow
                   label={isSettled ? "Net Settlement" : "Expected Net Settlement"}
                   value={settlement.amount}
@@ -537,8 +594,9 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
                 />
               </div>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Net settlement is the amount {isSettled ? "transferred" : "scheduled to be transferred"} to your
-                registered bank account.
+                Net settlement is the amount{" "}
+                {isSettled ? "transferred" : "scheduled to be transferred"} to your registered bank
+                account.
               </p>
             </Card>
           </div>
@@ -602,10 +660,16 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
         {(showReportInfo || showReleasedInfo) && (
           <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
             {showReportInfo && (
-              <SettlementReportInfoPanel onClose={() => setShowReportInfo(false)} settlement={settlement} />
+              <SettlementReportInfoPanel
+                onClose={() => setShowReportInfo(false)}
+                settlement={settlement}
+              />
             )}
             {showReleasedInfo && (
-              <ReleasedFromHoldInfoPanel onClose={() => setShowReleasedInfo(false)} payments={releasedPayments} />
+              <ReleasedFromHoldInfoPanel
+                onClose={() => setShowReleasedInfo(false)}
+                payments={releasedPayments}
+              />
             )}
           </aside>
         )}

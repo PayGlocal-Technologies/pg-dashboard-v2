@@ -1,7 +1,7 @@
 import { Badge, StatusBadge, type Column } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { CopyableCell } from "@/components/common/CopyableCell";
-import { ROLE_META } from "@/features/dashboard/team-management/constants";
+import { getRoleMeta } from "@/features/dashboard/team-management/constants";
 import type { TeamMemberRow, TeamMemberStatus } from "@/features/dashboard/team-management/types";
 
 export const TEAM_STATUS_META: Record<
@@ -9,8 +9,9 @@ export const TEAM_STATUS_META: Record<
   { label: string; variant: BadgeVariant; trailIcon: BadgeTrailIcon }
 > = {
   ACTIVE: { label: "Active", variant: "success", trailIcon: "check" },
-  INVITE_SENT: { label: "Invite Sent", variant: "info", trailIcon: "arrow-right" },
-  INACTIVE: { label: "Inactive", variant: "muted", trailIcon: "x" },
+  NOT_REGISTERED: { label: "Invite Sent", variant: "info", trailIcon: "arrow-right" },
+  DEACTIVATED: { label: "Inactive", variant: "muted", trailIcon: "x" },
+  LOCKED: { label: "Locked", variant: "warning", trailIcon: "clock" },
 };
 
 export const teamMemberColumns: Column<TeamMemberRow>[] = [
@@ -37,7 +38,7 @@ export const teamMemberColumns: Column<TeamMemberRow>[] = [
     minWidth: 130,
     render: (row) => (
       <Badge variant="secondary" size="sm">
-        {ROLE_META[row.role].label}
+        {getRoleMeta(row.role).label}
       </Badge>
     ),
   },
@@ -46,7 +47,9 @@ export const teamMemberColumns: Column<TeamMemberRow>[] = [
     header: "Merchant ID",
     minWidth: 140,
     render: (row) => (
-      <span className="whitespace-nowrap font-mono text-[13px] text-muted-foreground">{row.merchantId}</span>
+      <span className="whitespace-nowrap font-mono text-[13px] text-muted-foreground">
+        {row.merchantId}
+      </span>
     ),
   },
   {
@@ -55,7 +58,14 @@ export const teamMemberColumns: Column<TeamMemberRow>[] = [
     minWidth: 120,
     render: (row) => {
       const meta = TEAM_STATUS_META[row.status];
-      return <StatusBadge variant={meta.variant} label={meta.label} trailIcon={meta.trailIcon} size="sm" />;
+      return (
+        <StatusBadge
+          variant={meta.variant}
+          label={meta.label}
+          trailIcon={meta.trailIcon}
+          size="sm"
+        />
+      );
     },
   },
   {
