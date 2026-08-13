@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PaTransaction } from "@/features/dashboard/transactions/types";
+import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
 // TODO(integration): mock only. Real refunds go through a refund endpoint
 // that creates the linked "Refund" transaction server-side and returns it in

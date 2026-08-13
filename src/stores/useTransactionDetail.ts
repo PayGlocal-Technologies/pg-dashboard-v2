@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { PaTransaction } from "@/features/dashboard/transactions/types";
+import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
 // TODO(integration): there is no "get transaction by id" endpoint yet, so the
 // full-page detail view can only render a transaction the user just had open

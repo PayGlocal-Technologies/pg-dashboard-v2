@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useProductContext } from "@/stores/useProductContext";
-import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
-import { TRANSACTIONS_PAGE_LIMIT } from "@/features/dashboard/transactions/constants";
+import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
+import { TRANSACTIONS_PAGE_LIMIT } from "@/features/dashboard/pa-transactions/constants";
 import { usePostQuery } from "@/lib/api/hooks";
 import { Button, Card, DataTable, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
-import { TransactionColumnsMenu } from "@/features/dashboard/transactions/components/TransactionColumnsMenu";
+import { TransactionColumnsMenu } from "@/features/dashboard/pa-transactions/components/TransactionColumnsMenu";
 import { formatDayMonth, formatWeekdayDate, formatWeekdayName } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { SettlementCalendarButton } from "@/features/dashboard/settlement-reports/components/SettlementCalendarButton";
 import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementCycleInfoPanel";
@@ -37,8 +37,9 @@ import {
   totalSettledChartsByTimeframe,
 } from "@/features/dashboard/settlement-reports/mock-data";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
-import type { McaTransaction, McaTransactionsResponse, TableReqBody } from "@/features/dashboard/transactions/types";
-import { mcaTxnSearchApi } from "@/features/dashboard/transactions/services";
+import type { McaTransaction, McaTransactionsResponse } from "@/features/dashboard/mca-transactions/types";
+import type { TableReqBody } from "@/types/transactions";
+import { mcaTxnSearchApi } from "@/features/dashboard/mca-transactions/services";
 
 // TODO(integration): this screen is mock data only (see mock-data.ts). Wire it
 // up to the real settlement endpoints per the CLAUDE.md migration checklist

@@ -37,21 +37,24 @@ export const regularNavigation: NavGroup[] = [
     label: "Payments",
     items: [
       {
-        label: "Transactions",
-        href: "/transactions",
-        icon: "repeat",
-        permission: ["getTxnSearchResults"],
-      },
-      {
         label: "Payment Products",
         href: "/payment-products",
         icon: "shopping-cart",
         permission: [],
         children: [
-          { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
-          { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
+          { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
+          // Two separate entries, both labelled "Transactions": the first is
+          // the MCA table, the second the PA (Cards/UPI/NetBanking) one. They
+          // used to be a single item whose page carried a segment toggle.
+          { label: "Transactions", href: "/mca-transactions", permission: ["getTxnSearchResults"] },
+          { label: "Transactions", href: "/pa-transactions", permission: ["getTxnSearchResults"] },
+          { label: "MCA Links", href: "/mca-links", permission: [] },
+          { label: "Platforms", href: "/platforms", permission: [] },
+          { label: "Platforms v1", href: "/platforms-v1", permission: [] },
+          { label: "Payment Links", href: "/payment-links", permission: [] },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },
+          { label: "Virtual Accounts", href: "/mca-v2", permission: [] },
         ],
       },
       {
@@ -161,8 +164,14 @@ export const partnerNavigation: NavGroup[] = [
     items: [
       { label: "Merchant Activation", href: "/my-merchants", icon: "users", permission: [] },
       {
-        label: "Transaction Overview",
-        href: "/transactions",
+        label: "Transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
@@ -211,7 +220,13 @@ export const globalNavigation: NavGroup[] = [
     items: [
       {
         label: "Transactions",
-        href: "/transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },

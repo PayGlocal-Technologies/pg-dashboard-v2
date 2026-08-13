@@ -1,5 +1,5 @@
 import { type Metadata } from "next";
-import { TransactionDetailFeature } from "@/features/dashboard/transactions/components/TransactionDetailFeature";
+import { TransactionDetailFeature } from "@/features/dashboard/pa-transactions/components/TransactionDetailFeature";
 
 export const metadata: Metadata = {
   title: "Transaction Details",

@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NEXT_PUBLIC_ENV=dev next dev --turbopack -p 4100",
-    "uat": "cross-env NEXT_PUBLIC_ENV=uat next dev --turbopack -p 4100",
+    "dev": "cross-env NEXT_PUBLIC_ENV=dev next dev --turbopack -p 4000",
+    "uat": "cross-env NEXT_PUBLIC_ENV=uat next dev --turbopack -p 4000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
