@@ -87,7 +87,7 @@ export async function handleSingleSignOn(
   }
 }
 
-export const DEFAULT_AUTHED_PATH = "/transactions";
+export const DEFAULT_AUTHED_PATH = "/mca-transactions";
 
 const OLD_FLOW_PATH = "/gl-gcc/redirect";
 const REDIRECT_KEY = "redirect_after_login";

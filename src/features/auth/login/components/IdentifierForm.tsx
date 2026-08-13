@@ -148,7 +148,7 @@ export function IdentifierForm({ setScreen }: LoginScreenProps) {
             } else if (data?.responseType === "COUNTRY_QUESTIONNAIRE") {
               setScreen("countryQuestionnaire");
             } else {
-              window.location.href = "/transactions";
+              window.location.href = "/mca-transactions";
             }
           },
           onError: (err) => setApiError(err.message),

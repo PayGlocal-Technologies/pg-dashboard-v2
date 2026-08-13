@@ -24,12 +24,14 @@ import {
   ChevronUp,
   CircleDollarSign,
   Clock,
+  Copy,
   CreditCard,
   Database,
   Download,
   Eye,
   EyeOff,
   FileText,
+  Filter,
   Gauge,
   GitPullRequest,
   Globe,
@@ -49,8 +51,11 @@ import {
   LogOut,
   Mail,
   MapPin,
+  Maximize2,
   Menu,
   MessageCircle,
+  Minimize2,
+  MoreHorizontal,
   Monitor,
   Moon,
   Paperclip,
@@ -59,14 +64,18 @@ import {
   Pencil,
   Phone,
   PieChart,
+  PiggyBank,
   Plus,
   Receipt,
   RefreshCw,
   Repeat2,
+  RotateCcw,
+  Send,
   Scale,
   Search,
   SendHorizontal,
   Settings,
+  Share2,
   ShieldAlert,
   ShieldCheck,
   ShoppingCart,
@@ -78,12 +87,19 @@ import {
   Trash2,
   TrendingDown,
   TrendingUp,
+  Upload,
   UserPlus,
   Users,
   Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
+import { AmazonLogo } from "@/components/icon/AmazonLogo";
+import { DeelLogo } from "@/components/icon/DeelLogo";
+import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
+import { MdrOfferIcon } from "@/components/icon/MdrOfferIcon";
+import { ToptalLogo } from "@/components/icon/ToptalLogo";
+import { UpworkLogo } from "@/components/icon/UpworkLogo";
 
 export const ICONS = {
   activity: Activity,
@@ -104,12 +120,20 @@ export const ICONS = {
   "chevron-up": ChevronUp,
   "circle-dollar-sign": CircleDollarSign,
   clock: Clock,
+  copy: Copy,
   "credit-card": CreditCard,
   database: Database,
   download: Download,
+  // Two-arrow (diagonal, opposing-corners) expand/collapse pair, matching
+  // the rest of the product's iconography more closely than the previous
+  // four-arrow Expand/Shrink glyphs. Keys unchanged so existing <Icon
+  // name="expand"/"shrink"> call sites (drawer Expand, page Collapse) don't
+  // need to change, only what they render.
+  expand: Maximize2,
   eye: Eye,
   "eye-off": EyeOff,
   "file-text": FileText,
+  filter: Filter,
   gauge: Gauge,
   "git-pull-request": GitPullRequest,
   globe: Globe,
@@ -131,6 +155,7 @@ export const ICONS = {
   "map-pin": MapPin,
   menu: Menu,
   "message-circle": MessageCircle,
+  "more-horizontal": MoreHorizontal,
   monitor: Monitor,
   moon: Moon,
   paperclip: Paperclip,
@@ -139,17 +164,22 @@ export const ICONS = {
   pencil: Pencil,
   phone: Phone,
   "pie-chart": PieChart,
+  "piggy-bank": PiggyBank,
   plus: Plus,
   receipt: Receipt,
   refresh: RefreshCw,
+  "rotate-ccw": RotateCcw,
+  send: Send,
   repeat: Repeat2,
   scale: Scale,
   search: Search,
   "send-horizontal": SendHorizontal,
   settings: Settings,
+  share: Share2,
   "shield-alert": ShieldAlert,
   "shield-check": ShieldCheck,
   "shopping-cart": ShoppingCart,
+  shrink: Minimize2,
   smartphone: Smartphone,
   sparkles: Sparkles,
   square: Square,
@@ -158,11 +188,22 @@ export const ICONS = {
   "trash-2": Trash2,
   "trending-down": TrendingDown,
   "trending-up": TrendingUp,
+  upload: Upload,
   "user-plus": UserPlus,
   users: Users,
   wallet: Wallet,
   x: X,
 
+  // ─── Platform brand marks (Platforms tutorial page) ────────────────────────
+  // Placeholder artwork until the official assets land — see each file's own
+  // note. Registered here, like every other SVG in the product, so call sites
+  // stay `<Icon name="…" />` and never reference an asset path.
+  "amazon-logo": AmazonLogo as unknown as LucideIcon,
+  "deel-logo": DeelLogo as unknown as LucideIcon,
+  "freelancer-logo": FreelancerLogo as unknown as LucideIcon,
+  "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
+  "toptal-logo": ToptalLogo as unknown as LucideIcon,
+  "upwork-logo": UpworkLogo as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
