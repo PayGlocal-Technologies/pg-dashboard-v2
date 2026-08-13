@@ -7,6 +7,7 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
 import { ContentAreaProvider } from "@/components/layout/ContentAreaContext";
 import { Icon } from "@/components/icon";
+import { FeedbackSheet } from "@/features/feedback/FeedbackSheet";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { isError } = useFetchCommonData();
@@ -33,6 +34,11 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           </ContentAreaProvider>
         </main>
       </div>
+
+      {/* App-wide, not tied to any page: the survey asks about PayGlocal as a
+          whole. Whether it actually appears is the server's call — see the
+          eligibility check inside. */}
+      <FeedbackSheet />
     </div>
   );
 }

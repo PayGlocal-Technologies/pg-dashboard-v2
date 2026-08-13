@@ -24,12 +24,12 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/utils";
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms-v1/components/SettlementStatementDrawer";
-import type { PlatformDocument } from "@/features/dashboard/platforms/types";
+import type { PlatformDocument } from "@/features/dashboard/platforms-v1/types";
 import {
   SUPPORTED_PLATFORMS,
   accountOptionLabel,
   accountsForPlatform,
-} from "@/features/dashboard/platforms/constants";
+} from "@/features/dashboard/platforms-v1/constants";
 
 /** Module title — the step below the page's own h1, shared by every module
  *  here. Same tokens MCA v2 and Platforms use, so the three read as one
@@ -62,9 +62,8 @@ const STEP_SCREENSHOT_ASPECT_CLASS = "aspect-[5/3] w-full";
  * Nothing here is a new component. The platform row is a list of flux-ui Cards
  * in the selected treatment the Virtual Accounts carousel uses, the currency
  * control is flux-ui's Select, and every screenshot frame is a Card. Content
- * lives in `@/features/dashboard/platforms/constants`, shared with the
- * Platforms page, so a new platform or a new screenshot is one data change that
- * lands on both pages at once.
+ * lives in `@/features/dashboard/platforms-v1/constants`, so a new platform or
+ * a new screenshot is one data change rather than a component edit.
  */
 export function PlatformsV1Feature() {
   const platforms = SUPPORTED_PLATFORMS;

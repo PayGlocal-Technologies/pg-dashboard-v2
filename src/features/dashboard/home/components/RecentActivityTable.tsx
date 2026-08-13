@@ -259,7 +259,7 @@ export function RecentActivityTable({
           size="sm"
           className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
           onClick={() =>
-            router.push(tab === "transactions" ? "/transactions" : "/settlement-reports")
+            router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-reports")
           }
           rightIcon={<Icon name="arrow-right" className="h-3 w-3" aria-hidden />}
         >

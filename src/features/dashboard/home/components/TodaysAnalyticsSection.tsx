@@ -385,7 +385,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
                 <p className="mt-1 font-sans text-sm font-bold tabular-nums tracking-[-0.02em] text-amber-800 dark:text-amber-300 sm:text-base">{formatInrCompact(attention.fundsOnHold.amount)}</p>
                 <p className="mt-1 text-[11px] font-normal leading-snug text-muted-foreground">{attention.fundsOnHold.releaseLabel}</p>
               </div>
-              <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" onClick={() => router.push("/transactions")} rightIcon={<Icon name="arrow-up-right" className="h-3 w-3 shrink-0" aria-hidden />}>
+              <Button variant="outline" size="sm" className="h-7 shrink-0 px-2.5 text-xs" onClick={() => router.push("/mca-transactions")} rightIcon={<Icon name="arrow-up-right" className="h-3 w-3 shrink-0" aria-hidden />}>
                 Take action
               </Button>
             </div>

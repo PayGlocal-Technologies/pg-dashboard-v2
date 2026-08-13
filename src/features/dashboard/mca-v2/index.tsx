@@ -15,7 +15,7 @@ import { Button, Card, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { currencySymbol, formatCurrency } from "@/lib/utils/format";
-import { OutstandingAmountCard } from "@/features/dashboard/transactions/components/OutstandingAmountCard";
+import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";

@@ -10,7 +10,7 @@ import {
   toEndOfDayMs,
   toStartOfDayMs,
 } from "@/components/common/filters/FilterChips";
-import { ReorderColumnsPopover } from "@/components/common/table/ReorderColumnsPopover";
+import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { reorderColumns } from "@/lib/utils/columns";
 import { buildClientColumns } from "@/features/dashboard/client-management/columns";
 import { ClientCardList } from "@/features/dashboard/client-management/components/ClientCardList";

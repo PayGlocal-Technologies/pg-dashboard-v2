@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
  * Declared locally rather than imported, matching proxy.ts — helpers.ts pulls
  * in Firebase and the app store, which don't belong in a root server component.
  */
-const AUTHED_HOME = "/transactions";
+const AUTHED_HOME = "/mca-transactions";
 
 export default function RootPage() {
   redirect(AUTHED_HOME);
