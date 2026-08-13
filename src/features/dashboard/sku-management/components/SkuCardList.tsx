@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils/format";
@@ -21,7 +22,7 @@ function SkuCardSkeleton() {
   );
 }
 
-function SkuCard({ row }: { row: SkuProduct }) {
+function SkuCard({ row, actions }: { row: SkuProduct; actions?: ReactNode }) {
   return (
     <div className="flex gap-3 rounded-xl border border-border bg-card px-4 py-3.5">
       <ProductThumbnail product={row} className="shrink-0" />
@@ -31,12 +32,17 @@ function SkuCard({ row }: { row: SkuProduct }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <span className="text-[14px] font-semibold text-foreground">{row.name}</span>
-          <StatusBadge
-            variant={row.type === "GOODS" ? "info" : "muted"}
-            label={SKU_TYPE_LABEL[row.type]}
-            size="sm"
-            className="shrink-0"
-          />
+          {/* Type chip and the overflow menu share the card's top-right
+              corner. Unlike the table — where the menu only appears on row
+              hover — it's always visible here: there is no hover on touch. */}
+          <div className="flex shrink-0 items-start gap-1">
+            <StatusBadge
+              variant={row.type === "GOODS" ? "info" : "muted"}
+              label={SKU_TYPE_LABEL[row.type]}
+              size="sm"
+            />
+            {actions}
+          </div>
         </div>
 
         {/* Selling price is the figure merchants scan for, so it carries the
@@ -63,6 +69,9 @@ function SkuCard({ row }: { row: SkuProduct }) {
 interface SkuCardListProps {
   rows: SkuProduct[];
   isLoading: boolean;
+  /** Per-row overflow menu, mirroring DataTable's own `rowAction` signature so
+   *  the table and the card list are fed by the same call site. */
+  rowAction?: (row: SkuProduct) => ReactNode;
   skeletonCount?: number;
   page: number;
   onPageChange: (page: number) => void;
@@ -81,6 +90,7 @@ interface SkuCardListProps {
 export function SkuCardList({
   rows,
   isLoading,
+  rowAction,
   skeletonCount = 6,
   page,
   onPageChange,
@@ -99,7 +109,7 @@ export function SkuCardList({
       ) : rows.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyDescription} />
       ) : (
-        rows.map((row) => <SkuCard key={row.id} row={row} />)
+        rows.map((row) => <SkuCard key={row.id} row={row} actions={rowAction?.(row)} />)
       )}
 
       {!isLoading && rows.length > 0 && totalPages > 1 && (
