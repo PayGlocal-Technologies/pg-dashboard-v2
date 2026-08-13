@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import {
@@ -30,7 +30,15 @@ import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/component
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
-import { buildShareUrl, currencyDisplayName } from "@/features/dashboard/multi-currency/utils";
+import {
+  accountDocumentId,
+  accountNumberOf,
+  currencyDisplayName,
+} from "@/features/dashboard/multi-currency/utils";
+import {
+  useSendAccountEmail,
+  useShareLink,
+} from "@/features/dashboard/multi-currency/hooks";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -79,7 +87,28 @@ export function ShareAccountDetailsModal({
   onCopyFullAccount,
   onShareFullAccount,
 }: ShareAccountDetailsModalProps) {
-  const shareUrl = buildShareUrl(account);
+  // The link is issued by the backend per currency, so it can't be derived.
+  //
+  // Stored with the currency it was issued for, rather than as a bare string
+  // that an effect clears when the account changes: that clear would be a
+  // synchronous setState in an effect body, which the React Compiler lint
+  // plugin rejects (see CLAUDE.md). Comparing instead means a link belonging
+  // to a different currency is simply not shown, with no reset needed.
+  const [issuedLink, setIssuedLink] = useState<{ currency: string; url: string } | null>(null);
+  const shareUrl = issuedLink?.currency === account.currency ? issuedLink.url : "";
+
+  const { requestShareLink, isRequesting } = useShareLink();
+  const { sendAccountEmail, isSending } = useSendAccountEmail();
+
+  // Requesting is a command, so it happens here rather than as a query keyed on
+  // the modal being open. setState lands in the async callback, not this body.
+  useEffect(() => {
+    if (!open || !account.currency) return;
+    if (issuedLink?.currency === account.currency) return;
+    requestShareLink(account.currency, (url) =>
+      setIssuedLink({ currency: account.currency, url })
+    );
+  }, [open, account.currency, issuedLink, requestShareLink]);
 
   const senderEmail = useApp((s) => s.profile?.emailId) ?? "you@company.com";
 
@@ -98,12 +127,34 @@ export function ShareAccountDetailsModal({
       ) {
         return;
       }
-      // No email-send endpoint exists yet — mirrors Copy Link's own
-      // client-side-only stand-in until a real one does.
-      toast.success(`Account details sent to ${value.clientEmail}`);
-      emailForm.reset();
-      setShowCcBcc(false);
-      onOpenChange(false);
+      // The endpoint identifies the account by the SHA-256 of its number, the
+      // same hash pg-dashboard sends. Nothing here logs either value.
+      const id = await accountDocumentId(accountNumberOf(account));
+      if (!id) {
+        toast.error("This account has no account number to share.");
+        return;
+      }
+
+      // Cc/Bcc are omitted entirely when blank rather than sent as empty
+      // arrays, matching pg-dashboard's payload.
+      const cc = value.cc.trim();
+      const bcc = value.bcc.trim();
+
+      sendAccountEmail(
+        {
+          id,
+          clientName: value.clientName,
+          clientEmail: value.clientEmail,
+          ...(cc ? { ccEmails: [cc] } : {}),
+          ...(bcc ? { bccEmails: [bcc] } : {}),
+        },
+        () => {
+          toast.success(`Account details sent to ${value.clientEmail}`);
+          emailForm.reset();
+          setShowCcBcc(false);
+          onOpenChange(false);
+        }
+      );
     },
   });
 
@@ -117,7 +168,7 @@ export function ShareAccountDetailsModal({
   // `accounts` rather than building a pair by hand keeps Rest of the World in
   // its own list position, always below the selected region. Sharing Rest of
   // the World itself matches once, so the list is correctly one row long.
-  const previewCards = accounts.filter((a) => a.id === account.id || a.id === "row-swift");
+  const previewCards = accounts.filter((a) => a.id === account.id || a.isGlobal);
 
   return (
     <Dialog
@@ -184,6 +235,10 @@ export function ShareAccountDetailsModal({
                     className="shrink-0"
                     leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
                     onClick={() => onCopyLink(shareUrl)}
+                    // The link is issued by the backend, so there is nothing to
+                    // copy until it arrives. Mirrors pg-dashboard, which also
+                    // requests the link when the modal opens.
+                    disabled={!shareUrl || isRequesting}
                   >
                     Copy Link
                   </Button>
@@ -214,10 +269,15 @@ export function ShareAccountDetailsModal({
                   </p>
                 </div>
 
-                {/* Real public preview page doesn't exist yet — disabled
-                    rather than linking somewhere that 404s. Wrapped in a
-                    span so the tooltip still triggers on hover: a native
-                    disabled button suppresses pointer events entirely. */}
+                {/* Opens the real client-facing page — the same URL the Copy
+                    Link field carries, so the merchant previews exactly what
+                    they are about to send rather than a rendering of it.
+                    Matches pg-dashboard's own handlePreviewFullPage.
+
+                    Disabled only until the backend has issued that link, since
+                    there is nothing to open before then. Wrapped in a span so
+                    the tooltip still triggers while disabled: a native disabled
+                    button suppresses pointer events entirely. */}
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -226,7 +286,8 @@ export function ShareAccountDetailsModal({
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled
+                          disabled={!shareUrl || isRequesting}
+                          onClick={() => window.open(shareUrl, "_blank", "noopener,noreferrer")}
                           rightIcon={<Icon name="arrow-up-right" className="h-3.5 w-3.5" />}
                         >
                           Preview full page
@@ -234,7 +295,7 @@ export function ShareAccountDetailsModal({
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className={TOOLTIP_CONTENT_CLASS} sideOffset={4}>
-                      Coming soon
+                      {shareUrl ? "Opens in a new tab" : "Preparing the link…"}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -306,8 +367,8 @@ export function ShareAccountDetailsModal({
 
           <TabsContent value="email" className="mt-0">
             {/* Fixed-width form column, flexible preview column — the same
-                sidebar/content split mca-v2's own layout uses elsewhere in
-                this feature. 336px = 280px × 1.2 — a ~20% wider form column
+                sidebar/content split the Platforms page uses for its own
+                list-beside-content layout. 336px = 280px × 1.2 — a ~20% wider form column
                 (and so ~20% wider Client Name/Client Email inputs, both
                 w-full within it) without touching the modal's own max-width;
                 minmax(0,1fr) on the preview column absorbs the difference
@@ -440,6 +501,9 @@ export function ShareAccountDetailsModal({
                     type="submit"
                     className="w-full"
                     leftIcon={<Icon name="send-horizontal" className="h-4 w-4" />}
+                    // Same in-flight guard pg-dashboard's McaShareModal applies
+                    // via isSendingEmail, so one submit can't be sent twice.
+                    disabled={isSending}
                   >
                     Send Email
                   </Button>

@@ -1,9 +1,15 @@
 "use client";
 
-import { Button, Card, CardContent, Separator } from "@/components/ui";
+import { useState } from "react";
+import { Button, Card, CardContent, IconButton, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
+import { GlobalCurrenciesDialog } from "@/features/dashboard/multi-currency/components/GlobalCurrenciesDialog";
+import {
+  PaymentMethodInfoDialog,
+  hasPaymentMethodInfo,
+} from "@/features/dashboard/multi-currency/components/PaymentMethodInfoDialog";
 import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
@@ -34,6 +40,28 @@ interface VirtualAccountDetailsProps {
   showShare?: boolean;
   /** Merged onto the Card — e.g. to override its default shrink-wrapped width. */
   className?: string;
+}
+
+/**
+ * "See supported currencies", for the SWIFT catch-all only.
+ *
+ * Shared by both header placements rather than living in one of them: the
+ * accounts page renders the header *above* the card and the shared page renders
+ * it *inside*, and the link has to exist in both — it was originally attached to
+ * the subtitle, which only the "inside" variant draws, so on the accounts page
+ * there was no way to open the dialog at all.
+ */
+function SupportedCurrenciesLink({ onClick }: { onClick: () => void }) {
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      className="h-auto min-h-0 p-0 align-baseline text-[13px] font-medium text-primary hover:bg-transparent hover:underline"
+      onClick={onClick}
+    >
+      See supported currencies
+    </Button>
+  );
 }
 
 /** "For clients in United States". Regions whose name is already the account
@@ -76,12 +104,20 @@ export function VirtualAccountDetails({
 }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
 
+  const [currenciesOpen, setCurrenciesOpen] = useState(false);
+  const [methodInfoOpen, setMethodInfoOpen] = useState(false);
+
   return (
     <section aria-live="polite">
       {headerPlacement === "above" && (
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {account.countryName} Account
-        </h3>
+        <div className="mb-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {account.countryName} Account
+          </h3>
+          {/* The catch-all account's whole point is the 32 currencies it
+              accepts, which is too many to name in the caption itself. */}
+          {account.isGlobal && <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />}
+        </div>
       )}
 
       <Card size="sm" className={cn("w-fit max-w-[730px] gap-4", className)}>
@@ -99,8 +135,14 @@ export function VirtualAccountDetails({
               <p className="truncate text-base font-semibold text-foreground">
                 {account.accountName}
               </p>
-              <p className="truncate text-[13px] text-muted-foreground">
+              <p className="text-[13px] text-muted-foreground">
                 {accountSubtitle(account)}
+                {account.isGlobal && (
+                  <>
+                    {" "}
+                    <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -119,8 +161,22 @@ export function VirtualAccountDetails({
             {fields.map((field) => (
               <div key={field.label} className="min-w-[160px] space-y-1">
                 <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
-                <dd className="break-words text-[13px] font-medium text-foreground">
+                <dd className="flex items-center gap-1.5 break-words text-[13px] font-medium text-foreground">
                   {field.value}
+                  {/* Only the rail has an explainer behind it, and only for the
+                      rails production wrote one for — so the affordance appears
+                      exactly where there is something to open. */}
+                  {field.label === "Payment Method" && hasPaymentMethodInfo(field.value) && (
+                    <IconButton
+                      aria-label={`What is ${field.value}?`}
+                      variant="ghost"
+                      size="sm"
+                      className="h-5 w-5 shrink-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => setMethodInfoOpen(true)}
+                    >
+                      <Icon name="info" className="h-3.5 w-3.5" />
+                    </IconButton>
+                  )}
                 </dd>
               </div>
             ))}
@@ -156,6 +212,15 @@ export function VirtualAccountDetails({
           </Button>
         </div>
       </Card>
+      {account.isGlobal && (
+        <GlobalCurrenciesDialog open={currenciesOpen} onOpenChange={setCurrenciesOpen} />
+      )}
+
+      <PaymentMethodInfoDialog
+        paymentMethod={account.paymentMethod}
+        open={methodInfoOpen}
+        onOpenChange={setMethodInfoOpen}
+      />
     </section>
   );
 }

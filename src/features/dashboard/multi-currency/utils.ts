@@ -33,22 +33,85 @@ export function formatAllAccounts(accounts: VirtualAccount[]) {
 export function buildFullAccountDetails(account: VirtualAccount): AccountDetail[] {
   const [primaryIdentifier, ...otherIdentifiers] = account.details;
   return [
-    { label: "Payment Method", value: account.paymentMethod },
+    // Omitted rather than shown blank when no rail is named — the same thing
+    // pg-dashboard does for a currency missing from its
+    // CURRENCY_PAYMENT_METHOD_MAP (paymentMethodFields in its hooks.ts). That
+    // covers AED, SGD and the Rest of the World account.
+    ...(account.paymentMethod ? [{ label: "Payment Method", value: account.paymentMethod }] : []),
     ...(primaryIdentifier ? [primaryIdentifier] : []),
     { label: "Bank Name", value: account.bankName },
     { label: "Account Holder Name", value: account.accountHolderName },
     { label: "Account Type", value: account.accountType },
     { label: "Beneficiary Address", value: account.beneficiaryAddress },
     ...otherIdentifiers,
+    // Beside the ACH code it belongs with, not appended after the metadata.
+    // pg-dashboard shows USD accounts both rows ("ACH routing code" and
+    // "Fedwire routing Code") for the same reason: a client paying by wire
+    // needs the wire code, and the two are not interchangeable.
+    ...(account.fedwireRoutingCode
+      ? [{ label: "Fedwire Routing Code", value: account.fedwireRoutingCode }]
+      : []),
     ...(account.routingCodeType
       ? [{ label: "Routing Code Type", value: account.routingCodeType }]
       : []),
   ];
 }
 
+/**
+ * Splits a Canadian routing code into the two parts a Canadian bank actually
+ * asks for: an institution number (first 4 digits) and a transit number (the
+ * remaining 5).
+ *
+ * Only applied to Amazon CAD accounts, and only when the code is exactly 9
+ * characters — the same two conditions pg-dashboard checks in
+ * `displayAccountDetails` (Platforms.tsx). Amazon's payout form takes the parts
+ * separately, so showing only the combined code leaves the merchant to split it
+ * themselves and get it wrong. Everywhere else the combined code is what the
+ * client's bank wants, so nothing is added.
+ *
+ * Returns the fields to append, or [] when the split doesn't apply.
+ */
+export function canadianRoutingParts(
+  account: VirtualAccount,
+  isAmazonAccount: boolean
+): AccountDetail[] {
+  if (!isAmazonAccount || account.currency !== "CAD") return [];
+
+  const routingCode = account.details.find((detail) =>
+    detail.label.toLowerCase().includes("routing")
+  )?.value;
+  if (!routingCode || routingCode.length !== 9) return [];
+
+  return [
+    { label: "Institution No.", value: routingCode.slice(0, 4) },
+    { label: "Transit No.", value: routingCode.slice(4) },
+  ];
+}
+
+/**
+ * Labels for currency values that aren't ISO 4217 codes. "GLOBAL" is the
+ * accounts endpoint's SWIFT catch-all (its bucket key is "OTHER"; see
+ * mapAccounts), and it reaches currencyDisplayName like any other currency.
+ */
+const NON_ISO_CURRENCY_LABELS: Record<string, string> = {
+  GLOBAL: "Rest of the World",
+};
+
 /** "AUD" → "Australian Dollar" — for the email-share preview's Currency
  *  line. Intl's own currency-name table, not a lookup we'd have to maintain. */
 export function currencyDisplayName(currencyCode: string): string {
+  if (!currencyCode) return "";
+
+  const known = NON_ISO_CURRENCY_LABELS[currencyCode];
+  if (known) return known;
+
+  // Intl.DisplayNames#of *throws* RangeError on anything that isn't a
+  // well-formed three-letter code — it does not return undefined — so the
+  // shape is checked before calling rather than after. This is a label helper
+  // reached from render paths, and an unnamable currency must degrade to
+  // showing the raw code, never take the page down with it.
+  if (!/^[A-Za-z]{3}$/.test(currencyCode)) return currencyCode;
+
   const name = new Intl.DisplayNames(["en"], { type: "currency" }).of(currencyCode) ?? currencyCode;
   return name.replace(/\b\w/g, (char) => char.toUpperCase());
 }
@@ -62,28 +125,31 @@ export function formatFullAccount(account: VirtualAccount) {
   return lines.join("\n");
 }
 
-// Deterministic per account id (not Math.random/Date.now — see CLAUDE.md's
-// purity rules) so the same account always resolves to the same placeholder
-// id instead of a new one on every render.
-function mockShareId(accountId: string): number {
-  let hash = 0;
-  for (const ch of accountId) {
-    hash = (hash * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
-  }
-  return 1_000_000 + (hash % 9_000_000);
+/**
+ * How both document-download endpoints and the send-account-email endpoint
+ * identify an account: the SHA-256 of its account number, hex encoded. Same
+ * derivation as pg-dashboard's `stringToSHA256Hash`
+ * (src/utils/index.ts), so a hash computed here addresses the same account
+ * server-side.
+ *
+ * The account number is hashed precisely so it never travels in a URL, a query
+ * key, or an error message. Never log either side of this function.
+ *
+ * Returns "" when the account has no number, so callers can guard on falsy
+ * rather than sending a hash of the empty string.
+ */
+export async function accountDocumentId(accountNumber: string): Promise<string> {
+  if (!accountNumber) return "";
+  const utf8 = new TextEncoder().encode(accountNumber);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", utf8);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-/**
- * Placeholder shareable-link URL for one account. There's no share-link
- * endpoint yet, so this is a stand-in: same host-naming convention the rest
- * of the app uses (see CLAUDE.md's "Environment / backend" section — uat
- * resolves to pygcl.com, dev/prod to payglocal.in), with a deterministic
- * mock id in place of a real backend-issued one. Replace with the real URL
- * once that endpoint exists.
- */
-export function buildShareUrl(account: VirtualAccount): string {
-  const env = process.env.NEXT_PUBLIC_ENV;
-  const domain = env === "uat" ? "pygcl.com" : "payglocal.in";
-  const host = env === "prod" ? `dashboard.${domain}` : `${env ?? "dev"}.dashboard.${domain}`;
-  return `https://${host}/app/multi-currency-accounts-shared/${mockShareId(account.id)}`;
+/** The account's number as shown in its details rows — the input
+ *  `accountDocumentId` hashes. Reads the row rather than a dedicated field
+ *  because the view model keeps identifiers in `details`. */
+export function accountNumberOf(account: VirtualAccount): string {
+  return account.details.find((detail) => detail.label === "Account Number")?.value ?? "";
 }
