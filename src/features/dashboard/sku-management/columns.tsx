@@ -1,16 +1,24 @@
 "use client";
 
 import { type Column, StatusBadge } from "@/components/ui";
-import { formatCurrency } from "@/lib/utils/format";
-import { SKU_PRICE_LOCALE, SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
+import { SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
-import type { SkuProduct } from "@/features/dashboard/sku-management/types";
+import { EditablePriceCell } from "@/features/dashboard/sku-management/components/EditablePriceCell";
+import type { SkuPriceField, SkuProduct } from "@/features/dashboard/sku-management/types";
+
+// The two price columns' headers are declared once and reused as the popover's
+// label and assistive line ("This will update the selling price of this
+// product"), so renaming a column renames what its editor says about itself.
+const SELLING_PRICE_HEADER = "Selling price";
+const PRODUCT_COST_HEADER = "Product cost";
 
 // Column widths, typography (text-[13px] body, muted secondary text), and
 // alignment conventions mirror buildMcaColumns so the two tables read as one
-// system. No RowClick wrapper here: a SKU row has no details view to open, so
-// nothing would consume the click.
-export function buildSkuColumns(): Column<SkuProduct>[] {
+// system. No RowClick wrapper here: a SKU row has no details view to open, and
+// a row-level click target would swallow the clicks the price cells need.
+export function buildSkuColumns(
+  onPriceChange: (id: string, field: SkuPriceField, next: number) => void
+): Column<SkuProduct>[] {
   return [
     {
       key: "name",
@@ -61,24 +69,35 @@ export function buildSkuColumns(): Column<SkuProduct>[] {
     },
     {
       key: "sellingPrice",
-      header: "Selling price",
+      header: SELLING_PRICE_HEADER,
       minWidth: 140,
       align: "right",
+      // Compact density clips cells; the trigger's hover fill sits slightly
+      // proud of the text box and would be cut off without this.
+      cellClassName: "overflow-visible",
       render: (row) => (
-        <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap text-foreground">
-          {formatCurrency(row.sellingPrice, row.currency, SKU_PRICE_LOCALE)}
-        </span>
+        <EditablePriceCell
+          label={SELLING_PRICE_HEADER}
+          value={row.sellingPrice}
+          currency={row.currency}
+          onSave={(next) => onPriceChange(row.id, "sellingPrice", next)}
+          emphasis
+        />
       ),
     },
     {
       key: "productCost",
-      header: "Product cost",
+      header: PRODUCT_COST_HEADER,
       minWidth: 140,
       align: "right",
+      cellClassName: "overflow-visible",
       render: (row) => (
-        <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
-          {formatCurrency(row.productCost, row.currency, SKU_PRICE_LOCALE)}
-        </span>
+        <EditablePriceCell
+          label={PRODUCT_COST_HEADER}
+          value={row.productCost}
+          currency={row.currency}
+          onSave={(next) => onPriceChange(row.id, "productCost", next)}
+        />
       ),
     },
     {

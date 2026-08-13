@@ -9,6 +9,9 @@ export type SkuProductType = "GOODS" | "SERVICES";
  */
 export type SkuCurrency = "USD" | "GBP" | "EUR" | "CAD" | "AED" | "AUD" | "SGD";
 
+/** The two money fields the table lets a merchant edit in place. */
+export type SkuPriceField = "sellingPrice" | "productCost";
+
 export interface SkuProduct {
   id: string;
   name: string;
