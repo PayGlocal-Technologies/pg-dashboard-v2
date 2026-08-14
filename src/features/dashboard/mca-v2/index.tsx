@@ -20,7 +20,7 @@ import { RegionSelector } from "@/features/dashboard/multi-currency/components/R
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { formatFullAccount } from "@/features/dashboard/multi-currency/utils";
-import { MCA_V2_REGIONS } from "@/features/dashboard/mca-v2/constants";
+import { DEFAULT_SETTLED_CURRENCY, MCA_V2_REGIONS } from "@/features/dashboard/mca-v2/constants";
 import { SETTLED_AMOUNT_BY_CURRENCY } from "@/features/dashboard/mca-v2/mock-data";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
@@ -51,11 +51,15 @@ export function McaV2Feature() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>(accounts[0]?.id ?? "");
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? accounts[0] ?? null;
 
-  // Drives the settled-amount card's title, both amounts and its chart. Falls
-  // back to the first region's figures rather than rendering an empty card if
-  // a region ever carries a currency the summary data has no entry for.
-  const currency = selectedAccount?.currency ?? "";
-  const settled = SETTLED_AMOUNT_BY_CURRENCY[currency] ?? SETTLED_AMOUNT_BY_CURRENCY.USD;
+  // The settled-amount card follows the selected region: its title names that
+  // region and its figures are in that region's currency, so picking a region
+  // is the only thing that changes this card.
+  const settledCurrency = selectedAccount?.currency ?? DEFAULT_SETTLED_CURRENCY;
+  // Falls back rather than rendering an empty card if a region ever carries a
+  // currency the summary data has no entry for.
+  const settled =
+    SETTLED_AMOUNT_BY_CURRENCY[settledCurrency] ??
+    SETTLED_AMOUNT_BY_CURRENCY[DEFAULT_SETTLED_CURRENCY];
 
   // Unique per mount so the settled-amount chart's fill gradient doesn't
   // collide with another <linearGradient> id elsewhere on the page.
@@ -233,29 +237,33 @@ export function McaV2Feature() {
                     squeezed, the chart gives up width and the figure keeps
                     every pixel it needs. */}
                 <div className="flex-1 sm:basis-2/5">
+                  {/* The currency names the figure, so no control is needed
+                      here — picking a region below is what changes this card,
+                      and the code shown is that region's own currency. It also
+                      says up front which unit the amount and the chart's Y
+                      axis below are in. */}
                   <p className="text-sm font-semibold text-foreground">
-                    Settled amount in {currency}
+                    {settledCurrency} settled amount
                   </p>
 
                   {/* Same size and weight as OutstandingAmountCard's own
                       figure — the two headline numbers have to carry equal
                       visual weight for the cards to read as a pair.
-                      whitespace-nowrap keeps the amount and its currency code
-                      on one line: "128,400 USD" breaking before the code would
-                      read as two separate facts. */}
-                  <p className="mt-3 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                    {settled.value}
+                      whitespace-nowrap keeps a grouped figure from ever
+                      breaking mid-number. */}
+                  <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                    {`${currencySymbol(settledCurrency)}${settled.amount.toLocaleString("en-US")}`}
                   </p>
 
                   {/* Secondary to the figure above it: smaller size, muted
                       colour, same left edge — supporting context, not a second
-                      headline. */}
-                  {/* nowrap for the same reason as the figure above it, and
-                      it costs nothing: at text-sm this line is narrower than
-                      the text-3xl amount, so the amount is still what sets the
-                      column's floor. */}
-                  <p className="mt-2 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-                    {settled.valueInr}
+                      headline. mt-1 (tight) because it restates that same
+                      figure, so it belongs to the amount rather than reading
+                      as the next item down. nowrap costs nothing here: at
+                      text-sm this line is narrower than the text-3xl amount,
+                      so the amount still sets the column's floor. */}
+                  <p className="mt-1 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
+                    {formatCurrency(settled.amountInr, "INR", "en-IN")}
                   </p>
 
                   {/* Supporting metric, the lowest step in this stack. Left
@@ -316,8 +324,8 @@ export function McaV2Feature() {
                         tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                         tickFormatter={(v: number) =>
                           v >= 1000
-                            ? `${currencySymbol(currency)}${(v / 1000).toFixed(0)}K`
-                            : `${currencySymbol(currency)}${v}`
+                            ? `${currencySymbol(settledCurrency)}${(v / 1000).toFixed(0)}K`
+                            : `${currencySymbol(settledCurrency)}${v}`
                         }
                         width={64}
                       />
@@ -329,7 +337,10 @@ export function McaV2Feature() {
                           background: "var(--popover)",
                           color: "var(--popover-foreground)",
                         }}
-                        formatter={(v) => [formatCurrency(Number(v), currency, "en-US"), "Settled"]}
+                        formatter={(v) => [
+                          formatCurrency(Number(v), settledCurrency, "en-US"),
+                          "Settled",
+                        ]}
                       />
                       <Area
                         type="monotone"

@@ -11,12 +11,20 @@ import type { MetricSparklinePoint } from "@/components/ui";
  * self-contained and reads the Transactions feature's own mock data.
  */
 
-/** One currency's settled-amount card: the figures and the series behind them. */
+/**
+ * One currency's settled-amount card: the figures and the series behind them.
+ *
+ * Both totals are numbers, not pre-formatted strings: the card renders them
+ * through the same `currencySymbol` / `formatCurrency` helpers the rest of the
+ * product uses, so a figure here can't drift from how the same amount is
+ * written elsewhere, and the chart's axis and tooltip stay in the same unit as
+ * the headline above them.
+ */
 export interface SettledAmountSummary {
-  /** Settled total in the account's own currency, e.g. "128,400 USD". */
-  value: string;
-  /** The same total converted to INR, shown as supporting text beneath it. */
-  valueInr: string;
+  /** Settled total in this currency's own units, e.g. 128_400 for $128,400. */
+  amount: number;
+  /** The same total converted to INR. */
+  amountInr: number;
   /** Movement against the previous period, e.g. "+8.6% vs last period". */
   trendLabel: string;
   /**
@@ -30,14 +38,14 @@ export interface SettledAmountSummary {
 }
 
 /**
- * Keyed by the `currency` on each virtual account, so picking a region on the
- * page swaps the whole card — title, both amounts, the comparison, and the
- * chart — without any of them being derived from one another.
+ * Keyed by currency code, which is what the card's own currency selector
+ * chooses — picking one swaps both amounts, the comparison and the chart
+ * together, without any of them being derived from one another.
  */
 export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = {
   USD: {
-    value: "128,400 USD",
-    valueInr: "1,22,31,384.00 INR",
+    amount: 128_400,
+    amountInr: 12_231_384,
     trendLabel: "+8.6% vs last period",
     trend: [
       { x: "Jan", y: 92_000 },
@@ -50,8 +58,8 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
     ],
   },
   GBP: {
-    value: "74,600 GBP",
-    valueInr: "89,52,000.00 INR",
+    amount: 74_600,
+    amountInr: 8_952_000,
     trendLabel: "+4.5% vs last period",
     trend: [
       { x: "Jan", y: 61_200 },
@@ -64,8 +72,8 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
     ],
   },
   EUR: {
-    value: "96,200 EUR",
-    valueInr: "99,08,600.00 INR",
+    amount: 96_200,
+    amountInr: 9_908_600,
     trendLabel: "+3.8% vs last period",
     trend: [
       { x: "Jan", y: 78_400 },
@@ -78,8 +86,8 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
     ],
   },
   AUD: {
-    value: "58,300 AUD",
-    valueInr: "36,14,600.00 INR",
+    amount: 58_300,
+    amountInr: 3_614_600,
     trendLabel: "+4.3% vs last period",
     trend: [
       { x: "Jan", y: 44_100 },
@@ -92,8 +100,8 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
     ],
   },
   CAD: {
-    value: "41,900 CAD",
-    valueInr: "28,49,200.00 INR",
+    amount: 41_900,
+    amountInr: 2_849_200,
     trendLabel: "+4.2% vs last period",
     trend: [
       { x: "Jan", y: 33_600 },
@@ -108,8 +116,8 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
   // Rest of the World's account carries CHF as a stand-in currency — see the
   // note on that entry in multi-currency/mock-data.ts.
   CHF: {
-    value: "22,750 CHF",
-    valueInr: "24,11,500.00 INR",
+    amount: 22_750,
+    amountInr: 2_411_500,
     trendLabel: "+3.9% vs last period",
     trend: [
       { x: "Jan", y: 17_200 },

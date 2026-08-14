@@ -13,6 +13,13 @@ import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
  */
 const MCA_V2_REGION_IDS = ["us-usd", "gb-gbp", "eu-eur", "au-aud", "ca-cad", "row-swift"] as const;
 
-export const MCA_V2_REGIONS: VirtualAccount[] = MCA_V2_REGION_IDS.map(
-  (id) => MOCK_VIRTUAL_ACCOUNTS.find((account) => account.id === id)!
+export const MCA_V2_REGIONS: VirtualAccount[] = MCA_V2_REGION_IDS.map((id) =>
+  MOCK_VIRTUAL_ACCOUNTS.find((account) => account.id === id)!
 ).filter(Boolean);
+
+/**
+ * Last-resort currency for the settled-amount card, used only if a region ever
+ * carries one the summary data has no entry for. The card's actual currency
+ * comes from the selected region.
+ */
+export const DEFAULT_SETTLED_CURRENCY = "USD";
