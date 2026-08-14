@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import {
+  Alert,
+  AlertDescription,
   Button,
   Card,
   Dialog,
@@ -30,7 +32,7 @@ import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/component
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
-import { buildShareUrl, currencyDisplayName } from "@/features/dashboard/multi-currency/utils";
+import { buildShareUrl, splitAccountIdentifiers } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -107,7 +109,14 @@ export function ShareAccountDetailsModal({
     },
   });
 
-  const [primaryIdentifier, secondaryIdentifier] = account.details;
+  const { accountNumber, routingCode } = splitAccountIdentifiers(account);
+
+  /**
+   * One definition for both the preview below and whatever eventually sends
+   * the mail, so the two can't drift. There's no send endpoint yet (the form's
+   * onSubmit is a toast stand-in), but when there is, it takes this value.
+   */
+  const emailSubject = `Account details of ${account.accountHolderName}`;
 
   // The preview stands in for the customer-facing page for one payer country
   // at a time — every other receiving account is irrelevant to whichever
@@ -473,47 +482,83 @@ export function ShareAccountDetailsModal({
                     <p className="shrink-0 text-xs text-muted-foreground">Cc&nbsp;&nbsp;Bcc</p>
                   </div>
                   <Separator />
-                  <p>
+                  <p className="min-w-0 truncate">
                     <span className="font-semibold text-foreground">Subject: </span>
-                    <span className="text-foreground">New Bank Account Details for Payments</span>
+                    <span className="text-foreground">{emailSubject}</span>
                   </p>
                   <Separator />
 
-                  {/* space-y-2 (tight): the email body's own paragraph
-                      rhythm — greeting, intro line, the metadata block, and
-                      the closing note. */}
-                  <div className="space-y-2 text-muted-foreground">
-                    <p>Dear Client,</p>
-                    <p>Please find below our account details for your upcoming payment:</p>
-                    {/* space-y-1 (tight): consecutive metadata rows sit
-                        close together — each row's own label → value is
-                        already tight, being inline on one line. */}
-                    <div className="space-y-1">
+                  {/* The body is the one part of this preview that grows with
+                      the account — a long bank name or address adds lines
+                      nothing else here does. Capping it and scrolling keeps
+                      From/Subject above pinned in place and, more importantly,
+                      keeps the modal itself a fixed size: without this the
+                      dialog's own overflow-y-auto would take over and the
+                      whole modal would scroll instead. pr-1 keeps the
+                      scrollbar off the text. */}
+                  <div className="max-h-[280px] space-y-4 overflow-y-auto pr-1 text-muted-foreground">
+                    {/* Live-bound to the Client Name field: typing a name in
+                        the form updates the greeting here as the client will
+                        actually see it. Empty until they do, which is exactly
+                        what an unaddressed draft looks like. */}
+                    <p>Hi {emailForm.state.values.clientName},</p>
+                    <p>
+                      Please find our bank account details for your upcoming payment below. You can
+                      add our account as a beneficiary to your bank to initiate your payment with
+                      us.
+                    </p>
+                    <p>Kindly use these details while initiating the transfer.</p>
+
+                    {/* The details block sits on its own muted surface — the
+                        same treatment the grey Preview surfaces around it use,
+                        one step in. Labels carry the weight and values sit at
+                        foreground colour, so a client scanning for a number
+                        finds it. space-y-1 (tight): consecutive rows belong
+                        together, and each row's own label → value is already
+                        tight, being inline on one line. */}
+                    <div className="space-y-1 rounded-lg bg-muted/50 p-4">
                       <p>
-                        Account Holder Name:{" "}
-                        <span className="text-foreground">{account.accountHolderName}</span>
+                        <span className="font-semibold text-foreground">Account Holder Name:</span>{" "}
+                        {account.accountHolderName}
                       </p>
                       <p>
-                        Bank Name: <span className="text-foreground">{account.bankName}</span>
+                        <span className="font-semibold text-foreground">Bank Name:</span>{" "}
+                        {account.bankName}
                       </p>
                       <p>
-                        Account Number / IBAN:{" "}
-                        <span className="text-foreground">{primaryIdentifier?.value}</span>
+                        <span className="font-semibold text-foreground">
+                          Account Number / IBAN:
+                        </span>{" "}
+                        {accountNumber?.value}
                       </p>
                       <p>
-                        Routing Code:{" "}
-                        <span className="text-foreground">{secondaryIdentifier?.value}</span>
+                        <span className="font-semibold text-foreground">Routing Code:</span>{" "}
+                        {routingCode?.value}
                       </p>
                       <p>
-                        Currency:{" "}
-                        <span className="text-foreground">
-                          {currencyDisplayName(account.currency)}
-                        </span>
+                        <span className="font-semibold text-foreground">Currency:</span>{" "}
+                        {account.currency}
                       </p>
                     </div>
+
+                    {/* flux-ui's own warning Alert rather than a hand-tinted
+                        box: this is a fraud warning, which is exactly what the
+                        design system's warning semantic is for, and it keeps
+                        the amber here identical to every other warning in the
+                        product. */}
+                    <Alert variant="warning">
+                      <AlertDescription className="font-semibold text-foreground">
+                        Important: Please note that our bank account details remain unchanged unless
+                        officially communicated by us through verified channels
+                      </AlertDescription>
+                    </Alert>
+
+                    {/* The email's last content, per the sign-off the account
+                        holder sends under their own name. */}
                     <p>
-                      Kindly use the above details to complete the transfer. Once the payment is
-                      initiated, please share the transaction reference for our records.
+                      Warm regards,
+                      <br />
+                      {account.accountHolderName}
                     </p>
                   </div>
                 </Card>
