@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DataTable } from "@/components/ui";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
@@ -17,10 +17,14 @@ import { buildClientColumns } from "@/features/dashboard/client-management/colum
 import { ClientCardList } from "@/features/dashboard/client-management/components/ClientCardList";
 import { ClientDetailsDrawer } from "@/features/dashboard/client-management/components/ClientDetailsDrawer";
 import { ClientDetailsPage } from "@/features/dashboard/client-management/components/ClientDetailsPage";
+import { ClientFormModal } from "@/features/dashboard/client-management/components/ClientFormModal";
+import { toClientFields } from "@/features/dashboard/client-management/schemas";
+import type { Client, ClientFormValues } from "@/features/dashboard/client-management/types";
 import {
   CLIENT_PAGE_LIMIT,
   CLIENT_SEARCH_HINTS,
   clientCountryOptions,
+  currencyForCountry,
 } from "@/features/dashboard/client-management/constants";
 import { MOCK_CLIENTS } from "@/features/dashboard/client-management/mock-data";
 
@@ -32,9 +36,25 @@ function restoreScrollTop(el: HTMLElement, value: number): void {
   el.scrollTop = value;
 }
 
-export function ClientTable() {
+interface ClientTableProps {
+  /** Owned by the page, because the "Add client" button that opens it lives in
+   *  the page header while every row this creates lives down here. */
+  addClientOpen: boolean;
+  onAddClientOpenChange: (open: boolean) => void;
+}
+
+export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTableProps) {
   const contentEl = useContentAreaElement();
   const [scrollPosition, setScrollPosition] = useState(0);
+
+  // Clients created through the Add client form, newest first. Layered over
+  // MOCK_CLIENTS rather than merged into it, the same arrangement SkuTable
+  // uses for created items: once a real endpoint replaces the mock book, this
+  // becomes the pending-write set rather than a divergent copy of the data.
+  const [createdClients, setCreatedClients] = useState<Client[]>([]);
+  // Counter, not Math.random/Date.now — both are barred during render and this
+  // only ever increments inside the submit handler anyway.
+  const nextClientIdRef = useRef(0);
 
   const [search, setSearch] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
@@ -77,7 +97,11 @@ export function ClientTable() {
   // in state. Swapping in a real query means replacing the source array and
   // moving these predicates into the request body — the table itself doesn't
   // change.
-  const filteredRows = MOCK_CLIENTS.filter((client) => {
+  // Newly created clients lead the book, so one just added is the first row
+  // rather than buried wherever the seeded order would have put it.
+  const sourceRows = [...createdClients, ...MOCK_CLIENTS];
+
+  const filteredRows = sourceRows.filter((client) => {
     // Matches any of the three fields the placeholder cycles through
     // (CLIENT_SEARCH_HINTS), the same way the Transactions search spans
     // remitter/transaction ID/UTR: one box, no mode to pick, a hit on any of
@@ -110,11 +134,45 @@ export function ClientTable() {
   const safePage = Math.min(page, totalPages);
   const pageRows = filteredRows.slice((safePage - 1) * CLIENT_PAGE_LIMIT, safePage * CLIENT_PAGE_LIMIT);
 
-  const detailsRow = MOCK_CLIENTS.find((c) => c.id === detailsId) ?? null;
+  const detailsRow = sourceRows.find((c) => c.id === detailsId) ?? null;
 
   // The Country chip offers only countries the merchant actually has clients
   // in, so it can never narrow to an empty table (see clientCountryOptions).
-  const countryOptions = clientCountryOptions(MOCK_CLIENTS);
+  // Built from sourceRows, so a client added in a country nobody else is in
+  // brings its own filter option with it.
+  const countryOptions = clientCountryOptions(sourceRows);
+
+  // Both Add client and Save and add another land here; `keepOpen` is the only
+  // difference between them, and the modal itself handles resetting the form.
+  const onSubmitClient = (values: ClientFormValues, keepOpen: boolean) => {
+    const fields = toClientFields(values);
+    // Null means validation didn't pass. The form gates submission on the same
+    // check, so this is a guard rather than a path the UI can reach.
+    if (!fields) return;
+
+    setCreatedClients((prev) => [
+      {
+        id: `cli-new-${nextClientIdRef.current++}`,
+        ...fields,
+        // A brand-new client has no billing history yet: nothing outstanding
+        // and no invoices raised. The currency is only the denomination those
+        // zeroes are shown in, and follows the client's own country.
+        outstandingAmount: 0,
+        outstandingCurrency: currencyForCountry(fields.countryIso2),
+        totalInvoices: 0,
+        paidInvoices: 0,
+      },
+      ...prev,
+    ]);
+    // Otherwise the new row can land outside the current filters or on a page
+    // the merchant isn't looking at, and the form appears to have done nothing.
+    setSearch("");
+    setEmailFilter("");
+    setCountryFilters([]);
+    setDateRange({ from: "", to: "" });
+    setPage(1);
+    if (!keepOpen) onAddClientOpenChange(false);
+  };
 
   // Clicking a row opens the drawer, not the full page. The table stays
   // mounted underneath it, so filters, paging, and scroll are untouched for
@@ -331,6 +389,12 @@ export function ClientTable() {
         onOpenChange={setDrawerOpen}
         onExpand={expandToPage}
         onExpandTransaction={expandToPageWithTransaction}
+      />
+
+      <ClientFormModal
+        open={addClientOpen}
+        onOpenChange={onAddClientOpenChange}
+        onSubmit={onSubmitClient}
       />
     </div>
   );

@@ -47,4 +47,56 @@ export interface Client {
    * other.
    */
   paidInvoices: number;
+
+  // ── Captured by the Add client form ──────────────────────────────────────
+  // Optional on the record, not on the form: several of these are required to
+  // create a client (see the validators in schemas.ts), but the seeded client
+  // book predates the form and carries none of them, so a reader has to cope
+  // with their absence either way. Making them optional here is what says so
+  // honestly rather than back-filling placeholder values into every mock row.
+
+  /** Company, Partnership, Sole proprietorship, LLP, Other. */
+  businessType?: string;
+  website?: string;
+  /** Free-form labels the merchant files this client under. */
+  tags?: string[];
+  /** Street address — the first line of `billingAddress`, kept separately so a
+   *  future edit form can round-trip the parts rather than re-parsing them. */
+  addressLine?: string;
+  city?: string;
+  state?: string;
+  zipcode?: string;
+  /** Indian tax registration, where the client has one. */
+  gstin?: string;
+  notes?: string;
+  /** The uploaded contract's filename and size. Nothing is stored anywhere yet
+   *  — there is no document endpoint — so this records what was attached, not
+   *  a retrievable file. */
+  contract?: { name: string; size: number };
+}
+
+/**
+ * The Add client form's own values: every field a string (or a list of them),
+ * because that is what inputs hold. `toClientFields` in schemas.ts is what
+ * turns a validated set of these into the Client shape above.
+ */
+export interface ClientFormValues {
+  businessName: string;
+  businessType: string;
+  website: string;
+  tags: string[];
+  primaryContactName: string;
+  primaryContactEmail: string;
+  /** ISO2 of the country whose dial code prefixes the number. */
+  phoneCountry: string;
+  phoneNumber: string;
+  /** ISO2 — the address country, independent of the phone's. */
+  country: string;
+  state: string;
+  addressLine: string;
+  city: string;
+  zipcode: string;
+  gstin: string;
+  notes: string;
+  contract: { name: string; size: number } | null;
 }
