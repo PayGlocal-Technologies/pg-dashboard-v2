@@ -58,6 +58,11 @@ export function ClientTable() {
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Set only when Expand was pressed on a transaction inside the client
+  // drawer: the client expands to its full page and that transaction opens
+  // expanded there, since a drawer has nowhere to show a full-page
+  // transaction. Null for an ordinary client expand.
+  const [expandTxnId, setExpandTxnId] = useState<string | null>(null);
 
   const query = search.trim().toLowerCase();
   const emailQuery = emailFilter.trim().toLowerCase();
@@ -127,6 +132,18 @@ export function ClientTable() {
   const expandToPage = (client: { id: string }) => {
     if (contentEl) setScrollPosition(contentEl.scrollTop);
     setDetailsId(client.id);
+    setExpandTxnId(null);
+    setDrawerOpen(false);
+    setDetailsOpen(true);
+  };
+
+  // Same expand, plus the transaction the drawer was showing, so it opens
+  // expanded on the client's page rather than the action doing nothing from
+  // inside a drawer.
+  const expandToPageWithTransaction = (client: { id: string }, transaction: { gid: string }) => {
+    if (contentEl) setScrollPosition(contentEl.scrollTop);
+    setDetailsId(client.id);
+    setExpandTxnId(transaction.gid);
     setDrawerOpen(false);
     setDetailsOpen(true);
   };
@@ -212,6 +229,7 @@ export function ClientTable() {
         client={detailsRow}
         onBack={() => setDetailsOpen(false)}
         onCollapse={collapseToDrawer}
+        initialTransactionId={expandTxnId}
       />
     );
   }
@@ -312,6 +330,7 @@ export function ClientTable() {
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onExpand={expandToPage}
+        onExpandTransaction={expandToPageWithTransaction}
       />
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { Button, EmptyState, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { clientAmountLocale } from "@/features/dashboard/client-management/constants";
 import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
@@ -12,7 +12,8 @@ function ClientCardSkeleton() {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center gap-2">
-        <Shimmer className="h-7 w-7" rounded="full" />
+        {/* Matches CountryFlag's own 20×14 rectangle, not a circle. */}
+        <Shimmer className="h-3.5 w-5" rounded="sm" />
         <Shimmer className="h-4 w-40" />
         <Shimmer className="ml-auto h-4 w-20" />
       </div>
@@ -47,13 +48,11 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
       {/* Primary row: flag, business name, and the outstanding balance pushed
           to the far right — the two things a merchant scans a client list for,
           on the same line. min-w-0 on the name so a long one truncates instead
-          of pushing the figure off the card. */}
+          of pushing the figure off the card. The flag is CountryFlag, the same
+          rectangular treatment the table's Country column and the details views
+          use, rather than a circular avatar. */}
       <div className="flex items-center gap-2">
-        <CountryFlagAvatar
-          iso2={row.countryIso2}
-          countryName={row.countryName}
-          className="h-7 w-7 shrink-0"
-        />
+        <CountryFlag iso2={row.countryIso2} alt={row.countryName} />
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">
           {row.businessName}
         </span>

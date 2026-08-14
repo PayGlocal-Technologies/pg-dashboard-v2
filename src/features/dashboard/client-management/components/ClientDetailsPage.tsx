@@ -17,6 +17,13 @@ interface ClientDetailsPageProps {
   onBack: () => void;
   /** Closes the full page and reopens the same client in the drawer. */
   onCollapse: () => void;
+  /**
+   * A transaction to open expanded as soon as this page mounts — set when
+   * Expand was pressed on a transaction inside the client drawer, which has
+   * nowhere to show a full-page transaction itself (see
+   * ClientDetailsDrawer's onExpandTransaction). Null for an ordinary expand.
+   */
+  initialTransactionId?: string | null;
 }
 
 /**
@@ -33,16 +40,26 @@ interface ClientDetailsPageProps {
  * transactions section (which needs interaction state the drawer has no use
  * for), and the transaction detail views those rows open.
  */
-export function ClientDetailsPage({ client, onBack, onCollapse }: ClientDetailsPageProps) {
+export function ClientDetailsPage({
+  client,
+  onBack,
+  onCollapse,
+  initialTransactionId = null,
+}: ClientDetailsPageProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
 
   // The transaction opened from this client's transactions section. Mirrors
   // McaTransactionTable's own arrangement exactly: a row click opens the
   // drawer, Expand hands that same transaction to the full page, and the two
   // are mutually exclusive.
-  const [txnId, setTxnId] = useState<string | null>(null);
+  //
+  // Both seed from initialTransactionId, which is only ever read on mount —
+  // correct here because the caller mounts this component fresh on every
+  // expand (see ClientTable's early return), so a later expand of a different
+  // transaction arrives as a new mount rather than a prop change to reconcile.
+  const [txnId, setTxnId] = useState<string | null>(initialTransactionId);
   const [txnDrawerOpen, setTxnDrawerOpen] = useState(false);
-  const [txnPageOpen, setTxnPageOpen] = useState(false);
+  const [txnPageOpen, setTxnPageOpen] = useState(initialTransactionId != null);
   // Owned here rather than by the drawer or the transaction page, since
   // Expand/Collapse swap those two in and out of the tree and state either
   // held locally would be lost the moment the other took over.
