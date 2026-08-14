@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, CardContent } from "@/components/ui";
+import { Card, CardContent, Separator } from "@/components/ui";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
@@ -92,10 +92,21 @@ export function ClientIdentitySummary({ client, className }: { client: Client; c
         <h2 className="text-[26px] font-semibold leading-tight tracking-tight text-foreground">
           {client.businessName}
         </h2>
-        <div className="flex flex-col gap-0.5">
+        {/* Contact, phone, and email on one line rather than stacked: the
+            contact's name carries foreground weight and a vertical rule after
+            it, then the two ways to reach them in muted text. flex-wrap with
+            gap-y-1 lets the line break naturally at narrow widths — the
+            drawer's column, or a phone — while keeping the order, rather than
+            forcing a horizontal scroll. items-center so the rule sits centred
+            against the text either side of it. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[13px] font-medium text-foreground">
             {client.primaryContactName}
           </span>
+          {/* h-4 rather than Separator's own h-full for a vertical rule: there
+              is no fixed row height here to fill, and a wrapped line would
+              otherwise stretch it. */}
+          <Separator orientation="vertical" className="h-4" />
           <span className="text-[13px] tabular-nums text-muted-foreground">
             {formatPhoneNumber(client.phoneDialCode, client.phoneNumber)}
           </span>
@@ -208,6 +219,18 @@ export function ClientInvoiceMetrics({
   );
 }
 
+/**
+ * Overrides CopyableText's own font-mono/regular-weight value styling so a
+ * copyable value in the Contact card renders in exactly the typography
+ * ClientDetailRow gives every other value: the app's sans stack (font-sans →
+ * --font-geist-sans, the same family Transaction Details' own field values
+ * use), at the row's 13px/medium/foreground. Only the family, weight, and
+ * wrapping are set here — size and colour already come from the row.
+ * whitespace-normal cancels CopyableText's nowrap so a long address can wrap
+ * inside the column rather than overflowing the card.
+ */
+const CONTACT_VALUE_CLASS = "font-sans font-medium whitespace-normal break-all";
+
 // Both sections below use Card size="sm" and CardContent's space-y-4 — the
 // same container and the same field rhythm as the Transaction Details page's
 // Payment Details and Sender Details sections, so the two detail views' side
@@ -238,21 +261,31 @@ export function ClientContactSection({
           {/* Copyable, since an address or number in a details panel is almost
               always on its way into a message. CopyableText's own button stops
               at its own click handler, so a copy never reaches whatever row or
-              card this sits inside. whitespace-normal/break-all overrides its
-              default nowrap so a long address wraps within the column instead
-              of overflowing the card. */}
+              card this sits inside.
+              CONTACT_VALUE_CLASS is what keeps these values in the same
+              typeface as the plain ones above and below them: CopyableText
+              defaults to font-mono, which is right for an opaque identifier
+              (a transaction id) but makes an email or a phone number read as a
+              different kind of text than the rest of the card. */}
           <ClientDetailRow
             label="Email"
-            value={
-              <CopyableText
-                value={client.email}
-                valueClassName="whitespace-normal break-all text-left"
-              />
-            }
+            value={<CopyableText value={client.email} valueClassName={CONTACT_VALUE_CLASS} />}
           />
           <ClientDetailRow
             label="Phone number"
-            value={<CopyableText value={formatPhoneNumber(client.phoneDialCode, client.phoneNumber)} />}
+            value={
+              <CopyableText
+                value={formatPhoneNumber(client.phoneDialCode, client.phoneNumber)}
+                valueClassName={CONTACT_VALUE_CLASS}
+              />
+            }
+          />
+          {/* Not copyable and not truncated: an address is read, not lifted
+              into a form field, and it's the one field here long enough to
+              need more than a line. */}
+          <ClientDetailRow
+            label="Billing address"
+            value={<span className="whitespace-normal">{client.billingAddress}</span>}
           />
         </CardContent>
       </Card>
@@ -268,7 +301,6 @@ export function ClientAccountSection({ client }: { client: Client }) {
         <CardContent className="space-y-4">
           <ClientDetailRow label="Country" value={client.countryName} />
           <ClientDetailRow label="Created" value={formatTransactionDateOnly(client.createdAt)} />
-          <ClientDetailRow label="Client ID" value={<CopyableText value={client.id} />} />
         </CardContent>
       </Card>
     </section>

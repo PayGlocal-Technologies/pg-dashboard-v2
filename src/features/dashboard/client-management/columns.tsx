@@ -1,10 +1,10 @@
 "use client";
 
-import type { Column } from "@/components/ui";
+import { Avatar, AvatarFallback, type Column } from "@/components/ui";
 import { RowClick } from "@/components/common/table/RowClick";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { clientAmountLocale } from "@/features/dashboard/client-management/constants";
-import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
+import { businessInitials } from "@/features/dashboard/client-management/constants";
+import { formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
 import type { Client } from "@/features/dashboard/client-management/types";
 
 // Column widths, typography (text-[13px] body, muted secondary text), and
@@ -27,12 +27,26 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       cellClassName: "overflow-visible",
       render: (row) => (
         <RowClick onClick={() => onOpenDetails(row)}>
-          {/* The row's primary piece of information: the only cell in
-              foreground weight, and min-w-max so the column widens to the
-              longest business name rather than truncating it. */}
-          <span className="block min-w-max text-[13px] font-medium whitespace-nowrap text-foreground">
-            {row.businessName}
-          </span>
+          {/* min-w-max so the column widens to the longest business name
+              rather than truncating it. */}
+          <div className="flex min-w-max items-center gap-2.5">
+            {/* Supporting identifier, not a second piece of information:
+                Flux's own Avatar at h-7 (down from its h-9 default) so it
+                stays compact against a 13px row, with the initials in the
+                fallback's muted weight so the name beside it keeps the
+                emphasis. No AvatarImage — clients have no artwork to load,
+                so the fallback is the whole avatar. */}
+            <Avatar className="h-7 w-7">
+              <AvatarFallback className="text-[10px]">
+                {businessInitials(row.businessName)}
+              </AvatarFallback>
+            </Avatar>
+            {/* The row's primary piece of information: the only cell in
+                foreground weight. */}
+            <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
+              {row.businessName}
+            </span>
+          </div>
         </RowClick>
       ),
     },
@@ -91,40 +105,6 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
           </div>
         </RowClick>
       ),
-    },
-    {
-      key: "outstanding",
-      header: "Outstanding",
-      minWidth: 150,
-      align: "right",
-      render: (row) => {
-        // A settled-up client is the one row a merchant scanning this column
-        // can stop reading, so zero drops to muted, regular weight instead of
-        // carrying the same emphasis as a balance that's actually owed.
-        const isSettled = row.outstandingAmount === 0;
-        return (
-          <RowClick onClick={() => onOpenDetails(row)} align="right">
-            <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-              <span
-                className={
-                  isSettled
-                    ? "text-[13px] tabular-nums text-muted-foreground"
-                    : "text-[13px] font-semibold tabular-nums text-foreground"
-                }
-              >
-                {formatCurrency(
-                  row.outstandingAmount,
-                  row.outstandingCurrency,
-                  clientAmountLocale(row.outstandingCurrency)
-                )}
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {row.outstandingCurrency}
-              </span>
-            </div>
-          </RowClick>
-        );
-      },
     },
     {
       key: "createdAt",

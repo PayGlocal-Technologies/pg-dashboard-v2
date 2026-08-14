@@ -16,6 +16,12 @@ export interface Client {
    */
   phoneDialCode: string;
   phoneNumber: string;
+  /**
+   * Full billing address, as one display string. Kept unstructured because
+   * nothing in the UI addresses its parts individually — the Contact section
+   * renders it whole and lets it wrap.
+   */
+  billingAddress: string;
   /** ISO 3166-1 alpha-2, what the flag treatment is keyed by. */
   countryIso2: string;
   /** Display name for that country, so the cell never has to resolve one. */

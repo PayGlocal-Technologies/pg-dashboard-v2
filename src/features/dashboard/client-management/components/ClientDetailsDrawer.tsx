@@ -13,7 +13,6 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
-import { CopyableText } from "@/components/common/CopyableText";
 import { ClientDetailsContent } from "@/features/dashboard/client-management/components/ClientDetailsContent";
 import { ClientTransactionsSection } from "@/features/dashboard/client-management/components/ClientTransactionsSection";
 import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
@@ -108,12 +107,10 @@ export function ClientDetailsDrawer({
           </DrawerTitle>
 
           {/* Close and Expand grouped together on the left, adjacent to one
-            another; the client ID sits at the far right, value only, no label,
-            in secondary colour so it stays subordinate to the two actions
-            across from it — the same header composition, components, and sizes
-            as the transaction drawer's. ml-auto on the CopyableText (rather
-            than justify-between on the row) keeps Close/Expand pinned left even
-            when `client` is momentarily null mid close-animation. */}
+            another — the same header composition, components, and sizes as the
+            transaction drawer's. Nothing sits opposite them: the client id the
+            transaction drawer's header counterpart shows is deliberately not
+            surfaced anywhere in Client Management. */}
           <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
             <div className="flex shrink-0 items-center gap-1">
               <IconButton
@@ -141,13 +138,6 @@ export function ClientDetailsDrawer({
                 </IconButton>
               )}
             </div>
-            {client && (
-              <CopyableText
-                value={client.id}
-                valueClassName="text-muted-foreground"
-                className="ml-auto"
-              />
-            )}
           </DrawerHeader>
 
           {/* Only this region scrolls, so the header's close/expand stay
