@@ -9,6 +9,7 @@ import {
   clientInvoiceMetrics,
 } from "@/features/dashboard/client-management/constants";
 import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
 
 // Every section of the client detail view, built as the same "title outside +
@@ -18,9 +19,14 @@ import type { Client } from "@/features/dashboard/client-management/types";
 // the bottom), so neither view can drift from the other — only the
 // arrangement differs between them, exactly as it does for transactions.
 
-function SectionTitle({ children }: { children: ReactNode }) {
+function SectionTitle({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+    <h3
+      className={cn(
+        "mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground",
+        className
+      )}
+    >
       {children}
     </h3>
   );
@@ -101,12 +107,22 @@ export function ClientIdentitySummary({ client, className }: { client: Client; c
 }
 
 /**
- * One KPI tile. Same Card surface, tabular-nums, and text-3xl figure as the
- * product's existing analytics cards (see OutstandingAmountCard/
- * SavedAmountCard), with the label muted and the number in foreground weight
- * so the figure is unambiguously the strongest element. h-full plus the
- * flex column is what keeps the three equal in height whatever their labels
- * wrap to.
+ * One KPI tile, deliberately dense: three tightly stacked lines rather than
+ * the tall icon/title/figure/description column the page-level analytics cards
+ * use (see OutstandingAmountCard). Same Card surface, same tabular-nums figure
+ * in foreground weight against a muted label, but roughly half the height.
+ *
+ * What buys that back, in order of effect: the unit moves out of the label and
+ * onto the figure's own baseline ("Total completed" / "41 invoices" instead of
+ * "Total completed invoices" over "41"), which stops the label wrapping to two
+ * or three lines in a narrow column; Card's px-7 py-7 is overridden down to
+ * px-4 py-3.5; the figure steps from text-3xl to text-2xl; and the supporting
+ * amount sits directly under the figure it qualifies rather than being pushed
+ * to the card's bottom edge by mt-auto. gap-1 throughout keeps label, figure,
+ * and caption reading as one unit.
+ *
+ * h-full is what keeps all three equal in height when only one carries a
+ * caption — the grid stretches every card to the tallest.
  */
 function ClientMetricCard({
   label,
@@ -114,19 +130,26 @@ function ClientMetricCard({
   caption,
 }: {
   label: string;
+  /** The dominant figure. "invoices" trails it on the same baseline, so the
+   *  two read as one phrase ("41 invoices") and the label doesn't have to
+   *  carry the noun. */
   value: number;
-  /** Optional supporting line pinned to the card's bottom edge (mt-auto),
-   *  matching the existing analytics cards' own description placement. */
+  /** Optional supporting line directly below the figure. */
   caption?: string;
 }) {
   return (
-    <Card size="sm" className="h-full w-full">
+    <Card size="sm" className="h-full w-full px-4 py-3.5">
       <CardContent className="flex h-full flex-1 flex-col">
-        <p className="text-[13px] text-muted-foreground">{label}</p>
-        <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-          {value}
+        <p className="text-[12px] text-muted-foreground">{label}</p>
+        <p className="mt-1 flex items-baseline gap-1.5">
+          <span className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+            {value}
+          </span>
+          <span className="text-[12px] text-muted-foreground">invoices</span>
         </p>
-        {caption && <p className="mt-auto pt-4 text-[12px] tabular-nums text-muted-foreground">{caption}</p>}
+        {caption && (
+          <p className="mt-1 text-[12px] tabular-nums text-muted-foreground">{caption}</p>
+        )}
       </CardContent>
     </Card>
   );
@@ -138,7 +161,23 @@ function ClientMetricCard({
  * derived from the other two rather than stored, so the row always adds up —
  * see clientInvoiceMetrics.
  */
-export function ClientInvoiceMetrics({ client }: { client: Client }) {
+export function ClientInvoiceMetrics({
+  client,
+  floatTitle = false,
+}: {
+  client: Client;
+  /**
+   * Lifts the section heading out of the flow (from lg up, where the expanded
+   * view's two columns exist), so this section's box is exactly the KPI row's
+   * box and the details column beside it starts level with the cards rather
+   * than with the heading above them. The same device, for the same reason, as
+   * the Transaction Details page's own `floatTitle` — an alternative to
+   * offsetting the neighbouring column, which would only be correct at one
+   * heading height. Below lg, and in the drawer's single column, the heading
+   * stays in normal flow.
+   */
+  floatTitle?: boolean;
+}) {
   const metrics = clientInvoiceMetrics(client);
   const outstandingLabel = formatCurrency(
     client.outstandingAmount,
@@ -147,18 +186,25 @@ export function ClientInvoiceMetrics({ client }: { client: Client }) {
   );
 
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
-      <ClientMetricCard label="Total completed invoices" value={metrics.total} />
-      <ClientMetricCard label="Paid invoices" value={metrics.paid} />
-      {/* The one card carrying a caption: the count alone doesn't say how much
-          is actually owed, which is the figure a merchant chasing this client
-          needs. Same value as the table's Outstanding column. */}
-      <ClientMetricCard
-        label="Outstanding invoices"
-        value={metrics.outstanding}
-        caption={`${outstandingLabel} ${client.outstandingCurrency} due`}
-      />
-    </div>
+    <section className={cn(floatTitle && "lg:relative")}>
+      <SectionTitle className={floatTitle ? "lg:absolute lg:-top-7 lg:left-0 lg:mb-0" : undefined}>
+        Invoice summary
+      </SectionTitle>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <ClientMetricCard label="Total completed" value={metrics.total} />
+        <ClientMetricCard label="Paid" value={metrics.paid} />
+        {/* The one card carrying a caption: the count alone doesn't say how
+            much is actually owed, which is the figure a merchant chasing this
+            client needs. Same value as the table's Outstanding column; the
+            currency code is left off since formatCurrency's symbol already
+            carries it (and falls back to the code where there's no symbol). */}
+        <ClientMetricCard
+          label="Outstanding"
+          value={metrics.outstanding}
+          caption={`${outstandingLabel} due`}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -219,7 +265,7 @@ export function ClientAccountSection({ client }: { client: Client }) {
 
 interface ClientDetailsContentProps {
   client: Client;
-  /** "page" (default): the 1/3 details + 2/3 main grid of the expanded view.
+  /** "page" (default): the expanded view's 2/3 main + 1/3 details grid.
    *  "drawer": single column, everything stacked in document order, for the
    *  narrower drawer viewport. */
   layout?: "page" | "drawer";
@@ -268,17 +314,22 @@ export function ClientDetailsContent({
   // order is already the required mobile order; items-start keeps every block
   // sized to its own content instead of stretching to its row's tallest.
   //
-  // gap-y-6 throughout: tighter than the transaction page's space-y-9, so
-  // summary, metrics, and transactions read as one column of related blocks
-  // without large empty gaps between them.
+  // gap-y-8 throughout: still far tighter than the transaction page's
+  // space-y-9, and wide enough for the Invoice summary heading to sit in the
+  // gap above its own row (see floatTitle below) with clearance from the
+  // summary above it. The heading ends up ~12px from the cards it labels and
+  // further from the block above, so it groups downward, with its section.
   return (
-    <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[2fr_1fr] lg:items-start">
+    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[2fr_1fr] lg:items-start">
       <div className="lg:col-start-1 lg:row-start-1">
         <ClientIdentitySummary client={client} />
       </div>
 
+      {/* floatTitle: this row's box is exactly the KPI cards' box, so the
+          details column starting at row 2 aligns with the cards themselves
+          rather than with the heading above them. */}
       <div className="lg:col-start-1 lg:row-start-2">
-        <ClientInvoiceMetrics client={client} />
+        <ClientInvoiceMetrics client={client} floatTitle />
       </div>
 
       <div className="lg:col-start-1 lg:row-start-3">{transactionsSlot}</div>
