@@ -8,7 +8,7 @@ import {
   clientAmountLocale,
   clientInvoiceMetrics,
 } from "@/features/dashboard/client-management/constants";
-import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
+import { formatCurrency, formatPhoneNumber } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
 
@@ -293,19 +293,6 @@ export function ClientContactSection({
   );
 }
 
-export function ClientAccountSection({ client }: { client: Client }) {
-  return (
-    <section>
-      <SectionTitle>Account</SectionTitle>
-      <Card size="sm">
-        <CardContent className="space-y-4">
-          <ClientDetailRow label="Country" value={client.countryName} />
-          <ClientDetailRow label="Created" value={formatTransactionDateOnly(client.createdAt)} />
-        </CardContent>
-      </Card>
-    </section>
-  );
-}
 
 interface ClientDetailsContentProps {
   client: Client;
@@ -330,17 +317,16 @@ export function ClientDetailsContent({
 }: ClientDetailsContentProps) {
   if (layout === "drawer") {
     // Single column, in the same priority order the expanded view uses:
-    // identity → metrics → transactions → contact → account. The drawer is now
-    // the same content at one column wide rather than a reduced subset, so the
-    // two states read as two levels of one experience; its scroll container
-    // (see ClientDetailsDrawer) is what absorbs the extra height.
+    // identity → metrics → transactions → contact. The drawer is the same
+    // content at one column wide rather than a reduced subset, so the two
+    // states read as two levels of one experience; its scroll container (see
+    // ClientDetailsDrawer) is what absorbs the extra height.
     return (
       <div className="space-y-6">
         <ClientIdentitySummary client={client} />
         <ClientInvoiceMetrics client={client} />
         {transactionsSlot}
         <ClientContactSection client={client} />
-        <ClientAccountSection client={client} />
       </div>
     );
   }
@@ -351,10 +337,10 @@ export function ClientDetailsContent({
   // (space-y-8), rather than each section claiming a grid row of its own.
   //
   // That shape matters. When the details column spanned several rows, the grid
-  // distributed its height — Contact plus Account is tall — across every row it
-  // covered, inflating the KPI row and opening a gap between the cards and the
-  // Transactions heading below them. With one row, each column's height is its
-  // own content's, and neither can stretch the other.
+  // distributed its height across every row it covered, inflating the KPI row
+  // and opening a gap between the cards and the Transactions heading below
+  // them. With one row, each column's height is its own content's, and neither
+  // can stretch the other.
   //
   // Both row-2 columns lead with a floatTitle section, so the row starts at the
   // KPI cards and the Contact card respectively, not at their headings: the two
@@ -380,12 +366,11 @@ export function ClientDetailsContent({
       </div>
 
       {/* Supporting detail, deliberately secondary to the column beside it:
-          narrower, no KPI figures, and carrying only the two reference
-          modules — the same role, and the same label-above-value fields, as
-          the Payment/Sender Details column on a transaction. */}
-      <div className="space-y-8 lg:col-start-2 lg:row-start-2">
+          narrower, no KPI figures, and carrying the one reference module —
+          the same role, and the same label-above-value fields, as the
+          Payment/Sender Details column on a transaction. */}
+      <div className="lg:col-start-2 lg:row-start-2">
         <ClientContactSection client={client} floatTitle />
-        <ClientAccountSection client={client} />
       </div>
     </div>
   );

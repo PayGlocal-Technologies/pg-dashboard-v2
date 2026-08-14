@@ -15,13 +15,16 @@ import type { McaTransaction } from "@/features/dashboard/transactions/types";
  * hydration mismatch) and change on every re-render, which is exactly what
  * CLAUDE.md's purity rule forbids.
  *
- * The rows deliberately spread across the axes the table has to survive:
- * fourteen countries so the Country filter has something to narrow, five
- * currencies including INR (the one figure that groups in lakhs rather than
- * thousands), outstanding balances from zero to seven figures, business names
+ * The rows deliberately spread across the axes the table has to survive: a
+ * dozen countries so the Country filter has something to narrow, several
+ * currencies, outstanding balances from zero to six figures, business names
  * both short and long enough to test the column's width, and creation dates
  * spanning two years so a date range excludes some rows rather than all or
  * none.
+ *
+ * Every client is international. This is the merchant's cross-border client
+ * book — the counterparties who remit *to* them — so a domestic Indian client
+ * has no place in it, and none is listed here.
  */
 export const MOCK_CLIENTS: Client[] = [
   {
@@ -71,22 +74,6 @@ export const MOCK_CLIENTS: Client[] = [
     createdAt: "2025-02-27T11:45:00Z",
     totalInvoices: 12,
     paidInvoices: 12,
-  },
-  {
-    id: "cli-004",
-    businessName: "Sanjivani Exports Pvt Ltd",
-    primaryContactName: "Rohit Deshmukh",
-    email: "rohit.deshmukh@sanjivaniexports.in",
-    phoneDialCode: "+91",
-    phoneNumber: "9820045611",
-    billingAddress: "Plot 18, MIDC Industrial Area, Andheri East, Mumbai 400093, India",
-    countryIso2: "IN",
-    countryName: "India",
-    outstandingAmount: 1_247_500.0,
-    outstandingCurrency: "INR",
-    createdAt: "2024-05-12T06:30:00Z",
-    totalInvoices: 67,
-    paidInvoices: 48,
   },
   {
     id: "cli-005",
@@ -249,22 +236,6 @@ export const MOCK_CLIENTS: Client[] = [
     paidInvoices: 9,
   },
   {
-    id: "cli-015",
-    businessName: "Zenith Software Solutions",
-    primaryContactName: "Priya Venkatesan",
-    email: "priya.v@zenithsoftware.in",
-    phoneDialCode: "+91",
-    phoneNumber: "9945012388",
-    billingAddress: "4th Floor, Prestige Tech Park, Marathahalli, Bengaluru 560103, India",
-    countryIso2: "IN",
-    countryName: "India",
-    outstandingAmount: 342_800.0,
-    outstandingCurrency: "INR",
-    createdAt: "2025-08-02T05:45:00Z",
-    totalInvoices: 36,
-    paidInvoices: 27,
-  },
-  {
     id: "cli-016",
     businessName: "Pemberton & Hale Advisory",
     primaryContactName: "Julian Hale",
@@ -328,62 +299,71 @@ export const MOCK_CLIENTS: Client[] = [
  * Once a real endpoint exists, that filter becomes a query parameter and this
  * module goes away; nothing else about the section changes.
  */
+/**
+ * The three settlement states a client's transaction can be in, and the raw
+ * `externalStatus` each one is sent as. Named for what the Settlement Status
+ * column actually renders, since that is the contract being pinned here: these
+ * three values map, through the Transactions page's own MCA_STATUS_META, onto
+ * exactly "Invoice Pending", "Sent for Review", and "Settled" — no fourth
+ * badge, and no new status vocabulary of this feature's own.
+ */
+const SETTLEMENT_STATE = {
+  invoicePending: "DOCUMENT_PENDING",
+  sentForReview: "SENT_FOR_REVIEW",
+  settled: "SETTLED",
+} as const;
+
+type SettlementState = keyof typeof SETTLEMENT_STATE;
+
 interface ClientTransactionSeed {
   clientId: string;
   amount: string;
-  externalStatus: string;
-  frmStatus: McaTransaction["frmStatus"];
+  state: SettlementState;
   /** "DD/MM/YYYY HH:mm:ss", the shape the transactions API sends and
    *  parseApiDateTime expects. */
   createdAt: string;
-  /** ISO 8601, the shape the API sends settlement dates in. Present only for
-   *  transactions that actually reached a settled state. */
+  /** ISO 8601, the shape the API sends settlement dates in. Only ever set on a
+   *  "settled" seed — see the invariant enforced when the rows are built. */
   settlementDate?: string;
 }
 
 // Deliberately uneven: the first few clients carry enough transactions to page
 // through, several carry a handful, and some carry none at all, so the
 // section's empty state is reachable from the UI rather than only in theory.
-// Statuses span the full range the Settlement Status column renders (see
-// MCA_STATUS_META), including the two that need merchant action.
+// Every row is one of the three states above and nothing else.
 const CLIENT_TRANSACTION_SEEDS: ClientTransactionSeed[] = [
-  { clientId: "cli-001", amount: "18400.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "12/06/2026 09:14:22", settlementDate: "2026-06-15T10:02:11Z" },
-  { clientId: "cli-001", amount: "9250.50", externalStatus: "DOCUMENT_PENDING", frmStatus: "PENDING_MERCHANT_UPLOAD", createdAt: "28/06/2026 14:41:05" },
-  { clientId: "cli-001", amount: "12600.00", externalStatus: "SENT_FOR_REVIEW", frmStatus: "REVIEW_IN_PROGRESS", createdAt: "03/07/2026 11:27:48" },
-  { clientId: "cli-001", amount: "7999.99", externalStatus: "FIRC_SETTLED", frmStatus: "APPROVED", createdAt: "19/05/2026 16:03:37", settlementDate: "2026-05-22T08:45:00Z" },
-  { clientId: "cli-001", amount: "4310.00", externalStatus: "SENT_FOR_SETTLEMENT", frmStatus: "APPROVED", createdAt: "21/07/2026 08:52:14" },
-  { clientId: "cli-001", amount: "26750.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "04/04/2026 13:19:56", settlementDate: "2026-04-07T09:30:42Z" },
+  { clientId: "cli-001", amount: "18400.00", state: "settled", createdAt: "12/06/2026 09:14:22", settlementDate: "2026-06-15T10:02:11Z" },
+  { clientId: "cli-001", amount: "9250.50", state: "invoicePending", createdAt: "28/06/2026 14:41:05" },
+  { clientId: "cli-001", amount: "12600.00", state: "sentForReview", createdAt: "03/07/2026 11:27:48" },
+  { clientId: "cli-001", amount: "7999.99", state: "settled", createdAt: "19/05/2026 16:03:37", settlementDate: "2026-05-22T08:45:00Z" },
+  { clientId: "cli-001", amount: "4310.00", state: "sentForReview", createdAt: "21/07/2026 08:52:14" },
+  { clientId: "cli-001", amount: "26750.00", state: "settled", createdAt: "04/04/2026 13:19:56", settlementDate: "2026-04-07T09:30:42Z" },
 
-  { clientId: "cli-002", amount: "54200.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "02/07/2026 10:05:33", settlementDate: "2026-07-05T11:14:20Z" },
-  { clientId: "cli-002", amount: "31890.75", externalStatus: "DOCUMENT_PENDING", frmStatus: "PENDING_MERCHANT_UPLOAD", createdAt: "15/07/2026 17:22:09" },
-  { clientId: "cli-002", amount: "22450.00", externalStatus: "FUNDS_ON_HOLD", frmStatus: "REVIEW_IN_PROGRESS", createdAt: "09/07/2026 12:48:51" },
-  { clientId: "cli-002", amount: "78300.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "11/06/2026 07:36:44", settlementDate: "2026-06-14T10:11:03Z" },
-  { clientId: "cli-002", amount: "15720.40", externalStatus: "SENT_FOR_REVIEW", frmStatus: "REVIEW_IN_PROGRESS", createdAt: "24/07/2026 15:09:27" },
+  { clientId: "cli-002", amount: "54200.00", state: "settled", createdAt: "02/07/2026 10:05:33", settlementDate: "2026-07-05T11:14:20Z" },
+  { clientId: "cli-002", amount: "31890.75", state: "invoicePending", createdAt: "15/07/2026 17:22:09" },
+  { clientId: "cli-002", amount: "22450.00", state: "sentForReview", createdAt: "09/07/2026 12:48:51" },
+  { clientId: "cli-002", amount: "78300.00", state: "settled", createdAt: "11/06/2026 07:36:44", settlementDate: "2026-06-14T10:11:03Z" },
+  { clientId: "cli-002", amount: "15720.40", state: "sentForReview", createdAt: "24/07/2026 15:09:27" },
 
-  { clientId: "cli-003", amount: "8400.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "18/03/2026 09:41:12", settlementDate: "2026-03-21T08:20:00Z" },
-  { clientId: "cli-003", amount: "13950.00", externalStatus: "FIRC_SETTLED", frmStatus: "APPROVED", createdAt: "06/05/2026 11:58:03", settlementDate: "2026-05-09T14:37:19Z" },
+  { clientId: "cli-003", amount: "8400.00", state: "settled", createdAt: "18/03/2026 09:41:12", settlementDate: "2026-03-21T08:20:00Z" },
+  { clientId: "cli-003", amount: "13950.00", state: "settled", createdAt: "06/05/2026 11:58:03", settlementDate: "2026-05-09T14:37:19Z" },
 
-  { clientId: "cli-004", amount: "412000.00", externalStatus: "DOCUMENT_PENDING", frmStatus: "PENDING_MERCHANT_UPLOAD", createdAt: "22/07/2026 06:15:39" },
-  { clientId: "cli-004", amount: "268500.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "30/06/2026 08:27:51", settlementDate: "2026-07-03T09:44:12Z" },
-  { clientId: "cli-004", amount: "155000.00", externalStatus: "SENT_FOR_SETTLEMENT", frmStatus: "APPROVED", createdAt: "17/07/2026 13:03:26" },
-  { clientId: "cli-004", amount: "94750.00", externalStatus: "REVERSAL_FOR_RISK_REJECTED", frmStatus: "NO_FRM", createdAt: "28/05/2026 10:19:44" },
+  { clientId: "cli-005", amount: "11320.25", state: "settled", createdAt: "08/07/2026 04:22:18", settlementDate: "2026-07-11T05:03:55Z" },
+  { clientId: "cli-005", amount: "6480.00", state: "sentForReview", createdAt: "20/07/2026 03:47:02" },
 
-  { clientId: "cli-005", amount: "11320.25", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "08/07/2026 04:22:18", settlementDate: "2026-07-11T05:03:55Z" },
-  { clientId: "cli-005", amount: "6480.00", externalStatus: "SENT_FOR_REVIEW", frmStatus: "REVIEW_IN_PROGRESS", createdAt: "20/07/2026 03:47:02" },
+  { clientId: "cli-007", amount: "142600.00", state: "settled", createdAt: "26/06/2026 09:33:41", settlementDate: "2026-06-29T11:22:08Z" },
+  { clientId: "cli-007", amount: "88900.00", state: "invoicePending", createdAt: "14/07/2026 12:56:17" },
+  { clientId: "cli-007", amount: "54400.00", state: "sentForReview", createdAt: "01/07/2026 08:11:29" },
 
-  { clientId: "cli-007", amount: "142600.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "26/06/2026 09:33:41", settlementDate: "2026-06-29T11:22:08Z" },
-  { clientId: "cli-007", amount: "88900.00", externalStatus: "DOCUMENT_PENDING", frmStatus: "PENDING_MERCHANT_UPLOAD", createdAt: "14/07/2026 12:56:17" },
-  { clientId: "cli-007", amount: "54400.00", externalStatus: "FUNDS_ON_HOLD", frmStatus: "REVIEW_IN_PROGRESS", createdAt: "01/07/2026 08:11:29" },
+  { clientId: "cli-009", amount: "9640.00", state: "settled", createdAt: "13/06/2026 14:07:36", settlementDate: "2026-06-16T09:18:44Z" },
+  { clientId: "cli-009", amount: "8320.00", state: "settled", createdAt: "29/04/2026 10:44:53", settlementDate: "2026-05-02T13:26:31Z" },
 
-  { clientId: "cli-009", amount: "9640.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "13/06/2026 14:07:36", settlementDate: "2026-06-16T09:18:44Z" },
-  { clientId: "cli-009", amount: "8320.00", externalStatus: "FIRC_SETTLED", frmStatus: "APPROVED", createdAt: "29/04/2026 10:44:53", settlementDate: "2026-05-02T13:26:31Z" },
+  { clientId: "cli-012", amount: "46200.00", state: "settled", createdAt: "07/07/2026 19:12:05", settlementDate: "2026-07-10T20:41:37Z" },
+  { clientId: "cli-012", amount: "42225.60", state: "invoicePending", createdAt: "23/07/2026 18:35:49" },
 
-  { clientId: "cli-012", amount: "46200.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "07/07/2026 19:12:05", settlementDate: "2026-07-10T20:41:37Z" },
-  { clientId: "cli-012", amount: "42225.60", externalStatus: "DOCUMENT_PENDING", frmStatus: "PENDING_MERCHANT_UPLOAD", createdAt: "23/07/2026 18:35:49" },
-
-  { clientId: "cli-017", amount: "486000.00", externalStatus: "SETTLED", frmStatus: "NO_FRM", createdAt: "05/07/2026 12:26:14", settlementDate: "2026-07-08T13:52:29Z" },
-  { clientId: "cli-017", amount: "312240.00", externalStatus: "SENT_FOR_REVIEW", frmStatus: "REVIEW_IN_PROGRESS", createdAt: "18/07/2026 11:41:58" },
-  { clientId: "cli-017", amount: "120000.00", externalStatus: "SENT_FOR_SETTLEMENT", frmStatus: "APPROVED", createdAt: "25/07/2026 09:04:33" },
+  { clientId: "cli-017", amount: "486000.00", state: "settled", createdAt: "05/07/2026 12:26:14", settlementDate: "2026-07-08T13:52:29Z" },
+  { clientId: "cli-017", amount: "312240.00", state: "sentForReview", createdAt: "18/07/2026 11:41:58" },
+  { clientId: "cli-017", amount: "120000.00", state: "sentForReview", createdAt: "25/07/2026 09:04:33" },
 ];
 
 /**
@@ -393,30 +373,53 @@ const CLIENT_TRANSACTION_SEEDS: ClientTransactionSeed[] = [
  */
 const MOCK_MERCHANT_ID = "MID_PLACEHOLDER";
 
+/**
+ * The FRM state each settlement state is sent with. Every one of these is
+ * deliberately *not* "PENDING_MERCHANT_UPLOAD": getStatusMeta treats that value
+ * as an override and renders "Action Required" whatever the externalStatus
+ * says, which would put a fourth badge on this table. Keeping it out is what
+ * guarantees an invoice-pending row actually reads "Invoice Pending".
+ */
+const SETTLEMENT_STATE_FRM: Record<SettlementState, McaTransaction["frmStatus"]> = {
+  invoicePending: "NO_FRM",
+  sentForReview: "REVIEW_IN_PROGRESS",
+  settled: "APPROVED",
+};
+
 // Built at module scope, once, rather than per render: the seeds above are
 // literals, and each transaction inherits its remitter identity (name,
 // country) and currency straight from the client it belongs to, so a client's
 // transactions can never disagree with the client row that opened them.
-export const MOCK_CLIENT_TRANSACTIONS: McaTransaction[] = CLIENT_TRANSACTION_SEEDS.map(
+//
+// Seeds whose client isn't in MOCK_CLIENTS are dropped rather than rendered
+// against a blank remitter — that's what keeps a removed client's transactions
+// out of the table by construction, instead of relying on every seed being
+// deleted by hand alongside it.
+export const MOCK_CLIENT_TRANSACTIONS: McaTransaction[] = CLIENT_TRANSACTION_SEEDS.flatMap(
   (seed, index) => {
     const client = MOCK_CLIENTS.find((c) => c.id === seed.clientId);
-    return {
-      gid: `mcatxn_${String(index + 1).padStart(3, "0")}_${seed.clientId}`,
-      merchantId: MOCK_MERCHANT_ID,
-      amount: seed.amount,
-      currency: client?.outstandingCurrency ?? "USD",
-      externalStatus: seed.externalStatus,
-      internalStatus: seed.externalStatus,
-      formattedCreationDateTime: seed.createdAt,
-      partnerCustomerFullName: client?.businessName ?? "",
-      // Null, not a masked variant: these are the merchant's own known
-      // clients, so the table shows the business name in full (the Remitter
-      // Name column falls back to partnerCustomerFullName when this is null).
-      partnerMaskedCustomerFullName: null,
-      partnerCustomerCountry: client?.countryIso2 ?? null,
-      frmStatus: seed.frmStatus,
-      settlementDate: seed.settlementDate,
-    };
+    if (!client) return [];
+    return [
+      {
+        gid: `mcatxn_${String(index + 1).padStart(3, "0")}_${seed.clientId}`,
+        merchantId: MOCK_MERCHANT_ID,
+        amount: seed.amount,
+        currency: client.outstandingCurrency,
+        externalStatus: SETTLEMENT_STATE[seed.state],
+        internalStatus: SETTLEMENT_STATE[seed.state],
+        formattedCreationDateTime: seed.createdAt,
+        partnerCustomerFullName: client.businessName,
+        // Null, not a masked variant: these are the merchant's own known
+        // clients, so the table shows the business name in full (the Remitter
+        // Name column falls back to partnerCustomerFullName when this is null).
+        partnerMaskedCustomerFullName: null,
+        partnerCustomerCountry: client.countryIso2,
+        frmStatus: SETTLEMENT_STATE_FRM[seed.state],
+        // Only a settled transaction carries one, whatever a seed says — a
+        // settlement date on a pending row would contradict its own badge.
+        settlementDate: seed.state === "settled" ? seed.settlementDate : undefined,
+      },
+    ];
   }
 );
 
