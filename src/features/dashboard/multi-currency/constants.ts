@@ -37,11 +37,13 @@ export const CURRENCY_FILTER_OPTIONS: CurrencyOption[] = MOCK_VIRTUAL_ACCOUNTS.m
   account.iso2 === "ROW"
     ? // Rest of the World has no single real currency to filter by: the
       // account receives many over SWIFT (see mock-data.ts's own comment on
-      // this entry). `account.currency` is a placeholder ("CHF", chosen only
-      // because none of the seven local accounts claim it) standing in until
-      // the API supports an actual "everything else" filter; filtering by it
-      // today will under-match rather than show every non-local-rail
-      // transaction.
+      // this entry). `account.currency` is "Dollar" — the account is
+      // dollar-denominated, and the value stays distinct from the US
+      // account's "USD" because these options are keyed by it (see
+      // FilterChips). It stands in until the API supports an actual
+      // "everything else" filter; filtering by it today will under-match
+      // rather than show every non-local-rail transaction. The label is the
+      // region name either way, so no currency value surfaces here.
       { value: account.currency, label: "Rest of the World" }
     : { value: account.currency, label: account.currency, iso2: account.iso2 }
 );

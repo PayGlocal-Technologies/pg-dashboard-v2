@@ -113,9 +113,10 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
       { x: "Jul", y: 41_900 },
     ],
   },
-  // Rest of the World's account carries CHF as a stand-in currency — see the
-  // note on that entry in multi-currency/mock-data.ts.
-  CHF: {
+  // The Rest of the World account is dollar-denominated and carries "Dollar"
+  // as its currency value — see the note on that entry in
+  // multi-currency/mock-data.ts for why it isn't the ISO "USD".
+  Dollar: {
     amount: 22_750,
     amountInr: 2_411_500,
     trendLabel: "+3.9% vs last period",

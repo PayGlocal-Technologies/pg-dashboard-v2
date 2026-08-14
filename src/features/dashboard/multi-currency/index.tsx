@@ -120,10 +120,7 @@ export function MultiCurrencyFeature() {
       {selectedAccount && (
         // key remounts the whole section on every selection change, so the
         // fade replays on every switch, not just the first render.
-        <div
-          key={selectedAccount.id}
-          className="mt-4 flex flex-wrap items-start gap-4 page-enter"
-        >
+        <div key={selectedAccount.id} className="mt-4 flex flex-wrap items-start gap-4 page-enter">
           <VirtualAccountDetails
             account={selectedAccount}
             onCopy={handleCopyFullAccount}
@@ -183,7 +180,10 @@ export function MultiCurrencyFeature() {
 
                 <div className="mt-6 h-36 w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={TOTAL_EARNING_TREND} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                    <AreaChart
+                      data={TOTAL_EARNING_TREND}
+                      margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                    >
                       <defs>
                         <linearGradient id={settledAmountGradientId} x1="0" y1="0" x2="0" y2="1">
                           <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
@@ -206,7 +206,9 @@ export function MultiCurrencyFeature() {
                         axisLine={false}
                         tickLine={false}
                         tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                        tickFormatter={(v: number) => (v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`)}
+                        tickFormatter={(v: number) =>
+                          v >= 1000 ? `$${(v / 1000).toFixed(0)}K` : `$${v}`
+                        }
                         width={44}
                       />
                       <Tooltip

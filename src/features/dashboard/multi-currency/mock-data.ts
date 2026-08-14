@@ -144,9 +144,14 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
     // Transactions are filtered server-side by a single currency today (see
     // VirtualAccountActionRequired). A real SWIFT account receives many, so
     // this will need a multi-currency / "everything else" filter once the API
-    // supports it; CHF stands in meanwhile precisely because none of the seven
-    // local accounts claim it, keeping this card's list distinct from theirs.
-    currency: "CHF",
+    // supports it.
+    //
+    // "Dollar" rather than an ISO code: the account receives dollars over
+    // SWIFT, and this value is also a filter key that has to stay distinct
+    // from the US account's "USD" — CURRENCY_FILTER_OPTIONS keys its checkbox
+    // rows by it (see FilterChips), so two entries sharing "USD" would collide.
+    // format.ts maps it to "$" so amounts still render with a real symbol.
+    currency: "Dollar",
     accountName: "Rest of the World",
     details: [
       { label: "SWIFT BIC", value: "PGBLGB2LXXX" },

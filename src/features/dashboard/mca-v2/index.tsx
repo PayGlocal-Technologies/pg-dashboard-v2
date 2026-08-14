@@ -237,14 +237,12 @@ export function McaV2Feature() {
                     squeezed, the chart gives up width and the figure keeps
                     every pixel it needs. */}
                 <div className="flex-1 sm:basis-2/5">
-                  {/* The currency names the figure, so no control is needed
-                      here — picking a region below is what changes this card,
-                      and the code shown is that region's own currency. It also
-                      says up front which unit the amount and the chart's Y
-                      axis below are in. */}
-                  <p className="text-sm font-semibold text-foreground">
-                    {settledCurrency} settled amount
-                  </p>
+                  {/* No currency prefix: the symbol on the figure below
+                      already says which unit this is in, and the label would
+                      otherwise have to name currencies like the Rest of the
+                      World account's, whose value is a display word rather
+                      than a code that reads well in a sentence. */}
+                  <p className="text-sm font-semibold text-foreground">Settled amount</p>
 
                   {/* Same size and weight as OutstandingAmountCard's own
                       figure — the two headline numbers have to carry equal
@@ -312,12 +310,13 @@ export function McaV2Feature() {
                         tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                         interval="preserveStartEnd"
                       />
-                      {/* Axis and tooltip both read in the selected currency, so
-                        the chart never contradicts the headline figure above
-                        it. width=64 is sized for the widest label this can
-                        produce — CHF's symbol is the three-letter code rather
-                        than a glyph, so "CHF140K" is what has to fit without
-                        being clipped, not "$140K". */}
+                      {/* Axis and tooltip both read in the selected currency,
+                        so the chart never contradicts the headline figure
+                        above it. width=64 leaves room for the widest label
+                        this can produce: every region's symbol is a glyph or
+                        two ("$140K", "A$140K"), but the width is sized past
+                        that so a currency whose symbol falls back to its own
+                        code still can't clip. */}
                       <YAxis
                         axisLine={false}
                         tickLine={false}

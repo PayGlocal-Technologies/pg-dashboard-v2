@@ -112,11 +112,7 @@ export function VirtualAccountList({
           className="contents"
         >
           {accounts.map((account, index) => (
-            <div
-              key={account.id}
-              role="listitem"
-              className={index === 0 ? "ml-0":""}
-            >
+            <div key={account.id} role="listitem" className={index === 0 ? "ml-0" : ""}>
               <VirtualAccountCard
                 account={account}
                 onCopy={onCopy}
