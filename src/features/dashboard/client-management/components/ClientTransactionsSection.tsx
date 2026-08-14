@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { DataTable } from "@/components/ui";
-import { buildMcaColumns } from "@/features/dashboard/transactions/mcaColumns";
+import { Button, DataTable } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { buildMcaColumns, isWaitingForInvoice } from "@/features/dashboard/transactions/mcaColumns";
 import { TransactionCardList } from "@/features/dashboard/transactions/components/TransactionCardList";
 import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
 import { CLIENT_TRANSACTIONS_PAGE_LIMIT } from "@/features/dashboard/client-management/constants";
@@ -25,10 +26,12 @@ interface ClientTransactionsSectionProps {
  * where the table becomes cards are all inherited, not reproduced.
  *
  * The Actions column is dropped (showActions: false), the same way the
- * Transaction Details page's own embedded table drops it: an Upload/View
- * Invoice CTA belongs on the Transactions page, not inside another record's
- * detail view. Every remaining cell is still a click target, so the whole row
- * opens the transaction exactly as it does there.
+ * Transaction Details page's own embedded table drops it. In its place, a row
+ * still waiting on an invoice offers Upload Invoice through DataTable's own
+ * `rowAction` slot — revealed on hover (and on keyboard focus within the row,
+ * which the same slot handles) rather than occupying a column of its own. Every
+ * other cell is still a click target, so the whole row opens the transaction
+ * exactly as it does on the Transactions page.
  */
 export function ClientTransactionsSection({
   businessName,
@@ -78,6 +81,31 @@ export function ClientTransactionsSection({
           onPageChange={setPage}
           tableLayout="content"
           density="compact"
+          // Per row, so only the ones actually waiting on an invoice offer the
+          // action; returning null leaves every other row with nothing to
+          // reveal. Same button treatment as the Transactions table's own
+          // Upload Invoice cell, so the two read as one control in two places.
+          rowAction={(row) =>
+            isWaitingForInvoice(row) ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                leftIcon={<Icon name="upload" className="w-3 h-3" />}
+                onClick={(e) => {
+                  // The action floats over the row, so without this the click
+                  // would also open the row underneath it. Here they happen to
+                  // lead to the same place — the drawer's inline upload flow —
+                  // but that's a coincidence worth not relying on.
+                  e.stopPropagation();
+                  onOpenTransaction(row);
+                }}
+                className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
+              >
+                Upload Invoice
+              </Button>
+            ) : null
+          }
         />
 
         <TransactionCardList

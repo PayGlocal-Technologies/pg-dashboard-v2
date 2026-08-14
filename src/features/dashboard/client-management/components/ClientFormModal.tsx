@@ -3,6 +3,10 @@
 import { useRef, useState, type ReactNode } from "react";
 import { useForm } from "@tanstack/react-form";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
   Button,
   CountrySelect,
   Dialog,
@@ -20,7 +24,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Separator,
   Textarea,
   useBreakpoint,
 } from "@/components/ui";
@@ -56,34 +59,59 @@ function RequiredMark() {
   );
 }
 
-/** Trailing "Optional" note on a label, for the two sections that are lighter
- *  than the required ones above them. */
-function OptionalMark() {
-  return <span className="ml-1 text-[11px] font-normal text-muted-foreground">Optional</span>;
-}
+/**
+ * Which sections start expanded. The modal remounts its body every time it
+ * opens (see the `key` below), so these are the sections open on arrival every
+ * time, not just the first — the three that carry required fields. The other
+ * three are all-optional and start collapsed, keeping the form short enough to
+ * take in at a glance while leaving them one click away.
+ *
+ * Collapsing a section unmounts its fields, which is safe: TanStack Form keeps
+ * values in the form store rather than in the field components, so a collapsed
+ * section's values survive and are still submitted.
+ */
+const DEFAULT_OPEN_SECTIONS = ["business", "contact", "address"];
 
-/** One titled group of fields. Proximity and a rule do the grouping rather
- *  than a card per section, which would make a form this long read as eight
- *  stacked panels. */
+/**
+ * One titled, collapsible group of fields, as its own bordered container: a
+ * tinted header band carrying the title and the chevron, and — once expanded —
+ * the fields directly beneath it inside the same rounded box, divided from the
+ * header by a single hairline. Collapsed, the container is just that header, so
+ * a closed section shows its title and nothing else: no labels, no inputs, no
+ * values.
+ *
+ * Three details worth naming:
+ *
+ * - `last:border-b` cancels AccordionItem's own `last:border-b-0`, which exists
+ *   for the stacked-rows accordion this no longer is; without it the final
+ *   container would lose its bottom edge.
+ * - `overflow-hidden` is what makes the header band and the content beneath it
+ *   respect the container's rounded corners.
+ * - The padding lives on an inner div rather than on AccordionContent, because
+ *   flux passes that component's className to both its animated outer box and
+ *   its inner one, and layout utilities belong only on the inner.
+ */
 function FormSection({
+  value,
   title,
   children,
-  withDivider = true,
 }: {
+  value: string;
   title: string;
   children: ReactNode;
-  withDivider?: boolean;
 }) {
   return (
-    <>
-      {withDivider && <Separator />}
-      <div className="flex flex-col gap-3">
-        <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground">
-          {title}
-        </p>
-        {children}
-      </div>
-    </>
+    <AccordionItem
+      value={value}
+      className="overflow-hidden rounded-xl border border-border bg-card last:border-b"
+    >
+      <AccordionTrigger className="bg-muted/40 px-4 py-3 text-[14px] font-semibold text-foreground">
+        {title}
+      </AccordionTrigger>
+      <AccordionContent className="pb-0">
+        <div className="flex flex-col gap-3 border-t border-border px-4 py-4">{children}</div>
+      </AccordionContent>
+    </AccordionItem>
   );
 }
 
@@ -197,317 +225,301 @@ function ClientFormBody({
 
       {/* Only this middle band scrolls, so the footer actions stay reachable
           however tall the form runs. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
-        {/* ── Business information ─────────────────────────────────────── */}
-        <FormSection title="Business information" withDivider={false}>
-          <form.Field
-            name="businessName"
-            validators={{
-              onBlur: ({ value }) => validateBusinessName(value),
-              onSubmit: ({ value }) => validateBusinessName(value),
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="client-business-name">
-                  <RequiredMark /> Business name
-                </FieldLabel>
-                <Input
-                  id="client-business-name"
-                  placeholder="Enter business name"
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </Field>
-            )}
-          </form.Field>
-
-          <div className="grid gap-3 sm:grid-cols-2">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-1">
+        {/* type="multiple" so the open sections are independent — opening
+            Contract must not collapse Address the way a single-value accordion
+            would. gap-3 between the containers: each already draws its own
+            border, so this only needs to keep them from touching, not to stand
+            in for a divider. */}
+        <Accordion
+          type="multiple"
+          defaultValue={DEFAULT_OPEN_SECTIONS}
+          className="flex flex-col gap-3 py-2"
+        >
+          {/* ── Business information ─────────────────────────────────────── */}
+          <FormSection value="business" title="Business information">
             <form.Field
-              name="businessType"
+              name="businessName"
               validators={{
-                onChange: ({ value }) => validateBusinessType(value),
-                onSubmit: ({ value }) => validateBusinessType(value),
+                onBlur: ({ value }) => validateBusinessName(value),
+                onSubmit: ({ value }) => validateBusinessName(value),
               }}
             >
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="client-business-type">
-                    <RequiredMark /> Business type
+                  <FieldLabel htmlFor="client-business-name">
+                    <RequiredMark /> Business name
                   </FieldLabel>
-                  <Select value={field.state.value} onValueChange={field.handleChange}>
-                    <SelectTrigger
-                      id="client-business-type"
+                  <Input
+                    id="client-business-name"
+                    placeholder="Enter business name"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                  <FieldError>{field.state.meta.errors[0]}</FieldError>
+                </Field>
+              )}
+            </form.Field>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.Field
+                name="businessType"
+                validators={{
+                  onChange: ({ value }) => validateBusinessType(value),
+                  onSubmit: ({ value }) => validateBusinessType(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-business-type">
+                      <RequiredMark /> Business type
+                    </FieldLabel>
+                    <Select value={field.state.value} onValueChange={field.handleChange}>
+                      <SelectTrigger
+                        id="client-business-type"
+                        aria-invalid={field.state.meta.errors.length > 0}
+                        className="w-full"
+                      >
+                        <SelectValue placeholder="Select business type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CLIENT_BUSINESS_TYPES.map((type) => (
+                          <SelectItem key={type} value={type}>
+                            {type}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
+
+              <form.Field
+                name="website"
+                validators={{
+                  onBlur: ({ value }) => validateWebsite(value),
+                  onSubmit: ({ value }) => validateWebsite(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-website">Website</FieldLabel>
+                    <Input
+                      id="client-website"
+                      inputMode="url"
+                      placeholder="https://example.com"
                       aria-invalid={field.state.meta.errors.length > 0}
-                      className="w-full"
-                    >
-                      <SelectValue placeholder="Select business type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CLIENT_BUSINESS_TYPES.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                    />
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
 
-            <form.Field
-              name="website"
-              validators={{
-                onBlur: ({ value }) => validateWebsite(value),
-                onSubmit: ({ value }) => validateWebsite(value),
-              }}
-            >
+            <form.Field name="tags">
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="client-website">Website</FieldLabel>
-                  <Input
-                    id="client-website"
-                    inputMode="url"
-                    placeholder="https://example.com"
-                    aria-invalid={field.state.meta.errors.length > 0}
+                  <FieldLabel htmlFor="client-tags">Tags</FieldLabel>
+                  <ClientTagsInput
+                    id="client-tags"
                     value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
+                    onChange={field.handleChange}
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
               )}
             </form.Field>
-          </div>
+          </FormSection>
 
-          <form.Field name="tags">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="client-tags">Tags</FieldLabel>
-                <ClientTagsInput
-                  id="client-tags"
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                />
-              </Field>
-            )}
-          </form.Field>
-        </FormSection>
+          {/* ── Primary contact ──────────────────────────────────────────── */}
+          <FormSection value="contact" title="Primary contact">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.Field
+                name="primaryContactName"
+                validators={{
+                  onBlur: ({ value }) => validateContactName(value),
+                  onSubmit: ({ value }) => validateContactName(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-contact-name">
+                      <RequiredMark /> Primary contact name
+                    </FieldLabel>
+                    <Input
+                      id="client-contact-name"
+                      placeholder="Enter contact name"
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                    />
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
 
-        {/* ── Primary contact ──────────────────────────────────────────── */}
-        <FormSection title="Primary contact">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <form.Field
-              name="primaryContactName"
-              validators={{
-                onBlur: ({ value }) => validateContactName(value),
-                onSubmit: ({ value }) => validateContactName(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-contact-name">
-                    <RequiredMark /> Primary contact name
-                  </FieldLabel>
-                  <Input
-                    id="client-contact-name"
-                    placeholder="Enter contact name"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                  />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
+              <form.Field
+                name="primaryContactEmail"
+                validators={{
+                  onBlur: ({ value }) => validateContactEmail(value),
+                  onSubmit: ({ value }) => validateContactEmail(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-contact-email">
+                      <RequiredMark /> Primary contact email
+                    </FieldLabel>
+                    <Input
+                      id="client-contact-email"
+                      type="email"
+                      placeholder="name@company.com"
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                    />
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
 
-            <form.Field
-              name="primaryContactEmail"
-              validators={{
-                onBlur: ({ value }) => validateContactEmail(value),
-                onSubmit: ({ value }) => validateContactEmail(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-contact-email">
-                    <RequiredMark /> Primary contact email
-                  </FieldLabel>
-                  <Input
-                    id="client-contact-email"
-                    type="email"
-                    placeholder="name@company.com"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                  />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-          </div>
-
-          {/* Dial code and number are one field to the person filling this in,
+            {/* Dial code and number are one field to the person filling this in,
               so they share a row and a single error message — the country
               picker below is only there to supply the code, which is how the
               record stores it (phoneDialCode + phoneNumber). */}
-          <form.Field
-            name="phoneNumber"
-            validators={{
-              onBlur: ({ value }) => validatePhone(form.getFieldValue("phoneCountry"), value),
-              onSubmit: ({ value }) => validatePhone(form.getFieldValue("phoneCountry"), value),
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="client-phone-number">
-                  <RequiredMark /> Primary contact number
-                </FieldLabel>
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
-                  <form.Field name="phoneCountry">
-                    {(countryField) => (
-                      <CountrySelect
-                        value={countryField.state.value}
-                        onValueChange={(code) => {
-                          countryField.handleChange(code);
-                          // The number's validity depends on this, so its error
-                          // is re-evaluated here rather than waiting for
-                          // another blur on the number field.
-                          form.validateField("phoneNumber", "blur");
-                        }}
-                        showDialCode
-                        placeholder="Code"
-                      />
-                    )}
-                  </form.Field>
-                  <Input
-                    id="client-phone-number"
-                    type="tel"
-                    inputMode="tel"
-                    placeholder="Enter contact number"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                  />
-                </div>
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </Field>
-            )}
-          </form.Field>
-        </FormSection>
-
-        {/* ── Address ──────────────────────────────────────────────────── */}
-        <FormSection title="Address">
-          <div className="grid gap-3 sm:grid-cols-2">
             <form.Field
-              name="country"
+              name="phoneNumber"
               validators={{
-                onChange: ({ value }) => validateCountry(value),
-                onSubmit: ({ value }) => validateCountry(value),
+                onBlur: ({ value }) => validatePhone(form.getFieldValue("phoneCountry"), value),
+                onSubmit: ({ value }) => validatePhone(form.getFieldValue("phoneCountry"), value),
               }}
             >
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="client-country">
-                    <RequiredMark /> Country
+                  <FieldLabel htmlFor="client-phone-number">
+                    <RequiredMark /> Primary contact number
                   </FieldLabel>
-                  <CountrySelect
-                    value={field.state.value}
-                    onValueChange={(code) => {
-                      field.handleChange(code);
-                      // A blank phone country is almost always the same country
-                      // as the address, so the first country chosen seeds it —
-                      // never overwriting a code already picked.
-                      if (!form.getFieldValue("phoneCountry") && dialCodeFor(code)) {
-                        form.setFieldValue("phoneCountry", code);
-                      }
-                    }}
-                    placeholder="Select country"
-                  />
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
+                    <form.Field name="phoneCountry">
+                      {(countryField) => (
+                        <CountrySelect
+                          value={countryField.state.value}
+                          onValueChange={(code) => {
+                            countryField.handleChange(code);
+                            // The number's validity depends on this, so its error
+                            // is re-evaluated here rather than waiting for
+                            // another blur on the number field.
+                            form.validateField("phoneNumber", "blur");
+                          }}
+                          showDialCode
+                          placeholder="Code"
+                        />
+                      )}
+                    </form.Field>
+                    <Input
+                      id="client-phone-number"
+                      type="tel"
+                      inputMode="tel"
+                      placeholder="Enter contact number"
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                    />
+                  </div>
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
               )}
             </form.Field>
+          </FormSection>
 
-            <form.Field
-              name="state"
-              validators={{
-                onBlur: ({ value }) => validateState(value),
-                onSubmit: ({ value }) => validateState(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-state">
-                    <RequiredMark /> State
-                  </FieldLabel>
-                  {/* A text input rather than a select: a country-by-country
+          {/* ── Address ──────────────────────────────────────────────────── */}
+          <FormSection value="address" title="Address">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.Field
+                name="country"
+                validators={{
+                  onChange: ({ value }) => validateCountry(value),
+                  onSubmit: ({ value }) => validateCountry(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-country">
+                      <RequiredMark /> Country
+                    </FieldLabel>
+                    <CountrySelect
+                      value={field.state.value}
+                      onValueChange={(code) => {
+                        field.handleChange(code);
+                        // A blank phone country is almost always the same country
+                        // as the address, so the first country chosen seeds it —
+                        // never overwriting a code already picked.
+                        if (!form.getFieldValue("phoneCountry") && dialCodeFor(code)) {
+                          form.setFieldValue("phoneCountry", code);
+                        }
+                      }}
+                      placeholder="Select country"
+                    />
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
+
+              <form.Field
+                name="state"
+                validators={{
+                  onBlur: ({ value }) => validateState(value),
+                  onSubmit: ({ value }) => validateState(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-state">
+                      <RequiredMark /> State
+                    </FieldLabel>
+                    {/* A text input rather than a select: a country-by-country
                       list of states/provinces is data this app doesn't hold,
                       and an empty select for the countries it lacks would be
                       worse than a field that always accepts the right answer. */}
-                  <Input
-                    id="client-state"
-                    placeholder="Enter state"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                  />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-          </div>
+                    <Input
+                      id="client-state"
+                      placeholder="Enter state"
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                    />
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
 
-          <form.Field
-            name="addressLine"
-            validators={{
-              onBlur: ({ value }) => validateAddress(value),
-              onSubmit: ({ value }) => validateAddress(value),
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="client-address">
-                  <RequiredMark /> Address
-                </FieldLabel>
-                <Textarea
-                  id="client-address"
-                  rows={2}
-                  placeholder="Enter street address"
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </Field>
-            )}
-          </form.Field>
-
-          <div className="grid gap-3 sm:grid-cols-2">
             <form.Field
-              name="city"
+              name="addressLine"
               validators={{
-                onBlur: ({ value }) => validateCity(value),
-                onSubmit: ({ value }) => validateCity(value),
+                onBlur: ({ value }) => validateAddress(value),
+                onSubmit: ({ value }) => validateAddress(value),
               }}
             >
               {(field) => (
                 <Field>
-                  <FieldLabel htmlFor="client-city">
-                    <RequiredMark /> City
+                  <FieldLabel htmlFor="client-address">
+                    <RequiredMark /> Address
                   </FieldLabel>
-                  <Input
-                    id="client-city"
-                    placeholder="Enter city"
+                  <Textarea
+                    id="client-address"
+                    rows={2}
+                    placeholder="Enter street address"
                     aria-invalid={field.state.meta.errors.length > 0}
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
@@ -518,96 +530,114 @@ function ClientFormBody({
               )}
             </form.Field>
 
-            <form.Field
-              name="zipcode"
-              validators={{
-                onBlur: ({ value }) => validateZipcode(value),
-                onSubmit: ({ value }) => validateZipcode(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-zipcode">
-                    <RequiredMark /> Zipcode
-                  </FieldLabel>
-                  {/* Not type="number": postcodes are alphanumeric in half the
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.Field
+                name="city"
+                validators={{
+                  onBlur: ({ value }) => validateCity(value),
+                  onSubmit: ({ value }) => validateCity(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-city">
+                      <RequiredMark /> City
+                    </FieldLabel>
+                    <Input
+                      id="client-city"
+                      placeholder="Enter city"
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                    />
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
+
+              <form.Field
+                name="zipcode"
+                validators={{
+                  onBlur: ({ value }) => validateZipcode(value),
+                  onSubmit: ({ value }) => validateZipcode(value),
+                }}
+              >
+                {(field) => (
+                  <Field>
+                    <FieldLabel htmlFor="client-zipcode">
+                      <RequiredMark /> Zipcode
+                    </FieldLabel>
+                    {/* Not type="number": postcodes are alphanumeric in half the
                       world (SW1A 1AA, K1P 5Z9), so this stays a text field. */}
+                    <Input
+                      id="client-zipcode"
+                      placeholder="Enter zipcode"
+                      aria-invalid={field.state.meta.errors.length > 0}
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                    />
+                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                  </Field>
+                )}
+              </form.Field>
+            </div>
+          </FormSection>
+
+          {/* ── Tax information ──────────────────────────────────────────── */}
+          <FormSection value="tax" title="GST (Optional)">
+            <form.Field name="gstin">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="client-gstin">GSTIN (Optional)</FieldLabel>
                   <Input
-                    id="client-zipcode"
-                    placeholder="Enter zipcode"
-                    aria-invalid={field.state.meta.errors.length > 0}
+                    id="client-gstin"
+                    placeholder="Enter GSTIN"
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
               )}
             </form.Field>
-          </div>
-        </FormSection>
+          </FormSection>
 
-        {/* ── Tax information ──────────────────────────────────────────── */}
-        <FormSection title="Tax information">
-          <form.Field name="gstin">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="client-gstin">
-                  GSTIN
-                  <OptionalMark />
-                </FieldLabel>
-                <Input
-                  id="client-gstin"
-                  placeholder="Enter GSTIN"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-              </Field>
-            )}
-          </form.Field>
-        </FormSection>
+          {/* ── Additional information ───────────────────────────────────── */}
+          <FormSection value="notes" title="Additional information (Optional)">
+            <form.Field name="notes">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="client-notes">Notes (Optional)</FieldLabel>
+                  <Textarea
+                    id="client-notes"
+                    rows={3}
+                    placeholder="Add notes about this client"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                </Field>
+              )}
+            </form.Field>
+          </FormSection>
 
-        {/* ── Additional information ───────────────────────────────────── */}
-        <FormSection title="Additional information">
-          <form.Field name="notes">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="client-notes">
-                  Notes
-                  <OptionalMark />
-                </FieldLabel>
-                <Textarea
-                  id="client-notes"
-                  rows={3}
-                  placeholder="Add notes about this client"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-              </Field>
-            )}
-          </form.Field>
-        </FormSection>
-
-        {/* ── Contract ─────────────────────────────────────────────────── */}
-        <FormSection title="Contract">
-          <form.Field name="contract">
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="client-contract">
-                  Contract
-                  <OptionalMark />
-                </FieldLabel>
-                <ClientContractUpload
-                  id="client-contract"
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                />
-              </Field>
-            )}
-          </form.Field>
-        </FormSection>
+          {/* ── Contract ─────────────────────────────────────────────────── */}
+          <FormSection value="contract" title="Contract (Optional)">
+            <form.Field name="contract">
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="client-contract">Contract (Optional)</FieldLabel>
+                  <ClientContractUpload
+                    id="client-contract"
+                    value={field.state.value}
+                    onChange={field.handleChange}
+                  />
+                </Field>
+              )}
+            </form.Field>
+          </FormSection>
+        </Accordion>
       </div>
 
       {/* ── Actions ──────────────────────────────────────────────────────
