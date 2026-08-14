@@ -61,6 +61,16 @@ export function McaV2Feature() {
     SETTLED_AMOUNT_BY_CURRENCY[settledCurrency] ??
     SETTLED_AMOUNT_BY_CURRENCY[DEFAULT_SETTLED_CURRENCY];
 
+  // Every region names its currency in the title except Rest of the World,
+  // which keeps the bare label: its `currency` is the display word "Dollar"
+  // rather than an ISO code — it receives dollars over SWIFT but needs a
+  // filter key distinct from the US account's "USD" (see
+  // multi-currency/mock-data.ts) — and "Settled amount in Dollar" doesn't read
+  // as a sentence the way "Settled amount in USD" does. The symbol on the
+  // figure below still says which unit the amount is in either way.
+  const settledTitle =
+    selectedAccount?.iso2 === "ROW" ? "Settled amount" : `Settled amount in ${settledCurrency}`;
+
   // Unique per mount so the settled-amount chart's fill gradient doesn't
   // collide with another <linearGradient> id elsewhere on the page.
   const settledGradientId = useId().replace(/:/g, "");
@@ -237,12 +247,9 @@ export function McaV2Feature() {
                     squeezed, the chart gives up width and the figure keeps
                     every pixel it needs. */}
                 <div className="flex-1 sm:basis-2/5">
-                  {/* No currency prefix: the symbol on the figure below
-                      already says which unit this is in, and the label would
-                      otherwise have to name currencies like the Rest of the
-                      World account's, whose value is a display word rather
-                      than a code that reads well in a sentence. */}
-                  <p className="text-sm font-semibold text-foreground">Settled amount</p>
+                  {/* Names the region's currency everywhere but Rest of the
+                      World — see settledTitle for why that one stays bare. */}
+                  <p className="text-sm font-semibold text-foreground">{settledTitle}</p>
 
                   {/* Same size and weight as OutstandingAmountCard's own
                       figure — the two headline numbers have to carry equal

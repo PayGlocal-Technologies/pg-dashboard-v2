@@ -337,16 +337,27 @@ function SkuItemFormBody({
                           <SelectTrigger
                             id="sku-currency"
                             aria-invalid={field.state.meta.errors.length > 0}
-                            className="w-full"
+                            // SelectTrigger already line-clamps its value span,
+                            // but a flex child defaults to min-width:auto and
+                            // so refuses to shrink below its content — which is
+                            // why "AED United Arab Emirates" was pushing past
+                            // the trigger in this third-width column instead of
+                            // clipping. min-w-0 lets that clamp take effect.
+                            className="w-full [&>span]:min-w-0"
                           >
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
                             {SKU_CURRENCY_OPTIONS.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
-                                <span className="flex items-center gap-2">
-                                  <span className="font-medium">{option.value}</span>
-                                  <span className="text-muted-foreground">{option.country}</span>
+                                {/* The code never truncates and the country
+                                    always does: whichever is dropped, the row
+                                    still has to identify the currency. */}
+                                <span className="flex min-w-0 items-center gap-2">
+                                  <span className="shrink-0 font-medium">{option.value}</span>
+                                  <span className="truncate text-muted-foreground">
+                                    {option.country}
+                                  </span>
                                 </span>
                               </SelectItem>
                             ))}

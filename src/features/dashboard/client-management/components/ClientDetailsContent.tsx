@@ -148,8 +148,11 @@ function ClientMetricCard({
   /** Optional supporting line directly below the figure. */
   caption?: string;
 }) {
+  // min-w-0 so the three cards can narrow with the column that holds them,
+  // rather than the row's min-content width becoming a floor that overflows it.
+  // Their labels wrap instead.
   return (
-    <Card size="sm" className="h-full w-full px-4 py-3.5">
+    <Card size="sm" className="h-full w-full min-w-0 px-4 py-3.5">
       <CardContent className="flex h-full flex-1 flex-col">
         <p className="text-[12px] text-muted-foreground">{label}</p>
         <p className="mt-1 flex items-baseline gap-1.5">
@@ -201,7 +204,10 @@ export function ClientInvoiceMetrics({
       <SectionTitle className={floatTitle ? "lg:absolute lg:-top-7 lg:left-0 lg:mb-0" : undefined}>
         Invoice summary
       </SectionTitle>
-      <div className="grid gap-4 sm:grid-cols-3">
+      {/* gap-3 at the widths where the main column is tightest, opening to
+          gap-4 from xl — the same proportional easing the grid's own column
+          gap uses. */}
+      <div className="grid gap-3 sm:grid-cols-3 xl:gap-4">
         <ClientMetricCard label="Total completed" value={metrics.total} />
         <ClientMetricCard label="Paid" value={metrics.paid} />
         {/* The one card carrying a caption: the count alone doesn't say how
@@ -354,13 +360,31 @@ export function ClientDetailsContent({
   // items-start keeps each column sized to its own content rather than
   // stretching to the taller one; below lg the grid collapses to a single
   // column already in the required order.
+  //
+  // The track sizing is `minmax(0,1fr) 20rem`, not `2fr 1fr`. Two things follow
+  // from that, both of them the point:
+  //
+  // - The details column is a fixed 20rem at every desktop width, so the
+  //   Contact card stops resizing as the viewport moves and its label/value
+  //   rows keep one stable measure. The main column takes whatever is left
+  //   after that column and the gap, growing and shrinking with the viewport
+  //   rather than holding a share of it.
+  // - The `0` minimum is what stops the transactions table forcing the grid
+  //   wider than its container. A grid track's implicit minimum is `auto` —
+  //   its content's intrinsic width — so a table needing ~800px would push the
+  //   whole row out, overflowing the page and squeezing the fixed column.
+  //   Flooring it at 0 lets the main column narrow past its content, and
+  //   DataTable's own overflow-x-auto takes over inside the table where the
+  //   scrolling belongs. min-w-0 on the two main-column items applies the same
+  //   floor to the grid items themselves, which default to min-width:auto for
+  //   the same reason.
   return (
-    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-y-12">
-      <div className="lg:col-start-1 lg:row-start-1">
+    <div className="grid gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-y-12 xl:gap-x-10">
+      <div className="min-w-0 lg:col-start-1 lg:row-start-1">
         <ClientIdentitySummary client={client} />
       </div>
 
-      <div className="space-y-8 lg:col-start-1 lg:row-start-2">
+      <div className="min-w-0 space-y-8 lg:col-start-1 lg:row-start-2">
         <ClientInvoiceMetrics client={client} floatTitle />
         {transactionsSlot}
       </div>
