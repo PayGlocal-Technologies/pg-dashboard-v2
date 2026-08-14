@@ -205,7 +205,9 @@ function SkuItemFormBody({
             {(field) => (
               <Field>
                 <FieldLabel htmlFor="sku-name">
-                  <RequiredMark /> Name
+                  {/* Names the field for both kinds of catalogue item; the
+                      table still shows it under the Product column. */}
+                  <RequiredMark /> Product/Service Name
                 </FieldLabel>
                 <Input
                   id="sku-name"
@@ -484,7 +486,10 @@ function PriceInput({
   };
 }) {
   return (
-    <InputGroup className="h-9 min-h-9">
+    // No height override: InputGroup's own h-11 is the same token Input and
+    // SelectTrigger use, so the three pricing controls line up with each other
+    // and with Product/Service Name and the tax code above them.
+    <InputGroup>
       {symbol && (
         <InputGroupText className="shrink-0 pl-3 text-[13px] font-medium text-foreground">
           {symbol}

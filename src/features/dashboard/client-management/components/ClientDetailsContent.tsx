@@ -169,12 +169,12 @@ export function ClientInvoiceMetrics({
   /**
    * Lifts the section heading out of the flow (from lg up, where the expanded
    * view's two columns exist), so this section's box is exactly the KPI row's
-   * box and the details column beside it starts level with the cards rather
-   * than with the heading above them. The same device, for the same reason, as
-   * the Transaction Details page's own `floatTitle` — an alternative to
-   * offsetting the neighbouring column, which would only be correct at one
-   * heading height. Below lg, and in the drawer's single column, the heading
-   * stays in normal flow.
+   * box and the row it sits in starts at the cards rather than at the heading
+   * above them. The same device, for the same reason, as the Transaction
+   * Details page's own `floatTitle` — an alternative to offsetting the
+   * neighbouring column, which would only ever be correct at one heading
+   * height. Below lg, and in the drawer's single column, the heading stays in
+   * normal flow.
    */
   floatTitle?: boolean;
 }) {
@@ -216,10 +216,22 @@ export function ClientInvoiceMetrics({
 // default's px-10 py-10); anything narrower would be an arbitrary override
 // rather than a Flux token.
 
-export function ClientContactSection({ client }: { client: Client }) {
+export function ClientContactSection({
+  client,
+  floatTitle = false,
+}: {
+  client: Client;
+  /** Lifts the heading out of the flow from lg up, so this section's box is
+   *  exactly its card's box and the card's top edge — not the heading above
+   *  it — lands level with the KPI cards across the grid. Same device, and
+   *  same offset, as ClientInvoiceMetrics' own floatTitle. */
+  floatTitle?: boolean;
+}) {
   return (
-    <section>
-      <SectionTitle>Contact</SectionTitle>
+    <section className={cn(floatTitle && "lg:relative")}>
+      <SectionTitle className={floatTitle ? "lg:absolute lg:-top-7 lg:left-0 lg:mb-0" : undefined}>
+        Contact
+      </SectionTitle>
       <Card size="sm">
         <CardContent className="space-y-4">
           <ClientDetailRow label="Primary contact" value={client.primaryContactName} />
@@ -301,46 +313,46 @@ export function ClientDetailsContent({
     );
   }
 
-  // 2/3 main + 1/3 details, with the left column's three blocks placed in
-  // explicit grid rows rather than stacked inside one div. That's what lets the
-  // details column start at row 2 — its top edge landing exactly on the KPI
-  // row's, since both are row 2 of the same grid and share its gap — instead of
-  // at the summary. Same technique (and same reason) as the Transaction Details
-  // page's own ROW_START/ROW_SPAN placement. It spans rows 2 and 3 so the
-  // grid's row-height algorithm can distribute its height across both rather
-  // than forcing it all into one.
+  // 2/3 main + 1/3 details, as a deliberately shallow two-row grid: the summary
+  // alone in row 1, then everything else side by side in row 2. Both row-2
+  // columns are single grid items that stack their own sections internally
+  // (space-y-8), rather than each section claiming a grid row of its own.
   //
-  // Below lg the grid collapses to a single column and the natural document
-  // order is already the required mobile order; items-start keeps every block
-  // sized to its own content instead of stretching to its row's tallest.
+  // That shape matters. When the details column spanned several rows, the grid
+  // distributed its height — Contact plus Account is tall — across every row it
+  // covered, inflating the KPI row and opening a gap between the cards and the
+  // Transactions heading below them. With one row, each column's height is its
+  // own content's, and neither can stretch the other.
   //
-  // gap-y-8 throughout: still far tighter than the transaction page's
-  // space-y-9, and wide enough for the Invoice summary heading to sit in the
-  // gap above its own row (see floatTitle below) with clearance from the
-  // summary above it. The heading ends up ~12px from the cards it labels and
-  // further from the block above, so it groups downward, with its section.
+  // Both row-2 columns lead with a floatTitle section, so the row starts at the
+  // KPI cards and the Contact card respectively, not at their headings: the two
+  // cards' top edges land on the same line, and the headings sit above it in
+  // the row gap. That gap is gap-y-12 from lg up — 48px, of which the floated
+  // heading occupies the lower 28px, leaving ~20px below the summary and ~12px
+  // above the cards, so each heading reads as belonging to the section under
+  // it. Below lg there is no float and no second column, so gap-y-8 is the
+  // whole story and the headings sit in normal flow.
+  //
+  // items-start keeps each column sized to its own content rather than
+  // stretching to the taller one; below lg the grid collapses to a single
+  // column already in the required order.
   return (
-    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[2fr_1fr] lg:items-start">
+    <div className="grid gap-x-10 gap-y-8 lg:grid-cols-[2fr_1fr] lg:items-start lg:gap-y-12">
       <div className="lg:col-start-1 lg:row-start-1">
         <ClientIdentitySummary client={client} />
       </div>
 
-      {/* floatTitle: this row's box is exactly the KPI cards' box, so the
-          details column starting at row 2 aligns with the cards themselves
-          rather than with the heading above them. */}
-      <div className="lg:col-start-1 lg:row-start-2">
+      <div className="space-y-8 lg:col-start-1 lg:row-start-2">
         <ClientInvoiceMetrics client={client} floatTitle />
+        {transactionsSlot}
       </div>
-
-      <div className="lg:col-start-1 lg:row-start-3">{transactionsSlot}</div>
 
       {/* Supporting detail, deliberately secondary to the column beside it:
           narrower, no KPI figures, and carrying only the two reference
           modules — the same role, and the same label-above-value fields, as
-          the Payment/Sender Details column on a transaction. Starts level with
-          the KPI cards, not with the summary. */}
-      <div className="space-y-6 lg:col-start-2 lg:row-start-2 lg:row-span-2">
-        <ClientContactSection client={client} />
+          the Payment/Sender Details column on a transaction. */}
+      <div className="space-y-8 lg:col-start-2 lg:row-start-2">
+        <ClientContactSection client={client} floatTitle />
         <ClientAccountSection client={client} />
       </div>
     </div>

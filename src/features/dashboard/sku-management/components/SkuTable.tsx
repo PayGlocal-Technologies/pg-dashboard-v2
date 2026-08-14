@@ -68,9 +68,6 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   const [archivedIds, setArchivedIds] = useState<Set<string>>(() => new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
 
-  // Which row's overflow menu is open, if any — hoisted here rather than held
-  // per row so only one can ever be open at a time.
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   // The product awaiting delete confirmation. Delete never acts on the first
   // click; it only ever sets this, and DeleteSkuDialog is what calls through.
   const [pendingDelete, setPendingDelete] = useState<SkuProduct | null>(null);
@@ -215,8 +212,6 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
     <SkuRowActions
       product={row}
       archived={showArchived}
-      open={openMenuId === row.id}
-      onOpenChange={(next) => setOpenMenuId(next ? row.id : null)}
       onEdit={onEditItem}
       onArchive={onArchiveItem}
       onUnarchive={onUnarchiveItem}
@@ -224,7 +219,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
     />
   );
 
-  const columns = buildSkuColumns(onPriceChange, renderRowActions);
+  const columns = buildSkuColumns(onPriceChange);
 
   const onSearch = (value: string) => {
     setSearch(value);
@@ -242,7 +237,6 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   const onToggleArchived = () => {
     setShowArchived((prev) => !prev);
     setPage(1);
-    setOpenMenuId(null);
   };
 
   const emptyTitle = showArchived ? "No archived products" : "No products found";
@@ -301,11 +295,12 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
         </Button>
       </div>
 
-      {/* Desktop (lg+): the full table. The overflow menu is the last column
-          (see buildSkuColumns) rather than DataTable's hover-revealed
-          `rowAction` overlay, so the trigger is an ordinary button in an
-          ordinary cell. The six data columns and their alignment are
-          unchanged. */}
+      {/* Desktop (lg+): the full table. The overflow menu rides `rowAction`,
+          not a column — DataTable renders that slot in a zero-width cell stuck
+          to the right edge of the viewport and reveals it on row hover. That's
+          what keeps it pinned right and reachable while the six data columns
+          scroll horizontally under it, out of their widths, and out of any
+          future column reordering. */}
       <DataTable
         className="hidden rounded-none border-0 lg:block"
         columns={columns}
@@ -313,6 +308,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
         rowKey={(row) => row.id}
+        rowAction={renderRowActions}
         pageSize={SKU_PAGE_LIMIT}
         totalRows={totalCount}
         page={safePage}
