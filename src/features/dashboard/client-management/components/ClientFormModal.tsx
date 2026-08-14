@@ -124,12 +124,14 @@ export function ClientFormModal({ open, onOpenChange, onSubmit }: ClientFormModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* Wider than the Add item dialog (34rem): this form has twice the
-          fields, and the extra width is what lets the paired fields sit two
-          across instead of the modal growing taller than the viewport. */}
+      {/* Exactly the Add item dialog's width (w-[min(100%-1.5rem,34rem)]), so
+          the two form modals open at the same size rather than this one being
+          the odd width in the product. The paired fields still sit two across
+          inside it; the form just runs taller, which the scrolling middle band
+          below already absorbs. */}
       <DialogContent
         className={cn(
-          "flex max-h-[min(90vh,52rem)] w-[min(100%-1.5rem,44rem)] max-w-none flex-col",
+          "flex max-h-[min(90vh,52rem)] w-[min(100%-1.5rem,34rem)] max-w-none flex-col",
           "gap-0 overflow-hidden rounded-2xl p-0"
         )}
       >
