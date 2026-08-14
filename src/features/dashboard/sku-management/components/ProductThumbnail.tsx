@@ -30,19 +30,28 @@ export function ProductThumbnail({
   product: SkuProduct;
   className?: string;
 }) {
+  // images[0] is the primary image by definition (see SkuProduct.images);
+  // anything beyond it belongs to the item's gallery, not this cell.
+  const primaryImage = product.images?.[0];
+
   return (
     <Avatar className={cn("h-[70px] w-[70px] rounded-lg", className)}>
-      {product.imageUrl ? (
+      {primaryImage ? (
         // object-cover: the photo fills the square edge to edge, cropping
         // whatever doesn't fit rather than letterboxing inside it. The white
         // ground is fixed rather than themed — it's photographic backdrop,
         // matching what's baked into the JPEGs and standing behind the
         // transparent PNGs, so the tile reads the same in either theme.
         <Image
-          src={product.imageUrl}
+          src={primaryImage}
           alt={product.name}
           width={THUMBNAIL_SIZE}
           height={THUMBNAIL_SIZE}
+          // Images added through the item form are object URLs, which the
+          // optimiser can't fetch — it resolves sources server-side and a
+          // blob: URL only exists in the tab that minted it. Catalogue images
+          // shipped under /assets still go through it.
+          unoptimized={primaryImage.startsWith("blob:")}
           className="h-full w-full bg-white object-cover"
         />
       ) : (

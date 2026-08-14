@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Badge, Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
@@ -16,10 +16,42 @@ import {
   SKU_VIEW_TABS,
   type SkuViewTab,
 } from "@/features/dashboard/sku-management/constants";
+import { SkuItemFormModal } from "@/features/dashboard/sku-management/components/SkuItemFormModal";
 import { MOCK_SKU_PRODUCTS } from "@/features/dashboard/sku-management/mock-data";
-import type { SkuPriceField, SkuProduct } from "@/features/dashboard/sku-management/types";
+import { toSkuProductFields } from "@/features/dashboard/sku-management/schemas";
+import type {
+  SkuItemFormValues,
+  SkuPriceField,
+  SkuProduct,
+} from "@/features/dashboard/sku-management/types";
 
-export function SkuTable() {
+interface SkuTableProps {
+  /** Owned by the page, because the "Add item" button that opens it lives in
+   *  the page header while every row this creates lives down here. */
+  addItemOpen: boolean;
+  onAddItemOpenChange: (open: boolean) => void;
+}
+
+/** Turns a saved product back into form values, so Edit opens pre-filled with
+ *  exactly what the row holds. The inverse of toSkuProductFields. */
+function toFormValues(product: SkuProduct): SkuItemFormValues {
+  return {
+    name: product.name,
+    type: product.type,
+    hsnSac: product.hsnSac,
+    currency: product.currency,
+    sellingPrice: String(product.sellingPrice),
+    productCost: String(product.productCost),
+    description: product.description,
+    images: (product.images ?? []).map((url, index) => ({
+      id: `${product.id}-image-${index}`,
+      url,
+      name: `${product.name} image ${index + 1}`,
+    })),
+  };
+}
+
+export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   const [tab, setTab] = useState<SkuViewTab>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -43,6 +75,20 @@ export function SkuTable() {
   // click; it only ever sets this, and DeleteSkuDialog is what calls through.
   const [pendingDelete, setPendingDelete] = useState<SkuProduct | null>(null);
 
+  // Items created through the Add item form, newest first so a merchant sees
+  // what they just added at the top rather than hunting for it. Prepended to
+  // the catalogue rather than merged into it, for the same reason the override
+  // maps are kept separate: MOCK_SKU_PRODUCTS stands in for a server response.
+  const [createdItems, setCreatedItems] = useState<SkuProduct[]>([]);
+  // Field edits from the item form, keyed by id — the same layering as
+  // priceOverrides, which stays independent so an inline price edit and a form
+  // edit don't clobber one another.
+  const [itemEdits, setItemEdits] = useState<Record<string, Partial<SkuProduct>>>({});
+  // The product being edited, or null when the form is in Add mode.
+  const [editing, setEditing] = useState<SkuProduct | null>(null);
+  // Ids are minted per session; a real create endpoint returns the id instead.
+  const nextIdRef = useRef(0);
+
   // Inline price edits, keyed by product id and layered over the source rows
   // below — the same shape McaTransactionTable uses for its optimistic status
   // overrides. Held separately rather than by cloning the catalogue into
@@ -55,9 +101,16 @@ export function SkuTable() {
 
   const query = search.trim().toLowerCase();
 
-  const sourceRows = MOCK_SKU_PRODUCTS.map((product) =>
-    priceOverrides[product.id] ? { ...product, ...priceOverrides[product.id] } : product
-  );
+  // Three layers over the catalogue, applied in order: newly created items
+  // sit in front of it, form edits replace whole fields, and inline price
+  // edits are applied last so the figure showing in the table is always the
+  // most recent thing the merchant typed, whichever control they typed it in.
+  const sourceRows = [...createdItems, ...MOCK_SKU_PRODUCTS].map((product) => {
+    const edits = itemEdits[product.id];
+    const prices = priceOverrides[product.id];
+    if (!edits && !prices) return product;
+    return { ...product, ...edits, ...prices };
+  });
 
   // Tab and search both narrow the same list, and both reset paging (below),
   // so this is derived during render rather than held in state. There is no
@@ -100,11 +153,43 @@ export function SkuTable() {
     setPriceOverrides((prev) => ({ ...prev, [id]: { ...prev[id], [field]: next } }));
   };
 
-  // TODO: open the item editor once one exists. There is no create/edit form
-  // on this page yet — "Add item" and "Import" are the same stub — so this is
-  // deliberately inert rather than wired to a half-built flow.
+  // Opens the same form the Add item button does, pre-filled from the row.
+  // Setting `editing` is what switches the modal into edit mode.
   const onEditItem = (product: SkuProduct) => {
-    void product;
+    setEditing(product);
+    onAddItemOpenChange(true);
+  };
+
+  // Both Add item and Save and add another land here; `keepOpen` is the only
+  // difference between them, and the modal itself handles resetting the form.
+  const onSubmitItem = (values: SkuItemFormValues, keepOpen: boolean) => {
+    const fields = toSkuProductFields(values);
+    // Null means validation didn't pass. The form gates submission on the same
+    // check, so this is a guard rather than a path the UI can reach.
+    if (!fields) return;
+
+    if (editing) {
+      setItemEdits((prev) => ({ ...prev, [editing.id]: fields }));
+      setEditing(null);
+      onAddItemOpenChange(false);
+      return;
+    }
+
+    setCreatedItems((prev) => [
+      { id: `sku-new-${nextIdRef.current++}`, ...fields },
+      ...prev,
+    ]);
+    // A new item belongs in the active list, so leave the archived view and
+    // reset paging — otherwise it lands on a page the merchant isn't looking
+    // at and the form appears to have done nothing.
+    setShowArchived(false);
+    setPage(1);
+    if (!keepOpen) onAddItemOpenChange(false);
+  };
+
+  const closeItemForm = (open: boolean) => {
+    if (!open) setEditing(null);
+    onAddItemOpenChange(open);
   };
 
   const onArchiveItem = (product: SkuProduct) => {
@@ -257,6 +342,16 @@ export function SkuTable() {
         product={pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         onConfirm={onConfirmDelete}
+      />
+
+      {/* One form serving both Add and Edit — the field model is the same, so
+          `editing` is the only thing that distinguishes them. */}
+      <SkuItemFormModal
+        open={addItemOpen}
+        onOpenChange={closeItemForm}
+        mode={editing ? "edit" : "add"}
+        initialValues={editing ? toFormValues(editing) : undefined}
+        onSubmit={onSubmitItem}
       />
     </div>
   );
