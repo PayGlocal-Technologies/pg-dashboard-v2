@@ -74,28 +74,6 @@ export const CLIENT_CONTRACT_ACCEPTED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
 
-/**
- * Initials for a business's avatar: the first letter of each of the first two
- * words ("Acme Exports Pvt Ltd" → "AE", "Northwind Trading Co." → "NT"), or a
- * single letter when the name is one word. Deliberately the first two *words*
- * rather than first and last, which is right for people (see the sidebar's own
- * profileInitials) but would turn "Acme Exports Pvt Ltd" into "AL" — the
- * suffix, not the business.
- *
- * Punctuation-only tokens are skipped so a name like "Maple & Birch Studio"
- * reads "MB" instead of "M&".
- */
-export function businessInitials(businessName: string): string {
-  const words = businessName
-    .split(/\s+/)
-    .map((word) => word.replace(/[^\p{L}\p{N}]/gu, ""))
-    .filter(Boolean);
-  if (words.length === 0) return "";
-  return words
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("");
-}
 
 /** Rows per page in the Client Details view's transactions section. Smaller
  *  than the Transactions page's own limit: this is one client's recent

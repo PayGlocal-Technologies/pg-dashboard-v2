@@ -1,9 +1,8 @@
 "use client";
 
-import { Avatar, AvatarFallback, Button, EmptyState, Shimmer } from "@/components/ui";
+import { Button, EmptyState, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { businessInitials } from "@/features/dashboard/client-management/constants";
 import { formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
@@ -12,7 +11,6 @@ function ClientCardSkeleton() {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center gap-2">
-        <Shimmer className="h-7 w-7" rounded="full" />
         <Shimmer className="h-4 w-40" />
         {/* Matches CountryFlag's own 20×14 rectangle, not a circle. */}
         <Shimmer className="ml-auto h-3.5 w-5" rounded="sm" />
@@ -43,17 +41,12 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
       }}
       className="flex cursor-pointer flex-col rounded-xl border border-border bg-card px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
     >
-      {/* Primary row: the same avatar the Business name column now leads with,
-          then the business name, then the flag trailing as the country marker.
-          No outstanding figure — this card is the table's own responsive form,
-          and Outstanding is gone from the table. min-w-0 on the name so a long
-          one truncates rather than pushing the flag off the card. */}
+      {/* Primary row: the business name, then the flag trailing as the country
+          marker. No avatar, matching the Business name column this card is the
+          responsive form of, and no outstanding figure, matching the column the
+          table no longer has. min-w-0 on the name so a long one truncates
+          rather than pushing the flag off the card. */}
       <div className="flex items-center gap-2">
-        <Avatar className="h-7 w-7">
-          <AvatarFallback className="text-[10px]">
-            {businessInitials(row.businessName)}
-          </AvatarFallback>
-        </Avatar>
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">
           {row.businessName}
         </span>
