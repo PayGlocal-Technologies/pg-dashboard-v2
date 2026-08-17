@@ -2,9 +2,8 @@
 
 import { Button, EmptyState, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
-import { clientAmountLocale } from "@/features/dashboard/client-management/constants";
-import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
 
@@ -12,9 +11,9 @@ function ClientCardSkeleton() {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center gap-2">
-        <Shimmer className="h-7 w-7" rounded="full" />
         <Shimmer className="h-4 w-40" />
-        <Shimmer className="ml-auto h-4 w-20" />
+        {/* Matches CountryFlag's own 20×14 rectangle, not a circle. */}
+        <Shimmer className="ml-auto h-3.5 w-5" rounded="sm" />
       </div>
       <Shimmer className="mt-2 h-3 w-28" />
       <Shimmer className="mt-1.5 h-3 w-44" />
@@ -29,8 +28,6 @@ function ClientCardSkeleton() {
 // inside later must stop propagation in its own onClick to stay independent
 // of that, the same rule the Transactions card follows.
 function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: Client) => void }) {
-  const isSettled = row.outstandingAmount === 0;
-
   return (
     <div
       role="button"
@@ -44,31 +41,16 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
       }}
       className="flex cursor-pointer flex-col rounded-xl border border-border bg-card px-4 py-3.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
     >
-      {/* Primary row: flag, business name, and the outstanding balance pushed
-          to the far right — the two things a merchant scans a client list for,
-          on the same line. min-w-0 on the name so a long one truncates instead
-          of pushing the figure off the card. */}
+      {/* Primary row: the business name, then the flag trailing as the country
+          marker. No avatar, matching the Business name column this card is the
+          responsive form of, and no outstanding figure, matching the column the
+          table no longer has. min-w-0 on the name so a long one truncates
+          rather than pushing the flag off the card. */}
       <div className="flex items-center gap-2">
-        <CountryFlagAvatar
-          iso2={row.countryIso2}
-          countryName={row.countryName}
-          className="h-7 w-7 shrink-0"
-        />
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">
           {row.businessName}
         </span>
-        <span
-          className={cn(
-            "shrink-0 text-[14px] tabular-nums",
-            isSettled ? "text-muted-foreground" : "font-semibold text-foreground"
-          )}
-        >
-          {formatCurrency(
-            row.outstandingAmount,
-            row.outstandingCurrency,
-            clientAmountLocale(row.outstandingCurrency)
-          )}
-        </span>
+        <CountryFlag iso2={row.countryIso2} alt={row.countryName} />
       </div>
 
       {/* Contact block: who to talk to, then how. The name carries foreground

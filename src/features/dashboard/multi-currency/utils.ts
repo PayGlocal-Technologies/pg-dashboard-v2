@@ -116,6 +116,22 @@ export function currencyDisplayName(currencyCode: string): string {
   return name.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+/**
+ * The two identifiers the client-facing email lists as "Account Number / IBAN"
+ * and "Routing Code".
+ *
+ * `details` is ordered per region and doesn't always lead with the account
+ * number — Rest of the World's SWIFT account lists its BIC first — so the
+ * account identifier is matched by label rather than taken from a fixed index,
+ * and whatever's left over is the routing code. Both come back possibly
+ * undefined: a region could in principle carry only one identifier.
+ */
+export function splitAccountIdentifiers(account: VirtualAccount) {
+  const accountNumber = account.details.find((d) => /iban|account number/i.test(d.label));
+  const routingCode = account.details.find((d) => d !== accountNumber);
+  return { accountNumber, routingCode };
+}
+
 /** Plain-text block of every field in the expanded details section. */
 export function formatFullAccount(account: VirtualAccount) {
   const lines = [

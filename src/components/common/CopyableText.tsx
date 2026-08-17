@@ -28,6 +28,16 @@ interface CopyableTextProps {
    *  text-foreground, e.g. text-muted-foreground for a secondary/subordinate
    *  placement (see TransactionDetailsDrawer's header). */
   valueClassName?: string;
+  /**
+   * "inline" variant only: keeps the copy button invisible until the row (or
+   * whatever `group` ancestor holds it) is hovered, or the button itself is
+   * focused. For table cells, where a permanently visible icon on every row
+   * would be noise. Opacity only — the button keeps its space, so revealing it
+   * never shifts the row.
+   *
+   * Pointer-coarse devices have no hover to give, so it stays visible there.
+   */
+  revealOnHover?: boolean;
 }
 
 export function CopyableText({
@@ -36,10 +46,15 @@ export function CopyableText({
   className,
   variant = "inline",
   valueClassName,
+  revealOnHover = false,
 }: CopyableTextProps) {
   const [copied, setCopied] = useState(false);
 
-  const handleCopy = async () => {
+  // Takes the event so it can stop it: this control is often rendered inside a
+  // clickable row (see RowClick), and copying a value is never also a request
+  // to open the record it belongs to.
+  const handleCopy = async (e?: { stopPropagation: () => void }) => {
+    e?.stopPropagation();
     await navigator.clipboard.writeText(value);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -109,7 +124,15 @@ export function CopyableText({
               size="sm"
               aria-label={copied ? "Copied to clipboard" : `Copy ${value}`}
               onClick={handleCopy}
-              className="h-auto min-h-0 w-auto shrink-0 p-1 text-muted-foreground hover:text-foreground"
+              className={cn(
+                "h-auto min-h-0 w-auto shrink-0 p-1 text-muted-foreground hover:text-foreground",
+                revealOnHover && [
+                  "opacity-0 transition-opacity",
+                  "group-hover:opacity-100 focus-visible:opacity-100",
+                  // No hover to wait for on a touch device, so it simply shows.
+                  "[@media(hover:none)]:opacity-100",
+                ]
+              )}
             >
               <Icon name={copied ? "check" : "copy"} className="w-3 h-3" />
             </Button>

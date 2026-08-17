@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DataTable } from "@/components/ui";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import {
   CountryFilterChip,
   DateFilterChip,
@@ -15,14 +16,46 @@ import { reorderColumns } from "@/lib/utils/columns";
 import { buildClientColumns } from "@/features/dashboard/client-management/columns";
 import { ClientCardList } from "@/features/dashboard/client-management/components/ClientCardList";
 import { ClientDetailsDrawer } from "@/features/dashboard/client-management/components/ClientDetailsDrawer";
+import { ClientDetailsPage } from "@/features/dashboard/client-management/components/ClientDetailsPage";
+import { ClientFormModal } from "@/features/dashboard/client-management/components/ClientFormModal";
+import { toClientFields } from "@/features/dashboard/client-management/schemas";
+import type { Client, ClientFormValues } from "@/features/dashboard/client-management/types";
 import {
   CLIENT_PAGE_LIMIT,
   CLIENT_SEARCH_HINTS,
   clientCountryOptions,
+  currencyForCountry,
 } from "@/features/dashboard/client-management/constants";
 import { MOCK_CLIENTS } from "@/features/dashboard/client-management/mock-data";
 
-export function ClientTable() {
+// Sets scrollTop via a standalone function (rather than inline in a handler)
+// since the element comes from useContentAreaElement, and React Compiler's
+// lint forbids mutating a hook-returned value directly. Same helper, same
+// reason, as McaTransactionTable's.
+function restoreScrollTop(el: HTMLElement, value: number): void {
+  el.scrollTop = value;
+}
+
+interface ClientTableProps {
+  /** Owned by the page, because the "Add client" button that opens it lives in
+   *  the page header while every row this creates lives down here. */
+  addClientOpen: boolean;
+  onAddClientOpenChange: (open: boolean) => void;
+}
+
+export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTableProps) {
+  const contentEl = useContentAreaElement();
+  const [scrollPosition, setScrollPosition] = useState(0);
+
+  // Clients created through the Add client form, newest first. Layered over
+  // MOCK_CLIENTS rather than merged into it, the same arrangement SkuTable
+  // uses for created items: once a real endpoint replaces the mock book, this
+  // becomes the pending-write set rather than a divergent copy of the data.
+  const [createdClients, setCreatedClients] = useState<Client[]>([]);
+  // Counter, not Math.random/Date.now — both are barred during render and this
+  // only ever increments inside the submit handler anyway.
+  const nextClientIdRef = useRef(0);
+
   const [search, setSearch] = useState("");
   const [emailFilter, setEmailFilter] = useState("");
   const [countryFilters, setCountryFilters] = useState<string[]>([]);
@@ -36,11 +69,20 @@ export function ClientTable() {
   // so opening one closes whichever other one was open.
   const [openChip, setOpenChip] = useState<"email" | "country" | "date" | null>(null);
 
-  // The client whose details panel is open. Held as an id (not the row) so it
-  // survives the source list changing underneath it once a real endpoint
-  // replaces MOCK_CLIENTS.
+  // The client whose details are being viewed. Held as an id (not the row) so
+  // it survives the source list changing underneath it once a real endpoint
+  // replaces MOCK_CLIENTS. The drawer and the expanded page are two
+  // presentations of that same selection, so they share it: drawerOpen and
+  // detailsOpen are mutually exclusive — a row click opens the drawer, and
+  // Expand hands the same client off to the page.
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  // Set only when Expand was pressed on a transaction inside the client
+  // drawer: the client expands to its full page and that transaction opens
+  // expanded there, since a drawer has nowhere to show a full-page
+  // transaction. Null for an ordinary client expand.
+  const [expandTxnId, setExpandTxnId] = useState<string | null>(null);
 
   const query = search.trim().toLowerCase();
   const emailQuery = emailFilter.trim().toLowerCase();
@@ -55,7 +97,11 @@ export function ClientTable() {
   // in state. Swapping in a real query means replacing the source array and
   // moving these predicates into the request body — the table itself doesn't
   // change.
-  const filteredRows = MOCK_CLIENTS.filter((client) => {
+  // Newly created clients lead the book, so one just added is the first row
+  // rather than buried wherever the seeded order would have put it.
+  const sourceRows = [...createdClients, ...MOCK_CLIENTS];
+
+  const filteredRows = sourceRows.filter((client) => {
     // Matches any of the three fields the placeholder cycles through
     // (CLIENT_SEARCH_HINTS), the same way the Transactions search spans
     // remitter/transaction ID/UTR: one box, no mode to pick, a hit on any of
@@ -88,16 +134,96 @@ export function ClientTable() {
   const safePage = Math.min(page, totalPages);
   const pageRows = filteredRows.slice((safePage - 1) * CLIENT_PAGE_LIMIT, safePage * CLIENT_PAGE_LIMIT);
 
-  const detailsRow = MOCK_CLIENTS.find((c) => c.id === detailsId) ?? null;
+  const detailsRow = sourceRows.find((c) => c.id === detailsId) ?? null;
 
   // The Country chip offers only countries the merchant actually has clients
   // in, so it can never narrow to an empty table (see clientCountryOptions).
-  const countryOptions = clientCountryOptions(MOCK_CLIENTS);
+  // Built from sourceRows, so a client added in a country nobody else is in
+  // brings its own filter option with it.
+  const countryOptions = clientCountryOptions(sourceRows);
 
+  // Both Add client and Save and add another land here; `keepOpen` is the only
+  // difference between them, and the modal itself handles resetting the form.
+  const onSubmitClient = (values: ClientFormValues, keepOpen: boolean) => {
+    const fields = toClientFields(values);
+    // Null means validation didn't pass. The form gates submission on the same
+    // check, so this is a guard rather than a path the UI can reach.
+    if (!fields) return;
+
+    setCreatedClients((prev) => [
+      {
+        id: `cli-new-${nextClientIdRef.current++}`,
+        ...fields,
+        // A brand-new client has no billing history yet: nothing outstanding
+        // and no invoices raised. The currency is only the denomination those
+        // zeroes are shown in, and follows the client's own country.
+        outstandingAmount: 0,
+        outstandingCurrency: currencyForCountry(fields.countryIso2),
+        totalInvoices: 0,
+        paidInvoices: 0,
+      },
+      ...prev,
+    ]);
+    // Otherwise the new row can land outside the current filters or on a page
+    // the merchant isn't looking at, and the form appears to have done nothing.
+    setSearch("");
+    setEmailFilter("");
+    setCountryFilters([]);
+    setDateRange({ from: "", to: "" });
+    setPage(1);
+    if (!keepOpen) onAddClientOpenChange(false);
+  };
+
+  // Clicking a row opens the drawer, not the full page. The table stays
+  // mounted underneath it, so filters, paging, and scroll are untouched for
+  // the whole time the drawer is open and after it closes.
   const openDetails = (row: { id: string }) => {
     setDetailsId(row.id);
     setDrawerOpen(true);
   };
+
+  // Expand hands the drawer's current client off to the full page. detailsId
+  // already holds that selection, so the page renders exactly what the drawer
+  // was showing. The table's scroll position is captured here (rather than
+  // when the drawer opened) because this is the point the table actually
+  // leaves the screen and Back has to restore it.
+  const expandToPage = (client: { id: string }) => {
+    if (contentEl) setScrollPosition(contentEl.scrollTop);
+    setDetailsId(client.id);
+    setExpandTxnId(null);
+    setDrawerOpen(false);
+    setDetailsOpen(true);
+  };
+
+  // Same expand, plus the transaction the drawer was showing, so it opens
+  // expanded on the client's page rather than the action doing nothing from
+  // inside a drawer.
+  const expandToPageWithTransaction = (client: { id: string }, transaction: { gid: string }) => {
+    if (contentEl) setScrollPosition(contentEl.scrollTop);
+    setDetailsId(client.id);
+    setExpandTxnId(transaction.gid);
+    setDrawerOpen(false);
+    setDetailsOpen(true);
+  };
+
+  // Collapse reverses Expand: closes the full page and reopens the same client
+  // in the drawer. Deliberately doesn't touch detailsId, so whichever client
+  // was showing stays showing, and the scroll-restore effect below puts the
+  // table back where expandToPage found it.
+  const collapseToDrawer = () => {
+    setDetailsOpen(false);
+    setDrawerOpen(true);
+  };
+
+  // Restores the table's scroll position after the details page unmounts and
+  // the table re-renders in its place — deferred to an effect (rather than set
+  // inline in the handler) so it runs after the table's own content is back in
+  // the DOM, not while the details page is still on screen.
+  useEffect(() => {
+    if (!detailsOpen && contentEl) {
+      restoreScrollTop(contentEl, scrollPosition);
+    }
+  }, [detailsOpen, contentEl, scrollPosition]);
 
   const baseColumns = buildClientColumns(openDetails);
   const columns = reorderColumns(baseColumns, columnOrder);
@@ -150,6 +276,21 @@ export function ClientTable() {
       />
     </>
   );
+
+  // The details page replaces the table in place (same component instance,
+  // same closed-over search/filter/page state) rather than overlaying it —
+  // this is what makes Back restore the table's previous state for free, the
+  // same arrangement McaTransactionTable uses for transactions.
+  if (detailsOpen && detailsRow) {
+    return (
+      <ClientDetailsPage
+        client={detailsRow}
+        onBack={() => setDetailsOpen(false)}
+        onCollapse={collapseToDrawer}
+        initialTransactionId={expandTxnId}
+      />
+    );
+  }
 
   return (
     // Search/filters and the table share one bordered surface, matching the
@@ -242,7 +383,19 @@ export function ClientTable() {
 
       {/* Rendered alongside the table (not in place of it) so closing it leaves
           the table's search, filters, and page exactly as they were. */}
-      <ClientDetailsDrawer row={detailsRow} open={drawerOpen} onOpenChange={setDrawerOpen} />
+      <ClientDetailsDrawer
+        client={detailsRow}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        onExpand={expandToPage}
+        onExpandTransaction={expandToPageWithTransaction}
+      />
+
+      <ClientFormModal
+        open={addClientOpen}
+        onOpenChange={onAddClientOpenChange}
+        onSubmit={onSubmitClient}
+      />
     </div>
   );
 }

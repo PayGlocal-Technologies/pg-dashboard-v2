@@ -14,15 +14,27 @@ interface RegionSelectorProps {
   /** Accessible name for the list, e.g. "Select a region to preview". */
   label: string;
   /** Row height. `"sm"` for the compact list embedded in the share modal,
-   *  `"md"` where the list is the page's own primary control. */
+   *  `"md"` where the list is the page's own primary control. Ignored by the
+   *  `"cards"` variant, whose height comes from its own padding. */
   size?: ButtonProps["size"];
+  /**
+   * How the regions are laid out.
+   *
+   * - `"list"` (default) — a vertical stack of rows, for a fixed-width column
+   *   or the share modal's preview.
+   * - `"cards"` — a horizontally scrolling row of flag-over-name tiles, for
+   *   narrow viewports where a full-height vertical list would push the
+   *   account details far below the fold.
+   */
+  variant?: "list" | "cards";
   className?: string;
 }
 
 /**
- * Vertical list of receiving regions, one row per account, exactly one
- * selected. Lifted verbatim out of ShareAccountDetailsModal's embedded preview
- * so the MCA v2 page and that modal render the same rows rather than each
+ * The receiving regions, exactly one selected — a vertical list of rows by
+ * default, or a horizontally scrolling row of tiles under `variant="cards"`.
+ * Lifted verbatim out of ShareAccountDetailsModal's embedded preview so the
+ * MCA v2 page and that modal render the same rows rather than each
  * hand-rolling a list — flag, region name, and a chevron marking the selected
  * row.
  *
@@ -43,8 +55,64 @@ export function RegionSelector({
   onSelect,
   label,
   size = "sm",
+  variant = "list",
   className,
 }: RegionSelectorProps) {
+  if (variant === "cards") {
+    return (
+      // p-1 (4px, uniform) for the same reason VirtualAccountList carries it:
+      // overflow-x-auto also clips the vertical axis per the CSS overflow
+      // spec, so without a small inset this would shave the selected tile's
+      // ring and every tile's rounded corners.
+      <div
+        className={cn("scrollbar-none flex gap-3 overflow-x-auto p-1", className)}
+        role="list"
+        aria-label={label}
+      >
+        {accounts.map((account) => {
+          const isSelected = account.id === selectedAccountId;
+          return (
+            <Button
+              key={account.id}
+              type="button"
+              role="listitem"
+              aria-current={isSelected}
+              // Inverted against the list variant's pairing, because the
+              // surface underneath is: these tiles sit on the page itself, so
+              // the selected one lifts off it in card white with a primary
+              // ring while the resting ones stay filled. In the list variant
+              // the rows sit on a white Card, where that would read as a
+              // nested card instead of a selection.
+              variant={isSelected ? "outline" : "secondary"}
+              // flux-ui's Button lays leftIcon / label / rightIcon out as
+              // three direct flex children; flex-col is what stacks the flag
+              // above the region name. h-auto/min-h-0 drop the size variant's
+              // fixed row height so the padding here defines the tile instead.
+              className={cn(
+                "h-auto min-h-0 w-36 shrink-0 flex-col items-start gap-3 rounded-xl px-4 py-4",
+                "[&>span]:w-full [&>span]:truncate [&>span]:text-left",
+                isSelected && "border-primary font-semibold text-primary ring-1 ring-primary"
+              )}
+              leftIcon={
+                <CountryFlagAvatar
+                  iso2={account.iso2}
+                  countryName={account.countryName}
+                  className="h-6 w-8 rounded-md"
+                />
+              }
+              // No chevron: it points rightward at the details panel a row
+              // drives, which is only true of the list variant sitting beside
+              // that panel. Here the details sit below, not to the side.
+              onClick={() => onSelect(account)}
+            >
+              {account.countryName}
+            </Button>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className={cn("space-y-1", className)} role="list" aria-label={label}>
       {accounts.map((account) => {
