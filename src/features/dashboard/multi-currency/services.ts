@@ -14,7 +14,9 @@ export const mcaVirtualAccountsApi = (merchantId: string) =>
 
 /** Real-time exchange rates for one currency and amount. */
 export const mcaExchangeRatesApi = (merchantId: string, currency: string, amount: number) =>
-  merchantId && currency ? `${BASE_URL_V3}/merchants/${merchantId}/exchange-rates/${currency}/${amount}` : "";
+  merchantId && currency
+    ? `${BASE_URL_V3}/merchants/${merchantId}/exchange-rates/${currency}/${amount}`
+    : "";
 
 /**
  * Leg 1 of the proof-of-account-ownership download: asks the backend to start
@@ -23,12 +25,16 @@ export const mcaExchangeRatesApi = (merchantId: string, currency: string, amount
  * accountDocumentId in @/features/dashboard/multi-currency/utils.
  */
 export const mcaAccountConfirmationApi = (merchantId: string, accountId: string) =>
-  merchantId && accountId ? `${BASE_URL_V1}/merchants/${merchantId}/account-confirmation/${accountId}` : "";
+  merchantId && accountId
+    ? `${BASE_URL_V1}/merchants/${merchantId}/account-confirmation/${accountId}`
+    : "";
 
 /** Leg 1 of the bank settlement statement download. Same two-leg shape as
  *  mcaAccountConfirmationApi above, and the same SHA-256 accountId. */
 export const mcaBankStatementApi = (merchantId: string, accountId: string) =>
-  merchantId && accountId ? `${BASE_URL_V1}/merchants/${merchantId}/bank-statement/${accountId}` : "";
+  merchantId && accountId
+    ? `${BASE_URL_V1}/merchants/${merchantId}/bank-statement/${accountId}`
+    : "";
 
 /** Leg 2, shared by both downloads: POST the descriptor from leg 1 until the
  *  response carries a `url`. Generation is asynchronous, so this is polled. */

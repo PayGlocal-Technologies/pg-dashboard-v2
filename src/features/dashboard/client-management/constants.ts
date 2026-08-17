@@ -24,6 +24,99 @@ export function clientAmountLocale(currency: string): string {
 }
 
 /**
+ * The business types the Add client form offers. A flat list of display
+ * strings, not coded values: nothing downstream branches on the type, it's
+ * recorded and shown back, so a code would only be a second thing to keep in
+ * step with its own label.
+ */
+export const CLIENT_BUSINESS_TYPES = [
+  "Company",
+  "Partnership",
+  "Sole proprietorship",
+  "LLP",
+  "Other",
+] as const;
+
+/**
+ * The currency a client's balance is denominated in, by country. Covers the
+ * currencies the merchant actually holds a receiving account for; everywhere
+ * else settles in USD over SWIFT, which is what the fallback says.
+ *
+ * Only consulted when a client is created through the form — a seeded client
+ * carries its own currency — so this decides the denomination of a zero
+ * balance, not the conversion of a real one.
+ */
+const COUNTRY_CURRENCY: Record<string, string> = {
+  US: "USD",
+  GB: "GBP",
+  CA: "CAD",
+  AU: "AUD",
+  NZ: "AUD",
+  SG: "SGD",
+  AE: "AED",
+  // Euro area — the countries the single EUR account receives for.
+  AT: "EUR",
+  BE: "EUR",
+  HR: "EUR",
+  CY: "EUR",
+  EE: "EUR",
+  FI: "EUR",
+  FR: "EUR",
+  DE: "EUR",
+  GR: "EUR",
+  IE: "EUR",
+  IT: "EUR",
+  LV: "EUR",
+  LT: "EUR",
+  LU: "EUR",
+  MT: "EUR",
+  NL: "EUR",
+  PT: "EUR",
+  SK: "EUR",
+  SI: "EUR",
+  ES: "EUR",
+};
+
+export function currencyForCountry(countryIso2: string): string {
+  return COUNTRY_CURRENCY[countryIso2.toUpperCase()] ?? "USD";
+}
+
+/** Cap on the contract upload, matching the invoice upload's own limit. */
+export const CLIENT_CONTRACT_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+
+/** What a client contract can be filed as. */
+export const CLIENT_CONTRACT_ACCEPTED_MIME_TYPES = [
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+] as const;
+
+/** Rows per page in the Client Details view's transactions section. Smaller
+ *  than the Transactions page's own limit: this is one client's recent
+ *  activity inside a details view, not the full transaction list. */
+export const CLIENT_TRANSACTIONS_PAGE_LIMIT = 5;
+
+export interface ClientInvoiceMetrics {
+  total: number;
+  paid: number;
+  outstanding: number;
+}
+
+/**
+ * The three figures the Client Details view's KPI row shows. Outstanding is
+ * derived here rather than stored on the client (see Client.paidInvoices), so
+ * the three can never contradict each other, and clamped at zero so a bad
+ * record can't render a negative count.
+ */
+export function clientInvoiceMetrics(client: Client): ClientInvoiceMetrics {
+  return {
+    total: client.totalInvoices,
+    paid: client.paidInvoices,
+    outstanding: Math.max(0, client.totalInvoices - client.paidInvoices),
+  };
+}
+
+/**
  * The Country chip's options, derived from the clients themselves rather than
  * a fixed country list: the filter should only ever offer countries the
  * merchant actually has clients in, so it can never narrow to an empty table.

@@ -19,10 +19,11 @@ import type { SkuProduct } from "@/features/dashboard/sku-management/types";
  * (a £1,450 consulting engagement, an S$38.90 bottle) rather than one amount
  * repeated, so the columns exercise short and long number widths alike.
  *
- * `imageUrl` points at the product photography in public/assets/sku/ — one
- * shot per GOODS row. The six SERVICES rows have none (a consulting
- * engagement has no product shot), so they fall back to the type glyph the
- * Product cell renders whenever `imageUrl` is absent. That fallback is not
+ * `images` points at the product photography in public/assets/sku/ — one
+ * shot per GOODS row, and the first entry is the primary image the table
+ * shows. The six SERVICES rows have none (a consulting engagement has no
+ * product shot), so they fall back to the type glyph the Product cell renders
+ * whenever the list is absent or empty. That fallback is not
  * dead code once the real catalogue lands: a merchant can create an item
  * before uploading artwork for it.
  */
@@ -30,7 +31,7 @@ export const MOCK_SKU_PRODUCTS: SkuProduct[] = [
   {
     id: "sku-001",
     name: "Noise Cancelling Headphones",
-    imageUrl: "/assets/sku/noise-cancelling-headphones.jpg",
+    images: ["/assets/sku/noise-cancelling-headphones.jpg"],
     type: "GOODS",
     hsnSac: "85183000",
     sellingPrice: 229,
@@ -51,7 +52,7 @@ export const MOCK_SKU_PRODUCTS: SkuProduct[] = [
   {
     id: "sku-003",
     name: "Mechanical Keyboard 87-Key",
-    imageUrl: "/assets/sku/mechanical-keyboard-87-key.png",
+    images: ["/assets/sku/mechanical-keyboard-87-key.png"],
     type: "GOODS",
     hsnSac: "84716060",
     sellingPrice: 89.9,
@@ -72,7 +73,7 @@ export const MOCK_SKU_PRODUCTS: SkuProduct[] = [
   {
     id: "sku-005",
     name: "Cotton Crew Neck T-Shirt",
-    imageUrl: "/assets/sku/cotton-crew-neck-t-shirt.jpg",
+    images: ["/assets/sku/cotton-crew-neck-t-shirt.jpg"],
     type: "GOODS",
     hsnSac: "61091000",
     sellingPrice: 79,
@@ -93,7 +94,7 @@ export const MOCK_SKU_PRODUCTS: SkuProduct[] = [
   {
     id: "sku-007",
     name: "Stainless Steel Water Bottle",
-    imageUrl: "/assets/sku/stainless-steel-water-bottle.jpg",
+    images: ["/assets/sku/stainless-steel-water-bottle.jpg"],
     type: "GOODS",
     hsnSac: "96170019",
     sellingPrice: 38.9,
@@ -113,8 +114,8 @@ export const MOCK_SKU_PRODUCTS: SkuProduct[] = [
   },
   {
     id: "sku-009",
-    name: "Leather Laptop Sleeve 14\"",
-    imageUrl: "/assets/sku/leather-laptop-sleeve-14.png",
+    name: 'Leather Laptop Sleeve 14"',
+    images: ["/assets/sku/leather-laptop-sleeve-14.png"],
     type: "GOODS",
     hsnSac: "42021290",
     sellingPrice: 64,
@@ -135,7 +136,7 @@ export const MOCK_SKU_PRODUCTS: SkuProduct[] = [
   {
     id: "sku-011",
     name: "Desk Organiser Tray",
-    imageUrl: "/assets/sku/desk-organiser-tray.jpg",
+    images: ["/assets/sku/desk-organiser-tray.jpg"],
     type: "GOODS",
     hsnSac: "39241090",
     sellingPrice: 24.5,

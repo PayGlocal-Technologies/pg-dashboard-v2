@@ -16,7 +16,10 @@ import {
   PA_METHOD_FILTERS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/pa-transactions/constants";
-import type { PaTransaction, PaTransactionsResponse } from "@/features/dashboard/pa-transactions/types";
+import type {
+  PaTransaction,
+  PaTransactionsResponse,
+} from "@/features/dashboard/pa-transactions/types";
 import type { TableReqBody } from "@/types/transactions";
 
 export function PaTransactionTable() {

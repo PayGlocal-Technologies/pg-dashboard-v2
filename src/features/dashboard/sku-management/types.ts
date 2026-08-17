@@ -16,11 +16,16 @@ export interface SkuProduct {
   id: string;
   name: string;
   /**
-   * Product image preview. Optional: the catalogue lets merchants add an item
-   * before they upload artwork for it, so the Product cell falls back to a
-   * type glyph (see ProductCell in columns.tsx) rather than an empty box.
+   * The item's media, primary image first — the Product cell shows images[0]
+   * and ignores the rest. One ordered list rather than a separate
+   * primary/gallery pair, so "the first one is the primary" stays true by
+   * construction and reordering never needs two fields kept in step.
+   *
+   * Optional throughout: the catalogue lets a merchant create an item before
+   * uploading artwork for it, and the Product cell falls back to a type glyph
+   * (see ProductThumbnail) rather than an empty box.
    */
-  imageUrl?: string;
+  images?: string[];
   type: SkuProductType;
   /** HSN code for goods, SAC code for services — one column, both schemes. */
   hsnSac: string;
@@ -33,4 +38,31 @@ export interface SkuProduct {
    */
   currency: SkuCurrency;
   description: string;
+}
+
+/**
+ * The item form's working shape — one model shared by Add and Edit, mapping
+ * field-for-field onto SkuProduct. Prices and the two enums are held as
+ * strings because that is what an empty input and an unmade select choice
+ * actually are; validation is what turns them into a SkuProduct (see
+ * schemas.ts). Keeping this distinct from SkuProduct is what lets the form
+ * represent a half-filled item without SkuProduct having to admit
+ * `type: "" | "GOODS" | "SERVICES"` everywhere it's read.
+ */
+export interface SkuItemFormValues {
+  name: string;
+  type: SkuProductType | "";
+  hsnSac: string;
+  currency: SkuCurrency | "";
+  sellingPrice: string;
+  productCost: string;
+  description: string;
+  images: SkuMediaItem[];
+}
+
+/** One uploaded image: a local preview URL plus the file it came from. */
+export interface SkuMediaItem {
+  id: string;
+  url: string;
+  name: string;
 }

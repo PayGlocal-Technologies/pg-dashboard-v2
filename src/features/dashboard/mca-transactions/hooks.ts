@@ -194,11 +194,9 @@ export function useMcaOverview(): {
   const scopeId = urlMid || ucicId;
   const url = urlMid ? mcaOverviewByMidApi(urlMid) : mcaOverviewByUcicApi(ucicId);
 
-  const { data, isPending, isError } = useGet<McaOverviewResponse>(
-    ["mca-overview", scopeId],
-    url,
-    { enabled: isReady && !!scopeId }
-  );
+  const { data, isPending, isError } = useGet<McaOverviewResponse>(["mca-overview", scopeId], url, {
+    enabled: isReady && !!scopeId,
+  });
 
   return {
     overview: data?.data,

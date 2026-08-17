@@ -10,7 +10,8 @@
 // comes from the API; see usePurposeCodes in this feature's hooks.ts. This
 // table only supplies the human-readable text for whichever codes it returns.
 export const PURPOSE_CODES: Record<string, string> = {
-  P0102: "Realisation of export bills (in respect of goods) sent on collection (full invoice value)",
+  P0102:
+    "Realisation of export bills (in respect of goods) sent on collection (full invoice value)",
   P0103:
     "Advance against export of Goods and Services other than transactions initiated from Nepal and Bhutan",
   P0302: "Business Travel",
@@ -21,7 +22,8 @@ export const PURPOSE_CODES: Record<string, string> = {
   P0602: "Receipts of freight insurance - relating to import and export of goods",
   P0603: "Receipts on account of other general insurance premium",
   P0605: "Receipts on account of Auxiliary services (commission on insurance)",
-  P0607: "Insurance Claim Settlement of non-life insurance; and life insurance (only term insurance)",
+  P0607:
+    "Insurance Claim Settlement of non-life insurance; and life insurance (only term insurance)",
   P0608: "Life insurance claim settlements (excluding insurance) received by residents in India",
   P0801: "Hardware consultancy implementation",
   P0802: "Software Consultancy Services, Implementation",

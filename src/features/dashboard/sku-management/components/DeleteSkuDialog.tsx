@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
@@ -40,12 +34,9 @@ export function DeleteSkuDialog({ product, onOpenChange, onConfirm }: DeleteSkuD
               {/* The name is quoted rather than interpolated bare so a product
                   called e.g. "Desk Organiser Tray" reads as one object in the
                   sentence. */}
-              <span className="font-medium text-foreground">
-                {product?.name ?? "This item"}
-              </span>{" "}
-              will be permanently deleted, along with its pricing and tax
-              details. This can&apos;t be undone — archive it instead if you
-              only want it out of the active list.
+              <span className="font-medium text-foreground">{product?.name ?? "This item"}</span>{" "}
+              will be permanently deleted, along with its pricing and tax details. This can&apos;t
+              be undone — archive it instead if you only want it out of the active list.
             </DialogDescription>
           </div>
         </div>

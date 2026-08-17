@@ -39,7 +39,10 @@ const paymentDetailsSchema = z.object({
   amount: z
     .string()
     .min(1, "Enter an amount")
-    .refine((v) => Number.isFinite(parseFloat(v)) && parseFloat(v) > 0, "Enter an amount greater than 0"),
+    .refine(
+      (v) => Number.isFinite(parseFloat(v)) && parseFloat(v) > 0,
+      "Enter an amount greater than 0"
+    ),
   invoiceNumber: z.string().trim().min(1, "Enter an invoice number"),
   description: z.string().trim().min(1, "Enter a product description"),
 });
@@ -129,7 +132,11 @@ export function CreateMcaLinkPage({ onBack }: CreateMcaLinkPageProps) {
       <PageHeader
         title="Create MCA Link"
         actions={
-          <Button type="submit" variant="primary" rightIcon={<Icon name="check" className="h-4 w-4" />}>
+          <Button
+            type="submit"
+            variant="primary"
+            rightIcon={<Icon name="check" className="h-4 w-4" />}
+          >
             Create MCA Link
           </Button>
         }

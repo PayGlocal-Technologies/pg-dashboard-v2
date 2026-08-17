@@ -60,7 +60,10 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
-  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({ min: "", max: "" });
+  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
+    min: "",
+    max: "",
+  });
   // null until the merchant actually drags a column, at which point
   // DataTable renders that order instead of buildMcaLinkColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
@@ -88,7 +91,12 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
     if (currencyFilters.length && !currencyFilters.includes(link.currency)) return false;
 
     if (query) {
-      const haystack = [link.invoiceNumber, link.description, link.customerCountry, link.paymentLink]
+      const haystack = [
+        link.invoiceNumber,
+        link.description,
+        link.customerCountry,
+        link.paymentLink,
+      ]
         .filter(Boolean)
         .join(" ")
         .toLowerCase();

@@ -1,14 +1,17 @@
 "use client";
 
+import { useState } from "react";
 import { Button, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { SkuTable } from "@/features/dashboard/sku-management/components/SkuTable";
 
 export function SkuManagementFeature() {
-  // TODO: wire both up once the catalogue endpoints exist — "Add item" should
-  // open a create-product form and "Import" a bulk CSV upload. Same gap as the
-  // Transactions page's own Report button.
-  const handleAddItem = () => {};
+  // The button lives here but every row it creates lives in SkuTable, so this
+  // shared parent holds the open state and the table owns the form itself.
+  const [addItemOpen, setAddItemOpen] = useState(false);
+
+  // TODO: wire up once a bulk-import endpoint exists — Import should accept a
+  // CSV of items. Add item is a real flow now (see SkuItemFormModal).
   const handleImport = () => {};
 
   return (
@@ -31,7 +34,7 @@ export function SkuManagementFeature() {
               variant="primary"
               size="sm"
               leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={handleAddItem}
+              onClick={() => setAddItemOpen(true)}
             >
               Add item
             </Button>
@@ -39,7 +42,7 @@ export function SkuManagementFeature() {
         }
       />
 
-      <SkuTable />
+      <SkuTable addItemOpen={addItemOpen} onAddItemOpenChange={setAddItemOpen} />
     </div>
   );
 }

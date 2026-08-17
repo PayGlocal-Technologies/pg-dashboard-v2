@@ -13,19 +13,16 @@ import type { FrmConversationEntry } from "@/features/dashboard/mca-transactions
 
 type AuthorType = FrmConversationEntry["authorType"];
 
-const AUTHOR_ROLE: Record<AuthorType, { label: string; isMerchant: boolean; displayName?: string }> = {
+const AUTHOR_ROLE: Record<
+  AuthorType,
+  { label: string; isMerchant: boolean; displayName?: string }
+> = {
   GLOCAL: { label: "PayGlocal Team", isMerchant: false },
   OPS: { label: "PayGlocal Team", isMerchant: false, displayName: "PayGlocal" },
   MERCHANT: { label: "You", isMerchant: true },
 };
 
-function AttachmentChip({
-  fileName,
-  onDownload,
-}: {
-  fileName: string;
-  onDownload: () => void;
-}) {
+function AttachmentChip({ fileName, onDownload }: { fileName: string; onDownload: () => void }) {
   const extension = fileName.split(".").pop()?.toUpperCase() ?? "";
 
   return (

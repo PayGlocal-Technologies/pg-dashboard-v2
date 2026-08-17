@@ -85,7 +85,8 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
         screenshotAlt: "Amazon deposit methods page with Add new deposit method highlighted",
       },
       {
-        instruction: "Enter your PayGlocal virtual account details for the chosen location, then set the deposit method",
+        instruction:
+          "Enter your PayGlocal virtual account details for the chosen location, then set the deposit method",
         screenshotSrc: "/assets/platform-withdrawals/amazon/step-8.svg",
         screenshotAlt: "Amazon bank account form filled with virtual account details",
         quickAccess: true,
@@ -187,7 +188,8 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     accountCurrencies: ["USD", "GBP", "EUR"],
     steps: [
       {
-        instruction: "Log in to your Toptal account, click 'Transfer' and select 'Add new transfer method'",
+        instruction:
+          "Log in to your Toptal account, click 'Transfer' and select 'Add new transfer method'",
         screenshotSrc: "/assets/platform-withdrawals/toptal/step-1.jpg",
         screenshotAlt: "Toptal transfer page with Add new transfer method highlighted",
       },
@@ -237,7 +239,8 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
         screenshotAlt: "Deel withdrawal method options with Bank transfer selected",
       },
       {
-        instruction: "In the Business section, enter the account details — the sort code field takes your routing number",
+        instruction:
+          "In the Business section, enter the account details — the sort code field takes your routing number",
         screenshotSrc: "/assets/platform-withdrawals/deel/step-5.jpg",
         screenshotAlt: "Deel business bank details form filled with virtual account details",
         quickAccess: true,
@@ -270,7 +273,6 @@ export function accountsForPlatform(
     .filter((account): account is VirtualAccount => Boolean(account));
 }
 
-
 /**
  * The three fields Quick Access surfaces for an account: the holder name, then
  * the account's own two rail-specific identifiers.
@@ -281,10 +283,7 @@ export function accountsForPlatform(
  * rails.
  */
 export function quickAccessFields(account: VirtualAccount) {
-  return [
-    { label: "Account holder's name", value: account.accountHolderName },
-    ...account.details,
-  ];
+  return [{ label: "Account holder's name", value: account.accountHolderName }, ...account.details];
 }
 
 /**

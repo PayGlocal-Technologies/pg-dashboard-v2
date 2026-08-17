@@ -102,7 +102,10 @@ export function buildMcaLinkColumns(
           {/* Fixed width + truncate, the same treatment Remitter Name gets on
               the Transactions table, so a long merchant description can't
               stretch the row. */}
-          <span className="block w-[220px] truncate text-[13px] text-muted-foreground" title={row.description ?? undefined}>
+          <span
+            className="block w-[220px] truncate text-[13px] text-muted-foreground"
+            title={row.description ?? undefined}
+          >
             {row.description || "—"}
           </span>
         </RowClick>

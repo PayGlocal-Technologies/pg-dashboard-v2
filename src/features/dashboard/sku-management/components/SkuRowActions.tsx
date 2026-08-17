@@ -1,54 +1,38 @@
 "use client";
 
-import {
-  Button,
-  IconButton,
-  Popover,
-  PopoverAnchor,
-  PopoverContent,
-} from "@/components/ui";
+import { useState } from "react";
+import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
-interface SkuRowActionsProps {
-  product: SkuProduct;
-  /** Archived rows get Unarchive/Delete instead of Edit/Archive/Delete. */
-  archived: boolean;
-  /** Open state is owned by the table, not by each menu, so opening one
-   *  closes whichever other row's menu was open — Radix's outside-click would
-   *  usually manage that on its own, but only while both are mounted, and the
-   *  card list unmounts rows as pages change. */
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onEdit: (product: SkuProduct) => void;
-  onArchive: (product: SkuProduct) => void;
-  onUnarchive: (product: SkuProduct) => void;
-  onDelete: (product: SkuProduct) => void;
-  className?: string;
-}
-
-/** One row of the menu — a ghost Button flattened into a full-width menu item,
- *  matching the option rows in the Status filter flyout. */
+/**
+ * One row of the menu. A ghost Button flattened into a full-width menu item —
+ * the same treatment the Status filter flyout gives its options.
+ */
 function MenuAction({
   icon,
   label,
   destructive = false,
-  onClick,
+  onSelect,
 }: {
   icon: IconName;
   label: string;
   destructive?: boolean;
-  onClick: () => void;
+  onSelect: () => void;
 }) {
   return (
     <Button
       type="button"
       variant="ghost"
-      onClick={onClick}
+      size="sm"
+      onClick={onSelect}
       className={cn(
-        "h-auto min-h-0 w-full justify-start rounded-md px-2 py-1.5 text-[12.5px] font-normal",
-        "[&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-2",
+        "h-auto min-h-0 w-full justify-start rounded-md px-2 py-2 text-[12.5px] font-normal",
+        "[&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-2.5",
+        // Icon and label share one colour: lucide glyphs stroke with
+        // currentColor, so the destructive item's icon turns red with its text
+        // rather than needing its own class.
         destructive
           ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
           : "text-foreground"
@@ -60,117 +44,108 @@ function MenuAction({
   );
 }
 
+interface SkuRowActionsProps {
+  product: SkuProduct;
+  /** Archived rows swap Edit/Archive for Unarchive; Delete is on both. */
+  archived: boolean;
+  onEdit: (product: SkuProduct) => void;
+  onArchive: (product: SkuProduct) => void;
+  onUnarchive: (product: SkuProduct) => void;
+  onDelete: (product: SkuProduct) => void;
+  className?: string;
+}
+
 /**
- * The row-level overflow menu. Rendered through DataTable's `rowAction` slot on
- * desktop (a zero-width sticky cell pinned to the right edge, so it adds no
- * column and leaves the existing alignment untouched) and inside each card on
- * mobile. Both pass the same handlers, so an action behaves identically
- * wherever it's invoked.
+ * The row's overflow menu.
+ *
+ * Deliberately built to mirror EditablePriceCell, the popover on this page
+ * that has always worked: a flux `Button` as an `asChild` trigger, with its
+ * open state held locally. Earlier revisions of this menu used `IconButton`
+ * as the trigger and lifted the open state up to SkuTable, and never opened;
+ * those are the two things that differ from the working component, so neither
+ * is used here.
+ *
+ * Local state also means Radix alone decides what's open: clicking a second
+ * row's button is an outside press for the first row's menu, which dismisses
+ * it, so only one is ever open without a shared id to coordinate them.
+ *
+ * Rendered through DataTable's `rowAction` slot on desktop (pinned to the
+ * right edge, revealed on row hover, not a column) and in the card's action
+ * corner on mobile — same component and handlers in both.
  */
 export function SkuRowActions({
   product,
   archived,
-  open,
-  onOpenChange,
   onEdit,
   onArchive,
   onUnarchive,
   onDelete,
   className,
 }: SkuRowActionsProps) {
-  // Every item closes the menu first: the ones that open a dialog (Delete)
-  // would otherwise leave a popover stacked under it.
-  const run = (action: () => void) => {
-    onOpenChange(false);
+  const [open, setOpen] = useState(false);
+
+  // Every item closes the menu before acting, so the one that opens a dialog
+  // (Delete) doesn't leave a popover stacked underneath it.
+  const select = (action: () => void) => () => {
+    setOpen(false);
     action();
   };
 
   return (
-    // The pointerdown guard stops the native event before it reaches the
-    // document, which is where the open menu's dismiss layer listens. Without
-    // it, clicking this button while its own menu is open would both dismiss
-    // (as an outside click) and toggle, and the two would cancel out. Clicks
-    // also stop here before reaching any row-level handler.
-    <span
-      className="inline-flex"
-      onClick={(e) => e.stopPropagation()}
-      onPointerDown={(e) => e.stopPropagation()}
-    >
-      <Popover open={open} onOpenChange={onOpenChange}>
-        {/* Anchor, not Trigger. PopoverTrigger owns the open/close click
-            itself: it builds its handler by composing the child's onClick with
-            its internal toggle and hands the result down through Slot, so
-            whether the button opens depends on that composition surviving
-            two layers of prop merging (Slot's, then IconButton's) — and here
-            it wasn't. Anchor contributes positioning only, so the button is
-            an ordinary button whose own onClick is the single thing that
-            opens the menu, and there is nothing left in between to swallow
-            it. The menu is still anchored to this exact button. */}
-        <PopoverAnchor asChild>
-          <IconButton
-            type="button"
-            aria-label={`Actions for ${product.name}`}
-            aria-haspopup="menu"
-            aria-expanded={open}
-            variant="ghost"
-            size="sm"
-            onClick={() => onOpenChange(!open)}
-            className={cn("text-muted-foreground hover:text-foreground", className)}
-          >
-            <Icon name="more-horizontal" className="h-4 w-4" />
-          </IconButton>
-        </PopoverAnchor>
-
-        {/* Portaled by Radix, so it escapes the table container's and the
-            card's overflow clipping and paints above both. collisionPadding
-            keeps it clear of the viewport edges — near the bottom it flips
-            above the trigger, near the right it shifts inward. */}
-        <PopoverContent
-          align="end"
-          side="bottom"
-          collisionPadding={8}
-          // With no Trigger there is nothing for Radix to hand focus back to
-          // on close, so it's told not to try rather than left to focus the
-          // document body and scroll the table.
-          onCloseAutoFocus={(e) => e.preventDefault()}
-          className="w-44 p-1"
-        >
-          {archived ? (
-            <>
-              <MenuAction
-                icon="archive-restore"
-                label="Unarchive item"
-                onClick={() => run(() => onUnarchive(product))}
-              />
-              <MenuAction
-                icon="trash-2"
-                label="Delete item"
-                destructive
-                onClick={() => run(() => onDelete(product))}
-              />
-            </>
-          ) : (
-            <>
-              <MenuAction
-                icon="pencil"
-                label="Edit item"
-                onClick={() => run(() => onEdit(product))}
-              />
-              <MenuAction
-                icon="archive"
-                label="Archive item"
-                onClick={() => run(() => onArchive(product))}
-              />
-              <MenuAction
-                icon="trash-2"
-                label="Delete item"
-                destructive
-                onClick={() => run(() => onDelete(product))}
-              />
-            </>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {/* Flux's secondary Button, squared off to an icon-only control — the
+            same fill, border, and shadow as other secondary actions, at the
+            32px height the compact table controls use. Icon-only, so it needs
+            its own aria-label. */}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          aria-label={`Actions for ${product.name}`}
+          aria-haspopup="menu"
+          className={cn(
+            "h-8 w-8 min-h-0 shrink-0 rounded-lg p-0 text-muted-foreground hover:text-foreground",
+            "[&>span]:flex [&>span]:items-center [&>span]:justify-center",
+            className
           )}
-        </PopoverContent>
-      </Popover>
-    </span>
+        >
+          <Icon name="more-horizontal" className="h-4 w-4" />
+        </Button>
+      </PopoverTrigger>
+
+      {/* Portaled and collision-aware by default: it escapes the table
+          container's and the card's clipping, flips above the button near the
+          bottom of the viewport, and shifts inward near the right edge. */}
+      <PopoverContent align="end" collisionPadding={8} className="w-44 p-1">
+        {archived ? (
+          <MenuAction
+            icon="archive-restore"
+            label="Unarchive item"
+            onSelect={select(() => onUnarchive(product))}
+          />
+        ) : (
+          <>
+            <MenuAction icon="pencil" label="Edit item" onSelect={select(() => onEdit(product))} />
+            <MenuAction
+              icon="archive"
+              label="Archive item"
+              onSelect={select(() => onArchive(product))}
+            />
+          </>
+        )}
+
+        {/* Delete is fenced off from the reversible actions above it, so it
+            can't be hit by momentum on the way down the list. */}
+        <Separator className="my-1" />
+
+        <MenuAction
+          icon="trash-2"
+          label="Delete item"
+          destructive
+          onSelect={select(() => onDelete(product))}
+        />
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -65,9 +65,9 @@ export function buildTxnRequestBody(
 
   if (hasEmail) {
     if (hasFilters && hasTimeRange) searchFilterType = "EXACT_MATCH_SEARCH_FILTER_TYPE_TIME_RANGE";
-    else if (hasTimeRange)          searchFilterType = "EXACT_MATCH_SEARCH_TIME_RANGE";
-    else if (hasFilters)            searchFilterType = "EXACT_MATCH_SEARCH_FILTER_TYPE";
-    else                            searchFilterType = "EXACT_MATCH_SEARCH";
+    else if (hasTimeRange) searchFilterType = "EXACT_MATCH_SEARCH_TIME_RANGE";
+    else if (hasFilters) searchFilterType = "EXACT_MATCH_SEARCH_FILTER_TYPE";
+    else searchFilterType = "EXACT_MATCH_SEARCH";
   } else if (queryString && hasFilters && hasTimeRange) {
     searchFilterType = "QUERY_FILTER_TYPE_TIME_RANGE";
   } else if (queryString && hasTimeRange) {

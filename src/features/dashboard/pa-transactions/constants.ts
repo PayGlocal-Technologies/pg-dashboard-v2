@@ -13,17 +13,17 @@ export const PA_PRODUCT_FLAGS = [
 
 // ── PA status pills shown in the filter bar ──────────────────────────────────
 export const PA_STATUS_FILTERS: FilterOption[] = [
-  { value: "All",              label: "All" },
-  { value: "SUCCESS",          label: "Success" },
-  { value: "INPROGRESS",       label: "In Progress" },
+  { value: "All", label: "All" },
+  { value: "SUCCESS", label: "Success" },
+  { value: "INPROGRESS", label: "In Progress" },
   { value: "SENT_FOR_CAPTURE", label: "Sent for capture" },
-  { value: "ISSUER_DECLINE",   label: "Failed" },
+  { value: "ISSUER_DECLINE", label: "Failed" },
 ];
 
 // ── PA payment method pills ──────────────────────────────────────────────────
 export const PA_METHOD_FILTERS: FilterOption[] = [
-  { value: "All",        label: "All Methods" },
-  { value: "CARDS",      label: "Card" },
-  { value: "UPI",        label: "UPI" },
+  { value: "All", label: "All Methods" },
+  { value: "CARDS", label: "Card" },
+  { value: "UPI", label: "UPI" },
   { value: "NETBANKING", label: "Net Banking" },
 ];

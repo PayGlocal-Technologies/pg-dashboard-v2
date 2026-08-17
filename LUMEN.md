@@ -9,22 +9,22 @@ These rules extend Lumen's global defaults. They are re-read on every message.
 Use ONLY components from `@/components/ui` (flux-ui) for every interactive or data-display element.
 Bare HTML elements are forbidden for anything interactive.
 
-| What you need          | Use this                              | Never use              |
-|------------------------|---------------------------------------|------------------------|
-| Button / link-button   | `<Button>`                            | `<button>`             |
-| Text input             | `<Input>`                             | `<input>`              |
-| Password field         | `<PasswordInput>`                     | `<input type=password>`|
-| OTP field              | `<OtpInput>`                          | manual `<input>`       |
-| Dropdown / select      | `<Select>` + `<SelectTrigger>` etc.   | `<select>`             |
-| Modal / overlay        | `<Dialog>` + `<DialogContent>` etc.   | `<dialog>`             |
-| Table / data grid      | `<DataTable>`                         | `<table>`              |
-| Labelled field         | `<Field>`, `<FieldLabel>`, `<FieldError>` | bare `<label>`     |
-| Card surface           | `<Card>` + friends                    | `<div>` + shadow       |
-| Divider                | `<Separator>`                         | `<hr>`                 |
-| Status chip            | `<StatusBadge>`                       | hand-rolled span       |
-| Loading skeleton       | `<Shimmer>` / `<StatCardSkeleton>`    | `animate-pulse div`    |
-| Page title bar         | `<PageHeader>`                        | hand-rolled            |
-| Images                 | `<Image>` from `next/image`           | `<img>`                |
+| What you need        | Use this                                  | Never use               |
+| -------------------- | ----------------------------------------- | ----------------------- |
+| Button / link-button | `<Button>`                                | `<button>`              |
+| Text input           | `<Input>`                                 | `<input>`               |
+| Password field       | `<PasswordInput>`                         | `<input type=password>` |
+| OTP field            | `<OtpInput>`                              | manual `<input>`        |
+| Dropdown / select    | `<Select>` + `<SelectTrigger>` etc.       | `<select>`              |
+| Modal / overlay      | `<Dialog>` + `<DialogContent>` etc.       | `<dialog>`              |
+| Table / data grid    | `<DataTable>`                             | `<table>`               |
+| Labelled field       | `<Field>`, `<FieldLabel>`, `<FieldError>` | bare `<label>`          |
+| Card surface         | `<Card>` + friends                        | `<div>` + shadow        |
+| Divider              | `<Separator>`                             | `<hr>`                  |
+| Status chip          | `<StatusBadge>`                           | hand-rolled span        |
+| Loading skeleton     | `<Shimmer>` / `<StatCardSkeleton>`        | `animate-pulse div`     |
+| Page title bar       | `<PageHeader>`                            | hand-rolled             |
+| Images               | `<Image>` from `next/image`               | `<img>`                 |
 
 Structural/layout elements (`<div>`, `<section>`, `<main>`, `<nav>`, `<aside>`) are fine without a
 flux-ui wrapper.
@@ -76,6 +76,7 @@ outside `./`.
 ## PAYMENTS COMPLIANCE — HARD RULE
 
 Mock data must use clearly fake, masked values specific to this app:
+
 - Cards: `•••• •••• •••• 4242`
 - Accounts: `XXXXXXXX1234`
 - Names: `Demo Merchant`, `Test User`
@@ -87,6 +88,7 @@ Mock data must use clearly fake, masked values specific to this app:
 ## WORKFLOW FOR pg-dashboard-v2
 
 ### Before writing code
+
 1. Read the target file first.
 2. **Check pg-dashboard for reference.** If the feature already exists in
    `../pg-dashboard/src/features/<feature>/`, read it. Match visual behaviour and UX patterns —
@@ -95,6 +97,7 @@ Mock data must use clearly fake, masked values specific to this app:
    colour tokens, and interaction patterns.
 
 ### After writing code
+
 4. Tell the designer what changed in plain language.
 5. Run `npm run lint` and fix any errors before finishing.
 
@@ -121,6 +124,7 @@ src/features/<feature>/
 ## REFERENCING pg-dashboard
 
 pg-dashboard is the live production app. It is the source of truth for:
+
 - API endpoint paths (version prefix, exact URL shape)
 - Request payload field names and types
 - Response `status` strings and how they are branched on
@@ -128,6 +132,7 @@ pg-dashboard is the live production app. It is the source of truth for:
 - Which payloads are encrypted (JWE envelope) vs plain JSON
 
 When porting a feature:
+
 1. Open `../pg-dashboard/src/features/<feature>/services.ts` — copy the endpoint URL exactly.
 2. Read the pg-dashboard component that calls it — copy every payload field.
 3. Read the `onSuccess` handler — copy every `status` branch.

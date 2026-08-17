@@ -120,6 +120,12 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   BZD: "BZ$",
   BMD: "BD$",
   KYD: "CI$",
+  // Not an ISO code: the Rest of the World virtual account is dollar-
+  // denominated but needs a currency value distinct from the US account's
+  // "USD" (see multi-currency/mock-data.ts), and this is what keeps its
+  // amounts rendering with a real symbol rather than the word falling through
+  // as its own prefix.
+  Dollar: "$",
 };
 
 /**
@@ -173,13 +179,17 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
   let datePart: string;
   if (o.month === "long" && o.day === "numeric") {
     const y =
-      o.year === "numeric" ? String(d.getFullYear()) : String(d.getFullYear() % 100).padStart(2, "0");
+      o.year === "numeric"
+        ? String(d.getFullYear())
+        : String(d.getFullYear() % 100).padStart(2, "0");
     datePart = `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${y}`;
   } else {
     const day = String(d.getDate()).padStart(2, "0");
     const mon = o.month === "long" ? MONTHS_LONG[d.getMonth()] : MONTHS_SHORT[d.getMonth()];
     const yr =
-      o.year === "numeric" ? String(d.getFullYear()) : String(d.getFullYear() % 100).padStart(2, "0");
+      o.year === "numeric"
+        ? String(d.getFullYear())
+        : String(d.getFullYear() % 100).padStart(2, "0");
     datePart = `${day} ${mon} ${yr}`;
   }
 
@@ -212,7 +222,14 @@ export function parseApiDateTime(display: string | null | undefined): Date | nul
   const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2}):(\d{2})$/);
   if (!match) return null;
   const [, dd, mm, yyyy, hh, min, ss] = match;
-  const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd), Number(hh), Number(min), Number(ss));
+  const date = new Date(
+    Number(yyyy),
+    Number(mm) - 1,
+    Number(dd),
+    Number(hh),
+    Number(min),
+    Number(ss)
+  );
   return Number.isNaN(date.getTime()) ? null : date;
 }
 

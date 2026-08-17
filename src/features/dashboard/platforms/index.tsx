@@ -36,10 +36,7 @@ import {
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms/components/SettlementStatementDrawer";
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
-import {
-  SUPPORTED_PLATFORMS,
-  accountsForPlatform,
-} from "@/features/dashboard/platforms/constants";
+import { SUPPORTED_PLATFORMS, accountsForPlatform } from "@/features/dashboard/platforms/constants";
 
 /** Module title — the step below the page's own h1, shared by every module
  *  here. Same tokens MCA v2 and Platforms use, so the three read as one
@@ -106,9 +103,7 @@ export function PlatformsFeature() {
   // offers no choice the first account simply wins outright.
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const platformAccounts = selectedPlatform?.id === "amazon" ? amazonAccounts : generalAccounts;
-  const accounts = selectedPlatform
-    ? accountsForPlatform(selectedPlatform, platformAccounts)
-    : [];
+  const accounts = selectedPlatform ? accountsForPlatform(selectedPlatform, platformAccounts) : [];
   const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? accounts[0] ?? null;
 
   // Amazon is the only platform with documents (see the Platform type), so on
@@ -441,23 +436,25 @@ export function PlatformsFeature() {
                   is what gives the sequence its rhythm rather than reading as
                   six evenly spaced blocks. */}
               <ol className="space-y-8">
-              {selectedPlatform.steps.map((step, index) => (
-                <li key={step.instruction}>
-                  <p className="text-[12px] font-medium text-muted-foreground">Step {index + 1}</p>
-                  <p className="mt-1 text-[15px] font-medium text-foreground">
-                    {step.instruction}
-                  </p>
+                {selectedPlatform.steps.map((step, index) => (
+                  <li key={step.instruction}>
+                    <p className="text-[12px] font-medium text-muted-foreground">
+                      Step {index + 1}
+                    </p>
+                    <p className="mt-1 text-[15px] font-medium text-foreground">
+                      {step.instruction}
+                    </p>
 
-                  {/* Caveat, not instruction: muted and a size down so it reads
+                    {/* Caveat, not instruction: muted and a size down so it reads
                       as an aside rather than a seventh thing to do. Same "Note:"
                       prefix pg-dashboard's own step timeline uses. */}
-                  {step.note && (
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      <span className="font-medium">Note:</span> {step.note}
-                    </p>
-                  )}
+                    {step.note && (
+                      <p className="mt-1 text-[13px] text-muted-foreground">
+                        <span className="font-medium">Note:</span> {step.note}
+                      </p>
+                    )}
 
-                  {/* Quick Access — the identifiers this step asks the merchant
+                    {/* Quick Access — the identifiers this step asks the merchant
                       to type into the platform, sat between the instruction
                       that names them and the screenshot showing where they go,
                       so they're on screen at the moment they're needed rather
@@ -473,36 +470,36 @@ export function PlatformsFeature() {
                       into generic ones that would be wrong on half the rails.
                       They follow the currency selector above, so switching
                       currency reprints these values. */}
-                  {step.quickAccess && selectedAccount && (
-                    <Card
-                      size="sm"
-                      className="mt-3 flex-row flex-wrap items-center justify-between gap-x-8 gap-y-4 p-6"
-                    >
-                      <p className="text-[15px] font-semibold text-foreground">Quick access</p>
+                    {step.quickAccess && selectedAccount && (
+                      <Card
+                        size="sm"
+                        className="mt-3 flex-row flex-wrap items-center justify-between gap-x-8 gap-y-4 p-6"
+                      >
+                        <p className="text-[15px] font-semibold text-foreground">Quick access</p>
 
-                      <dl className="flex flex-wrap items-start gap-x-6 gap-y-4">
-                        {selectedAccount.details.map((field) => (
-                          <div key={field.label} className="min-w-0 space-y-1.5">
-                            <dt className="text-[12px] text-muted-foreground">{field.label}:</dt>
-                            <dd>
-                              {/* The product's own copyable field, sat on a
+                        <dl className="flex flex-wrap items-start gap-x-6 gap-y-4">
+                          {selectedAccount.details.map((field) => (
+                            <div key={field.label} className="min-w-0 space-y-1.5">
+                              <dt className="text-[12px] text-muted-foreground">{field.label}:</dt>
+                              <dd>
+                                {/* The product's own copyable field, sat on a
                                   bordered surface so it reads as an
                                   input-shaped chip — the same treatment the
                                   Platforms page gives its Quick Access
                                   values. */}
-                              <CopyableText
-                                value={field.value}
-                                className="rounded-lg border border-border px-3 py-1.5"
-                                valueClassName="font-medium"
-                              />
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </Card>
-                  )}
+                                <CopyableText
+                                  value={field.value}
+                                  className="rounded-lg border border-border px-3 py-1.5"
+                                  valueClassName="font-medium"
+                                />
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </Card>
+                    )}
 
-                  {/* pg-dashboard's own frame for these (StyledImageCard in its
+                    {/* pg-dashboard's own frame for these (StyledImageCard in its
                       platform-withdrawals styles) minus the border: a fixed
                       515x265 box with a 10px radius, clipped content and no
                       padding, with the image filling it edge to edge.
@@ -514,19 +511,19 @@ export function PlatformsFeature() {
                       captures carry a frame in the artwork itself and one added
                       here would double up on exactly those. overflow-hidden stays:
                       it is what clips the image to the rounded corners. */}
-                  {step.screenshotSrc && (
-                    <div className="mt-3 aspect-[515/265] w-full overflow-hidden rounded-[10px]">
-                      <Image
-                        src={step.screenshotSrc}
-                        alt={step.screenshotAlt ?? ""}
-                        width={515}
-                        height={265}
-                        className="h-full w-full"
-                      />
-                    </div>
-                  )}
-                </li>
-              ))}
+                    {step.screenshotSrc && (
+                      <div className="mt-3 aspect-[515/265] w-full overflow-hidden rounded-[10px]">
+                        <Image
+                          src={step.screenshotSrc}
+                          alt={step.screenshotAlt ?? ""}
+                          width={515}
+                          height={265}
+                          className="h-full w-full"
+                        />
+                      </div>
+                    )}
+                  </li>
+                ))}
               </ol>
             </div>
 

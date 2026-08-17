@@ -53,7 +53,8 @@ interface TimelineEventWithStatus {
 
 const isReversalDone = (status?: string): boolean => status === "REVERSAL_DONE";
 
-const statusOrPending = (status?: string): ApiStatus => (status as ApiStatus | undefined) ?? "PENDING";
+const statusOrPending = (status?: string): ApiStatus =>
+  (status as ApiStatus | undefined) ?? "PENDING";
 
 function toStepStatus(status: ApiStatus): SettlementStepStatus {
   switch (status) {
@@ -143,13 +144,7 @@ function RejectionReason({ reason }: { reason: string }) {
 }
 
 /** The uploaded invoice as a downloadable attachment chip. */
-function InvoiceAttachment({
-  fileName,
-  onDownload,
-}: {
-  fileName: string;
-  onDownload: () => void;
-}) {
+function InvoiceAttachment({ fileName, onDownload }: { fileName: string; onDownload: () => void }) {
   return (
     <button
       type="button"
@@ -317,7 +312,9 @@ export function buildSettlementTimeline({
     ) : null;
 
   const fundsPendingTitle =
-    row.externalStatus === "FUNDS_IN_TRANSIT" ? "Funds in Transit" : "Funds received in virtual account";
+    row.externalStatus === "FUNDS_IN_TRANSIT"
+      ? "Funds in Transit"
+      : "Funds received in virtual account";
 
   if (
     appendStep(
@@ -353,8 +350,9 @@ export function buildSettlementTimeline({
         isFundDelayed ? (
           <Alert variant="warning" className="mt-2">
             <AlertDescription className="text-[12px]">
-              <span className="font-medium">Bank Holiday:</span> Payments made during holiday periods
-              may take longer to settle, so this one could take an additional 1–2 business days.
+              <span className="font-medium">Bank Holiday:</span> Payments made during holiday
+              periods may take longer to settle, so this one could take an additional 1–2 business
+              days.
             </AlertDescription>
           </Alert>
         ) : null,
@@ -459,6 +457,7 @@ export function getDocumentPendingMessage(multipleTimelineEvents?: MultipleTimel
     hasRejection && invoiceEvents.some((e) => e?.INVOICE_APPROVED?.STATUS === "IN_PROGRESS");
 
   if (hasResubmission) return "Revised invoice received. Compliance review in progress.";
-  if (hasRejection) return "Invoice does not match the payment, upload a corrected invoice to proceed";
+  if (hasRejection)
+    return "Invoice does not match the payment, upload a corrected invoice to proceed";
   return "Upload your invoice to proceed with settlement";
 }

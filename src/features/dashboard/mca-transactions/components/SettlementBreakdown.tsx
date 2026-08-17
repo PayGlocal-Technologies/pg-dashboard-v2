@@ -40,7 +40,11 @@ export function SettlementBreakdown({ data }: { data: FxSettlementEvent | undefi
   const settlementLine = `${inrSymbol}${formatAmount(data.settlementAmount, "INR")} INR`;
 
   return (
-    <Accordion type="single" collapsible className="mt-3 rounded-lg border border-border bg-muted/30">
+    <Accordion
+      type="single"
+      collapsible
+      className="mt-3 rounded-lg border border-border bg-muted/30"
+    >
       <AccordionItem value="settlement-breakdown" className="border-none">
         <AccordionTrigger className="px-3 py-2.5 hover:no-underline">
           <div className="min-w-0 text-left">
@@ -145,7 +149,10 @@ export function DownloadFircButton({
       disabled={isLoading}
       className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-60"
     >
-      <Icon name={isLoading ? "loader" : "download"} className={isLoading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"} />
+      <Icon
+        name={isLoading ? "loader" : "download"}
+        className={isLoading ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
+      />
       Download FIRC
     </button>
   );

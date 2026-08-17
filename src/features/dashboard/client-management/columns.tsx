@@ -2,10 +2,27 @@
 
 import type { Column } from "@/components/ui";
 import { RowClick } from "@/components/common/table/RowClick";
+import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { clientAmountLocale } from "@/features/dashboard/client-management/constants";
-import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
+import { cn } from "@/lib/utils";
+import { formatPhoneNumber, formatTransactionDateOnly, truncateMiddle } from "@/lib/utils/format";
 import type { Client } from "@/features/dashboard/client-management/types";
+
+/**
+ * How much of an email survives its middle elision in the table: the first
+ * character, then the last eight, which lands on the domain's tail
+ * ("amelia.hartley@northwindtrading.co.uk" → "a…ng.co.uk"). Enough to tell two
+ * rows apart at a glance without the column widening to fit an address nobody
+ * reads in full from a table. The whole address is still what the title
+ * attribute, the tooltip, the accessible name, and the clipboard carry — this
+ * only changes what is drawn.
+ */
+const EMAIL_HEAD_CHARS = 1;
+const EMAIL_TAIL_CHARS = 8;
+
+/** Shared by the two copyable cells so their text matches every other cell in
+ *  the row: the table's own 13px muted body, not CopyableText's default mono. */
+const COPY_CELL_VALUE_CLASS = "font-sans text-[13px] text-muted-foreground";
 
 // Column widths, typography (text-[13px] body, muted secondary text), and
 // alignment conventions mirror buildMcaColumns so the two tables read as one
@@ -51,15 +68,22 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
     {
       key: "email",
       header: "Email",
-      minWidth: 240,
-      // Addresses run long and vary wildly in length: a fixed width that
-      // truncates (with the full address in `title`) keeps the money columns
-      // on screen, where widening to the longest address would push them off.
+      minWidth: 150,
+      // Compact density clips every cell; the copy button's hover state sits
+      // slightly proud of the text and would otherwise be cut at the boundary.
+      cellClassName: "overflow-visible",
       render: (row) => (
         <RowClick onClick={() => onOpenDetails(row)}>
-          <span className="block w-[220px] truncate text-[13px] text-muted-foreground" title={row.email}>
-            {row.email}
-          </span>
+          {/* Elided for display only — CopyableText keeps the full address in
+              the title, the tooltip, the accessible name, and the clipboard,
+              and the record itself is untouched. Its copy button stops the
+              click from also opening the row. */}
+          <CopyableText
+            value={row.email}
+            displayValue={truncateMiddle(row.email, EMAIL_HEAD_CHARS, EMAIL_TAIL_CHARS)}
+            valueClassName={COPY_CELL_VALUE_CLASS}
+            revealOnHover
+          />
         </RowClick>
       ),
     },
@@ -67,11 +91,17 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       key: "phone",
       header: "Phone number",
       minWidth: 165,
+      cellClassName: "overflow-visible",
       render: (row) => (
         <RowClick onClick={() => onOpenDetails(row)}>
-          <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
-            {formatPhoneNumber(row.phoneDialCode, row.phoneNumber)}
-          </span>
+          {/* Shown in full — a formatted number is short enough to read from a
+              table — but copyable on the same hover affordance as the email
+              beside it. */}
+          <CopyableText
+            value={formatPhoneNumber(row.phoneDialCode, row.phoneNumber)}
+            valueClassName={cn(COPY_CELL_VALUE_CLASS, "tabular-nums")}
+            revealOnHover
+          />
         </RowClick>
       ),
     },
@@ -87,44 +117,12 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
         <RowClick onClick={() => onOpenDetails(row)}>
           <div className="flex min-w-max items-center gap-1.5">
             <CountryFlag iso2={row.countryIso2} alt={row.countryName} />
-            <span className="text-[13px] whitespace-nowrap text-muted-foreground">{row.countryName}</span>
+            <span className="text-[13px] whitespace-nowrap text-muted-foreground">
+              {row.countryName}
+            </span>
           </div>
         </RowClick>
       ),
-    },
-    {
-      key: "outstanding",
-      header: "Outstanding",
-      minWidth: 150,
-      align: "right",
-      render: (row) => {
-        // A settled-up client is the one row a merchant scanning this column
-        // can stop reading, so zero drops to muted, regular weight instead of
-        // carrying the same emphasis as a balance that's actually owed.
-        const isSettled = row.outstandingAmount === 0;
-        return (
-          <RowClick onClick={() => onOpenDetails(row)} align="right">
-            <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-              <span
-                className={
-                  isSettled
-                    ? "text-[13px] tabular-nums text-muted-foreground"
-                    : "text-[13px] font-semibold tabular-nums text-foreground"
-                }
-              >
-                {formatCurrency(
-                  row.outstandingAmount,
-                  row.outstandingCurrency,
-                  clientAmountLocale(row.outstandingCurrency)
-                )}
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {row.outstandingCurrency}
-              </span>
-            </div>
-          </RowClick>
-        );
-      },
     },
     {
       key: "createdAt",

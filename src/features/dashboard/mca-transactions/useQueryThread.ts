@@ -145,7 +145,9 @@ export function useQueryThread({
         await uploadToS3({ dynamicUrl: presignedUrl, customHeaders: headers, reqBody: file });
 
         setAttachments((prev) =>
-          prev.map((a) => (a.fileUUID === tempId ? { fileUUID, fileName: file.name, uploading: false } : a))
+          prev.map((a) =>
+            a.fileUUID === tempId ? { fileUUID, fileName: file.name, uploading: false } : a
+          )
         );
       } catch {
         setAttachments((prev) => prev.filter((a) => a.fileUUID !== tempId));

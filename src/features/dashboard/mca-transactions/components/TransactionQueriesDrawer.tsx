@@ -74,11 +74,7 @@ function EmptyThread() {
  * read-only, since an unsolicited reply has nothing to attach itself to.
  */
 function ComplianceQueriesTab({ mid, gid }: { mid: string; gid: string }) {
-  const {
-    data,
-    isPending,
-    refetch,
-  } = useGet<FrmStatusResponse>(
+  const { data, isPending, refetch } = useGet<FrmStatusResponse>(
     ["mca-txn-frm-status", mid, gid],
     mcaFrmStatusApi(mid, gid),
     { enabled: !!mid && !!gid }
@@ -122,11 +118,7 @@ function ComplianceQueriesTab({ mid, gid }: { mid: string; gid: string }) {
  * supplying documents, so they can add to it whenever they have something.
  */
 function AdditionalDocumentsTab({ mid, gid }: { mid: string; gid: string }) {
-  const {
-    data,
-    isPending,
-    refetch,
-  } = useGet<AdditionalDocConversationResponse>(
+  const { data, isPending, refetch } = useGet<AdditionalDocConversationResponse>(
     ["mca-txn-additional-doc", mid, gid],
     mcaAdditionalDocConversationApi(mid, gid),
     { enabled: !!mid && !!gid }

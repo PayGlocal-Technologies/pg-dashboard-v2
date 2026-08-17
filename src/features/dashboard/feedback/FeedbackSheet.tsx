@@ -70,10 +70,10 @@ export function FeedbackSheet() {
   const [comment, setComment] = useState("");
   const reduceMotion = useReducedMotion();
 
-  const { mutate: checkEligibility } = usePost<
-    FeedbackEligibilityResponse,
-    FeedbackTypePayload
-  >(feedbackEligibilityApi, { invalidateQueries: false });
+  const { mutate: checkEligibility } = usePost<FeedbackEligibilityResponse, FeedbackTypePayload>(
+    feedbackEligibilityApi,
+    { invalidateQueries: false }
+  );
 
   const { mutate: submitFeedback } = usePost<unknown, FeedbackPayload>(feedbackApi, {
     invalidateQueries: false,
@@ -157,7 +157,9 @@ export function FeedbackSheet() {
           className="fixed bottom-6 right-6 z-50 max-w-[calc(100vw-3rem)] overflow-hidden rounded-2xl border border-border bg-card px-4 py-3 shadow-xl"
         >
           <div className="flex items-start justify-between gap-2">
-            <p className="text-[13px] font-semibold text-foreground">How are you liking our product?</p>
+            <p className="text-[13px] font-semibold text-foreground">
+              How are you liking our product?
+            </p>
             <IconButton
               aria-label="Dismiss feedback"
               variant="ghost"

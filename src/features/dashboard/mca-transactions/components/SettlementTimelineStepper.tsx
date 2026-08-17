@@ -10,12 +10,7 @@ import { cn } from "@/lib/utils";
 // constants, rebuilt on Tailwind tokens instead of styled-components and
 // var(--grey-*) literals, so it inherits this app's light/dark theming.
 
-export type SettlementStepStatus =
-  | "success"
-  | "pending"
-  | "error"
-  | "inProgress"
-  | "reversal";
+export type SettlementStepStatus = "success" | "pending" | "error" | "inProgress" | "reversal";
 
 export interface SettlementTimelineStep {
   status: SettlementStepStatus;
@@ -151,7 +146,10 @@ export function SettlementTimelineStepper({ items }: { items: SettlementTimeline
         const downFill = lineFillClass(item.status);
 
         return (
-          <li key={`${item.title}-${index}`} className="grid grid-cols-[1.25rem_1fr] items-stretch gap-3">
+          <li
+            key={`${item.title}-${index}`}
+            className="grid grid-cols-[1.25rem_1fr] items-stretch gap-3"
+          >
             {/* Rail. The dot sits at the vertical centre of the title's first
                 line (top-0 h-5 box), and the two connector halves are
                 measured from that same centre, so they meet the dot exactly
@@ -235,7 +233,9 @@ export function SettlementTimelineStepper({ items }: { items: SettlementTimeline
                 </div>
               ) : null}
 
-              {item.date ? <p className="mt-0.5 text-[11px] text-muted-foreground">{item.date}</p> : null}
+              {item.date ? (
+                <p className="mt-0.5 text-[11px] text-muted-foreground">{item.date}</p>
+              ) : null}
 
               {item.children}
             </div>

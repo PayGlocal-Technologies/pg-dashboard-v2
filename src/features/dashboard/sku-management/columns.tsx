@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import { type Column, StatusBadge } from "@/components/ui";
 import { SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
@@ -17,9 +16,13 @@ const PRODUCT_COST_HEADER = "Product cost";
 // alignment conventions mirror buildMcaColumns so the two tables read as one
 // system. No RowClick wrapper here: a SKU row has no details view to open, and
 // a row-level click target would swallow the clicks the price cells need.
+//
+// These six are the table's whole column set. The row's overflow menu is
+// deliberately not among them — it rides DataTable's `rowAction` slot instead
+// (see SkuTable), so it never takes column width, never reorders with the
+// data, and stays pinned to the right while the columns scroll.
 export function buildSkuColumns(
-  onPriceChange: (id: string, field: SkuPriceField, next: number) => void,
-  renderActions: (row: SkuProduct) => ReactNode
+  onPriceChange: (id: string, field: SkuPriceField, next: number) => void
 ): Column<SkuProduct>[] {
   return [
     {
@@ -117,26 +120,6 @@ export function buildSkuColumns(
           {row.description}
         </span>
       ),
-    },
-    {
-      key: "actions",
-      // Unlabelled: the glyph is self-evident and a header here would read as
-      // a seventh data column.
-      header: "",
-      // A real trailing cell rather than DataTable's `rowAction` slot. That
-      // slot renders the control in a zero-width sticky cell as an absolutely
-      // positioned, opacity-0 overlay revealed on row hover — a stack of
-      // conditions between the pointer and the trigger, and the arrangement
-      // the menu was failing to open from. An ordinary cell puts the button
-      // in the normal flow and hit-testing path, which is what the popover
-      // trigger needs to be reliable.
-      width: "56px",
-      minWidth: 56,
-      align: "right",
-      // Compact density clips every cell; without this the popover's trigger
-      // ring and the menu itself would be cut at the cell boundary.
-      cellClassName: "overflow-visible",
-      render: (row) => renderActions(row),
     },
   ];
 }

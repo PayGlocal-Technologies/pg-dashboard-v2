@@ -41,13 +41,7 @@ interface InvoiceDropzoneProps {
   onCreateInvoice?: () => void;
 }
 
-function ValidationGroup({
-  label,
-  rows,
-}: {
-  label: string;
-  rows: InvoiceComparisonRow[];
-}) {
+function ValidationGroup({ label, rows }: { label: string; rows: InvoiceComparisonRow[] }) {
   return (
     <div>
       <div className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-700 dark:text-amber-500">
@@ -133,18 +127,7 @@ function MismatchPanel({
 
 export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
   (
-    {
-      id,
-      phase,
-      file,
-      matching,
-      error,
-      onSelectFile,
-      onReset,
-      invalid,
-      errorId,
-      onCreateInvoice,
-    },
+    { id, phase, file, matching, error, onSelectFile, onReset, invalid, errorId, onCreateInvoice },
     ref
   ) => {
     const [isDragOver, setIsDragOver] = useState(false);
@@ -162,15 +145,21 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
     const handleFile = (candidate: File) => {
       const extension = `.${candidate.name.split(".").pop()?.toLowerCase() ?? ""}`;
       const typeOk =
-        INVOICE_ACCEPTED_MIME_TYPES.includes(candidate.type as (typeof INVOICE_ACCEPTED_MIME_TYPES)[number]) ||
-        INVOICE_ACCEPTED_EXTENSIONS.includes(extension as (typeof INVOICE_ACCEPTED_EXTENSIONS)[number]);
+        INVOICE_ACCEPTED_MIME_TYPES.includes(
+          candidate.type as (typeof INVOICE_ACCEPTED_MIME_TYPES)[number]
+        ) ||
+        INVOICE_ACCEPTED_EXTENSIONS.includes(
+          extension as (typeof INVOICE_ACCEPTED_EXTENSIONS)[number]
+        );
 
       if (!typeOk) {
         setRejection("Only PDF invoices are supported. Please upload a .pdf file.");
         return;
       }
       if (candidate.size > INVOICE_MAX_SIZE_BYTES) {
-        setRejection(`File is too large. Maximum size is ${formatFileSize(INVOICE_MAX_SIZE_BYTES)}.`);
+        setRejection(
+          `File is too large. Maximum size is ${formatFileSize(INVOICE_MAX_SIZE_BYTES)}.`
+        );
         return;
       }
 
@@ -261,8 +250,8 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
               </p>
             </div>
             <p className="text-[12px] text-muted-foreground">
-              Reviewing invoice details. This usually takes a few seconds. Please keep this
-              window open.
+              Reviewing invoice details. This usually takes a few seconds. Please keep this window
+              open.
             </p>
           </div>
         ) : rejection ? (
@@ -359,7 +348,6 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
             </p>
           </div>
         )}
-
 
         {showCreateInvoiceLink && (
           <Button

@@ -20,7 +20,12 @@ interface UploadInvoiceModalProps {
   onUploaded?: (row: McaTransaction) => void;
 }
 
-export function UploadInvoiceModal({ row, open, onOpenChange, onUploaded }: UploadInvoiceModalProps) {
+export function UploadInvoiceModal({
+  row,
+  open,
+  onOpenChange,
+  onUploaded,
+}: UploadInvoiceModalProps) {
   const { isMobile } = useBreakpoint();
 
   const body = row ? (
@@ -30,7 +35,9 @@ export function UploadInvoiceModal({ row, open, onOpenChange, onUploaded }: Uplo
   if (isMobile) {
     return (
       <Drawer open={open} onOpenChange={onOpenChange} side="bottom">
-        <DrawerContent className="flex max-h-[88vh] flex-col rounded-t-2xl p-0">{body}</DrawerContent>
+        <DrawerContent className="flex max-h-[88vh] flex-col rounded-t-2xl p-0">
+          {body}
+        </DrawerContent>
       </Drawer>
     );
   }
