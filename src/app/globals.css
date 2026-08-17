@@ -262,7 +262,6 @@ body {
   --tw-exit-translate-y: 100%;
 }
 
-
 /* ─── Shimmer ────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0% {
@@ -297,10 +296,20 @@ body {
 
 /* ─── Wave (dashboard greeting) ──────────────────────────────────────────── */
 @keyframes wave {
-  0%,  60%, 100% { transform: rotate(0deg);   }
-  15%            { transform: rotate(16deg);  }
-  30%            { transform: rotate(-8deg);  }
-  45%            { transform: rotate(12deg);  }
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(16deg);
+  }
+  30% {
+    transform: rotate(-8deg);
+  }
+  45% {
+    transform: rotate(12deg);
+  }
 }
 
 /* ─── Focus ──────────────────────────────────────────────────────────────── */

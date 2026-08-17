@@ -48,7 +48,9 @@ export function CopyableValue({
 
   const labelBlock = (
     <div className="flex items-center gap-1">
-      <p className={cn("text-muted-foreground", layout === "stack" ? "text-xs" : "text-sm")}>{label}</p>
+      <p className={cn("text-muted-foreground", layout === "stack" ? "text-xs" : "text-sm")}>
+        {label}
+      </p>
       {tooltip && (
         <TooltipProvider delayDuration={200}>
           <Tooltip>
@@ -101,7 +103,12 @@ export function CopyableValue({
   }
 
   return (
-    <div className={cn("flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5", className)}>
+    <div
+      className={cn(
+        "flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5",
+        className
+      )}
+    >
       {labelBlock}
       {valueBlock}
     </div>

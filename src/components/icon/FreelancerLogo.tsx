@@ -5,33 +5,31 @@ import { forwardRef, type SVGProps } from "react";
  *
  * PLACEHOLDER ARTWORK — see AmazonLogo for the swap-in note.
  */
-export const FreelancerLogo = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>(
-  (props, ref) => (
-    <svg
-      ref={ref}
-      width="1em"
-      height="1em"
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      role="img"
-      aria-label="Freelancer"
-      {...props}
+export const FreelancerLogo = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>((props, ref) => (
+  <svg
+    ref={ref}
+    width="1em"
+    height="1em"
+    viewBox="0 0 32 32"
+    fill="none"
+    xmlns="http://www.w3.org/2000/svg"
+    role="img"
+    aria-label="Freelancer"
+    {...props}
+  >
+    <rect width="32" height="32" rx="8" fill="#29B2FE" />
+    <text
+      x="16"
+      y="16.5"
+      textAnchor="middle"
+      dominantBaseline="central"
+      fontFamily="system-ui, -apple-system, 'Segoe UI', sans-serif"
+      fontSize="17"
+      fontWeight="700"
+      fill="#FFFFFF"
     >
-      <rect width="32" height="32" rx="8" fill="#29B2FE" />
-      <text
-        x="16"
-        y="16.5"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontFamily="system-ui, -apple-system, 'Segoe UI', sans-serif"
-        fontSize="17"
-        fontWeight="700"
-        fill="#FFFFFF"
-      >
-        F
-      </text>
-    </svg>
-  )
-);
+      F
+    </text>
+  </svg>
+));
 FreelancerLogo.displayName = "FreelancerLogo";

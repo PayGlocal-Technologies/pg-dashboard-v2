@@ -407,7 +407,10 @@ export function AmountFilterChip({
       </FilterChipShell>
       <PopoverContent align="end" className="w-64 space-y-3 p-3">
         <div className="space-y-1.5">
-          <label className="text-[11px] font-medium text-muted-foreground" htmlFor={`${idPrefix}-min`}>
+          <label
+            className="text-[11px] font-medium text-muted-foreground"
+            htmlFor={`${idPrefix}-min`}
+          >
             Min amount
           </label>
           <Input
@@ -420,7 +423,10 @@ export function AmountFilterChip({
           />
         </div>
         <div className="space-y-1.5">
-          <label className="text-[11px] font-medium text-muted-foreground" htmlFor={`${idPrefix}-max`}>
+          <label
+            className="text-[11px] font-medium text-muted-foreground"
+            htmlFor={`${idPrefix}-max`}
+          >
             Max amount
           </label>
           <Input
@@ -516,7 +522,10 @@ export function EmailFilterChip({
       </FilterChipShell>
       <PopoverContent align="end" className="w-64 space-y-3 p-3">
         <div className="space-y-1.5">
-          <label className="text-[11px] font-medium text-muted-foreground" htmlFor={`${idPrefix}-value`}>
+          <label
+            className="text-[11px] font-medium text-muted-foreground"
+            htmlFor={`${idPrefix}-value`}
+          >
             {label} contains
           </label>
           <Input
@@ -621,7 +630,10 @@ export function CountryFilterChip({
               key={option.value}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
             >
-              <Checkbox checked={draft.includes(option.value)} onCheckedChange={() => toggle(option.value)} />
+              <Checkbox
+                checked={draft.includes(option.value)}
+                onCheckedChange={() => toggle(option.value)}
+              />
               <CountryFlag iso2={option.iso2 ?? option.value} />
               <span className="truncate">{option.label}</span>
             </label>
@@ -683,7 +695,10 @@ function StatusFilterPanel({
             key={option.value}
             className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
           >
-            <Checkbox checked={draft.includes(option.value)} onCheckedChange={() => onToggle(option.value)} />
+            <Checkbox
+              checked={draft.includes(option.value)}
+              onCheckedChange={() => onToggle(option.value)}
+            />
             {option.label}
           </label>
         ))}
@@ -825,7 +840,10 @@ export function CurrencyFilterChip({
               key={option.value}
               className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
             >
-              <Checkbox checked={draft.includes(option.value)} onCheckedChange={() => toggle(option.value)} />
+              <Checkbox
+                checked={draft.includes(option.value)}
+                onCheckedChange={() => toggle(option.value)}
+              />
               {option.iso2 ? (
                 <CountryFlag iso2={option.iso2} />
               ) : (

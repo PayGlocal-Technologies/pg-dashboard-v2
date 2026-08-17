@@ -208,7 +208,13 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
         role="button"
         tabIndex={0}
         onClick={toggleOpen}
-        title={collapsed ? (triggerName ? `${selectedProductLabel} / ${triggerName}` : "All Businesses") : undefined}
+        title={
+          collapsed
+            ? triggerName
+              ? `${selectedProductLabel} / ${triggerName}`
+              : "All Businesses"
+            : undefined
+        }
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -236,7 +242,10 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
             <Icon
               name="chevron-down"
               size={14}
-              className={cn("shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180"
+              )}
             />
           </>
         )}

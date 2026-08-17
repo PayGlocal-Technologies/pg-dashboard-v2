@@ -74,8 +74,8 @@ const METHOD_INFO: Record<string, MethodInfo> = {
           transfers in the UK.
         </Body>
         <Body>
-          To make payments, your client needs to add your UK bank account details as a beneficiary in
-          their banking portal.
+          To make payments, your client needs to add your UK bank account details as a beneficiary
+          in their banking portal.
         </Body>
         <TimelineHeading>Transfer timeline</TimelineHeading>
         <Body>
@@ -95,8 +95,8 @@ const METHOD_INFO: Record<string, MethodInfo> = {
           customers across Europe, directly into your account.
         </Body>
         <Body>
-          To make payments, your client needs to add your local bank account details as a beneficiary
-          in their banking portal.
+          To make payments, your client needs to add your local bank account details as a
+          beneficiary in their banking portal.
         </Body>
         <TimelineHeading>Transfer timeline</TimelineHeading>
         <Body>
@@ -157,8 +157,8 @@ const METHOD_INFO: Record<string, MethodInfo> = {
             transfers.
           </Body>
           <Body>
-            Osko is a payment overlay built on NPP that enables near-instant, 24/7 bank transfers. It
-            is widely used by major Australian banks.
+            Osko is a payment overlay built on NPP that enables near-instant, 24/7 bank transfers.
+            It is widely used by major Australian banks.
           </Body>
           <Body>
             To make payments, your client needs to add your Australian bank account details as a

@@ -46,9 +46,9 @@ function AudGuideDialog({
         <Separator className="my-4 border-dashed" />
 
         <p className="text-[13px] text-muted-foreground">
-          If your client&apos;s bank shows errors like &lsquo;Payment rejected&rsquo;, &lsquo;Account
-          appears closed&rsquo; or &lsquo;Delays in receiving payment&rsquo;, you can do the
-          following:
+          If your client&apos;s bank shows errors like &lsquo;Payment rejected&rsquo;,
+          &lsquo;Account appears closed&rsquo; or &lsquo;Delays in receiving payment&rsquo;, you can
+          do the following:
         </p>
 
         <p className="mt-5 text-sm font-semibold text-foreground">Steps to guide your client:</p>
@@ -108,8 +108,8 @@ function GlobalGuideDialog({
         </p>
 
         <p className="mt-4 text-[13px] text-muted-foreground">
-          This helps ensure the funds are sent in the intended currency and that you receive the full
-          expected amount.
+          This helps ensure the funds are sent in the intended currency and that you receive the
+          full expected amount.
         </p>
 
         <div className="mt-6 flex justify-end">
@@ -147,15 +147,13 @@ export function AccountCurrencyNotice({
         <p className="text-[13px] text-muted-foreground">
           {kind === "aud" ? (
             <>
-              Under new security measures, Australian banks may ask clients to verify account details
-              and display precautionary warnings.{" "}
+              Under new security measures, Australian banks may ask clients to verify account
+              details and display precautionary warnings.{" "}
             </>
           ) : (
             <>
               Ask senders to add{" "}
-              <span className="font-medium text-foreground">
-                &quot;DO NOT CONVERT TO GBP&quot;
-              </span>{" "}
+              <span className="font-medium text-foreground">&quot;DO NOT CONVERT TO GBP&quot;</span>{" "}
               as a remark to avoid unexpected FX charges.{" "}
             </>
           )}

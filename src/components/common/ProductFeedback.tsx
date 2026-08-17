@@ -109,7 +109,13 @@ export function ProductFeedback() {
               rows={3}
               className="resize-none text-sm"
             />
-            <Button type="button" variant="primary" size="sm" onClick={handleSubmit} className="self-end">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleSubmit}
+              className="self-end"
+            >
               Submit
             </Button>
           </div>

@@ -68,8 +68,16 @@ function buildInsightDelightContent(headline: string) {
         "High success rates are compounding your business outcomes. PayGlocal routing and retries are reducing avoidable payment drop-offs.",
       highlights: [
         { label: "Estimated recovered payments", value: "+7.8%", hint: "vs baseline this month" },
-        { label: "Repeat buyer confidence", value: "+11%", hint: "customers returning after successful payments" },
-        { label: "Support ticket reduction", value: "-16%", hint: "fewer payment-failure complaints" },
+        {
+          label: "Repeat buyer confidence",
+          value: "+11%",
+          hint: "customers returning after successful payments",
+        },
+        {
+          label: "Support ticket reduction",
+          value: "-16%",
+          hint: "fewer payment-failure complaints",
+        },
       ],
       wins: [
         "Reliable payment performance is improving customer trust at checkout.",
@@ -85,7 +93,11 @@ function buildInsightDelightContent(headline: string) {
         "Your cross-border payment flows are growing steadily with healthy conversion. You are unlocking new GMV without adding extra operational complexity.",
       highlights: [
         { label: "International GMV uplift", value: "+31%", hint: "month-over-month growth" },
-        { label: "High-intent checkout conversion", value: "+9.2%", hint: "from international traffic" },
+        {
+          label: "High-intent checkout conversion",
+          value: "+9.2%",
+          hint: "from international traffic",
+        },
         { label: "New market contribution", value: "22%", hint: "share of this month's growth" },
       ],
       wins: [
@@ -100,9 +112,17 @@ function buildInsightDelightContent(headline: string) {
     subtitle:
       "Cash-flow quality has improved and your funds are arriving faster. This gives your team more working-capital flexibility and predictable planning.",
     highlights: [
-      { label: "Average settlement speed", value: "-2.1 days", hint: "improvement vs last quarter" },
+      {
+        label: "Average settlement speed",
+        value: "-2.1 days",
+        hint: "improvement vs last quarter",
+      },
       { label: "Cash-flow predictability", value: "+14%", hint: "lower variance in payout timing" },
-      { label: "On-time operational readiness", value: "96%", hint: "planned payouts met schedule" },
+      {
+        label: "On-time operational readiness",
+        value: "96%",
+        hint: "planned payouts met schedule",
+      },
     ],
     wins: [
       "Faster access to funds supports smoother inventory and vendor cycles.",
@@ -418,7 +438,11 @@ export function PayGlocalAdvantageBanner({
                         "dark:border-primary/15 dark:from-card dark:to-primary-light/10 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
                       )}
                     >
-                      <Icon name={current.iconName} className="h-[20px] w-[20px] text-primary" aria-hidden />
+                      <Icon
+                        name={current.iconName}
+                        className="h-[20px] w-[20px] text-primary"
+                        aria-hidden
+                      />
                     </motion.div>
                   </AnimatePresence>
                 </div>
@@ -480,7 +504,9 @@ export function PayGlocalAdvantageBanner({
                 variant="primary"
                 size="sm"
                 className="h-8 w-full justify-center whitespace-nowrap px-3"
-                rightIcon={<Icon name="chevron-right" className="h-3.5 w-3.5 shrink-0" aria-hidden />}
+                rightIcon={
+                  <Icon name="chevron-right" className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                }
                 onClick={() => {
                   setInsightModalOpen(true);
                   setModalCardIndex(index);
@@ -507,12 +533,17 @@ export function PayGlocalAdvantageBanner({
       <Dialog open={insightModalOpen} onOpenChange={setInsightModalOpen}>
         <DialogContent className="max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden p-0 sm:h-[min(88vh,740px)] sm:max-w-2xl">
           <div className="relative overflow-hidden border-b border-border/80 bg-gradient-to-r from-primary/[0.12] via-primary/[0.06] to-transparent px-5 pb-4 pt-5 sm:px-6">
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/[0.35]" aria-hidden />
+            <div
+              className="absolute inset-0 bg-gradient-to-b from-transparent to-background/[0.35]"
+              aria-hidden
+            />
             <div className="relative">
               <span className="inline-flex rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-white">
                 Your monthly insight
               </span>
-              <DialogTitle className="mt-3 pr-10 text-[22px] leading-tight">{modalDetailContent.title}</DialogTitle>
+              <DialogTitle className="mt-3 pr-10 text-[22px] leading-tight">
+                {modalDetailContent.title}
+              </DialogTitle>
               <DialogDescription className="mt-2 max-w-[58ch] text-[13px] leading-relaxed text-muted-foreground">
                 {modalDetailContent.subtitle}
               </DialogDescription>
@@ -530,8 +561,12 @@ export function PayGlocalAdvantageBanner({
                 className="space-y-3"
               >
                 <div className="rounded-xl border border-border/80 bg-card p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Current trend</p>
-                  <p className="mt-1 text-sm font-semibold leading-snug text-foreground">{modalInsight.headline}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Current trend
+                  </p>
+                  <p className="mt-1 text-sm font-semibold leading-snug text-foreground">
+                    {modalInsight.headline}
+                  </p>
                   <div className="mt-2.5 h-[56px]">
                     <AdvantageInsightChart
                       kind={modalInsight.chartKind}
@@ -548,7 +583,9 @@ export function PayGlocalAdvantageBanner({
                   {modalDetailContent.highlights.map((h) => (
                     <div key={h.label} className="rounded-xl border border-border bg-muted/35 p-3">
                       <p className="text-[11px] font-medium text-muted-foreground">{h.label}</p>
-                      <p className="mt-1 text-base font-semibold tracking-tight text-foreground">{h.value}</p>
+                      <p className="mt-1 text-base font-semibold tracking-tight text-foreground">
+                        {h.value}
+                      </p>
                       <p className="mt-1 text-[11px] text-muted-foreground">{h.hint}</p>
                     </div>
                   ))}
@@ -560,8 +597,15 @@ export function PayGlocalAdvantageBanner({
                   </p>
                   <ul className="mt-2 space-y-1.5">
                     {modalDetailContent.wins.map((point) => (
-                      <li key={point} className="flex items-start gap-2 text-[13px] leading-relaxed text-foreground">
-                        <Icon name="check-circle" className="mt-[1px] h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                      <li
+                        key={point}
+                        className="flex items-start gap-2 text-[13px] leading-relaxed text-foreground"
+                      >
+                        <Icon
+                          name="check-circle"
+                          className="mt-[1px] h-4 w-4 shrink-0 text-emerald-600"
+                          aria-hidden
+                        />
                         <span>{point}</span>
                       </li>
                     ))}

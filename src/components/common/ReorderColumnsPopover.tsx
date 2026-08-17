@@ -17,7 +17,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Checkbox, Popover, PopoverContent, PopoverTrigger, Separator } from "@/components/ui";
+import {
+  Button,
+  Checkbox,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Separator,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -64,7 +71,9 @@ function SortableColumnRow({
   label: string;
   visibility?: ColumnVisibility;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -117,9 +126,7 @@ export function ReorderColumnsPopover({
 
   const toggleVisibility = (key: string) => {
     if (!onHiddenKeysChange || fixedKeys.includes(key)) return;
-    onHiddenKeysChange(
-      hidden.includes(key) ? hidden.filter((k) => k !== key) : [...hidden, key]
-    );
+    onHiddenKeysChange(hidden.includes(key) ? hidden.filter((k) => k !== key) : [...hidden, key]);
   };
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),

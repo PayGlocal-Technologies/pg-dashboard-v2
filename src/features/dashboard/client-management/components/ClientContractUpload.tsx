@@ -128,7 +128,9 @@ export function ClientContractUpload({ id, value, onChange }: ClientContractUplo
           className={cn(
             "flex cursor-pointer flex-col items-center gap-1.5 rounded-lg border-2 border-dashed px-4 py-5 text-center transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
-            isDragOver ? "border-primary bg-primary/5" : "border-border bg-muted/30 hover:bg-muted/50"
+            isDragOver
+              ? "border-primary bg-primary/5"
+              : "border-border bg-muted/30 hover:bg-muted/50"
           )}
         >
           <Icon name="upload" className="h-4 w-4 text-muted-foreground" />

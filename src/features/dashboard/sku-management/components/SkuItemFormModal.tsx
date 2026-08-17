@@ -43,10 +43,7 @@ import {
   validateType,
 } from "@/features/dashboard/sku-management/schemas";
 import { SkuMediaUpload } from "@/features/dashboard/sku-management/components/SkuMediaUpload";
-import type {
-  SkuItemFormValues,
-  SkuProductType,
-} from "@/features/dashboard/sku-management/types";
+import type { SkuItemFormValues, SkuProductType } from "@/features/dashboard/sku-management/types";
 
 /** Red asterisk before a required field's label — the same marker the Create
  *  MCA Link form uses, so required-ness reads identically across the product. */
@@ -380,11 +377,7 @@ function SkuItemFormBody({
                         <FieldLabel htmlFor="sku-selling-price">
                           <RequiredMark /> Selling price
                         </FieldLabel>
-                        <PriceInput
-                          id="sku-selling-price"
-                          symbol={symbol}
-                          field={field}
-                        />
+                        <PriceInput id="sku-selling-price" symbol={symbol} field={field} />
                         <FieldError>{field.state.meta.errors[0]}</FieldError>
                       </Field>
                     )}

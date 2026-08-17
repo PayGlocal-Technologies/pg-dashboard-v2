@@ -44,7 +44,12 @@ interface UploadInvoiceFormProps {
   onSuccess?: () => void;
 }
 
-export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess }: UploadInvoiceFormProps) {
+export function UploadInvoiceForm({
+  row,
+  variant = "modal",
+  onCancel,
+  onSuccess,
+}: UploadInvoiceFormProps) {
   const isModal = variant === "modal";
   const [saveError, setSaveError] = useState<string | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
@@ -53,8 +58,11 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
 
   // Which codes this merchant may choose from, and which one they last used,
   // both come from the API — see usePurposeCodes.
-  const { options: purposeCodeOptions, defaultPurposeCode, isLoading: isLoadingPurposeCodes } =
-    usePurposeCodes(row.merchantId);
+  const {
+    options: purposeCodeOptions,
+    defaultPurposeCode,
+    isLoading: isLoadingPurposeCodes,
+  } = usePurposeCodes(row.merchantId);
 
   // Persists the merchant's choice back onto their profile, so the next
   // invoice opens preselected with it. Same PUT pg-dashboard fires alongside
@@ -108,7 +116,9 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
         }
         onSuccess?.();
       } catch (err) {
-        setSaveError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+        setSaveError(
+          err instanceof Error ? err.message : "Something went wrong. Please try again."
+        );
       }
     },
   });
@@ -162,7 +172,11 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
           </Alert>
         )}
 
-        {isModal ? <DialogDescription asChild>{requirementBanner}</DialogDescription> : requirementBanner}
+        {isModal ? (
+          <DialogDescription asChild>{requirementBanner}</DialogDescription>
+        ) : (
+          requirementBanner
+        )}
 
         <form.Field
           name="purposeCode"
@@ -198,7 +212,7 @@ export function UploadInvoiceForm({ row, variant = "modal", onCancel, onSuccess 
           </FieldLabel>
           <FieldDescription>
             Invoice must match the amount, currency, and sender name. It should also include the
-            remitter address and item details. 
+            remitter address and item details.
           </FieldDescription>
           <InvoiceDropzone
             ref={dropzoneRef}

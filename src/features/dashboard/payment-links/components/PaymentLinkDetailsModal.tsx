@@ -150,7 +150,12 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <DetailField label="Customer Name" value={row.customerName} />
               <DetailField label="Phone Number" value={row.customerPhone || "—"} />
-              <DetailField label="Email Address" value={row.customerDetails} className="lowercase" span />
+              <DetailField
+                label="Email Address"
+                value={row.customerDetails}
+                className="lowercase"
+                span
+              />
               <DetailField
                 label="Billing Address"
                 value={row.billingAddress}

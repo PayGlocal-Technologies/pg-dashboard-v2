@@ -23,7 +23,10 @@ import {
   PaymentLinksMetricsPeriodFilter,
   type MetricsPeriod,
 } from "@/features/dashboard/payment-links/components/PaymentLinksMetricsPeriodFilter";
-import { PAYMENT_LINKS_PAGE_LIMIT, PAYMENT_LINK_STATUS_FILTERS } from "@/features/dashboard/payment-links/constants";
+import {
+  PAYMENT_LINKS_PAGE_LIMIT,
+  PAYMENT_LINK_STATUS_FILTERS,
+} from "@/features/dashboard/payment-links/constants";
 import {
   paymentLinkRows as initialPaymentLinkRows,
   paymentLinksMetricsByPeriod,
@@ -171,7 +174,11 @@ export function PaymentLinksFeature() {
       <Card className="gap-0 overflow-hidden p-0">
         <div className="pl-5 pr-3 pb-3 pt-5">
           <div className="space-y-3">
-            <SegmentedTabs options={PAYMENT_LINK_STATUS_FILTERS} value={status} onChange={onStatus} />
+            <SegmentedTabs
+              options={PAYMENT_LINK_STATUS_FILTERS}
+              value={status}
+              onChange={onStatus}
+            />
 
             {/* Thin top divider separates the filter bar from the tabs
              * above instead of its own bordered/boxed container. */}
@@ -236,7 +243,11 @@ export function PaymentLinksFeature() {
       </Card>
 
       <PaymentLinkDetailsModal row={detailsRow} open={detailsOpen} onOpenChange={setDetailsOpen} />
-      <CreatePaymentLinkModal open={createOpen} onOpenChange={setCreateOpen} onCreated={handleCreated} />
+      <CreatePaymentLinkModal
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onCreated={handleCreated}
+      />
     </div>
   );
 }

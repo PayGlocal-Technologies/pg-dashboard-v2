@@ -5,11 +5,7 @@ import { RowClick } from "@/components/common/table/RowClick";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { cn } from "@/lib/utils";
-import {
-  formatPhoneNumber,
-  formatTransactionDateOnly,
-  truncateMiddle,
-} from "@/lib/utils/format";
+import { formatPhoneNumber, formatTransactionDateOnly, truncateMiddle } from "@/lib/utils/format";
 import type { Client } from "@/features/dashboard/client-management/types";
 
 /**
@@ -121,7 +117,9 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
         <RowClick onClick={() => onOpenDetails(row)}>
           <div className="flex min-w-max items-center gap-1.5">
             <CountryFlag iso2={row.countryIso2} alt={row.countryName} />
-            <span className="text-[13px] whitespace-nowrap text-muted-foreground">{row.countryName}</span>
+            <span className="text-[13px] whitespace-nowrap text-muted-foreground">
+              {row.countryName}
+            </span>
           </div>
         </RowClick>
       ),

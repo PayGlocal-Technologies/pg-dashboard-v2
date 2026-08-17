@@ -1,7 +1,15 @@
 "use client";
 
 import { toast } from "sonner";
-import { Button, Card, InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput, PageHeader } from "@/components/ui";
+import {
+  Button,
+  Card,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  PageHeader,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 
 // TODO(integration): this screen is a placeholder only. Wire it up to the
@@ -21,7 +29,10 @@ export function ReferAndEarnFeature() {
 
   return (
     <div className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden">
-      <PageHeader title="Refer & Earn" subtitle="Invite other businesses to PayGlocal and earn rewards" />
+      <PageHeader
+        title="Refer & Earn"
+        subtitle="Invite other businesses to PayGlocal and earn rewards"
+      />
 
       <Card className="items-start gap-4 p-6">
         <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -31,7 +42,8 @@ export function ReferAndEarnFeature() {
         <div>
           <h2 className="text-sm font-semibold text-foreground">Share your referral link</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            When a business you refer signs up and completes their first settlement, you both earn a reward.
+            When a business you refer signs up and completes their first settlement, you both earn a
+            reward.
           </p>
         </div>
 

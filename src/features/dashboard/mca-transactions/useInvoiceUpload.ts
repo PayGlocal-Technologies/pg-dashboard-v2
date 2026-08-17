@@ -111,7 +111,10 @@ export interface UseInvoiceUploadResult {
   reset: () => void;
 }
 
-export function useInvoiceUpload({ merchantId, gid }: UseInvoiceUploadArgs): UseInvoiceUploadResult {
+export function useInvoiceUpload({
+  merchantId,
+  gid,
+}: UseInvoiceUploadArgs): UseInvoiceUploadResult {
   const [file, setFile] = useState<File | null>(null);
   const [invoiceId, setInvoiceId] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -275,7 +278,16 @@ export function useInvoiceUpload({ merchantId, gid }: UseInvoiceUploadArgs): Use
       // the updated transaction rather than the pre-upload one.
       await new Promise((resolve) => setTimeout(resolve, POST_UPLOAD_SETTLE_MS));
     },
-    [file, gid, merchantId, invoiceId, matching, requestFfmsUploadUrl, putToS3, sendNameMismatchEmail]
+    [
+      file,
+      gid,
+      merchantId,
+      invoiceId,
+      matching,
+      requestFfmsUploadUrl,
+      putToS3,
+      sendNameMismatchEmail,
+    ]
   );
 
   return { phase, file, matching, error, startScan, submit, reset };

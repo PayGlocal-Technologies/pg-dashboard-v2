@@ -62,7 +62,12 @@ export function DateRangeCalendarPicker({
       {mode === "single" ? (
         <Calendar mode="single" selected={singleDate} onSelect={onSingleDateChange} />
       ) : (
-        <Calendar mode="range" selected={range} onSelect={onRangeChange} numberOfMonths={numberOfMonths} />
+        <Calendar
+          mode="range"
+          selected={range}
+          onSelect={onRangeChange}
+          numberOfMonths={numberOfMonths}
+        />
       )}
 
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">

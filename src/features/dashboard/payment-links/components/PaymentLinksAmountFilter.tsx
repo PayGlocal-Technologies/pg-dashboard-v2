@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Field, FieldLabel, Input, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
+import {
+  Button,
+  Field,
+  FieldLabel,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -78,7 +86,10 @@ export function PaymentLinksAmountFilter({ value, onChange }: PaymentLinksAmount
       <PopoverContent align="start" className="w-64 p-3">
         <div className="flex items-start gap-2">
           <Field className="flex-1">
-            <FieldLabel htmlFor="payment-links-amount-min" className="text-[11px] text-muted-foreground">
+            <FieldLabel
+              htmlFor="payment-links-amount-min"
+              className="text-[11px] text-muted-foreground"
+            >
               Min amount
             </FieldLabel>
             <Input
@@ -92,7 +103,10 @@ export function PaymentLinksAmountFilter({ value, onChange }: PaymentLinksAmount
             />
           </Field>
           <Field className="flex-1">
-            <FieldLabel htmlFor="payment-links-amount-max" className="text-[11px] text-muted-foreground">
+            <FieldLabel
+              htmlFor="payment-links-amount-max"
+              className="text-[11px] text-muted-foreground"
+            >
               Max amount
             </FieldLabel>
             <Input

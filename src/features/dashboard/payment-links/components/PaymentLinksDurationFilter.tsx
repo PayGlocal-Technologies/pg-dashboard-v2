@@ -9,7 +9,10 @@ import {
   type DateRangeValue,
   type DurationPickMode,
 } from "@/components/common/DateRangeCalendarPicker";
-import { formatDateKey, formatShortDate } from "@/features/dashboard/settlement-reports/calendarUtils";
+import {
+  formatDateKey,
+  formatShortDate,
+} from "@/features/dashboard/settlement-reports/calendarUtils";
 
 export type DurationPreset = "today" | "last7" | "last30" | "last3months" | "custom";
 
@@ -98,7 +101,11 @@ export function PaymentLinksDurationFilter({ value, onChange }: PaymentLinksDura
     } else {
       onChange(
         range?.from
-          ? { preset: "custom", from: formatDateKey(range.from), to: formatDateKey(range.to ?? range.from) }
+          ? {
+              preset: "custom",
+              from: formatDateKey(range.from),
+              to: formatDateKey(range.to ?? range.from),
+            }
           : undefined
       );
     }

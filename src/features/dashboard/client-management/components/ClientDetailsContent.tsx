@@ -62,7 +62,13 @@ function ClientDetailRow({ label, value }: { label: string; value: ReactNode }) 
  * weight) the transaction amount has there, because it is what identifies this
  * record.
  */
-export function ClientIdentitySummary({ client, className }: { client: Client; className?: string }) {
+export function ClientIdentitySummary({
+  client,
+  className,
+}: {
+  client: Client;
+  className?: string;
+}) {
   return (
     // No second column opposite the stack: the identity stays one narrow
     // group at the left of whatever column holds it, rather than spreading
@@ -298,7 +304,6 @@ export function ClientContactSection({
     </section>
   );
 }
-
 
 interface ClientDetailsContentProps {
   client: Client;

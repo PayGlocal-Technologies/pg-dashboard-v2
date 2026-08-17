@@ -124,7 +124,10 @@ export function countryNameFor(countryIso2: string): string {
  */
 export function toClientFields(
   values: ClientFormValues
-): Omit<Client, "id" | "outstandingAmount" | "outstandingCurrency" | "totalInvoices" | "paidInvoices"> | null {
+): Omit<
+  Client,
+  "id" | "outstandingAmount" | "outstandingCurrency" | "totalInvoices" | "paidInvoices"
+> | null {
   if (!isClientFormValid(values)) return null;
 
   const countryName = countryNameFor(values.country);
@@ -143,9 +146,7 @@ export function toClientFields(
     // Composed once, here, from the parts the form collected: the Contact
     // section renders this one string, while the parts stay on the record for
     // a future edit form to read back.
-    billingAddress: [addressLine, city, state, zipcode, countryName]
-      .filter(Boolean)
-      .join(", "),
+    billingAddress: [addressLine, city, state, zipcode, countryName].filter(Boolean).join(", "),
     countryIso2: values.country,
     countryName,
     createdAt: new Date().toISOString(),

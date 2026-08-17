@@ -1,7 +1,15 @@
 "use client";
 
 import { useId } from "react";
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Card } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -67,7 +75,9 @@ export function PaymentLinkMetricCard({
         <div
           className={cn(
             "mt-2 flex items-center gap-1 text-xs font-medium",
-            trendPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+            trendPositive
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-red-600 dark:text-red-400"
           )}
         >
           <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />

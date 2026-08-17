@@ -150,7 +150,6 @@ export function TransactionDetailsDrawer({
             />
           )}
         </div>
-
       </DrawerContent>
     </Drawer>
   );

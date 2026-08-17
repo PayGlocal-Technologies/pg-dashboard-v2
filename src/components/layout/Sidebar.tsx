@@ -390,7 +390,12 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           </Button>
         </div>
 
-        <div className={cn("flex-shrink-0 border-b border-sidebar-border", collapsed ? "px-2 py-2" : "px-2.5 py-2.5")}>
+        <div
+          className={cn(
+            "flex-shrink-0 border-b border-sidebar-border",
+            collapsed ? "px-2 py-2" : "px-2.5 py-2.5"
+          )}
+        >
           <MerchantSelector collapsed={collapsed} />
         </div>
 

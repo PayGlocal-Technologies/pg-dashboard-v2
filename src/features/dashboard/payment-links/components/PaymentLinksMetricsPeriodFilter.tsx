@@ -21,7 +21,10 @@ interface PaymentLinksMetricsPeriodFilterProps {
   onChange: (value: MetricsPeriod) => void;
 }
 
-export function PaymentLinksMetricsPeriodFilter({ value, onChange }: PaymentLinksMetricsPeriodFilterProps) {
+export function PaymentLinksMetricsPeriodFilter({
+  value,
+  onChange,
+}: PaymentLinksMetricsPeriodFilterProps) {
   return (
     <Select value={value} onValueChange={(v) => onChange(v as MetricsPeriod)}>
       <SelectTrigger className="w-[150px]" aria-label="Metrics time period">

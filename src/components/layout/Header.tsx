@@ -108,7 +108,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               // Payments and MCA currently share the same feature routes, so
               // their highlight is driven by the active product context, not
               // the URL, Home/Partners still key off their own unique route.
-              const onHomeOrPartners = pathname === "/dashboard" || pathname.startsWith("/refer-and-earn");
+              const onHomeOrPartners =
+                pathname === "/dashboard" || pathname.startsWith("/refer-and-earn");
               const isActive = tab.product
                 ? activeProduct === tab.product && !onHomeOrPartners
                 : pathname === tab.href || pathname.startsWith(tab.href + "/");
@@ -119,9 +120,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   onClick={() => tab.product && setActiveProduct(tab.product)}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
-                    isActive
-                      ? "text-primary"
-                      : "text-muted-foreground hover:text-foreground"
+                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {tab.label}

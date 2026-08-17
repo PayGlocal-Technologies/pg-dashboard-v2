@@ -57,7 +57,13 @@ export function PaymentLinkQrCard({ url, onCopy, className }: PaymentLinkQrCardP
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <Button type="button" variant="outline" size="sm" onClick={onCopy} className="whitespace-nowrap">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onCopy}
+          className="whitespace-nowrap"
+        >
           Copy to Clipboard
         </Button>
         <Button

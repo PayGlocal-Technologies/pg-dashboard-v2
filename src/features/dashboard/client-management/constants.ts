@@ -55,9 +55,26 @@ const COUNTRY_CURRENCY: Record<string, string> = {
   SG: "SGD",
   AE: "AED",
   // Euro area — the countries the single EUR account receives for.
-  AT: "EUR", BE: "EUR", HR: "EUR", CY: "EUR", EE: "EUR", FI: "EUR", FR: "EUR",
-  DE: "EUR", GR: "EUR", IE: "EUR", IT: "EUR", LV: "EUR", LT: "EUR", LU: "EUR",
-  MT: "EUR", NL: "EUR", PT: "EUR", SK: "EUR", SI: "EUR", ES: "EUR",
+  AT: "EUR",
+  BE: "EUR",
+  HR: "EUR",
+  CY: "EUR",
+  EE: "EUR",
+  FI: "EUR",
+  FR: "EUR",
+  DE: "EUR",
+  GR: "EUR",
+  IE: "EUR",
+  IT: "EUR",
+  LV: "EUR",
+  LT: "EUR",
+  LU: "EUR",
+  MT: "EUR",
+  NL: "EUR",
+  PT: "EUR",
+  SK: "EUR",
+  SI: "EUR",
+  ES: "EUR",
 };
 
 export function currencyForCountry(countryIso2: string): string {
@@ -73,7 +90,6 @@ export const CLIENT_CONTRACT_ACCEPTED_MIME_TYPES = [
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
-
 
 /** Rows per page in the Client Details view's transactions section. Smaller
  *  than the Transactions page's own limit: this is one client's recent

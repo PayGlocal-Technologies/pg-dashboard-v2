@@ -51,8 +51,10 @@ const MCA_STATUS_META: Record<string, StatusMeta> = {
  * FrmPendingBadge) and by the timeline's own banner.
  */
 export function getStatusMeta(raw: string, isFrmPending: boolean): StatusMeta {
-  const meta =
-    MCA_STATUS_META[raw] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
+  const meta = MCA_STATUS_META[raw] ?? {
+    label: raw.replace(/_/g, " ").toLowerCase(),
+    variant: "muted",
+  };
   return isFrmPending ? { ...meta, variant: "warning" } : meta;
 }
 
@@ -388,9 +390,7 @@ export function buildMcaColumns(
                   Invoice is already the button above, so it only appears here
                   when there is something else alongside it. */}
               {actions.length > (isPendingInvoice ? 1 : 0) && (
-                <RowActionsMenu
-                  actions={isPendingInvoice ? actions.slice(1) : actions}
-                />
+                <RowActionsMenu actions={isPendingInvoice ? actions.slice(1) : actions} />
               )}
             </div>
           </RowClick>

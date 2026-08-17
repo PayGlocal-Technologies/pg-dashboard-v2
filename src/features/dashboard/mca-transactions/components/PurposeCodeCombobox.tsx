@@ -37,137 +37,143 @@ interface PurposeCodeComboboxProps {
 
 export const PurposeCodeCombobox = forwardRef<PurposeCodeComboboxHandle, PurposeCodeComboboxProps>(
   ({ id, value, onChange, onBlur, invalid, errorId, options, isLoading }, forwardedRef) => {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
+    const [open, setOpen] = useState(false);
+    const [search, setSearch] = useState("");
+    const [highlightedIndex, setHighlightedIndex] = useState(0);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
 
-  useImperativeHandle(forwardedRef, () => ({
-    focus: () => {
-      triggerRef.current?.focus();
-    },
-  }));
+    useImperativeHandle(forwardedRef, () => ({
+      focus: () => {
+        triggerRef.current?.focus();
+      },
+    }));
 
-  const selected = useMemo(() => options.find((p) => p.code === value), [options, value]);
+    const selected = useMemo(() => options.find((p) => p.code === value), [options, value]);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return options;
-    return options.filter(
-      (p) => p.code.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
-    );
-  }, [options, search]);
+    const filtered = useMemo(() => {
+      const q = search.trim().toLowerCase();
+      if (!q) return options;
+      return options.filter(
+        (p) => p.code.toLowerCase().includes(q) || p.description.toLowerCase().includes(q)
+      );
+    }, [options, search]);
 
-  // Focusing the search input only needs the DOM node, no state update — safe
-  // inside the effect body itself (no synchronous setState here).
-  useEffect(() => {
-    if (!open) return;
-    const focusTimer = setTimeout(() => inputRef.current?.focus(), 0);
-    return () => clearTimeout(focusTimer);
-  }, [open]);
+    // Focusing the search input only needs the DOM node, no state update — safe
+    // inside the effect body itself (no synchronous setState here).
+    useEffect(() => {
+      if (!open) return;
+      const focusTimer = setTimeout(() => inputRef.current?.focus(), 0);
+      return () => clearTimeout(focusTimer);
+    }, [open]);
 
-  const listboxId = `${id}-listbox`;
-  const activeOption = filtered[highlightedIndex];
-  const activeOptionId = activeOption ? `${id}-option-${activeOption.code}` : undefined;
+    const listboxId = `${id}-listbox`;
+    const activeOption = filtered[highlightedIndex];
+    const activeOptionId = activeOption ? `${id}-option-${activeOption.code}` : undefined;
 
-  const updateSearch = (v: string) => {
-    setSearch(v);
-    setHighlightedIndex(0);
-  };
+    const updateSearch = (v: string) => {
+      setSearch(v);
+      setHighlightedIndex(0);
+    };
 
-  const selectOption = (code: string) => {
-    onChange(code);
-    setOpen(false);
-  };
+    const selectOption = (code: string) => {
+      onChange(code);
+      setOpen(false);
+    };
 
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
-    setHighlightedIndex(0);
-    if (!next) {
-      setSearch("");
-      onBlur?.();
-    }
-  };
+    const handleOpenChange = (next: boolean) => {
+      setOpen(next);
+      setHighlightedIndex(0);
+      if (!next) {
+        setSearch("");
+        onBlur?.();
+      }
+    };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setHighlightedIndex((i) => Math.min(i + 1, filtered.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setHighlightedIndex((i) => Math.max(i - 1, 0));
-    } else if (e.key === "Enter") {
-      e.preventDefault();
-      if (activeOption) selectOption(activeOption.code);
-    }
-  };
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setHighlightedIndex((i) => Math.min(i + 1, filtered.length - 1));
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setHighlightedIndex((i) => Math.max(i - 1, 0));
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        if (activeOption) selectOption(activeOption.code);
+      }
+    };
 
-  // One trigger for both states, rather than a separate "selected" layout
-  // carrying its own Change action beside the value: the whole field is the
-  // dropdown, so clicking anywhere on it opens the selector and the trailing
-  // chevron is the only affordance in either state. Only the label inside
-  // differs between having a selection and not.
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <button
-          ref={triggerRef}
-          id={id}
-          type="button"
-          role="combobox"
-          aria-expanded={open}
-          aria-haspopup="listbox"
-          aria-controls={listboxId}
-          aria-invalid={invalid || undefined}
-          aria-describedby={invalid ? errorId : undefined}
-          className={cn(
-            "flex h-10 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-left text-[13px] shadow-sm",
-            "transition-colors duration-150",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
-            selected ? "text-foreground" : "text-muted-foreground",
-            invalid ? "border-destructive" : "border-border"
-          )}
+    // One trigger for both states, rather than a separate "selected" layout
+    // carrying its own Change action beside the value: the whole field is the
+    // dropdown, so clicking anywhere on it opens the selector and the trailing
+    // chevron is the only affordance in either state. Only the label inside
+    // differs between having a selection and not.
+    return (
+      <Popover open={open} onOpenChange={handleOpenChange}>
+        <PopoverTrigger asChild>
+          <button
+            ref={triggerRef}
+            id={id}
+            type="button"
+            role="combobox"
+            aria-expanded={open}
+            aria-haspopup="listbox"
+            aria-controls={listboxId}
+            aria-invalid={invalid || undefined}
+            aria-describedby={invalid ? errorId : undefined}
+            className={cn(
+              "flex h-10 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-left text-[13px] shadow-sm",
+              "transition-colors duration-150",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+              selected ? "text-foreground" : "text-muted-foreground",
+              invalid ? "border-destructive" : "border-border"
+            )}
+          >
+            {selected ? (
+              <span className="min-w-0 flex-1 truncate">
+                <span className="font-medium">{selected.code}</span>
+                <span className="text-muted-foreground"> {selected.description}</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-2">
+                <Icon
+                  name={isLoading ? "loader" : "search"}
+                  className={cn("h-3.5 w-3.5 shrink-0", isLoading && "animate-spin")}
+                />
+                {isLoading ? "Loading purpose codes…" : "Search by code or keyword"}
+              </span>
+            )}
+            <Icon
+              name="chevron-down"
+              className={cn(
+                "h-3.5 w-3.5 shrink-0 opacity-70 transition-transform",
+                open && "rotate-180"
+              )}
+            />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          className="w-[var(--radix-popover-trigger-width)] min-w-[min(24rem,calc(100vw-3rem))] p-0"
+          onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          {selected ? (
-            <span className="min-w-0 flex-1 truncate">
-              <span className="font-medium">{selected.code}</span>
-              <span className="text-muted-foreground"> {selected.description}</span>
-            </span>
-          ) : (
-            <span className="flex items-center gap-2">
-              <Icon name={isLoading ? "loader" : "search"} className={cn("h-3.5 w-3.5 shrink-0", isLoading && "animate-spin")} />
-              {isLoading ? "Loading purpose codes…" : "Search by code or keyword"}
-            </span>
-          )}
-          <Icon
-            name="chevron-down"
-            className={cn("h-3.5 w-3.5 shrink-0 opacity-70 transition-transform", open && "rotate-180")}
+          <ComboboxList
+            id={id}
+            listboxId={listboxId}
+            inputRef={inputRef}
+            search={search}
+            onSearchChange={updateSearch}
+            onKeyDown={handleKeyDown}
+            filtered={filtered}
+            isLoading={isLoading}
+            highlightedIndex={highlightedIndex}
+            activeOptionId={activeOptionId}
+            value={value}
+            onSelect={selectOption}
           />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        align="start"
-        className="w-[var(--radix-popover-trigger-width)] min-w-[min(24rem,calc(100vw-3rem))] p-0"
-        onOpenAutoFocus={(e) => e.preventDefault()}
-      >
-        <ComboboxList
-          id={id}
-          listboxId={listboxId}
-          inputRef={inputRef}
-          search={search}
-          onSearchChange={updateSearch}
-          onKeyDown={handleKeyDown}
-          filtered={filtered}
-          isLoading={isLoading}
-          highlightedIndex={highlightedIndex}
-          activeOptionId={activeOptionId}
-          value={value}
-          onSelect={selectOption}
-        />
-      </PopoverContent>
-    </Popover>
-  );
+        </PopoverContent>
+      </Popover>
+    );
   }
 );
 PurposeCodeCombobox.displayName = "PurposeCodeCombobox";

@@ -222,7 +222,10 @@ export function SettlementStatementDrawer({
             variant="primary"
             className="w-full"
             disabled={
-              isWorking || !account || !(legalNameOverride ?? account.accountHolderName) || !address.trim()
+              isWorking ||
+              !account ||
+              !(legalNameOverride ?? account.accountHolderName) ||
+              !address.trim()
             }
             onClick={() => {
               if (!account) return;

@@ -11,13 +11,13 @@ export const SEGMENT_MCA = "GLOBAL_FUND_TRANSFER";
 // reversal statuses are listed separately (the server treats them as distinct
 // values) even though the table's badge renders one label for both.
 export const MCA_STATUS_FILTERS: FilterOption[] = [
-  { value: "All",                        label: "All" },
-  { value: "FUNDS_ON_HOLD",              label: "Funds on Hold" },
-  { value: "DOCUMENT_PENDING",           label: "Invoice Pending" },
-  { value: "SENT_FOR_REVIEW",            label: "Sent for Review" },
-  { value: "SENT_FOR_SETTLEMENT",        label: "Sent for Settlement" },
-  { value: "SETTLED",                    label: "Settled" },
-  { value: "FIRC_SETTLED",               label: "FIRC Settled" },
+  { value: "All", label: "All" },
+  { value: "FUNDS_ON_HOLD", label: "Funds on Hold" },
+  { value: "DOCUMENT_PENDING", label: "Invoice Pending" },
+  { value: "SENT_FOR_REVIEW", label: "Sent for Review" },
+  { value: "SENT_FOR_SETTLEMENT", label: "Sent for Settlement" },
+  { value: "SETTLED", label: "Settled" },
+  { value: "FIRC_SETTLED", label: "FIRC Settled" },
   { value: "REVERSAL_FOR_RISK_REJECTED", label: "Funds reversed" },
   { value: "REVERSAL_FOR_NOT_SUPPORTED", label: "Reversal - Not Supported" },
 ];
@@ -28,11 +28,11 @@ export const MCA_STATUS_FILTERS: FilterOption[] = [
 // "OTHER" is a real server-side value covering every currency outside the
 // five, so it is a genuine option rather than a placeholder.
 export const MCA_CURRENCY_FILTERS: CurrencyFilterOption[] = [
-  { value: "USD",   label: "USD",    iso2: "US" },
-  { value: "EUR",   label: "EUR",    iso2: "EU" },
-  { value: "GBP",   label: "GBP",    iso2: "GB" },
-  { value: "AUD",   label: "AUD",    iso2: "AU" },
-  { value: "CAD",   label: "CAD",    iso2: "CA" },
+  { value: "USD", label: "USD", iso2: "US" },
+  { value: "EUR", label: "EUR", iso2: "EU" },
+  { value: "GBP", label: "GBP", iso2: "GB" },
+  { value: "AUD", label: "AUD", iso2: "AU" },
+  { value: "CAD", label: "CAD", iso2: "CA" },
   { value: "OTHER", label: "Others" },
 ];
 
@@ -59,9 +59,19 @@ export const MCA_PROCESSING_FEE_RATE = 0.0075; // 0.75% of the converted INR amo
 
 // ── Country name map (ISO2 → display name, matches pg-dashboard) ─────────────
 export const COUNTRY_NAME_MAP: Record<string, string> = {
-  US: "United States", GB: "United Kingdom", EU: "European Union",
-  AU: "Australia",     CA: "Canada",         SG: "Singapore",
-  AE: "UAE",           IN: "India",          JP: "Japan",
-  DE: "Germany",       FR: "France",         NL: "Netherlands",
-  CH: "Switzerland",   HK: "Hong Kong",      NZ: "New Zealand",
+  US: "United States",
+  GB: "United Kingdom",
+  EU: "European Union",
+  AU: "Australia",
+  CA: "Canada",
+  SG: "Singapore",
+  AE: "UAE",
+  IN: "India",
+  JP: "Japan",
+  DE: "Germany",
+  FR: "France",
+  NL: "Netherlands",
+  CH: "Switzerland",
+  HK: "Hong Kong",
+  NZ: "New Zealand",
 };

@@ -29,9 +29,7 @@ export type NavGroup = {
 export const regularNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Payments",
@@ -181,9 +179,7 @@ export const regularNavigation: NavGroup[] = [
 export const partnerNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/manage-merchants", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/manage-merchants", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Merchant",
@@ -237,9 +233,7 @@ export const partnerNavigation: NavGroup[] = [
 export const globalNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Payments",
@@ -261,9 +255,7 @@ export const globalNavigation: NavGroup[] = [
         href: "/payment-products",
         icon: "shopping-cart",
         permission: [],
-        children: [
-          { label: "Payment Links", href: "/payment-links", permission: [] },
-        ],
+        children: [{ label: "Payment Links", href: "/payment-links", permission: [] }],
       },
     ],
   },

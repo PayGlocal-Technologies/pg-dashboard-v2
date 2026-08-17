@@ -21,7 +21,12 @@ interface MultiSelectChipFilterProps {
  * with Clear/Apply footer buttons, selections are staged in the popover and
  * only committed on Apply. Mirrors TransactionAmountFilter's draft/resync
  * pattern, generalized to a multi-select list instead of a min/max range. */
-export function MultiSelectChipFilter({ value, options, onChange, placeholder }: MultiSelectChipFilterProps) {
+export function MultiSelectChipFilter({
+  value,
+  options,
+  onChange,
+  placeholder,
+}: MultiSelectChipFilterProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>(value ?? []);
 
@@ -35,7 +40,9 @@ export function MultiSelectChipFilter({ value, options, onChange, placeholder }:
   }
 
   function toggleOption(optValue: string) {
-    setDraft((prev) => (prev.includes(optValue) ? prev.filter((v) => v !== optValue) : [...prev, optValue]));
+    setDraft((prev) =>
+      prev.includes(optValue) ? prev.filter((v) => v !== optValue) : [...prev, optValue]
+    );
   }
 
   function handleApply() {
@@ -50,11 +57,12 @@ export function MultiSelectChipFilter({ value, options, onChange, placeholder }:
   }
 
   const hasValue = !!value && value.length > 0;
-  const triggerLabel = hasValue && value
-    ? value.length === 1
-      ? (options.find((o) => o.value === value[0])?.label ?? placeholder)
-      : `${placeholder} (${value.length})`
-    : placeholder;
+  const triggerLabel =
+    hasValue && value
+      ? value.length === 1
+        ? (options.find((o) => o.value === value[0])?.label ?? placeholder)
+        : `${placeholder} (${value.length})`
+      : placeholder;
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
@@ -71,7 +79,10 @@ export function MultiSelectChipFilter({ value, options, onChange, placeholder }:
         >
           {triggerLabel}
           {hasValue && (
-            <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
+            <span
+              className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary"
+              aria-hidden="true"
+            />
           )}
         </Button>
       </PopoverTrigger>
@@ -82,7 +93,10 @@ export function MultiSelectChipFilter({ value, options, onChange, placeholder }:
               key={opt.value}
               className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-muted/60"
             >
-              <Checkbox checked={draft.includes(opt.value)} onCheckedChange={() => toggleOption(opt.value)} />
+              <Checkbox
+                checked={draft.includes(opt.value)}
+                onCheckedChange={() => toggleOption(opt.value)}
+              />
               <span className="text-sm text-foreground">{opt.label}</span>
             </div>
           ))}

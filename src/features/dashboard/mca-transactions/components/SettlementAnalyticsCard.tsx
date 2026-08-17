@@ -70,7 +70,11 @@ export function SettlementAnalyticsCard({ className }: { className?: string }) {
   // vertical space Outstanding + Saved's combined height gives this card, put
   // to use as more rows instead of sitting as blank space below a truncated
   // five. Below lg (the carousel), the Show more/less toggle is unchanged.
-  const visibleRows = isDesktop ? accountRows : expanded ? accountRows : accountRows.slice(0, VISIBLE_COUNT);
+  const visibleRows = isDesktop
+    ? accountRows
+    : expanded
+      ? accountRows
+      : accountRows.slice(0, VISIBLE_COUNT);
   const canExpand = !isDesktop && accountRows.length > VISIBLE_COUNT;
 
   const settledValue = toMetricNumber(overview?.successfulPayments?.value);
@@ -223,7 +227,9 @@ export function SettlementAnalyticsCard({ className }: { className?: string }) {
               variant="ghost"
               size="sm"
               onClick={() => setExpanded((prev) => !prev)}
-              rightIcon={<Icon name={expanded ? "chevron-up" : "chevron-down"} className="h-3.5 w-3.5" />}
+              rightIcon={
+                <Icon name={expanded ? "chevron-up" : "chevron-down"} className="h-3.5 w-3.5" />
+              }
             >
               {expanded ? "Show less" : "Show more"}
             </Button>

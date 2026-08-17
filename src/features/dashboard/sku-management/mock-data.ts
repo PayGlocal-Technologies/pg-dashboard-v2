@@ -114,7 +114,7 @@ export const MOCK_SKU_PRODUCTS: SkuProduct[] = [
   },
   {
     id: "sku-009",
-    name: "Leather Laptop Sleeve 14\"",
+    name: 'Leather Laptop Sleeve 14"',
     images: ["/assets/sku/leather-laptop-sleeve-14.png"],
     type: "GOODS",
     hsnSac: "42021290",

@@ -48,7 +48,12 @@ export function McaLinkDetailsDrawer({
         </DrawerTitle>
 
         <DrawerHeader className="flex shrink-0 items-center gap-1 py-3">
-          <IconButton aria-label="Close" variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+          <IconButton
+            aria-label="Close"
+            variant="ghost"
+            size="sm"
+            onClick={() => onOpenChange(false)}
+          >
             <Icon name="x" className="h-4 w-4" />
           </IconButton>
         </DrawerHeader>
@@ -61,7 +66,9 @@ export function McaLinkDetailsDrawer({
                   <span className="text-2xl font-semibold tabular-nums text-foreground">
                     {formatCurrency(parseFloat(row.amount ?? "0"), row.currency ?? "USD", "en-US")}
                   </span>
-                  <span className="text-[13px] font-medium text-muted-foreground">{row.currency}</span>
+                  <span className="text-[13px] font-medium text-muted-foreground">
+                    {row.currency}
+                  </span>
                 </div>
                 {status && (
                   <StatusBadge

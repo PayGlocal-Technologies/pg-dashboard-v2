@@ -29,9 +29,12 @@ export function ReferAndEarnBanner() {
 
       <div className="relative flex flex-wrap items-center justify-between gap-3 pr-20">
         <div className="min-w-0">
-          <h3 className="text-sm font-semibold text-foreground">Liking the product? Refer &amp; Earn</h3>
+          <h3 className="text-sm font-semibold text-foreground">
+            Liking the product? Refer &amp; Earn
+          </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Invite other businesses to PayGlocal and earn rewards when they complete their first settlement.
+            Invite other businesses to PayGlocal and earn rewards when they complete their first
+            settlement.
           </p>
         </div>
         <Button

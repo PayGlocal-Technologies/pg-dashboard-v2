@@ -44,7 +44,10 @@ import {
   MCA_STATUS_FILTERS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/mca-transactions/constants";
-import type { McaTransaction, McaTransactionsResponse } from "@/features/dashboard/mca-transactions/types";
+import type {
+  McaTransaction,
+  McaTransactionsResponse,
+} from "@/features/dashboard/mca-transactions/types";
 import type { TableReqBody } from "@/types/transactions";
 
 // The same rotating hints pg-dashboard's transactions search offers.
@@ -102,11 +105,11 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   const queryClient = useQueryClient();
   const [scrollPosition, setScrollPosition] = useState(0);
 
-  const [search, setSearch]     = useState("");
+  const [search, setSearch] = useState("");
   // Defaults to "Invoice Pending" (rather than "All") when the page loads.
-  const [statusFilters, setStatusFilters]     = useState<string[]>(INVOICE_PENDING_STATUSES);
+  const [statusFilters, setStatusFilters] = useState<string[]>(INVOICE_PENDING_STATUSES);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
-  const [dateRange, setDateRange]     = useState<{ from: string; to: string }>({ from: "", to: "" });
+  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   // "Last N weeks/days/hours/minutes", kept as two pieces of state on
   // purpose. `relativeRange` is what the chip shows and re-seeds from;
   // `relativeWindow` is that range resolved to absolute epoch millis at the
@@ -129,7 +132,7 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   // Columns the merchant has hidden. Amount/Status/Date are pinned (see
   // FIXED_COLUMN_KEYS) and can never end up in here.
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
-  const [page, setPage]         = useState(1);
+  const [page, setPage] = useState(1);
 
   // Upload Invoice modal — superseded by the drawer's inline upload flow
   // (Upload Invoice now opens the Transaction Details Drawer). Kept
@@ -142,8 +145,8 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   // it. drawerOpen and detailsOpen are mutually exclusive: a row click opens
   // the drawer, and Expand hands the same transaction off to the page.
   const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen]     = useState(false);
-  const [detailsOpen, setDetailsOpen]   = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // Set when navigating to a linked transaction that isn't part of the
   // table's own currently-fetched page (see openLinkedTransaction below) —
   // takes precedence over the rows.find lookup so the details page can show
@@ -187,7 +190,7 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
     isReady
   );
 
-  const rows       = data?.data?.data ?? [];
+  const rows = data?.data?.data ?? [];
   const totalCount = data?.data?.totalCount ?? 0;
 
   // Every filter is server-side, so what the API returned is what the table
@@ -198,7 +201,10 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
   const detailsRow = detailsOverrideRow ?? rows.find((r) => r.gid === detailsRowId) ?? null;
 
-  const onSearch = (v: string) => { setSearch(v); setPage(1); };
+  const onSearch = (v: string) => {
+    setSearch(v);
+    setPage(1);
+  };
 
   // const openUploadInvoice = (row: McaTransaction) => {
   //   setUploadRowId(row.gid);
@@ -288,7 +294,9 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   const handleInvoiceSubmitted = (row: McaTransaction) => {
     void refetch();
     void queryClient.invalidateQueries({ queryKey: ["mca-txn-timeline", row.gid] });
-    void queryClient.invalidateQueries({ queryKey: ["mca-txn-documents", row.merchantId, row.gid] });
+    void queryClient.invalidateQueries({
+      queryKey: ["mca-txn-documents", row.merchantId, row.gid],
+    });
   };
 
   // Export runs the table's current request body against the download
@@ -468,7 +476,11 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
             }
             onValueChange={(v) => {
               setStatusFilters(
-                v === "invoice-pending" ? INVOICE_PENDING_STATUSES : v === "settled" ? SETTLED_STATUSES : []
+                v === "invoice-pending"
+                  ? INVOICE_PENDING_STATUSES
+                  : v === "settled"
+                    ? SETTLED_STATUSES
+                    : []
               );
               setPage(1);
             }}
@@ -506,10 +518,7 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
               variant="outline"
               size="sm"
               leftIcon={
-                <Icon
-                  name="refresh"
-                  className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
-                />
+                <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
               }
               onClick={() => void handleRefresh()}
               disabled={isFetching}
@@ -546,10 +555,16 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
               <Icon name="alert-circle" size={22} />
             </span>
             <div>
-              <h3 className="text-sm font-semibold text-foreground">Couldn&apos;t load transactions</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Something went wrong while fetching data.</p>
+              <h3 className="text-sm font-semibold text-foreground">
+                Couldn&apos;t load transactions
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Something went wrong while fetching data.
+              </p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => void refetch()}>Retry</Button>
+            <Button variant="outline" size="sm" onClick={() => void refetch()}>
+              Retry
+            </Button>
           </div>
         ) : (
           <>

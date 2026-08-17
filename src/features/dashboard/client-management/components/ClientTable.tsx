@@ -132,7 +132,10 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // writes state back.
   const totalPages = Math.max(1, Math.ceil(totalCount / CLIENT_PAGE_LIMIT));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filteredRows.slice((safePage - 1) * CLIENT_PAGE_LIMIT, safePage * CLIENT_PAGE_LIMIT);
+  const pageRows = filteredRows.slice(
+    (safePage - 1) * CLIENT_PAGE_LIMIT,
+    safePage * CLIENT_PAGE_LIMIT
+  );
 
   const detailsRow = sourceRows.find((c) => c.id === detailsId) ?? null;
 

@@ -105,9 +105,7 @@ export function ShareAccountDetailsModal({
   useEffect(() => {
     if (!open || !account.currency) return;
     if (issuedLink?.currency === account.currency) return;
-    requestShareLink(account.currency, (url) =>
-      setIssuedLink({ currency: account.currency, url })
-    );
+    requestShareLink(account.currency, (url) => setIssuedLink({ currency: account.currency, url }));
   }, [open, account.currency, issuedLink, requestShareLink]);
 
   const senderEmail = useApp((s) => s.profile?.emailId) ?? "you@company.com";

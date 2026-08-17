@@ -122,7 +122,8 @@ export function FxCalculatorModal({
   // headline "1 USD = x INR" is its reciprocal — the same inversion
   // pg-dashboard applies before displaying it.
   const rate = Number(rates?.fxRate);
-  const displayRate = rates && Number.isFinite(rate) && rate > 0 ? (1 / rate).toFixed(2) : undefined;
+  const displayRate =
+    rates && Number.isFinite(rate) && rate > 0 ? (1 / rate).toFixed(2) : undefined;
 
   const selectedIso2 = QUOTE_CURRENCIES.find((c) => c.code === currency)?.iso2 ?? "";
 
@@ -251,8 +252,8 @@ export function FxCalculatorModal({
         </div>
 
         <p className="mt-3 text-[11px] text-muted-foreground">
-          *The amount shown may differ from the final settled amount, which uses the exchange rate at
-          the time of settlement.
+          *The amount shown may differ from the final settled amount, which uses the exchange rate
+          at the time of settlement.
         </p>
 
         <div className="mt-5 flex justify-end">

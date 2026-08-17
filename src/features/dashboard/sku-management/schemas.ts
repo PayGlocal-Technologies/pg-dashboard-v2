@@ -26,9 +26,7 @@ export function validateType(value: string): string | undefined {
 }
 
 export function validateCurrency(value: string): string | undefined {
-  return (SKU_CURRENCIES as readonly string[]).includes(value)
-    ? undefined
-    : "Select a currency";
+  return (SKU_CURRENCIES as readonly string[]).includes(value) ? undefined : "Select a currency";
 }
 
 /**

@@ -126,11 +126,7 @@ export function SkuRowActions({
           />
         ) : (
           <>
-            <MenuAction
-              icon="pencil"
-              label="Edit item"
-              onSelect={select(() => onEdit(product))}
-            />
+            <MenuAction icon="pencil" label="Edit item" onSelect={select(() => onEdit(product))} />
             <MenuAction
               icon="archive"
               label="Archive item"

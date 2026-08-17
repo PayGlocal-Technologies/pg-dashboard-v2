@@ -18,7 +18,14 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Checkbox, Popover, PopoverContent, PopoverTrigger, Separator } from "@/components/ui";
+import {
+  Button,
+  Checkbox,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Separator,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -34,13 +41,18 @@ interface SortableRowProps {
 }
 
 function SortableRow({ item, checked, onToggle }: SortableRowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.key });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.key,
+  });
 
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={cn("flex items-center gap-2 rounded-lg px-1.5 py-1.5", isDragging && "z-10 bg-muted shadow-sm")}
+      className={cn(
+        "flex items-center gap-2 rounded-lg px-1.5 py-1.5",
+        isDragging && "z-10 bg-muted shadow-sm"
+      )}
     >
       <Button
         type="button"
@@ -78,7 +90,9 @@ export function TransactionColumnsMenu({
   const [open, setOpen] = useState(false);
 
   const itemsByKey = new Map(items.map((i) => [i.key, i]));
-  const orderedItems = order.map((k) => itemsByKey.get(k)).filter((i): i is ColumnToggleItem => !!i);
+  const orderedItems = order
+    .map((k) => itemsByKey.get(k))
+    .filter((i): i is ColumnToggleItem => !!i);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),

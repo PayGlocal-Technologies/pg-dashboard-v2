@@ -1,7 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Alert, AlertDescription, Badge, Button, Card, CardContent, StatusBadge } from "@/components/ui";
+import {
+  Alert,
+  AlertDescription,
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  StatusBadge,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
@@ -11,7 +19,11 @@ import {
   formatTransactionTimestamp,
   truncateMiddle,
 } from "@/lib/utils/format";
-import { CountryCell, getStatusMeta, MdrOfferBadge } from "@/features/dashboard/mca-transactions/columns";
+import {
+  CountryCell,
+  getStatusMeta,
+  MdrOfferBadge,
+} from "@/features/dashboard/mca-transactions/columns";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { UploadInvoiceForm } from "@/features/dashboard/mca-transactions/components/UploadInvoiceForm";
 import { SettlementTimelineSection } from "@/features/dashboard/mca-transactions/components/SettlementTimelineSection";
@@ -132,7 +144,10 @@ function PaymentDetailsSection({
       </h3>
       <Card size="sm">
         <CardContent className="space-y-4">
-          <DetailRow label="Transaction date" value={formatTransactionTimestamp(row.formattedTransactionCreationDateTime)} />
+          <DetailRow
+            label="Transaction date"
+            value={formatTransactionTimestamp(row.formattedTransactionCreationDateTime)}
+          />
           {/* Always shown, even pre-settlement — a "-" placeholder keeps the
               field present across every transaction state instead of the
               row disappearing until settlement. */}
@@ -144,11 +159,7 @@ function PaymentDetailsSection({
               that the bank, or failing both the currency it is held in. */}
           <DetailRow
             label="Receiving Account"
-            value={
-              account?.accountHolderName ??
-              account?.bankName ??
-              `${accountCurrency} Account`
-            }
+            value={account?.accountHolderName ?? account?.bankName ?? `${accountCurrency} Account`}
           />
           {/* Flag + code chip rather than bare text, so the currency is
               recognisable at a glance. Flux's Badge is the chip primitive
@@ -166,7 +177,9 @@ function PaymentDetailsSection({
               <Badge
                 variant="secondary"
                 size="md"
-                leftIcon={account?.bankCountry ? <CountryFlag iso2={account.bankCountry} /> : undefined}
+                leftIcon={
+                  account?.bankCountry ? <CountryFlag iso2={account.bankCountry} /> : undefined
+                }
               >
                 {accountCurrency}
               </Badge>
@@ -272,13 +285,14 @@ export function TransactionDetailsPage({
         onOpenTransaction={onOpenTransaction}
         isPartnerUser={isPartnerUser}
       />
-
     </div>
   );
 }
 
-interface TransactionDetailsContentProps
-  extends Omit<TransactionDetailsPageProps, "onBack" | "onCollapse"> {
+interface TransactionDetailsContentProps extends Omit<
+  TransactionDetailsPageProps,
+  "onBack" | "onCollapse"
+> {
   /** "page" (default): 2-column grid, as on the full Transaction Details
    * page. "drawer": single column, everything stacked in document order,
    * for the narrower drawer viewport. */
@@ -350,9 +364,7 @@ export function TransactionDetailsContent({
     <div className={layout === "drawer" ? undefined : "mb-9"}>
       {isSampleTransaction && (
         <Alert variant="warning" className="mb-4">
-          <AlertDescription>
-            This is a sample transaction shown for preview only.
-          </AlertDescription>
+          <AlertDescription>This is a sample transaction shown for preview only.</AlertDescription>
         </Alert>
       )}
       {/* flex-wrap rather than a hard breakpoint: the date drops below the
@@ -466,7 +478,11 @@ export function TransactionDetailsContent({
             with Settlement Timeline across from it. */}
         <div className={cn("space-y-9 lg:col-start-2", ROW_START_CLASS[timelineRow])}>
           <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
-          <SenderDetailsSection row={row} counterpartyName={counterpartyName} isPartnerUser={isPartnerUser} />
+          <SenderDetailsSection
+            row={row}
+            counterpartyName={counterpartyName}
+            isPartnerUser={isPartnerUser}
+          />
         </div>
       </div>
     </div>

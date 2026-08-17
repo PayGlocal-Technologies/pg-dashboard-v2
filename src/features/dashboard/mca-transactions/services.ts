@@ -115,7 +115,6 @@ export const mcaOverviewByMidApi = (mid: string) =>
 export const mcaOverviewByUcicApi = (ucicId: string) =>
   ucicId ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/getPacbOverview` : "";
 
-
 /** Transactions export. POST the same OpenSearch body the table uses; the
  *  response is an xlsx blob, not JSON. */
 export const mcaTxnReportDownloadApi = (mid: string) =>

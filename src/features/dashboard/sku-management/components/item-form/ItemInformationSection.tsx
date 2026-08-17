@@ -108,9 +108,7 @@ export function ItemInformationSection({ form }: { form: SkuItemFormApi }) {
         <form.Subscribe selector={(state) => state.values.type}>
           {(type) => {
             const scheme =
-              type === "GOODS" || type === "SERVICES"
-                ? SKU_TAX_CODE[type]
-                : SKU_TAX_CODE_FALLBACK;
+              type === "GOODS" || type === "SERVICES" ? SKU_TAX_CODE[type] : SKU_TAX_CODE_FALLBACK;
             return (
               <form.Field
                 name="hsnSac"

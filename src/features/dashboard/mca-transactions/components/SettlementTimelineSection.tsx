@@ -10,10 +10,7 @@ import {
   mcaTxnDocumentsApi,
   mcaTxnTimelineApi,
 } from "@/features/dashboard/mca-transactions/services";
-import {
-  useDocumentDownload,
-  useFircDownload,
-} from "@/features/dashboard/mca-transactions/hooks";
+import { useDocumentDownload, useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import {
   buildSettlementTimeline,
   getDocumentPendingMessage,
@@ -74,11 +71,9 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
     isPending,
     isError,
     refetch,
-  } = useGet<TimelineApiResponse>(
-    ["mca-txn-timeline", row.gid],
-    mcaTxnTimelineApi(row.gid),
-    { enabled: !!row.gid }
-  );
+  } = useGet<TimelineApiResponse>(["mca-txn-timeline", row.gid], mcaTxnTimelineApi(row.gid), {
+    enabled: !!row.gid,
+  });
 
   const { data: documentsData } = useGet<TxnDocumentsResponse>(
     ["mca-txn-documents", row.merchantId, row.gid],
@@ -197,7 +192,8 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
     (frmData?.data?.frmStatus?.conversation?.length ?? 0) > 0 &&
     frmData?.data?.frmStatus?.status !== "NO_FRM";
   const hasAdditionalDocThread = (additionalDocData?.data?.data?.length ?? 0) > 0;
-  const hasQueries = hasComplianceThread || hasAdditionalDocThread || isFrmPending || isAwaitingAdditionalDocs;
+  const hasQueries =
+    hasComplianceThread || hasAdditionalDocThread || isFrmPending || isAwaitingAdditionalDocs;
 
   return (
     <section>
@@ -211,7 +207,9 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="message-circle" className="h-3.5 w-3.5" />}
-            onClick={() => setQueriesTab(hasComplianceThread || isFrmPending ? "compliance" : "additional")}
+            onClick={() =>
+              setQueriesTab(hasComplianceThread || isFrmPending ? "compliance" : "additional")
+            }
             className="h-auto min-h-0 py-1 text-[12px] text-muted-foreground hover:text-foreground"
           >
             Transaction queries

@@ -41,11 +41,7 @@ function RollingDigit({ digit, delay }: RollingDigitProps) {
           }
         >
           {stack.map((d) => (
-            <span
-              key={d}
-              className="block text-center tabular-nums"
-              style={{ height: "1lh" }}
-            >
+            <span key={d} className="block text-center tabular-nums" style={{ height: "1lh" }}>
               {d}
             </span>
           ))}

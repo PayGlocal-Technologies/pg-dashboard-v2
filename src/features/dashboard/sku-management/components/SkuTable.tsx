@@ -126,8 +126,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
     // one box, no mode to pick, a hit on either counts. Description stays
     // unsearchable — the hint never offers it.
     return (
-      product.name.toLowerCase().includes(query) ||
-      product.hsnSac.toLowerCase().includes(query)
+      product.name.toLowerCase().includes(query) || product.hsnSac.toLowerCase().includes(query)
     );
   });
 
@@ -138,10 +137,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   // shrink, and is derived during render, so no effect writes state back.
   const totalPages = Math.max(1, Math.ceil(totalCount / SKU_PAGE_LIMIT));
   const safePage = Math.min(page, totalPages);
-  const pageRows = filteredRows.slice(
-    (safePage - 1) * SKU_PAGE_LIMIT,
-    safePage * SKU_PAGE_LIMIT
-  );
+  const pageRows = filteredRows.slice((safePage - 1) * SKU_PAGE_LIMIT, safePage * SKU_PAGE_LIMIT);
 
   // TODO: every mutation below is local only — persist each through the
   // catalogue endpoints once they exist. Edits, archives, and deletes survive
@@ -172,10 +168,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
       return;
     }
 
-    setCreatedItems((prev) => [
-      { id: `sku-new-${nextIdRef.current++}`, ...fields },
-      ...prev,
-    ]);
+    setCreatedItems((prev) => [{ id: `sku-new-${nextIdRef.current++}`, ...fields }, ...prev]);
     // A new item belongs in the active list, so leave the archived view and
     // reset paging — otherwise it lands on a page the merchant isn't looking
     // at and the form appears to have done nothing.
@@ -260,7 +253,11 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
           onValueChange={onTabChange}
           actions={
             showArchived ? (
-              <Badge variant="secondary" size="sm" leftIcon={<Icon name="archive" className="h-3 w-3" />}>
+              <Badge
+                variant="secondary"
+                size="sm"
+                leftIcon={<Icon name="archive" className="h-3 w-3" />}
+              >
                 Viewing archived items
               </Badge>
             ) : null
@@ -283,10 +280,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
           variant="outline"
           size="sm"
           leftIcon={
-            <Icon
-              name={showArchived ? "chevron-left" : "archive"}
-              className="h-3.5 w-3.5"
-            />
+            <Icon name={showArchived ? "chevron-left" : "archive"} className="h-3.5 w-3.5" />
           }
           onClick={onToggleArchived}
           className="ml-auto h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"

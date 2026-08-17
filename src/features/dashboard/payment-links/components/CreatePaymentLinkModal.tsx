@@ -74,7 +74,14 @@ interface AddressValues {
   pincode: string;
 }
 
-const EMPTY_ADDRESS: AddressValues = { line1: "", line2: "", city: "", state: "", country: "", pincode: "" };
+const EMPTY_ADDRESS: AddressValues = {
+  line1: "",
+  line2: "",
+  city: "",
+  state: "",
+  country: "",
+  pincode: "",
+};
 
 interface CreatePaymentLinkFormValues {
   currency: string;
@@ -135,7 +142,13 @@ const DEFAULT_VALUES: CreatePaymentLinkFormValues = {
 };
 
 function isAddressComplete(a: AddressValues): boolean {
-  return !!(a.line1.trim() && a.city.trim() && a.state.trim() && a.country.trim() && a.pincode.trim());
+  return !!(
+    a.line1.trim() &&
+    a.city.trim() &&
+    a.state.trim() &&
+    a.country.trim() &&
+    a.pincode.trim()
+  );
 }
 
 function hasValidPhone(phone: string): boolean {
@@ -143,17 +156,22 @@ function hasValidPhone(phone: string): boolean {
 }
 
 function isAddressEmpty(a: AddressValues): boolean {
-  return !a.line1.trim() && !a.city.trim() && !a.state.trim() && !a.country.trim() && !a.pincode.trim();
+  return (
+    !a.line1.trim() && !a.city.trim() && !a.state.trim() && !a.country.trim() && !a.pincode.trim()
+  );
 }
 
 function computeIsValid(v: CreatePaymentLinkFormValues): boolean {
   const amountValid = Number(v.amount) > 0;
   const hasContact = v.customerEmail.trim().length > 0 || hasValidPhone(v.customerPhone);
   const billingValid = isAddressEmpty(v.billing) || isAddressComplete(v.billing);
-  const shippingValid = v.shippingSameAsBilling || isAddressEmpty(v.shipping) || isAddressComplete(v.shipping);
+  const shippingValid =
+    v.shippingSameAsBilling || isAddressEmpty(v.shipping) || isAddressComplete(v.shipping);
   const recurringValid =
-    !v.recurringEnabled || Boolean(v.recurringFrequency && v.recurringStartDate && v.recurringStartTime);
-  const expiryValid = v.expiryOption !== "custom" || Boolean(v.customExpiryDate && v.customExpiryTime);
+    !v.recurringEnabled ||
+    Boolean(v.recurringFrequency && v.recurringStartDate && v.recurringStartTime);
+  const expiryValid =
+    v.expiryOption !== "custom" || Boolean(v.customExpiryDate && v.customExpiryTime);
 
   // Amount + currency are the only mandatory fields for this workflow, see
   // the modal's "Enter amount" tab, every other section below is optional
@@ -162,18 +180,20 @@ function computeIsValid(v: CreatePaymentLinkFormValues): boolean {
   // does not).
   return Boolean(
     amountValid &&
-      (!v.customerName.trim() || hasContact) &&
-      billingValid &&
-      shippingValid &&
-      recurringValid &&
-      expiryValid
+    (!v.customerName.trim() || hasContact) &&
+    billingValid &&
+    shippingValid &&
+    recurringValid &&
+    expiryValid
   );
 }
 
 function expiryLabel(v: CreatePaymentLinkFormValues): string {
   const preset = EXPIRY_OPTIONS.find((o) => o.value === v.expiryOption);
   if (v.expiryOption !== "custom") return preset?.label ?? "7 Days";
-  return v.customExpiryDate ? `${v.customExpiryDate} ${v.customExpiryTime || ""}`.trim() : "Custom date";
+  return v.customExpiryDate
+    ? `${v.customExpiryDate} ${v.customExpiryTime || ""}`.trim()
+    : "Custom date";
 }
 
 /** Only called from the submit handler (an event handler, not render), safe
@@ -222,19 +242,35 @@ function AddressFields({ values, onChange, idPrefix }: AddressFieldsProps) {
     <div className="grid gap-3 sm:grid-cols-2">
       <Field className="sm:col-span-2">
         <FieldLabel htmlFor={`${idPrefix}-line1`}>Address Line 1</FieldLabel>
-        <Input id={`${idPrefix}-line1`} value={values.line1} onChange={(e) => set("line1", e.target.value)} />
+        <Input
+          id={`${idPrefix}-line1`}
+          value={values.line1}
+          onChange={(e) => set("line1", e.target.value)}
+        />
       </Field>
       <Field className="sm:col-span-2">
         <FieldLabel htmlFor={`${idPrefix}-line2`}>Address Line 2</FieldLabel>
-        <Input id={`${idPrefix}-line2`} value={values.line2} onChange={(e) => set("line2", e.target.value)} />
+        <Input
+          id={`${idPrefix}-line2`}
+          value={values.line2}
+          onChange={(e) => set("line2", e.target.value)}
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-city`}>City</FieldLabel>
-        <Input id={`${idPrefix}-city`} value={values.city} onChange={(e) => set("city", e.target.value)} />
+        <Input
+          id={`${idPrefix}-city`}
+          value={values.city}
+          onChange={(e) => set("city", e.target.value)}
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-state`}>State</FieldLabel>
-        <Input id={`${idPrefix}-state`} value={values.state} onChange={(e) => set("state", e.target.value)} />
+        <Input
+          id={`${idPrefix}-state`}
+          value={values.state}
+          onChange={(e) => set("state", e.target.value)}
+        />
       </Field>
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-country`}>Country</FieldLabel>
@@ -242,7 +278,11 @@ function AddressFields({ values, onChange, idPrefix }: AddressFieldsProps) {
       </Field>
       <Field>
         <FieldLabel htmlFor={`${idPrefix}-pincode`}>Pincode</FieldLabel>
-        <Input id={`${idPrefix}-pincode`} value={values.pincode} onChange={(e) => set("pincode", e.target.value)} />
+        <Input
+          id={`${idPrefix}-pincode`}
+          value={values.pincode}
+          onChange={(e) => set("pincode", e.target.value)}
+        />
       </Field>
     </div>
   );
@@ -273,7 +313,9 @@ function SingleSelectChips<T extends string>({
           onClick={() => onChange(opt.value)}
           className={cn(
             "h-auto min-h-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-medium",
-            value === opt.value ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+            value === opt.value
+              ? "bg-card text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
           )}
         >
           {opt.label}
@@ -314,7 +356,11 @@ interface CreatePaymentLinkModalProps {
   onCreated: (row: PaymentLinkRow) => void;
 }
 
-export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: CreatePaymentLinkModalProps) {
+export function CreatePaymentLinkModal({
+  open,
+  onOpenChange,
+  onCreated,
+}: CreatePaymentLinkModalProps) {
   const [notifyViaTouched, setNotifyViaTouched] = useState(false);
   // Lazy initializer runs once on mount, not on every render, see CLAUDE.md.
   const [todayDateKey] = useState(() => new Date().toISOString().slice(0, 10));
@@ -433,7 +479,10 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                     </p>
                     <form.Field name="currency">
                       {(currencyField) => (
-                        <Select value={currencyField.state.value} onValueChange={currencyField.handleChange}>
+                        <Select
+                          value={currencyField.state.value}
+                          onValueChange={currencyField.handleChange}
+                        >
                           <SelectTrigger className="h-7 w-fit min-w-0 gap-1 rounded-full border-border bg-muted/60 px-3 text-xs font-semibold">
                             <SelectValue />
                           </SelectTrigger>
@@ -586,7 +635,11 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                         <h3 className="text-sm font-semibold text-foreground">Billing details</h3>
                         <form.Field name="billing">
                           {(field) => (
-                            <AddressFields values={field.state.value} onChange={field.handleChange} idPrefix="billing" />
+                            <AddressFields
+                              values={field.state.value}
+                              onChange={field.handleChange}
+                              idPrefix="billing"
+                            />
                           )}
                         </form.Field>
 
@@ -596,7 +649,9 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                               <label className="flex items-center gap-2">
                                 <Checkbox
                                   checked={sameField.state.value}
-                                  onCheckedChange={(checked) => sameField.handleChange(checked === true)}
+                                  onCheckedChange={(checked) =>
+                                    sameField.handleChange(checked === true)
+                                  }
                                 />
                                 <span className="text-sm text-foreground">
                                   Shipping address is same as billing address
@@ -605,7 +660,9 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
 
                               {!sameField.state.value && (
                                 <div className="mt-3">
-                                  <h3 className="text-sm font-semibold text-foreground">Shipping details</h3>
+                                  <h3 className="text-sm font-semibold text-foreground">
+                                    Shipping details
+                                  </h3>
                                   <form.Field name="shipping">
                                     {(field) => (
                                       <div className="mt-3">
@@ -629,9 +686,12 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                       <Card className="gap-4 p-5">
                         <h3 className="text-sm font-semibold text-foreground">Add reminders</h3>
                         <p className="text-xs text-muted-foreground">
-                          Send payment link reminders to your customer through the channels selected below.
+                          Send payment link reminders to your customer through the channels selected
+                          below.
                         </p>
-                        <form.Subscribe selector={(s) => [s.values.customerPhone, s.values.notifyVia] as const}>
+                        <form.Subscribe
+                          selector={(s) => [s.values.customerPhone, s.values.notifyVia] as const}
+                        >
                           {([phone, notifyVia]) => (
                             <div className="flex flex-wrap gap-1.5">
                               {NOTIFY_CHANNELS.map((channel) => {
@@ -710,7 +770,9 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                           {(recurringField) => (
                             <>
                               <div className="flex items-center justify-between gap-4">
-                                <p className="text-sm font-medium text-foreground">Enable recurring payment</p>
+                                <p className="text-sm font-medium text-foreground">
+                                  Enable recurring payment
+                                </p>
                                 <Switch
                                   checked={recurringField.state.value}
                                   onCheckedChange={recurringField.handleChange}
@@ -816,9 +878,13 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                           <div className="flex flex-col gap-4">
                             <div>
                               <p className="text-3xl font-bold tracking-tight text-foreground tabular-nums">
-                                {hasAmount ? formatCurrency(Number(values.amount), values.currency) : "₹0"}
+                                {hasAmount
+                                  ? formatCurrency(Number(values.amount), values.currency)
+                                  : "₹0"}
                               </p>
-                              <p className="text-xs font-medium text-muted-foreground">{values.currency}</p>
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {values.currency}
+                              </p>
                             </div>
 
                             {!hasAmount ? (
@@ -844,23 +910,31 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                                         {values.customerName}
                                       </p>
                                       {values.customerEmail.trim() && (
-                                        <p className="text-xs text-muted-foreground">{values.customerEmail}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {values.customerEmail}
+                                        </p>
                                       )}
                                     </>
                                   ) : (
-                                    <p className="mt-0.5 text-sm font-semibold text-foreground">Not added</p>
+                                    <p className="mt-0.5 text-sm font-semibold text-foreground">
+                                      Not added
+                                    </p>
                                   )}
                                 </div>
 
                                 <div className="flex items-center justify-between gap-4 py-2">
                                   <span className="text-xs text-muted-foreground">Expiry</span>
-                                  <span className="text-sm font-semibold text-foreground">{expiryLabel(values)}</span>
+                                  <span className="text-sm font-semibold text-foreground">
+                                    {expiryLabel(values)}
+                                  </span>
                                 </div>
 
                                 <div className="flex items-center justify-between gap-4 py-2">
                                   <span className="text-xs text-muted-foreground">Reminders</span>
                                   <span className="text-sm font-semibold text-foreground">
-                                    {notifyCount > 0 ? `${notifyCount} channel${notifyCount === 1 ? "" : "s"}` : "Off"}
+                                    {notifyCount > 0
+                                      ? `${notifyCount} channel${notifyCount === 1 ? "" : "s"}`
+                                      : "Off"}
                                   </span>
                                 </div>
 
@@ -868,7 +942,9 @@ export function CreatePaymentLinkModal({ open, onOpenChange, onCreated }: Create
                                   <span className="text-xs text-muted-foreground">Recurring</span>
                                   <span className="text-sm font-semibold text-foreground">
                                     {values.recurringEnabled
-                                      ? FREQUENCY_OPTIONS.find((o) => o.value === values.recurringFrequency)?.label
+                                      ? FREQUENCY_OPTIONS.find(
+                                          (o) => o.value === values.recurringFrequency
+                                        )?.label
                                       : "No"}
                                   </span>
                                 </div>

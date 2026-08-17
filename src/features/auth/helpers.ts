@@ -7,8 +7,7 @@ import { useApp } from "@/stores/useApp";
 export function firebaseConfigProvider(): Auth {
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain:
-      process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${window.location.host}/app`,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${window.location.host}/app`,
   };
 
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
