@@ -22,6 +22,18 @@ export const useProductContext = create<ProductContextState>()(
       activeProduct: "PA",
       setActiveProduct: (product) => set({ activeProduct: product }),
     }),
-    { name: "productContextState" }
+    {
+      name: "productContextState",
+      // The stored product lives in localStorage, which the server cannot read,
+      // and both the header tabs and the sidebar's child filtering branch on
+      // `activeProduct` during render. Hydrating automatically would therefore
+      // make the server's markup (always the "PA" default) disagree with the
+      // client's for anyone whose last selection was MCA, which React reports
+      // as a hydration mismatch and recovers from by throwing the tree away.
+      //
+      // Skipping it here keeps the first client render identical to the
+      // server's; Providers reads the stored value in immediately afterwards.
+      skipHydration: true,
+    }
   )
 );
