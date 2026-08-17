@@ -2,13 +2,39 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { MerchantSelector } from "@/components/layout/MerchantSelector";
+import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useProductContext } from "@/stores/useProductContext";
+import type { ProductType } from "@/lib/hooks/useResolvedMids";
+
+/**
+ * The 4 tabs represent 3 products: Payments (PA) and Multi-Currency Accounts
+ * (PACB) each own a `product` tag, Home is a combined overview of both (no
+ * tag, doesn't touch the active product) and Partners is unrelated.
+ *
+ * Most feature routes (/reports/settlement-report, /team-management, ...) are
+ * shared by both products, so clicking a tab sets which product those screens
+ * resolve data for (see useProductContext.ts) rather than navigating to a
+ * distinct per-product page. Transactions is the exception: it is two real
+ * routes, /pa-transactions and /mca-transactions, so the Payments tab lands on
+ * its own table directly. Multi-Currency Accounts has no landing page of its
+ * own yet, so its tab opens the settlement dashboard, scoped to PACB.
+ */
+const HEADER_TABS: { label: string; href: string; product?: ProductType }[] = [
+  { label: "Home", href: "/dashboard" },
+  // /pa-transactions, not /transactions: the single segment-toggled page this
+  // tab originally pointed at was split into the PA and MCA tables, and the
+  // PA one is this tab's product.
+  { label: "Payments", href: "/pa-transactions", product: "PA" },
+  { label: "Multi-Currency Accounts", href: "/reports/settlement-report", product: "PACB" },
+  { label: "Partners", href: "/refer-and-earn" },
+] as const;
 
 const CREATE_ITEMS = [
   {
@@ -29,16 +55,21 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const paMids = useApp((s) => s.paMids);
   const paCbMids = useApp((s) => s.paCbMids);
   const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
   const tidsInfo = useApp((s) => s.tidsInfo);
 
   const selectedMidDetails = useAccountSetup((s) => s.selectedMidDetails);
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+
+  const activeProduct = useProductContext((s) => s.activeProduct);
+  const setActiveProduct = useProductContext((s) => s.setActiveProduct);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createHover, setCreateHover] = useState(false);
 
   const createRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   const isMultiMids = paMids.length > 1 || (paCbMids.length > 1 && isMultiMidUser);
 
@@ -70,8 +101,35 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           <Icon name="menu" size={20} />
         </Button>
 
-        {/* Merchant selector */}
-        <MerchantSelector />
+        {/* Top-level category tabs */}
+        {!isPartnerUser && (
+          <nav className="hidden items-center gap-1 md:flex">
+            {HEADER_TABS.map((tab) => {
+              // Payments and MCA currently share the same feature routes, so
+              // their highlight is driven by the active product context, not
+              // the URL, Home/Partners still key off their own unique route.
+              const onHomeOrPartners = pathname === "/dashboard" || pathname.startsWith("/refer-and-earn");
+              const isActive = tab.product
+                ? activeProduct === tab.product && !onHomeOrPartners
+                : pathname === tab.href || pathname.startsWith(tab.href + "/");
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  onClick={() => tab.product && setActiveProduct(tab.product)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
+                    isActive
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -187,7 +245,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
       </header>
 
-      {/* "Viewing as" ribbon — shown when a MID is selected in multi-MID mode */}
+      {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode */}
       {showRibbon && (
         <div
           className="flex items-center justify-between px-4 py-1.5 text-[13px]"

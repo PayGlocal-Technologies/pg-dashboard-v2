@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { ViewPortal } from "@/components/layout/ViewPortal";
+import { MerchantSelector } from "@/components/layout/MerchantSelector";
 import {
   regularNavigation,
   partnerNavigation,
@@ -16,6 +17,7 @@ import {
   type NavGroup,
 } from "@/lib/navigation";
 import { useApp } from "@/stores/useApp";
+import { useProductContext } from "@/stores/useProductContext";
 import { useLogout } from "@/lib/hooks/useLogout";
 import useNewPermissions from "@/hooks/useNewPermissions";
 
@@ -235,7 +237,7 @@ function SidebarBody({
             <>
               <div className="flex-1 min-w-0 overflow-hidden">
                 <p className="text-[13px] font-medium leading-tight text-foreground truncate">
-                  {displayName || "—"}
+                  {displayName || "Not available"}
                 </p>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {formatRole(profile?.role)}
@@ -318,6 +320,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGlobalTenant = useApp((s) => s.isGlobalTenant);
+  const activeProduct = useProductContext((s) => s.activeProduct);
 
   const checkPermissions = useNewPermissions();
 
@@ -327,7 +330,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
       ? globalNavigation
       : regularNavigation;
 
-  // Filter groups based on permissions — mirrors pg-dashboard formatMenuItems logic
+  // Filter groups based on permissions, mirrors pg-dashboard formatMenuItems logic.
+  // A child tagged with `product` (e.g. "Payment Links" / "MCA Links") only
+  // shows while the Header's active product context matches, see
+  // useProductContext.ts, everything else in the sidebar is shared by both.
   const filteredNavigation: NavGroup[] = baseNavigation
     .map((group) => {
       const visibleItems = group.items
@@ -335,7 +341,9 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         .map((item) => ({
           ...item,
           children: item.children?.filter(
-            (c) => !c.permission?.length || checkPermissions(c.permission)
+            (c) =>
+              (!c.permission?.length || checkPermissions(c.permission)) &&
+              (!c.product || c.product === activeProduct)
           ),
         }))
         // Drop parent items whose children have all been filtered away
@@ -382,6 +390,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           </Button>
         </div>
 
+        <div className={cn("flex-shrink-0 border-b border-sidebar-border", collapsed ? "px-2 py-2" : "px-2.5 py-2.5")}>
+          <MerchantSelector collapsed={collapsed} />
+        </div>
+
         <SidebarBody collapsed={collapsed} pathname={pathname} navigation={filteredNavigation} />
       </aside>
 
@@ -414,6 +426,10 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             >
               <Icon name="x" size={16} />
             </Button>
+          </div>
+
+          <div className="flex-shrink-0 border-b border-sidebar-border px-2.5 py-2.5">
+            <MerchantSelector />
           </div>
 
           <SidebarBody
