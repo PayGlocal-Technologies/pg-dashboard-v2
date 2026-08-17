@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { buildMcaColumns, isWaitingForInvoice } from "@/features/dashboard/mca-transactions/columns";
+import {
+  buildMcaColumns,
+  isWaitingForInvoice,
+} from "@/features/dashboard/mca-transactions/columns";
 import { TransactionCardList } from "@/features/dashboard/mca-transactions/components/TransactionCardList";
 import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
 import { CLIENT_TRANSACTIONS_PAGE_LIMIT } from "@/features/dashboard/client-management/constants";

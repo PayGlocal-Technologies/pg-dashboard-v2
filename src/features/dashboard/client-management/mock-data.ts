@@ -408,6 +408,12 @@ export const MOCK_CLIENT_TRANSACTIONS: McaTransaction[] = CLIENT_TRANSACTION_SEE
         externalStatus: SETTLEMENT_STATE[seed.state],
         internalStatus: SETTLEMENT_STATE[seed.state],
         formattedCreationDateTime: seed.createdAt,
+        // One instant for both: on a real record these differ by up to a
+        // minute (the FFMS row is written just after the transaction), but the
+        // table and the details header read the transaction field, so a
+        // separate mock value here would only invent a discrepancy no surface
+        // shows. Both are populated because both are required.
+        formattedTransactionCreationDateTime: seed.createdAt,
         partnerCustomerFullName: client.businessName,
         // Null, not a masked variant: these are the merchant's own known
         // clients, so the table shows the business name in full (the Remitter

@@ -38,10 +38,7 @@ import {
   currencyDisplayName,
   splitAccountIdentifiers,
 } from "@/features/dashboard/multi-currency/utils";
-import {
-  useSendAccountEmail,
-  useShareLink,
-} from "@/features/dashboard/multi-currency/hooks";
+import { useSendAccountEmail, useShareLink } from "@/features/dashboard/multi-currency/hooks";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
