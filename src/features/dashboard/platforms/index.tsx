@@ -10,6 +10,7 @@ import {
   AccordionTrigger,
   Button,
   Card,
+  Heading,
   IconButton,
   PageHeader,
   Select,
@@ -17,6 +18,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Text,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -32,39 +34,37 @@ import {
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
 
 /**
- * The workflow's own title — one step above the section titles beneath it, so
- * the right column reads as a named workflow containing three parts rather than
- * four peers.
+ * Account field label and value.
+ *
+ * These carry classes rather than being flux-ui `Text`, because `Text` only
+ * renders p/span/div/label and these belong in a `dl` as `dt`/`dd` — dropping
+ * the description-list semantics to gain the component would be the wrong
+ * trade. The classes are exactly what `Text size="xs" color="subtle"` and
+ * `Text size="sm" weight="medium"` emit, so they stay on the same scale and
+ * the same colour tokens as every other string on the page.
  */
-const WORKFLOW_TITLE = "text-lg font-semibold text-foreground";
-
-/** Section title inside the workflow: Documents, Steps, and the account
- *  accordion's own trigger. Same tokens MCA v2 and Platforms v1 use for a
- *  module title, so the three pages read as one product. */
-const MODULE_TITLE = "text-base font-semibold text-foreground";
-
-/** Supporting copy under a title, and secondary text inside a section. */
-const MODULE_SUBTITLE = "text-[13px] text-muted-foreground";
-
-/**
- * Caption over the platform navigation. Deliberately a size below the workflow
- * titles and muted: the navigation is how you get to the content, not content
- * itself, and this is the same treatment the Virtual Accounts details card gives
- * its own above-card caption.
- */
-const SIDEBAR_LABEL = "text-[11px] font-semibold uppercase tracking-wide text-muted-foreground";
+const FIELD_LABEL = "text-xs text-muted-foreground";
+const FIELD_VALUE = "break-words text-sm font-medium text-foreground";
 
 /**
  * Platforms — how to point a PayGlocal receiving account at the marketplace or
  * freelancing platform that pays you.
  *
  * Two columns: the platform navigation on the left, and that platform's whole
- * connection workflow on the right. The workflow itself reads top-down as one
- * funnel — name the platform and storefront, check the account those resolve
- * to, collect the documents you'll be asked for, then work down the numbered
- * steps. Sections are separated by space rather than rules, and each sits
- * closer to the parts it owns than to the section next to it, so the steps stay
- * the page's subject and everything above them reads as their preparation.
+ * connection workflow on the right. The workflow reads top-down as one funnel —
+ * name the platform and storefront, check the account those resolve to, collect
+ * the documents you'll be asked for, then work down the numbered steps.
+ *
+ * The type scale is what carries the hierarchy, in three steps and no more: the
+ * workflow title at `Heading size="md"`, its three section titles a step below
+ * at `size="sm"`, and everything else `Text` — `weight="medium"` where an item
+ * leads its own group (a step's instruction, a document's title, an account
+ * value), `color="subtle"` where it supports one (descriptions, field labels,
+ * step numbers, the navigation caption). Nothing on the page sets a font size,
+ * weight or colour of its own, so the whole thing moves with the design system.
+ *
+ * Sections are separated by space, never rules: 40px between the four sections,
+ * 32px between steps, and 4–16px binding each group's own parts together.
  *
  * Nothing here is a new component. The platform rows are flux-ui Buttons in the
  * same ghost/secondary selected treatment RegionSelector uses, the mobile
@@ -149,12 +149,21 @@ export function PlatformsFeature() {
           taking whatever width is left. minmax(0,1fr) rather than 1fr so a long
           instruction or a wide screenshot can't push the column past the
           viewport — which is what keeps the page free of horizontal scroll at
-          every width. Below `lg` the template drops out entirely and the two
-          stack in DOM order: platform control first, then the workflow. */}
-      <div className="grid gap-x-10 gap-y-6 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
+          every width. gap-x-10 on desktop narrows to gap-x-8 at `lg`, where the
+          two columns first appear and the width is tightest. Below `lg` the
+          template drops out entirely and the two stack in DOM order: platform
+          control first, then the workflow. */}
+      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start xl:gap-x-10">
         {/* ─── Platform navigation ─────────────────────────────────────── */}
         <div className="lg:col-start-1">
-          <h2 className={SIDEBAR_LABEL}>Select platform</h2>
+          {/* Text, not Heading: the navigation is how you reach the content
+              rather than content itself, so its caption sits on the supporting
+              scale — the smallest size, muted — and stays lighter than any
+              title in the workflow beside it. The list's own aria-label is what
+              a screen reader announces here. */}
+          <Text as="div" size="xs" weight="semibold" color="subtle" className="uppercase tracking-wide">
+            Select platform
+          </Text>
 
           {/* Below `lg` the same choice is a dropdown: a five-row vertical list
               above the workflow would push the content it selects off the first
@@ -212,11 +221,13 @@ export function PlatformsFeature() {
                       // the far right of the row instead.
                       className={cn(
                         "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
-                        // `secondary` already carries the selected surface; the
-                        // primary tint on top is what makes the selected
-                        // platform readable at a glance in a list where every
-                        // row shares the same shape.
-                        isSelected && "text-primary font-semibold"
+                        // The selected row is the only one at full emphasis:
+                        // `secondary` carries the design system's own selected
+                        // surface, and the primary tint on top is its accent.
+                        // Unselected rows drop to the muted token, which is
+                        // what keeps the whole column from out-weighing the
+                        // workflow beside it.
+                        isSelected ? "text-primary font-semibold" : "text-muted-foreground"
                       )}
                       // The platform's own brand mark, sized by the box rather
                       // than by the file so all five sit on the same optical
@@ -258,11 +269,18 @@ export function PlatformsFeature() {
             steps below all read off the selected platform, so switching tabs
             reprints the whole column in place.
 
+            max-w-4xl caps the measure: past about 900px an instruction line
+            runs longer than is comfortable to read and a screenshot frame grows
+            taller than the step it belongs to, so the column stops there rather
+            than taking every pixel a wide viewport offers.
+
             space-y-10 is the section step — the largest on the page, and wider
-            than the 32px between two steps inside the Steps section, which is
-            what §8's "larger between sections, tighter within" resolves to. No
-            rules anywhere: space alone separates the four sections. */}
-        <div key={selectedPlatform.id} className="page-enter space-y-10 lg:col-start-2">
+            than the 32px between two steps inside the Steps section. No rules
+            anywhere: space alone separates the four sections. */}
+        <div
+          key={selectedPlatform.id}
+          className="page-enter max-w-4xl space-y-10 lg:col-start-2"
+        >
           {/* ─── 1. Connect your account ──────────────────────────────── */}
           {/* Heading and storefront control share one row, the control aligned
               right: it scopes everything below it, and sitting on the workflow
@@ -278,12 +296,18 @@ export function PlatformsFeature() {
           <section>
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
               <div className="min-w-0">
-                <h2 className={WORKFLOW_TITLE}>
+                {/* The page's strongest element — a full size above the three
+                    section titles below it, so the workflow reads as one named
+                    thing containing three parts rather than four peers. */}
+                <Heading level={2} size="md">
                   Connect your account to {selectedPlatform.name}
-                </h2>
-                <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+                </Heading>
+                {/* mt-1 binds the description to the title it explains: the
+                    tightest step on the page, against the 40px that separates
+                    this whole section from the next. */}
+                <Text size="sm" color="subtle" className="mt-1">
                   Follow these steps in {selectedPlatform.name} to start receiving payouts.
-                </p>
+                </Text>
               </div>
 
               {/* Only on platforms that run more than one storefront — Amazon,
@@ -292,7 +316,10 @@ export function PlatformsFeature() {
                   decision the merchant still has to make. */}
               {selectedMarketplace && marketplaces.length > 1 && (
                 <Select value={selectedMarketplace.id} onValueChange={setSelectedMarketplaceId}>
-                  {/* Wide enough for the longest storefront the options carry
+                  {/* A secondary control beside a primary title: the Select's
+                      own default (outlined, not filled) is already that step
+                      down, so nothing is added on top of it. Wide enough for
+                      the longest storefront the options carry
                       ("Amazon.com.au") beside its flag, so no row is truncated
                       in the trigger. */}
                   <SelectTrigger
@@ -322,10 +349,12 @@ export function PlatformsFeature() {
           {/* ─── 2. Account details ───────────────────────────────────── */}
           {/* Supporting preparation, not a step: collapsed by default so it
               costs a header's height until it's wanted. flux-ui's Accordion
-              supplies the disclosure and the rotating chevron; `collapsible` is
-              what lets the only item be closed, which is the state it opens in.
-              Its trigger is the section's own title, so there's no separate
-              heading above it to say the same thing twice.
+              supplies the disclosure, the chevron and their alignment — the
+              trigger is already `items-center justify-between`, so the title
+              and chevron sit on one line without anything added here.
+              `collapsible` is what lets the only item be closed, which is the
+              state it opens in. Its trigger is the section's own title, so
+              there's no separate heading above it saying the same thing twice.
 
               Read-only by design: no Share or Copy actions, so it stays
               subordinate to the walkthrough rather than becoming a second thing
@@ -335,32 +364,36 @@ export function PlatformsFeature() {
               the rest of the product shows, and they follow the platform and
               marketplace selections above.
 
-              px-5 py-0 rather than Card's own inset: the trigger and content
-              carry their own vertical padding, so the card only has to hold
-              them clear of its side edges — anything more and the collapsed row
-              sits adrift inside its own surface. */}
+              px-7 py-0 keeps Card's own horizontal inset — the value every
+              other card on the page uses — while handing the vertical to the
+              trigger's py-4 and the content's pb-4, which are the component's
+              own. Card's default py-7 on top of those would double the padding
+              around a collapsed row. */}
           {selectedAccount && (
-            <Card size="sm" className="gap-0 px-5 py-0">
+            <Card size="sm" className="gap-0 px-7 py-0">
               <Accordion type="single" collapsible>
                 <AccordionItem value="account-details" className="border-b-0">
-                  {/* Named for the payer: these are the details someone in that
+                  {/* Sized on the trigger rather than by wrapping the label in
+                      a Heading: these are the exact classes `Heading size="sm"`
+                      emits, and leaving the colour to the component is what
+                      keeps its hover-to-primary state working — an inner
+                      element setting text-foreground would block it.
+
+                      Named for the payer: these are the details someone in that
                       country pays into, and saying so is what confirms the
                       marketplace choice above landed. */}
-                  <AccordionTrigger className={MODULE_TITLE}>
+                  <AccordionTrigger className="text-base font-semibold">
                     Account details for payers in {selectedAccount.countryName}
                   </AccordionTrigger>
                   <AccordionContent>
-                    {/* Label above value, in the same tokens the Virtual
-                        Accounts details card uses. space-y-1 inside a field
-                        against the grid's own gaps is what keeps each label
-                        bound to its own value. */}
-                    <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {/* Proximity does the grouping, not rules: 4px holds a
+                        label to its own value, 24px separates one field from
+                        the next, and no field carries padding of its own. */}
+                    <dl className="grid grid-cols-1 gap-x-8 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
                       {buildFullAccountDetails(selectedAccount).map((field) => (
                         <div key={field.label} className="min-w-0 space-y-1">
-                          <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
-                          <dd className="break-words text-[13px] font-medium text-foreground">
-                            {field.value}
-                          </dd>
+                          <dt className={FIELD_LABEL}>{field.label}</dt>
+                          <dd className={FIELD_VALUE}>{field.value}</dd>
                         </div>
                       ))}
                     </dl>
@@ -375,24 +408,28 @@ export function PlatformsFeature() {
               instructions begin. Separated from the account panel above by
               space only — no rule. */}
           <section>
-            <h2 className={MODULE_TITLE}>Documents you might need</h2>
-            <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-              Statements {selectedPlatform.name} may ask you for.
-            </p>
+            {/* A step below the workflow title and a step above the card
+                metadata beneath it — the middle of the page's three type
+                levels. */}
+            <Heading level={3} size="sm">
+              Documents you might need
+            </Heading>
 
             {/* One card per document rather than rows inside a single card:
                 each is its own action target. Side by side in equal columns
                 from `sm` up — they shrink together on a tablet rather than one
                 dropping under the other — and stacked below it, where two cards
-                on one line would truncate their own titles. */}
+                on one line would truncate their own titles. mt-3 binds the pair
+                to the heading that names them. */}
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {selectedPlatform.documents.map((doc) => (
-                // The whole card is the target, not just the icon: the card
-                // carries one action, so anywhere on it should trigger it
-                // rather than asking for a hit on a 32px button. role/tabIndex
-                // and the Enter/Space handler are what make that reachable by
-                // keyboard too; the accessible name comes from the card's own
-                // caption and title text.
+                // Card's own surface, border and radius, with nothing added but
+                // the hover shadow that says it's actionable. The whole card is
+                // the target, not just the icon: it carries one action, so
+                // anywhere on it should trigger it rather than asking for a hit
+                // on a 32px button. role/tabIndex and the Enter/Space handler
+                // are what make that reachable by keyboard too; the accessible
+                // name comes from the card's own caption and title text.
                 <Card
                   key={doc.title}
                   size="sm"
@@ -408,8 +445,14 @@ export function PlatformsFeature() {
                   className="min-w-0 flex-row items-center justify-between gap-3 p-4 cursor-pointer transition-[box-shadow,border-color] duration-150 hover:shadow-md"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[12px] text-muted-foreground">{doc.caption}</p>
-                    <p className="truncate text-[13px] font-medium text-foreground">{doc.title}</p>
+                    {/* Metadata above, title below — the caption qualifies the
+                        title, so it sits muted and a size smaller. */}
+                    <Text size="xs" color="subtle" truncate>
+                      {doc.caption}
+                    </Text>
+                    <Text size="sm" weight="medium" truncate>
+                      {doc.title}
+                    </Text>
                   </div>
                   {/* Kept as an affordance — it says the card does something —
                       but it runs the same handler the card does.
@@ -437,30 +480,42 @@ export function PlatformsFeature() {
               carrying full-width art, which is what gives it the weight the two
               compact sections above it deliberately don't have. */}
           <section>
-            <h2 className={MODULE_TITLE}>Steps</h2>
+            <Heading level={3} size="sm">
+              Steps
+            </Heading>
 
             {/* Step number → instruction → screenshot, in that order, every
                 step the same shape so the sequence scans as one column.
 
-                space-y-8 between steps against the 12px that holds an
-                instruction to its own screenshot: a step and its art sit closer
-                to each other than any step does to the next one, which is what
-                gives the sequence its rhythm rather than reading as six evenly
-                spaced blocks. */}
+                space-y-8 between steps against the 4px and 12px inside one: a
+                step's own parts sit far closer to each other than any step does
+                to the next, which is what gives the sequence its rhythm rather
+                than reading as six evenly spaced blocks. */}
             <ol className="mt-4 space-y-8">
               {selectedPlatform.steps.map((step, index) => (
                 <li key={step.instruction}>
-                  <p className="text-[12px] font-medium text-muted-foreground">Step {index + 1}</p>
-                  <p className="mt-1 text-[15px] font-medium text-foreground">{step.instruction}</p>
+                  {/* The number is a marker, not a title: smallest size, muted,
+                      medium weight so it still reads as a label. The
+                      instruction above it in both size and colour is what makes
+                      the instruction the step's own strongest element. */}
+                  <Text size="xs" weight="medium" color="subtle">
+                    Step {index + 1}
+                  </Text>
+                  <Text size="md" weight="medium" className="mt-1">
+                    {step.instruction}
+                  </Text>
 
                   {/* The screenshot frame — a single Card, not a Card wrapped
                       around an inner surface: one border, one radius, nothing
-                      matted around the art. It holds its footprint whether or
-                      not there's a screenshot in it, so dropping one into
-                      `constants.ts` later swaps the contents without moving a
-                      single step. p-0 so the image meets the frame's own edge;
-                      object-contain rather than cover so a screenshot of any
-                      ratio is letterboxed inside it instead of being cropped. */}
+                      matted around the art, and every one of those from the
+                      design system's own surface and border tokens so the frame
+                      stays neutral behind whatever lands in it. It holds its
+                      footprint whether or not there's a screenshot in it, so
+                      dropping one into `constants.ts` later swaps the contents
+                      without moving a single step. p-0 so the image meets the
+                      frame's own edge; object-contain rather than cover so a
+                      screenshot of any ratio is letterboxed inside it instead
+                      of being cropped. */}
                   <Card
                     size="sm"
                     className={cn(SCREENSHOT_ASPECT_CLASS, "mt-3 gap-0 overflow-hidden p-0")}
