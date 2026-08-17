@@ -22,16 +22,47 @@ function SkuCardSkeleton() {
   );
 }
 
-function SkuCard({ row, actions }: { row: SkuProduct; actions?: ReactNode }) {
+function SkuCard({
+  row,
+  actions,
+  onPreview,
+}: {
+  row: SkuProduct;
+  actions?: ReactNode;
+  onPreview: (product: SkuProduct) => void;
+}) {
   return (
     <div className="flex gap-3 rounded-xl border border-border bg-card px-4 py-3.5">
-      <ProductThumbnail product={row} className="shrink-0" />
+      {/* Image and name open the preview, matching the table's Product cell.
+          Kept off the card as a whole so the overflow menu, and anything added
+          to the card later, keep their own clicks. */}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-label={`Preview ${row.name}`}
+        aria-haspopup="dialog"
+        onClick={() => onPreview(row)}
+        className="h-auto min-h-0 shrink-0 rounded-lg p-0"
+      >
+        <ProductThumbnail product={row} />
+      </Button>
 
       {/* min-w-0 so the long description below can actually truncate inside
           this flex child instead of stretching the card. */}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
-          <span className="text-[14px] font-semibold text-foreground">{row.name}</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`Preview ${row.name}`}
+            aria-haspopup="dialog"
+            onClick={() => onPreview(row)}
+            className="-mx-1 h-auto min-h-0 min-w-0 justify-start rounded-md px-1 py-0.5 text-left text-[14px] font-semibold text-foreground"
+          >
+            {row.name}
+          </Button>
           {/* Type chip and the overflow menu share the card's top-right
               corner. Unlike the table — where the menu only appears on row
               hover — it's always visible here: there is no hover on touch. */}
@@ -72,6 +103,9 @@ interface SkuCardListProps {
   /** Per-row overflow menu, mirroring DataTable's own `rowAction` signature so
    *  the table and the card list are fed by the same call site. */
   rowAction?: (row: SkuProduct) => ReactNode;
+  /** Opens the read-only product preview — same handler the table's Product
+   *  cell uses, so a tap and a click land on the same modal. */
+  onPreview: (product: SkuProduct) => void;
   skeletonCount?: number;
   page: number;
   onPageChange: (page: number) => void;
@@ -91,6 +125,7 @@ export function SkuCardList({
   rows,
   isLoading,
   rowAction,
+  onPreview,
   skeletonCount = 6,
   page,
   onPageChange,
@@ -109,7 +144,9 @@ export function SkuCardList({
       ) : rows.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyDescription} />
       ) : (
-        rows.map((row) => <SkuCard key={row.id} row={row} actions={rowAction?.(row)} />)
+        rows.map((row) => (
+          <SkuCard key={row.id} row={row} actions={rowAction?.(row)} onPreview={onPreview} />
+        ))
       )}
 
       {!isLoading && rows.length > 0 && totalPages > 1 && (

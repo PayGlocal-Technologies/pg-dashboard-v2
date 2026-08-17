@@ -1,6 +1,7 @@
 "use client";
 
-import { type Column, StatusBadge } from "@/components/ui";
+import { Button, type Column, StatusBadge } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
 import { EditablePriceCell } from "@/features/dashboard/sku-management/components/EditablePriceCell";
@@ -22,7 +23,8 @@ const PRODUCT_COST_HEADER = "Product cost";
 // (see SkuTable), so it never takes column width, never reorders with the
 // data, and stays pinned to the right while the columns scroll.
 export function buildSkuColumns(
-  onPriceChange: (id: string, field: SkuPriceField, next: number) => void
+  onPriceChange: (id: string, field: SkuPriceField, next: number) => void,
+  onPreview: (product: SkuProduct) => void
 ): Column<SkuProduct>[] {
   return [
     {
@@ -40,14 +42,32 @@ export function buildSkuColumns(
       // its Country cell.
       cellClassName: "overflow-visible",
       render: (row) => (
+        // The image and the name together are the preview's click target —
+        // just this cell, not the row, so the price editors and the overflow
+        // menu keep their own clicks. A ghost Button stripped back to the
+        // cell's own type scale, the same treatment EditablePriceCell uses, so
+        // opening a preview is discoverable on hover without the column
+        // looking any different at rest.
+        //
         // min-w-max: the cell never shrinks below thumbnail + full name, so
         // the column widens to fit rather than truncating or wrapping.
-        <div className="flex min-w-max items-center gap-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label={`Preview ${row.name}`}
+          aria-haspopup="dialog"
+          onClick={() => onPreview(row)}
+          className={cn(
+            "-mx-1.5 h-auto min-h-0 min-w-max justify-start rounded-lg px-1.5 py-1 text-left font-normal",
+            "[&>span]:flex [&>span]:min-w-max [&>span]:items-center [&>span]:gap-3"
+          )}
+        >
           <ProductThumbnail product={row} className="shrink-0" />
           <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
             {row.name}
           </span>
-        </div>
+        </Button>
       ),
     },
     {

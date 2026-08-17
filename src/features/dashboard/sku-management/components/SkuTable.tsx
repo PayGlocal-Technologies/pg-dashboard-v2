@@ -6,6 +6,7 @@ import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SkuCardList } from "@/features/dashboard/sku-management/components/SkuCardList";
+import { ProductPreviewModal } from "@/features/dashboard/sku-management/components/ProductPreviewModal";
 import { SkuRowActions } from "@/features/dashboard/sku-management/components/SkuRowActions";
 import { DeleteSkuDialog } from "@/features/dashboard/sku-management/components/DeleteSkuDialog";
 import {
@@ -65,6 +66,10 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   // divergent copy of the data.
   const [archivedIds, setArchivedIds] = useState<Set<string>>(() => new Set());
   const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+
+  // The product being previewed, or null. Holds the product rather than an id
+  // so the modal can never render a stale row while it animates closed.
+  const [previewProduct, setPreviewProduct] = useState<SkuProduct | null>(null);
 
   // The product awaiting delete confirmation. Delete never acts on the first
   // click; it only ever sets this, and DeleteSkuDialog is what calls through.
@@ -222,7 +227,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
     />
   );
 
-  const columns = buildSkuColumns(onPriceChange);
+  const columns = buildSkuColumns(onPriceChange, setPreviewProduct);
 
   const onSearch = (value: string) => {
     setSearch(value);
@@ -295,12 +300,21 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
         rows={pageRows}
         isLoading={false}
         rowAction={renderRowActions}
+        onPreview={setPreviewProduct}
         page={safePage}
         onPageChange={setPage}
         totalRows={totalCount}
         pageSize={SKU_PAGE_LIMIT}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
+      />
+
+      {/* Read-only. Deliberately carries no actions — Edit, Archive, and
+          Delete stay on the row's overflow menu, so there's one home for
+          them and this stays a look-don't-touch view. */}
+      <ProductPreviewModal
+        product={previewProduct}
+        onOpenChange={(open) => !open && setPreviewProduct(null)}
       />
 
       {/* Rendered once for the whole table rather than per row: only one
