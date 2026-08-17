@@ -11,6 +11,9 @@ interface RotatingSearchInputProps {
   words: string[];
   debounceDelay?: number;
   className?: string;
+  /** Screen-reader label. Defaults to the Transactions page's own wording,
+   *  so pages searching something else (e.g. SKU management) can say so. */
+  ariaLabel?: string;
 }
 
 export function RotatingSearchInput({
@@ -19,6 +22,7 @@ export function RotatingSearchInput({
   words,
   debounceDelay = 300,
   className,
+  ariaLabel = "Search transactions",
 }: RotatingSearchInputProps) {
   const [internalValue, setInternalValue] = useState(value ?? "");
   const [index, setIndex] = useState(0);
@@ -123,7 +127,7 @@ export function RotatingSearchInput({
       />
       <Input
         type="text"
-        aria-label="Search transactions"
+        aria-label={ariaLabel}
         value={internalValue}
         placeholder=""
         onChange={handleChange}

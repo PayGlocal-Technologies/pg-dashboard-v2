@@ -63,7 +63,10 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   BYN: "Br",
   ALL: "L",
   // Middle Eastern Currencies
-  AED: "د.إ",
+  // Latin code rather than the د.إ glyph: the dashboard is LTR throughout, and
+  // the RTL mark reorders badly against the Latin digits it prefixes. Also
+  // affects the AED figures on Multi-Currency and Transactions.
+  AED: "AED ",
   SAR: "﷼",
   BHD: ".د.ب",
   QAR: "﷼",
@@ -265,6 +268,30 @@ export function formatTransactionDateOnly(raw: string | null | undefined): strin
   if (!raw) return "—";
   const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
   return parsed ? formatTransactionDate(parsed) : raw;
+}
+
+/**
+ * Groups a phone number for display, e.g. ("+44", "7911123456") →
+ * "+44 791 112 3456". One grouping rule for every country rather than a
+ * per-country mask: a table of numbers from a dozen countries reads far better
+ * when the digit groups line up than when each row follows its own national
+ * convention, and there is no libphonenumber-style dependency in the app to
+ * supply those conventions anyway.
+ *
+ * Digits are taken three at a time from the left while more than five remain,
+ * so the number always ends on a group of three to five and never on an orphan
+ * digit or pair — the shape that makes "+65 812 345 67" look like a typo.
+ */
+export function formatPhoneNumber(dialCode: string, nationalNumber: string): string {
+  const digits = nationalNumber.replace(/\D/g, "");
+  const groups: string[] = [];
+  let rest = digits;
+  while (rest.length > 5) {
+    groups.push(rest.slice(0, 3));
+    rest = rest.slice(3);
+  }
+  if (rest) groups.push(rest);
+  return `${dialCode} ${groups.join(" ")}`.trim();
 }
 
 export function truncate(str: string, length: number): string {

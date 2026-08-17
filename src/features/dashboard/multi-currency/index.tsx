@@ -11,24 +11,28 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { MetricSparklineCard, PageHeader } from "@/components/ui";
+import { Button, MetricSparklineCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
+import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
+import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/components/AccountCurrencyNotice";
+import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
 import {
-  MOCK_VIRTUAL_ACCOUNTS,
   MULTI_CURRENCY_SUMMARY,
   TOTAL_EARNING_TREND,
 } from "@/features/dashboard/multi-currency/mock-data";
+import { useVirtualAccounts } from "@/features/dashboard/multi-currency/hooks";
 import { formatAccount, formatFullAccount } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 export function MultiCurrencyFeature() {
-  // Dummy data for now. Swapping these two for the real query's `data` /
-  // `isLoading` is the only change needed once the endpoint exists.
-  const [accounts] = useState<VirtualAccount[]>(MOCK_VIRTUAL_ACCOUNTS);
-  const isLoading = false;
+  // The merchant's own receiving accounts. The response also carries an
+  // `amazon` bucket, which this page deliberately ignores — those are Amazon
+  // payout accounts and belong to the Platforms page, which reads the same
+  // query with bucket "amazon".
+  const { accounts, isLoading } = useVirtualAccounts("general");
 
   // Unique per mount so the Settled Amount chart's fill gradient doesn't
   // collide with another <linearGradient> id elsewhere on the page.
@@ -43,6 +47,8 @@ export function MultiCurrencyFeature() {
   const selectAccount = (account: VirtualAccount) => setSelectedAccountId(account.id);
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  const [fxModalOpen, setFxModalOpen] = useState(false);
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const copyToClipboard = async (text: string, message: string) => {
     try {
@@ -88,7 +94,53 @@ export function MultiCurrencyFeature() {
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader title="Virtual accounts" />
+      {/* Both actions go through PageHeader's own actions slot. They belong with
+          the title rather than below the accounts because both are about the
+          page's subject as a whole: what a foreign-currency invoice becomes in
+          INR, and how a client actually pays into these accounts. pg-dashboard
+          puts its FxCalculatorBanner and "How it works?" on this same page.
+
+          Ordered by how often they are needed — the calculator is a tool a
+          merchant returns to, "How it works?" is read once — and ghost vs
+          outline says which is which without a second row. */}
+      <PageHeader
+        title="Virtual accounts"
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            {selectedAccount && (
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<Icon name="help-circle" className="h-4 w-4" />}
+                onClick={() => setHowItWorksOpen(true)}
+              >
+                How it works?
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Icon name="calculator" className="h-4 w-4" />}
+              onClick={() => setFxModalOpen(true)}
+            >
+              Forex calculator
+            </Button>
+          </div>
+        }
+      />
+
+      <FxCalculatorModal open={fxModalOpen} onOpenChange={setFxModalOpen} />
+
+      {/* Keyed to the selected account: the rail and its timeline differ per
+          currency, so the guide follows the selection rather than being a
+          single page-level explainer. */}
+      {selectedAccount && (
+        <HowItWorksDialog
+          currency={selectedAccount.currency}
+          open={howItWorksOpen}
+          onOpenChange={setHowItWorksOpen}
+        />
+      )}
 
       {selectedAccount && (
         <ShareAccountDetailsModal
@@ -124,11 +176,19 @@ export function MultiCurrencyFeature() {
           key={selectedAccount.id}
           className="mt-4 flex flex-wrap items-start gap-4 page-enter"
         >
-          <VirtualAccountDetails
-            account={selectedAccount}
-            onCopy={handleCopyFullAccount}
-            onShare={() => setShareModalOpen(true)}
-          />
+          {/* Details and their currency's caveat as one column: the notice is
+              about the account whose details sit above it, so it travels with
+              them rather than with the summary cards beside them. Renders
+              nothing for a currency that carries no caveat. */}
+          <div className="w-full max-w-[730px] space-y-3">
+            <VirtualAccountDetails
+              account={selectedAccount}
+              onCopy={handleCopyFullAccount}
+              onShare={() => setShareModalOpen(true)}
+              className="w-full max-w-none"
+            />
+            <AccountCurrencyNotice currency={selectedAccount.currency} />
+          </div>
           {/* Total Earnings/Outstanding span every account, not just the
               selected one, so they don't live inside VirtualAccountDetails'
               own per-account remount above. */}

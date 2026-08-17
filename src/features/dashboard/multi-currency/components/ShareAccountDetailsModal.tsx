@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import {
@@ -27,10 +27,18 @@ import {
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
-import { VirtualAccountList } from "@/features/dashboard/multi-currency/components/VirtualAccountList";
+import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { TOOLTIP_CONTENT_CLASS } from "@/features/dashboard/multi-currency/constants";
-import { buildShareUrl, currencyDisplayName } from "@/features/dashboard/multi-currency/utils";
+import {
+  accountDocumentId,
+  accountNumberOf,
+  currencyDisplayName,
+} from "@/features/dashboard/multi-currency/utils";
+import {
+  useSendAccountEmail,
+  useShareLink,
+} from "@/features/dashboard/multi-currency/hooks";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -57,7 +65,11 @@ interface ShareAccountDetailsModalProps {
 function AccountSummary({ account, title }: { account: VirtualAccount; title: string }) {
   return (
     <div className="flex items-center gap-3">
-      <CountryFlagAvatar iso2={account.iso2} countryName={account.countryName} className="h-10 w-10" />
+      <CountryFlagAvatar
+        iso2={account.iso2}
+        countryName={account.countryName}
+        className="h-10 w-10"
+      />
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-foreground">{title}</p>
         <p className="truncate text-xs text-muted-foreground">{account.accountName}</p>
@@ -75,32 +87,28 @@ export function ShareAccountDetailsModal({
   onCopyFullAccount,
   onShareFullAccount,
 }: ShareAccountDetailsModalProps) {
-  // Which account the embedded preview's region selector currently shows —
-  // independent of the account the modal was opened for and of the real
-  // page's own selection, so browsing regions here never changes what's
-  // selected on the Multi Currency Accounts page underneath.
-  const [previewAccountId, setPreviewAccountId] = useState(account.id);
-  // useState's initializer only runs on first mount — if this modal instance
-  // stays mounted across two different Share clicks (no key change on the
-  // caller's side) with previewAccountId still pointing at whichever account
-  // was previewed last time, the preview would keep showing that stale
-  // account instead of the one this modal was just reopened for.
+  // The link is issued by the backend per currency, so it can't be derived.
   //
-  // Adjusted during render (not in an effect — see CLAUDE.md's purity rules
-  // on synchronous setState in an effect body) via the React-documented
-  // "store the last prop you rendered with, compare, and setState inline if
-  // it changed" pattern: this re-render happens before the browser paints,
-  // so there's no stale-preview flash the way an effect-based reset would
-  // produce, and it's what keeps "the account selected in the Share modal"
-  // and "the account the preview shows" from ever diverging regardless of
-  // how the caller mounts this component.
-  const [syncedAccountId, setSyncedAccountId] = useState(account.id);
-  if (account.id !== syncedAccountId) {
-    setSyncedAccountId(account.id);
-    setPreviewAccountId(account.id);
-  }
-  const previewAccount = accounts.find((a) => a.id === previewAccountId) ?? account;
-  const shareUrl = buildShareUrl(account);
+  // Stored with the currency it was issued for, rather than as a bare string
+  // that an effect clears when the account changes: that clear would be a
+  // synchronous setState in an effect body, which the React Compiler lint
+  // plugin rejects (see CLAUDE.md). Comparing instead means a link belonging
+  // to a different currency is simply not shown, with no reset needed.
+  const [issuedLink, setIssuedLink] = useState<{ currency: string; url: string } | null>(null);
+  const shareUrl = issuedLink?.currency === account.currency ? issuedLink.url : "";
+
+  const { requestShareLink, isRequesting } = useShareLink();
+  const { sendAccountEmail, isSending } = useSendAccountEmail();
+
+  // Requesting is a command, so it happens here rather than as a query keyed on
+  // the modal being open. setState lands in the async callback, not this body.
+  useEffect(() => {
+    if (!open || !account.currency) return;
+    if (issuedLink?.currency === account.currency) return;
+    requestShareLink(account.currency, (url) =>
+      setIssuedLink({ currency: account.currency, url })
+    );
+  }, [open, account.currency, issuedLink, requestShareLink]);
 
   const senderEmail = useApp((s) => s.profile?.emailId) ?? "you@company.com";
 
@@ -112,26 +120,55 @@ export function ShareAccountDetailsModal({
   const emailForm = useForm({
     defaultValues: { clientName: "", clientEmail: "", cc: "", bcc: "" },
     onSubmit: async ({ value }) => {
-      if (validateEmail(value.clientEmail, true) || validateEmail(value.cc, false) || validateEmail(value.bcc, false)) {
+      if (
+        validateEmail(value.clientEmail, true) ||
+        validateEmail(value.cc, false) ||
+        validateEmail(value.bcc, false)
+      ) {
         return;
       }
-      // No email-send endpoint exists yet — mirrors Copy Link's own
-      // client-side-only stand-in until a real one does.
-      toast.success(`Account details sent to ${value.clientEmail}`);
-      emailForm.reset();
-      setShowCcBcc(false);
-      onOpenChange(false);
+      // The endpoint identifies the account by the SHA-256 of its number, the
+      // same hash pg-dashboard sends. Nothing here logs either value.
+      const id = await accountDocumentId(accountNumberOf(account));
+      if (!id) {
+        toast.error("This account has no account number to share.");
+        return;
+      }
+
+      // Cc/Bcc are omitted entirely when blank rather than sent as empty
+      // arrays, matching pg-dashboard's payload.
+      const cc = value.cc.trim();
+      const bcc = value.bcc.trim();
+
+      sendAccountEmail(
+        {
+          id,
+          clientName: value.clientName,
+          clientEmail: value.clientEmail,
+          ...(cc ? { ccEmails: [cc] } : {}),
+          ...(bcc ? { bccEmails: [bcc] } : {}),
+        },
+        () => {
+          toast.success(`Account details sent to ${value.clientEmail}`);
+          emailForm.reset();
+          setShowCcBcc(false);
+          onOpenChange(false);
+        }
+      );
     },
   });
 
   const [primaryIdentifier, secondaryIdentifier] = account.details;
 
-  // The white preview window stands in for the customer-facing page for one
-  // payer country at a time — every other receiving account is irrelevant to
-  // whichever customer would land on it, so only the currently previewed
-  // account and the SWIFT catch-all (every other country's actual fallback)
-  // show up here, not the full carousel the real page renders.
-  const previewCards = accounts.filter((a) => a.id === previewAccountId || a.id === "row-swift");
+  // The preview stands in for the customer-facing page for one payer country
+  // at a time — every other receiving account is irrelevant to whichever
+  // customer would land on it, so its region list carries only the account
+  // this modal was opened for plus the SWIFT catch-all (every other country's
+  // actual fallback), not the full set the real page renders. Filtering
+  // `accounts` rather than building a pair by hand keeps Rest of the World in
+  // its own list position, always below the selected region. Sharing Rest of
+  // the World itself matches once, so the list is correctly one row long.
+  const previewCards = accounts.filter((a) => a.id === account.id || a.isGlobal);
 
   return (
     <Dialog
@@ -139,7 +176,6 @@ export function ShareAccountDetailsModal({
       onOpenChange={(next) => {
         onOpenChange(next);
         if (!next) {
-          setPreviewAccountId(account.id);
           emailForm.reset();
           setShowCcBcc(false);
         }
@@ -199,6 +235,10 @@ export function ShareAccountDetailsModal({
                     className="shrink-0"
                     leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
                     onClick={() => onCopyLink(shareUrl)}
+                    // The link is issued by the backend, so there is nothing to
+                    // copy until it arrives. Mirrors pg-dashboard, which also
+                    // requests the link when the modal opens.
+                    disabled={!shareUrl || isRequesting}
                   >
                     Copy Link
                   </Button>
@@ -212,34 +252,32 @@ export function ShareAccountDetailsModal({
                 already marks that section's own edge, so no separate rule is
                 needed here to double-mark the same boundary.
 
-                pb-3 (small) on top of the shared p-4 (rather than p-4 on every
-                side) is the one place padding is intentionally asymmetric:
-                the top/sides still give the Preview heading and its button
-                room to breathe, but the bottom — measured from the white
-                window's own edge to the grey surface's edge below it — stays
-                noticeably tighter, which is what actually reads as "the white
-                window sits inset in here" rather than "these two boxes happen
-                to be near each other."
-
-                max-h/overflow-hidden is what makes this a viewport rather
-                than a plain wrapper: the white Card below is left to its own
-                natural height (no cap, no scrollbar of its own), so on a
-                tall account it genuinely extends past this box's fixed
-                height — and this box's overflow-hidden is what cuts that
-                overflow off cleanly at its own bottom edge, the same way a
-                real browser viewport clips a page that's taller than the
-                window rather than shrinking the page to fit. */}
-            <div className="mt-8 max-h-[440px] overflow-hidden rounded-xl bg-muted/40 p-4 pb-3">
+                The grey surface is what the client page's own white cards sit
+                on, so it takes no height cap: the preview renders complete,
+                down to the Copy button at the bottom of the account card. It
+                used to clip at a fixed height to read as a browser viewport,
+                which only made sense while the preview was a single white
+                page inside it; cutting a two-card layout mid-button just
+                looks broken. DialogContent already scrolls (overflow-y-auto)
+                if the modal outgrows the screen. */}
+            <div className="mt-8 rounded-xl bg-muted/40 p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <h3 className="text-sm font-semibold text-foreground">Preview</h3>
-                  <p className="text-xs text-muted-foreground">This is what your clients will see.</p>
+                  <p className="text-xs text-muted-foreground">
+                    This is what your clients will see.
+                  </p>
                 </div>
 
-                {/* Real public preview page doesn't exist yet — disabled
-                    rather than linking somewhere that 404s. Wrapped in a
-                    span so the tooltip still triggers on hover: a native
-                    disabled button suppresses pointer events entirely. */}
+                {/* Opens the real client-facing page — the same URL the Copy
+                    Link field carries, so the merchant previews exactly what
+                    they are about to send rather than a rendering of it.
+                    Matches pg-dashboard's own handlePreviewFullPage.
+
+                    Disabled only until the backend has issued that link, since
+                    there is nothing to open before then. Wrapped in a span so
+                    the tooltip still triggers while disabled: a native disabled
+                    button suppresses pointer events entirely. */}
                 <TooltipProvider delayDuration={200}>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -248,7 +286,8 @@ export function ShareAccountDetailsModal({
                           type="button"
                           variant="outline"
                           size="sm"
-                          disabled
+                          disabled={!shareUrl || isRequesting}
+                          onClick={() => window.open(shareUrl, "_blank", "noopener,noreferrer")}
                           rightIcon={<Icon name="arrow-up-right" className="h-3.5 w-3.5" />}
                         >
                           Preview full page
@@ -256,74 +295,80 @@ export function ShareAccountDetailsModal({
                       </span>
                     </TooltipTrigger>
                     <TooltipContent className={TOOLTIP_CONTENT_CLASS} sideOffset={4}>
-                      Coming soon
+                      {shareUrl ? "Opens in a new tab" : "Preparing the link…"}
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
 
-              {/* The actual white preview window — the same Card component
-                  (border/rounded-xl/shadow-sm) used everywhere else in the
-                  product, not a hand-styled substitute, so "a subtle,
-                  Flux-compatible shadow/border" means literally reusing its
-                  elevation rather than picking stronger new values. mt-4
-                  (medium) is the "Preview heading → client preview" step —
-                  closer than the large step above it, since both belong to
-                  this one Preview section. No max-h/overflow of its own —
-                  it renders at whatever height its content actually needs;
-                  the grey box around it (above) is what clips it. */}
-              <Card size="sm" className="mt-4">
-                {/* The same muted, uppercase caption style
-                    VirtualAccountDetails uses for its own "{Country} Account"
-                    label elsewhere in this product — not the bold text-lg
-                    heading this used before, which was reading as more
-                    prominent than "Copy account details" above (a sm/
-                    semibold label) despite this whole window being the
-                    lowest-priority content in the modal. */}
-                <h2 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Account details for payers in {previewAccount.countryName}
-                </h2>
+              {/* A picture of the client-facing page, not a working copy of
+                  it. `inert` does the whole job in one attribute: it swallows
+                  clicks, takes every control inside out of the tab order, and
+                  hides them from the accessibility tree. All three matter
+                  because these controls are otherwise real components — a
+                  keyboard user would otherwise tab onto a Copy button that
+                  belongs to a mock-up. The account this modal was opened for
+                  is what it renders; there is nothing to select here, so it
+                  holds no state of its own.
 
-                {/* Only the account this preview represents, plus the SWIFT
-                    catch-all every other payer country actually falls back
-                    to — not the full 8-account carousel the real page
-                    renders, which would name countries this simulated
-                    customer was never going to pay from. */}
-                <VirtualAccountList
-                  accounts={previewCards}
-                  onCopy={onCopyFullAccount}
-                  onShare={onShareFullAccount}
-                  selectedAccountId={previewAccountId}
-                  onSelect={(a) => setPreviewAccountId(a.id)}
-                />
+                  Two columns on the grey surface rather than one white
+                  window: the region list and the account details are
+                  separate white cards, which is how the real client page
+                  lays them out. mt-4 (medium) is the "Preview heading →
+                  client preview" step, closer than the large step above it
+                  since both belong to this one Preview section. */}
+              <div inert className="mt-4 select-none">
+                <div className="grid gap-6 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">Select Your Region</h3>
 
-                {/* headerPlacement="inside" moves the flag/name/subtitle into
-                    the card — this preview has no carousel-adjacent caption
-                    naming the account the way the real page's "above"
-                    placement assumes. showShare={false}: a customer
-                    receiving these details has nothing of their own to
-                    share, so Copy account details is the page's sole,
-                    full-width action. flagShape="circle": the same circular
-                    treatment every other flag in the product uses — this
-                    card's own default rectangular flag is specifically for
-                    MCA v2's real Account Details card, not this preview. */}
-                <VirtualAccountDetails
-                  account={previewAccount}
-                  onCopy={onCopyFullAccount}
-                  onShare={onShareFullAccount}
-                  headerPlacement="inside"
-                  showShare={false}
-                  flagShape="circle"
-                  className="w-full max-w-none"
-                />
-              </Card>
+                    {/* Only the account this preview represents plus the
+                        SWIFT catch-all every other payer country actually
+                        falls back to — never the full set the real page
+                        renders, which would name countries this simulated
+                        customer was never going to pay from. */}
+                    <Card size="sm" className="mt-3 gap-0 p-2">
+                      <RegionSelector
+                        accounts={previewCards}
+                        selectedAccountId={account.id}
+                        // Inert, so this can never fire — the region shown is
+                        // fixed to the account being shared.
+                        onSelect={() => {}}
+                        label="Regions your client can pay from"
+                      />
+                    </Card>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Account details for payers in {account.countryName}
+                    </h3>
+
+                    {/* headerPlacement="inside" moves the flag/name/subtitle
+                        into the card — this preview has no caption above it
+                        naming the account the way the real page's "above"
+                        placement assumes. showShare={false}: a customer
+                        receiving these details has nothing of their own to
+                        share, so Copy account details is the page's sole,
+                        full-width action. */}
+                    <VirtualAccountDetails
+                      account={account}
+                      onCopy={onCopyFullAccount}
+                      onShare={onShareFullAccount}
+                      headerPlacement="inside"
+                      showShare={false}
+                      className="mt-3 w-full max-w-none"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </TabsContent>
 
           <TabsContent value="email" className="mt-0">
             {/* Fixed-width form column, flexible preview column — the same
-                sidebar/content split mca-v2's own layout uses elsewhere in
-                this feature. 336px = 280px × 1.2 — a ~20% wider form column
+                sidebar/content split the Platforms page uses for its own
+                list-beside-content layout. 336px = 280px × 1.2 — a ~20% wider form column
                 (and so ~20% wider Client Name/Client Email inputs, both
                 w-full within it) without touching the modal's own max-width;
                 minmax(0,1fr) on the preview column absorbs the difference
@@ -456,6 +501,9 @@ export function ShareAccountDetailsModal({
                     type="submit"
                     className="w-full"
                     leftIcon={<Icon name="send-horizontal" className="h-4 w-4" />}
+                    // Same in-flight guard pg-dashboard's McaShareModal applies
+                    // via isSendingEmail, so one submit can't be sent twice.
+                    disabled={isSending}
                   >
                     Send Email
                   </Button>
@@ -522,7 +570,9 @@ export function ShareAccountDetailsModal({
                       </p>
                       <p>
                         Currency:{" "}
-                        <span className="text-foreground">{currencyDisplayName(account.currency)}</span>
+                        <span className="text-foreground">
+                          {currencyDisplayName(account.currency)}
+                        </span>
                       </p>
                     </div>
                     <p>

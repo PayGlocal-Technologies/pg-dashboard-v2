@@ -5,6 +5,13 @@ export interface PlatformStep {
   /** The instruction itself, e.g. "Log in to your Upwork account". */
   instruction: string;
   /**
+   * A caveat shown under the instruction, prefixed "Note:" — something the
+   * platform may ask for that isn't part of the step itself. pg-dashboard
+   * carries the same field on its own step data and renders it the same way;
+   * only Upwork's last step has one.
+   */
+  note?: string;
+  /**
    * Screenshot for this step. Left undefined until the assets are supplied —
    * the step then renders an empty surface of the same dimensions, so dropping
    * a real screenshot in later is a data change, not a layout change.
@@ -19,9 +26,7 @@ export interface PlatformStep {
    *
    * Set it on the one step that asks the merchant to type those identifiers
    * into the platform, so the values are under the instruction that needs them
-   * rather than somewhere else on the page. Platforms v1 reads this; the
-   * sidebar-layout Platforms page carries its own Quick Access strip above the
-   * whole walkthrough and ignores it.
+   * rather than somewhere else on the page.
    */
   quickAccess?: boolean;
 }
@@ -37,8 +42,9 @@ export interface PlatformDocument {
   actionLabel: string;
   /**
    * Whether the row's action opens the settlement statement form instead of
-   * downloading something directly. Platforms v1 opens that form in a drawer;
-   * rows without it keep the placeholder toast until their endpoint exists.
+   * downloading something directly. The Platforms page opens that form in a
+   * drawer; rows without it keep the placeholder toast until their endpoint
+   * exists.
    */
   opensSettlementForm?: boolean;
 }
@@ -62,21 +68,35 @@ export interface Platform {
    */
   logoSrc: string;
   /**
-   * Virtual accounts this platform can pay out to, in the order the currency
-   * selector should offer them. Ids reference MOCK_VIRTUAL_ACCOUNTS, so the
-   * account details shown here are the same ones Virtual Accounts renders
-   * rather than a second copy that can drift.
-   */
-  accountIds: string[];
-  /**
-   * Whether the merchant picks which of those accounts to be paid into.
+   * Currencies this platform can pay out to, in the order the currency selector
+   * should offer them. Matched against the merchant's real Amazon-bucket
+   * accounts (see accountsForPlatform), so the details shown here are the same
+   * ones the accounts endpoint returns rather than a second copy that can drift.
    *
-   * Only true where the platform genuinely lets you choose the payout currency
-   * per marketplace. Everywhere else the first entry in `accountIds` is the
-   * account, and Platforms v1 renders no currency control at all rather than a
-   * dropdown with one real answer in it.
+   * A currency the merchant holds no account for is dropped rather than
+   * rendered as an empty option — which is also why currencies the accounts
+   * endpoint doesn't bucket yet (AED, SGD) can safely stay listed.
    */
-  offersCurrencyChoice?: boolean;
+  accountCurrencies: string[];
+  /** The numbered walkthrough, in order. */
   steps: PlatformStep[];
-  documents: PlatformDocument[];
+  /**
+   * Statements this platform may ask the merchant for, shown as an aside beside
+   * the walkthrough. Optional, and in practice Amazon-only: pg-dashboard gates
+   * the whole column on `resolvedSelectedPlatform === "amazon"` (Platforms.tsx),
+   * and its second card is an Amazon account statement specifically. A platform
+   * with no documents renders no column, and the walkthrough takes the full
+   * width instead.
+   */
+  documents?: PlatformDocument[];
+}
+
+/** Body of the request-a-platform submission. One free-text field, matching
+ *  pg-dashboard's own payload. */
+export interface RequestPlatformRequest {
+  platformRequestMessage: string;
+}
+
+export interface RequestPlatformResponse {
+  message?: string;
 }

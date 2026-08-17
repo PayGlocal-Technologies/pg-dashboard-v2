@@ -28,4 +28,144 @@ export interface VirtualAccount {
   /** Machine-readable routing code type, e.g. "ach_routing_number". Not every
    *  country's rail has one worth surfacing. */
   routingCodeType?: string;
+  /**
+   * USD accounts reach the same account over two rails and the API returns a
+   * separate code for each: `routingCode` is the ACH one, this is the Fedwire
+   * one. Only USD has it, which is why it is optional and shown as its own row
+   * rather than folded into the generic routing field.
+   */
+  fedwireRoutingCode?: string;
+  /** True for the SWIFT catch-all account (the API's "OTHER" bucket key, shown
+   *  as "Rest of the World"). Surfaces that need to single it out test this
+   *  rather than a hardcoded id, since real ids are issued by the backend. */
+  isGlobal?: boolean;
+}
+
+// ── API contracts ───────────────────────────────────────────────────────────
+// Everything below mirrors pg-dashboard's src/features/multi-currency-accounts/
+// types.ts. The types above are this app's *view* shape, which the mapper in
+// hooks.ts produces from ApiVirtualAccount; they are deliberately not the same
+// thing, because the API returns no presentation fields (see the API-gap notes
+// on the mapper).
+
+/** Currency keys the accounts response is bucketed by. "OTHER" is the SWIFT
+ *  catch-all, displayed as "GLOBAL"/Rest of the World. */
+export type ApiCurrency = "AUD" | "USD" | "EUR" | "GBP" | "CAD" | "OTHER";
+
+export interface ApiVirtualAccount {
+  id: string;
+  accountId: string;
+  currency: string;
+  paymentType: "priority" | "regular";
+  accountHolderName: string;
+  accountNumber: string;
+  accountNumberType: string;
+  routingCode: string;
+  routingCodeType: string;
+  fedwireRoutingCode: string | null;
+  bankName: string;
+  bankAddress: string;
+  bankCountry: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * The accounts response carries two independent sets:
+ * - `general` — the merchant's own receiving accounts (Virtual accounts page).
+ * - `amazon`  — accounts issued for Amazon payouts (Platforms page).
+ * Either may be absent for a merchant who has no accounts of that kind.
+ */
+export interface AccountDataResponse {
+  gid: string;
+  status: string;
+  message: string;
+  timestamp: string;
+  reasonCode: string;
+  data: {
+    general?: Record<ApiCurrency, ApiVirtualAccount>;
+    amazon?: Record<ApiCurrency, ApiVirtualAccount>;
+  };
+  errors: unknown;
+}
+
+/** Leg 1 of either document download returns this descriptor; leg 2 posts it
+ *  back unchanged. `isAmazon` is a string, not a boolean, on the wire. */
+export interface GeneratedDocumentPayload {
+  fileName: string;
+  processor: string;
+  isAmazon: string;
+  documentType: string;
+}
+
+/** Leg 2's response. `url` is absent while generation is still running, which
+ *  is the signal to poll again. */
+export interface GeneratedDocumentUrlResponse {
+  url?: string;
+  fileName?: string;
+}
+
+export interface ShareLinkRequest {
+  currency: string;
+}
+
+export interface ShareLinkResponse {
+  gid: string;
+  status: string;
+  message: string;
+  data: { url: string };
+}
+
+/** `id` is the SHA-256 of the account number, matching pg-dashboard's
+ *  McaShareModal. Cc/Bcc are omitted entirely when the merchant leaves them
+ *  blank rather than sent as empty arrays. */
+export interface SendAccountEmailRequest {
+  id: string;
+  clientName: string;
+  clientEmail: string;
+  ccEmails?: string[];
+  bccEmails?: string[];
+}
+
+/** Verbatim from pg-dashboard's src/features/dashboard/types.ts. Note the
+ *  money figures are strings and only `fxRate` is a number. */
+export interface ExchangeRateData {
+  annualSavingsComparedToBanks: string;
+  convertedAmount: string;
+  fxRate: number;
+  gst: string;
+  payGlocalFeeAmount: string;
+  payGlocalFeeRate: string;
+  payGlocalFeeType: "PERCENTAGE" | "FLAT";
+  settlementAmount: string;
+}
+
+export interface ExchangeRatesResponse {
+  gid: string;
+  status: string;
+  message: string;
+  data: ExchangeRateData;
+}
+
+/**
+ * Leg 1's payload for the Amazon account-detail statement. Exactly the six
+ * fields pg-dashboard sends (AmzAccountDetailReportRequest) — the drawer also
+ * collects a DBA name and country, which this endpoint does not take.
+ */
+export interface AmzAccountStatementRequest {
+  currency: string;
+  routingCode: string;
+  accountNumber: string;
+  merchantName: string;
+  merchantRegisteredAddress: string;
+  contactEmail?: string;
+}
+
+export interface AmzAccountStatementTriggerResponse {
+  message?: string;
+  data?: { requestTimestamp?: string };
+}
+
+export interface AmzAccountStatementPollResponse {
+  data?: { presignedUrl?: string };
 }
