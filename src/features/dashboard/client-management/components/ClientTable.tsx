@@ -154,13 +154,12 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
       {
         id: `cli-new-${nextClientIdRef.current++}`,
         ...fields,
-        // A brand-new client has no billing history yet: nothing outstanding
-        // and no invoices raised. The currency is only the denomination those
-        // zeroes are shown in, and follows the client's own country.
-        outstandingAmount: 0,
-        outstandingCurrency: currencyForCountry(fields.countryIso2),
-        totalInvoices: 0,
-        paidInvoices: 0,
+        // A brand-new client has no billing history: no transactions, so every
+        // figure derived from them — Total received, and all three invoice
+        // counts — comes out empty on its own, with nothing to seed here. The
+        // currency is only the denomination those figures will be shown in once
+        // there are any, and follows the client's own country.
+        currency: currencyForCountry(fields.countryIso2),
       },
       ...prev,
     ]);

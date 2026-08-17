@@ -26,7 +26,32 @@ export interface PlatformStep {
   quickAccess?: boolean;
 }
 
-/** A document card in the sidebar's "Documents you might need" list. */
+/**
+ * One storefront a platform runs, e.g. Amazon.com or Amazon.co.uk.
+ *
+ * Deliberately not the same list as `accountIds`: several storefronts can pay
+ * into one receiving account (Amazon.de, .fr, .it and .es all settle to the
+ * euro account), so a marketplace is its own choice that *resolves* to an
+ * account rather than being one. Selecting a marketplace is what scopes the
+ * account details and the walkthrough beneath it.
+ */
+export interface PlatformMarketplace {
+  /** Stable key — the Select's option value and the selected-row identity. */
+  id: string;
+  /** What the option and the trigger read, e.g. "Amazon.co.uk". */
+  label: string;
+  /** Which of the platform's `accountIds` this storefront settles into. */
+  accountId: string;
+  /**
+   * ISO 3166-1 alpha-2 for the storefront's own country, which drives the flag
+   * beside the option. The storefront's country, not the account's: the four
+   * euro-settling Amazon marketplaces each show their own flag rather than
+   * four identical EU ones.
+   */
+  iso2: string;
+}
+
+/** A document card in the "Documents you might need" row. */
 export interface PlatformDocument {
   /** Small caption above the title, e.g. "Last 3 months" or the platform name. */
   caption: string;
@@ -83,6 +108,19 @@ export interface Platform {
    * `accountOptionLabel`.
    */
   marketplaceLabels?: Record<string, string>;
+  /**
+   * The platform's storefronts, in the order the selector should offer them.
+   *
+   * Read by the Platforms page, whose selector picks a marketplace and derives
+   * the account from it. Platforms v1 keeps picking an account directly through
+   * `marketplaceLabels` above, which is why both exist: one storefront per
+   * account there, several per account here.
+   *
+   * Absent on platforms that run a single storefront — the Platforms page then
+   * renders no selector at all rather than a dropdown with one answer in it,
+   * and the first entry in `accountIds` is the account.
+   */
+  marketplaces?: PlatformMarketplace[];
   /**
    * Whether the merchant picks which of those accounts to be paid into.
    *

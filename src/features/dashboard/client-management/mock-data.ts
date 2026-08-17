@@ -17,10 +17,14 @@ import type { McaTransaction } from "@/features/dashboard/transactions/types";
  *
  * The rows deliberately spread across the axes the table has to survive: a
  * dozen countries so the Country filter has something to narrow, several
- * currencies, outstanding balances from zero to six figures, business names
- * both short and long enough to test the column's width, and creation dates
- * spanning two years so a date range excludes some rows rather than all or
- * none.
+ * currencies, business names both short and long enough to test the column's
+ * width, and creation dates spanning two years so a date range excludes some
+ * rows rather than all or none.
+ *
+ * A client carries no invoice counts and no received total of its own. Both
+ * are derived from the transactions below (see clientInvoiceMetrics and
+ * clientTotalReceived), so a client's figures can never disagree with the
+ * transactions the details view lists underneath them.
  *
  * Every client is international. This is the merchant's cross-border client
  * book — the counterparties who remit *to* them — so a domestic Indian client
@@ -37,11 +41,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Unit 7, Chancery House, 53-64 Chancery Lane, London WC2A 1QS, United Kingdom",
     countryIso2: "GB",
     countryName: "United Kingdom",
-    outstandingAmount: 48_250.0,
-    outstandingCurrency: "GBP",
+    currency: "GBP",
     createdAt: "2024-11-04T09:20:00Z",
-    totalInvoices: 24,
-    paidInvoices: 18,
   },
   {
     id: "cli-002",
@@ -53,11 +54,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "5 Penn Plaza, 14th Floor, New York, NY 10001, United States",
     countryIso2: "US",
     countryName: "United States",
-    outstandingAmount: 132_890.75,
-    outstandingCurrency: "USD",
+    currency: "USD",
     createdAt: "2024-08-19T14:05:00Z",
-    totalInvoices: 41,
-    paidInvoices: 33,
   },
   {
     id: "cli-003",
@@ -69,11 +67,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Industriestraße 42, 70565 Stuttgart, Germany",
     countryIso2: "DE",
     countryName: "Germany",
-    outstandingAmount: 0,
-    outstandingCurrency: "EUR",
+    currency: "EUR",
     createdAt: "2025-02-27T11:45:00Z",
-    totalInvoices: 12,
-    paidInvoices: 12,
   },
   {
     id: "cli-005",
@@ -85,11 +80,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "12 Marina View, #21-01 Asia Square Tower 2, Singapore 018961",
     countryIso2: "SG",
     countryName: "Singapore",
-    outstandingAmount: 22_640.5,
-    outstandingCurrency: "SGD",
+    currency: "SGD",
     createdAt: "2025-06-03T02:10:00Z",
-    totalInvoices: 19,
-    paidInvoices: 16,
   },
   {
     id: "cli-006",
@@ -101,11 +93,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Level 3, 88 Cambridge Street, Collingwood VIC 3066, Australia",
     countryIso2: "AU",
     countryName: "Australia",
-    outstandingAmount: 9_780.0,
-    outstandingCurrency: "AUD",
+    currency: "AUD",
     createdAt: "2025-01-16T22:40:00Z",
-    totalInvoices: 8,
-    paidInvoices: 6,
   },
   {
     id: "cli-007",
@@ -117,11 +106,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Office 1204, Burj Al Salam Tower, Sheikh Zayed Road, Dubai, United Arab Emirates",
     countryIso2: "AE",
     countryName: "United Arab Emirates",
-    outstandingAmount: 386_400.0,
-    outstandingCurrency: "AED",
+    currency: "AED",
     createdAt: "2024-09-30T08:15:00Z",
-    totalInvoices: 52,
-    paidInvoices: 39,
   },
   {
     id: "cli-008",
@@ -133,11 +119,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "220 Laurier Avenue West, Suite 900, Ottawa, ON K1P 5Z9, Canada",
     countryIso2: "CA",
     countryName: "Canada",
-    outstandingAmount: 4_115.25,
-    outstandingCurrency: "CAD",
+    currency: "CAD",
     createdAt: "2025-04-08T17:55:00Z",
-    totalInvoices: 14,
-    paidInvoices: 12,
   },
   {
     id: "cli-009",
@@ -149,11 +132,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "18 Rue du Faubourg Saint-Honoré, 75008 Paris, France",
     countryIso2: "FR",
     countryName: "France",
-    outstandingAmount: 17_960.0,
-    outstandingCurrency: "EUR",
+    currency: "EUR",
     createdAt: "2024-07-22T13:25:00Z",
-    totalInvoices: 23,
-    paidInvoices: 19,
   },
   {
     id: "cli-010",
@@ -165,11 +145,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "3-15 Higashiyama-ku, Kiyomizu, Kyoto 605-0862, Japan",
     countryIso2: "JP",
     countryName: "Japan",
-    outstandingAmount: 0,
-    outstandingCurrency: "USD",
+    currency: "USD",
     createdAt: "2025-05-29T04:00:00Z",
-    totalInvoices: 31,
-    paidInvoices: 31,
   },
   {
     id: "cli-011",
@@ -181,11 +158,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "14 Rossouw Street, Vaalpark, Sasolburg 1947, South Africa",
     countryIso2: "ZA",
     countryName: "South Africa",
-    outstandingAmount: 63_310.0,
-    outstandingCurrency: "USD",
+    currency: "USD",
     createdAt: "2024-12-11T10:35:00Z",
-    totalInvoices: 17,
-    paidInvoices: 11,
   },
   {
     id: "cli-012",
@@ -197,11 +171,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Av. Paulista 1374, 8º andar, Bela Vista, São Paulo 01310-100, Brazil",
     countryIso2: "BR",
     countryName: "Brazil",
-    outstandingAmount: 88_425.6,
-    outstandingCurrency: "USD",
+    currency: "USD",
     createdAt: "2025-03-19T19:05:00Z",
-    totalInvoices: 28,
-    paidInvoices: 21,
   },
   {
     id: "cli-013",
@@ -213,11 +184,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Sveavägen 44, 111 34 Stockholm, Sweden",
     countryIso2: "SE",
     countryName: "Sweden",
-    outstandingAmount: 12_050.0,
-    outstandingCurrency: "EUR",
+    currency: "EUR",
     createdAt: "2025-07-24T07:50:00Z",
-    totalInvoices: 9,
-    paidInvoices: 7,
   },
   {
     id: "cli-014",
@@ -229,11 +197,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "27 Te Awa Road, Havelock North, Hastings 4130, New Zealand",
     countryIso2: "NZ",
     countryName: "New Zealand",
-    outstandingAmount: 5_690.4,
-    outstandingCurrency: "AUD",
+    currency: "AUD",
     createdAt: "2024-10-07T21:15:00Z",
-    totalInvoices: 11,
-    paidInvoices: 9,
   },
   {
     id: "cli-016",
@@ -245,11 +210,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Sixth Floor, 30 St Mary Axe, London EC3A 8BF, United Kingdom",
     countryIso2: "GB",
     countryName: "United Kingdom",
-    outstandingAmount: 74_500.0,
-    outstandingCurrency: "GBP",
+    currency: "GBP",
     createdAt: "2024-06-14T15:30:00Z",
-    totalInvoices: 22,
-    paidInvoices: 15,
   },
   {
     id: "cli-017",
@@ -261,11 +223,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "1201 Market Street, Suite 2100, Philadelphia, PA 19107, United States",
     countryIso2: "US",
     countryName: "United States",
-    outstandingAmount: 918_240.0,
-    outstandingCurrency: "USD",
+    currency: "USD",
     createdAt: "2025-09-11T12:00:00Z",
-    totalInvoices: 58,
-    paidInvoices: 44,
   },
   {
     id: "cli-018",
@@ -277,11 +236,8 @@ export const MOCK_CLIENTS: Client[] = [
     billingAddress: "Keizersgracht 241, 1016 EA Amsterdam, Netherlands",
     countryIso2: "NL",
     countryName: "Netherlands",
-    outstandingAmount: 26_775.9,
-    outstandingCurrency: "EUR",
+    currency: "EUR",
     createdAt: "2025-10-28T09:10:00Z",
-    totalInvoices: 13,
-    paidInvoices: 10,
   },
 ];
 
@@ -328,9 +284,15 @@ interface ClientTransactionSeed {
 }
 
 // Deliberately uneven: the first few clients carry enough transactions to page
-// through, several carry a handful, and some carry none at all, so the
-// section's empty state is reachable from the UI rather than only in theory.
-// Every row is one of the three states above and nothing else.
+// through, several carry a handful, and two (cli-013, cli-014) carry none at
+// all, so the section's empty state — and the table's own em-dash for a client
+// who has received nothing yet — are both reachable from the UI rather than
+// only in theory. Every row is one of the three states above and nothing else.
+//
+// Every client's invoice counts and received total are read off these seeds,
+// so this list is now the single description of a client's billing history:
+// adding a settled seed here is what moves that client's Total received and
+// Paid invoices figures, and there is nowhere else to change them.
 const CLIENT_TRANSACTION_SEEDS: ClientTransactionSeed[] = [
   { clientId: "cli-001", amount: "18400.00", state: "settled", createdAt: "12/06/2026 09:14:22", settlementDate: "2026-06-15T10:02:11Z" },
   { clientId: "cli-001", amount: "9250.50", state: "invoicePending", createdAt: "28/06/2026 14:41:05" },
@@ -364,6 +326,27 @@ const CLIENT_TRANSACTION_SEEDS: ClientTransactionSeed[] = [
   { clientId: "cli-017", amount: "486000.00", state: "settled", createdAt: "05/07/2026 12:26:14", settlementDate: "2026-07-08T13:52:29Z" },
   { clientId: "cli-017", amount: "312240.00", state: "sentForReview", createdAt: "18/07/2026 11:41:58" },
   { clientId: "cli-017", amount: "120000.00", state: "sentForReview", createdAt: "25/07/2026 09:04:33" },
+
+  { clientId: "cli-006", amount: "7420.00", state: "settled", createdAt: "22/06/2026 23:18:40", settlementDate: "2026-06-25T22:04:12Z" },
+  { clientId: "cli-006", amount: "3160.00", state: "settled", createdAt: "10/05/2026 21:52:07", settlementDate: "2026-05-13T20:31:55Z" },
+  { clientId: "cli-006", amount: "2900.00", state: "invoicePending", createdAt: "27/07/2026 22:09:31" },
+
+  { clientId: "cli-008", amount: "15380.00", state: "settled", createdAt: "16/06/2026 18:02:55", settlementDate: "2026-06-19T16:44:08Z" },
+  { clientId: "cli-008", amount: "4115.25", state: "sentForReview", createdAt: "26/07/2026 17:31:12" },
+
+  { clientId: "cli-010", amount: "28600.00", state: "settled", createdAt: "09/06/2026 05:14:26", settlementDate: "2026-06-12T04:37:50Z" },
+  { clientId: "cli-010", amount: "19450.00", state: "settled", createdAt: "17/04/2026 03:48:19", settlementDate: "2026-04-20T05:12:33Z" },
+  { clientId: "cli-010", amount: "11200.00", state: "settled", createdAt: "02/03/2026 06:25:44", settlementDate: "2026-03-05T04:59:17Z" },
+
+  { clientId: "cli-011", amount: "34700.00", state: "settled", createdAt: "30/06/2026 11:36:58", settlementDate: "2026-07-03T10:18:24Z" },
+  { clientId: "cli-011", amount: "28610.00", state: "invoicePending", createdAt: "22/07/2026 10:47:03" },
+
+  { clientId: "cli-016", amount: "41250.00", state: "settled", createdAt: "12/07/2026 08:29:37", settlementDate: "2026-07-15T09:41:06Z" },
+  { clientId: "cli-016", amount: "18900.00", state: "sentForReview", createdAt: "19/07/2026 14:16:22" },
+  { clientId: "cli-016", amount: "14350.00", state: "invoicePending", createdAt: "28/07/2026 10:03:49" },
+
+  { clientId: "cli-018", amount: "22400.00", state: "settled", createdAt: "24/06/2026 09:55:11", settlementDate: "2026-06-27T11:07:38Z" },
+  { clientId: "cli-018", amount: "9375.90", state: "sentForReview", createdAt: "21/07/2026 13:42:05" },
 ];
 
 /**
@@ -404,7 +387,7 @@ export const MOCK_CLIENT_TRANSACTIONS: McaTransaction[] = CLIENT_TRANSACTION_SEE
         gid: `mcatxn_${String(index + 1).padStart(3, "0")}_${seed.clientId}`,
         merchantId: MOCK_MERCHANT_ID,
         amount: seed.amount,
-        currency: client.outstandingCurrency,
+        currency: client.currency,
         externalStatus: SETTLEMENT_STATE[seed.state],
         internalStatus: SETTLEMENT_STATE[seed.state],
         formattedCreationDateTime: seed.createdAt,

@@ -1,5 +1,9 @@
 import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
-import type { Platform, PlatformDocument } from "@/features/dashboard/platforms/types";
+import type {
+  Platform,
+  PlatformDocument,
+  PlatformMarketplace,
+} from "@/features/dashboard/platforms/types";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 /**
@@ -62,6 +66,22 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
       "ae-aed": "amazon.ae",
       "sg-sgd": "amazon.sg",
     },
+    // The eight Amazon storefronts the walkthrough covers, in the order the
+    // selector offers them. Four of them settle into the one euro account —
+    // Amazon runs a storefront per European country, but a single receiving
+    // account serves them all — which is why this is its own list rather than
+    // one label per entry in `accountIds`. Each carries its storefront's own
+    // country flag, so the four euro rows stay distinguishable.
+    marketplaces: [
+      { id: "amazon-com", label: "Amazon.com", accountId: "us-usd", iso2: "US" },
+      { id: "amazon-co-uk", label: "Amazon.co.uk", accountId: "gb-gbp", iso2: "GB" },
+      { id: "amazon-ca", label: "Amazon.ca", accountId: "ca-cad", iso2: "CA" },
+      { id: "amazon-com-au", label: "Amazon.com.au", accountId: "au-aud", iso2: "AU" },
+      { id: "amazon-de", label: "Amazon.de", accountId: "eu-eur", iso2: "DE" },
+      { id: "amazon-fr", label: "Amazon.fr", accountId: "eu-eur", iso2: "FR" },
+      { id: "amazon-it", label: "Amazon.it", accountId: "eu-eur", iso2: "IT" },
+      { id: "amazon-es", label: "Amazon.es", accountId: "eu-eur", iso2: "ES" },
+    ],
     // Amazon pays out per marketplace, so the merchant picks which currency
     // this walkthrough is describing. No other platform here offers that
     // choice — see `offersCurrencyChoice` on the Platform type.
@@ -164,19 +184,20 @@ export function accountOptionLabel(platform: Platform, account: VirtualAccount):
 }
 
 /**
- * The three fields Quick Access surfaces for an account: the holder name, then
- * the account's own two rail-specific identifiers.
- *
- * Those identifiers keep the labels the account itself carries — "Account
- * Number"/"ACH Routing" for the US, "IBAN"/"SEPA BIC" for Europe — rather than
- * being flattened into a generic "Routing Code" that would be wrong on half the
- * rails.
+ * The receiving account one of a platform's storefronts settles into, resolved
+ * against the accounts that platform actually offers. Falls back to the first
+ * of those whenever the marketplace is absent or points at an account the
+ * platform doesn't carry, so the caller always has an account to render.
  */
-export function quickAccessFields(account: VirtualAccount) {
-  return [
-    { label: "Account holder's name", value: account.accountHolderName },
-    ...account.details,
-  ];
+export function accountForMarketplace(
+  accounts: VirtualAccount[],
+  marketplace: PlatformMarketplace | null
+): VirtualAccount | null {
+  return (
+    (marketplace ? accounts.find((account) => account.id === marketplace.accountId) : undefined) ??
+    accounts[0] ??
+    null
+  );
 }
 
 /**

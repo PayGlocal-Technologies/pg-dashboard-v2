@@ -6,10 +6,16 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { cn } from "@/lib/utils";
 import {
+  formatCurrency,
   formatPhoneNumber,
   formatTransactionDateOnly,
   truncateMiddle,
 } from "@/lib/utils/format";
+import {
+  clientAmountLocale,
+  clientTotalReceived,
+} from "@/features/dashboard/client-management/constants";
+import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
 import type { Client } from "@/features/dashboard/client-management/types";
 
 /**
@@ -125,6 +131,59 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
           </div>
         </RowClick>
       ),
+    },
+    {
+      key: "totalReceived",
+      header: "Total received",
+      minWidth: 165,
+      // Right-aligned, exactly as the Transactions table aligns its own Amount
+      // column: figures line up on their last digit down the column, which is
+      // what makes two rows comparable at a glance.
+      align: "right",
+      render: (row) => {
+        // Summed from the client's settled transactions on every render rather
+        // than read off the row: there is no received total on the client
+        // record, precisely so this figure and the transactions the details
+        // view lists can't disagree. Once a real endpoint exists it either
+        // sends the total or sends the transactions — either way this call is
+        // the only thing that changes.
+        const totals = clientTotalReceived(clientTransactions(row.businessName));
+
+        return (
+          <RowClick onClick={() => onOpenDetails(row)} align="right">
+            {totals.length === 0 ? (
+              // Nothing settled yet — an em-dash, not a formatted zero, since
+              // "no invoices have settled" and "settled for nothing" are
+              // different facts and only the first one is true here.
+              <span className="text-[13px] text-muted-foreground">—</span>
+            ) : (
+              // Amount then its ISO code in muted 11px, the same pairing the
+              // Transactions table's Amount cell uses. One line per currency:
+              // with a client billed in a single currency (all of them today)
+              // that is exactly one line.
+              <div className="flex flex-col items-end gap-0.5">
+                {totals.map((total) => (
+                  <div
+                    key={total.currency}
+                    className="flex items-baseline justify-end gap-1.5 whitespace-nowrap"
+                  >
+                    <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                      {formatCurrency(
+                        total.amount,
+                        total.currency,
+                        clientAmountLocale(total.currency)
+                      )}
+                    </span>
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {total.currency}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </RowClick>
+        );
+      },
     },
     {
       key: "createdAt",

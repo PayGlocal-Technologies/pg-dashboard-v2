@@ -1,8 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Badge, Button, DataTable } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { DataTable } from "@/components/ui";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -56,10 +55,9 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  // Archived items are a view of this same page, not a route: the tab bar,
-  // search, columns, and card list are all shared, and only the row set and
-  // the overflow menu's options differ.
-  const [showArchived, setShowArchived] = useState(false);
+  // Archived is a tab, not a separate mode, so this is derived rather than
+  // held: there is one selected view and `tab` already is it.
+  const showArchived = tab === "archived";
 
   // Archive and delete are recorded as id sets layered over the catalogue,
   // for the same reason priceOverrides is: once a real endpoint replaces
@@ -115,11 +113,15 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   // filtering is client-side; swapping in a real query means replacing the
   // source array and moving these predicates into the request body.
   const filteredRows = sourceRows.filter((product) => {
-    // Deleted rows are gone from both views; archived rows appear in exactly
-    // one of them, which is what makes archiving a move rather than a copy.
+    // Deleted rows are gone from every tab. Archived rows appear under
+    // Archived and nowhere else, which is what makes archiving a move rather
+    // than a copy — and why the type filter below only applies to the two
+    // tabs that name a type: Archived spans both.
     if (deletedIds.has(product.id)) return false;
     if (archivedIds.has(product.id) !== showArchived) return false;
-    if (tab !== "all" && product.type !== SKU_TAB_TYPE[tab]) return false;
+    if (tab === "goods" || tab === "services") {
+      if (product.type !== SKU_TAB_TYPE[tab]) return false;
+    }
     if (!query) return true;
     // Matches either field the placeholder cycles through (SKU_SEARCH_HINTS),
     // the same way the Transactions search spans remitter/transaction ID/UTR:
@@ -176,10 +178,11 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
       { id: `sku-new-${nextIdRef.current++}`, ...fields },
       ...prev,
     ]);
-    // A new item belongs in the active list, so leave the archived view and
-    // reset paging — otherwise it lands on a page the merchant isn't looking
-    // at and the form appears to have done nothing.
-    setShowArchived(false);
+    // A new item is active, so a merchant sitting on Archived would otherwise
+    // watch the form close onto a list the item isn't in. Sending them to All
+    // (and back to page 1) puts it in front of them whichever tab they were on
+    // and whichever type they picked.
+    setTab("all");
     setPage(1);
     if (!keepOpen) onAddItemOpenChange(false);
   };
@@ -226,16 +229,11 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
     setPage(1);
   };
 
+  // Switching tabs keeps the search query — a merchant looking for one product
+  // shouldn't retype it to check whether they archived it. Only paging resets,
+  // since each tab has its own row count.
   const onTabChange = (value: string) => {
     setTab(value as SkuViewTab);
-    setPage(1);
-  };
-
-  // Toggling the view keeps the tab and the search query — a merchant looking
-  // for one product shouldn't have to retype it to check whether they archived
-  // it. Only paging resets, since the two views' row counts differ.
-  const onToggleArchived = () => {
-    setShowArchived((prev) => !prev);
     setPage(1);
   };
 
@@ -250,27 +248,16 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
     // (rounded-none border-0) since this wrapper draws them, and a border-b
     // under each control row stands in for the separators between them.
     <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Four tabs, one selected view. Archived is one of them rather than a
+          button beside the search, so there's a single control for "which
+          items am I looking at" instead of a tab and a mode that cross. */}
       <div className="border-b border-border px-4 pt-3">
-        {/* The tab bar's own right-hand slot carries the archived marker, so
-            All/Goods/Services keep filtering both views identically while it
-            stays obvious which set is on screen. */}
-        <UnderlineTabs
-          tabs={SKU_VIEW_TABS}
-          value={tab}
-          onValueChange={onTabChange}
-          actions={
-            showArchived ? (
-              <Badge variant="secondary" size="sm" leftIcon={<Icon name="archive" className="h-3 w-3" />}>
-                Viewing archived items
-              </Badge>
-            ) : null
-          }
-        />
+        <UnderlineTabs tabs={SKU_VIEW_TABS} value={tab} onValueChange={onTabChange} />
       </div>
 
-      {/* Search, with the archived-view toggle pushed to the far right by
-          ml-auto. Still no Report, no Reorder Columns, no filter chips. */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+      {/* Search only — no Report, no Reorder Columns, no filter chips, and no
+          archived control: the tab bar above owns that now. */}
+      <div className="border-b border-border px-4 py-3">
         <RotatingSearchInput
           value={search}
           onSearch={onSearch}
@@ -278,21 +265,6 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
           ariaLabel="Search products by name or HSN/SAC"
           className="w-full sm:w-56"
         />
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={
-            <Icon
-              name={showArchived ? "chevron-left" : "archive"}
-              className="h-3.5 w-3.5"
-            />
-          }
-          onClick={onToggleArchived}
-          className="ml-auto h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-        >
-          {showArchived ? "Back to items" : "Archived items"}
-        </Button>
       </div>
 
       {/* Desktop (lg+): the full table. The overflow menu rides `rowAction`,
