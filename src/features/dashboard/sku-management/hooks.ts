@@ -169,11 +169,29 @@ export function useSkuPathMid() {
   return { mid, midFilter, isReady: isReady && !!mid, guardState };
 }
 
+/**
+ * The catalogue search's `fieldSearch`, or undefined when there is nothing to
+ * filter on. Built here rather than inline so the "omit the key entirely rather
+ * than send an empty array" rule holds for both entries: an empty `type` would
+ * narrow the search to no product type at all rather than to every one.
+ */
+function buildCatalogueFieldSearch(
+  mids: string[] | undefined,
+  type: SkuProductType | undefined
+): Record<string, string | string[]> | undefined {
+  const fieldSearch: Record<string, string | string[]> = {};
+  if (mids?.length) fieldSearch.mid = mids;
+  if (type) fieldSearch.type = [toApiType(type)];
+  return Object.keys(fieldSearch).length > 0 ? fieldSearch : undefined;
+}
+
 // ── Reads ───────────────────────────────────────────────────────────────────
 
 interface SkuCatalogueArgs {
   /** The search box's current query, already trimmed by the caller. */
   search: string;
+  /** Which product type the selected tab narrows to, or undefined for All. */
+  type?: SkuProductType;
   /** 1-based page, as the table holds it. */
   page: number;
 }
@@ -191,12 +209,20 @@ interface SkuCatalogue {
 }
 
 /**
- * The catalogue list. Search and paging are server-side, exactly as
- * pg-dashboard does them; the Goods/Services tabs narrow the returned page
- * client-side in SkuTable, because no pg-dashboard call site sends a type
- * filter and guessing one against production was not on the table.
+ * The catalogue list. Search, paging and the type tabs are all server-side, so
+ * the rows that arrive are the rows to draw and `totalCount` always describes
+ * the same set they came from.
+ *
+ * One caveat on the type filter, because it is the one part of this body with no
+ * production precedent: pg-dashboard's SKU search only ever sends
+ * `fieldSearch.mid`, so the `type` key is inferred rather than copied. It follows
+ * the convention every other fieldSearch key in both apps follows — the key is
+ * the record's own field name, and the value is the record's own enum, so `type`
+ * takes the API's singular `GOOD`/`SERVICE` and not v2's plural display form. If
+ * the backend happens to name it something else, a type tab returns no rows,
+ * which is visible immediately rather than quietly wrong.
  */
-export function useSkuCatalogue({ search, page }: SkuCatalogueArgs): SkuCatalogue {
+export function useSkuCatalogue({ search, type, page }: SkuCatalogueArgs): SkuCatalogue {
   const { mid, midFilter, isReady, guardState } = useSkuPathMid();
 
   // Stable across renders as long as its inputs are — usePostQuery folds the
@@ -208,14 +234,15 @@ export function useSkuCatalogue({ search, page }: SkuCatalogueArgs): SkuCatalogu
       // Verbatim from pg-dashboard: a query switches the filter type, an empty
       // box is DEFAULT.
       searchFilterType: search ? "QUERY_FILTER_TYPE" : "DEFAULT",
-      // The key is `mid`, not `merchantId`. midFilter names itself
-      // "merchantId" because that is what the OpenSearch txn endpoints want;
-      // the catalogue search wants `mid`, so only the values carry over.
-      fieldSearch: midFilter ? { mid: midFilter.value } : undefined,
+      // Two possible keys. `mid` is not `merchantId`: midFilter names itself
+      // "merchantId" because that is what the OpenSearch txn endpoints want,
+      // while the catalogue search wants `mid`, so only the values carry over.
+      // `type` carries the API's own enum — see the note above.
+      fieldSearch: buildCatalogueFieldSearch(midFilter?.value, type),
       from: (page - 1) * SKU_PAGE_LIMIT,
       pageLimit: SKU_PAGE_LIMIT,
     }),
-    [search, midFilter, page]
+    [search, midFilter, type, page]
   );
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<

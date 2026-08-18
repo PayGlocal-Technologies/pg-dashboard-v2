@@ -91,10 +91,14 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   // The product being edited, or null when the form is in Add mode.
   const [editing, setEditing] = useState<SkuProduct | null>(null);
 
-  // Search and paging are server-side (see useSkuCatalogue), so the query and
-  // the page are request inputs now rather than things filtered locally.
+  // Search, the type tab and the page are all request inputs — every one of them
+  // is applied by the server (see useSkuCatalogue), so the rows that arrive are
+  // the rows to draw and the pager's count always describes the same set.
   const { products, totalCount, isLoading, isFetching, refetch } = useSkuCatalogue({
     search: search.trim(),
+    // All sends no type filter at all rather than both types, so the request says
+    // "don't narrow" instead of "narrow to everything".
+    type: tab === "goods" || tab === "services" ? SKU_TAB_TYPE[tab] : undefined,
     page,
   });
 
@@ -111,15 +115,6 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   const { updateSku } = useUpdateSku();
   const { deleteSku } = useDeleteSku();
   const { duplicateSku } = useDuplicateSku();
-
-  // Only the type tabs narrow locally. No pg-dashboard call site sends a type
-  // filter to the catalogue search, so this filters the page the server
-  // returned rather than the whole catalogue — which is why the pager below
-  // still counts server rows.
-  const tabRows =
-    tab === "goods" || tab === "services"
-      ? products.filter((product) => product.type === SKU_TAB_TYPE[tab])
-      : products;
 
   // Both prices are edited in place, and the endpoint replaces the row, so the
   // whole record is resent with just this field changed.
@@ -211,7 +206,13 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   // wants the two ways to put something in it; anything else is a query or tab
   // that matched nothing, and wants to be told to widen it. pg-dashboard draws
   // the same distinction.
-  const isFirstRun = !isLoading && totalCount === 0 && !search.trim();
+  //
+  // `tab === "all"` is load-bearing now that the tabs filter server-side:
+  // totalCount describes the *filtered* set, so a merchant on Goods with no goods
+  // would otherwise be told their catalogue is empty and offered the import CTAs,
+  // when in fact they have items — just none of that type. First run means the
+  // whole catalogue is empty, which only an unfiltered, unsearched request can say.
+  const isFirstRun = !isLoading && totalCount === 0 && !search.trim() && tab === "all";
   const emptyTitle = "No products found";
   const emptyDescription = "Try a different search or switch tabs";
 
@@ -309,7 +310,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
               "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
             )}
             columns={columns}
-            data={tabRows}
+            data={products}
             isLoading={isLoading}
             emptyTitle={emptyTitle}
             emptyDescription={emptyDescription}
@@ -326,7 +327,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
           {/* Tablet + mobile (below lg): the same page's rows as cards. */}
           <SkuCardList
             className="lg:hidden"
-            rows={tabRows}
+            rows={products}
             isLoading={isLoading}
             rowAction={renderRowActions}
             onPreview={setPreviewProduct}
