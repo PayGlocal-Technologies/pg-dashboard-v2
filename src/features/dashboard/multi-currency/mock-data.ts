@@ -1,8 +1,48 @@
 import type { MetricSparklinePoint } from "@/components/ui";
-import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
+import type { SupportedRegion, VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 /** Same legal entity receives every currency, so the holder name is shared. */
 const ACCOUNT_HOLDER_NAME = "Acme Exports Pvt Ltd";
+
+/**
+ * Regions the Rest of the World account can receive from over SWIFT. Attached
+ * to the account itself (see its `supportedRegions`) rather than living inside
+ * the Supported currencies modal — the modal lists whatever the account it's
+ * given carries, so replacing this with the real endpoint's list needs no UI
+ * change. Every code here has a symbol in format.ts's CURRENCY_SYMBOLS, so
+ * amounts in these currencies render with a real glyph rather than a bare code.
+ */
+const SWIFT_SUPPORTED_REGIONS: SupportedRegion[] = [
+  { iso2: "US", countryName: "United States", currency: "USD", currencyName: "US Dollar" },
+  {
+    iso2: "GB",
+    countryName: "United Kingdom",
+    currency: "GBP",
+    currencyName: "British Pound Sterling",
+  },
+  { iso2: "DE", countryName: "Germany", currency: "EUR", currencyName: "Euro" },
+  { iso2: "FR", countryName: "France", currency: "EUR", currencyName: "Euro" },
+  { iso2: "NL", countryName: "Netherlands", currency: "EUR", currencyName: "Euro" },
+  { iso2: "CH", countryName: "Switzerland", currency: "CHF", currencyName: "Swiss Franc" },
+  { iso2: "SE", countryName: "Sweden", currency: "SEK", currencyName: "Swedish Krona" },
+  { iso2: "NO", countryName: "Norway", currency: "NOK", currencyName: "Norwegian Krone" },
+  { iso2: "DK", countryName: "Denmark", currency: "DKK", currencyName: "Danish Krone" },
+  { iso2: "PL", countryName: "Poland", currency: "PLN", currencyName: "Polish Zloty" },
+  { iso2: "CA", countryName: "Canada", currency: "CAD", currencyName: "Canadian Dollar" },
+  { iso2: "MX", countryName: "Mexico", currency: "MXN", currencyName: "Mexican Peso" },
+  { iso2: "AU", countryName: "Australia", currency: "AUD", currencyName: "Australian Dollar" },
+  { iso2: "NZ", countryName: "New Zealand", currency: "NZD", currencyName: "New Zealand Dollar" },
+  { iso2: "SG", countryName: "Singapore", currency: "SGD", currencyName: "Singapore Dollar" },
+  { iso2: "HK", countryName: "Hong Kong", currency: "HKD", currencyName: "Hong Kong Dollar" },
+  { iso2: "JP", countryName: "Japan", currency: "JPY", currencyName: "Japanese Yen" },
+  { iso2: "KR", countryName: "South Korea", currency: "KRW", currencyName: "South Korean Won" },
+  { iso2: "MY", countryName: "Malaysia", currency: "MYR", currencyName: "Malaysian Ringgit" },
+  { iso2: "TH", countryName: "Thailand", currency: "THB", currencyName: "Thai Baht" },
+  { iso2: "AE", countryName: "United Arab Emirates", currency: "AED", currencyName: "UAE Dirham" },
+  { iso2: "SA", countryName: "Saudi Arabia", currency: "SAR", currencyName: "Saudi Riyal" },
+  { iso2: "IL", countryName: "Israel", currency: "ILS", currencyName: "Israeli Shekel" },
+  { iso2: "ZA", countryName: "South Africa", currency: "ZAR", currencyName: "South African Rand" },
+];
 
 /**
  * Placeholder virtual accounts for the seven supported countries, plus the
@@ -163,6 +203,12 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
     bankName: "PayGlocal International Ltd",
     beneficiaryAddress: "1 King Street, London, EC2V 8AU, UK",
     routingCodeType: "swift_bic",
+    supportedRegions: SWIFT_SUPPORTED_REGIONS,
+    // The account is held at a UK bank, so a sender's own bank may convert the
+    // payment to GBP on the way in and charge its own FX spread for doing it.
+    // The seven local-rail accounts carry no remark: they already receive in
+    // the currency their senders hold, so there is nothing to convert.
+    senderRemark: "DO NOT CONVERT TO GBP",
   },
 ];
 

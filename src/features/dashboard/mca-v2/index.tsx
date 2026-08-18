@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Button, Card, PageHeader } from "@/components/ui";
+import { Alert, AlertDescription, Button, Card, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { currencySymbol, formatCurrency } from "@/lib/utils/format";
@@ -402,6 +402,40 @@ export function McaV2Feature() {
                 </Button>
               </div>
 
+              {/* Only accounts that can arrive in the wrong currency carry a
+                  senderRemark, so this banner is the Rest of the World
+                  account's alone — the seven local-rail accounts have nothing
+                  to warn about and render nothing here. Driven by the data's
+                  presence rather than a check against a particular account.
+
+                  flux-ui's own info Alert, not a banner of our own: it spans
+                  the column, keeps its content in one row on desktop, and
+                  wraps inside its own box on a phone (the text sits in a
+                  `flex-1 min-w-0` slot beside the icon), so it can't push the
+                  page wider. mb-4 sits it closer to the card it qualifies
+                  than to the heading above. */}
+              {selectedAccount.senderRemark && (
+                <Alert variant="info" className="mb-4">
+                  <AlertDescription className="text-[13px]">
+                    Ask senders to add{" "}
+                    <span className="font-semibold">
+                      &ldquo;{selectedAccount.senderRemark}&rdquo;
+                    </span>{" "}
+                    as a remark to avoid unexpected FX charges.{" "}
+                    {/* No explainer article exists yet — the toast is the
+                        stand-in, same treatment as How it works? above. */}
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 align-baseline text-[13px] underline"
+                      onClick={() => toast.info("Explainer coming soon")}
+                    >
+                      Why this is important?
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Same Account Details card the Multi Currency Accounts page
                   and the share modal render — `inside` moves the
                   flag/name/subtitle into the card (there's no carousel here
@@ -430,7 +464,8 @@ export function McaV2Feature() {
                   Need proof of account ownership?
                 </p>
                 <p className={MODULE_SUBTITLE}>
-                  If your client asks for a proof of this account&apos;s ownership, you can download and send them this document
+                  If your client asks for a proof of this account&apos;s ownership, you can download
+                  and send them this document
                 </p>
               </div>
               {/* Placeholder until the proof-of-account document endpoint

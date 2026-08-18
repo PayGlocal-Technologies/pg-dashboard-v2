@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { Button, Card, CardContent, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
+import { SupportedCurrenciesModal } from "@/features/dashboard/multi-currency/components/SupportedCurrenciesModal";
 import { buildFullAccountDetails } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
@@ -76,6 +78,10 @@ export function VirtualAccountDetails({
 }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
 
+  // Only ever opened by accounts carrying supportedRegions — the link that
+  // sets it doesn't render for the rest.
+  const [currenciesOpen, setCurrenciesOpen] = useState(false);
+
   return (
     <section aria-live="polite">
       {headerPlacement === "above" && (
@@ -99,8 +105,34 @@ export function VirtualAccountDetails({
               <p className="truncate text-base font-semibold text-foreground">
                 {account.accountName}
               </p>
-              <p className="truncate text-[13px] text-muted-foreground">
+              {/* No `truncate` here, unlike the name above: this line can
+                  carry the supported-currency link after it, and truncating
+                  would be able to hide the link entirely. It wraps instead,
+                  which is also what puts the link below the text rather than
+                  off the edge on a narrow viewport. */}
+              <p className="text-[13px] text-muted-foreground">
                 {accountSubtitle(account)}
+                {/* Only accounts covering many regions have a list to show, so
+                    the link is driven by the data's presence rather than a
+                    check against a particular account. */}
+                {account.supportedRegions && (
+                  <>
+                    {" · "}
+                    <Button
+                      type="button"
+                      variant="link"
+                      // h-auto/p-0 strip the variant's own button box so this
+                      // sits inline in the sentence, and text-[13px] matches
+                      // the surrounding copy rather than the variant's larger
+                      // default — secondary to the account information, but
+                      // still carrying the design system's own link colour.
+                      className="h-auto p-0 align-baseline text-[13px]"
+                      onClick={() => setCurrenciesOpen(true)}
+                    >
+                      See supported currency
+                    </Button>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -156,6 +188,16 @@ export function VirtualAccountDetails({
           </Button>
         </div>
       </Card>
+
+      {/* Mounted only for accounts that have a list, so it can never open
+          empty. Read-only — see SupportedCurrenciesModal. */}
+      {account.supportedRegions && (
+        <SupportedCurrenciesModal
+          open={currenciesOpen}
+          onOpenChange={setCurrenciesOpen}
+          regions={account.supportedRegions}
+        />
+      )}
     </section>
   );
 }
