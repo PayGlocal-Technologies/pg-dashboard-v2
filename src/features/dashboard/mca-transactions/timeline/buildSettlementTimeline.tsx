@@ -284,7 +284,10 @@ export function buildSettlementTimeline({
   }
 
   const txnCurrency = data?.FUND_RECEIVED?.TXN_CURRENCY || row.currency || "INR";
-  const receivedMoney = `${currencySymbol(txnCurrency)}${formatAmount(data?.FUND_RECEIVED?.TXN_AMOUNT, txnCurrency)} ${txnCurrency}`;
+  // Symbol + amount only, no trailing currency code: the code already
+  // appears once in "received in {code} account" right after this, so
+  // repeating it here read redundant ("$1 USD received in USD account").
+  const receivedMoney = `${currencySymbol(txnCurrency)}${formatAmount(data?.FUND_RECEIVED?.TXN_AMOUNT, txnCurrency)}`;
   // Last 4 digits only, bullet-masked, same convention RecentActivityTable
   // already uses for card numbers elsewhere in the product. accountDetails
   // (the same object VirtualAccountRow renders below this step) is the only
@@ -292,6 +295,12 @@ export function buildSettlementTimeline({
   const maskedAccountSuffix = accountDetails?.accountNumber
     ? `••••${accountDetails.accountNumber.slice(-4)}`
     : "";
+  // See getMockUtrNumber's own TODO (mock-data.ts): no per-transaction UTR
+  // field exists in the API yet, so this is a placeholder rather than the
+  // real thing. Kept truthy-checked below regardless, so the "don't show if
+  // no UTR exists" behaviour is already correct once a real, nullable field
+  // replaces this.
+  const utrNumber = getMockUtrNumber(row.gid);
 
   const pgHouseStatus = data?.PG_HOUSE_FUND_RECEIVED?.STATUS;
   const fircStatus = data?.FIRC_RECEIVED?.STATUS;
@@ -330,7 +339,7 @@ export function buildSettlementTimeline({
       data?.FUND_RECEIVED,
       createStep(
         fundsReceivedSucceeded
-          ? `${receivedMoney} received in ${txnCurrency} Account${maskedAccountSuffix ? ` ${maskedAccountSuffix}` : ""}`
+          ? `${receivedMoney} received in ${txnCurrency} account${maskedAccountSuffix ? ` ${maskedAccountSuffix}` : ""}`
           : fundsPendingTitle,
         statusOrPending(data?.FUND_RECEIVED?.STATUS),
         fundReceivedChildren,
@@ -426,12 +435,15 @@ export function buildSettlementTimeline({
         fircStatus === "SUCCESS" ? (
           <>
             <DownloadFircButton onDownload={onDownloadFirc} isLoading={isFircDownloading} />
-            {/* Visually secondary to the FIRC info above: smaller and
-                muted, same treatment the "children" slot uses for supporting
-                detail elsewhere in this timeline (e.g. RejectionReason). */}
-            <p className="mt-1.5 text-[11px] text-muted-foreground">
-              UTR: {getMockUtrNumber(row.gid)}
-            </p>
+            {/* Part of this same FIRC issuance step, not a separate section:
+                rendered right after the download action, visually secondary
+                (smaller, muted) the same way RejectionReason and other
+                children elsewhere in this timeline read as supporting detail
+                rather than a primary line. Omitted entirely when there's no
+                UTR to show, rather than rendering an empty "UTR:" line. */}
+            {utrNumber && (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">UTR: {utrNumber}</p>
+            )}
           </>
         ) : null,
         formatEventTime(data?.FIRC_RECEIVED?.FORMATTED_DATE_TIME, fircStatus === "SUCCESS")
