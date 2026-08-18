@@ -136,8 +136,8 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
     // Catch-all for senders outside the seven local-rail countries, received
     // over SWIFT. `iso2` has no flag on the CDN by design — CountryFlagAvatar
     // falls back to its globe glyph, which is the right mark for a region
-    // rather than a country. `accountName` doubles as the region name, so the
-    // card omits the country subtitle (see VirtualAccountCard).
+    // rather than a country. `accountName` doubles as the region name, which
+    // is why it repeats `countryName` rather than naming a currency.
     id: "row-swift",
     iso2: "ROW",
     countryName: "Rest of the World",
