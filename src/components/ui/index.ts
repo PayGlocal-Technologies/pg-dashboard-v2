@@ -91,6 +91,7 @@ export {
   TableRowSkeleton,
   ChartSkeleton,
   StatusBadge,
+  type BadgeVariant,
   Tabs,
   TabsList,
   TabsTrigger,

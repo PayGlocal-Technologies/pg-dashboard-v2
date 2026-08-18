@@ -113,6 +113,10 @@ import {
 import { AmazonLogo } from "@/components/icon/AmazonLogo";
 import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
+import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
+import { LinkGreenFilled } from "@/components/icon/LinkGreenFilled";
+import { RecurringOutlined } from "@/components/icon/RecurringOutlined";
+import { ZohoLogo } from "@/components/icon/ZohoLogo";
 import { MdrOfferIcon } from "@/components/icon/MdrOfferIcon";
 import { NoTransactionsIllustration } from "@/components/icon/NoTransactionsIllustration";
 import { ToptalLogo } from "@/components/icon/ToptalLogo";
@@ -241,6 +245,14 @@ export const ICONS = {
   "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
   "toptal-logo": ToptalLogo as unknown as LucideIcon,
   "upwork-logo": UpworkLogo as unknown as LucideIcon,
+
+  // ─── Invoice management ────────────────────────────────────────────────────
+  // Ported from pg-dashboard's public/assets, so the two apps show the same
+  // marks on the same rows. See each component for what changed in the port.
+  "zoho-logo": ZohoLogo as unknown as LucideIcon,
+  "recurring-outlined": RecurringOutlined as unknown as LucideIcon,
+  "link-custom-outlined": LinkCustomOutlined as unknown as LucideIcon,
+  "link-green-filled": LinkGreenFilled as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

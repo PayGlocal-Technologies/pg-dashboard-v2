@@ -373,7 +373,13 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               collapsed ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100"
             )}
           >
-            <Image src="/assets/payglocal-logo.png" alt="PayGlocal" width={126} height={28} />
+            <Image
+              src="/assets/payglocal-logo.png"
+              alt="PayGlocal"
+              width={160}
+              height={28}
+              className="h-7 w-auto"
+            />
           </div>
           <Button
             variant="ghost"
@@ -422,7 +428,13 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         >
           {/* Logo + close button */}
           <div className="flex h-[57px] flex-shrink-0 items-center justify-between border-b border-sidebar-border px-3.5">
-            <Image src="/assets/payglocal-logo.png" alt="PayGlocal" width={126} height={28} />
+            <Image
+              src="/assets/payglocal-logo.png"
+              alt="PayGlocal"
+              width={160}
+              height={28}
+              className="h-7 w-auto"
+            />
             <Button
               variant="ghost"
               onClick={onClose}

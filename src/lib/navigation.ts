@@ -95,7 +95,6 @@ export const regularNavigation: NavGroup[] = [
         label: "Invoice Management",
         href: "/mca-invoices",
         icon: "receipt",
-        badge: "NEW",
         permission: ["getAllMerchantInvoice"],
       },
       {
