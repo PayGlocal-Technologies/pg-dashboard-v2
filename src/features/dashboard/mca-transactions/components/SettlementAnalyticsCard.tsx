@@ -15,7 +15,6 @@ import {
   Tabs,
   TabsList,
   TabsTrigger,
-  useBreakpoint,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -65,17 +64,53 @@ const TIME_RANGE_MULTIPLIERS: Record<TimeRange, number> = {
 // Show more.
 const VISIBLE_COUNT = 5;
 
+interface AccountBarRowData {
+  accountId: string;
+  label: string;
+  iso2: string;
+  value: number;
+  valueLabel: string;
+}
+
+/** One virtual account's row in the per-account graph: flag + name, a bar
+ *  scaled against the ranked list's own top value, then the figure. Shared
+ *  between the always-visible first five and the rows Show more reveals, so
+ *  the two stay pixel-identical. */
+function AccountBarRow({ row, maxValue }: { row: AccountBarRowData; maxValue: number }) {
+  return (
+    <li className="flex items-center gap-3 text-sm">
+      {/* w-24 below sm: as a carousel page the card is narrower than the
+          viewport, and the label column, the value column, and the card's
+          own padding are all fixed width, so a 144px label would leave the
+          bar (the only flexible element in the row) too narrow to read as a
+          bar at all. Account names are short enough to still fit, and
+          truncate covers the rest. */}
+      <div className="flex w-24 min-w-0 shrink-0 items-center gap-2 sm:w-36">
+        <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-6 w-6" />
+        <span className="truncate font-medium text-foreground">{row.label}</span>
+      </div>
+      <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+        <div
+          className="absolute inset-y-0 left-0 rounded-full"
+          style={{
+            width: `${maxValue > 0 ? Math.min(100, (row.value / maxValue) * 100) : 0}%`,
+            background: "linear-gradient(90deg, var(--chart-1), var(--chart-3))",
+          }}
+        />
+      </div>
+      <span className="w-16 shrink-0 text-right text-xs font-semibold tabular-nums text-foreground">
+        {row.valueLabel}
+      </span>
+    </li>
+  );
+}
+
 export function SettlementAnalyticsCard({ className }: { className?: string }) {
   const [mode, setMode] = useState<AnalyticsMode>("amount");
   const [timeRange, setTimeRange] = useState<TimeRange>("year");
   const [expanded, setExpanded] = useState(false);
   const isAmountMode = mode === "amount";
   const { overview, isLoading } = useMcaOverview();
-  // true from lg up: the same breakpoint the analytics row switches from the
-  // mobile carousel to the side-by-side grid at (see
-  // TransactionsAnalyticsCarousel), and where Outstanding + Saved's combined
-  // height sets this card's target height instead of its own content.
-  const { isDesktop } = useBreakpoint();
 
   const rangeMultiplier = TIME_RANGE_MULTIPLIERS[timeRange];
 
@@ -98,16 +133,14 @@ export function SettlementAnalyticsCard({ className }: { className?: string }) {
   }).sort((a, b) => b.value - a.value);
 
   const maxValue = accountRows[0]?.value ?? 0;
-  // At lg and up every account row renders unconditionally: that's the extra
-  // vertical space Outstanding + Saved's combined height gives this card, put
-  // to use as more rows instead of sitting as blank space below a truncated
-  // five. Below lg (the carousel), the Show more/less toggle is unchanged.
-  const visibleRows = isDesktop
-    ? accountRows
-    : expanded
-      ? accountRows
-      : accountRows.slice(0, VISIBLE_COUNT);
-  const canExpand = !isDesktop && accountRows.length > VISIBLE_COUNT;
+  // Capped at five on every breakpoint, not just the mobile carousel: the
+  // card grows to fit the rest once expanded (see the lg:h-full/grow wiring
+  // in TransactionsAnalyticsCarousel, which stretches Outstanding + Saved to
+  // match whatever height this card ends up at), so there's no longer a
+  // "spare space at lg" case to fill with extra rows by default.
+  const firstFiveRows = accountRows.slice(0, VISIBLE_COUNT);
+  const restRows = accountRows.slice(VISIBLE_COUNT);
+  const canExpand = restRows.length > 0;
 
   const settledValue = toMetricNumber(overview?.successfulPayments?.value);
   const settledCount = toMetricNumber(overview?.successfulPayments?.count);
@@ -217,97 +250,110 @@ export function SettlementAnalyticsCard({ className }: { className?: string }) {
       {/* flex-1: when className carries h-full (see TransactionsAnalyticsCarousel,
           which stretches this card to match the grid row's height at lg and
           up), CardHeader keeps its own intrinsic height and this region
-          absorbs whatever's left. */}
-      <CardContent className="flex flex-1 flex-col">
+          absorbs whatever's left.
+
+          gap-6 between the tab bar and everything below it: the same size
+          gap Card itself already puts between CardHeader and CardContent (see
+          card.tsx's size="sm" gap-6), so the switcher reads as clearly apart
+          from the KPI above and the info/graph group below, not squeezed
+          against either. */}
+      <CardContent className="flex flex-1 flex-col gap-6">
         {/* Amount settled/No. of transactions: full width, directly below the
             KPI and above everything else in this card, rather than sharing
             the header row with the KPI (its old position). Secondary to the
             KPI by construction (Tabs' own inactive-tab colouring), not by a
             size override. */}
-        <div className="mb-4">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
-            <TabsList className="w-full">
-              <TabsTrigger value="amount" className="flex-1">
-                Amount settled
-              </TabsTrigger>
-              <TabsTrigger value="count" className="flex-1">
-                No. of transactions
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
+        <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
+          <TabsList className="w-full">
+            <TabsTrigger value="amount" className="flex-1">
+              Amount settled
+            </TabsTrigger>
+            <TabsTrigger value="count" className="flex-1">
+              No. of transactions
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        {/* Supporting tier: kept visually restrained so the KPI above stays
-            the strongest element on the card. */}
-        {isLoading ? (
-          <div className="space-y-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="flex items-center justify-between gap-3">
-                <Shimmer className="h-3.5 w-32" />
-                <Shimmer className="h-3.5 w-20" />
-              </div>
-            ))}
-          </div>
-        ) : supportingRows.length > 0 ? (
-          <ul className="space-y-3">
-            {supportingRows.map((row) => (
-              <li key={row.key} className="flex items-center justify-between gap-3 text-sm">
-                <span className="min-w-0 truncate text-muted-foreground">{row.label}</span>
-                <span className="shrink-0 font-medium tabular-nums text-foreground">
-                  {row.value}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        {/* Info group (supporting settlement figures) and the per-account
+            graph below it: gap-5, tighter than the gap-6 above so the pair
+            reads as one connected block under the switcher, but still
+            clearly two tiers rather than merged together. */}
+        <div className="flex flex-1 flex-col gap-5">
+          {/* Supporting tier: kept visually restrained so the KPI above stays
+              the strongest element on the card. */}
+          {isLoading ? (
+            <div className="space-y-3">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex items-center justify-between gap-3">
+                  <Shimmer className="h-3.5 w-32" />
+                  <Shimmer className="h-3.5 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : supportingRows.length > 0 ? (
+            <ul className="space-y-3">
+              {supportingRows.map((row) => (
+                <li key={row.key} className="flex items-center justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate text-muted-foreground">{row.label}</span>
+                  <span className="shrink-0 font-medium tabular-nums text-foreground">
+                    {row.value}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
-        {/* Per-account breakdown. Still placeholder-fed — see the module
-            comment above and mock-data.ts's TODO. */}
-        <ul className={cn("space-y-3", supportingRows.length > 0 && "mt-4")}>
-          {visibleRows.map((row) => (
-            <li key={row.accountId} className="flex items-center gap-3 text-sm">
-              {/* w-24 below sm: as a carousel page the card is narrower than
-                  the viewport, and the label column, the value column, and
-                  the card's own padding are all fixed width, so a 144px
-                  label would leave the bar (the only flexible element in the
-                  row) too narrow to read as a bar at all. Account names are
-                  short enough to still fit, and truncate covers the rest. */}
-              <div className="flex w-24 min-w-0 shrink-0 items-center gap-2 sm:w-36">
-                <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-6 w-6" />
-                <span className="truncate font-medium text-foreground">{row.label}</span>
-              </div>
-              <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+          {/* Per-account graph. Still placeholder-fed, see the module
+              comment above and mock-data.ts's TODO. Capped at five rows on
+              every breakpoint; the rest sit behind Show more. */}
+          <div className="flex flex-col gap-3">
+            <ul className="space-y-3">
+              {firstFiveRows.map((row) => (
+                <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
+              ))}
+            </ul>
+
+            {canExpand && (
+              <>
+                {/* grid-rows-[0fr]→[1fr] is a plain CSS expand: no measured
+                    height needed, and it animates cleanly whatever the
+                    revealed row count is. The card's own height (and with it
+                    Outstanding + Saved's matched height, see
+                    TransactionsAnalyticsCarousel) grows along with it rather
+                    than clipping. */}
                 <div
-                  className="absolute inset-y-0 left-0 rounded-full"
-                  style={{
-                    width: `${maxValue > 0 ? Math.min(100, (row.value / maxValue) * 100) : 0}%`,
-                    background: "linear-gradient(90deg, var(--chart-1), var(--chart-3))",
-                  }}
-                />
-              </div>
-              <span className="w-16 shrink-0 text-right text-xs font-semibold tabular-nums text-foreground">
-                {row.valueLabel}
-              </span>
-            </li>
-          ))}
-        </ul>
+                  className={cn(
+                    "grid transition-[grid-template-rows] duration-300 ease-out",
+                    expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                  )}
+                >
+                  <ul className="min-h-0 space-y-3 overflow-hidden">
+                    {restRows.map((row) => (
+                      <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
+                    ))}
+                  </ul>
+                </div>
 
-        {/* Utility tier: only present once there's something to reveal. */}
-        {canExpand && (
-          <div className="mt-4 flex justify-center">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpanded((prev) => !prev)}
-              rightIcon={
-                <Icon name={expanded ? "chevron-up" : "chevron-down"} className="h-3.5 w-3.5" />
-              }
-            >
-              {expanded ? "Show less" : "Show more"}
-            </Button>
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExpanded((prev) => !prev)}
+                    rightIcon={
+                      <Icon
+                        name={expanded ? "chevron-up" : "chevron-down"}
+                        className="h-3.5 w-3.5"
+                      />
+                    }
+                  >
+                    {expanded ? "Show less" : "Show more"}
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
-        )}
+        </div>
       </CardContent>
     </Card>
   );
