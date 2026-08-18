@@ -8,6 +8,7 @@ import {
   DownloadFircButton,
 } from "@/features/dashboard/mca-transactions/components/SettlementBreakdown";
 import { VirtualAccountRow } from "@/features/dashboard/mca-transactions/components/VirtualAccountRow";
+import { getMockUtrNumber } from "@/features/dashboard/mca-transactions/mock-data";
 import { mcaTxnFilePath } from "@/features/dashboard/mca-transactions/services";
 import {
   fileNameFrom,
@@ -16,6 +17,7 @@ import {
   formatEventTime,
 } from "@/features/dashboard/mca-transactions/timeline/format";
 import { currencySymbol } from "@/lib/utils/format";
+import { accountNumberOf } from "@/features/dashboard/multi-currency/utils";
 import type {
   SettlementStepStatus,
   SettlementTimelineStep,
@@ -27,6 +29,7 @@ import type {
   TimelineStatus,
   TxnAccountDetails,
 } from "@/features/dashboard/mca-transactions/types";
+import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 // Maps the timeline API's event bag into the ordered list of steps the
 // stepper renders. Port of pg-dashboard's TimeLineMapper, keeping its step
@@ -169,6 +172,10 @@ export interface BuildTimelineArgs {
   isFundDelayed: boolean;
   isSameBankSettlement: boolean;
   accountDetails?: TxnAccountDetails | null;
+  /** The merchant's real virtual accounts (from useVirtualAccounts("general")),
+   *  used to look up a masked account number by currency when this
+   *  transaction's own accountDetails doesn't carry one. */
+  virtualAccounts?: VirtualAccount[];
   onDownloadDocument: (documentPath: string) => void;
   onDownloadFirc: () => void;
   isFircDownloading?: boolean;
@@ -187,6 +194,7 @@ export function buildSettlementTimeline({
   isFundDelayed,
   isSameBankSettlement,
   accountDetails,
+  virtualAccounts,
   onDownloadDocument,
   onDownloadFirc,
   isFircDownloading,
@@ -283,7 +291,35 @@ export function buildSettlementTimeline({
   }
 
   const txnCurrency = data?.FUND_RECEIVED?.TXN_CURRENCY || row.currency || "INR";
+  // Symbol, amount, then the currency code, matching the format the first
+  // timeline step's title is built from below ("$1 USD received in USD
+  // Account ••••1234").
   const receivedMoney = `${currencySymbol(txnCurrency)}${formatAmount(data?.FUND_RECEIVED?.TXN_AMOUNT, txnCurrency)} ${txnCurrency}`;
+  // Prefer this transaction's own recorded funding account (accountDetails,
+  // the same object VirtualAccountRow renders below this step). When the
+  // timeline API hasn't attached one, fall back to the merchant's real
+  // virtual account for this currency, and if the currency isn't one of the
+  // named accounts (USD/GBP/EUR/CAD/AUD) fall back again to the "GLOBAL"
+  // SWIFT catch-all account, which is what actually receives every other
+  // currency in the real system (see mapAccounts.ts's isGlobal). A masked
+  // number should always be resolvable this way; the only case it can't is a
+  // merchant with no virtual accounts at all yet.
+  const fallbackVirtualAccount =
+    virtualAccounts?.find((account) => account.currency === txnCurrency) ??
+    virtualAccounts?.find((account) => account.isGlobal);
+  const resolvedAccountNumber =
+    accountDetails?.accountNumber || (fallbackVirtualAccount && accountNumberOf(fallbackVirtualAccount)) || "";
+  // Last 4 digits only, bullet-masked, same convention RecentActivityTable
+  // already uses for card numbers elsewhere in the product.
+  const maskedAccountSuffix = resolvedAccountNumber
+    ? `••••${resolvedAccountNumber.slice(-4)}`
+    : "";
+  // See getMockUtrNumber's own TODO (mock-data.ts): no per-transaction UTR
+  // field exists in the API yet, so this is a placeholder rather than the
+  // real thing. Kept truthy-checked below regardless, so the "don't show if
+  // no UTR exists" behaviour is already correct once a real, nullable field
+  // replaces this.
+  const utrNumber = getMockUtrNumber(row.gid);
 
   const pgHouseStatus = data?.PG_HOUSE_FUND_RECEIVED?.STATUS;
   const fircStatus = data?.FIRC_RECEIVED?.STATUS;
@@ -321,7 +357,9 @@ export function buildSettlementTimeline({
       steps,
       data?.FUND_RECEIVED,
       createStep(
-        fundsReceivedSucceeded ? `${receivedMoney} received in virtual account` : fundsPendingTitle,
+        fundsReceivedSucceeded
+          ? `${receivedMoney} received in ${txnCurrency} Account${maskedAccountSuffix ? ` ${maskedAccountSuffix}` : ""}`
+          : fundsPendingTitle,
         statusOrPending(data?.FUND_RECEIVED?.STATUS),
         fundReceivedChildren,
         formatEventTime(data?.FUND_RECEIVED?.FORMATTED_DATE_TIME)
@@ -414,7 +452,18 @@ export function buildSettlementTimeline({
         "FIRC issuance",
         statusOrPending(fircStatus),
         fircStatus === "SUCCESS" ? (
-          <DownloadFircButton onDownload={onDownloadFirc} isLoading={isFircDownloading} />
+          <>
+            <DownloadFircButton onDownload={onDownloadFirc} isLoading={isFircDownloading} />
+            {/* Part of this same FIRC issuance step, not a separate section:
+                rendered right after the download action, visually secondary
+                (smaller, muted) the same way RejectionReason and other
+                children elsewhere in this timeline read as supporting detail
+                rather than a primary line. Omitted entirely when there's no
+                UTR to show, rather than rendering an empty "UTR:" line. */}
+            {utrNumber && (
+              <p className="mt-1.5 text-[11px] text-muted-foreground">UTR: {utrNumber}</p>
+            )}
+          </>
         ) : null,
         formatEventTime(data?.FIRC_RECEIVED?.FORMATTED_DATE_TIME, fircStatus === "SUCCESS")
       )

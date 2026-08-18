@@ -28,6 +28,7 @@ import { CountryFlag } from "@/features/dashboard/multi-currency/components/Coun
 import { UploadInvoiceForm } from "@/features/dashboard/mca-transactions/components/UploadInvoiceForm";
 import { SettlementTimelineSection } from "@/features/dashboard/mca-transactions/components/SettlementTimelineSection";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
+import { getMockUtrNumber } from "@/features/dashboard/mca-transactions/mock-data";
 import { mcaTxnTimelineApi } from "@/features/dashboard/mca-transactions/services";
 import { useGet } from "@/lib/api/hooks";
 import type {
@@ -154,6 +155,14 @@ function PaymentDetailsSection({
           <DetailRow
             label="Settlement date"
             value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
+          />
+          {/* Same "-" placeholder pattern as Settlement date above, gated on
+              the same field: a real UTR only exists once settlement has
+              actually happened. See mock-data.ts's getMockUtrNumber for why
+              this is still a placeholder. */}
+          <DetailRow
+            label="UTR number"
+            value={row.settlementDate ? getMockUtrNumber(row.gid) : "-"}
           />
           {/* Names the account the funds landed in — its holder, or failing
               that the bank, or failing both the currency it is held in. */}
