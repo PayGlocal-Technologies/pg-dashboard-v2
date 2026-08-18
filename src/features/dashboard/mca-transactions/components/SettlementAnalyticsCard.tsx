@@ -279,13 +279,13 @@ export function SettlementAnalyticsCard({ className }: { className?: string }) {
             above that separates this whole block from the info group. */}
         <div className="flex flex-1 flex-col gap-5">
           <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
-            <TabsList className="w-full">
-              <TabsTrigger value="amount" className="flex-1">
-                Amount settled
-              </TabsTrigger>
-              <TabsTrigger value="count" className="flex-1">
-                No. of transactions
-              </TabsTrigger>
+            {/* No w-full/flex-1 here: TabsList's own default is inline-flex,
+                sized to its triggers' content, which is what hugs the bar to
+                "Amount settled"/"No. of transactions" instead of stretching
+                it across the card. */}
+            <TabsList>
+              <TabsTrigger value="amount">Amount settled</TabsTrigger>
+              <TabsTrigger value="count">No. of transactions</TabsTrigger>
             </TabsList>
           </Tabs>
 
