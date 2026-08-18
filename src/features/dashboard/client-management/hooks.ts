@@ -115,17 +115,53 @@ function composeAddress(address: ClientApiAddress | undefined, countryName: stri
 }
 
 /**
- * One client, wire → render.
+ * Resolves a client's country into the code the flag needs and the name the cell
+ * shows, from whichever of the two the record happens to carry.
  *
- * `countryCodes` is the name→ISO2 map from clientCountryCodesApi, and is the only
- * source of a client's ISO2: the record carries the country's display name alone.
- * Without the map (still loading, or the call failed) the flag falls back to an
- * empty code, which CountryFlag already renders as no flag rather than a broken
- * image.
+ * The record's `country` turned out to hold an **ISO2 code** ("NZ"), not the
+ * display name the mapper first assumed. That single wrong assumption produced
+ * both visible bugs at once: the cell printed "NZ" instead of "New Zealand", and
+ * the ISO2 lookup missed, so every flag resolved to an empty code and rendered as
+ * a broken image.
+ *
+ * Handled by detecting the shape rather than trusting either: an ISO2 code is
+ * exactly two letters and no country name is, so the test is unambiguous and
+ * works whichever form a given environment returns. The name comes from flux's
+ * COUNTRIES — the same source the rest of the app names countries from — with the
+ * fetched map as a fallback, so a correct flag no longer depends on that call
+ * having resolved at all.
  */
-export function toClient(record: ClientApiRecord, countryCodes: Record<string, string>): Client {
-  const countryName = record.country ?? "";
-  const countryIso2 = countryCodes[countryName] ?? "";
+function resolveCountry(
+  raw: string,
+  iso2ToName: Record<string, string>,
+  nameToIso2: Record<string, string>
+): { iso2: string; name: string } {
+  const value = (raw ?? "").trim();
+  if (!value) return { iso2: "", name: "" };
+
+  const looksLikeIso2 = /^[A-Za-z]{2}$/.test(value);
+
+  if (looksLikeIso2) {
+    const iso2 = value.toUpperCase();
+    const name =
+      COUNTRIES.find((country) => country.code === iso2)?.name ?? iso2ToName[iso2] ?? iso2;
+    return { iso2, name };
+  }
+
+  // A display name: keep it, and find its code so the flag still renders.
+  const iso2 = nameToIso2[value] ?? COUNTRIES.find((country) => country.name === value)?.code ?? "";
+  return { iso2, name: value };
+}
+
+/**
+ * One client, wire → render.
+ */
+export function toClient(record: ClientApiRecord, countryMap: ClientCountryMap): Client {
+  const { iso2: countryIso2, name: countryName } = resolveCountry(
+    record.country ?? "",
+    countryMap.iso2ToName,
+    countryMap.nameToIso2
+  );
   const phone = splitPhone(record.number, countryIso2);
 
   return {
@@ -163,7 +199,8 @@ export function toClient(record: ClientApiRecord, countryCodes: Record<string, s
     shippingZipcode: record.shippingAddress?.zipcode,
     shippingCountryName: record.shippingAddress?.country,
     shippingCountryIso2: record.shippingAddress?.country
-      ? (countryCodes[record.shippingAddress.country] ?? "")
+      ? resolveCountry(record.shippingAddress.country, countryMap.iso2ToName, countryMap.nameToIso2)
+          .iso2
       : undefined,
     gstin: record.gstIn,
     notes: record.notes,
@@ -354,36 +391,55 @@ export function useClientMidScope(): {
 
 // ── Reference data ──────────────────────────────────────────────────────────
 
+/** The country reference data, normalised so callers never have to know which
+ *  way round the endpoint sent it. */
+export interface ClientCountryMap {
+  iso2ToName: Record<string, string>;
+  nameToIso2: Record<string, string>;
+}
+
 /**
- * Country name → ISO2. App-level configuration, not merchant-scoped, so the key
- * carries no mid and every surface shares one cached response.
+ * The country reference list, normalised in both directions.
  *
- * This is what turns the record's country name into the code the flag treatment
- * and the country filter are keyed by, and it is why the client list waits on two
- * calls rather than one.
+ * `countryCodes` is a flat `Record<string, string>`, which is the same type
+ * whichever way round it is populated — name→code or code→name — and the two are
+ * indistinguishable from the type alone. Rather than assume (the assumption that
+ * produced the broken flags in the first place), the direction is detected: ISO2
+ * codes are exactly two letters and country names never are, so whichever side
+ * matches that is the code side.
+ *
+ * App-level configuration, not merchant-scoped, so the query key carries no mid
+ * and every surface shares one cached response.
  */
-export function useClientCountryCodes(): {
-  countryCodes: Record<string, string>;
-  /** ISO2 → name, for turning v2's coded country filter back into the names the
-   *  search body wants. */
-  countryNames: Record<string, string>;
-  isLoading: boolean;
-} {
+export function useClientCountryMap(): ClientCountryMap & { isLoading: boolean } {
   const { data, isPending } = useGet<ClientCountryCodesResponse>(
     ["client-country-codes"],
     clientCountryCodesApi
   );
 
-  const countryCodes = data?.data?.countryCodes ?? {};
+  const raw = data?.data?.countryCodes;
 
-  const countryNames = useMemo(() => {
-    const inverted: Record<string, string> = {};
-    for (const [name, iso2] of Object.entries(countryCodes)) inverted[iso2] = name;
-    return inverted;
-    // Keyed on the response rather than the derived object, which is rebuilt here.
-  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
+  const normalised = useMemo<ClientCountryMap>(() => {
+    const iso2ToName: Record<string, string> = {};
+    const nameToIso2: Record<string, string> = {};
+    const isIso2 = (value: string) => /^[A-Za-z]{2}$/.test(value.trim());
 
-  return { countryCodes, countryNames, isLoading: isPending };
+    for (const [key, value] of Object.entries(raw ?? {})) {
+      if (isIso2(key) && !isIso2(value)) {
+        // code → name
+        iso2ToName[key.toUpperCase()] = value;
+        nameToIso2[value] = key.toUpperCase();
+      } else if (isIso2(value)) {
+        // name → code, which is how pg-dashboard's own client list reads it
+        nameToIso2[key] = value.toUpperCase();
+        iso2ToName[value.toUpperCase()] = key;
+      }
+    }
+
+    return { iso2ToName, nameToIso2 };
+  }, [raw]);
+
+  return { ...normalised, isLoading: isPending };
 }
 
 /** Indian state names for the form's State field. Every non-India address
@@ -455,21 +511,27 @@ export function useClients({
   refetch: () => void;
 } {
   const { mid, midFilter, isReady, guardState } = useClientPathMid();
-  const { countryCodes, countryNames } = useClientCountryCodes();
-
-  const countryFilter = useMemo(
-    () => countryIso2s.map((iso2) => countryNames[iso2]).filter(Boolean),
-    [countryIso2s, countryNames]
-  );
+  const countryMap = useClientCountryMap();
 
   // Stable across renders as long as its inputs are — usePostQuery folds the body
   // into the query key, so an object rebuilt every render would refetch forever.
   const body = useMemo<TableReqBody>(() => {
     const built = buildTxnRequestBody(
-      { country: countryFilter, startTime, endTime },
       {
-        // An email goes down the exact-match path, anything else is full text.
-        searchQuery: email || search || undefined,
+        // The ISO2 codes as the chip holds them, because that is what the record's
+        // own `country` field contains. This previously converted them to display
+        // names before sending, which is why the country chip matched nothing: it
+        // was filtering "New Zealand" against a column holding "NZ".
+        country: countryIso2s,
+        startTime,
+        endTime,
+      },
+      {
+        // Only the search box feeds the full-text query. The email chip is its own
+        // field filter below — the two are separate controls, so folding both into
+        // one queryString would mean whichever was set last silently replaced the
+        // other.
+        searchQuery: search || undefined,
         // The key is `mid`, not `merchantId`: midFilter names itself merchantId
         // because that is what the OpenSearch txn endpoints want, while the client
         // search wants `mid`. Only the values carry over.
@@ -479,14 +541,32 @@ export function useClients({
       }
     );
 
-    // With nothing but the MID filter, the derived type would be FILTER_TYPE,
-    // but pg-dashboard's client list explicitly sends DEFAULT for exactly this
-    // case (see the effect in mca-clients/index.tsx) and only lets the derived
-    // type through once a real filter is applied. Reproduced rather than
-    // tidied away: which one the backend wants is its business, not ours.
-    const hasUserFilter = !!(search || email || countryFilter.length || (startTime && endTime));
-    return hasUserFilter ? built : { ...built, searchFilterType: "DEFAULT" };
-  }, [search, email, countryFilter, startTime, endTime, midFilter, page]);
+    // The email chip filters on the record's own `email` field rather than going
+    // through the builder's email path, which routes to `encEmailId` — an
+    // encrypted-id field belonging to the transaction search, not this one. That
+    // mismatch is why the chip returned nothing. The key follows the same
+    // convention as every other fieldSearch key here: the record's field name.
+    const withEmail = email
+      ? {
+          ...built,
+          fieldSearch: { ...(built.fieldSearch ?? {}), email: [email] },
+        }
+      : built;
+
+    // With nothing but the MID filter, the derived type would be FILTER_TYPE, but
+    // pg-dashboard's client list explicitly sends DEFAULT for exactly this case
+    // (see the effect in mca-clients/index.tsx) and only lets the derived type
+    // through once a real filter is applied. Reproduced rather than tidied away:
+    // which one the backend wants is its business, not ours.
+    const hasUserFilter = !!(search || email || countryIso2s.length || startTime || endTime);
+    if (!hasUserFilter) return { ...withEmail, searchFilterType: "DEFAULT" };
+
+    // An email filter is a field filter, so the type has to say so — the builder
+    // derived its type before the key was added.
+    return email && withEmail.searchFilterType === "DEFAULT"
+      ? { ...withEmail, searchFilterType: "FILTER_TYPE" }
+      : withEmail;
+  }, [search, email, countryIso2s, startTime, endTime, midFilter, page]);
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     ClientSearchResponse,
@@ -494,8 +574,8 @@ export function useClients({
   >(["clients", mid], clientSearchApi(mid), body, { staleTime: 0 }, isReady);
 
   const clients = useMemo(
-    () => (data?.data?.data ?? []).map((record) => toClient(record, countryCodes)),
-    [data, countryCodes]
+    () => (data?.data?.data ?? []).map((record) => toClient(record, countryMap)),
+    [data, countryMap]
   );
 
   return {
@@ -516,7 +596,7 @@ export function useClients({
  */
 export function useClient(id: string | null): { client: Client | undefined; isLoading: boolean } {
   const { mid, isReady } = useClientPathMid();
-  const { countryCodes } = useClientCountryCodes();
+  const countryMap = useClientCountryMap();
   const enabled = isReady && !!id;
 
   const { data, isPending } = useGet<ClientByIdResponse>(
@@ -529,8 +609,8 @@ export function useClient(id: string | null): { client: Client | undefined; isLo
 
   return {
     client: useMemo(
-      () => (record ? toClient(record, countryCodes) : undefined),
-      [record, countryCodes]
+      () => (record ? toClient(record, countryMap) : undefined),
+      [record, countryMap]
     ),
     isLoading: enabled && isPending,
   };

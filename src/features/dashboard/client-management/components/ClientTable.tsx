@@ -25,7 +25,7 @@ import {
   useClientContractDelete,
   useClientContractUpload,
   useClientContractView,
-  useClientCountryCodes,
+  useClientCountryMap,
   useClients,
   useCreateClient,
   useUpdateClient,
@@ -125,9 +125,11 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
 
   // Every country the map knows, not just the ones on this page: with the list
   // server-paged, options derived from the loaded rows would change as the
-  // merchant pages (see countryOptionsFromMap).
-  const { countryCodes } = useClientCountryCodes();
-  const countryOptions = countryOptionsFromMap(countryCodes);
+  // merchant pages (see countryOptionsFromMap). The option *values* are ISO2
+  // codes, which is what the record's own country field holds and therefore what
+  // the request filters on.
+  const { iso2ToName } = useClientCountryMap();
+  const countryOptions = countryOptionsFromMap(iso2ToName);
 
   const { mid } = useClientPathMid();
   const { createClient } = useCreateClient();

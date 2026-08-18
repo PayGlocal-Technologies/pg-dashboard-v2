@@ -1,6 +1,12 @@
 "use client";
 
-import { Tooltip, TooltipContent, TooltipTrigger, type Column } from "@/components/ui";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+  type Column,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RowClick } from "@/components/common/table/RowClick";
 import { CopyableText } from "@/components/common/CopyableText";
@@ -70,14 +76,16 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
               own that would be empty for most rows. */}
           <span className="flex min-w-max items-center gap-1.5">
             {row.source === "ZOHO" ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className="flex shrink-0 items-center">
-                    <Icon name="zoho-logo" className="h-3 w-3" aria-label="Imported from Zoho" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>Imported from Zoho</TooltipContent>
-              </Tooltip>
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex shrink-0 items-center">
+                      <Icon name="zoho-logo" className="h-3 w-3" aria-label="Imported from Zoho" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Imported from Zoho</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             ) : null}
             <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
               {row.businessName}
