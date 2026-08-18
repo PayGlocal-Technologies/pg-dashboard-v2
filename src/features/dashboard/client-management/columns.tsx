@@ -1,6 +1,7 @@
 "use client";
 
-import type { Column } from "@/components/ui";
+import { Tooltip, TooltipContent, TooltipTrigger, type Column } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { RowClick } from "@/components/common/table/RowClick";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
@@ -15,7 +16,6 @@ import {
   clientAmountLocale,
   clientTotalReceived,
 } from "@/features/dashboard/client-management/constants";
-import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
 import type { Client } from "@/features/dashboard/client-management/types";
 
 /**
@@ -62,9 +62,26 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
         <RowClick onClick={() => onOpenDetails(row)}>
           {/* The row's primary piece of information: the only cell in
               foreground weight, and min-w-max so the column widens to the
-              longest business name rather than truncating it. */}
-          <span className="block min-w-max text-[13px] font-medium whitespace-nowrap text-foreground">
-            {row.businessName}
+              longest business name rather than truncating it.
+
+              A Zoho-imported client is marked here, in front of the name, the
+              same placement production uses — it qualifies who entered this
+              record, so it belongs with the name rather than in a column of its
+              own that would be empty for most rows. */}
+          <span className="flex min-w-max items-center gap-1.5">
+            {row.source === "ZOHO" ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex shrink-0 items-center">
+                    <Icon name="zoho-logo" className="h-3 w-3" aria-label="Imported from Zoho" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Imported from Zoho</TooltipContent>
+              </Tooltip>
+            ) : null}
+            <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
+              {row.businessName}
+            </span>
           </span>
         </RowClick>
       ),
@@ -149,13 +166,11 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       // what makes two rows comparable at a glance.
       align: "right",
       render: (row) => {
-        // Summed from the client's settled transactions on every render rather
-        // than read off the row: there is no received total on the client
-        // record, precisely so this figure and the transactions the details
-        // view lists can't disagree. Once a real endpoint exists it either
-        // sends the total or sends the transactions — either way this call is
-        // the only thing that changes.
-        const totals = clientTotalReceived(clientTransactions(row.businessName));
+        // Read off the row's own server-side figures (see clientTotalReceived):
+        // the search response carries totalInvoiceAmount and outstandingAmount
+        // for every client, so the column costs no extra request and quotes the
+        // same numbers production does.
+        const totals = clientTotalReceived(row);
 
         return (
           <RowClick onClick={() => onOpenDetails(row)} align="right">
@@ -187,6 +202,44 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
                     </span>
                   </div>
                 ))}
+              </div>
+            )}
+          </RowClick>
+        );
+      },
+    },
+    {
+      key: "outstandingAmount",
+      header: "Outstanding",
+      minWidth: 140,
+      align: "right",
+      render: (row) => {
+        // The record's own figure, in the client's currency. Production renders
+        // this column with `currency={"INR"}` hardcoded, which is wrong for a
+        // book of cross-border clients — the column is ported, that detail is
+        // not.
+        const owed = row.outstandingAmount;
+
+        return (
+          <RowClick onClick={() => onOpenDetails(row)} align="right">
+            {owed === undefined || !row.currency ? (
+              // Nothing to state: an em-dash rather than a formatted zero, since
+              // "nothing owed" and "we don't know" are different facts.
+              <span className="text-[13px] text-muted-foreground">—</span>
+            ) : (
+              <div className="flex flex-col items-end gap-0.5">
+                <span
+                  className={cn(
+                    "text-[13px] font-medium tabular-nums whitespace-nowrap",
+                    // Zero owed is settled up, which is good news and reads
+                    // muted; anything outstanding is the figure a merchant is
+                    // scanning this column for.
+                    owed > 0 ? "text-foreground" : "text-muted-foreground"
+                  )}
+                >
+                  {formatCurrency(owed, row.currency, clientAmountLocale(row.currency))}
+                </span>
+                <span className="text-[11px] text-muted-foreground">{row.currency}</span>
               </div>
             )}
           </RowClick>

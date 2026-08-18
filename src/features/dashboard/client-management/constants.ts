@@ -1,6 +1,5 @@
 import type { CountryFilterOption } from "@/components/common/filters/FilterChips";
 import type { Client } from "@/features/dashboard/client-management/types";
-import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 
 /** Rows per page — matches TRANSACTIONS_PAGE_LIMIT so every table pages alike. */
 export const CLIENT_PAGE_LIMIT = 10;
@@ -97,29 +96,6 @@ export const CLIENT_CONTRACT_ACCEPTED_MIME_TYPES = [
  *  activity inside a details view, not the full transaction list. */
 export const CLIENT_TRANSACTIONS_PAGE_LIMIT = 5;
 
-/**
- * The raw `externalStatus` values that mean the money actually reached the
- * merchant. "SETTLED" is the one this feature's own data produces — it is what
- * the Settlement Status column renders as "Settled", the third of the three
- * states a client transaction can be in. FIRC_SETTLED is included because the
- * real MCA feed uses it for the same thing (MCA_STATUS_META renders it "FIRC
- * Settled", a success badge): leaving it out would count a settled invoice as
- * outstanding and drop its amount from Total received once this reads live data.
- */
-const SETTLED_STATUSES = new Set(["SETTLED", "FIRC_SETTLED"]);
-
-/**
- * Whether a transaction counts as a paid invoice. Derived from the same two
- * inputs as getStatusMeta, and in the same order, so this can only ever agree
- * with the badge the Settlement Status column draws: a row whose FRM state
- * overrides its status into "Action Required" is not settled, whatever its
- * externalStatus says. Same rule, and same reason, as isWaitingForInvoice.
- */
-export function isSettledInvoice(txn: McaTransaction): boolean {
-  if (txn.frmStatus === "PENDING_MERCHANT_UPLOAD") return false;
-  return SETTLED_STATUSES.has(txn.externalStatus);
-}
-
 export interface ClientInvoiceMetrics {
   /** Every invoice raised against the client, whatever its settlement state. */
   total: number;
@@ -129,61 +105,9 @@ export interface ClientInvoiceMetrics {
   outstanding: number;
 }
 
-/**
- * The three figures the Client Details view's KPI row shows, counted off the
- * client's own transactions rather than read from stored fields. Paid is the
- * settled subset and outstanding is the remainder, so the two always sum to
- * the total and no figure can drift from the transactions listed below it.
- */
-export function clientInvoiceMetrics(transactions: McaTransaction[]): ClientInvoiceMetrics {
-  const paid = transactions.filter(isSettledInvoice).length;
-  return { total: transactions.length, paid, outstanding: transactions.length - paid };
-}
-
 export interface ClientReceivedTotal {
   currency: string;
   amount: number;
-}
-
-/**
- * Sums a set of transactions by currency, largest first.
- *
- * Returned as a list rather than a single figure because amounts in different
- * currencies cannot be added: converting them would need a rate this page has
- * no business inventing, so each is carried separately and displayed on its own
- * line. A client billed in one currency — every client today — yields exactly
- * one entry, and an empty set yields none, which is what lets a caller draw an
- * em-dash instead of a formatted zero.
- *
- * Reads settlementAmount/settlementCurrency where the feed provides them (the
- * amount that actually landed, which can differ from the amount invoiced) and
- * falls back to the transaction's own amount where it doesn't.
- */
-export function sumByCurrency(transactions: McaTransaction[]): ClientReceivedTotal[] {
-  const byCurrency = new Map<string, number>();
-
-  for (const txn of transactions) {
-    const amount = Number(txn.settlementAmount ?? txn.amount);
-    // A malformed amount is skipped rather than summed as NaN, which would
-    // poison the whole total and render the cell as "NaN".
-    if (!Number.isFinite(amount)) continue;
-    const currency = txn.settlementCurrency ?? txn.currency;
-    byCurrency.set(currency, (byCurrency.get(currency) ?? 0) + amount);
-  }
-
-  return [...byCurrency.entries()]
-    .map(([currency, amount]) => ({ currency, amount }))
-    .sort((a, b) => b.amount - a.amount);
-}
-
-/**
- * What the client has actually paid the merchant: the settled invoices summed
- * per currency, and nothing else — invoice-pending and sent-for-review
- * transactions are money not yet received, so they are excluded rather than
- * netted off. This is not the outstanding balance and is never derived from one.
- */
-export function clientTotalReceived(transactions: McaTransaction[]): ClientReceivedTotal[] {
-  return sumByCurrency(transactions.filter(isSettledInvoice));
 }
 
 export interface ClientInvoiceAmounts {
@@ -193,38 +117,71 @@ export interface ClientInvoiceAmounts {
 }
 
 /**
- * The money behind clientInvoiceMetrics' three counts: what every invoice is
- * worth, what the settled ones are worth, and what the rest are. Split on the
- * same isSettledInvoice predicate as the counts, so a card's figure and its
- * amount always describe the same set of transactions — paid plus outstanding
- * is total, in every currency, by construction.
+ * The money behind the KPI row's three counts, read off the client record's own
+ * server-side figures.
+ *
+ * An earlier revision summed the client's transactions for these instead. That
+ * was replaced because the two disagreed: the record's `totalInvoiceAmount` and
+ * `outstandingAmount` are what production reports for the same client, and a
+ * transaction-derived figure could only ever approximate them.
+ *
+ * Paid is arithmetic — total minus outstanding — because the API returns no paid
+ * amount of its own. That identity is the same one the counts obey, so a card's
+ * figure and its amount still describe the same thing.
+ *
+ * Each is a single-entry list because a client is billed in one currency (the
+ * record carries exactly one). The list shape is kept so the cells that render
+ * these are unchanged, and so a future multi-currency client needs no new type.
+ * A record with no totals at all yields empty lists, which is what lets a caller
+ * draw an em-dash rather than a formatted zero.
  */
-export function clientInvoiceAmounts(transactions: McaTransaction[]): ClientInvoiceAmounts {
-  const paid: McaTransaction[] = [];
-  const outstanding: McaTransaction[] = [];
-  for (const txn of transactions) {
-    (isSettledInvoice(txn) ? paid : outstanding).push(txn);
+export function clientInvoiceAmounts(client: Client): ClientInvoiceAmounts {
+  const currency = client.currency;
+  const total = client.totalInvoiceAmount;
+  const outstanding = client.outstandingAmount;
+
+  if (total === undefined || !currency) {
+    return { total: [], paid: [], outstanding: [] };
   }
+
+  const owed = outstanding ?? 0;
+
   return {
-    total: sumByCurrency(transactions),
-    paid: sumByCurrency(paid),
-    outstanding: sumByCurrency(outstanding),
+    total: [{ currency, amount: total }],
+    // Clamped at zero: an outstanding figure larger than the invoiced total
+    // would otherwise render a negative amount received, which is not a fact
+    // about anything.
+    paid: [{ currency, amount: Math.max(0, total - owed) }],
+    outstanding: [{ currency, amount: owed }],
   };
 }
 
 /**
- * The Country chip's options, derived from the clients themselves rather than
- * a fixed country list: the filter should only ever offer countries the
- * merchant actually has clients in, so it can never narrow to an empty table.
- * Deduped by ISO2 and sorted by name, so the list's order doesn't follow
- * whatever order the rows happened to arrive in.
+ * What the client has actually paid the merchant, for the table's Total received
+ * column: the paid half of clientInvoiceAmounts, so the column and the details
+ * view's Paid invoices card can never quote different figures.
+ *
+ * Empty when the record carries no totals, which the cell draws as an em-dash —
+ * "nothing has settled" and "we don't know" both being different from a zero.
  */
-export function clientCountryOptions(clients: Client[]): CountryFilterOption[] {
-  const byIso2 = new Map<string, CountryFilterOption>();
-  for (const client of clients) {
-    if (!byIso2.has(client.countryIso2)) {
-      byIso2.set(client.countryIso2, { value: client.countryIso2, label: client.countryName });
-    }
-  }
-  return [...byIso2.values()].sort((a, b) => a.label.localeCompare(b.label));
+export function clientTotalReceived(client: Client): ClientReceivedTotal[] {
+  const { paid } = clientInvoiceAmounts(client);
+  // A zero paid amount is dropped rather than shown as a formatted 0.00: with
+  // nothing settled the column reads as an em-dash, exactly as it did when this
+  // was summed from an empty set of settled transactions.
+  return paid.filter((entry) => entry.amount > 0);
+}
+
+/**
+ * The Country chip's options, from the fetched name→ISO2 map.
+ *
+ * This replaced deriving them from the loaded clients, which stopped being
+ * correct once the list became server-paged: options built from the rows on
+ * screen would offer only the current page's countries and change as the merchant
+ * paged. pg-dashboard feeds its own country dropdown from this same map.
+ */
+export function countryOptionsFromMap(countryCodes: Record<string, string>): CountryFilterOption[] {
+  return Object.entries(countryCodes)
+    .map(([label, value]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label));
 }

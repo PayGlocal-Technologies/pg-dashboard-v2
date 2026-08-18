@@ -1,16 +1,24 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Card, CardContent, Separator } from "@/components/ui";
+import {
+  Badge,
+  Card,
+  CardContent,
+  Separator,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
   clientAmountLocale,
   clientInvoiceAmounts,
-  clientInvoiceMetrics,
   type ClientReceivedTotal,
 } from "@/features/dashboard/client-management/constants";
-import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
+import { useClientInvoiceSummary } from "@/features/dashboard/client-management/hooks";
 import { formatCurrency, formatPhoneNumber } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
@@ -152,20 +160,69 @@ function ClientMetricCard({
   label,
   value,
   amounts,
+  hint,
+  onClick,
 }: {
   label: string;
   value: number;
-  /** What those invoices are worth, one entry per currency (see sumByCurrency).
-   *  Empty when there are no invoices to value. */
+  /** What those invoices are worth, one entry per currency. Empty when there are
+   *  no invoices to value. */
   amounts: ClientReceivedTotal[];
+  /** What the figure counts, on an info affordance beside the label. Wording is
+   *  production's own (see ClientSummary's tooltips) — these three counts are
+   *  easy to read as the same number three ways, and the tooltip is what says
+   *  which invoices each one includes. */
+  hint?: string;
+  /** Filters the invoice ledger below to the statuses this card describes.
+   *  Absent when there is no ledger to filter. */
+  onClick?: () => void;
 }) {
   // min-w-0 so the three cards can narrow with the column that holds them,
   // rather than the row's min-content width becoming a floor that overflows it.
   // Their labels wrap instead.
   return (
-    <Card size="sm" className="h-full w-full min-w-0 px-4 py-3.5">
+    <Card
+      size="sm"
+      className={cn(
+        "h-full w-full min-w-0 px-4 py-3.5",
+        onClick && "cursor-pointer transition-colors hover:bg-muted/40"
+      )}
+      {...(onClick
+        ? {
+            role: "button",
+            tabIndex: 0,
+            onClick,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick();
+              }
+            },
+          }
+        : {})}
+    >
       <CardContent className="flex h-full flex-1 flex-col">
-        <p className="text-[12px] text-muted-foreground">{label}</p>
+        <div className="flex items-center gap-1">
+          <p className="text-[12px] text-muted-foreground">{label}</p>
+          {hint ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* A button, not a bare icon: it has to be focusable for the
+                    tooltip to be reachable without a pointer. */}
+                <button
+                  type="button"
+                  aria-label={`About ${label.toLowerCase()}`}
+                  className="shrink-0 text-muted-foreground/70 hover:text-muted-foreground"
+                  // The card itself may be clickable; the hint is not that.
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Icon name="info" className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{hint}</TooltipContent>
+            </Tooltip>
+          ) : null}
+        </div>
         {/* mt-auto pins the figure and its amount to the card's bottom edge, so
             the three cards' numbers sit on one line and their amounts on
             another whatever their labels do. Without it, a label that wraps to
@@ -212,15 +269,31 @@ function ClientMetricCard({
  * The three invoice figures, in a row that collapses to a single column on
  * narrow viewports (the existing responsive card pattern). All three counts,
  * and the amounts beneath them, are derived from the client's own transactions
- * — the same list the Transactions section below renders — so the row always
- * adds up and never contradicts what is listed underneath it. See
- * clientInvoiceMetrics and clientInvoiceAmounts.
+ * Counts come from the per-client invoice summary endpoint and amounts from the
+ * client record's own totals — both server figures, so this row reports what
+ * production reports rather than an approximation computed from the transactions
+ * listed underneath it. See useClientInvoiceSummary and clientInvoiceAmounts.
  */
+/**
+ * Which invoice statuses each KPI card narrows the ledger to. Copied from
+ * pg-dashboard's ClientSummary: "completed" spans everything that was actually
+ * raised, "paid" both settled states, and outstanding just the one.
+ */
+const METRIC_STATUS_FILTERS = {
+  total: ["ACTIVE", "PAID", "PAID_OUTSIDE", "OUTSTANDING"],
+  paid: ["PAID", "PAID_OUTSIDE"],
+  outstanding: ["OUTSTANDING"],
+} as const;
+
 export function ClientInvoiceMetrics({
   client,
   floatTitle = false,
+  onFilterByStatus,
 }: {
   client: Client;
+  /** Narrows the invoice ledger below to these statuses. Absent in the drawer,
+   *  where there is no ledger on screen to filter. */
+  onFilterByStatus?: (statuses: string[]) => void;
   /**
    * Lifts the section heading out of the flow (from lg up, where the expanded
    * view's two columns exist), so this section's box is exactly the KPI row's
@@ -233,11 +306,17 @@ export function ClientInvoiceMetrics({
    */
   floatTitle?: boolean;
 }) {
-  // One read of the client's transactions, counted and summed the same way, so
-  // a card's figure and its amount can never describe different sets.
-  const transactions = clientTransactions(client.businessName);
-  const metrics = clientInvoiceMetrics(transactions);
-  const amounts = clientInvoiceAmounts(transactions);
+  // Counts and amounts come from two different places, because the API splits
+  // them that way: get-invoice-summary returns the three counts and no money,
+  // while the client record carries the money and no counts. Both describe the
+  // same client, so the pairing holds — see useClientInvoiceSummary and
+  // clientInvoiceAmounts.
+  const { counts } = useClientInvoiceSummary(client.id);
+  const amounts = clientInvoiceAmounts(client);
+  // Zero rather than a skeleton while the summary loads: the amounts beside them
+  // are already on screen from the record, so blanking the counts alone would
+  // make the row flicker in two stages.
+  const metrics = counts ?? { total: 0, paid: 0, outstanding: 0 };
 
   return (
     <section className={cn(floatTitle && "lg:relative")}>
@@ -252,12 +331,34 @@ export function ClientInvoiceMetrics({
             left to right, the row says what was raised and how much of it has
             landed. Each label names its own count, so no card needs a unit or
             a supporting line. */}
-        <ClientMetricCard label="Total invoices" value={metrics.total} amounts={amounts.total} />
-        <ClientMetricCard label="Paid invoices" value={metrics.paid} amounts={amounts.paid} />
+        <ClientMetricCard
+          label="Total invoices"
+          value={metrics.total}
+          amounts={amounts.total}
+          hint="The total number of successfully generated invoices."
+          onClick={
+            onFilterByStatus ? () => onFilterByStatus([...METRIC_STATUS_FILTERS.total]) : undefined
+          }
+        />
+        <ClientMetricCard
+          label="Paid invoices"
+          value={metrics.paid}
+          amounts={amounts.paid}
+          hint="The total number of invoices for which payments have been linked."
+          onClick={
+            onFilterByStatus ? () => onFilterByStatus([...METRIC_STATUS_FILTERS.paid]) : undefined
+          }
+        />
         <ClientMetricCard
           label="Outstanding invoices"
           value={metrics.outstanding}
           amounts={amounts.outstanding}
+          hint="The total number of unpaid invoices past due date."
+          onClick={
+            onFilterByStatus
+              ? () => onFilterByStatus([...METRIC_STATUS_FILTERS.outstanding])
+              : undefined
+          }
         />
       </div>
     </section>
@@ -287,14 +388,31 @@ const CONTACT_VALUE_CLASS = "font-sans font-medium whitespace-normal break-all";
 export function ClientContactSection({
   client,
   floatTitle = false,
+  onViewContract,
 }: {
   client: Client;
+  /** Opens the stored contract. Absent where nothing can open it. */
+  onViewContract?: () => void;
   /** Lifts the heading out of the flow from lg up, so this section's box is
    *  exactly its card's box and the card's top edge — not the heading above
    *  it — lands level with the KPI cards across the grid. Same device, and
    *  same offset, as ClientInvoiceMetrics' own floatTitle. */
   floatTitle?: boolean;
 }) {
+  // Only the parts that are actually populated, in the order production lists
+  // them (country down to street).
+  const addressRows = (
+    [
+      ["Country", client.countryName],
+      ["State", client.state],
+      ["City", client.city],
+      ["Zipcode", client.zipcode],
+      ["Street address", client.addressLine],
+    ] as const
+  )
+    .filter(([, value]) => !!value?.trim())
+    .map(([label, value]) => ({ label, value: value as string }));
+
   return (
     <section className={cn(floatTitle && "lg:relative")}>
       <SectionTitle className={floatTitle ? "lg:absolute lg:-top-7 lg:left-0 lg:mb-0" : undefined}>
@@ -325,13 +443,91 @@ export function ClientContactSection({
               />
             }
           />
-          {/* Not copyable and not truncated: an address is read, not lifted
-              into a form field, and it's the one field here long enough to
-              need more than a line. */}
-          <ClientDetailRow
-            label="Billing address"
-            value={<span className="whitespace-normal">{client.billingAddress}</span>}
-          />
+          {/* Client type, GST and tags all come off the record and were being
+              mapped but never drawn. Each is omitted when absent rather than
+              shown as an empty row: the seeded book predates the form that
+              collects them, so a client legitimately has none. */}
+          {client.businessType ? (
+            <ClientDetailRow label="Client type" value={client.businessType} />
+          ) : null}
+          {client.gstin ? (
+            <ClientDetailRow
+              label="GST number"
+              value={<CopyableText value={client.gstin} valueClassName={CONTACT_VALUE_CLASS} />}
+            />
+          ) : null}
+          {client.tags && client.tags.length > 0 ? (
+            <ClientDetailRow
+              label="Tags"
+              value={
+                <span className="flex flex-wrap gap-1">
+                  {client.tags.map((tag) => (
+                    <Badge key={tag} variant="secondary" size="sm">
+                      {tag}
+                    </Badge>
+                  ))}
+                </span>
+              }
+            />
+          ) : null}
+
+          {/* The address, broken into the parts the record carries rather than
+              the one composed line this used to draw. Each part is its own row,
+              as production's details page has them, so a reader can pick out a
+              city or a postcode without reading a sentence. `billingAddress`
+              remains the composed form and is what the table's cells use — this
+              is the only place the parts are addressed individually.
+
+              Any part the record lacks is dropped, which is what keeps this from
+              becoming six near-empty rows for a client captured before the form
+              collected them. */}
+          {client.notes ? (
+            <ClientDetailRow
+              label="Notes"
+              value={<span className="whitespace-normal">{client.notes}</span>}
+            />
+          ) : null}
+
+          {/* The contract, openable rather than just named: the file is stored
+              server-side and reachable only through a presigned GET, so the row
+              is a button that fetches one on the click (see onViewContract).
+              Without a handler it stays a plain filename — which is what the
+              drawer shows, since nothing there can open it. */}
+          {client.contract ? (
+            <ClientDetailRow
+              label="Contract"
+              value={
+                onViewContract && client.contract.fileId ? (
+                  <button
+                    type="button"
+                    onClick={onViewContract}
+                    className="inline-flex items-center gap-1.5 text-left font-medium text-primary underline-offset-2 hover:underline"
+                  >
+                    <Icon name="file-text" className="h-3.5 w-3.5 shrink-0" />
+                    <span className="whitespace-normal break-all">{client.contract.name}</span>
+                  </button>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="file-text" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="whitespace-normal break-all">{client.contract.name}</span>
+                  </span>
+                )
+              }
+            />
+          ) : null}
+
+          {addressRows.length > 0 ? (
+            addressRows.map((row) => (
+              <ClientDetailRow key={row.label} label={row.label} value={row.value} />
+            ))
+          ) : (
+            // Nothing structured to break out, so fall back to the one line the
+            // record does have.
+            <ClientDetailRow
+              label="Billing address"
+              value={<span className="whitespace-normal">{client.billingAddress}</span>}
+            />
+          )}
         </CardContent>
       </Card>
     </section>
@@ -351,12 +547,26 @@ interface ClientDetailsContentProps {
    * arranged. Both layouts place it identically: last, after Contact.
    */
   transactionsSlot?: ReactNode;
+  /**
+   * The client's invoice ledger, composed by the expanded view (which owns the
+   * status filter the KPI cards drive) and positioned here, between the metrics
+   * those cards show and the transactions below. Absent in the drawer, which is a
+   * single narrow column with no room for a second table.
+   */
+  ledgerSlot?: ReactNode;
+  /** Narrows the ledger to the statuses a KPI card describes. */
+  onFilterByStatus?: (statuses: string[]) => void;
+  /** Opens the stored contract. */
+  onViewContract?: () => void;
 }
 
 export function ClientDetailsContent({
   client,
   layout = "page",
   transactionsSlot,
+  ledgerSlot,
+  onFilterByStatus,
+  onViewContract,
 }: ClientDetailsContentProps) {
   if (layout === "drawer") {
     // Single column, in the same priority order the expanded view uses:
@@ -367,8 +577,10 @@ export function ClientDetailsContent({
     return (
       <div className="space-y-6">
         <ClientIdentitySummary client={client} />
+        {/* No onFilterByStatus: the drawer carries no ledger, so a card here has
+            nothing to filter and stays a plain figure. */}
         <ClientInvoiceMetrics client={client} />
-        <ClientContactSection client={client} />
+        <ClientContactSection client={client} onViewContract={onViewContract} />
         {transactionsSlot}
       </div>
     );
@@ -433,7 +645,7 @@ export function ClientDetailsContent({
       </div>
 
       <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-        <ClientInvoiceMetrics client={client} floatTitle />
+        <ClientInvoiceMetrics client={client} floatTitle onFilterByStatus={onFilterByStatus} />
       </div>
 
       {/* Supporting detail, deliberately secondary to the column beside it:
@@ -444,8 +656,8 @@ export function ClientDetailsContent({
           row-start-2 + row-end-4, not row-span-2: `row-span-*` compiles to the
           `grid-row` shorthand, which would overwrite the explicit start
           depending on rule order. Two longhands can't conflict. */}
-      <div className="lg:col-start-2 lg:row-start-2 lg:row-end-4">
-        <ClientContactSection client={client} floatTitle />
+      <div className="lg:col-start-2 lg:row-start-2 lg:row-end-5">
+        <ClientContactSection client={client} floatTitle onViewContract={onViewContract} />
       </div>
 
       {/* Pulled up by 16px above lg, so the space between the KPI cards and
@@ -453,7 +665,13 @@ export function ClientDetailsContent({
           shared a column, not the grid's full 48px row gap — that gap is sized
           for the floated headings in row 2, and there is no floated heading
           here. Below lg the sections are simply gap-y-8 apart already. */}
-      <div className="min-w-0 lg:col-start-1 lg:row-start-3 lg:-mt-4">{transactionsSlot}</div>
+      {/* Invoices, then transactions: the ledger explains the KPI figures
+          directly above it, and the transactions are the money that settled
+          against them. Both sit in the main column under the cards; the Contact
+          card spans past both (see above), so neither affects it. */}
+      <div className="min-w-0 lg:col-start-1 lg:row-start-3 lg:-mt-4">{ledgerSlot}</div>
+
+      <div className="min-w-0 lg:col-start-1 lg:row-start-4">{transactionsSlot}</div>
     </div>
   );
 }

@@ -8,13 +8,13 @@ import {
   isWaitingForInvoice,
 } from "@/features/dashboard/mca-transactions/columns";
 import { TransactionCardList } from "@/features/dashboard/mca-transactions/components/TransactionCardList";
-import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
+import { useClientTransactions } from "@/features/dashboard/client-management/hooks";
 import { CLIENT_TRANSACTIONS_PAGE_LIMIT } from "@/features/dashboard/client-management/constants";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 
 interface ClientTransactionsSectionProps {
   /** The client's business name — the remitter these transactions belong to,
-   *  and the only thing that selects them (see clientTransactions). */
+   *  and the only thing that selects them (see useClientTransactions). */
   businessName: string;
   isPartnerUser: boolean;
   /** Opens the existing Transaction Details drawer for the clicked row. */
@@ -43,19 +43,16 @@ export function ClientTransactionsSection({
 }: ClientTransactionsSectionProps) {
   const [page, setPage] = useState(1);
 
-  // Filtered by business name only — a client's transactions are the ones
-  // remitted in its name, and no others.
-  const rows = clientTransactions(businessName);
-
-  const totalCount = rows.length;
-  // Clamped during render (rather than reset from a handler) so the page can
-  // never point past the end, the same guard the client table itself uses.
-  const totalPages = Math.max(1, Math.ceil(totalCount / CLIENT_TRANSACTIONS_PAGE_LIMIT));
-  const safePage = Math.min(page, totalPages);
-  const pageRows = rows.slice(
-    (safePage - 1) * CLIENT_TRANSACTIONS_PAGE_LIMIT,
-    safePage * CLIENT_TRANSACTIONS_PAGE_LIMIT
-  );
+  // Paged server-side by the transaction search, matched to this client by its
+  // business name (see useClientTransactions). `totalCount` is the server's own,
+  // which describes its looser full-text match rather than the exact-name rows
+  // below — so the pager can offer a page whose rows all filter out. That is the
+  // known cost of there being no client id on a transaction.
+  const {
+    transactions: pageRows,
+    totalCount,
+    isLoading,
+  } = useClientTransactions(businessName, page);
 
   // buildMcaColumns takes the whole RowActionHandlers set, but showActions:
   // false drops the Actions column before it is ever rendered (see the filter
@@ -95,8 +92,9 @@ export function ClientTransactionsSection({
           emptyDescription={emptyDescription}
           rowKey={(row) => row.gid}
           pageSize={CLIENT_TRANSACTIONS_PAGE_LIMIT}
+          isLoading={isLoading}
           totalRows={totalCount}
-          page={safePage}
+          page={page}
           onPageChange={setPage}
           tableLayout="content"
           density="compact"
@@ -130,9 +128,9 @@ export function ClientTransactionsSection({
         <TransactionCardList
           className="lg:hidden"
           rows={pageRows}
-          isLoading={false}
+          isLoading={isLoading}
           onOpenDetails={onOpenTransaction}
-          page={safePage}
+          page={page}
           onPageChange={setPage}
           totalRows={totalCount}
           pageSize={CLIENT_TRANSACTIONS_PAGE_LIMIT}

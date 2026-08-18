@@ -15,8 +15,8 @@ import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { ClientDetailsContent } from "@/features/dashboard/client-management/components/ClientDetailsContent";
 import { ClientTransactionsSection } from "@/features/dashboard/client-management/components/ClientTransactionsSection";
+import { useClientContractView } from "@/features/dashboard/client-management/hooks";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
-import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
 import type { Client } from "@/features/dashboard/client-management/types";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 
@@ -64,15 +64,18 @@ export function ClientDetailsDrawer({
   // existing Transaction Details drawer is rendered as a sibling below, so it
   // stacks above this one (both portal; the later mount paints on top) and
   // closing it leaves this drawer exactly as it was.
-  const [txnId, setTxnId] = useState<string | null>(null);
+  // The row itself, not its id. It used to be an id looked back up in the
+  // client's transaction list, which only worked while that list was a local
+  // array — with the transactions server-paged, the row to show may not be on the
+  // page currently loaded. The handler already receives it, so nothing needs
+  // looking up.
+  const { viewContract } = useClientContractView();
+
+  const [txnRow, setTxnRow] = useState<McaTransaction | null>(null);
   const [txnDrawerOpen, setTxnDrawerOpen] = useState(false);
 
-  const txnRow = client
-    ? (clientTransactions(client.businessName).find((t) => t.gid === txnId) ?? null)
-    : null;
-
   const openTransaction = (row: McaTransaction) => {
-    setTxnId(row.gid);
+    setTxnRow(row);
     setTxnDrawerOpen(true);
   };
 
@@ -149,6 +152,11 @@ export function ClientDetailsDrawer({
               <ClientDetailsContent
                 client={client}
                 layout="drawer"
+                onViewContract={
+                  client.contract?.fileId
+                    ? () => viewContract({ clientId: client.id, rowMid: client.mid })
+                    : undefined
+                }
                 transactionsSlot={
                   <ClientTransactionsSection
                     businessName={client.businessName}

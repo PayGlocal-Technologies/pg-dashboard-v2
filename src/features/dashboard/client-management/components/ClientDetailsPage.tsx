@@ -6,9 +6,10 @@ import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { ClientDetailsContent } from "@/features/dashboard/client-management/components/ClientDetailsContent";
 import { ClientTransactionsSection } from "@/features/dashboard/client-management/components/ClientTransactionsSection";
+import { ClientInvoicesSection } from "@/features/dashboard/client-management/components/ClientInvoicesSection";
+import { useClientContractView } from "@/features/dashboard/client-management/hooks";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
-import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
 import type { Client } from "@/features/dashboard/client-management/types";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 
@@ -23,7 +24,10 @@ interface ClientDetailsPageProps {
    * nowhere to show a full-page transaction itself (see
    * ClientDetailsDrawer's onExpandTransaction). Null for an ordinary expand.
    */
-  initialTransactionId?: string | null;
+  /** The transaction to open expanded on mount, when the merchant expanded one
+   *  from inside the client drawer. The row itself rather than its id: with the
+   *  transactions server-paged there is no local list to look an id up in. */
+  initialTransaction?: McaTransaction | null;
 }
 
 /**
@@ -44,7 +48,7 @@ export function ClientDetailsPage({
   client,
   onBack,
   onCollapse,
-  initialTransactionId = null,
+  initialTransaction = null,
 }: ClientDetailsPageProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
 
@@ -53,18 +57,22 @@ export function ClientDetailsPage({
   // drawer, Expand hands that same transaction to the full page, and the two
   // are mutually exclusive.
   //
-  // Both seed from initialTransactionId, which is only ever read on mount —
+  // Both seed from initialTransaction, which is only ever read on mount —
   // correct here because the caller mounts this component fresh on every
   // expand (see ClientTable's early return), so a later expand of a different
   // transaction arrives as a new mount rather than a prop change to reconcile.
-  const [txnId, setTxnId] = useState<string | null>(initialTransactionId);
-  const [txnDrawerOpen, setTxnDrawerOpen] = useState(false);
-  const [txnPageOpen, setTxnPageOpen] = useState(initialTransactionId != null);
+  // Which invoice statuses the ledger is narrowed to. Held here rather than in
+  // the ledger because the KPI cards above it are what set it, and they live in a
+  // different subtree.
+  const [invoiceStatuses, setInvoiceStatuses] = useState<string[]>([]);
+  const { viewContract } = useClientContractView();
 
-  const txnRow = clientTransactions(client.businessName).find((t) => t.gid === txnId) ?? null;
+  const [txnRow, setTxnRow] = useState<McaTransaction | null>(initialTransaction);
+  const [txnDrawerOpen, setTxnDrawerOpen] = useState(false);
+  const [txnPageOpen, setTxnPageOpen] = useState(initialTransaction != null);
 
   const openTransaction = (row: McaTransaction) => {
-    setTxnId(row.gid);
+    setTxnRow(row);
     setTxnDrawerOpen(true);
   };
 
@@ -119,6 +127,22 @@ export function ClientDetailsPage({
       <ClientDetailsContent
         client={client}
         layout="page"
+        // Pressing a KPI card narrows the ledger to the statuses that card
+        // counts, which is the whole reason the cards are clickable — the figure
+        // and the rows behind it end up on screen together.
+        onFilterByStatus={setInvoiceStatuses}
+        onViewContract={
+          client.contract?.fileId
+            ? () => viewContract({ clientId: client.id, rowMid: client.mid })
+            : undefined
+        }
+        ledgerSlot={
+          <ClientInvoicesSection
+            clientId={client.id}
+            statuses={invoiceStatuses}
+            onStatusesChange={setInvoiceStatuses}
+          />
+        }
         transactionsSlot={
           <ClientTransactionsSection
             businessName={client.businessName}

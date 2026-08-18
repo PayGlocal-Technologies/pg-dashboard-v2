@@ -8,7 +8,6 @@ import {
   clientAmountLocale,
   clientTotalReceived,
 } from "@/features/dashboard/client-management/constants";
-import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
 
@@ -35,8 +34,9 @@ function ClientCardSkeleton() {
 // of that, the same rule the Transactions card follows.
 function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: Client) => void }) {
   // The card's form of the Total received column, from the same derivation:
-  // settled transactions only, summed per currency (see clientTotalReceived).
-  const received = clientTotalReceived(clientTransactions(row.businessName));
+  // the row's own server-side figures (see clientTotalReceived), the same
+  // source the table's Total received column reads.
+  const received = clientTotalReceived(row);
 
   return (
     <div
@@ -57,6 +57,10 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
           table no longer has. min-w-0 on the name so a long one truncates
           rather than pushing the flag off the card. */}
       <div className="flex items-center gap-2">
+        {/* Same marker, same placement as the table's Business name cell. */}
+        {row.source === "ZOHO" ? (
+          <Icon name="zoho-logo" className="h-3.5 w-3.5 shrink-0" aria-label="Imported from Zoho" />
+        ) : null}
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">
           {row.businessName}
         </span>

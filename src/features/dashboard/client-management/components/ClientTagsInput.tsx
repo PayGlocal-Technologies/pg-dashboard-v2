@@ -1,12 +1,19 @@
 "use client";
 
 import { useState, type KeyboardEvent } from "react";
-import { InputGroup, InputGroupAddon, InputGroupInput, Tag } from "@/components/ui";
+import { Button, InputGroup, InputGroupAddon, InputGroupInput, Tag } from "@/components/ui";
 
 interface ClientTagsInputProps {
   id: string;
   value: string[];
   onChange: (next: string[]) => void;
+  /**
+   * Tags already in use across this merchant's clients, offered below the field
+   * (see useClientTagOptions). Suggestions only — the field stays free-form, so a
+   * merchant can still type a tag nobody has used yet. Filing two clients under
+   * "retainer" and "Retainer" is the thing this exists to prevent.
+   */
+  suggestions?: string[];
 }
 
 /**
@@ -35,7 +42,7 @@ interface ClientTagsInputProps {
  * one picks from a fixed option list, and client tags are whatever the merchant
  * decides to file this client under.
  */
-export function ClientTagsInput({ id, value, onChange }: ClientTagsInputProps) {
+export function ClientTagsInput({ id, value, onChange, suggestions = [] }: ClientTagsInputProps) {
   const [draft, setDraft] = useState("");
 
   const commit = () => {
@@ -62,41 +69,72 @@ export function ClientTagsInput({ id, value, onChange }: ClientTagsInputProps) {
     }
   };
 
+  // Case-insensitive, because the point of offering these is to stop the same
+  // label being filed twice under different capitalisation.
+  const chosen = new Set(value.map((tag) => tag.toLowerCase()));
+  const unusedSuggestions = suggestions.filter((tag) => !chosen.has(tag.toLowerCase()));
+
   return (
-    // h-auto/flex-wrap override InputGroup's fixed h-11 single row: enough tags
-    // to fill the width push the caret onto a second line inside the same field,
-    // growing the box downward instead of scrolling it sideways. items-center
-    // keeps the chips and the caret on a shared centre line, and the vertical
-    // padding is what stops the chips touching the border once it grows.
-    <InputGroup className="h-auto min-h-11 flex-wrap items-center gap-1.5 py-1.5">
-      {value.length > 0 && (
-        // min-h-0 cancels the addon's own min-h-11, which is sized for a single
-        // icon in a fixed-height field and would otherwise hold the box open at
-        // one row's height regardless of how many chips it carries.
-        <InputGroupAddon align="inline-start" className="min-h-0 flex-wrap gap-1.5">
-          {value.map((tag) => (
-            <Tag key={tag} onRemove={() => onChange(value.filter((t) => t !== tag))}>
+    // The field and its suggestion row stack, so the suggestions read as
+    // belonging to it rather than as a separate control below.
+    <div className="flex flex-col gap-2">
+      {/* h-auto/flex-wrap override InputGroup's fixed h-11 single row: enough tags
+          to fill the width push the caret onto a second line inside the same
+          field, growing the box downward instead of scrolling it sideways.
+          items-center keeps the chips and the caret on a shared centre line, and
+          the vertical padding is what stops the chips touching the border once it
+          grows. */}
+      <InputGroup className="h-auto min-h-11 flex-wrap items-center gap-1.5 py-1.5">
+        {value.length > 0 && (
+          // min-h-0 cancels the addon's own min-h-11, which is sized for a single
+          // icon in a fixed-height field and would otherwise hold the box open at
+          // one row's height regardless of how many chips it carries.
+          <InputGroupAddon align="inline-start" className="min-h-0 flex-wrap gap-1.5">
+            {value.map((tag) => (
+              <Tag key={tag} onRemove={() => onChange(value.filter((t) => t !== tag))}>
+                {tag}
+              </Tag>
+            ))}
+          </InputGroupAddon>
+        )}
+        <InputGroupInput
+          id={id}
+          // Once there are chips the field has demonstrated what it does, so the
+          // hint shortens to leave the caret room on the same line as them.
+          placeholder={value.length ? "Add another" : "Add a tag and press Enter"}
+          // flex-1 with a floor, so the caret always has somewhere to sit: it
+          // takes the space left on the chips' line where there is any, and wraps
+          // to its own line where there isn't.
+          className="min-w-[7rem] flex-1"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={handleKeyDown}
+          // Commits whatever is half-typed when focus leaves, so a tag isn't
+          // silently lost by tabbing onward or submitting the form.
+          onBlur={commit}
+        />
+      </InputGroup>
+
+      {/* Only the ones not already on this client, so the row shrinks as they
+          are used and disappears once there is nothing left to offer. Buttons,
+          not Tags: a Tag carries a remove affordance, and these add. */}
+      {unusedSuggestions.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] text-muted-foreground">Used before:</span>
+          {unusedSuggestions.map((tag) => (
+            <Button
+              key={tag}
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => onChange([...value, tag])}
+              className="h-auto min-h-0 rounded-full px-2 py-0.5 text-[11px] font-normal"
+            >
               {tag}
-            </Tag>
+            </Button>
           ))}
-        </InputGroupAddon>
-      )}
-      <InputGroupInput
-        id={id}
-        // Once there are chips the field has demonstrated what it does, so the
-        // hint shortens to leave the caret room on the same line as them.
-        placeholder={value.length ? "Add another" : "Add a tag and press Enter"}
-        // flex-1 with a floor, so the caret always has somewhere to sit: it
-        // takes the space left on the chips' line where there is any, and wraps
-        // to its own line where there isn't.
-        className="min-w-[7rem] flex-1"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={handleKeyDown}
-        // Commits whatever is half-typed when focus leaves, so a tag isn't
-        // silently lost by tabbing onward or submitting the form.
-        onBlur={commit}
-      />
-    </InputGroup>
+        </div>
+      ) : null}
+    </div>
   );
 }
