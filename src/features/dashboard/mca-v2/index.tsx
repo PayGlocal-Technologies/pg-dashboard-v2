@@ -430,7 +430,7 @@ export function McaV2Feature() {
                   Need proof of account ownership?
                 </p>
                 <p className={MODULE_SUBTITLE}>
-                  Download an official document confirming ownership of this receiving account.
+                  If your client asks for a proof of this account&apos;s ownership, you can download and send them this document
                 </p>
               </div>
               {/* Placeholder until the proof-of-account document endpoint
