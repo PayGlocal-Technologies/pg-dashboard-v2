@@ -31,8 +31,10 @@ import {
 } from "@/features/dashboard/multi-currency/utils";
 import {
   useAccountDocumentDownload,
+  useNeedsMidSelection,
   useVirtualAccounts,
 } from "@/features/dashboard/multi-currency/hooks";
+import { SelectMidView } from "@/components/common/SelectMidView";
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms/components/SettlementStatementDrawer";
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
@@ -62,6 +64,24 @@ const MODULE_SUBTITLE = "text-[13px] text-muted-foreground";
  * a new screenshot is one data change rather than a component edit.
  */
 export function PlatformsFeature() {
+  // Same gate as Multi-currency: this page reads the very same virtual-accounts
+  // endpoint, which is scoped to a single MID in its path, so a multi-MID
+  // merchant has to choose one before it can show the right accounts.
+  const needsMidSelection = useNeedsMidSelection();
+
+  if (needsMidSelection) {
+    return (
+      <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
+        <PageHeader title="Platforms" />
+        <SelectMidView midType="PACB" />
+      </div>
+    );
+  }
+
+  return <PlatformsContent />;
+}
+
+function PlatformsContent() {
   // Which bucket a platform pays into depends on the platform, exactly as in
   // pg-dashboard (`resolvedSelectedPlatform === "amazon" ? amazonCurrencyList :
   // generalCurrencyList`, Platforms.tsx): Amazon pays into the accounts issued

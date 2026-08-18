@@ -23,11 +23,34 @@ import {
   MULTI_CURRENCY_SUMMARY,
   TOTAL_EARNING_TREND,
 } from "@/features/dashboard/multi-currency/mock-data";
-import { useVirtualAccounts } from "@/features/dashboard/multi-currency/hooks";
+import {
+  useNeedsMidSelection,
+  useVirtualAccounts,
+} from "@/features/dashboard/multi-currency/hooks";
+import { SelectMidView } from "@/components/common/SelectMidView";
 import { formatAccount, formatFullAccount } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 export function MultiCurrencyFeature() {
+  // A multi-MID merchant has to say which account they mean before anything is
+  // fetched: these endpoints put one MID in the path, so guessing shows the
+  // wrong merchant's accounts. Mirrors pg-dashboard, which gates the whole page
+  // the same way.
+  const needsMidSelection = useNeedsMidSelection();
+
+  if (needsMidSelection) {
+    return (
+      <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
+        <PageHeader title="Multi-currency accounts" />
+        <SelectMidView midType="PACB" />
+      </div>
+    );
+  }
+
+  return <MultiCurrencyContent />;
+}
+
+function MultiCurrencyContent() {
   // The merchant's own receiving accounts. The response also carries an
   // `amazon` bucket, which this page deliberately ignores — those are Amazon
   // payout accounts and belong to the Platforms page, which reads the same
