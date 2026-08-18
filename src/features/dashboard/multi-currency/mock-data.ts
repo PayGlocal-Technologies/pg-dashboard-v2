@@ -1,5 +1,6 @@
 import type { MetricSparklinePoint } from "@/components/ui";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
+import { SWIFT_SUPPORTED_REGIONS } from "@/features/dashboard/multi-currency/mapAccounts";
 
 /** Same legal entity receives every currency, so the holder name is shared. */
 const ACCOUNT_HOLDER_NAME = "Acme Exports Pvt Ltd";
@@ -163,6 +164,11 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
     bankName: "PayGlocal International Ltd",
     beneficiaryAddress: "1 King Street, London, EC2V 8AU, UK",
     routingCodeType: "swift_bic",
+    // Shared with the mapper rather than duplicated: the Virtual Accounts page
+    // renders API-mapped accounts while several other surfaces still read this
+    // mock, and the two showing different region lists for the same account
+    // would be a bug nobody would think to look for.
+    supportedRegions: SWIFT_SUPPORTED_REGIONS,
   },
 ];
 
