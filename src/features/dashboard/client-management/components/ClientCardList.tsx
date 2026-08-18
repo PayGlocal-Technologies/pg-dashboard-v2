@@ -3,7 +3,11 @@
 import { Button, EmptyState, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
+import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
+import {
+  clientAmountLocale,
+  clientTotalReceived,
+} from "@/features/dashboard/client-management/constants";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
 
@@ -17,6 +21,7 @@ function ClientCardSkeleton() {
       </div>
       <Shimmer className="mt-2 h-3 w-28" />
       <Shimmer className="mt-1.5 h-3 w-44" />
+      <Shimmer className="mt-2 h-3.5 w-32" />
       <Shimmer className="mt-2.5 h-3 w-36" />
     </div>
   );
@@ -28,6 +33,11 @@ function ClientCardSkeleton() {
 // inside later must stop propagation in its own onClick to stay independent
 // of that, the same rule the Transactions card follows.
 function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: Client) => void }) {
+  // The card's form of the Total received column, from the same derivation:
+  // the row's own server-side figures (see clientTotalReceived), the same
+  // source the table's Total received column reads.
+  const received = clientTotalReceived(row);
+
   return (
     <div
       role="button"
@@ -47,6 +57,10 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
           table no longer has. min-w-0 on the name so a long one truncates
           rather than pushing the flag off the card. */}
       <div className="flex items-center gap-2">
+        {/* Same marker, same placement as the table's Business name cell. */}
+        {row.source === "ZOHO" ? (
+          <Icon name="zoho-logo" className="h-3.5 w-3.5 shrink-0" aria-label="Imported from Zoho" />
+        ) : null}
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">
           {row.businessName}
         </span>
@@ -62,6 +76,29 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
       </p>
       <p className="mt-1 truncate text-[12px] text-muted-foreground" title={row.email}>
         {row.email}
+      </p>
+
+      {/* The card's form of the Total received column. Labelled, unlike the
+          table's, since a card has no column header to say what the figure is;
+          the amount still carries the foreground weight, so it reads as the
+          value and the label as its caption. An em-dash where nothing has
+          settled yet, exactly as the column renders it. */}
+      <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-[12px] text-muted-foreground">
+        <span>Total received</span>
+        {received.length === 0 ? (
+          <span className="text-[13px] text-foreground">—</span>
+        ) : (
+          received.map((total) => (
+            <span key={total.currency} className="whitespace-nowrap">
+              <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                {formatCurrency(total.amount, total.currency, clientAmountLocale(total.currency))}
+              </span>{" "}
+              <span className="text-[11px] font-medium text-muted-foreground">
+                {total.currency}
+              </span>
+            </span>
+          ))
+        )}
       </p>
 
       {/* Trailing metadata row, the same beat the transaction card puts its

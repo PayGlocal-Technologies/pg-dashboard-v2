@@ -22,9 +22,32 @@ function SkuCardSkeleton() {
   );
 }
 
-function SkuCard({ row, actions }: { row: SkuProduct; actions?: ReactNode }) {
+function SkuCard({
+  row,
+  actions,
+  onPreview,
+}: {
+  row: SkuProduct;
+  actions?: ReactNode;
+  onPreview: (product: SkuProduct) => void;
+}) {
   return (
-    <div className="flex gap-3 rounded-xl border border-border bg-card px-4 py-3.5">
+    // The whole card opens the preview, the touch equivalent of the table's
+    // whole-row click. Keyboard-reachable too, since it isn't a real button.
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Preview ${row.name}`}
+      aria-haspopup="dialog"
+      onClick={() => onPreview(row)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPreview(row);
+        }
+      }}
+      className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+    >
       <ProductThumbnail product={row} className="shrink-0" />
 
       {/* min-w-0 so the long description below can actually truncate inside
@@ -38,10 +61,14 @@ function SkuCard({ row, actions }: { row: SkuProduct; actions?: ReactNode }) {
           <div className="flex shrink-0 items-start gap-1">
             <StatusBadge
               variant={row.type === "GOODS" ? "info" : "muted"}
-              label={SKU_TYPE_LABEL[row.type]}
+              label={row.type ? SKU_TYPE_LABEL[row.type] : "—"}
               size="sm"
             />
-            {actions}
+            {/* Fenced off from the card's own click, so the overflow menu
+                opens without also opening the preview behind it. */}
+            <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+              {actions}
+            </span>
           </div>
         </div>
 
@@ -72,6 +99,9 @@ interface SkuCardListProps {
   /** Per-row overflow menu, mirroring DataTable's own `rowAction` signature so
    *  the table and the card list are fed by the same call site. */
   rowAction?: (row: SkuProduct) => ReactNode;
+  /** Opens the read-only product preview — same handler the table's Product
+   *  cell uses, so a tap and a click land on the same modal. */
+  onPreview: (product: SkuProduct) => void;
   skeletonCount?: number;
   page: number;
   onPageChange: (page: number) => void;
@@ -91,6 +121,7 @@ export function SkuCardList({
   rows,
   isLoading,
   rowAction,
+  onPreview,
   skeletonCount = 6,
   page,
   onPageChange,
@@ -109,7 +140,9 @@ export function SkuCardList({
       ) : rows.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyDescription} />
       ) : (
-        rows.map((row) => <SkuCard key={row.id} row={row} actions={rowAction?.(row)} />)
+        rows.map((row) => (
+          <SkuCard key={row.id} row={row} actions={rowAction?.(row)} onPreview={onPreview} />
+        ))
       )}
 
       {!isLoading && rows.length > 0 && totalPages > 1 && (

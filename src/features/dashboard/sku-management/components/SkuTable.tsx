@@ -1,14 +1,18 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Badge, Button, DataTable } from "@/components/ui";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button, DataTable, EmptyState } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SkuCardList } from "@/features/dashboard/sku-management/components/SkuCardList";
+import { ProductPreviewModal } from "@/features/dashboard/sku-management/components/ProductPreviewModal";
 import { SkuRowActions } from "@/features/dashboard/sku-management/components/SkuRowActions";
 import { DeleteSkuDialog } from "@/features/dashboard/sku-management/components/DeleteSkuDialog";
+import { DuplicateSkuDialog } from "@/features/dashboard/sku-management/components/DuplicateSkuDialog";
 import {
   SKU_PAGE_LIMIT,
   SKU_SEARCH_HINTS,
@@ -17,8 +21,16 @@ import {
   type SkuViewTab,
 } from "@/features/dashboard/sku-management/constants";
 import { SkuItemFormModal } from "@/features/dashboard/sku-management/components/SkuItemFormModal";
-import { MOCK_SKU_PRODUCTS } from "@/features/dashboard/sku-management/mock-data";
-import { toSkuProductFields } from "@/features/dashboard/sku-management/schemas";
+import {
+  toSkuMutationPayload,
+  toSkuPayloadFromProduct,
+  useCreateSku,
+  useDeleteSku,
+  useDuplicateSku,
+  useSkuCatalogue,
+  useSkuMidScope,
+  useUpdateSku,
+} from "@/features/dashboard/sku-management/hooks";
 import type {
   SkuItemFormValues,
   SkuPriceField,
@@ -30,19 +42,27 @@ interface SkuTableProps {
    *  the page header while every row this creates lives down here. */
   addItemOpen: boolean;
   onAddItemOpenChange: (open: boolean) => void;
+  /** Opens the page's import modal. The first-run empty state offers it as a
+   *  second way in, so the button in the header isn't the only one. */
+  onImport: () => void;
 }
 
 /** Turns a saved product back into form values, so Edit opens pre-filled with
- *  exactly what the row holds. The inverse of toSkuProductFields. */
+ *  exactly what the row holds. The inverse of toSkuMutationPayload. */
 function toFormValues(product: SkuProduct): SkuItemFormValues {
   return {
     name: product.name,
-    type: product.type,
+    // A row can arrive untyped, which the select shows as its unchosen state
+    // rather than guessing a type on the merchant's behalf.
+    type: product.type ?? "",
     hsnSac: product.hsnSac,
     currency: product.currency,
     sellingPrice: String(product.sellingPrice),
     productCost: String(product.productCost),
     description: product.description,
+    // The catalogue endpoint has no media field, so a fetched row never carries
+    // images. Kept mapping-shaped rather than hardcoded to [] so this starts
+    // working the day the API grows one.
     images: (product.images ?? []).map((url, index) => ({
       id: `${product.id}-image-${index}`,
       url,
@@ -51,99 +71,64 @@ function toFormValues(product: SkuProduct): SkuItemFormValues {
   };
 }
 
-export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
+export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTableProps) {
   const [tab, setTab] = useState<SkuViewTab>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
-  // Archived items are a view of this same page, not a route: the tab bar,
-  // search, columns, and card list are all shared, and only the row set and
-  // the overflow menu's options differ.
-  const [showArchived, setShowArchived] = useState(false);
-
-  // Archive and delete are recorded as id sets layered over the catalogue,
-  // for the same reason priceOverrides is: once a real endpoint replaces
-  // MOCK_SKU_PRODUCTS these become the pending-write set rather than a
-  // divergent copy of the data.
-  const [archivedIds, setArchivedIds] = useState<Set<string>>(() => new Set());
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
+  // The product being previewed, or null. Holds the product rather than an id
+  // so the modal can never render a stale row while it animates closed.
+  const [previewProduct, setPreviewProduct] = useState<SkuProduct | null>(null);
 
   // The product awaiting delete confirmation. Delete never acts on the first
   // click; it only ever sets this, and DeleteSkuDialog is what calls through.
   const [pendingDelete, setPendingDelete] = useState<SkuProduct | null>(null);
 
-  // Items created through the Add item form, newest first so a merchant sees
-  // what they just added at the top rather than hunting for it. Prepended to
-  // the catalogue rather than merged into it, for the same reason the override
-  // maps are kept separate: MOCK_SKU_PRODUCTS stands in for a server response.
-  const [createdItems, setCreatedItems] = useState<SkuProduct[]>([]);
-  // Field edits from the item form, keyed by id — the same layering as
-  // priceOverrides, which stays independent so an inline price edit and a form
-  // edit don't clobber one another.
-  const [itemEdits, setItemEdits] = useState<Record<string, Partial<SkuProduct>>>({});
+  // The product awaiting duplicate confirmation. Same shape as pendingDelete:
+  // the menu item only ever sets this, and the dialog is what calls through.
+  const [pendingDuplicate, setPendingDuplicate] = useState<SkuProduct | null>(null);
+
   // The product being edited, or null when the form is in Add mode.
   const [editing, setEditing] = useState<SkuProduct | null>(null);
-  // Ids are minted per session; a real create endpoint returns the id instead.
-  const nextIdRef = useRef(0);
 
-  // Inline price edits, keyed by product id and layered over the source rows
-  // below — the same shape McaTransactionTable uses for its optimistic status
-  // overrides. Held separately rather than by cloning the catalogue into
-  // state, so once a real endpoint replaces MOCK_SKU_PRODUCTS a refetch keeps
-  // every field the merchant hasn't touched fresh, and this narrows to the
-  // pending-write set it already is.
-  const [priceOverrides, setPriceOverrides] = useState<
-    Record<string, Partial<Pick<SkuProduct, SkuPriceField>>>
-  >({});
-
-  const query = search.trim().toLowerCase();
-
-  // Three layers over the catalogue, applied in order: newly created items
-  // sit in front of it, form edits replace whole fields, and inline price
-  // edits are applied last so the figure showing in the table is always the
-  // most recent thing the merchant typed, whichever control they typed it in.
-  const sourceRows = [...createdItems, ...MOCK_SKU_PRODUCTS].map((product) => {
-    const edits = itemEdits[product.id];
-    const prices = priceOverrides[product.id];
-    if (!edits && !prices) return product;
-    return { ...product, ...edits, ...prices };
+  // Search, the type tab and the page are all request inputs — every one of them
+  // is applied by the server (see useSkuCatalogue), so the rows that arrive are
+  // the rows to draw and the pager's count always describes the same set.
+  const { products, totalCount, isLoading, isFetching, refetch } = useSkuCatalogue({
+    search: search.trim(),
+    // All sends no type filter at all rather than both types, so the request says
+    // "don't narrow" instead of "narrow to everything".
+    type: tab === "goods" || tab === "services" ? SKU_TAB_TYPE[tab] : undefined,
+    page,
   });
 
-  // Tab and search both narrow the same list, and both reset paging (below),
-  // so this is derived during render rather than held in state. There is no
-  // catalogue endpoint yet — MOCK_SKU_PRODUCTS stands in for one — so the
-  // filtering is client-side; swapping in a real query means replacing the
-  // source array and moving these predicates into the request body.
-  const filteredRows = sourceRows.filter((product) => {
-    // Deleted rows are gone from both views; archived rows appear in exactly
-    // one of them, which is what makes archiving a move rather than a copy.
-    if (deletedIds.has(product.id)) return false;
-    if (archivedIds.has(product.id) !== showArchived) return false;
-    if (tab !== "all" && product.type !== SKU_TAB_TYPE[tab]) return false;
-    if (!query) return true;
-    // Matches either field the placeholder cycles through (SKU_SEARCH_HINTS),
-    // the same way the Transactions search spans remitter/transaction ID/UTR:
-    // one box, no mode to pick, a hit on either counts. Description stays
-    // unsearchable — the hint never offers it.
-    return (
-      product.name.toLowerCase().includes(query) || product.hsnSac.toLowerCase().includes(query)
-    );
-  });
+  // Only true when several PACB MIDs are in play and none is selected — see
+  // useSkuMidScope. That is the one state where a row's own MID matters.
+  const { needsMidChoice } = useSkuMidScope();
 
-  const totalCount = filteredRows.length;
-  // Archiving or deleting the last row on the final page would otherwise leave
-  // `page` pointing past the end and show an empty table. Clamping here (rather
-  // than resetting page in each handler) covers every way the row count can
-  // shrink, and is derived during render, so no effect writes state back.
-  const totalPages = Math.max(1, Math.ceil(totalCount / SKU_PAGE_LIMIT));
-  const safePage = Math.min(page, totalPages);
-  const pageRows = filteredRows.slice((safePage - 1) * SKU_PAGE_LIMIT, safePage * SKU_PAGE_LIMIT);
+  const closeItemForm = (open: boolean) => {
+    if (!open) setEditing(null);
+    onAddItemOpenChange(open);
+  };
 
-  // TODO: every mutation below is local only — persist each through the
-  // catalogue endpoints once they exist. Edits, archives, and deletes survive
-  // filtering, paging, and view switches, but not a reload.
+  const { createSku } = useCreateSku();
+  const { updateSku } = useUpdateSku();
+  const { deleteSku } = useDeleteSku();
+  const { duplicateSku } = useDuplicateSku();
+
+  // Both prices are edited in place, and the endpoint replaces the row, so the
+  // whole record is resent with just this field changed.
   const onPriceChange = (id: string, field: SkuPriceField, next: number) => {
-    setPriceOverrides((prev) => ({ ...prev, [id]: { ...prev[id], [field]: next } }));
+    const product = products.find((row) => row.id === id);
+    if (!product) return;
+
+    const payload = toSkuPayloadFromProduct(product, { [field]: next });
+    if (!payload) {
+      toast.error("Add a product type to this item before editing its price.");
+      return;
+    }
+
+    updateSku({ id, rowMid: product.mid, payload });
   };
 
   // Opens the same form the Add item button does, pre-filled from the row.
@@ -156,47 +141,39 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   // Both Add item and Save and add another land here; `keepOpen` is the only
   // difference between them, and the modal itself handles resetting the form.
   const onSubmitItem = (values: SkuItemFormValues, keepOpen: boolean) => {
-    const fields = toSkuProductFields(values);
+    const payload = toSkuMutationPayload(values);
     // Null means validation didn't pass. The form gates submission on the same
     // check, so this is a guard rather than a path the UI can reach.
-    if (!fields) return;
+    if (!payload) return;
 
     if (editing) {
-      setItemEdits((prev) => ({ ...prev, [editing.id]: fields }));
+      updateSku({ id: editing.id, rowMid: editing.mid, payload });
       setEditing(null);
       onAddItemOpenChange(false);
       return;
     }
 
-    setCreatedItems((prev) => [{ id: `sku-new-${nextIdRef.current++}`, ...fields }, ...prev]);
-    // A new item belongs in the active list, so leave the archived view and
-    // reset paging — otherwise it lands on a page the merchant isn't looking
-    // at and the form appears to have done nothing.
-    setShowArchived(false);
+    createSku(payload);
+    // A new item lands at the top of the unfiltered list, so a merchant sitting
+    // on a type tab or a later page would otherwise watch the form close onto a
+    // list the item isn't in.
+    setTab("all");
     setPage(1);
     if (!keepOpen) onAddItemOpenChange(false);
   };
 
-  const closeItemForm = (open: boolean) => {
-    if (!open) setEditing(null);
-    onAddItemOpenChange(open);
-  };
-
-  const onArchiveItem = (product: SkuProduct) => {
-    setArchivedIds((prev) => new Set(prev).add(product.id));
-  };
-
-  const onUnarchiveItem = (product: SkuProduct) => {
-    setArchivedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(product.id);
-      return next;
-    });
-  };
-
   const onConfirmDelete = (product: SkuProduct) => {
-    setDeletedIds((prev) => new Set(prev).add(product.id));
+    deleteSku(product);
     setPendingDelete(null);
+  };
+
+  const onConfirmDuplicate = (product: SkuProduct) => {
+    duplicateSku(product);
+    setPendingDuplicate(null);
+    // The copy lands at the top of the unfiltered list, so show the merchant
+    // the view it is actually in — the same reason Add item resets these.
+    setTab("all");
+    setPage(1);
   };
 
   // One menu renderer feeding both the table's trailing actions column and
@@ -204,38 +181,40 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
   const renderRowActions = (row: SkuProduct) => (
     <SkuRowActions
       product={row}
-      archived={showArchived}
       onEdit={onEditItem}
-      onArchive={onArchiveItem}
-      onUnarchive={onUnarchiveItem}
+      onDuplicate={setPendingDuplicate}
       onDelete={setPendingDelete}
     />
   );
 
-  const columns = buildSkuColumns(onPriceChange);
+  const columns = buildSkuColumns(onPriceChange, setPreviewProduct, needsMidChoice);
 
   const onSearch = (value: string) => {
     setSearch(value);
     setPage(1);
   };
 
+  // Switching tabs keeps the search query — a merchant looking for one product
+  // shouldn't retype it to check which type it filed under. Only paging resets.
   const onTabChange = (value: string) => {
     setTab(value as SkuViewTab);
     setPage(1);
   };
 
-  // Toggling the view keeps the tab and the search query — a merchant looking
-  // for one product shouldn't have to retype it to check whether they archived
-  // it. Only paging resets, since the two views' row counts differ.
-  const onToggleArchived = () => {
-    setShowArchived((prev) => !prev);
-    setPage(1);
-  };
-
-  const emptyTitle = showArchived ? "No archived products" : "No products found";
-  const emptyDescription = showArchived
-    ? "Items you archive from the SKU list appear here"
-    : "Try a different search or switch tabs";
+  // Two different empty states, because they ask the merchant for two different
+  // things. A catalogue with nothing in it and no query typed is a first run, and
+  // wants the two ways to put something in it; anything else is a query or tab
+  // that matched nothing, and wants to be told to widen it. pg-dashboard draws
+  // the same distinction.
+  //
+  // `tab === "all"` is load-bearing now that the tabs filter server-side:
+  // totalCount describes the *filtered* set, so a merchant on Goods with no goods
+  // would otherwise be told their catalogue is empty and offered the import CTAs,
+  // when in fact they have items — just none of that type. First run means the
+  // whole catalogue is empty, which only an unfiltered, unsearched request can say.
+  const isFirstRun = !isLoading && totalCount === 0 && !search.trim() && tab === "all";
+  const emptyTitle = "No products found";
+  const emptyDescription = "Try a different search or switch tabs";
 
   return (
     // Tab bar, search, and the table share one bordered surface, matching the
@@ -243,31 +222,14 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
     // (rounded-none border-0) since this wrapper draws them, and a border-b
     // under each control row stands in for the separators between them.
     <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Three tabs, one selected view: the whole catalogue, or one product
+          type. */}
       <div className="border-b border-border px-4 pt-3">
-        {/* The tab bar's own right-hand slot carries the archived marker, so
-            All/Goods/Services keep filtering both views identically while it
-            stays obvious which set is on screen. */}
-        <UnderlineTabs
-          tabs={SKU_VIEW_TABS}
-          value={tab}
-          onValueChange={onTabChange}
-          actions={
-            showArchived ? (
-              <Badge
-                variant="secondary"
-                size="sm"
-                leftIcon={<Icon name="archive" className="h-3 w-3" />}
-              >
-                Viewing archived items
-              </Badge>
-            ) : null
-          }
-        />
+        <UnderlineTabs tabs={SKU_VIEW_TABS} value={tab} onValueChange={onTabChange} />
       </div>
 
-      {/* Search, with the archived-view toggle pushed to the far right by
-          ml-auto. Still no Report, no Reorder Columns, no filter chips. */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+      {/* Search and refresh — no Report, no Reorder Columns, no filter chips. */}
+      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
         <RotatingSearchInput
           value={search}
           onSearch={onSearch}
@@ -275,54 +237,116 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
           ariaLabel="Search products by name or HSN/SAC"
           className="w-full sm:w-56"
         />
+
+        {/* Every mutation already invalidates the catalogue, so this is for
+            changes made elsewhere — another tab, or another member of the team.
+            Spinning the glyph on isFetching (not isLoading) is what makes a
+            press over existing rows visibly do something. */}
         <Button
           type="button"
-          variant="outline"
+          variant="ghost"
           size="sm"
+          aria-label="Refresh products"
+          isLoading={false}
+          disabled={isFetching}
           leftIcon={
-            <Icon name={showArchived ? "chevron-left" : "archive"} className="h-3.5 w-3.5" />
+            <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
           }
-          onClick={onToggleArchived}
-          className="ml-auto h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+          onClick={refetch}
+          className="ml-auto shrink-0"
         >
-          {showArchived ? "Back to items" : "Archived items"}
+          Refresh
         </Button>
       </div>
 
       {/* Desktop (lg+): the full table. The overflow menu rides `rowAction`,
           not a column — DataTable renders that slot in a zero-width cell stuck
-          to the right edge of the viewport and reveals it on row hover. That's
-          what keeps it pinned right and reachable while the six data columns
-          scroll horizontally under it, out of their widths, and out of any
-          future column reordering. */}
-      <DataTable
-        className="hidden rounded-none border-0 lg:block"
-        columns={columns}
-        data={pageRows}
-        emptyTitle={emptyTitle}
-        emptyDescription={emptyDescription}
-        rowKey={(row) => row.id}
-        rowAction={renderRowActions}
-        pageSize={SKU_PAGE_LIMIT}
-        totalRows={totalCount}
-        page={safePage}
-        onPageChange={setPage}
-        tableLayout="content"
-        density="compact"
-      />
+          to the right edge of the viewport. That's what keeps it pinned right
+          and reachable while the six data columns scroll horizontally under
+          it, out of their widths, and out of any future column reordering.
+          It floats over the row rather than sitting in the flow, so it can
+          overlap the trailing column's text; the secondary button's own fill
+          and border are what keep it legible there.
 
-      {/* Tablet + mobile (below lg): the same page's rows as cards. */}
-      <SkuCardList
-        className="lg:hidden"
-        rows={pageRows}
-        isLoading={false}
-        rowAction={renderRowActions}
-        page={safePage}
-        onPageChange={setPage}
-        totalRows={totalCount}
-        pageSize={SKU_PAGE_LIMIT}
-        emptyTitle={emptyTitle}
-        emptyDescription={emptyDescription}
+          DataTable reveals that slot on row hover only (opacity-0 on a span
+          it owns). A child can't undo a parent's opacity, so the override is
+          applied here, scoped to this table's action cell — `td.sticky` is
+          that zero-width cell, and the descendant selector outranks the bare
+          `opacity-0` class without needing !important. z-[2] lifts it above
+          the row's own cells so it always paints on top. */}
+      {isFirstRun ? (
+        <EmptyState
+          title="No items yet"
+          description="Add items to your catalog to pull them into invoices."
+          action={
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+                onClick={onImport}
+              >
+                Import from a file
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                onClick={() => onAddItemOpenChange(true)}
+              >
+                Add item
+              </Button>
+            </div>
+          }
+          className="py-12"
+        />
+      ) : (
+        <>
+          <DataTable
+            className={cn(
+              "hidden rounded-none border-0 lg:block",
+              "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+            )}
+            columns={columns}
+            data={products}
+            isLoading={isLoading}
+            emptyTitle={emptyTitle}
+            emptyDescription={emptyDescription}
+            rowKey={(row) => row.id}
+            rowAction={renderRowActions}
+            pageSize={SKU_PAGE_LIMIT}
+            totalRows={totalCount}
+            page={page}
+            onPageChange={setPage}
+            tableLayout="content"
+            density="compact"
+          />
+
+          {/* Tablet + mobile (below lg): the same page's rows as cards. */}
+          <SkuCardList
+            className="lg:hidden"
+            rows={products}
+            isLoading={isLoading}
+            rowAction={renderRowActions}
+            onPreview={setPreviewProduct}
+            page={page}
+            onPageChange={setPage}
+            totalRows={totalCount}
+            pageSize={SKU_PAGE_LIMIT}
+            emptyTitle={emptyTitle}
+            emptyDescription={emptyDescription}
+          />
+        </>
+      )}
+
+      {/* Read-only. Deliberately carries no actions — Edit, Duplicate, and
+          Delete stay on the row's overflow menu, so there's one home for
+          them and this stays a look-don't-touch view. */}
+      <ProductPreviewModal
+        product={previewProduct}
+        onOpenChange={(open) => !open && setPreviewProduct(null)}
       />
 
       {/* Rendered once for the whole table rather than per row: only one
@@ -332,6 +356,14 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
         product={pendingDelete}
         onOpenChange={(open) => !open && setPendingDelete(null)}
         onConfirm={onConfirmDelete}
+      />
+
+      {/* Neutral twin of the delete dialog: Duplicate confirms too, because its
+          result lands somewhere the merchant may not be looking. */}
+      <DuplicateSkuDialog
+        product={pendingDuplicate}
+        onOpenChange={(open) => !open && setPendingDuplicate(null)}
+        onConfirm={onConfirmDuplicate}
       />
 
       {/* One form serving both Add and Edit — the field model is the same, so

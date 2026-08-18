@@ -1,4 +1,7 @@
+import { COUNTRIES } from "@/components/ui";
+import { GLOBAL_CURRENCIES } from "@/features/dashboard/multi-currency/accountGuides";
 import type {
+  SupportedRegion,
   AccountDetail,
   ApiCurrency,
   ApiVirtualAccount,
@@ -97,6 +100,36 @@ const PRESENTATION_BY_CURRENCY: Record<string, Partial<VirtualAccount>> = {
   },
 };
 
+/**
+ * Regions the SWIFT catch-all account can receive from, as the Supported
+ * currencies modal lists them.
+ *
+ * Derived from GLOBAL_CURRENCIES rather than hand-listed. That list is a verbatim
+ * port of production's own GLOBAL_CURRENCIES_MAP (33 currencies), and it is what
+ * production's copy means by "33+ additional currencies" — so hand-writing a
+ * shorter one here would quietly tell merchants they can receive fewer currencies
+ * than they actually can.
+ *
+ * `countryName` is resolved from the ISO2 through flux's COUNTRIES, because the
+ * production list carries a code and a currency but no country name, and the modal
+ * searches on the name. Falls back to the code itself, which is still a better row
+ * label than a blank.
+ *
+ * Static, and living here beside PRESENTATION_BY_CURRENCY for the same reason
+ * those four fields do: the accounts endpoint returns no region list, so this is
+ * presentation the mapper attaches rather than something it reads. When the backend
+ * grows the field, this constant goes and the mapper reads it instead — nothing
+ * downstream changes, because the modal renders whatever the account carries.
+ */
+export const SWIFT_SUPPORTED_REGIONS: SupportedRegion[] = GLOBAL_CURRENCIES.map((currency) => ({
+  iso2: currency.countryIso2Code,
+  countryName:
+    COUNTRIES.find((country) => country.code === currency.countryIso2Code)?.name ??
+    currency.countryIso2Code,
+  currency: currency.currencyCode,
+  currencyName: currency.currencyName,
+}));
+
 /** The API bucket key for the SWIFT catch-all account. pg-dashboard renames it
  *  to "GLOBAL" for display; the v2 mock called the same thing "ROW". */
 const GLOBAL_CURRENCY_KEY: ApiCurrency = "OTHER";
@@ -169,6 +202,11 @@ function toViewAccount(currencyKey: string, account: ApiVirtualAccount): Virtual
     routingCodeType: account.routingCodeType || undefined,
     fedwireRoutingCode: account.fedwireRoutingCode || undefined,
     isGlobal,
+
+    // Belongs to the catch-all alone, and is attached here rather than read from
+    // the response — see the constant above. Undefined on every local-rail
+    // account, which is what stops it offering a region list it doesn't have.
+    supportedRegions: isGlobal ? SWIFT_SUPPORTED_REGIONS : undefined,
 
     // ── API gaps (see the note at the top of this file) ──────────────────
     iso2: "",

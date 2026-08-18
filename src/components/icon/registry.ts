@@ -117,6 +117,7 @@ import { MdrOfferIcon } from "@/components/icon/MdrOfferIcon";
 import { NoTransactionsIllustration } from "@/components/icon/NoTransactionsIllustration";
 import { ToptalLogo } from "@/components/icon/ToptalLogo";
 import { UpworkLogo } from "@/components/icon/UpworkLogo";
+import { ZohoLogo } from "@/components/icon/ZohoLogo";
 
 export const ICONS = {
   activity: Activity,
@@ -241,6 +242,7 @@ export const ICONS = {
   "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
   "toptal-logo": ToptalLogo as unknown as LucideIcon,
   "upwork-logo": UpworkLogo as unknown as LucideIcon,
+  "zoho-logo": ZohoLogo as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
