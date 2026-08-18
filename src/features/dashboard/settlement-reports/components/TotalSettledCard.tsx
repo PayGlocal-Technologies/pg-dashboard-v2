@@ -62,7 +62,7 @@ export function TotalSettledCard({
   const { domain, ticks } = computeYAxisTicks(data);
 
   return (
-    <Card className={cn("gap-4 p-5", className)}>
+    <Card className={cn("flex flex-col gap-4 p-5", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-foreground">Total settled</p>
@@ -104,7 +104,7 @@ export function TotalSettledCard({
         </div>
       </div>
 
-      <div className="h-48 w-full">
+      <div className="min-h-48 w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <defs>

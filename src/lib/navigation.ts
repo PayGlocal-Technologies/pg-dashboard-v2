@@ -17,6 +17,9 @@ export type NavItem = {
   badge?: string;
   permission?: string[];
   children?: NavChild[];
+  /** Only shown while the header's product context matches, see
+   * useProductContext.ts. Omit for items shared by both products. */
+  product?: ProductType;
 };
 
 export type NavGroup = {
@@ -24,13 +27,37 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+// ─── Home navigation (Header's "Home" tab, the combined overview) ─────────────
+// Deliberately short, 3 top-level items only, the full Payments/MCA feature
+// tree below only makes sense once the merchant has picked a product.
+
+export const homeNavigation: NavGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: "layout-grid", permission: [] },
+      { label: "Reports", href: "/reports/settlement-report", icon: "file-text", permission: [] },
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: "settings",
+        permission: [],
+        children: [{ label: "Team Management", href: "/team-management", permission: [] }],
+      },
+    ],
+  },
+];
+
 // ─── Regular merchant navigation ──────────────────────────────────────────────
+// Shown once the Header's "Payments" or "Multi-Currency Accounts" tab is
+// active (see useProductContext.ts), not for "Home", see homeNavigation above.
 
 export const regularNavigation: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      { label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] },
+      { label: "Dashboard", href: "/dashboard/payments", icon: "layout-grid", permission: [], product: "PA" },
+      { label: "Dashboard", href: "/dashboard/mca", icon: "layout-grid", permission: [], product: "PACB" },
     ],
   },
   {
@@ -143,6 +170,60 @@ export const regularNavigation: NavGroup[] = [
         icon: "clock",
         permission: ["merchantAdminReport"],
       },
+    ],
+  },
+];
+
+// ─── MCA navigation ────────────────────────────────────────────────────────────
+// Shown instead of regularNavigation while the Header's "Multi-Currency
+// Accounts" tab is active, a dedicated tree (not the PA/PACB-shared one
+// above) since MCA's feature set and grouping differ enough that tagging
+// items with product:"PACB" on the shared tree stopped making sense.
+
+export const mcaNavigation: NavGroup[] = [
+  {
+    label: "Home",
+    items: [{ label: "Dashboard", href: "/dashboard/mca", icon: "layout-grid", permission: [] }],
+  },
+  {
+    label: "Payments",
+    items: [
+      {
+        label: "Transactions",
+        href: "/transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Settlements",
+        href: "/reports/settlement-report",
+        icon: "file-text",
+        permission: ["getAllSettlementDetailReports", "getSettlementReport"],
+      },
+      { label: "Invoice Management", href: "/mca-invoices", icon: "receipt", permission: [] },
+    ],
+  },
+  {
+    label: "Accounts",
+    items: [
+      { label: "International Accounts", href: "/international-accounts", icon: "globe-2", permission: [] },
+      { label: "Connect Platforms", href: "/connect-platforms", icon: "link", permission: [] },
+    ],
+  },
+  {
+    label: "Compliance Center",
+    items: [
+      { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
+      { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
+      { label: "GST Invoices", href: "/gst-invoices", icon: "percent", permission: [] },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      { label: "Client management", href: "/mca-clients", icon: "users", permission: [] },
+      { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
+      { label: "Team management", href: "/team-management", icon: "user-plus", permission: [] },
     ],
   },
 ];

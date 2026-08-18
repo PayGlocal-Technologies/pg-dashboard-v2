@@ -10,25 +10,26 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
-import { useProductContext } from "@/stores/useProductContext";
-import type { ProductType } from "@/lib/hooks/useResolvedMids";
+import { useProductContext, type NavContext } from "@/stores/useProductContext";
 
 /**
- * The 4 tabs represent 3 products: Payments (PA) and Multi-Currency Accounts
- * (PACB) each own a `product` tag, Home is a combined overview of both (no
- * tag, doesn't touch the active product) and Partners is unrelated.
+ * The 4 tabs represent 3 contexts: Home (combined overview), Payments (PA)
+ * and Multi-Currency Accounts (PACB), each carrying a `context` tag read by
+ * useProductContext.ts. Partners is unrelated and carries none.
  *
- * Payments and MCA currently share the exact same feature routes
- * (/transactions, /reports/settlement-report, ...) rather than each getting
- * their own. Clicking a tab sets which product those shared screens resolve
- * data for (see useProductContext.ts) rather than navigating to a distinct
- * per-product page. Multi-Currency Accounts has no landing page of its own
- * yet, so its tab opens the settlement dashboard directly, scoped to PACB.
+ * Home/Payments/MCA currently share the exact same feature routes
+ * (/dashboard, /transactions, /reports/settlement-report, ...) rather than
+ * each getting their own for every feature. Clicking a tab sets which
+ * context those shared screens resolve data for and which Sidebar nav tree
+ * shows (short Home tree vs the full product tree), rather than navigating
+ * to a distinct per-context page. Multi-Currency Accounts has no dashboard
+ * landing page of its own yet, so its tab opens the settlement dashboard
+ * directly, scoped to PACB.
  */
-const HEADER_TABS: { label: string; href: string; product?: ProductType }[] = [
-  { label: "Home", href: "/dashboard" },
-  { label: "Payments", href: "/transactions", product: "PA" },
-  { label: "Multi-Currency Accounts", href: "/reports/settlement-report", product: "PACB" },
+const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
+  { label: "Home", href: "/dashboard", context: "HOME" },
+  { label: "Payments", href: "/transactions", context: "PA" },
+  { label: "Multi-Currency Accounts", href: "/reports/settlement-report", context: "PACB" },
   { label: "Partners", href: "/refer-and-earn" },
 ] as const;
 
@@ -57,8 +58,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const selectedMidDetails = useAccountSetup((s) => s.selectedMidDetails);
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
 
-  const activeProduct = useProductContext((s) => s.activeProduct);
-  const setActiveProduct = useProductContext((s) => s.setActiveProduct);
+  const activeContext = useProductContext((s) => s.activeContext);
+  const setActiveContext = useProductContext((s) => s.setActiveContext);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createHover, setCreateHover] = useState(false);
@@ -101,18 +102,19 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         {!isPartnerUser && (
           <nav className="hidden items-center gap-1 md:flex">
             {HEADER_TABS.map((tab) => {
-              // Payments and MCA currently share the same feature routes, so
-              // their highlight is driven by the active product context, not
-              // the URL, Home/Partners still key off their own unique route.
-              const onHomeOrPartners = pathname === "/dashboard" || pathname.startsWith("/refer-and-earn");
-              const isActive = tab.product
-                ? activeProduct === tab.product && !onHomeOrPartners
+              // Home/Payments/MCA currently share the same feature routes, so
+              // their highlight is driven by the active context, not the
+              // URL, Partners still keys off its own unique route (it has no
+              // context tag, and never touches activeContext on click).
+              const onPartners = pathname === "/refer-and-earn" || pathname.startsWith("/refer-and-earn/");
+              const isActive = tab.context
+                ? activeContext === tab.context && !onPartners
                 : pathname === tab.href || pathname.startsWith(tab.href + "/");
               return (
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  onClick={() => tab.product && setActiveProduct(tab.product)}
+                  onClick={() => tab.context && setActiveContext(tab.context)}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
                     isActive

@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
-import { useProductContext } from "@/stores/useProductContext";
+import { useProductContext, toProductType } from "@/stores/useProductContext";
 import { buildTxnRequestBody } from "@/features/dashboard/transactions/buildRequestBody";
 import { TRANSACTIONS_PAGE_LIMIT } from "@/features/dashboard/transactions/constants";
 import { usePostQuery } from "@/lib/api/hooks";
@@ -81,7 +81,10 @@ export function SettlementReportsFeature() {
   // Which product (Payments / Multi-Currency Accounts) this shared screen is
   // currently scoped to, set by the Header's top-level tabs, see
   // useProductContext.ts. Everything below picks its dataset off this.
-  const activeProduct = useProductContext((s) => s.activeProduct);
+  // "Home" has no dataset of its own, reached via its "Reports" nav item it
+  // falls back to Payments.
+  const activeContext = useProductContext((s) => s.activeContext);
+  const activeProduct = toProductType(activeContext);
   const isMca = activeProduct === "PACB";
   const productSettlementRows = isMca ? mcaSettlementRows : settlementRows;
   const summary = isMca ? mcaSettlementSummary : settlementSummary;

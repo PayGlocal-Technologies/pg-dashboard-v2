@@ -9,15 +9,18 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { ViewPortal } from "@/components/layout/ViewPortal";
 import { MerchantSelector } from "@/components/layout/MerchantSelector";
+import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
 import {
+  homeNavigation,
   regularNavigation,
+  mcaNavigation,
   partnerNavigation,
   globalNavigation,
   type NavItem,
   type NavGroup,
 } from "@/lib/navigation";
 import { useApp } from "@/stores/useApp";
-import { useProductContext } from "@/stores/useProductContext";
+import { useProductContext, toProductType } from "@/stores/useProductContext";
 import { useLogout } from "@/lib/hooks/useLogout";
 import useNewPermissions from "@/hooks/useNewPermissions";
 
@@ -135,11 +138,15 @@ function SidebarBody({
   pathname,
   onNavClick,
   navigation,
+  showReferBanner = false,
 }: {
   collapsed: boolean;
   pathname: string;
   onNavClick?: () => void;
   navigation: NavGroup[];
+  /** MCA-only: a compact "Refer & Earn" promo below the nav groups, above the
+   * fixed profile section, see SidebarReferBanner. */
+  showReferBanner?: boolean;
 }) {
   const profile = useApp((s) => s.profile);
   const { logout, isLoading } = useLogout();
@@ -212,6 +219,12 @@ function SidebarBody({
             </div>
           </div>
         ))}
+
+        {showReferBanner && !collapsed && (
+          <div className="mt-1">
+            <SidebarReferBanner />
+          </div>
+        )}
       </nav>
 
       {/* ── Bottom profile section ── */}
@@ -320,24 +333,39 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGlobalTenant = useApp((s) => s.isGlobalTenant);
-  const activeProduct = useProductContext((s) => s.activeProduct);
+  const activeContext = useProductContext((s) => s.activeContext);
+  const activeProduct = toProductType(activeContext);
 
   const checkPermissions = useNewPermissions();
 
+  // "Home" gets its own short nav tree (see homeNavigation), "Multi-Currency
+  // Accounts" gets its own dedicated tree (see mcaNavigation), "Payments"
+  // uses the shared regularNavigation tree, filtered by product tag.
   const baseNavigation = isPartnerUser
     ? partnerNavigation
     : isGlobalTenant
       ? globalNavigation
-      : regularNavigation;
+      : activeContext === "HOME"
+        ? homeNavigation
+        : activeContext === "PACB"
+          ? mcaNavigation
+          : regularNavigation;
+
+  const showReferBanner = !isPartnerUser && !isGlobalTenant && activeContext === "PACB";
 
   // Filter groups based on permissions, mirrors pg-dashboard formatMenuItems logic.
-  // A child tagged with `product` (e.g. "Payment Links" / "MCA Links") only
-  // shows while the Header's active product context matches, see
-  // useProductContext.ts, everything else in the sidebar is shared by both.
+  // An item or child tagged with `product` (e.g. the two "Dashboard" entries,
+  // "Payment Links" / "MCA Links") only shows while the Header's active
+  // product context matches, see useProductContext.ts, everything else in
+  // the sidebar is shared by both.
   const filteredNavigation: NavGroup[] = baseNavigation
     .map((group) => {
       const visibleItems = group.items
-        .filter((item) => !item.permission?.length || checkPermissions(item.permission))
+        .filter(
+          (item) =>
+            (!item.permission?.length || checkPermissions(item.permission)) &&
+            (!item.product || item.product === activeProduct)
+        )
         .map((item) => ({
           ...item,
           children: item.children?.filter(
@@ -394,7 +422,12 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           <MerchantSelector collapsed={collapsed} />
         </div>
 
-        <SidebarBody collapsed={collapsed} pathname={pathname} navigation={filteredNavigation} />
+        <SidebarBody
+          collapsed={collapsed}
+          pathname={pathname}
+          navigation={filteredNavigation}
+          showReferBanner={showReferBanner}
+        />
       </aside>
 
       {/* ── Mobile nav (portaled so fixed layers cover full viewport) ────── */}
@@ -437,6 +470,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             pathname={pathname}
             onNavClick={onClose}
             navigation={filteredNavigation}
+            showReferBanner={showReferBanner}
           />
         </aside>
       </ViewPortal>

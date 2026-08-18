@@ -3,25 +3,34 @@ import { persist } from "zustand/middleware";
 import type { ProductType } from "@/lib/hooks/useResolvedMids";
 
 /**
- * Which of the merchant's two products (Payments / PA, or Multi-Currency
- * Accounts / PACB) the shared Transactions and Settlement Reports screens
- * are currently scoped to. Set by the Header's top-level product tabs, read
- * by every feature that resolves mids or picks a mock dataset by product, so
- * the same URL (e.g. /reports/settlement-report) renders different data
- * depending on which product the merchant last selected. Defaults to "PA"
- * (Payments), see navigation.md for the full model this backs.
+ * Which of the Header's 3 top-level tabs the app is currently scoped to:
+ * "HOME" (the combined overview), "PA" (Payments) or "PACB" (Multi-Currency
+ * Accounts). Set by the Header's tabs, read by the Sidebar (to pick the
+ * short Home nav tree vs the full product nav tree) and by every feature
+ * that resolves mids or picks a mock dataset by product (via toProductType()
+ * below), so the same URL (e.g. /reports/settlement-report) can render
+ * different data depending on which context the merchant last selected.
+ * Defaults to "HOME".
  */
+export type NavContext = "HOME" | "PA" | "PACB";
+
 interface ProductContextState {
-  activeProduct: ProductType;
-  setActiveProduct: (product: ProductType) => void;
+  activeContext: NavContext;
+  setActiveContext: (context: NavContext) => void;
 }
 
 export const useProductContext = create<ProductContextState>()(
   persist(
     (set) => ({
-      activeProduct: "PA",
-      setActiveProduct: (product) => set({ activeProduct: product }),
+      activeContext: "HOME",
+      setActiveContext: (context) => set({ activeContext: context }),
     }),
     { name: "productContextState" }
   )
 );
+
+/** "HOME" has no PA/PACB data of its own, features that need a concrete
+ * product to resolve mids or pick a mock dataset fall back to "PA". */
+export function toProductType(context: NavContext): ProductType {
+  return context === "PACB" ? "PACB" : "PA";
+}
