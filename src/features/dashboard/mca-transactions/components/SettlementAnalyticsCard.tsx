@@ -273,10 +273,11 @@ export function SettlementAnalyticsCard({ className }: { className?: string }) {
         ) : null}
 
         {/* Amount settled/No. of transactions, directly above the graph it
-            controls, and the graph itself: gap-3 throughout so that
-            relationship reads as obviously connected, distinct from the
-            gap-6 above that separates this whole block from the info group. */}
-        <div className="flex flex-1 flex-col gap-3">
+            controls: gap-5, a step up from the graph's own internal gap-3
+            below, enough breathing room that the switcher doesn't read as
+            glued to the first bar row, while staying tighter than the gap-6
+            above that separates this whole block from the info group. */}
+        <div className="flex flex-1 flex-col gap-5">
           <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
             <TabsList className="w-full">
               <TabsTrigger value="amount" className="flex-1">
@@ -288,54 +289,56 @@ export function SettlementAnalyticsCard({ className }: { className?: string }) {
             </TabsList>
           </Tabs>
 
-          {/* Per-account graph. Still placeholder-fed, see the module
-              comment above and mock-data.ts's TODO. Capped at five rows on
-              every breakpoint; the rest sit behind Show more. */}
-          <ul className="space-y-3">
-            {firstFiveRows.map((row) => (
-              <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
-            ))}
-          </ul>
+          <div className="flex flex-col gap-3">
+            {/* Per-account graph. Still placeholder-fed, see the module
+                comment above and mock-data.ts's TODO. Capped at five rows on
+                every breakpoint; the rest sit behind Show more. */}
+            <ul className="space-y-3">
+              {firstFiveRows.map((row) => (
+                <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
+              ))}
+            </ul>
 
-          {canExpand && (
-            <>
-              {/* grid-rows-[0fr]→[1fr] is a plain CSS expand: no measured
-                  height needed, and it animates cleanly whatever the
-                  revealed row count is. The card's own height (and with it
-                  Outstanding + Saved's matched height, see
-                  TransactionsAnalyticsCarousel) grows along with it rather
-                  than clipping. */}
-              <div
-                className={cn(
-                  "grid transition-[grid-template-rows] duration-300 ease-out",
-                  expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                )}
-              >
-                <ul className="min-h-0 space-y-3 overflow-hidden">
-                  {restRows.map((row) => (
-                    <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
-                  ))}
-                </ul>
-              </div>
-
-              <div className="flex justify-center">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setExpanded((prev) => !prev)}
-                  rightIcon={
-                    <Icon
-                      name={expanded ? "chevron-up" : "chevron-down"}
-                      className="h-3.5 w-3.5"
-                    />
-                  }
+            {canExpand && (
+              <>
+                {/* grid-rows-[0fr]→[1fr] is a plain CSS expand: no measured
+                    height needed, and it animates cleanly whatever the
+                    revealed row count is. The card's own height (and with it
+                    Outstanding + Saved's matched height, see
+                    TransactionsAnalyticsCarousel) grows along with it rather
+                    than clipping. */}
+                <div
+                  className={cn(
+                    "grid transition-[grid-template-rows] duration-300 ease-out",
+                    expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                  )}
                 >
-                  {expanded ? "Show less" : "Show more"}
-                </Button>
-              </div>
-            </>
-          )}
+                  <ul className="min-h-0 space-y-3 overflow-hidden">
+                    {restRows.map((row) => (
+                      <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setExpanded((prev) => !prev)}
+                    rightIcon={
+                      <Icon
+                        name={expanded ? "chevron-up" : "chevron-down"}
+                        className="h-3.5 w-3.5"
+                      />
+                    }
+                  >
+                    {expanded ? "Show less" : "Show more"}
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>
