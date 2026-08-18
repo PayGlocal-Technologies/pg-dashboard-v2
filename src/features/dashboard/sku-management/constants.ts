@@ -27,23 +27,23 @@ export const SKU_CURRENCIES: readonly SkuCurrency[] = [
 export const SKU_PRICE_LOCALE = "en-US";
 
 /**
- * The tab bar's four views. The first three are the active catalogue split by
- * product type; Archived is a different axis — it holds archived items of both
- * types — which is why it sits alongside them rather than crossing with them.
- * An archived item therefore appears under Archived and nowhere else, and
- * unarchiving returns it to whichever type tab matches it.
+ * The tab bar's three views: the whole catalogue, or it split by product type.
+ *
+ * There was a fourth, Archived, until the catalogue was wired to its endpoints.
+ * The API has no archive field and no archive endpoint, so the tab and the
+ * Archive/Unarchive row actions had nothing behind them; they were removed
+ * rather than left backed by session-only state that a reload would discard.
  */
 export const SKU_VIEW_TABS = [
   { value: "all", label: "All" },
   { value: "goods", label: "Goods" },
   { value: "services", label: "Services" },
-  { value: "archived", label: "Archived" },
 ] as const;
 
 export type SkuViewTab = (typeof SKU_VIEW_TABS)[number]["value"];
 
-/** Which product type each type-filtering tab narrows to. "all" and
- *  "archived" are absent because neither filters on type. */
+/** Which product type each type-filtering tab narrows to. "all" is absent
+ *  because it does not filter on type. */
 export const SKU_TAB_TYPE: Record<"goods" | "services", SkuProductType> = {
   goods: "GOODS",
   services: "SERVICES",
@@ -104,6 +104,8 @@ export const SKU_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
  * cycles remitter/transaction ID/UTR: each one names a field the query is
  * matched against, and the query hits any of them (see SkuTable's filter).
  * Rendered as "Search by " + hint, so these are lowercase phrases except
- * HSN/SAC, which is an initialism.
+ * HSN/SAC, which is an initialism. All three are matched server-side by the
+ * catalogue search's queryString, which is why description is named here even
+ * though no client-side predicate reads it.
  */
-export const SKU_SEARCH_HINTS = ["product name", "HSN/SAC"];
+export const SKU_SEARCH_HINTS = ["product name", "HSN/SAC", "description"];

@@ -61,7 +61,7 @@ function SkuCard({
           <div className="flex shrink-0 items-start gap-1">
             <StatusBadge
               variant={row.type === "GOODS" ? "info" : "muted"}
-              label={SKU_TYPE_LABEL[row.type]}
+              label={row.type ? SKU_TYPE_LABEL[row.type] : "—"}
               size="sm"
             />
             {/* Fenced off from the card's own click, so the overflow menu

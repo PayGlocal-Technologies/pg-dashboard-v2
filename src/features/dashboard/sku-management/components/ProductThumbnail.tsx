@@ -56,7 +56,7 @@ export function ProductThumbnail({
         />
       ) : (
         <AvatarFallback className="rounded-lg bg-muted text-muted-foreground">
-          <Icon name={product.type === "GOODS" ? "package" : "wrench"} className="h-6 w-6" />
+          <Icon name={product.type === "SERVICES" ? "wrench" : "package"} className="h-6 w-6" />
         </AvatarFallback>
       )}
     </Avatar>

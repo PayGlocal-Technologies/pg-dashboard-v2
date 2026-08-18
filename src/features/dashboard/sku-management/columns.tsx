@@ -39,13 +39,22 @@ function StopRowClick({ children }: { children: ReactNode }) {
 // product preview — including each cell's padding, which a bare span would
 // leave dead. The two price editors are fenced off with StopRowClick above.
 //
-// These six are the table's whole column set. The row's overflow menu is
+// These are the table's whole column set, plus the optional MID column below.
+// The row's overflow menu is
 // deliberately not among them — it rides DataTable's `rowAction` slot instead
 // (see SkuTable), so it never takes column width, never reorders with the
 // data, and stays pinned to the right while the columns scroll.
 export function buildSkuColumns(
   onPriceChange: (id: string, field: SkuPriceField, next: number) => void,
-  onPreview: (product: SkuProduct) => void
+  onPreview: (product: SkuProduct) => void,
+  /**
+   * Adds the MID column, second from the left. Only true when the merchant
+   * holds several PACB MIDs and has selected none — the one state where rows
+   * from different accounts sit in the same table and the row's own name is not
+   * enough to tell you which account it belongs to. Same condition and same
+   * position pg-dashboard uses (`hidden: !showMid`).
+   */
+  showMid = false
 ): Column<SkuProduct>[] {
   return [
     {
@@ -75,6 +84,22 @@ export function buildSkuColumns(
         </RowClick>
       ),
     },
+    ...(showMid
+      ? [
+          {
+            key: "mid",
+            header: "MID",
+            minWidth: 120,
+            render: (row: SkuProduct) => (
+              <RowClick onClick={() => onPreview(row)}>
+                <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
+                  {row.mid || "—"}
+                </span>
+              </RowClick>
+            ),
+          } satisfies Column<SkuProduct>,
+        ]
+      : []),
     {
       key: "type",
       header: "Type of product",
@@ -83,7 +108,7 @@ export function buildSkuColumns(
         <RowClick onClick={() => onPreview(row)}>
           <StatusBadge
             variant={row.type === "GOODS" ? "info" : "muted"}
-            label={SKU_TYPE_LABEL[row.type]}
+            label={row.type ? SKU_TYPE_LABEL[row.type] : "—"}
             size="sm"
           />
         </RowClick>

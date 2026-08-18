@@ -117,7 +117,7 @@ function PreviewMedia({ product }: { product: SkuProduct }) {
         // than collapsing. Same Avatar placeholder the Product column uses.
         <Avatar className="h-full w-full rounded-none border-0">
           <AvatarFallback className="rounded-none bg-muted text-muted-foreground">
-            <Icon name={product.type === "GOODS" ? "package" : "wrench"} className="h-10 w-10" />
+            <Icon name={product.type === "SERVICES" ? "wrench" : "package"} className="h-10 w-10" />
           </AvatarFallback>
         </Avatar>
       )}
@@ -220,7 +220,7 @@ function PreviewBody({ product }: { product: SkuProduct }) {
           {/* Type and tax code as one quiet supporting line, well below the
               name and the selling price in the hierarchy. */}
           <p className="mt-1 text-[12px] text-muted-foreground">
-            {SKU_TYPE_LABEL[product.type]}
+            {product.type ? SKU_TYPE_LABEL[product.type] : "—"}
             <span aria-hidden className="px-1.5">
               ·
             </span>
