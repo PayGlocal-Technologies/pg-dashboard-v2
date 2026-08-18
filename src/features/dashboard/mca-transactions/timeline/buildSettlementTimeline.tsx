@@ -8,6 +8,7 @@ import {
   DownloadFircButton,
 } from "@/features/dashboard/mca-transactions/components/SettlementBreakdown";
 import { VirtualAccountRow } from "@/features/dashboard/mca-transactions/components/VirtualAccountRow";
+import { getMockUtrNumber } from "@/features/dashboard/mca-transactions/mock-data";
 import { mcaTxnFilePath } from "@/features/dashboard/mca-transactions/services";
 import {
   fileNameFrom,
@@ -284,6 +285,13 @@ export function buildSettlementTimeline({
 
   const txnCurrency = data?.FUND_RECEIVED?.TXN_CURRENCY || row.currency || "INR";
   const receivedMoney = `${currencySymbol(txnCurrency)}${formatAmount(data?.FUND_RECEIVED?.TXN_AMOUNT, txnCurrency)} ${txnCurrency}`;
+  // Last 4 digits only, bullet-masked, same convention RecentActivityTable
+  // already uses for card numbers elsewhere in the product. accountDetails
+  // (the same object VirtualAccountRow renders below this step) is the only
+  // source for this; there's nothing to show once it's absent.
+  const maskedAccountSuffix = accountDetails?.accountNumber
+    ? `••••${accountDetails.accountNumber.slice(-4)}`
+    : "";
 
   const pgHouseStatus = data?.PG_HOUSE_FUND_RECEIVED?.STATUS;
   const fircStatus = data?.FIRC_RECEIVED?.STATUS;
@@ -321,7 +329,9 @@ export function buildSettlementTimeline({
       steps,
       data?.FUND_RECEIVED,
       createStep(
-        fundsReceivedSucceeded ? `${receivedMoney} received in virtual account` : fundsPendingTitle,
+        fundsReceivedSucceeded
+          ? `${receivedMoney} received in ${txnCurrency} Account${maskedAccountSuffix ? ` ${maskedAccountSuffix}` : ""}`
+          : fundsPendingTitle,
         statusOrPending(data?.FUND_RECEIVED?.STATUS),
         fundReceivedChildren,
         formatEventTime(data?.FUND_RECEIVED?.FORMATTED_DATE_TIME)
@@ -414,7 +424,15 @@ export function buildSettlementTimeline({
         "FIRC issuance",
         statusOrPending(fircStatus),
         fircStatus === "SUCCESS" ? (
-          <DownloadFircButton onDownload={onDownloadFirc} isLoading={isFircDownloading} />
+          <>
+            <DownloadFircButton onDownload={onDownloadFirc} isLoading={isFircDownloading} />
+            {/* Visually secondary to the FIRC info above: smaller and
+                muted, same treatment the "children" slot uses for supporting
+                detail elsewhere in this timeline (e.g. RejectionReason). */}
+            <p className="mt-1.5 text-[11px] text-muted-foreground">
+              UTR: {getMockUtrNumber(row.gid)}
+            </p>
+          </>
         ) : null,
         formatEventTime(data?.FIRC_RECEIVED?.FORMATTED_DATE_TIME, fircStatus === "SUCCESS")
       )

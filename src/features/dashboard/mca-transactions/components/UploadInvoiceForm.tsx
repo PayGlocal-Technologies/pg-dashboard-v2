@@ -153,8 +153,7 @@ export function UploadInvoiceForm({
   const requirementBanner = (
     <Alert variant="neutral">
       <AlertDescription>
-        This transaction can&apos;t proceed to settlement until a purpose code and invoice are
-        provided.
+        This transaction can&apos;t proceed to settlement until an invoice is provided.
       </AlertDescription>
     </Alert>
   );
