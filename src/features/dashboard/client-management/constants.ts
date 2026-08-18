@@ -117,6 +117,22 @@ export interface ClientInvoiceAmounts {
 }
 
 /**
+ * The currency the record's money figures are denominated in.
+ *
+ * INR, and not the client's own currency. `totalInvoiceAmount` and
+ * `outstandingAmount` arrive with no currency field beside them, and
+ * pg-dashboard's Outstanding column renders both with `currency={"INR"}` — so they
+ * are settled figures in the merchant's own reporting currency, not amounts in
+ * whatever the client is billed in.
+ *
+ * An earlier revision here used `client.currency` for them on the grounds that a
+ * hardcoded INR looked wrong for a book of cross-border clients. That was the
+ * wrong call: it did not convert anything, it just relabelled an INR figure as
+ * AUD or GBP, which is worse than the thing it was trying to fix.
+ */
+export const CLIENT_AMOUNT_CURRENCY = "INR";
+
+/**
  * The money behind the KPI row's three counts, read off the client record's own
  * server-side figures.
  *
@@ -136,11 +152,11 @@ export interface ClientInvoiceAmounts {
  * draw an em-dash rather than a formatted zero.
  */
 export function clientInvoiceAmounts(client: Client): ClientInvoiceAmounts {
-  const currency = client.currency;
+  const currency = CLIENT_AMOUNT_CURRENCY;
   const total = client.totalInvoiceAmount;
   const outstanding = client.outstandingAmount;
 
-  if (total === undefined || !currency) {
+  if (total === undefined) {
     return { total: [], paid: [], outstanding: [] };
   }
 
@@ -180,8 +196,36 @@ export function clientTotalReceived(client: Client): ClientReceivedTotal[] {
  * screen would offer only the current page's countries and change as the merchant
  * paged. pg-dashboard feeds its own country dropdown from this same map.
  */
-export function countryOptionsFromMap(countryCodes: Record<string, string>): CountryFilterOption[] {
-  return Object.entries(countryCodes)
-    .map(([label, value]) => ({ value, label }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+export function countryOptionsFromMap(
+  filterKeys: string[],
+  iso2ToName: Record<string, string>,
+  /**
+   * Countries actually present on the loaded clients, as `{ iso2, name }`. Used
+   * only when the reference endpoint returned nothing — an empty dropdown reads as
+   * a broken control, and the rows on screen are a guaranteed-present source whose
+   * values are, by construction, exactly what the records hold and therefore
+   * exactly what the filter can match on.
+   */
+  fallback: { iso2: string; name: string }[] = []
+): CountryFilterOption[] {
+  if (filterKeys.length > 0) {
+    return filterKeys
+      .map((key) => ({
+        // The key verbatim, because that is exactly what the request sends.
+        value: key,
+        // A readable label for it. Where the endpoint keys by ISO2 the key alone
+        // would render as "NZ" in the chip, so the resolved name is preferred and
+        // the key is only the fallback — a chip listing bare codes is unreadable.
+        label: iso2ToName[key.toUpperCase()] ?? key,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  const byIso2 = new Map<string, CountryFilterOption>();
+  for (const country of fallback) {
+    if (country.iso2 && !byIso2.has(country.iso2)) {
+      byIso2.set(country.iso2, { value: country.iso2, label: country.name || country.iso2 });
+    }
+  }
+  return [...byIso2.values()].sort((a, b) => a.label.localeCompare(b.label));
 }

@@ -396,6 +396,16 @@ export function useClientMidScope(): {
 export interface ClientCountryMap {
   iso2ToName: Record<string, string>;
   nameToIso2: Record<string, string>;
+  /**
+   * The map's own keys, in the order the endpoint returned them.
+   *
+   * This is what the country filter sends, because it is exactly what
+   * pg-dashboard's dropdown sends: its options are `Object.keys(countryCodes)`
+   * used as both label and value. Whatever side of the map the backend keys by is
+   * therefore the side its own filter matches on, so passing the keys through
+   * verbatim is right without having to know which side that is.
+   */
+  filterKeys: string[];
 }
 
 /**
@@ -436,7 +446,7 @@ export function useClientCountryMap(): ClientCountryMap & { isLoading: boolean }
       }
     }
 
-    return { iso2ToName, nameToIso2 };
+    return { iso2ToName, nameToIso2, filterKeys: Object.keys(raw ?? {}) };
   }, [raw]);
 
   return { ...normalised, isLoading: isPending };
@@ -483,25 +493,16 @@ export function useClientTagOptions(): { tags: string[]; isLoading: boolean } {
 interface ClientsArgs {
   /** The search box's query, already trimmed by the caller. */
   search: string;
-  /** The email chip, which the builder routes to an exact-match rather than a
-   *  full-text query — the same treatment pg-dashboard gives an email. */
-  email: string;
-  /** ISO2 codes from the country chip. Converted to names for the request. */
-  countryIso2s: string[];
-  startTime?: number;
-  endTime?: number;
+  /**
+   * Values from the Country chip, passed through to `fieldSearch.country`
+   * untouched — see ClientCountryMap.filterKeys for why they are not translated.
+   */
+  countries: string[];
   /** 1-based page, as the table holds it. */
   page: number;
 }
 
-export function useClients({
-  search,
-  email,
-  countryIso2s,
-  startTime,
-  endTime,
-  page,
-}: ClientsArgs): {
+export function useClients({ search, countries, page }: ClientsArgs): {
   clients: Client[];
   totalCount: number;
   isLoading: boolean;
@@ -515,22 +516,16 @@ export function useClients({
 
   // Stable across renders as long as its inputs are — usePostQuery folds the body
   // into the query key, so an object rebuilt every render would refetch forever.
+  //
+  // Two filters, because two is all pg-dashboard's client list has: a text input
+  // that becomes `queryString`, and a multi-select country dropdown that becomes
+  // `fieldSearch.country`. Earlier revisions also sent an email field filter and a
+  // creation-date range; neither exists on this endpoint's own screen in
+  // production, and inventing keys for them is why those chips never worked.
   const body = useMemo<TableReqBody>(() => {
     const built = buildTxnRequestBody(
+      { country: countries },
       {
-        // The ISO2 codes as the chip holds them, because that is what the record's
-        // own `country` field contains. This previously converted them to display
-        // names before sending, which is why the country chip matched nothing: it
-        // was filtering "New Zealand" against a column holding "NZ".
-        country: countryIso2s,
-        startTime,
-        endTime,
-      },
-      {
-        // Only the search box feeds the full-text query. The email chip is its own
-        // field filter below — the two are separate controls, so folding both into
-        // one queryString would mean whichever was set last silently replaced the
-        // other.
         searchQuery: search || undefined,
         // The key is `mid`, not `merchantId`: midFilter names itself merchantId
         // because that is what the OpenSearch txn endpoints want, while the client
@@ -541,32 +536,14 @@ export function useClients({
       }
     );
 
-    // The email chip filters on the record's own `email` field rather than going
-    // through the builder's email path, which routes to `encEmailId` — an
-    // encrypted-id field belonging to the transaction search, not this one. That
-    // mismatch is why the chip returned nothing. The key follows the same
-    // convention as every other fieldSearch key here: the record's field name.
-    const withEmail = email
-      ? {
-          ...built,
-          fieldSearch: { ...(built.fieldSearch ?? {}), email: [email] },
-        }
-      : built;
-
     // With nothing but the MID filter, the derived type would be FILTER_TYPE, but
-    // pg-dashboard's client list explicitly sends DEFAULT for exactly this case
-    // (see the effect in mca-clients/index.tsx) and only lets the derived type
-    // through once a real filter is applied. Reproduced rather than tidied away:
-    // which one the backend wants is its business, not ours.
-    const hasUserFilter = !!(search || email || countryIso2s.length || startTime || endTime);
-    if (!hasUserFilter) return { ...withEmail, searchFilterType: "DEFAULT" };
-
-    // An email filter is a field filter, so the type has to say so — the builder
-    // derived its type before the key was added.
-    return email && withEmail.searchFilterType === "DEFAULT"
-      ? { ...withEmail, searchFilterType: "FILTER_TYPE" }
-      : withEmail;
-  }, [search, email, countryIso2s, startTime, endTime, midFilter, page]);
+    // pg-dashboard's client list explicitly sends DEFAULT for exactly that case
+    // (the effect in mca-clients/index.tsx) and only lets the derived type through
+    // once a real filter is applied. Reproduced rather than tidied away: which one
+    // the backend wants is its business, not ours.
+    const hasUserFilter = !!(search || countries.length);
+    return hasUserFilter ? built : { ...built, searchFilterType: "DEFAULT" };
+  }, [search, countries, midFilter, page]);
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     ClientSearchResponse,

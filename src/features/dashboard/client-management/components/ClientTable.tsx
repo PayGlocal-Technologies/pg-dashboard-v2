@@ -6,13 +6,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
-import {
-  CountryFilterChip,
-  DateFilterChip,
-  EmailFilterChip,
-  toEndOfDayMs,
-  toStartOfDayMs,
-} from "@/components/common/filters/FilterChips";
+import { CountryFilterChip } from "@/components/common/filters/FilterChips";
 import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { reorderColumns } from "@/lib/utils/columns";
 import { buildClientColumns } from "@/features/dashboard/client-management/columns";
@@ -68,17 +62,15 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   const [editing, setEditing] = useState<Client | null>(null);
 
   const [search, setSearch] = useState("");
-  const [emailFilter, setEmailFilter] = useState("");
   const [countryFilters, setCountryFilters] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [page, setPage] = useState(1);
 
   // null until the merchant actually drags a column, at which point DataTable
   // renders that order instead of buildClientColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
-  // Which of the Email/Country/Creation date popovers is open, if any: shared
-  // so opening one closes whichever other one was open.
-  const [openChip, setOpenChip] = useState<"email" | "country" | "date" | null>(null);
+  // Whether the Country popover is open. Still lifted rather than held inside the
+  // chip, so a second chip added later closes this one rather than stacking.
+  const [openChip, setOpenChip] = useState<"country" | null>(null);
 
   // The client whose details are being viewed. Held as an id (not the row) so
   // it survives the source list changing underneath it once a real endpoint
@@ -95,21 +87,12 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // transaction. Null for an ordinary client expand.
   const [expandTxn, setExpandTxn] = useState<McaTransaction | null>(null);
 
-  // yyyy-mm-dd → epoch ms, which is what the search body's startTime/endTime
-  // take. Pushed into the request now rather than compared client-side.
-  const fromMs = dateRange.from ? toStartOfDayMs(dateRange.from) : undefined;
-  const toMs = dateRange.to ? toEndOfDayMs(dateRange.to) : undefined;
-
-  // Search, the email chip, the country chip, the date range and the page are all
-  // request inputs now — every one of them is applied by the server, so the rows
-  // that arrive are exactly the rows to draw and totalCount always describes the
-  // same set they came from. See useClients.
+  // Both filters and the page are request inputs, so the rows that arrive are
+  // exactly the rows to draw and totalCount always describes the same set they
+  // came from. See useClients.
   const { clients, totalCount, isLoading, isFetching, refetch } = useClients({
     search: search.trim(),
-    email: emailFilter.trim(),
-    countryIso2s: countryFilters,
-    startTime: fromMs,
-    endTime: toMs,
+    countries: countryFilters,
     page,
   });
 
@@ -128,8 +111,15 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // merchant pages (see countryOptionsFromMap). The option *values* are ISO2
   // codes, which is what the record's own country field holds and therefore what
   // the request filters on.
-  const { iso2ToName } = useClientCountryMap();
-  const countryOptions = countryOptionsFromMap(iso2ToName);
+  const { iso2ToName, filterKeys } = useClientCountryMap();
+  // The loaded rows are the fallback source when the reference endpoint gives
+  // nothing, so the chip is never an empty popover — which is indistinguishable
+  // from a control that doesn't work.
+  const countryOptions = countryOptionsFromMap(
+    filterKeys,
+    iso2ToName,
+    clients.map((client) => ({ iso2: client.countryIso2, name: client.countryName }))
+  );
 
   const { mid } = useClientPathMid();
   const { createClient } = useCreateClient();
@@ -168,12 +158,10 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
       if (clientId && file) uploadContract({ clientId, file });
     });
 
-    // Otherwise the new row can land outside the current filters or on a page
-    // the merchant isn't looking at, and the form appears to have done nothing.
+    // Otherwise the new row can land outside the current filters or on a page the
+    // merchant isn't looking at, and the form appears to have done nothing.
     setSearch("");
-    setEmailFilter("");
     setCountryFilters([]);
-    setDateRange({ from: "", to: "" });
     setPage(1);
     if (!keepOpen) onAddClientOpenChange(false);
   };
@@ -257,40 +245,22 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // wrapping div: desktop wraps them onto a new line if needed, while mobile
   // scrolls them horizontally on a single line instead, so each layout below
   // supplies its own container.
+  // Country alone, because that is the only filter pg-dashboard's client list has
+  // besides its text search (which v2's search box already is). The Email and
+  // Creation date chips that used to sit here had no counterpart on this endpoint,
+  // so nothing they sent was ever honoured — they are gone rather than left
+  // looking operable.
   const filterChips = (
-    <>
-      <EmailFilterChip
-        value={emailFilter}
-        onChange={(next) => {
-          setEmailFilter(next);
-          setPage(1);
-        }}
-        open={openChip === "email"}
-        onOpenChange={(next) => setOpenChip(next ? "email" : null)}
-        idPrefix="client-email"
-        hint="Matches any part of the address, including the domain."
-      />
-      <CountryFilterChip
-        options={countryOptions}
-        value={countryFilters}
-        onChange={(next) => {
-          setCountryFilters(next);
-          setPage(1);
-        }}
-        open={openChip === "country"}
-        onOpenChange={(next) => setOpenChip(next ? "country" : null)}
-      />
-      <DateFilterChip
-        label="Creation date"
-        value={dateRange}
-        onChange={(next) => {
-          setDateRange(next);
-          setPage(1);
-        }}
-        open={openChip === "date"}
-        onOpenChange={(next) => setOpenChip(next ? "date" : null)}
-      />
-    </>
+    <CountryFilterChip
+      options={countryOptions}
+      value={countryFilters}
+      onChange={(next) => {
+        setCountryFilters(next);
+        setPage(1);
+      }}
+      open={openChip === "country"}
+      onOpenChange={(next) => setOpenChip(next ? "country" : null)}
+    />
   );
 
   // The details page replaces the table in place (same component instance,
