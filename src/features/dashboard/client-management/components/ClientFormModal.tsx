@@ -19,11 +19,6 @@ import {
   FieldError,
   FieldLabel,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Textarea,
   useBreakpoint,
 } from "@/components/ui";
@@ -45,6 +40,7 @@ import {
   validateWebsite,
   validateZipcode,
 } from "@/features/dashboard/client-management/schemas";
+import { ClientBusinessTypeChips } from "@/features/dashboard/client-management/components/ClientBusinessTypeChips";
 import { ClientTagsInput } from "@/features/dashboard/client-management/components/ClientTagsInput";
 import { ClientContractUpload } from "@/features/dashboard/client-management/components/ClientContractUpload";
 import type { ClientFormValues } from "@/features/dashboard/client-management/types";
@@ -263,64 +259,66 @@ function ClientFormBody({
               )}
             </form.Field>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <form.Field
-                name="businessType"
-                validators={{
-                  onChange: ({ value }) => validateBusinessType(value),
-                  onSubmit: ({ value }) => validateBusinessType(value),
-                }}
-              >
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-business-type">
+            {/* Chips, not a dropdown: five short options are cheaper to read
+                on screen than behind a trigger, and the row folds onto a
+                second line at narrow widths rather than needing one. */}
+            <form.Field
+              name="businessType"
+              validators={{
+                onChange: ({ value }) => validateBusinessType(value),
+                onSubmit: ({ value }) => validateBusinessType(value),
+              }}
+            >
+              {(field) => {
+                const invalid = field.state.meta.errors.length > 0;
+                return (
+                  <Field invalid={invalid}>
+                    {/* No htmlFor: the control is a group of checkboxes rather
+                        than one input, so the group points back at this label
+                        with aria-labelledby instead. */}
+                    <FieldLabel id="client-business-type-label">
                       <RequiredMark /> Business type
                     </FieldLabel>
-                    <Select value={field.state.value} onValueChange={field.handleChange}>
-                      <SelectTrigger
-                        id="client-business-type"
-                        aria-invalid={field.state.meta.errors.length > 0}
-                        className="w-full"
-                      >
-                        <SelectValue placeholder="Select business type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CLIENT_BUSINESS_TYPES.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                )}
-              </form.Field>
-
-              <form.Field
-                name="website"
-                validators={{
-                  onBlur: ({ value }) => validateWebsite(value),
-                  onSubmit: ({ value }) => validateWebsite(value),
-                }}
-              >
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-website">Website</FieldLabel>
-                    <Input
-                      id="client-website"
-                      inputMode="url"
-                      placeholder="https://example.com"
-                      aria-invalid={field.state.meta.errors.length > 0}
+                    <ClientBusinessTypeChips
+                      id="client-business-type"
+                      labelledBy="client-business-type-label"
+                      options={CLIENT_BUSINESS_TYPES}
                       value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
+                      onChange={field.handleChange}
+                      invalid={invalid}
                     />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>
-                )}
-              </form.Field>
-            </div>
+                );
+              }}
+            </form.Field>
+
+            {/* Full width and on its own line, after the two fields that
+                identify the business — optional, and the least consequential
+                thing in the section. */}
+            <form.Field
+              name="website"
+              validators={{
+                onBlur: ({ value }) => validateWebsite(value),
+                onSubmit: ({ value }) => validateWebsite(value),
+              }}
+            >
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="client-website">Website</FieldLabel>
+                  <Input
+                    id="client-website"
+                    inputMode="url"
+                    placeholder="https://example.com"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                  <FieldError>{field.state.meta.errors[0]}</FieldError>
+                </Field>
+              )}
+            </form.Field>
 
             <form.Field name="tags">
               {(field) => (
@@ -441,68 +439,49 @@ function ClientFormBody({
             </form.Field>
           </FormSection>
 
-          {/* ── Address ──────────────────────────────────────────────────── */}
-          <FormSection value="address" title="Address">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <form.Field
-                name="country"
-                validators={{
-                  onChange: ({ value }) => validateCountry(value),
-                  onSubmit: ({ value }) => validateCountry(value),
-                }}
-              >
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-country">
-                      <RequiredMark /> Country
-                    </FieldLabel>
-                    <CountrySelect
-                      value={field.state.value}
-                      onValueChange={(code) => {
-                        field.handleChange(code);
-                        // A blank phone country is almost always the same country
-                        // as the address, so the first country chosen seeds it —
-                        // never overwriting a code already picked.
-                        if (!form.getFieldValue("phoneCountry") && dialCodeFor(code)) {
-                          form.setFieldValue("phoneCountry", code);
-                        }
-                      }}
-                      placeholder="Select country"
-                    />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                )}
-              </form.Field>
+          {/* ── Address ──────────────────────────────────────────────────────
+              Laid out as the reference's address block: the street address
+              across the full width, the two fields that qualify a city on one
+              row beneath it, then the postcode. Country leads, since it is the
+              field the others are read against — a state and a postcode only
+              mean something once you know which country they belong to — and
+              it is the one the reference has no slot for.
 
-              <form.Field
-                name="state"
-                validators={{
-                  onBlur: ({ value }) => validateState(value),
-                  onSubmit: ({ value }) => validateState(value),
-                }}
-              >
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-state">
-                      <RequiredMark /> State
-                    </FieldLabel>
-                    {/* A text input rather than a select: a country-by-country
-                      list of states/provinces is data this app doesn't hold,
-                      and an empty select for the countries it lacks would be
-                      worse than a field that always accepts the right answer. */}
-                    <Input
-                      id="client-state"
-                      placeholder="Enter state"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                    />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                )}
-              </form.Field>
-            </div>
+              Every paired row is `grid gap-3 sm:grid-cols-2`, the same as the
+              Primary contact section's: two columns from sm up, one below it,
+              so the fields stack in this same order on a phone and nothing ever
+              scrolls sideways. Spacing between the groups is the section's own
+              flex gap-3 — no rules or separators. */}
+          <FormSection value="address" title="Address">
+            <form.Field
+              name="country"
+              validators={{
+                onChange: ({ value }) => validateCountry(value),
+                onSubmit: ({ value }) => validateCountry(value),
+              }}
+            >
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="client-country">
+                    <RequiredMark /> Country
+                  </FieldLabel>
+                  <CountrySelect
+                    value={field.state.value}
+                    onValueChange={(code) => {
+                      field.handleChange(code);
+                      // A blank phone country is almost always the same country
+                      // as the address, so the first country chosen seeds it —
+                      // never overwriting a code already picked.
+                      if (!form.getFieldValue("phoneCountry") && dialCodeFor(code)) {
+                        form.setFieldValue("phoneCountry", code);
+                      }
+                    }}
+                    placeholder="Select country"
+                  />
+                  <FieldError>{field.state.meta.errors[0]}</FieldError>
+                </Field>
+              )}
+            </form.Field>
 
             <form.Field
               name="addressLine"
@@ -557,22 +536,24 @@ function ClientFormBody({
               </form.Field>
 
               <form.Field
-                name="zipcode"
+                name="state"
                 validators={{
-                  onBlur: ({ value }) => validateZipcode(value),
-                  onSubmit: ({ value }) => validateZipcode(value),
+                  onBlur: ({ value }) => validateState(value),
+                  onSubmit: ({ value }) => validateState(value),
                 }}
               >
                 {(field) => (
                   <Field>
-                    <FieldLabel htmlFor="client-zipcode">
-                      <RequiredMark /> Zipcode
+                    <FieldLabel htmlFor="client-state">
+                      <RequiredMark /> State
                     </FieldLabel>
-                    {/* Not type="number": postcodes are alphanumeric in half the
-                      world (SW1A 1AA, K1P 5Z9), so this stays a text field. */}
+                    {/* A text input rather than a select: a country-by-country
+                      list of states/provinces is data this app doesn't hold,
+                      and an empty select for the countries it lacks would be
+                      worse than a field that always accepts the right answer. */}
                     <Input
-                      id="client-zipcode"
-                      placeholder="Enter zipcode"
+                      id="client-state"
+                      placeholder="Enter state"
                       aria-invalid={field.state.meta.errors.length > 0}
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}
@@ -583,6 +564,33 @@ function ClientFormBody({
                 )}
               </form.Field>
             </div>
+
+            <form.Field
+              name="zipcode"
+              validators={{
+                onBlur: ({ value }) => validateZipcode(value),
+                onSubmit: ({ value }) => validateZipcode(value),
+              }}
+            >
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="client-zipcode">
+                    <RequiredMark /> Zipcode
+                  </FieldLabel>
+                  {/* Not type="number": postcodes are alphanumeric in half the
+                      world (SW1A 1AA, K1P 5Z9), so this stays a text field. */}
+                  <Input
+                    id="client-zipcode"
+                    placeholder="Enter zipcode"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                  <FieldError>{field.state.meta.errors[0]}</FieldError>
+                </Field>
+              )}
+            </form.Field>
           </FormSection>
 
           {/* ── Tax information ──────────────────────────────────────────── */}

@@ -113,21 +113,16 @@ export function countryNameFor(countryIso2: string): string {
 
 /**
  * Turns validated form values into the client-record shape, minus the fields
- * the caller owns (`id`, and the invoice/outstanding figures a brand-new
- * client has none of). Returns null when the form doesn't pass, so a caller
- * can't build a half-valid client.
+ * the caller owns (`id`, and the `currency` it derives from the client's
+ * country). Returns null when the form doesn't pass, so a caller can't build a
+ * half-valid client.
  *
  * `createdAt` is stamped here from the clock rather than being a form field —
  * it's generated, never entered. Safe because this only ever runs inside a
  * submit handler; the same call during render would break React's idempotency
  * guarantee (see CLAUDE.md).
  */
-export function toClientFields(
-  values: ClientFormValues
-): Omit<
-  Client,
-  "id" | "outstandingAmount" | "outstandingCurrency" | "totalInvoices" | "paidInvoices"
-> | null {
+export function toClientFields(values: ClientFormValues): Omit<Client, "id" | "currency"> | null {
   if (!isClientFormValid(values)) return null;
 
   const countryName = countryNameFor(values.country);

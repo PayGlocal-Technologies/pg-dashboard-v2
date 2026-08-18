@@ -27,26 +27,18 @@ export interface Client {
   /** Display name for that country, so the cell never has to resolve one. */
   countryName: string;
   /**
-   * What the client currently owes, in `outstandingCurrency`. Zero is a real
-   * value (a client who is fully settled up), not a missing one.
+   * ISO 4217 code this client is billed and settled in — the denomination of
+   * its transactions, and so of the Total received column.
    */
-  outstandingAmount: number;
-  /** ISO 4217 code the outstanding figure is denominated in. */
-  outstandingCurrency: string;
+  currency: string;
   /** ISO 8601 timestamp the client record was created. */
   createdAt: string;
-  /**
-   * Completed invoices raised against this client, whatever their payment
-   * state — the "Total completed invoices" KPI on the details view.
-   */
-  totalInvoices: number;
-  /**
-   * How many of those the client has actually paid. The outstanding count is
-   * the difference between the two (see clientInvoiceMetrics) rather than a
-   * third stored field, so the three figures can never disagree with each
-   * other.
-   */
-  paidInvoices: number;
+
+  // No invoice counts and no received total live on the record. Every one of
+  // those figures — Total invoices, Paid invoices, Outstanding invoices, and
+  // the table's Total received — is derived from the client's transactions
+  // instead (see clientInvoiceMetrics and clientTotalReceived in constants.ts),
+  // so a stored count can never contradict the transactions listed beneath it.
 
   // ── Captured by the Add client form ──────────────────────────────────────
   // Optional on the record, not on the form: several of these are required to

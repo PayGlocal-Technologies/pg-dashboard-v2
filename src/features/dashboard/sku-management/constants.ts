@@ -26,16 +26,25 @@ export const SKU_CURRENCIES: readonly SkuCurrency[] = [
  */
 export const SKU_PRICE_LOCALE = "en-US";
 
+/**
+ * The tab bar's four views. The first three are the active catalogue split by
+ * product type; Archived is a different axis — it holds archived items of both
+ * types — which is why it sits alongside them rather than crossing with them.
+ * An archived item therefore appears under Archived and nowhere else, and
+ * unarchiving returns it to whichever type tab matches it.
+ */
 export const SKU_VIEW_TABS = [
   { value: "all", label: "All" },
   { value: "goods", label: "Goods" },
   { value: "services", label: "Services" },
+  { value: "archived", label: "Archived" },
 ] as const;
 
 export type SkuViewTab = (typeof SKU_VIEW_TABS)[number]["value"];
 
-/** Which product type each non-"All" tab narrows to. */
-export const SKU_TAB_TYPE: Record<Exclude<SkuViewTab, "all">, SkuProductType> = {
+/** Which product type each type-filtering tab narrows to. "all" and
+ *  "archived" are absent because neither filters on type. */
+export const SKU_TAB_TYPE: Record<"goods" | "services", SkuProductType> = {
   goods: "GOODS",
   services: "SERVICES",
 };
