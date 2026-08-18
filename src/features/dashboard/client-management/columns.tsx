@@ -19,16 +19,22 @@ import { clientTransactions } from "@/features/dashboard/client-management/mock-
 import type { Client } from "@/features/dashboard/client-management/types";
 
 /**
- * How much of an email survives its middle elision in the table: the first
- * character, then the last eight, which lands on the domain's tail
- * ("amelia.hartley@northwindtrading.co.uk" → "a…ng.co.uk"). Enough to tell two
- * rows apart at a glance without the column widening to fit an address nobody
- * reads in full from a table. The whole address is still what the title
- * attribute, the tooltip, the accessible name, and the clipboard carry — this
- * only changes what is drawn.
+ * How much of an email survives its middle elision in the table: the first four
+ * characters, then the last six, which lands on the domain's tail
+ * ("amelia.hartley@northwindtrading.co.uk" → "amel….co.uk"). The head is now
+ * long enough to read as the start of a name rather than a single initial,
+ * which is what tells two rows apart at a glance, and the column still never
+ * widens to fit an address nobody reads in full from a table.
+ *
+ * Computed from the address itself on every row, never a stored display string.
+ * The whole address is still what the title attribute, the tooltip, the
+ * accessible name, and the clipboard carry — this only changes what is drawn.
+ * An address too short to be worth eliding is drawn whole: truncateMiddle
+ * returns it untouched unless the ellipsis actually hides more characters than
+ * it costs.
  */
-const EMAIL_HEAD_CHARS = 1;
-const EMAIL_TAIL_CHARS = 8;
+const EMAIL_HEAD_CHARS = 4;
+const EMAIL_TAIL_CHARS = 6;
 
 /** Shared by the two copyable cells so their text matches every other cell in
  *  the row: the table's own 13px muted body, not CopyableText's default mono. */

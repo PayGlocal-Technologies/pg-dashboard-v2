@@ -4,9 +4,14 @@ import type { ReactNode } from "react";
 import { Card, CardContent, Separator } from "@/components/ui";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { clientInvoiceMetrics } from "@/features/dashboard/client-management/constants";
+import {
+  clientAmountLocale,
+  clientInvoiceAmounts,
+  clientInvoiceMetrics,
+  type ClientReceivedTotal,
+} from "@/features/dashboard/client-management/constants";
 import { clientTransactions } from "@/features/dashboard/client-management/mock-data";
-import { formatPhoneNumber } from "@/lib/utils/format";
+import { formatCurrency, formatPhoneNumber } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
 
@@ -116,23 +121,38 @@ export function ClientIdentitySummary({ client, className }: { client: Client; c
 }
 
 /**
- * One KPI tile: a muted label with its figure directly beneath, and nothing
- * else. Deliberately dense — two tightly stacked lines rather than the tall
- * icon/title/figure/description column the page-level analytics cards use (see
- * OutstandingAmountCard). Same Card surface and the same tabular-nums figure in
- * foreground weight, at roughly half the height.
+ * One KPI tile: a muted label, the count as the figure that carries the card,
+ * and the money those invoices are worth beneath it. Deliberately dense — three
+ * tight lines rather than the tall icon/title/figure/description column the
+ * page-level analytics cards use (see OutstandingAmountCard). Same Card surface
+ * and the same tabular-nums figure in foreground weight, at roughly half the
+ * height.
  *
- * What buys that back: Card's px-7 py-7 is overridden down to px-4 py-3.5, the
- * figure steps from text-3xl to text-2xl, and the card carries no supporting
- * copy at all — the label names the count ("Paid invoices"), so the figure
- * needs no unit trailing it and no caption under it. mt-1 between the two keeps
- * them reading as one unit rather than two lines that happen to share a card.
+ * What keeps it there: Card's px-7 py-7 is overridden down to px-4 py-3.5, the
+ * figure steps from text-3xl to text-2xl, and the amount is one 11px muted line
+ * with no label of its own — the count above already names what is being
+ * counted. mt-1/mt-0.5 keep the three lines reading as one unit rather than
+ * three that happen to share a card.
  *
- * h-full is what keeps all three exactly equal in height: the grid stretches
- * every card to the tallest, which is whichever label wraps first at a given
- * width. Nothing else stretches them — the content is a fixed two lines.
+ * The hierarchy is deliberate and holds at a glance: 24px semibold foreground
+ * against 11px regular muted. The count is the KPI; the amount is the context
+ * for it.
+ *
+ * h-full is what keeps all three cards exactly equal in height — the grid
+ * stretches every one to the tallest, which is whichever label wraps first or
+ * whichever card carries the most currencies.
  */
-function ClientMetricCard({ label, value }: { label: string; value: number }) {
+function ClientMetricCard({
+  label,
+  value,
+  amounts,
+}: {
+  label: string;
+  value: number;
+  /** What those invoices are worth, one entry per currency (see sumByCurrency).
+   *  Empty when there are no invoices to value. */
+  amounts: ClientReceivedTotal[];
+}) {
   // min-w-0 so the three cards can narrow with the column that holds them,
   // rather than the row's min-content width becoming a floor that overflows it.
   // Their labels wrap instead.
@@ -140,9 +160,43 @@ function ClientMetricCard({ label, value }: { label: string; value: number }) {
     <Card size="sm" className="h-full w-full min-w-0 px-4 py-3.5">
       <CardContent className="flex h-full flex-1 flex-col">
         <p className="text-[12px] text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-foreground">
-          {value}
-        </p>
+        {/* mt-auto pins the figure and its amount to the card's bottom edge, so
+            the three cards' numbers sit on one line and their amounts on
+            another whatever their labels do. Without it, a label that wraps to
+            two lines ("Outstanding invoices" at this column width) pushes its
+            own figure down while its neighbours' stay put — leaving the short
+            cards with dead space under their amounts and no two figures level.
+            The slack now opens under the label, where it reads as breathing
+            room rather than as a gap. pt-1 is the floor: the figure never
+            touches the label even when the label takes the full height. */}
+        <div className="mt-auto pt-1">
+          <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
+            {value}
+          </p>
+          {amounts.length === 0 ? (
+            // An em-dash, not a formatted zero: "there are no invoices here"
+            // and "these invoices are worth nothing" are different facts, and
+            // only the first one is ever true. Rendered rather than omitted so
+            // a card with nothing to value keeps its neighbours' bottom line.
+            <p className="mt-0.5 text-[11px] text-muted-foreground">—</p>
+          ) : (
+            // One line per currency, amount then ISO code, the same pairing the
+            // table's Total received column uses. A client billed in a single
+            // currency — every client today — gets exactly one line, so this
+            // never makes the card taller in practice; a mixed-currency client
+            // adds a line rather than silently summing across rates.
+            amounts.map((total) => (
+              <p
+                key={total.currency}
+                className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground"
+                title={`${formatCurrency(total.amount, total.currency, clientAmountLocale(total.currency))} ${total.currency}`}
+              >
+                {formatCurrency(total.amount, total.currency, clientAmountLocale(total.currency))}{" "}
+                <span className="font-medium">{total.currency}</span>
+              </p>
+            ))
+          )}
+        </div>
       </CardContent>
     </Card>
   );
@@ -150,10 +204,11 @@ function ClientMetricCard({ label, value }: { label: string; value: number }) {
 
 /**
  * The three invoice figures, in a row that collapses to a single column on
- * narrow viewports (the existing responsive card pattern). All three are
- * counted off the client's own transactions — the same list the Transactions
- * section below renders — so the row always adds up and never contradicts what
- * is listed underneath it. See clientInvoiceMetrics.
+ * narrow viewports (the existing responsive card pattern). All three counts,
+ * and the amounts beneath them, are derived from the client's own transactions
+ * — the same list the Transactions section below renders — so the row always
+ * adds up and never contradicts what is listed underneath it. See
+ * clientInvoiceMetrics and clientInvoiceAmounts.
  */
 export function ClientInvoiceMetrics({
   client,
@@ -172,7 +227,11 @@ export function ClientInvoiceMetrics({
    */
   floatTitle?: boolean;
 }) {
-  const metrics = clientInvoiceMetrics(clientTransactions(client.businessName));
+  // One read of the client's transactions, counted and summed the same way, so
+  // a card's figure and its amount can never describe different sets.
+  const transactions = clientTransactions(client.businessName);
+  const metrics = clientInvoiceMetrics(transactions);
+  const amounts = clientInvoiceAmounts(transactions);
 
   return (
     <section className={cn(floatTitle && "lg:relative")}>
@@ -187,9 +246,13 @@ export function ClientInvoiceMetrics({
             left to right, the row says what was raised and how much of it has
             landed. Each label names its own count, so no card needs a unit or
             a supporting line. */}
-        <ClientMetricCard label="Total invoices" value={metrics.total} />
-        <ClientMetricCard label="Paid invoices" value={metrics.paid} />
-        <ClientMetricCard label="Outstanding invoices" value={metrics.outstanding} />
+        <ClientMetricCard label="Total invoices" value={metrics.total} amounts={amounts.total} />
+        <ClientMetricCard label="Paid invoices" value={metrics.paid} amounts={amounts.paid} />
+        <ClientMetricCard
+          label="Outstanding invoices"
+          value={metrics.outstanding}
+          amounts={amounts.outstanding}
+        />
       </div>
     </section>
   );

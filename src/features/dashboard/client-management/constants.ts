@@ -130,27 +130,23 @@ export interface ClientReceivedTotal {
 }
 
 /**
- * What the client has actually paid the merchant: the sum of the settlement
- * amounts on its settled invoices, and nothing else — invoice-pending and
- * sent-for-review transactions are money not yet received, so they are excluded
- * rather than netted off. This is not the outstanding balance and is never
- * derived from one.
+ * Sums a set of transactions by currency, largest first.
  *
- * Summed per currency, and returned as a list rather than a single figure,
- * because amounts in different currencies cannot be added: converting them
- * would need a rate this page has no business inventing. A client billed in one
- * currency — every client today — yields exactly one entry. Largest first, so
- * a mixed-currency client leads with the figure that matters.
+ * Returned as a list rather than a single figure because amounts in different
+ * currencies cannot be added: converting them would need a rate this page has
+ * no business inventing, so each is carried separately and displayed on its own
+ * line. A client billed in one currency — every client today — yields exactly
+ * one entry, and an empty set yields none, which is what lets a caller draw an
+ * em-dash instead of a formatted zero.
  *
  * Reads settlementAmount/settlementCurrency where the feed provides them (the
  * amount that actually landed, which can differ from the amount invoiced) and
  * falls back to the transaction's own amount where it doesn't.
  */
-export function clientTotalReceived(transactions: McaTransaction[]): ClientReceivedTotal[] {
+export function sumByCurrency(transactions: McaTransaction[]): ClientReceivedTotal[] {
   const byCurrency = new Map<string, number>();
 
   for (const txn of transactions) {
-    if (!isSettledInvoice(txn)) continue;
     const amount = Number(txn.settlementAmount ?? txn.amount);
     // A malformed amount is skipped rather than summed as NaN, which would
     // poison the whole total and render the cell as "NaN".
@@ -162,6 +158,42 @@ export function clientTotalReceived(transactions: McaTransaction[]): ClientRecei
   return [...byCurrency.entries()]
     .map(([currency, amount]) => ({ currency, amount }))
     .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * What the client has actually paid the merchant: the settled invoices summed
+ * per currency, and nothing else — invoice-pending and sent-for-review
+ * transactions are money not yet received, so they are excluded rather than
+ * netted off. This is not the outstanding balance and is never derived from one.
+ */
+export function clientTotalReceived(transactions: McaTransaction[]): ClientReceivedTotal[] {
+  return sumByCurrency(transactions.filter(isSettledInvoice));
+}
+
+export interface ClientInvoiceAmounts {
+  total: ClientReceivedTotal[];
+  paid: ClientReceivedTotal[];
+  outstanding: ClientReceivedTotal[];
+}
+
+/**
+ * The money behind clientInvoiceMetrics' three counts: what every invoice is
+ * worth, what the settled ones are worth, and what the rest are. Split on the
+ * same isSettledInvoice predicate as the counts, so a card's figure and its
+ * amount always describe the same set of transactions — paid plus outstanding
+ * is total, in every currency, by construction.
+ */
+export function clientInvoiceAmounts(transactions: McaTransaction[]): ClientInvoiceAmounts {
+  const paid: McaTransaction[] = [];
+  const outstanding: McaTransaction[] = [];
+  for (const txn of transactions) {
+    (isSettledInvoice(txn) ? paid : outstanding).push(txn);
+  }
+  return {
+    total: sumByCurrency(transactions),
+    paid: sumByCurrency(paid),
+    outstanding: sumByCurrency(outstanding),
+  };
 }
 
 /**

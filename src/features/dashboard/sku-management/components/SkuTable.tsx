@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { DataTable } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -274,12 +275,24 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange }: SkuTableProps) {
 
       {/* Desktop (lg+): the full table. The overflow menu rides `rowAction`,
           not a column — DataTable renders that slot in a zero-width cell stuck
-          to the right edge of the viewport and reveals it on row hover. That's
-          what keeps it pinned right and reachable while the six data columns
-          scroll horizontally under it, out of their widths, and out of any
-          future column reordering. */}
+          to the right edge of the viewport. That's what keeps it pinned right
+          and reachable while the six data columns scroll horizontally under
+          it, out of their widths, and out of any future column reordering.
+          It floats over the row rather than sitting in the flow, so it can
+          overlap the trailing column's text; the secondary button's own fill
+          and border are what keep it legible there.
+
+          DataTable reveals that slot on row hover only (opacity-0 on a span
+          it owns). A child can't undo a parent's opacity, so the override is
+          applied here, scoped to this table's action cell — `td.sticky` is
+          that zero-width cell, and the descendant selector outranks the bare
+          `opacity-0` class without needing !important. z-[2] lifts it above
+          the row's own cells so it always paints on top. */}
       <DataTable
-        className="hidden rounded-none border-0 lg:block"
+        className={cn(
+          "hidden rounded-none border-0 lg:block",
+          "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+        )}
         columns={columns}
         data={pageRows}
         emptyTitle={emptyTitle}
