@@ -12,5 +12,13 @@ export interface Referral {
    * a pending referral doesn't read as one that earned nothing.
    */
   rewardAmount: string | null;
+  /**
+   * How much of `rewardAmount` has actually been waived against the merchant's
+   * fees so far. Null before anything is earned, and can be less than
+   * `rewardAmount` while a credited reward is still being drawn down — the
+   * analytics row shows the waived total against the earned total for exactly
+   * that reason.
+   */
+  waivedAmount: string | null;
   rewardCurrency: string;
 }

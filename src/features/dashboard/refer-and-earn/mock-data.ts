@@ -9,7 +9,10 @@ import type { Referral } from "@/features/dashboard/refer-and-earn/types";
  * not touching the UI. See CLAUDE.md — do not guess an API contract; confirm
  * the real field names before mapping onto `Referral`.
  *
- * Names and email addresses are fictional.
+ * Names and email addresses are fictional. `waivedAmount` is the slice of each
+ * credited reward already drawn down against fees — deliberately a mix of fully
+ * waived, partly waived, and not-yet-started so the analytics row shows a real
+ * waived-vs-earned split rather than two identical figures.
  */
 export const MOCK_REFERRALS: Referral[] = [
   {
@@ -18,6 +21,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "aarav.mehta@brightloom.example",
     status: "REWARD_EARNED",
     rewardAmount: "30.00",
+    waivedAmount: "30.00",
     rewardCurrency: "USD",
   },
   {
@@ -26,6 +30,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "diane@northquay.example",
     status: "REWARD_EARNED",
     rewardAmount: "30.00",
+    waivedAmount: "30.00",
     rewardCurrency: "USD",
   },
   {
@@ -34,6 +39,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "rohan.iyer@stitchcraft.example",
     status: "ACTIVATED",
     rewardAmount: null,
+    waivedAmount: null,
     rewardCurrency: "USD",
   },
   {
@@ -42,6 +48,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "marta.oliveira@velacreative.example",
     status: "REWARD_EARNED",
     rewardAmount: "30.00",
+    waivedAmount: "20.00",
     rewardCurrency: "USD",
   },
   {
@@ -50,6 +57,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "kenji@harborlabs.example",
     status: "PENDING",
     rewardAmount: null,
+    waivedAmount: null,
     rewardCurrency: "USD",
   },
   {
@@ -58,6 +66,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "priya.nair@lumenstudio.example",
     status: "REWARD_EARNED",
     rewardAmount: "30.00",
+    waivedAmount: null,
     rewardCurrency: "USD",
   },
   {
@@ -66,6 +75,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "tomas@kestrelgoods.example",
     status: "ACTIVATED",
     rewardAmount: null,
+    waivedAmount: null,
     rewardCurrency: "USD",
   },
   {
@@ -74,6 +84,7 @@ export const MOCK_REFERRALS: Referral[] = [
     emailId: "sofia.ramirez@cadenzaco.example",
     status: "PENDING",
     rewardAmount: null,
+    waivedAmount: null,
     rewardCurrency: "USD",
   },
 ];

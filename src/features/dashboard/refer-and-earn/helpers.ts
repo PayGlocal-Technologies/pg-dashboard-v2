@@ -11,6 +11,14 @@ export interface ReferralSummary {
   inProgress: number;
   /** Referrals whose qualifying transaction has completed. */
   completed: number;
+  /** Of the earned rewards, how much has already been waived against fees. */
+  totalWaived: number;
+  /**
+   * The pool the waiver draws from — the earned total. Kept as its own field so
+   * the "waived of eligible" pair reads from one place and the two figures can
+   * never be computed from different row sets.
+   */
+  waivedEligible: number;
 }
 
 /**
@@ -24,11 +32,16 @@ export interface ReferralSummary {
  */
 export function summarizeReferrals(referrals: Referral[]): ReferralSummary {
   let totalEarned = 0;
+  let totalWaived = 0;
   let earnedCurrency: string | null = null;
   let completed = 0;
 
   for (const referral of referrals) {
     if (referral.status === "REWARD_EARNED") completed += 1;
+
+    const waived = referral.waivedAmount == null ? NaN : parseFloat(referral.waivedAmount);
+    if (!Number.isNaN(waived)) totalWaived += waived;
+
     if (referral.rewardAmount == null) continue;
 
     const amount = parseFloat(referral.rewardAmount);
@@ -46,5 +59,9 @@ export function summarizeReferrals(referrals: Referral[]): ReferralSummary {
     // Activated both count as in progress.
     inProgress: referrals.length - completed,
     completed,
+    totalWaived,
+    // The earned total is what is eligible to be waived — a reward has to be
+    // credited before any of it can come off a fee.
+    waivedEligible: totalEarned,
   };
 }
