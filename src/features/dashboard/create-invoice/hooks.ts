@@ -299,8 +299,20 @@ const addedToRow = (account: AddedAccountDetails): BankAccountRow => ({
  *
  * Recommendation follows production: only meaningful when there is a choice,
  * and the local account wins when one exists.
+ *
+ * `currency` is not sent — the endpoint reads the currency off the stored
+ * invoice — but it IS part of the cache key, because which account is suggested
+ * depends on it: a USD invoice gets the USD local account, a EUR one the EUR
+ * account. Pass the currency the *server's* copy of the draft is known to
+ * carry, not the one in the form. Keying on the form's value would fire this
+ * the instant the merchant picks a new currency, ahead of the debounced
+ * autosave that tells the server about it, and the answer would come back for
+ * the currency the invoice still had.
  */
-export function useInvoiceBankAccounts(invoiceId: string): {
+export function useInvoiceBankAccounts(
+  invoiceId: string,
+  currency: string
+): {
   rows: BankAccountRow[];
   isLoading: boolean;
   refetchAdded: () => void;
@@ -309,10 +321,12 @@ export function useInvoiceBankAccounts(invoiceId: string): {
 
   const suggestedUrl = suggestedAccountsApi(merchantId, invoiceId);
   const { data: suggested, isLoading } = useGet<AccountListResponse>(
-    ["suggested-accounts", merchantId, invoiceId],
+    ["suggested-accounts", merchantId, invoiceId, currency],
     suggestedUrl,
     undefined,
-    { enabled: !!suggestedUrl }
+    // Without a currency the server rejects the request outright, so there is
+    // nothing to gain from asking.
+    { enabled: !!suggestedUrl && !!currency }
   );
 
   const addedUrl = addedAccountsApi(merchantId);

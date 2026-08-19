@@ -245,12 +245,6 @@ export function CreateInvoiceFeature() {
   } = usePost<InvoiceDetailsResponse, InvoiceCreatePayload>(createInvoiceApi(merchantId), {
     invalidateQueries: false,
     onSuccess: (response) => {
-      console.warn("[create-invoice] create POST SUCCESS", {
-        envelopeKeys: Object.keys(response ?? {}),
-        dataKeys: Object.keys(response?.data ?? {}),
-        hasInvoiceIdField: !!response?.data?.invoiceId,
-      });
-
       const newId = response?.data?.invoiceId ?? response?.data?.invoice?.id;
       if (!newId) {
         creatingRef.current = false;
@@ -268,7 +262,6 @@ export function CreateInvoiceFeature() {
       routerRef.current.replace(nextUrl, { scroll: false });
     },
     onError: (error) => {
-      console.warn("[create-invoice] create POST FAILED", { message: error?.message });
       creatingRef.current = false;
       setBootstrapError(error.message || "Couldn't start the invoice.");
       toast.error("Couldn't start the invoice", { description: error.message });
@@ -321,25 +314,19 @@ export function CreateInvoiceFeature() {
   // the invoice number, so one is created up front rather than on first edit.
   // The ref keeps it to a single call under StrictMode's double-invoke.
   useEffect(() => {
-    // TEMPORARY DIAGNOSTICS — remove once the create flow is confirmed working.
-    // console.warn rather than log because the lint config only permits
-    // warn/error. Never logs the merchant or invoice id itself: those are
-    // sensitive identifiers and presence is all that is being diagnosed.
-    if (invoiceId || !merchantId || creatingRef.current) {
-      console.warn("[create-invoice] bootstrap effect SKIPPED", {
-        reason: invoiceId
-          ? "already has an invoiceId"
-          : !merchantId
-            ? "no merchantId yet"
-            : "already created (ref guard)",
-        hasInvoiceId: !!invoiceId,
-        hasMerchantId: !!merchantId,
-        alreadyCreating: creatingRef.current,
-      });
-      return;
-    }
+    // The draft must be created already carrying a currency, so creation waits
+    // for the currency list. get-suggested-account resolves the account from
+    // the invoice's OWN stored currency and rejects a draft without one
+    // ("Missing currency from invoice"). Production never hits that: its wizard
+    // persists the ITEMS step, which carries the currency, long before the Bank
+    // step runs. This editor renders every section at once and asks for the
+    // accounts as soon as the draft exists, so the currency has to be there
+    // from the first write. Waiting costs nothing visible — `isReady` below
+    // already blocks the editor on the same list.
+    const defaultCurrency = currencies[0]?.currencyCode ?? "";
 
-    console.warn("[create-invoice] bootstrap effect FIRING create POST");
+    if (invoiceId || !merchantId || !defaultCurrency || creatingRef.current) return;
+
     creatingRef.current = true;
 
     // Production's first (BILLER) save posts this slice. No callbacks here:
@@ -347,9 +334,10 @@ export function CreateInvoiceFeature() {
     createDraft({
       clientId: clientIdParam || undefined,
       gid: gid || undefined,
+      currency: defaultCurrency,
       currentStep: "CLIENT",
     });
-  }, [invoiceId, merchantId, clientIdParam, gid, createDraft, router]);
+  }, [invoiceId, merchantId, clientIdParam, gid, currencies, createDraft, router]);
 
   const invoice = detailsData?.data?.invoice;
   const biller = invoice?.billerDetails ?? billerData?.data;
@@ -376,46 +364,6 @@ export function CreateInvoiceFeature() {
     { label: "Biller profile", ok: !!biller },
     { label: "Currencies", ok: currencies.length > 0 },
   ];
-
-  // TEMPORARY DIAGNOSTICS — remove with the others once this flow is verified.
-  useEffect(() => {
-    console.warn("[create-invoice] bootstrap state", {
-      hasMerchantId: !!merchantId,
-      invoiceIdSource: searchParams.get("invoiceId")
-        ? "url"
-        : createdInvoiceId
-          ? "create-response"
-          : "none",
-      createStatus,
-      createErrorMessage: createError?.message,
-      detailsQuery: {
-        enabled: !!detailsUrl,
-        status: detailsStatus,
-        fetchStatus: detailsFetchStatus,
-      },
-      billerQuery: { enabled: !!billerUrl, status: billerStatus, fetchStatus: billerFetchStatus },
-      currencyCount: currencies.length,
-      hasInvoice: !!invoice,
-      hasBiller: !!biller,
-      isReady,
-    });
-  }, [
-    merchantId,
-    searchParams,
-    createdInvoiceId,
-    createStatus,
-    createError,
-    detailsUrl,
-    detailsStatus,
-    detailsFetchStatus,
-    billerUrl,
-    billerStatus,
-    billerFetchStatus,
-    currencies.length,
-    invoice,
-    biller,
-    isReady,
-  ]);
 
   // Above every early return: hooks must run in the same order on every render.
   // setState lives in the timeout callback, not the effect body.
@@ -610,7 +558,18 @@ function InvoiceEditor({
 
   const linkedTxn = useLinkedTransaction(linkedGid);
   const { clients } = useInvoiceClients(invoiceId);
-  const { rows: bankRows } = useInvoiceBankAccounts(invoiceId);
+
+  /**
+   * The currency the server's copy of this draft is known to hold.
+   *
+   * Seeded from the fetched invoice and moved forward only once a save has
+   * actually landed, so the suggested-accounts lookup below always asks about a
+   * currency the invoice really has. Tracking `form.currency` instead would
+   * race the debounced autosave.
+   */
+  const [persistedCurrency, setPersistedCurrency] = useState<string>(() => invoice.currency ?? "");
+
+  const { rows: bankRows } = useInvoiceBankAccounts(invoiceId, persistedCurrency);
   const logo = useInvoiceAsset("LOGO");
   const signature = useInvoiceAsset("SIGNATURE");
 
@@ -644,9 +603,15 @@ function InvoiceEditor({
   );
 
   const persistDraft = useCallback(() => {
-    saveInvoice(buildPayload(), {
-      // Fire and forget: a failed autosave must not interrupt typing, and
-      // Generate saves again before it finalises.
+    const payload = buildPayload();
+    saveInvoice(payload, {
+      // The server now holds this currency, so the suggested-accounts lookup
+      // may re-ask against it. This is what makes changing the currency
+      // re-resolve the recommended account instead of leaving the one picked
+      // for the previous one.
+      onSuccess: () => setPersistedCurrency(payload.currency ?? ""),
+      // Otherwise fire and forget: a failed autosave must not interrupt typing,
+      // and Generate saves again before it finalises.
       onError: () => undefined,
     });
   }, [saveInvoice, buildPayload]);
@@ -908,6 +873,7 @@ function InvoiceEditor({
 
             <PaymentDetailsSection
               invoiceId={invoiceId}
+              currency={persistedCurrency}
               accountNo={form.accountNo}
               onAccountNoChange={(accountNo) => patch({ accountNo })}
             />

@@ -99,10 +99,6 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
           "Content-Type": isFormData ? "multipart/form-data" : "application/json",
         };
 
-        // TEMPORARY DIAGNOSTICS — remove once the create-invoice flow is fixed.
-        const isCreateInvoice = finalUrl.includes("/mca-invoice/") && finalUrl.endsWith("/create");
-        if (isCreateInvoice) console.warn("[api] create: about to await axios");
-
         const res =
           method === "delete"
             ? await api.delete<TData>(finalUrl, { data: requestBody, headers })
@@ -111,22 +107,10 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
                 responseType: download ? "blob" : "json",
               });
 
-        if (isCreateInvoice) {
-          console.warn("[api] create: axios RESOLVED", {
-            httpStatus: res.status,
-            dataKeys: Object.keys((res.data ?? {}) as object),
-          });
-        }
-
         useApp.getState().resetTimer();
 
-        if (isCreateInvoice) console.warn("[api] create: returning to react-query");
         return res.data;
       } catch (error) {
-        console.warn("[api] mutation threw", {
-          url: finalUrl.replace(/\/[^/]+\/create$/, "/<mid>/create"),
-          message: (error as Error)?.message,
-        });
         return handleApiError(error as AxiosError);
       }
     },

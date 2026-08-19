@@ -32,7 +32,9 @@ function Row({ label, value, labelWidth }: { label: string; value: string; label
  * details in its own preview. This looks the payee up across both lists.
  */
 export function EmailPreview({ invoice }: { invoice: InvoiceData | undefined }) {
-  const { rows: accounts } = useInvoiceBankAccounts(invoice?.id ?? "");
+  // `invoice` here is the saved record straight from the server, so its own
+  // currency is by definition the persisted one.
+  const { rows: accounts } = useInvoiceBankAccounts(invoice?.id ?? "", invoice?.currency ?? "");
 
   if (!invoice) {
     return (
