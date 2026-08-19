@@ -1,11 +1,5 @@
-import { BASE_URL_V1 } from "@/api";
-
-// Endpoint URL builders only. Path copied from ZOHO_BASE + zohoPaymentSyncApi
-// in pg-dashboard's src/features/zoho-integration/service.ts. Note it is v1 and
-// sits under /integrations/zoho, not alongside the v3 mca-invoice endpoints.
-
-/** Retries pushing a payment to Zoho after a failed sync. */
-export const zohoPaymentSyncApi = (mid: string, invoiceId: string): string =>
-  mid && invoiceId
-    ? `${BASE_URL_V1}/integrations/zoho/${mid}/invoices/${invoiceId}/payment-sync`
-    : "";
+// Zoho's payment-sync endpoint now lives with the rest of the integration, in
+// @/features/dashboard/zoho-integration/services, rather than being redeclared
+// per consuming feature. Re-exported here so this feature's own call sites keep
+// importing from their feature's services file, per the API-layer convention.
+export { zohoPaymentSyncApi } from "@/features/dashboard/zoho-integration/services";

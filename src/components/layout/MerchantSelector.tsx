@@ -57,6 +57,19 @@ function MidAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md" }) 
 
 type TagUpdateVars = { dynamicUrl: string };
 
+/**
+ * Whether this account has more than one MID to pick between. The selector
+ * itself renders nothing when it doesn't, so the Sidebar reads the same
+ * condition to drop the wrapper holding it, otherwise that wrapper's padding
+ * and bottom border survive as an empty banded strip with a divider under it.
+ */
+export function useHasMultipleMids(): boolean {
+  const paMidIds = useApp((s) => s.paMids);
+  const paCbMidIds = useApp((s) => s.paCbMids);
+  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  return paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+}
+
 interface MerchantSelectorProps {
   /** Sidebar is collapsed to icon-only width, shrink the trigger to match. */
   collapsed?: boolean;
@@ -104,7 +117,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
     [paCbMidInfos, paMidInfos]
   );
 
-  const isMultiMids = paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+  const isMultiMids = useHasMultipleMids();
 
   const {
     data: merchantProductsData,

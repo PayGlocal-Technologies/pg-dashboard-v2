@@ -40,8 +40,8 @@ import type {
   McaSettlementPayment,
   SettlementPayment,
 } from "@/features/dashboard/settlement-reports/types";
-
-const LIST_PATH = "/reports/settlement-report";
+import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
+import { useProductContext } from "@/stores/useProductContext";
 
 /** "UTR2603120001" → "UTR26....0001" */
 function truncateMiddle(value: string): string {
@@ -265,6 +265,9 @@ interface SettlementDetailFeatureProps {
 
 export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatureProps) {
   const router = useRouter();
+  // Back-navigation targets the list route the merchant came from: MCA has its
+  // own, see settlement-reports/routes.ts.
+  const listPath = settlementListPath(useProductContext((s) => s.activeContext));
   const [showReportInfo, setShowReportInfo] = useState(false);
   const [showReleasedInfo, setShowReleasedInfo] = useState(false);
   const detail = settlementDetailsById[settlementId];
@@ -282,7 +285,7 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
               This settlement ID doesn&apos;t match any record.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => router.push(LIST_PATH)}>
+          <Button variant="outline" size="sm" onClick={() => router.push(listPath)}>
             Go back
           </Button>
         </div>
@@ -393,7 +396,7 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
         variant="link"
         className="h-auto w-fit gap-1 p-0 text-sm font-medium"
         leftIcon={<Icon name="chevron-left" size={14} />}
-        onClick={() => router.push(LIST_PATH)}
+        onClick={() => router.push(listPath)}
       >
         Go Back
       </Button>

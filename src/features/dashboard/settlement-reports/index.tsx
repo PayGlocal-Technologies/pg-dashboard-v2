@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
-import { useProductContext } from "@/stores/useProductContext";
+import { useProductContext, toProductType } from "@/stores/useProductContext";
+import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
 import { useApp } from "@/stores/useApp";
 import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { MidGuard } from "@/components/common/MidGuard";
@@ -79,10 +80,13 @@ export function SettlementReportsFeature() {
 
   // Which product (Payments / Multi-Currency Accounts) this shared screen is
   // currently scoped to, set by the Header's top-level tabs, see
-  // useProductContext.ts. The real settlement endpoint differs per product:
-  // PA is a GET summary, FFMS (PACB) is a POST summary.
-  const activeProduct = useProductContext((s) => s.activeProduct);
+  // useProductContext.ts. "Home" has no product of its own and falls back to
+  // PA. The real settlement endpoint differs per product: PA is a GET
+  // summary, FFMS (PACB) is a POST summary.
+  const activeContext = useProductContext((s) => s.activeContext);
+  const activeProduct = toProductType(activeContext);
   const isMca = activeProduct === "PACB";
+  const listPath = settlementListPath(activeContext);
 
   const { urlMid, midFilter } = useResolvedMids(activeProduct);
   const isGuestUser = useApp((s) => s.isGuestUser);
@@ -384,7 +388,7 @@ export function SettlementReportsFeature() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => router.push(`/reports/settlement-report/${row.id}`)}
+                        onClick={() => router.push(`${listPath}/${row.id}`)}
                         rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
                         className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                       >

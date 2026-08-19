@@ -594,7 +594,7 @@ function buildSettlementDetail(settlement: SettlementRow): SettlementDetail {
 }
 
 // Keyed by every row from both products (ids never collide, "stl_" vs
-// "mca_"), so the detail page at /reports/settlement-report/[settlementId]
+// "mca_"), so the detail page at /settlement-report/[settlementId]
 // can look up either product's settlement without needing to know which
 // product context it came from.
 export const settlementDetailsById: Record<string, SettlementDetail> = Object.fromEntries(

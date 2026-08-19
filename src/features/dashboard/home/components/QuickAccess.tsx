@@ -53,7 +53,9 @@ const ACTION_ROUTES: Record<QuickActionId, string> = {
   // pg-dashboard, which opens it from a banner there), not a page of its own —
   // so this tile goes to that page rather than to a route that doesn't exist.
   "fx-calculator": "/multi-currency",
-  "international-accounts": "/international-accounts",
+  // Same page: Virtual accounts is this app's international-accounts screen,
+  // there is no separate /international-accounts route.
+  "international-accounts": "/multi-currency",
   "manage-dispute": "/disputes",
 };
 
