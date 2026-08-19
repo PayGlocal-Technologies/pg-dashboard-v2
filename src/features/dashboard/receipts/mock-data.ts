@@ -39,7 +39,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-08",
     amount: "486250.00",
     currency: "INR",
-    status: "ISSUED",
   },
   {
     gid: "receipt-mca-0002",
@@ -49,7 +48,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-07",
     amount: "452180.75",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0003",
@@ -59,7 +57,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-06",
     amount: "471905.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0004",
@@ -69,7 +66,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-05",
     amount: "398640.50",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0005",
@@ -79,7 +75,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-04",
     amount: "415370.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0006",
@@ -89,7 +84,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-03",
     amount: "523815.25",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0007",
@@ -99,7 +93,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-02",
     amount: "361490.00",
     currency: "INR",
-    status: "REFUNDED",
   },
   {
     gid: "receipt-mca-0008",
@@ -109,7 +102,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-01",
     amount: "389075.50",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0009",
@@ -119,7 +111,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-12",
     amount: "604320.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0010",
@@ -129,7 +120,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-11",
     amount: "512760.25",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0011",
@@ -139,7 +129,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-10",
     amount: "447190.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-mca-0012",
@@ -149,7 +138,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-09",
     amount: "468530.75",
     currency: "INR",
-    status: "PAID",
   },
 
   // ── Payment aggregator: one receipt a month ───────────────────────────────
@@ -161,7 +149,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-08",
     amount: "842750.00",
     currency: "INR",
-    status: "PENDING",
   },
   {
     gid: "receipt-pa-0002",
@@ -171,7 +158,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-07",
     amount: "791340.50",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0003",
@@ -181,7 +167,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-06",
     amount: "823615.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0004",
@@ -191,7 +176,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-05",
     amount: "674180.75",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0005",
@@ -201,7 +185,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-04",
     amount: "710542.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0006",
@@ -211,7 +194,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-03",
     amount: "928407.50",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0007",
@@ -221,7 +203,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-02",
     amount: "583691.25",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0008",
@@ -231,7 +212,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-01",
     amount: "641277.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0009",
@@ -241,7 +221,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-12",
     amount: "1023864.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0010",
@@ -251,7 +230,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-11",
     amount: "890123.50",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0011",
@@ -261,7 +239,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-10",
     amount: "765430.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-pa-0012",
@@ -271,7 +248,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2025-09",
     amount: "812905.25",
     currency: "INR",
-    status: "PAID",
   },
 
   // ── Fraud screening: one receipt a month, from January 2026 ───────────────
@@ -283,7 +259,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-08",
     amount: "128450.00",
     currency: "INR",
-    status: "ISSUED",
   },
   {
     gid: "receipt-frm-0002",
@@ -293,7 +268,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-07",
     amount: "124380.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-frm-0003",
@@ -303,7 +277,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-06",
     amount: "131720.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-frm-0004",
@@ -313,7 +286,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-05",
     amount: "118960.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-frm-0005",
@@ -323,7 +295,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-04",
     amount: "122540.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-frm-0006",
@@ -333,7 +304,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-03",
     amount: "139815.00",
     currency: "INR",
-    status: "PENDING",
   },
   {
     gid: "receipt-frm-0007",
@@ -343,7 +313,6 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-02",
     amount: "109275.00",
     currency: "INR",
-    status: "PAID",
   },
   {
     gid: "receipt-frm-0008",
@@ -353,6 +322,5 @@ export const MOCK_RECEIPTS: Receipt[] = [
     periodMonth: "2026-01",
     amount: "115630.00",
     currency: "INR",
-    status: "VOID",
   },
 ];

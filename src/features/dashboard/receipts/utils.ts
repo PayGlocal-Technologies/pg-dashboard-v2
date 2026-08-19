@@ -1,5 +1,4 @@
-import type { DateRangeValue } from "@/components/common/filters/FilterChips";
-import { toEndOfDayMs, toStartOfDayMs } from "@/components/common/filters/FilterChips";
+import type { AmountRangeValue, FilterChipOption } from "@/components/common/filters/FilterChips";
 import { formatCurrency } from "@/lib/utils/format";
 import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
 
@@ -43,28 +42,28 @@ export function formatReceiptMonth(periodMonth: string): string {
 }
 
 /**
- * The span a receipt's period covers, as epoch ms — first instant of the month
- * to last. Used by the date filter, which matches a receipt whose whole month
- * overlaps the chosen range rather than one that starts inside it: a receipt
- * "covers all payments made during the month" (the Month column's own info tip
- * says so), so asking for any few days in August has to return August's receipt.
+ * The months one product actually has receipts for, as Month filter chip options,
+ * newest first — the order the table lists its rows in, so the chip reads like
+ * the list it filters.
+ *
+ * Derived from the rows rather than from a generated calendar, so the chip can
+ * only ever offer a month with a receipt behind it: Fraud screening starts later
+ * than the other two products, and its chip says so instead of listing empty
+ * months. There is exactly one receipt per product per month, so each option here
+ * corresponds to exactly one row.
  */
-export function periodMonthRangeMs(periodMonth: string): { start: number; end: number } | null {
-  const [year, month] = periodMonth.split("-").map(Number);
-  if (!year || !month || month < 1 || month > 12) return null;
-
-  const start = new Date(year, month - 1, 1).getTime();
-  // Day 0 of the following month is the last day of this one — the arithmetic
-  // that makes December roll into the next January without a special case.
-  const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
-  return Number.isNaN(start) || Number.isNaN(end) ? null : { start, end };
+export function receiptMonthOptions(receipts: Receipt[]): FilterChipOption[] {
+  const months = Array.from(new Set(receipts.map((r) => r.periodMonth)))
+    .sort()
+    .reverse();
+  return months.map((month) => ({ value: month, label: formatReceiptMonth(month) }));
 }
 
 export interface ReceiptFilters {
   product: ReceiptProduct;
   search: string;
-  dateRange: DateRangeValue;
-  statusFilters: string[];
+  amountRange: AmountRangeValue;
+  monthFilters: string[];
 }
 
 /**
@@ -76,12 +75,18 @@ export interface ReceiptFilters {
  * columns that feed it need no changes.
  *
  * The product tab is applied here too, and first: it is the page's context, so
- * the search box and every chip only ever see the selected product's rows.
+ * the search box and both chips only ever see the selected product's rows. The
+ * filters compose — an amount range and a set of months applied together match
+ * only the rows satisfying both.
  */
 export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Receipt[] {
   const query = filters.search.trim().toLowerCase();
-  const fromMs = filters.dateRange.from ? toStartOfDayMs(filters.dateRange.from) : null;
-  const toMs = filters.dateRange.to ? toEndOfDayMs(filters.dateRange.to) : null;
+  // Blank and non-numeric inputs both mean "no bound", so a half-typed minus sign
+  // never silently filters everything out.
+  const min = parseFloat(filters.amountRange.min);
+  const max = parseFloat(filters.amountRange.max);
+  const hasMin = !Number.isNaN(min);
+  const hasMax = !Number.isNaN(max);
 
   return receipts.filter((receipt) => {
     if (receipt.product !== filters.product) return false;
@@ -100,20 +105,20 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
       return false;
     }
 
-    if (filters.statusFilters.length && !filters.statusFilters.includes(receipt.status)) {
-      return false;
+    // Inclusive on both ends, so a range typed to match a figure the merchant can
+    // see in the Amount column returns that row.
+    if (hasMin || hasMax) {
+      const amount = parseFloat(receipt.amount);
+      if (Number.isNaN(amount)) return false;
+      if (hasMin && amount < min) return false;
+      if (hasMax && amount > max) return false;
     }
 
-    if (fromMs !== null || toMs !== null) {
-      const period = periodMonthRangeMs(receipt.periodMonth);
-      // A row whose period can't be read is dropped rather than kept: a date
-      // filter that silently let unparseable rows through would report a range
-      // it isn't actually showing.
-      if (!period) return false;
-      // Overlap, not containment — see periodMonthRangeMs. A range ending before
-      // the month starts, or starting after it ends, is the only miss.
-      if (toMs !== null && period.start > toMs) return false;
-      if (fromMs !== null && period.end < fromMs) return false;
+    // Months are matched as whole periods, not as a range: the chip lists the
+    // months that exist and the merchant ticks the ones they want, so this is a
+    // set membership test rather than a comparison.
+    if (filters.monthFilters.length && !filters.monthFilters.includes(receipt.periodMonth)) {
+      return false;
     }
 
     return true;

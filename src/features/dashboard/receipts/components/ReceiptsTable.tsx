@@ -6,12 +6,16 @@ import { DataTable } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
-import { type DateRangeValue } from "@/components/common/filters/FilterChips";
+import { type AmountRangeValue } from "@/components/common/filters/FilterChips";
 import { RECEIPT_COLUMNS, ReceiptDownloadAction } from "@/features/dashboard/receipts/columns";
 import { ReceiptCardList } from "@/features/dashboard/receipts/components/ReceiptCardList";
 import { ReceiptFilterChips } from "@/features/dashboard/receipts/components/ReceiptFilterChips";
 import { MOCK_RECEIPTS } from "@/features/dashboard/receipts/mock-data";
-import { filterReceipts, formatReceiptMonth } from "@/features/dashboard/receipts/utils";
+import {
+  filterReceipts,
+  formatReceiptMonth,
+  receiptMonthOptions,
+} from "@/features/dashboard/receipts/utils";
 import {
   DEFAULT_RECEIPT_PRODUCT,
   RECEIPTS_PAGE_LIMIT,
@@ -22,7 +26,7 @@ import {
 } from "@/features/dashboard/receipts/constants";
 import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
 
-const EMPTY_DATE_RANGE: DateRangeValue = { from: "", to: "" };
+const EMPTY_AMOUNT_RANGE: AmountRangeValue = { min: "", max: "" };
 
 /**
  * The receipts table: product tabs, search/filter controls, and the rows
@@ -54,19 +58,27 @@ const EMPTY_DATE_RANGE: DateRangeValue = { from: "", to: "" };
 export function ReceiptsTable() {
   const [product, setProduct] = useState<ReceiptProduct>(DEFAULT_RECEIPT_PRODUCT);
   const [search, setSearch] = useState("");
-  const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE);
-  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
+  const [monthFilters, setMonthFilters] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+
+  // Only the months this product actually has receipts for. Computed before the
+  // other filters are applied — narrowing the list as the merchant filters would
+  // take away the month they just ticked.
+  const monthOptions = useMemo(
+    () => receiptMonthOptions(MOCK_RECEIPTS.filter((r) => r.product === product)),
+    [product]
+  );
 
   const filtered = useMemo(
     () =>
       filterReceipts(MOCK_RECEIPTS, {
         product,
         search,
-        dateRange,
-        statusFilters,
+        amountRange,
+        monthFilters,
       }),
-    [product, search, dateRange, statusFilters]
+    [product, search, amountRange, monthFilters]
   );
 
   const totalCount = filtered.length;
@@ -86,13 +98,19 @@ export function ReceiptsTable() {
     setPage(1);
   };
 
-  // Switching products keeps the search query and both filters, the same way
+  // Switching products keeps the search query and the amount range, the same way
   // SkuTable keeps its search across type tabs: a merchant chasing one invoice ID
-  // shouldn't retype it to check which product it was raised under, and a month
-  // range and a status mean the same thing in all three tabs. Only the page
-  // resets, since the new tab's list is a different length.
+  // shouldn't retype it to check which product it was raised under, and an amount
+  // bound means the same thing in all three tabs.
+  //
+  // The months are the exception, and are cleared. Their options come from the
+  // selected product's own rows (see monthOptions), and the products don't cover
+  // the same span — Fraud screening starts in January 2026 — so a month carried
+  // across could be one the new tab has no checkbox for at all: an active filter
+  // the merchant can see the effect of but not find, let alone clear.
   const onProductChange = (value: string) => {
     setProduct(value as ReceiptProduct);
+    setMonthFilters([]);
     setPage(1);
   };
 
@@ -111,19 +129,23 @@ export function ReceiptsTable() {
     );
   };
 
-  // Each instance owns its own open-popover state, which is why the two control
-  // rows below can both render one: see ReceiptFilterChips' own note on why
-  // lifting that state breaks the hidden copy.
-  const filterChips = (
+  // A function, not a shared element: both control rows are mounted at once (only
+  // CSS hides one), so each needs its own `idPrefix` to keep the Amount popover's
+  // input ids unique across the page. Each instance also owns its own
+  // open-popover state — see ReceiptFilterChips' note on why lifting that state
+  // breaks the hidden copy.
+  const renderFilterChips = (idPrefix: string) => (
     <ReceiptFilterChips
-      dateRange={dateRange}
-      onDateRangeChange={(next) => {
-        setDateRange(next);
+      idPrefix={idPrefix}
+      amountRange={amountRange}
+      onAmountRangeChange={(next) => {
+        setAmountRange(next);
         setPage(1);
       }}
-      statusFilters={statusFilters}
-      onStatusFiltersChange={(next) => {
-        setStatusFilters(next);
+      monthOptions={monthOptions}
+      monthFilters={monthFilters}
+      onMonthFiltersChange={(next) => {
+        setMonthFilters(next);
         setPage(1);
       }}
     />
@@ -169,10 +191,12 @@ export function ReceiptsTable() {
           action on this screen belongs to individual rows. */}
       <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
         {searchInput}
-        {/* Filter group: Date and Status read as one cohesive filtering
+        {/* Filter group: Amount and Month read as one cohesive filtering
             control, so the gap within it is tighter than the gap separating it
             from search. */}
-        <div className="flex flex-wrap items-center gap-1.5">{filterChips}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {renderFilterChips("receipt-amount-wide")}
+        </div>
       </div>
 
       {/* Tablet + mobile (below lg): search takes the full width on its own row,
@@ -186,7 +210,7 @@ export function ReceiptsTable() {
       <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
         {searchInput}
         <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-          {filterChips}
+          {renderFilterChips("receipt-amount-compact")}
         </div>
       </div>
 

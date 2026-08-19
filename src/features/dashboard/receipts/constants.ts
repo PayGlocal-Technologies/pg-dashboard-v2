@@ -1,5 +1,4 @@
-import type { FilterChipOption } from "@/components/common/filters/FilterChips";
-import type { ReceiptProduct, ReceiptStatus } from "@/features/dashboard/receipts/types";
+import type { ReceiptProduct } from "@/features/dashboard/receipts/types";
 
 /** Rows per page — matches SKU_PAGE_LIMIT so both tables page alike. */
 export const RECEIPTS_PAGE_LIMIT = 10;
@@ -47,17 +46,11 @@ export const RECEIPT_MONTH_HINT =
   "This receipt covers all payments made during the selected month.";
 
 /**
- * Options in the Status filter chip's checkbox list. The table shows no status
- * column — see Receipt.status — so this chip is the only place a merchant can
- * narrow by it.
+ * Assistive line inside the Amount filter's popover. Names what the two inputs
+ * are compared against, since a receipt's amount is a whole month's fees rather
+ * than any single payment, and every receipt is billed in INR.
  */
-export const RECEIPT_STATUS_FILTERS: FilterChipOption[] = [
-  { value: "PAID", label: "Paid" },
-  { value: "ISSUED", label: "Issued" },
-  { value: "PENDING", label: "Pending" },
-  { value: "REFUNDED", label: "Refunded" },
-  { value: "VOID", label: "Void" },
-];
+export const RECEIPT_AMOUNT_HINT = "Matched against the receipt's total for the month, in INR.";
 
 /**
  * The hints the search box cycles through, exactly as the Transactions page
@@ -75,12 +68,4 @@ export const RECEIPT_SEARCH_ARIA_LABEL: Record<ReceiptProduct, string> = {
   MCA: "Search multi-currency account receipts",
   PA: "Search payment aggregator receipts",
   FRAUD: "Search fraud screening receipts",
-};
-
-export const RECEIPT_STATUS_LABEL: Record<ReceiptStatus, string> = {
-  PAID: "Paid",
-  ISSUED: "Issued",
-  PENDING: "Pending",
-  REFUNDED: "Refunded",
-  VOID: "Void",
 };

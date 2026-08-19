@@ -9,9 +9,6 @@
  */
 export type ReceiptProduct = "MCA" | "PA" | "FRAUD";
 
-/** Lifecycle of a receipt, as the Status filter chip presents it. */
-export type ReceiptStatus = "PAID" | "ISSUED" | "PENDING" | "REFUNDED" | "VOID";
-
 /**
  * One month of one product's payment activity, as a receipt.
  *
@@ -51,10 +48,4 @@ export interface Receipt {
    * Amount cell never hardcodes a symbol.
    */
   currency: string;
-  /**
-   * Whether the receipt has been settled. Not a column — the table shows no
-   * status, since every row a merchant can see is a real, issued receipt — but
-   * the Status filter chip narrows on it.
-   */
-  status: ReceiptStatus;
 }
