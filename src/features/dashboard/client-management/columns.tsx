@@ -19,6 +19,7 @@ import {
   truncateMiddle,
 } from "@/lib/utils/format";
 import {
+  CLIENT_AMOUNT_CURRENCY,
   clientAmountLocale,
   clientTotalReceived,
 } from "@/features/dashboard/client-management/constants";
@@ -115,16 +116,25 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       cellClassName: "overflow-visible",
       render: (row) => (
         <RowClick onClick={() => onOpenDetails(row)}>
-          {/* Elided for display only — CopyableText keeps the full address in
-              the title, the tooltip, the accessible name, and the clipboard,
-              and the record itself is untouched. Its copy button stops the
-              click from also opening the row. */}
-          <CopyableText
-            value={row.email}
-            displayValue={truncateMiddle(row.email, EMAIL_HEAD_CHARS, EMAIL_TAIL_CHARS)}
-            valueClassName={COPY_CELL_VALUE_CLASS}
-            revealOnHover
-          />
+          {/* An em-dash when there is no address, and no copy affordance with it:
+              a copy button beside an empty cell offers to put nothing on the
+              clipboard, which is what the bare icons in the table were. Same
+              `text || "-"` treatment production's own Email column gives it.
+
+              Otherwise elided for display only — CopyableText keeps the full
+              address in the title, the tooltip, the accessible name, and the
+              clipboard, and the record itself is untouched. Its copy button stops
+              the click from also opening the row. */}
+          {row.email ? (
+            <CopyableText
+              value={row.email}
+              displayValue={truncateMiddle(row.email, EMAIL_HEAD_CHARS, EMAIL_TAIL_CHARS)}
+              valueClassName={COPY_CELL_VALUE_CLASS}
+              revealOnHover
+            />
+          ) : (
+            <span className="text-[13px] text-muted-foreground">—</span>
+          )}
         </RowClick>
       ),
     },
@@ -136,13 +146,21 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       render: (row) => (
         <RowClick onClick={() => onOpenDetails(row)}>
           {/* Shown in full — a formatted number is short enough to read from a
-              table — but copyable on the same hover affordance as the email
-              beside it. */}
-          <CopyableText
-            value={formatPhoneNumber(row.phoneDialCode, row.phoneNumber)}
-            valueClassName={cn(COPY_CELL_VALUE_CLASS, "tabular-nums")}
-            revealOnHover
-          />
+              table — but copyable on the same hover affordance as the email beside
+              it. Nothing to copy means an em-dash and no button, as above.
+
+              Keyed off phoneNumber rather than the formatted string: the formatter
+              returns the dial code alone for a record that has one and no number,
+              which would render "+64" as though it were a phone number. */}
+          {row.phoneNumber ? (
+            <CopyableText
+              value={formatPhoneNumber(row.phoneDialCode, row.phoneNumber)}
+              valueClassName={cn(COPY_CELL_VALUE_CLASS, "tabular-nums")}
+              revealOnHover
+            />
+          ) : (
+            <span className="text-[13px] text-muted-foreground">—</span>
+          )}
         </RowClick>
       ),
     },
@@ -156,12 +174,25 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       cellClassName: "overflow-visible",
       render: (row) => (
         <RowClick onClick={() => onOpenDetails(row)}>
-          <div className="flex min-w-max items-center gap-1.5">
-            <CountryFlag iso2={row.countryIso2} alt={row.countryName} />
-            <span className="text-[13px] whitespace-nowrap text-muted-foreground">
-              {row.countryName}
-            </span>
-          </div>
+          {/* A record with no country renders an em-dash and no flag. Without this
+              the flag fell back to an empty ISO2, which the CDN answers with
+              nothing — a broken-image box beside a blank cell. Same `|| "-"`
+              treatment the Email and Phone cells above give an absent value.
+
+              A name with no resolvable code still renders: the name is the useful
+              half, so it shows without a flag rather than being suppressed. */}
+          {!row.countryName && !row.countryIso2 ? (
+            <span className="text-[13px] text-muted-foreground">—</span>
+          ) : (
+            <div className="flex min-w-max items-center gap-1.5">
+              {row.countryIso2 ? (
+                <CountryFlag iso2={row.countryIso2} alt={row.countryName} />
+              ) : null}
+              <span className="text-[13px] whitespace-nowrap text-muted-foreground">
+                {row.countryName || row.countryIso2}
+              </span>
+            </div>
+          )}
         </RowClick>
       ),
     },
@@ -222,33 +253,35 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       minWidth: 140,
       align: "right",
       render: (row) => {
-        // The record's own figure, in the client's currency. Production renders
-        // this column with `currency={"INR"}` hardcoded, which is wrong for a
-        // book of cross-border clients — the column is ported, that detail is
-        // not.
+        // The record's own figure, in INR — see CLIENT_AMOUNT_CURRENCY. Not the
+        // client's own currency: this used to read row.currency, which relabelled
+        // an INR amount as AUD or GBP rather than converting it.
         const owed = row.outstandingAmount;
 
         return (
           <RowClick onClick={() => onOpenDetails(row)} align="right">
-            {owed === undefined || !row.currency ? (
+            {owed === undefined ? (
               // Nothing to state: an em-dash rather than a formatted zero, since
               // "nothing owed" and "we don't know" are different facts.
               <span className="text-[13px] text-muted-foreground">—</span>
             ) : (
-              <div className="flex flex-col items-end gap-0.5">
-                <span
-                  className={cn(
-                    "text-[13px] font-medium tabular-nums whitespace-nowrap",
-                    // Zero owed is settled up, which is good news and reads
-                    // muted; anything outstanding is the figure a merchant is
-                    // scanning this column for.
-                    owed > 0 ? "text-foreground" : "text-muted-foreground"
+              // The Transactions table's Amount treatment, and the same one the
+              // Total received column beside this already uses: figure and code on
+              // one baseline-aligned line, the figure semibold, the code 11px
+              // muted. Every money cell in the product then reads alike, and this
+              // one no longer stacks onto two lines.
+              <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+                <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                  {formatCurrency(
+                    owed,
+                    CLIENT_AMOUNT_CURRENCY,
+                    clientAmountLocale(CLIENT_AMOUNT_CURRENCY)
                   )}
-                >
-                  {formatCurrency(owed, row.currency, clientAmountLocale(row.currency))}
                 </span>
-                <span className="text-[11px] text-muted-foreground">{row.currency}</span>
-              </div>
+                <span className="text-[11px] font-medium text-muted-foreground">
+                  {CLIENT_AMOUNT_CURRENCY}
+                </span>
+              </span>
             )}
           </RowClick>
         );

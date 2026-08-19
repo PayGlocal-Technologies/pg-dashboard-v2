@@ -7,8 +7,10 @@ interface ClientBusinessTypeChipsProps {
   /** The id the field's label points at, so clicking the label focuses the
    *  group's first chip. */
   id: string;
-  options: readonly string[];
-  /** The one selected option, or "" for none. */
+  /** Code and label per option. The code is what the API takes (see
+   *  CLIENT_BUSINESS_TYPES); the label is only ever drawn. */
+  options: readonly { value: string; label: string }[];
+  /** The code of the selected option, or "" for none. */
   value: string;
   onChange: (next: string) => void;
   /** Labels the group for assistive tech — the FieldLabel's own id. */
@@ -19,8 +21,8 @@ interface ClientBusinessTypeChipsProps {
 /**
  * Single-choice check chips: every business type is on screen at once, and
  * picking one deselects whatever was picked before. A row of chips rather than
- * a dropdown because there are five short options — a select would hide all of
- * them behind a click and a scroll to save no space at all.
+ * a dropdown because there are only a handful of short options — a select would
+ * hide all of them behind a click and a scroll to save no space at all.
  *
  * Each chip is flux's own `Checkbox` inside a bordered label, which is the
  * pattern this product already uses for a selectable option (see the
@@ -57,10 +59,10 @@ export function ClientBusinessTypeChips({
       className="flex flex-wrap gap-2"
     >
       {options.map((option) => {
-        const selected = option === value;
+        const selected = option.value === value;
         return (
           <label
-            key={option}
+            key={option.value}
             className={cn(
               "flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-[13px] transition-colors",
               // The ring comes from the Checkbox's own focus, so the whole chip
@@ -75,8 +77,11 @@ export function ClientBusinessTypeChips({
               invalid && !selected && "border-destructive/50"
             )}
           >
-            <Checkbox checked={selected} onCheckedChange={() => onChange(selected ? "" : option)} />
-            {option}
+            <Checkbox
+              checked={selected}
+              onCheckedChange={() => onChange(selected ? "" : option.value)}
+            />
+            {option.label}
           </label>
         );
       })}

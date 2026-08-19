@@ -472,6 +472,14 @@ interface SkuFileImport {
   importedCount: number;
   skipped: SkuSkippedItem[];
   isImporting: boolean;
+  /**
+   * Why the upload leg stopped, or null. Surfaced so the upload step can say so
+   * instead of silently returning to its idle state: every failure here (initiate,
+   * the S3 PUT, the parse) leaves the merchant looking at the same dropzone they
+   * started at, and without this there is nothing to tell them apart from a click
+   * that never registered.
+   */
+  error: string | null;
   selectFile: (file: File) => void;
   commit: () => void;
   reset: () => void;
@@ -495,13 +503,15 @@ export function useSkuFileImport(onImported?: () => void, midOverride?: string):
   const [file, setFile] = useState<File | null>(null);
   const [fileRef, setFileRef] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  /** Whatever went wrong before the rows arrived. Cleared on the next attempt. */
+  const [uploadError, setUploadError] = useState<string | null>(null);
   // Set once the commit returns, which is the one thing that cannot be derived
   // from a query: it is a mutation result.
   const [result, setResult] = useState<{ importedCount: number; skipped: SkuSkippedItem[] } | null>(
     null
   );
 
-  const { data: rowsData, isFetching: isFetchingRows } = useGet<SkuExtractedRowsResponse>(
+  const { data: rowsData, isError: isRowsError } = useGet<SkuExtractedRowsResponse>(
     ["sku-extracted-rows", mid, fileRef],
     skuExtractedRowsApi(mid, fileRef),
     { enabled: !!fileRef }
@@ -537,6 +547,7 @@ export function useSkuFileImport(onImported?: () => void, midOverride?: string):
     setFile(null);
     setFileRef("");
     setIsUploading(false);
+    setUploadError(null);
     setResult(null);
   };
 
@@ -544,6 +555,7 @@ export function useSkuFileImport(onImported?: () => void, midOverride?: string):
     setFile(next);
     setIsUploading(true);
     setFileRef("");
+    setUploadError(null);
     setResult(null);
 
     initiateUpload(
@@ -554,6 +566,7 @@ export function useSkuFileImport(onImported?: () => void, midOverride?: string):
           const ref = res?.data?.fileRef;
           if (!uploadUrl || !ref) {
             setIsUploading(false);
+            setUploadError("We couldn't start the upload. Try again.");
             toast.error("Failed to initiate upload.");
             return;
           }
@@ -572,6 +585,7 @@ export function useSkuFileImport(onImported?: () => void, midOverride?: string):
             });
           } catch {
             setIsUploading(false);
+            setUploadError("We couldn't upload that file. Try again.");
             toast.error("Failed to upload file.");
             return;
           }
@@ -582,25 +596,54 @@ export function useSkuFileImport(onImported?: () => void, midOverride?: string):
         },
         onError: () => {
           setIsUploading(false);
+          setUploadError("We couldn't start the upload. Try again.");
           toast.error("Failed to initiate upload.");
         },
       }
     );
   };
 
+  // Whether the parse has come back for the *current* file — a rows array being
+  // present, whatever its length. This is the condition that moves the modal on,
+  // and it is pg-dashboard's own (`if (extractedRowsData?.data?.rows)`).
+  //
+  // It used to be `rows.length > 0`, and that was the bug behind "the modal does
+  // not move to step two": a sheet the backend parsed to *zero* rows satisfied
+  // nothing, so the step stayed "upload" while isProcessing went false — the
+  // dropzone quietly returned to its idle state, indistinguishable from a click
+  // that never registered. A parse that yields no rows is a real answer and has to
+  // land on Review, where the table says so, rather than nowhere. The same held
+  // for a failed parse, which is now `isRowsError` below.
+  //
+  // Keyed by fileRef, so this can never be a previous file's answer: a new ref is
+  // a new query key, whose data is undefined until it resolves.
+  const rowsReady = !!fileRef && !!rowsData?.data?.rows;
   const rows = rowsData?.data?.rows ?? [];
-  const step: SkuImportStep = result ? "done" : rows.length > 0 ? "review" : "upload";
+
+  const step: SkuImportStep = result ? "done" : rowsReady ? "review" : "upload";
 
   return {
     step,
     file,
-    isProcessing: isUploading || isFetchingRows,
+    // True for the whole gap between picking a file and having an answer about it,
+    // rather than only while a request is in flight: between the S3 PUT resolving
+    // and the rows query being enabled there is a render with neither happening,
+    // and a spinner that blinks off there reads as "finished" when it is not.
+    isProcessing: isUploading || (!!fileRef && !rowsReady && !isRowsError),
     rows,
     importedCount: result?.importedCount ?? 0,
     skipped: result?.skipped ?? [],
     isImporting,
+    // The parse failing is reported the same way as the two legs before it. Read
+    // off the query rather than pushed from an effect, so there is no
+    // setState-in-effect and no window where the modal has failed but not said so.
+    error:
+      uploadError ??
+      (isRowsError ? "We couldn't read that file. Check the format and try again." : null),
     selectFile,
-    commit: () => fileRef && importFile({ fileRef }),
+    commit: () => {
+      if (fileRef) importFile({ fileRef });
+    },
     reset,
   };
 }

@@ -64,7 +64,9 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
         <span className="min-w-0 flex-1 truncate text-[15px] font-semibold text-foreground">
           {row.businessName}
         </span>
-        <CountryFlag iso2={row.countryIso2} alt={row.countryName} />
+        {/* Only when there is a country: an empty ISO2 renders as a broken-image
+            box, the same fault the table's Country cell had. */}
+        {row.countryIso2 ? <CountryFlag iso2={row.countryIso2} alt={row.countryName} /> : null}
       </div>
 
       {/* Contact block: who to talk to, then how. The name carries foreground
@@ -72,10 +74,12 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
           business itself); email and phone trail it as muted metadata. */}
       <p className="mt-2 text-[13px] text-muted-foreground">
         <span className="font-medium text-foreground">{row.primaryContactName}</span>
-        <span className="text-muted-foreground"> · {row.countryName}</span>
+        <span className="text-muted-foreground"> · {row.countryName || "—"}</span>
       </p>
+      {/* An em-dash rather than an empty line, so the card keeps its rhythm and
+          says "no address on file" instead of looking clipped. */}
       <p className="mt-1 truncate text-[12px] text-muted-foreground" title={row.email}>
-        {row.email}
+        {row.email || "—"}
       </p>
 
       {/* The card's form of the Total received column. Labelled, unlike the
@@ -105,7 +109,9 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
           timestamp on: phone at the left, creation date at the right. */}
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <span className="text-[12px] tabular-nums text-muted-foreground">
-          {formatPhoneNumber(row.phoneDialCode, row.phoneNumber)}
+          {/* Keyed off the number, not the formatted string: the formatter returns
+              the dial code alone for a record with one and no number. */}
+          {row.phoneNumber ? formatPhoneNumber(row.phoneDialCode, row.phoneNumber) : "—"}
         </span>
         <span className="text-[12px] text-muted-foreground">
           Created {formatTransactionDateOnly(row.createdAt)}
