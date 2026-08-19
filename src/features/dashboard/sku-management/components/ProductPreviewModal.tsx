@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import {
   Avatar,
   AvatarFallback,

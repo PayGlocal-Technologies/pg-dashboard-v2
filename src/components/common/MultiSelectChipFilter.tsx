@@ -1,9 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Checkbox, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
+import {
+  Button,
+  Checkbox,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Separator,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
+import {
+  FilterChipClearButton,
+  FilterChipLabelTrigger,
+  FilterChipShell,
+} from "@/components/common/filters/FilterChips";
 
 export interface MultiSelectChipOption {
   value: string;
@@ -17,10 +28,17 @@ interface MultiSelectChipFilterProps {
   placeholder: string;
 }
 
-/** Dotted, no-fill filter chip whose popover is a scrollable checkbox list
- * with Clear/Apply footer buttons, selections are staged in the popover and
- * only committed on Apply. Mirrors TransactionAmountFilter's draft/resync
- * pattern, generalized to a multi-select list instead of a min/max range. */
+/**
+ * A generic multi-select filter chip: a checkbox list staged in a popover and
+ * committed only on Apply.
+ *
+ * Built from the same FilterChipShell/ClearButton/LabelTrigger pieces the
+ * transaction tables' chips use, so a filter reads identically wherever it
+ * appears. That means the dashed pill (not dotted), the leading + only while
+ * inactive, a separate × segment once there is something to clear, and a
+ * trailing dot rather than a selected-count — the chips deliberately signal
+ * on/off rather than how many, see FilterChipLabelTrigger.
+ */
 export function MultiSelectChipFilter({
   value,
   options,
@@ -29,6 +47,8 @@ export function MultiSelectChipFilter({
 }: MultiSelectChipFilterProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string[]>(value ?? []);
+
+  const isActive = !!value?.length;
 
   function handleOpenChange(next: boolean) {
     if (next) {
@@ -56,65 +76,49 @@ export function MultiSelectChipFilter({
     setOpen(false);
   }
 
-  const hasValue = !!value && value.length > 0;
-  const triggerLabel =
-    hasValue && value
-      ? value.length === 1
-        ? (options.find((o) => o.value === value[0])?.label ?? placeholder)
-        : `${placeholder} (${value.length})`
-      : placeholder;
-
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Icon name="plus" className="h-3 w-3" />}
-          className={cn(
-            "relative h-auto rounded-full border-dotted bg-transparent px-4 py-2 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground",
-            open && "text-foreground"
-          )}
-        >
-          {triggerLabel}
-          {hasValue && (
-            <span
-              className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary"
-              aria-hidden="true"
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 p-0">
-        <div className="max-h-64 overflow-y-auto p-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border">
-          {options.map((opt) => (
-            <div
-              key={opt.value}
-              className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-muted/60"
+      <FilterChipShell active={isActive}>
+        {isActive && <FilterChipClearButton label={placeholder} onClick={handleClear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label={placeholder} active={isActive} />
+        </PopoverTrigger>
+      </FilterChipShell>
+
+      <PopoverContent align="start" className="w-auto p-0">
+        <div className="w-56 p-3">
+          <div className="max-h-64 space-y-0.5 overflow-y-auto">
+            {options.map((option) => (
+              <label
+                key={option.value}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
+              >
+                <Checkbox
+                  checked={draft.includes(option.value)}
+                  onCheckedChange={() => toggleOption(option.value)}
+                />
+                {option.label}
+              </label>
+            ))}
+          </div>
+
+          <Separator className="my-2" />
+
+          <div className="flex items-center justify-between gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              leftIcon={<Icon name="x" className="w-3 h-3" />}
+              onClick={handleClear}
+              disabled={draft.length === 0}
+              className="text-muted-foreground hover:text-foreground"
             >
-              <Checkbox
-                checked={draft.includes(opt.value)}
-                onCheckedChange={() => toggleOption(opt.value)}
-              />
-              <span className="text-sm text-foreground">{opt.label}</span>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center justify-between gap-2 border-t border-border p-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon name="x" className="h-3 w-3" />}
-            onClick={handleClear}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </Button>
-          <Button type="button" variant="primary" size="sm" onClick={handleApply}>
-            Apply
-          </Button>
+              Clear
+            </Button>
+            <Button type="button" variant="primary" size="sm" onClick={handleApply}>
+              Apply
+            </Button>
+          </div>
         </div>
       </PopoverContent>
     </Popover>
