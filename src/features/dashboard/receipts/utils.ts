@@ -68,13 +68,14 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
   return receipts.filter((receipt) => {
     if (receipt.product !== filters.product) return false;
 
-    // The three fields the search hints name, plus the channel, so a query for
-    // "SEPA" or "UPI" narrows the list the way merchants expect it to.
+    // The two fields the search hints name, both of them columns the table
+    // renders in every tab. The amount is matched on its raw decimal string, so
+    // "24500" finds the row the Amount column shows as 24,500.00 — grouping
+    // separators and the currency symbol are display-only and never part of the
+    // query.
     if (
       query &&
-      ![receipt.receiptNumber, receipt.party, receipt.reference, receipt.channel].some((field) =>
-        field.toLowerCase().includes(query)
-      )
+      ![receipt.invoiceId, receipt.amount].some((field) => field.toLowerCase().includes(query))
     ) {
       return false;
     }

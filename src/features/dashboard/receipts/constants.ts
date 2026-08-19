@@ -1,14 +1,15 @@
 import type { FilterChipOption } from "@/components/common/filters/FilterChips";
 import type { ReceiptProduct, ReceiptStatus } from "@/features/dashboard/receipts/types";
 
-/** Same page size as the MCA Transactions and MCA Links tables, so all three paginate identically. */
+/** Rows per page — matches SKU_PAGE_LIMIT so both tables page alike. */
 export const RECEIPTS_PAGE_LIMIT = 10;
 
 /**
  * The product tab bar: the three products receipts are issued under, and no
- * others. Unlike the Transactions and SKU tab bars — which are shortcuts onto a
- * status/type filter — this one selects which product's receipts the table is
- * showing at all, so it is a context switch rather than a filter axis.
+ * others. Unlike the SKU and Transactions tab bars — which are shortcuts onto a
+ * type/status filter — this one selects which product's receipts the table is
+ * showing at all, so it changes the column set as well as the rows (see
+ * buildReceiptColumns).
  *
  * Multi-currency accounts leads because it is the product most receipts are
  * raised under, and it is the page's default selection.
@@ -32,33 +33,15 @@ export const RECEIPT_STATUS_FILTERS: FilterChipOption[] = [
 ];
 
 /**
- * Three columns name different things depending on the product the receipt was
- * issued under, so the header travels with the selected tab rather than
- * settling on one generic word for all three. The underlying Receipt fields
- * (`party`, `reference`, `channel`) are the same either way — this only renames
- * them, which is what makes one table serve all three products.
- */
-export const RECEIPT_COLUMN_LABELS: Record<
-  ReceiptProduct,
-  { party: string; reference: string; channel: string }
-> = {
-  MCA: { party: "Remitter", reference: "Transaction ID", channel: "Rail" },
-  PA: { party: "Customer", reference: "Order ID", channel: "Payment method" },
-  FRAUD: { party: "Billed to", reference: "Invoice number", channel: "Service" },
-};
-
-/**
  * The hints the search box cycles through, exactly as the Transactions page
  * cycles remitter/transaction ID/UTR: each names a field the query is matched
- * against, and the query hits any of them (see filterReceipts). Keyed by
- * product so the hints always name the fields the visible rows actually have.
- * Rendered as "Search by " + hint, so these are lowercase phrases.
+ * against, and the query hits either of them (see filterReceipts). Rendered as
+ * "Search by " + hint, so these are lowercase phrases except the ID initialism.
+ *
+ * Both name a column the table actually renders, in every tab — a receipt found
+ * by a field the merchant can't see in the row would read as a mis-match.
  */
-export const RECEIPT_SEARCH_HINTS: Record<ReceiptProduct, string[]> = {
-  MCA: ["receipt number", "remitter", "transaction ID"],
-  PA: ["receipt number", "customer", "order ID"],
-  FRAUD: ["receipt number", "billed entity", "invoice number"],
-};
+export const RECEIPT_SEARCH_HINTS = ["invoice ID", "amount"];
 
 /** Screen-reader label for the search box, per product. */
 export const RECEIPT_SEARCH_ARIA_LABEL: Record<ReceiptProduct, string> = {

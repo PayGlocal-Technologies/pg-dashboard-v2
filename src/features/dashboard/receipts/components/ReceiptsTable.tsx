@@ -1,7 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DataTable } from "@/components/ui";
+import { toast } from "sonner";
+import { Button, DataTable } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { FilterChipsRow, type DateRangeValue } from "@/components/common/filters/FilterChips";
 import { buildReceiptColumns } from "@/features/dashboard/receipts/columns";
@@ -9,7 +12,9 @@ import { ReceiptCardList } from "@/features/dashboard/receipts/components/Receip
 import { MOCK_RECEIPTS } from "@/features/dashboard/receipts/mock-data";
 import { filterReceipts, receiptCurrencyOptions } from "@/features/dashboard/receipts/utils";
 import {
+  DEFAULT_RECEIPT_PRODUCT,
   RECEIPTS_PAGE_LIMIT,
+  RECEIPT_PRODUCT_TABS,
   RECEIPT_SEARCH_ARIA_LABEL,
   RECEIPT_SEARCH_HINTS,
   RECEIPT_STATUS_FILTERS,
@@ -19,27 +24,28 @@ import type { ReceiptProduct } from "@/features/dashboard/receipts/types";
 const EMPTY_DATE_RANGE: DateRangeValue = { from: "", to: "" };
 
 /**
- * The receipts table, plus the search and filter controls above it.
+ * The receipts table: product tabs, search/filter/Download controls, and the
+ * rows themselves, all inside one bordered surface.
  *
- * Structurally a sibling of McaLinkTable — same controls container, same chips,
- * same DataTable configuration, same card list below `lg` as the Transactions
- * and SKU tables — so every table in the product reads as one family. Two
- * things are its own:
+ * Structurally a copy of SkuTable — same container (overflow-hidden rounded-xl
+ * border border-border bg-card), same tab row, same controls row with the
+ * trailing action pushed right by ml-auto, same DataTable configuration with its
+ * own border/radius neutralised, same card list below `lg`. A border-b under
+ * each of the first two rows stands in for the divider that would otherwise
+ * separate them, so no rule is drawn that the layout doesn't already need.
  *
- * 1. The product it shows is a prop, not internal state. The page's tab bar owns
- *    that selection because it is page-level context (which product's receipts
- *    am I looking at), not one more filter axis on this table. The page also
- *    keys this component on it, so switching products resets search, filters and
- *    the page number rather than carrying one product's query onto another's rows.
- * 2. Three of its column headers are named by that product — see
- *    RECEIPT_COLUMN_LABELS.
+ * The one real difference from SkuTable is what the tabs do. There, they filter
+ * by product type; here they select which product's receipts are on screen at
+ * all, so they change the column set as well as the rows — see
+ * buildReceiptColumns, where Country exists only for MCA.
  *
  * There is no receipts endpoint yet, so rows come from MOCK_RECEIPTS and every
  * filter is applied client-side in filterReceipts. When the endpoint lands,
- * replace that call with a request body and a usePostQuery; nothing here needs
- * to change.
+ * replace that call with a request body (mirroring buildTxnRequestBody) and a
+ * usePostQuery call; the tabs, chips and columns need no changes.
  */
-export function ReceiptsTable({ product }: { product: ReceiptProduct }) {
+export function ReceiptsTable() {
+  const [product, setProduct] = useState<ReceiptProduct>(DEFAULT_RECEIPT_PRODUCT);
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE);
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
@@ -69,9 +75,9 @@ export function ReceiptsTable({ product }: { product: ReceiptProduct }) {
 
   const totalCount = filtered.length;
 
-  // The mock source holds every product's receipts at once, so the page slice
-  // is taken here. Against a real endpoint this whole `useMemo` disappears:
-  // the request returns one page and `filtered` is already it.
+  // The mock source holds every product's receipts at once, so the page slice is
+  // taken here. Against a real endpoint this whole `useMemo` disappears: the
+  // request returns one page and `filtered` is already it.
   const pageRows = useMemo(() => {
     const start = (page - 1) * RECEIPTS_PAGE_LIMIT;
     return filtered.slice(start, start + RECEIPTS_PAGE_LIMIT);
@@ -86,9 +92,49 @@ export function ReceiptsTable({ product }: { product: ReceiptProduct }) {
     setPage(1);
   };
 
-  // Each instance owns its own open-popover state, which is why the desktop and
-  // compact control rows below can both render one: see FilterChipsRow's own
-  // note on why lifting that state breaks the hidden copy.
+  // Switching products keeps the search query and the Date/Status filters, the
+  // same way SkuTable keeps its search across type tabs: a merchant chasing one
+  // invoice ID shouldn't retype it to check which product it was raised under,
+  // and both of those filters mean the same thing in all three tabs.
+  //
+  // Currency is the exception, and is cleared. Its options are derived from the
+  // selected product's own rows (see currencyOptions), so a code carried across
+  // could be one the new tab has no option for at all — an active filter the
+  // merchant can see the effect of but not find, let alone clear.
+  const onProductChange = (value: string) => {
+    setProduct(value as ReceiptProduct);
+    setCurrencyFilters([]);
+    setPage(1);
+  };
+
+  const handleDownload = () => {
+    // TODO: wire up once a receipts export endpoint exists — the same gap the
+    // Transactions and MCA Links tables' own Report buttons have.
+    toast.message("Download receipts", {
+      description: "Receipt exports aren't connected to the backend yet.",
+    });
+  };
+
+  // One button, rendered once per control row (desktop and compact), so the
+  // action is identical at every width — labelled rather than collapsed into an
+  // icon or an overflow menu, matching how the Transactions table keeps its
+  // Report button labelled on mobile.
+  const downloadButton = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+      onClick={handleDownload}
+      className="ml-auto shrink-0"
+    >
+      Download
+    </Button>
+  );
+
+  // Each instance owns its own open-popover state, which is why the two control
+  // rows below can both render one: see FilterChipsRow's own note on why lifting
+  // that state breaks the hidden copy.
   const filterChips = (
     <FilterChipsRow
       dateRange={dateRange}
@@ -111,66 +157,85 @@ export function ReceiptsTable({ product }: { product: ReceiptProduct }) {
     />
   );
 
+  const searchInput = (
+    <RotatingSearchInput
+      value={search}
+      onSearch={onSearch}
+      words={RECEIPT_SEARCH_HINTS}
+      ariaLabel={RECEIPT_SEARCH_ARIA_LABEL[product]}
+      className="min-w-0 flex-1 lg:w-56 lg:flex-none"
+    />
+  );
+
   const emptyTitle = "No receipts found";
   const emptyDescription = "Try adjusting your filters or search query";
 
   return (
-    <div className="space-y-4">
-      {/* Controls container: search sits at the left with the filter chip group
-          immediately after it, tight enough that the chips read as following
-          search rather than floating away from it. No Report or Reorder Columns
-          group, so nothing is pushed to the far right. */}
-      <div className="rounded-xl border border-border bg-card px-4 py-3">
-        {/* Desktop (lg+): search and the chips share one row. */}
-        <div className="hidden flex-wrap items-center gap-2 lg:flex">
-          <RotatingSearchInput
-            value={search}
-            onSearch={onSearch}
-            words={RECEIPT_SEARCH_HINTS[product]}
-            ariaLabel={RECEIPT_SEARCH_ARIA_LABEL[product]}
-            className="w-56"
-          />
-          {/* Filter group: Date, Status and Currency read as one cohesive
-              filtering control, so the gap within it is tighter than the gap
-              separating it from search. */}
-          <div className="flex flex-wrap items-center gap-1.5">{filterChips}</div>
-        </div>
+    // Tab bar, controls, and the table share one bordered surface, matching
+    // SkuTable and the Transactions page: DataTable's own border/radius are
+    // neutralised below (rounded-none border-0) since this wrapper draws them.
+    <div className="overflow-hidden rounded-xl border border-border bg-card">
+      {/* Product context: which product's receipts are on screen. No bottom
+          padding here — TabsTrigger's own py-2.5 already clears the border-b
+          below before the sliding indicator meets it.
 
-        {/* Tablet + mobile (below lg): search takes the full width on its own
-            row, then the chips below it on a single line that scrolls
-            horizontally — there is no room to show all three beside search, and
-            wrapping them would push the table down a row at a time. The
-            scrollbar is hidden (scrollbar-none, the same utility the
-            multi-currency account carousel and the Transactions controls use) so
-            the chips read as a row of controls rather than a scroll region: the
-            gesture still works, there is just no persistent indicator. The
-            scrolling is inside this row, so the page itself never scrolls
-            sideways. */}
-        <div className="flex flex-col gap-2 lg:hidden">
-          <RotatingSearchInput
-            value={search}
-            onSearch={onSearch}
-            words={RECEIPT_SEARCH_HINTS[product]}
-            ariaLabel={RECEIPT_SEARCH_ARIA_LABEL[product]}
-            className="w-full"
-          />
-          <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-            {filterChips}
-          </div>
+          scrollbar-none + overflow-x-auto so the three labels stay on one line
+          and scroll on a narrow phone instead of wrapping or pushing the page
+          itself sideways. UnderlineTabs measures its indicator from the DOM, so
+          it tracks the selected tab at any scroll offset. */}
+      <div className="scrollbar-none overflow-x-auto border-b border-border px-4 pt-3">
+        <UnderlineTabs
+          tabs={RECEIPT_PRODUCT_TABS}
+          value={product}
+          onValueChange={onProductChange}
+        />
+      </div>
+
+      {/* Desktop (lg+): search, the filter chip group, and Download all share one
+          row. Search and the chips sit together on the left with tight spacing —
+          the chips read as immediately following search — while ml-auto on the
+          button pushes it to the far right rather than justify-between spreading
+          the controls into a wide gap. */}
+      <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
+        {searchInput}
+        {/* Filter group: Date, Status and Currency read as one cohesive
+            filtering control, so the gap within it is tighter than the gap
+            separating it from search. */}
+        <div className="flex flex-wrap items-center gap-1.5">{filterChips}</div>
+        {downloadButton}
+      </div>
+
+      {/* Tablet + mobile (below lg): search shrinks to whatever room Download
+          leaves it on a row that never wraps, so the button stays visible and
+          labelled at every width instead of moving into a menu. The chips go on
+          their own row beneath, on a single line that scrolls horizontally —
+          there's no room for all three beside search, and wrapping them would
+          push the table down a row at a time. Its scrollbar is hidden
+          (scrollbar-none, the same utility the Transactions controls use) so the
+          chips read as a row of controls rather than a scroll region: the gesture
+          still works, there's just no persistent indicator. The scrolling is
+          inside this row, so the page itself never scrolls sideways. */}
+      <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
+        <div className="flex flex-nowrap items-center gap-2">
+          {searchInput}
+          {downloadButton}
+        </div>
+        <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+          {filterChips}
         </div>
       </div>
 
       {/* Desktop (lg+): the full table. `tableLayout="content"` sizes every
-          column to its own content and scrolls inside the table's own box once
-          the columns outgrow it, so a narrow desktop window keeps usable column
-          widths instead of squeezing all eight and never scrolls the page. */}
+          column to its content and scrolls inside the table's own box once the
+          columns outgrow it, so a narrow desktop window keeps usable column
+          widths instead of squeezing all five — and never scrolls the page. */}
       <DataTable
-        className="hidden lg:block"
+        className="hidden rounded-none border-0 lg:block"
         columns={columns}
         data={pageRows}
-        // No endpoint behind this yet (see MOCK_RECEIPTS), so nothing is ever
-        // in flight. Plumbed rather than dropped so the loading state is
-        // already wired when the query lands.
+        // No endpoint behind this yet (see MOCK_RECEIPTS), so nothing is ever in
+        // flight. Plumbed rather than dropped so the loading state is already
+        // wired when the query lands.
         isLoading={false}
         skeletonRows={8}
         emptyTitle={emptyTitle}
@@ -184,13 +249,11 @@ export function ReceiptsTable({ product }: { product: ReceiptProduct }) {
         density="compact"
       />
 
-      {/* Tablet + mobile (below lg): the same page's rows as cards. `pageRows`
-          is already just this page's slice — the same array DataTable's
-          controlled `page`/`data` above consumes — so this re-slices nothing.
-          p-0 drops the list's own padding: each card draws its own border, so
-          it sits directly on the page rather than inside a second surface. */}
+      {/* Tablet + mobile (below lg): the same page's rows as cards. `pageRows` is
+          already just this page's slice — the same array DataTable's controlled
+          `page`/`data` above consumes — so this re-slices nothing. */}
       <ReceiptCardList
-        className="lg:hidden p-0"
+        className="lg:hidden"
         rows={pageRows}
         product={product}
         isLoading={false}

@@ -4,9 +4,9 @@ import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatTransactionTimestamp } from "@/lib/utils/format";
+import { CountryCell } from "@/features/dashboard/mca-transactions/columns";
 import { getReceiptStatusMeta } from "@/features/dashboard/receipts/columns";
 import { formatReceiptAmount } from "@/features/dashboard/receipts/utils";
-import { RECEIPT_COLUMN_LABELS } from "@/features/dashboard/receipts/constants";
 import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
 
 function ReceiptCardSkeleton() {
@@ -17,25 +17,26 @@ function ReceiptCardSkeleton() {
         <Shimmer className="h-5 w-16" rounded="full" />
       </div>
       <Shimmer className="mt-2.5 h-5 w-28" />
-      <Shimmer className="mt-2.5 h-3 w-40" />
-      <Shimmer className="mt-2 h-3 w-32" />
+      <Shimmer className="mt-2.5 h-3 w-36" />
     </div>
   );
 }
 
+// The same four or five fields the table's columns show, in the same order, laid
+// out as a stacked card instead of cells — including Country, which appears here
+// only on the MCA tab for exactly the reason the column does.
 function ReceiptCard({ row, product }: { row: Receipt; product: ReceiptProduct }) {
   const { label, variant, trailIcon } = getReceiptStatusMeta(row.status);
-  const labels = RECEIPT_COLUMN_LABELS[product];
 
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-muted/40">
-      {/* Receipt number leads and the status chip closes the row: the two facts
-          a merchant scans a list of receipts for. Unlike the table — where the
-          number reveals its copy button on row hover — nothing is hover-gated
-          here, since there is no hover on touch. */}
+      {/* Invoice ID leads and the status chip closes the row: the two facts a
+          merchant scans a list of receipts for. Unlike the table — where the ID
+          reveals its copy button on row hover — nothing is hover-gated here,
+          since there is no hover on touch. */}
       <div className="flex items-start justify-between gap-2">
         <span className="font-mono text-[12.5px] font-medium break-all text-foreground">
-          {row.receiptNumber}
+          {row.invoiceId}
         </span>
         <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />
       </div>
@@ -48,26 +49,14 @@ function ReceiptCard({ row, product }: { row: Receipt; product: ReceiptProduct }
         <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
       </div>
 
-      {/* The remaining table columns as labelled pairs, in the table's own
-          order — the card is the same record, so it names the same fields in
-          the same sequence, with the labels following the selected product just
-          as the column headers do. Two pairs per row where there's room, one
-          when there isn't; min-w-0 on each is what lets a long value truncate
-          inside its grid cell instead of widening the card. */}
-      <div className="mt-2.5 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
-        {[
-          { term: labels.party, value: row.party },
-          { term: labels.reference, value: row.reference },
-          { term: labels.channel, value: row.channel },
-          { term: "Issued on", value: formatTransactionTimestamp(row.issuedOn) },
-        ].map((item) => (
-          <div key={item.term} className="min-w-0">
-            <p className="text-[11px] text-muted-foreground">{item.term}</p>
-            <p className="truncate text-[12.5px] text-foreground" title={item.value}>
-              {item.value}
-            </p>
-          </div>
-        ))}
+      {/* Date and, on the MCA tab, the remitter country share the trailing row —
+          the card's own metadata line, matching where the transaction card puts
+          its timestamp. */}
+      <div className="mt-2.5 flex items-center justify-between gap-2">
+        <span className="text-[12px] text-muted-foreground">
+          {formatTransactionTimestamp(row.issuedOn)}
+        </span>
+        {product === "MCA" && <CountryCell iso2={row.remitterCountry} />}
       </div>
     </div>
   );
