@@ -49,7 +49,10 @@ const ACTION_ROUTES: Record<QuickActionId, string> = {
   "payment-link": "/payment-links/create",
   invoice: "/invoices/create",
   "invite-teammate": "/settings/team",
-  "fx-calculator": "/fx-calculator",
+  // The forex calculator is a modal on the Virtual accounts page (as it is in
+  // pg-dashboard, which opens it from a banner there), not a page of its own —
+  // so this tile goes to that page rather than to a route that doesn't exist.
+  "fx-calculator": "/multi-currency",
   "international-accounts": "/international-accounts",
   "manage-dispute": "/disputes",
 };

@@ -72,8 +72,7 @@ export function TwoFAOtpForm({ setScreen }: LoginScreenProps) {
       noValidate
     >
       <AuthHeading title="Two-factor verification">
-        For extra security, enter the {OTP_LENGTH}-digit code sent to{" "}
-        {maskedEmail || identifier}.
+        For extra security, enter the {OTP_LENGTH}-digit code sent to {maskedEmail || identifier}.
       </AuthHeading>
       <AuthError message={apiError} />
 

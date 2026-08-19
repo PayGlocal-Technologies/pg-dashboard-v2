@@ -42,13 +42,10 @@ import {
 import { CountryInsightsMap } from "@/features/dashboard/home/components/widgets/CountryInsightsMap";
 import { StateInsightsList } from "@/features/dashboard/home/components/widgets/StateInsightsList";
 
- 
-
 const BRAND = "#0061E3";
 const BRAND_SOFT = "#93c5fd";
 
-const cardClass =
-  "bg-card text-card-foreground rounded-xl border border-border shadow-sm";
+const cardClass = "bg-card text-card-foreground rounded-xl border border-border shadow-sm";
 
 /** Recharts sometimes fails to resolve `fill="var(--…)"` on bar backgrounds; use explicit colors per theme. */
 function useChartBarTrackFill(): string {
@@ -90,7 +87,7 @@ function StandardChartTooltip({
             <span className="shrink-0 text-[13px] font-semibold tabular-nums text-foreground">
               {formatValue && entry.value !== undefined
                 ? formatValue(entry.value as number)
-                : (entry.value as number)?.toLocaleString("en-IN") ?? String(entry.value)}
+                : ((entry.value as number)?.toLocaleString("en-IN") ?? String(entry.value))}
             </span>
           </div>
         ))}
@@ -385,7 +382,9 @@ function PieSplitCard({
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Tooltip
-                content={(props) => <StandardChartTooltip {...props} formatValue={(v) => `${v}%`} />}
+                content={(props) => (
+                  <StandardChartTooltip {...props} formatValue={(v) => `${v}%`} />
+                )}
                 cursor={false}
               />
               <Pie
@@ -597,7 +596,11 @@ export function DashboardWidgetRenderer({
         ? hourlyTraffic.map((d) => ({ ...d, v: Math.round(d.v * 0.4 + 5) }))
         : hourlyTraffic;
       return (
-        <ChartCardFrame title="Hourly traffic" subtitle="Sessions by hour (IST)" minHeight="min-h-[240px]">
+        <ChartCardFrame
+          title="Hourly traffic"
+          subtitle="Sessions by hour (IST)"
+          minHeight="min-h-[240px]"
+        >
           <div className="h-[188px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={ht}>
@@ -732,7 +735,9 @@ export function DashboardWidgetRenderer({
                   width={36}
                 />
                 <Tooltip
-                  content={(props) => <StandardChartTooltip {...props} formatValue={(v) => `${v}%`} />}
+                  content={(props) => (
+                    <StandardChartTooltip {...props} formatValue={(v) => `${v}%`} />
+                  )}
                   cursor={{ fill: "var(--chart-cursor)", radius: 4 }}
                 />
                 <Bar
@@ -757,7 +762,11 @@ export function DashboardWidgetRenderer({
       }
       const maxCount = Math.max(...paymentFailureReasons.map((d) => d.count), 1);
       return (
-        <ChartCardFrame title="Decline reasons" subtitle="Top failure codes — last 30 days" minHeight="min-h-[260px]">
+        <ChartCardFrame
+          title="Decline reasons"
+          subtitle="Top failure codes — last 30 days"
+          minHeight="min-h-[260px]"
+        >
           <div className="h-[220px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
@@ -765,7 +774,11 @@ export function DashboardWidgetRenderer({
                 data={paymentFailureReasons}
                 margin={{ left: 4, right: 16, top: 4, bottom: 4 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" horizontal={false} />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="var(--chart-grid)"
+                  horizontal={false}
+                />
                 <XAxis type="number" domain={[0, maxCount]} hide />
                 <YAxis
                   type="category"
@@ -919,7 +932,9 @@ export function DashboardWidgetRenderer({
           transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
           className={cn("rounded-xl p-5 overflow-x-auto", cardClass)}
         >
-          <span className="text-[13px] font-normal text-muted-foreground">Top customers by spend</span>
+          <span className="text-[13px] font-normal text-muted-foreground">
+            Top customers by spend
+          </span>
           <p className="text-xs text-muted-foreground mt-0.5 mb-3">Last 90 days</p>
           <DataTable
             columns={topCustomerColumns}

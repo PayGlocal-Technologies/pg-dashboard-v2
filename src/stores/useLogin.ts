@@ -67,8 +67,7 @@ export const useLogin = create<LoginState>()(
           set({ smsOtpInitiateTimestamp }, false, "setSmsOtpInitiateTimestamp"),
         setHasChangedPassword: (hasChangedPassword) =>
           set({ hasChangedPassword }, false, "setHasChangedPassword"),
-        setIsWebsiteLogin: (isWebsiteLogin) =>
-          set({ isWebsiteLogin }, false, "setIsWebsiteLogin"),
+        setIsWebsiteLogin: (isWebsiteLogin) => set({ isWebsiteLogin }, false, "setIsWebsiteLogin"),
         reset: () => set(initial, false, "reset"),
       }),
       {

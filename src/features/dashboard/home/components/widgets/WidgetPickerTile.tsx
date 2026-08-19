@@ -45,7 +45,9 @@ export function WidgetPickerTile({
       <div className="mb-2 flex items-start justify-between gap-2 pr-1">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold text-foreground leading-snug">{entry.name}</h4>
-          <p className="text-[11px] text-muted-foreground mt-0.5">Tap to {selected ? "remove" : "add"}</p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Tap to {selected ? "remove" : "add"}
+          </p>
         </div>
         <span
           className={cn(

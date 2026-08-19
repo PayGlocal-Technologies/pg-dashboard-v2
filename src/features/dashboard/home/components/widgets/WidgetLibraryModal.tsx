@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Button, Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, Input } from "@/components/ui";
+import {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Input,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import {
   CATEGORY_ORDER,
@@ -156,11 +164,15 @@ export function WidgetLibraryModal({
               >
                 <Icon name="search" className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
               </div>
-              <h3 className="text-[15px] font-semibold text-foreground tracking-tight">No charts found</h3>
+              <h3 className="text-[15px] font-semibold text-foreground tracking-tight">
+                No charts found
+              </h3>
               <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
                 Nothing matches{" "}
-                <span className="font-medium text-foreground">&ldquo;{searchQuery.trim()}&rdquo;</span>. Try another
-                keyword or browse by category.
+                <span className="font-medium text-foreground">
+                  &ldquo;{searchQuery.trim()}&rdquo;
+                </span>
+                . Try another keyword or browse by category.
               </p>
               <Button
                 type="button"

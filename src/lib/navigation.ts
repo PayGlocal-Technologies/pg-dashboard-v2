@@ -1,9 +1,13 @@
 import type { IconName } from "@/components/icon";
+import type { ProductType } from "@/lib/hooks/useResolvedMids";
 
 export type NavChild = {
   label: string;
   href: string;
   permission?: string[];
+  /** Only shown while the header's product context matches, see
+   * useProductContext.ts. Omit for items shared by both products. */
+  product?: ProductType;
 };
 
 export type NavItem = {
@@ -25,19 +29,11 @@ export type NavGroup = {
 export const regularNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Payments",
     items: [
-      {
-        label: "Transactions",
-        href: "/transactions",
-        icon: "repeat",
-        permission: ["getTxnSearchResults"],
-      },
       {
         label: "Payment Products",
         href: "/payment-products",
@@ -45,11 +41,38 @@ export const regularNavigation: NavGroup[] = [
         permission: [],
         children: [
           { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
-          { label: "MCA Links", href: "/mca-links", permission: [] },
-          { label: "Payment Links", href: "/payment-links", permission: [] },
+          // Two separate entries, both labelled "Transactions": the first is
+          // the MCA table, the second the PA (Cards/UPI/NetBanking) one. They
+          // used to be a single item whose page carried a segment toggle.
+          //
+          // Tagged by product so the header's switcher surfaces one at a time
+          // (see useProductContext.ts) — untagged, both would render as two
+          // identical "Transactions" rows side by side.
+          {
+            label: "Transactions",
+            href: "/mca-transactions",
+            permission: ["getTxnSearchResults"],
+            product: "PACB",
+          },
+          {
+            label: "Transactions",
+            href: "/pa-transactions",
+            permission: ["getTxnSearchResults"],
+            product: "PA",
+          },
+          { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
+          { label: "Platforms", href: "/platforms", permission: [] },
+          { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },
         ],
+      },
+      {
+        label: "SKU Management",
+        href: "/sku-management",
+        icon: "package",
+        badge: "NEW",
+        permission: [],
       },
       {
         label: "Manage Mandates",
@@ -114,9 +137,15 @@ export const regularNavigation: NavGroup[] = [
   {
     label: "Configure",
     items: [
+      // Points at this app's own Client Management page (/client-management)
+      // rather than pg-dashboard's /mca-clients route, which has no v2
+      // equivalent. Gated on getAllMcaClient, the permission pg-dashboard puts on
+      // the same page: the page now genuinely calls that endpoint (the client list
+      // is server-backed), so hiding it from a user who cannot call it is correct
+      // — which was not true while it read a local client book.
       {
         label: "Client Management",
-        href: "/mca-clients",
+        href: "/client-management",
         icon: "users",
         permission: ["getAllMcaClient"],
       },
@@ -149,17 +178,21 @@ export const regularNavigation: NavGroup[] = [
 export const partnerNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/manage-merchants", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/manage-merchants", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Merchant",
     items: [
       { label: "Merchant Activation", href: "/my-merchants", icon: "users", permission: [] },
       {
-        label: "Transaction Overview",
-        href: "/transactions",
+        label: "Transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
@@ -199,16 +232,20 @@ export const partnerNavigation: NavGroup[] = [
 export const globalNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Payments",
     items: [
       {
         label: "Transactions",
-        href: "/transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
@@ -217,9 +254,7 @@ export const globalNavigation: NavGroup[] = [
         href: "/payment-products",
         icon: "shopping-cart",
         permission: [],
-        children: [
-          { label: "Payment Links", href: "/payment-links", permission: [] },
-        ],
+        children: [{ label: "Payment Links", href: "/payment-links", permission: [] }],
       },
     ],
   },

@@ -17,7 +17,10 @@ import type { AuthEnvelope } from "@/features/auth/types";
 /** Step 3: set the new password, then return to sign-in. */
 export function ResetPasswordForm() {
   const router = useRouter();
-  const { mutate, isPending } = usePost<AuthEnvelope, { newPassword: string; newConfirmedPassword: string }>(forgotPasswordUpdateApi);
+  const { mutate, isPending } = usePost<
+    AuthEnvelope,
+    { newPassword: string; newConfirmedPassword: string }
+  >(forgotPasswordUpdateApi);
   const [apiError, setApiError] = useState<string | null>(null);
 
   const reset = useForgotPassword((s) => s.reset);

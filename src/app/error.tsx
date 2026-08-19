@@ -27,8 +27,7 @@ export default function Error({
           {/* Heading */}
           <h1 className="text-xl font-semibold text-foreground">Something went wrong</h1>
           <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            We hit an unexpected error. The issue has been reported and our team has been
-            notified.
+            We hit an unexpected error. The issue has been reported and our team has been notified.
           </p>
 
           {/* Error digest */}

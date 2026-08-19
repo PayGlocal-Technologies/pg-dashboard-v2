@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { heartbeatApi } from "@/api";
 import { PUBLIC_ROUTE_PATTERNS, PUBLIC_ROUTE_PREFIXES } from "@/constants/publicRoutes";
 
-const AUTHED_HOME = "/transactions";
+const AUTHED_HOME = "/mca-transactions";
 
 /**
  * Paths that global-tenant users (identified by ?isGlobal=true) are allowed to
@@ -12,7 +12,8 @@ const AUTHED_HOME = "/transactions";
 const GLOBAL_TENANT_ALLOWED_PREFIXES = [
   "/login",
   "/forgot-password",
-  "/transactions",
+  "/mca-transactions",
+  "/pa-transactions",
   "/global-onboarding",
   "/__/auth",
   "/404",

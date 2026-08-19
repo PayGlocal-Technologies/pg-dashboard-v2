@@ -7,8 +7,7 @@ import { useApp } from "@/stores/useApp";
 export function firebaseConfigProvider(): Auth {
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain:
-      process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${window.location.host}/app`,
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${window.location.host}/app`,
   };
 
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -87,7 +86,7 @@ export async function handleSingleSignOn(
   }
 }
 
-export const DEFAULT_AUTHED_PATH = "/transactions";
+export const DEFAULT_AUTHED_PATH = "/mca-transactions";
 
 const OLD_FLOW_PATH = "/gl-gcc/redirect";
 const REDIRECT_KEY = "redirect_after_login";
