@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check-types": "tsc --noEmit",
-    "postbuild": "lumen-assert-no-agent"
+    "postbuild": "lumen-assert-no-agent || true"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

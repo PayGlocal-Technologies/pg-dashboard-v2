@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
     NEXT_PUBLIC_FIREBASE_API_KEY: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+    // Read by proxy.ts for the heartbeat check. Unset it falls back to the
+    // request's own origin, which loops the call back through this app's /gcc
+    // rewrite instead of addressing the backend directly.
+    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   },
 
   async rewrites() {
