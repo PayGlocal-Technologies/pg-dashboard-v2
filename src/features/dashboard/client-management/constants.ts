@@ -24,18 +24,31 @@ export function clientAmountLocale(currency: string): string {
 }
 
 /**
- * The business types the Add client form offers. A flat list of display
- * strings, not coded values: nothing downstream branches on the type, it's
- * recorded and shown back, so a code would only be a second thing to keep in
- * step with its own label.
+ * The business types the Add client form offers — code and label, exactly as
+ * pg-dashboard's own Client Type select declares them (see its
+ * ADD_CLIENT_FIELDS_FORM_CONTACT).
+ *
+ * The codes matter: `type` is what goes on the wire, and the API takes these four
+ * enum values and nothing else. An earlier revision here offered display strings
+ * of its own devising ("Partnership", "Sole proprietorship", "LLP") on the grounds
+ * that nothing downstream branches on the type — but the server does, and every
+ * create carrying one of those was rejected. Labels are for the screen only;
+ * `value` is the contract.
  */
 export const CLIENT_BUSINESS_TYPES = [
-  "Company",
-  "Partnership",
-  "Sole proprietorship",
-  "LLP",
-  "Other",
+  { value: "COMPANY", label: "Company" },
+  { value: "INDIVIDUAL", label: "Individual" },
+  { value: "LIMITED_LIABILITY_PARTNERSHIP", label: "Limited Liability Partnership" },
+  { value: "OTHERS", label: "Others" },
 ] as const;
+
+/** A stored `type` code as a reader should see it. Falls back to the code itself
+ *  for a value this build does not know — a record created before an option was
+ *  added should still show something rather than nothing. */
+export function clientBusinessTypeLabel(code: string | undefined): string | undefined {
+  if (!code) return undefined;
+  return CLIENT_BUSINESS_TYPES.find((option) => option.value === code)?.label ?? code;
+}
 
 /**
  * The currency a client's balance is denominated in, by country. Covers the
@@ -90,11 +103,6 @@ export const CLIENT_CONTRACT_ACCEPTED_MIME_TYPES = [
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ] as const;
-
-/** Rows per page in the Client Details view's transactions section. Smaller
- *  than the Transactions page's own limit: this is one client's recent
- *  activity inside a details view, not the full transaction list. */
-export const CLIENT_TRANSACTIONS_PAGE_LIMIT = 5;
 
 export interface ClientInvoiceMetrics {
   /** Every invoice raised against the client, whatever its settlement state. */
@@ -197,8 +205,14 @@ export function clientTotalReceived(client: Client): ClientReceivedTotal[] {
  * paged. pg-dashboard feeds its own country dropdown from this same map.
  */
 export function countryOptionsFromMap(
-  filterKeys: string[],
-  iso2ToName: Record<string, string>,
+  /** The fetched country map, as useClientCountryMap normalises it. Typed
+   *  structurally rather than as ClientCountryMap so this module keeps no
+   *  dependency on hooks.ts, which already depends on this one. */
+  countryMap: {
+    filterKeys: string[];
+    iso2ToName: Record<string, string>;
+    nameToIso2: Record<string, string>;
+  },
   /**
    * Countries actually present on the loaded clients, as `{ iso2, name }`. Used
    * only when the reference endpoint returned nothing — an empty dropdown reads as
@@ -208,6 +222,8 @@ export function countryOptionsFromMap(
    */
   fallback: { iso2: string; name: string }[] = []
 ): CountryFilterOption[] {
+  const { filterKeys, iso2ToName, nameToIso2 } = countryMap;
+
   if (filterKeys.length > 0) {
     return filterKeys
       .map((key) => ({
@@ -217,6 +233,11 @@ export function countryOptionsFromMap(
         // would render as "NZ" in the chip, so the resolved name is preferred and
         // the key is only the fallback — a chip listing bare codes is unreadable.
         label: iso2ToName[key.toUpperCase()] ?? key,
+        // The code for the flag beside that label, resolved separately because the
+        // endpoint keys by country *name* (see clientCountryCodesApi) — so `value`
+        // is "New Zealand", not "NZ", and the chip's default of flagging by
+        // `value` would build a flag URL out of a name and render broken.
+        iso2: nameToIso2[key] ?? (isIso2Code(key) ? key.toUpperCase() : undefined),
       }))
       .sort((a, b) => a.label.localeCompare(b.label));
   }
@@ -228,4 +249,10 @@ export function countryOptionsFromMap(
     }
   }
   return [...byIso2.values()].sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** Whether a country map key is already an ISO2 code rather than a display name.
+ *  Same test useClientCountryMap normalises with. */
+function isIso2Code(value: string): boolean {
+  return /^[A-Za-z]{2}$/.test(value.trim());
 }

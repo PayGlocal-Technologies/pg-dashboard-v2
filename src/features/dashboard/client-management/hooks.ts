@@ -8,7 +8,6 @@ import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
-import { mcaTxnSearchApi } from "@/features/dashboard/mca-transactions/services";
 import { buildS3Headers } from "@/features/dashboard/mca-transactions/useInvoiceUpload";
 import {
   clientByIdApi,
@@ -31,7 +30,6 @@ import {
 } from "@/features/dashboard/client-management/services";
 import {
   CLIENT_PAGE_LIMIT,
-  CLIENT_TRANSACTIONS_PAGE_LIMIT,
   currencyForCountry,
 } from "@/features/dashboard/client-management/constants";
 import type {
@@ -56,10 +54,6 @@ import type {
   ZohoPullSyncPayload,
   ZohoStatusResponse,
 } from "@/features/dashboard/client-management/types";
-import type {
-  McaTransaction,
-  McaTransactionsResponse,
-} from "@/features/dashboard/mca-transactions/types";
 import type { TableReqBody } from "@/types/transactions";
 
 // ── Wire ↔ render mapping ───────────────────────────────────────────────────
@@ -157,8 +151,21 @@ function resolveCountry(
  * One client, wire → render.
  */
 export function toClient(record: ClientApiRecord, countryMap: ClientCountryMap): Client {
+  // The address's country first, the top-level one only as a fallback.
+  //
+  // The record carries the country twice and the two are not equivalent. The one
+  // inside `address` is the authoritative copy: it is the field pg-dashboard's form
+  // binds to (`["address", "country"]`) and the one its details page renders, so it
+  // is what a create or an update actually writes. The top-level `country` is a
+  // derived convenience its list column reads, and on a record written by either
+  // app it can be absent entirely — neither sends one, since neither form collects
+  // one at the top level.
+  //
+  // Reading only the top-level field is why the edit form opened with an empty
+  // Country: the by-id record had the country under `address` and nothing above
+  // it, so this resolved to "" and the select had no value to show.
   const { iso2: countryIso2, name: countryName } = resolveCountry(
-    record.country ?? "",
+    record.address?.country || record.country || "",
     countryMap.iso2ToName,
     countryMap.nameToIso2
   );
@@ -185,19 +192,22 @@ export function toClient(record: ClientApiRecord, countryMap: ClientCountryMap):
     businessType: record.type,
     website: record.websiteLink,
     tags: record.tags ?? [],
-    addressLine: record.address?.streetAddress1,
-    addressLine2: record.address?.streetAddress2,
-    city: record.address?.city,
-    state: record.address?.state,
-    zipcode: record.address?.zipcode,
+    // ?? undefined throughout: the wire address is nullable in both directions
+    // (see ClientApiAddress), and the render model distinguishes only "present" from
+    // "absent" — a null would otherwise reach a form field expecting a string.
+    addressLine: record.address?.streetAddress1 ?? undefined,
+    addressLine2: record.address?.streetAddress2 ?? undefined,
+    city: record.address?.city ?? undefined,
+    state: record.address?.state ?? undefined,
+    zipcode: record.address?.zipcode ?? undefined,
     // The shipping address, kept so the edit form can round-trip it and so the
     // "same as billing" checkbox can be derived rather than guessed.
-    shippingAddressLine: record.shippingAddress?.streetAddress1,
-    shippingAddressLine2: record.shippingAddress?.streetAddress2,
-    shippingCity: record.shippingAddress?.city,
-    shippingState: record.shippingAddress?.state,
-    shippingZipcode: record.shippingAddress?.zipcode,
-    shippingCountryName: record.shippingAddress?.country,
+    shippingAddressLine: record.shippingAddress?.streetAddress1 ?? undefined,
+    shippingAddressLine2: record.shippingAddress?.streetAddress2 ?? undefined,
+    shippingCity: record.shippingAddress?.city ?? undefined,
+    shippingState: record.shippingAddress?.state ?? undefined,
+    shippingZipcode: record.shippingAddress?.zipcode ?? undefined,
+    shippingCountryName: record.shippingAddress?.country ?? undefined,
     shippingCountryIso2: record.shippingAddress?.country
       ? resolveCountry(record.shippingAddress.country, countryMap.iso2ToName, countryMap.nameToIso2)
           .iso2
@@ -220,43 +230,62 @@ export function toClient(record: ClientApiRecord, countryMap: ClientCountryMap):
 }
 
 /**
- * Form values → create/update body, field-for-field from pg-dashboard's submit
- * handler (AddClientForm).
+ * Form values → create/update body.
  *
- * Both of pg-dashboard's mirroring checkboxes are honoured: ticked "same as
- * billing address" sends `shippingAddress` as a copy of `address`, and ticked
- * "same as business name" sends `name` as a copy of `businessName`. Unticked,
- * each sends what its own fields collected.
+ * Byte for byte the shape pg-dashboard puts on the wire. Its handler spreads antd
+ * form values straight into the request, and three properties of that fall out
+ * which have to be reproduced deliberately rather than approximated:
+ *
+ * - **A rendered-but-empty field is `null`, not `""` and not absent.** antd
+ *   registers every mounted field, so `websiteLink`, `tags` and an unfilled
+ *   `streetAddress2` all arrive as explicit nulls.
+ * - **A field behind a collapsed accordion is absent entirely**, because it was
+ *   never mounted and so never registered. That is `gstIn` and `notes` — both live
+ *   in "GST (Optional)" and "Notes & Contract (Optional)" panels. An absent GSTIN
+ *   has nothing to validate; a `""` one is a value that must pass the GSTIN rule.
+ * - **`sameAsBusinessName` is sent**, because pg-dashboard's checkbox is a
+ *   registered form field. `sameAsBillingAddress` is not, because its equivalent
+ *   there is local component state.
+ *
+ * There is no `mid` in the body: the merchant id is a path segment on this
+ * endpoint (see clientCreateApi), and pg-dashboard sends it nowhere else despite
+ * its own ClientCreateRequest type declaring one.
+ *
+ * Key order below follows production's payload too. Irrelevant to any parser, but
+ * it makes the two bodies diffable side by side, which is how this was found.
  */
 export function toClientApiPayload(
   values: ClientFormValues,
-  mid: string,
-  countryNameFor: (iso2: string) => string
+  /** ISO2 → the country string this API takes. Not a display name: pg-dashboard's
+   *  country select is built from get-country-details and submits one of that
+   *  map's own keys verbatim — which in every environment seen so far is the ISO2
+   *  code ("NZ"), not the name. See useClientCountryMap's iso2ToApiCountry. */
+  apiCountryFor: (iso2: string) => string
 ): ClientMutationPayload {
-  const countryName = countryNameFor(values.country);
+  const countryName = apiCountryFor(values.country);
 
-  const address: ClientApiAddress = {
-    streetAddress1: values.addressLine.trim(),
-    streetAddress2: values.addressLine2.trim(),
-    city: values.city.trim(),
-    state: values.state.trim(),
+  const address = toApiAddress({
     country: countryName,
-    zipcode: values.zipcode.trim(),
-  };
+    state: values.state,
+    streetAddress1: values.addressLine,
+    streetAddress2: values.addressLine2,
+    city: values.city,
+    zipcode: values.zipcode,
+  });
 
   // Ticked "same as billing" sends a copy of the billing address, which is
   // exactly what pg-dashboard does behind its own checkbox. Unticked sends what
   // the shipping fields collected.
-  const shippingAddress: ClientApiAddress = values.sameAsBillingAddress
+  const shippingAddress = values.sameAsBillingAddress
     ? address
-    : {
-        streetAddress1: values.shippingAddressLine.trim(),
-        streetAddress2: values.shippingAddressLine2.trim(),
-        city: values.shippingCity.trim(),
-        state: values.shippingState.trim(),
-        country: countryNameFor(values.shippingCountry) || countryName,
-        zipcode: values.shippingZipcode.trim(),
-      };
+    : toApiAddress({
+        country: apiCountryFor(values.shippingCountry) || countryName,
+        state: values.shippingState,
+        streetAddress1: values.shippingAddressLine,
+        streetAddress2: values.shippingAddressLine2,
+        city: values.shippingCity,
+        zipcode: values.shippingZipcode,
+      });
 
   // Ticked "same as business name" sends the business name as the contact name,
   // the other half of pg-dashboard's pair of mirroring checkboxes.
@@ -265,20 +294,49 @@ export function toClientApiPayload(
     : values.primaryContactName.trim();
 
   return {
-    mid,
-    gstIn: values.gstin.trim(),
     businessName: values.businessName.trim(),
     name: contactName || values.businessName.trim(),
+    sameAsBusinessName: values.sameAsBusinessName,
     email: values.primaryContactEmail.trim(),
-    // Recombined into the single string the API stores, which is also the shape
-    // the merchant would have typed into pg-dashboard's one phone field.
+    // Recombined into the single string the API stores, which is the one free-text
+    // field pg-dashboard collects this as. The dial code is kept — v2 collects it
+    // as its own picker, and production's field accepts a "+"-prefixed number too
+    // (it carries no format rule, only `required`), so this is strictly more
+    // information in the same shape rather than a different one.
     number: `${dialCodeOf(values.phoneCountry)}${values.phoneNumber.replace(/\D/g, "")}`,
+    websiteLink: emptyToNull(values.website),
+    // Already an API enum code, not a label — see CLIENT_BUSINESS_TYPES. This is
+    // what the 400 was: v2 offered business types of its own devising and sent
+    // "Company" where the API's enum is "COMPANY".
+    type: values.businessType.trim(),
+    tags: values.tags.length ? values.tags : null,
     address,
     shippingAddress,
-    ...(values.website.trim() ? { websiteLink: values.website.trim() } : {}),
+    // Accordion-gated in production, so absent rather than null when unfilled.
+    ...(values.gstin.trim() ? { gstIn: values.gstin.trim() } : {}),
     ...(values.notes.trim() ? { notes: values.notes.trim() } : {}),
-    ...(values.tags.length ? { tags: values.tags } : {}),
-    ...(values.businessType.trim() ? { type: values.businessType.trim() } : {}),
+  };
+}
+
+/** "" → null, matching what a registered-but-empty antd field serialises to. */
+function emptyToNull(value: string): string | null {
+  const trimmed = (value ?? "").trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/**
+ * The address as production sends it: every part present as a key, each one
+ * trimmed, and an unfilled part as `null` rather than an empty string — all six
+ * fields are mounted in pg-dashboard's form, so all six are registered.
+ */
+function toApiAddress(parts: Record<keyof ClientApiAddress, string>): ClientApiAddress {
+  return {
+    country: emptyToNull(parts.country),
+    state: emptyToNull(parts.state),
+    streetAddress1: emptyToNull(parts.streetAddress1),
+    streetAddress2: emptyToNull(parts.streetAddress2),
+    city: emptyToNull(parts.city),
+    zipcode: emptyToNull(parts.zipcode),
   };
 }
 
@@ -406,6 +464,17 @@ export interface ClientCountryMap {
    * verbatim is right without having to know which side that is.
    */
   filterKeys: string[];
+  /**
+   * ISO2 → the country string this API takes on a write, which is the map's own
+   * key for that country.
+   *
+   * Same reasoning as `filterKeys`, for the create/update body rather than the
+   * filter: pg-dashboard's country select submits one of the map's keys verbatim,
+   * so a write has to carry that key and not a display name of our own. Observed
+   * payloads key by ISO2 ("NZ"), but this is derived rather than assumed, so a
+   * name-keyed environment resolves correctly too.
+   */
+  iso2ToApiCountry: Record<string, string>;
 }
 
 /**
@@ -434,19 +503,25 @@ export function useClientCountryMap(): ClientCountryMap & { isLoading: boolean }
     const nameToIso2: Record<string, string> = {};
     const isIso2 = (value: string) => /^[A-Za-z]{2}$/.test(value.trim());
 
+    // The map's key for each country, by ISO2 — whichever side the endpoint keys
+    // by. This is what a write has to send; see iso2ToApiCountry.
+    const iso2ToApiCountry: Record<string, string> = {};
+
     for (const [key, value] of Object.entries(raw ?? {})) {
       if (isIso2(key) && !isIso2(value)) {
         // code → name
         iso2ToName[key.toUpperCase()] = value;
         nameToIso2[value] = key.toUpperCase();
+        iso2ToApiCountry[key.toUpperCase()] = key;
       } else if (isIso2(value)) {
         // name → code, which is how pg-dashboard's own client list reads it
         nameToIso2[key] = value.toUpperCase();
         iso2ToName[value.toUpperCase()] = key;
+        iso2ToApiCountry[value.toUpperCase()] = key;
       }
     }
 
-    return { iso2ToName, nameToIso2, filterKeys: Object.keys(raw ?? {}) };
+    return { iso2ToName, nameToIso2, iso2ToApiCountry, filterKeys: Object.keys(raw ?? {}) };
   }, [raw]);
 
   return { ...normalised, isLoading: isPending };
@@ -625,61 +700,6 @@ export function useClientInvoiceSummary(clientId: string | null): {
   };
 }
 
-/**
- * The transactions remitted by one client, for the details view's transactions
- * section.
- *
- * There is no client id on a transaction and no pg-dashboard call site that
- * filters the transaction search by client, so the link is the client's business
- * name matched as a full-text query — which is a shape the search genuinely
- * supports, since "Customer name" is one of the things the Transactions page's own
- * search box matches. Because that is a full-text match, the rows are then
- * narrowed to an exact `partnerCustomerFullName` equality, so a client whose name
- * is a substring of another's cannot pull in the other's transactions. The
- * consequence to know: `totalCount` describes the server's looser match, so it can
- * exceed the rows shown.
- */
-export function useClientTransactions(
-  businessName: string | undefined,
-  page: number
-): { transactions: McaTransaction[]; totalCount: number; isLoading: boolean } {
-  const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
-  const enabled = isReady && !!businessName;
-
-  const body = useMemo<TableReqBody>(
-    () =>
-      buildTxnRequestBody(
-        {},
-        {
-          searchQuery: businessName || undefined,
-          selectedMid: midFilter ? { key: midFilter.key, value: midFilter.value } : undefined,
-          pageLimit: CLIENT_TRANSACTIONS_PAGE_LIMIT,
-          from: (page - 1) * CLIENT_TRANSACTIONS_PAGE_LIMIT,
-        }
-      ),
-    [businessName, midFilter, page]
-  );
-
-  const { data, isPending } = usePostQuery<McaTransactionsResponse, TableReqBody>(
-    ["client-transactions", urlMid, businessName ?? ""],
-    mcaTxnSearchApi(urlMid),
-    body,
-    { staleTime: 0 },
-    enabled
-  );
-
-  const transactions = useMemo(
-    () => (data?.data?.data ?? []).filter((txn) => txn.partnerCustomerFullName === businessName),
-    [data, businessName]
-  );
-
-  return {
-    transactions,
-    totalCount: data?.data?.totalCount ?? 0,
-    isLoading: enabled && isPending,
-  };
-}
-
 // ── Writes ──────────────────────────────────────────────────────────────────
 // Every mutation invalidates the client list rather than calling refetch with a
 // remembered body, which is how pg-dashboard threads `refetch(reqBody)` through
@@ -687,6 +707,17 @@ export function useClientTransactions(
 // table has since changed.
 
 const CLIENTS_KEY = ["clients"];
+/**
+ * The by-id record, which both the details views and the edit form read (see
+ * useClient). Invalidated alongside the list by everything that changes a client,
+ * because "clients" does not match it — react-query matches by key *prefix*, and
+ * ["client", …] and ["clients"] share no first segment. Without this an edit
+ * saved successfully and then reopened showing the values it had replaced, since
+ * only the list had been refreshed. pg-dashboard refetches the same record
+ * explicitly after a save (its getClientData); this is that, expressed as
+ * invalidation.
+ */
+const CLIENT_KEY = ["client"];
 
 /** POST .../create. Resolves with the new client's id, which the contract upload
  *  needs — a contract can only be attached to a client that exists. */
@@ -732,7 +763,7 @@ export function useUpdateClient(): {
   const { mutate, isPending } = usePut<unknown, ClientMutationPayload & { dynamicUrl: string }>(
     "",
     {
-      invalidateQueries: [CLIENTS_KEY],
+      invalidateQueries: [CLIENTS_KEY, CLIENT_KEY],
       onError: (error: Error) => toast.error(error.message || "Client updation failed."),
     }
   );
@@ -778,7 +809,7 @@ export function useClientContractUpload(): {
   const { mutate: uploadToS3, isPending: isUploading } = usePut<
     void,
     { dynamicUrl: string; customHeaders: Record<string, string>; reqBody: File }
-  >("", { invalidateQueries: [CLIENTS_KEY] });
+  >("", { invalidateQueries: [CLIENTS_KEY, CLIENT_KEY] });
 
   return {
     uploadContract: ({ clientId, rowMid, file }) => {
@@ -850,7 +881,7 @@ export function useClientContractDelete(): {
   const { mid } = useClientPathMid();
 
   const { mutate, isPending } = usePut<unknown, { dynamicUrl: string }>("", {
-    invalidateQueries: [CLIENTS_KEY],
+    invalidateQueries: [CLIENTS_KEY, CLIENT_KEY],
     onError: (error: Error) => toast.error(error.message || "Failed to remove contract."),
   });
 
@@ -1049,7 +1080,7 @@ export function useZohoClientSync(): {
   );
 
   const { mutate, isPending } = usePost<unknown, ZohoPullSyncPayload & { dynamicUrl: string }>("", {
-    invalidateQueries: [CLIENTS_KEY],
+    invalidateQueries: [CLIENTS_KEY, CLIENT_KEY],
     onError: (error: Error) => toast.error(error.message || "Sync failed"),
   });
 

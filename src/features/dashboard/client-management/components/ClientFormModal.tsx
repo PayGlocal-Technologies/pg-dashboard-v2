@@ -25,6 +25,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Shimmer,
   Textarea,
   useBreakpoint,
 } from "@/components/ui";
@@ -137,8 +138,15 @@ interface ClientFormModalProps {
   /** "add" (default) or "edit" — the field model is identical, so this only
    *  changes the wording and which values the form opens on. */
   mode?: "add" | "edit";
+  /** The id of the record being edited. Identity only — it keys the form body, so
+   *  reopening on a different client mounts a fresh form. Absent in add mode. */
+  recordId?: string;
   /** Pre-filled values for edit mode. Undefined opens a blank form. */
   initialValues?: ClientFormValues;
+  /** True while the record those values come from is still being fetched, which
+   *  holds the modal in a loading state rather than mounting the form on partial
+   *  values. See ClientTable's by-id fetch. */
+  isLoading?: boolean;
   /** Called with validated values. `keepOpen` distinguishes Add client from
    *  Save and add another, so the caller doesn't need two callbacks. */
   onSubmit: (values: ClientFormValues, keepOpen: boolean) => void;
@@ -153,24 +161,54 @@ export function ClientFormModal({
   open,
   onOpenChange,
   mode = "add",
+  recordId,
   initialValues,
+  isLoading = false,
   onSubmit,
   onViewStoredContract,
   onRemoveStoredContract,
 }: ClientFormModalProps) {
   const { isMobile } = useBreakpoint();
 
-  const body = (
+  // Announced by the Dialog/Drawer on open, and the heading the loading state
+  // shows before the form itself is mounted.
+  const modalTitle = mode === "edit" ? "Edit client" : "Add client";
+
+  const body = isLoading ? (
+    // The record the form will be built from is still in flight (see
+    // ClientTable's by-id fetch). The body is withheld rather than mounted on
+    // partial values, so the form is seeded exactly once, from the whole record —
+    // pg-dashboard shows the same loading state on its own drawer for the same
+    // reason. Shimmer rather than a spinner, so the modal keeps the shape of the
+    // form that is about to appear in it.
+    <div className="flex min-h-0 flex-col" aria-busy>
+      <div className="flex-shrink-0 border-b border-border px-5 py-4">
+        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{modalTitle}</h2>
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 px-5 py-5">
+        <span className="sr-only" role="status">
+          Loading client details
+        </span>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Shimmer className="h-3 w-24 rounded" />
+            <Shimmer className="h-9 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : (
     <ClientFormBody
       // Remounts the form whenever the modal opens on a different client (or
       // reopens on a blank one), which is what discards a previous session's
       // half-typed values and validation state. Cheaper and harder to get wrong
       // than resetting every field in an effect.
-      key={
-        open
-          ? `open-${initialValues ? mode : "add"}-${initialValues?.businessName ?? ""}`
-          : "closed"
-      }
+      //
+      // Keyed on the record's id, not its business name: two clients can share a
+      // name, and the id is what actually says "this is a different record". It
+      // also means the key does not change when the fetched record replaces
+      // nothing — the body only ever mounts once the values are final.
+      key={open ? `open-${mode}-${recordId ?? "new"}` : "closed"}
       mode={mode}
       initialValues={initialValues}
       onCancel={() => onOpenChange(false)}
@@ -186,7 +224,7 @@ export function ClientFormModal({
     return (
       <Drawer open={open} onOpenChange={onOpenChange} side="bottom">
         <DrawerContent className="flex max-h-[90vh] flex-col rounded-t-2xl p-0">
-          <DrawerTitle className="sr-only">Add client</DrawerTitle>
+          <DrawerTitle className="sr-only">{modalTitle}</DrawerTitle>
           {body}
         </DrawerContent>
       </Drawer>
@@ -206,7 +244,7 @@ export function ClientFormModal({
           "gap-0 overflow-hidden rounded-2xl p-0"
         )}
       >
-        <DialogTitle className="sr-only">Add client</DialogTitle>
+        <DialogTitle className="sr-only">{modalTitle}</DialogTitle>
         {body}
       </DialogContent>
     </Dialog>
@@ -231,6 +269,9 @@ function ClientFormBody({
   // Which button started the submit. A ref, not state: it's read inside the
   // submit handler in the same tick it's written, and re-rendering on it would
   // be pointless.
+  const isEdit = mode === "edit";
+  const title = isEdit ? "Edit client" : "Add client";
+
   const keepOpenRef = useRef(false);
   // Cancel with typed-in values asks first; an untouched form just closes.
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
@@ -289,7 +330,7 @@ function ClientFormBody({
       {/* Header — the Dialog/Drawer's own close button sits at the top right,
           so the title row only carries the title. */}
       <div className="flex-shrink-0 border-b border-border px-5 py-4">
-        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">Add client</h2>
+        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{title}</h2>
       </div>
 
       {/* Only this middle band scrolls, so the footer actions stay reachable
@@ -923,20 +964,34 @@ function ClientFormBody({
       </div>
 
       {/* ── Actions ──────────────────────────────────────────────────────
-          Save and add another sits opposite the pair, as a link-style action,
-          so it reads as a secondary route through the same form rather than a
-          third button competing with the primary CTA — same arrangement as the
-          Add item form's footer. */}
-      <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3.5">
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="px-0"
-          onClick={() => submitWith(true)}
-        >
-          Save and add another
-        </Button>
+          In add mode, Save and add another sits opposite the pair as a
+          link-style action, so it reads as a secondary route through the same
+          form rather than a third button competing with the primary CTA — the
+          same arrangement as the Add item form's footer.
+
+          In edit mode it is not rendered at all: "another" has no meaning when
+          the form is open on one existing record, and the action would either
+          have to save the edit and then open a blank Add form (a different task
+          the merchant did not ask for) or duplicate the client. Nothing to
+          disable, so nothing is shown. justify-end then pulls the remaining pair
+          to the right, where they sit in every other single-action footer. */}
+      <div
+        className={cn(
+          "flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border px-5 py-3.5",
+          isEdit ? "justify-end" : "justify-between"
+        )}
+      >
+        {!isEdit && (
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="px-0"
+            onClick={() => submitWith(true)}
+          >
+            Save and add another
+          </Button>
+        )}
 
         <div className="flex items-center gap-2">
           {/* Cancel turns into its own confirmation once the form has been
@@ -952,7 +1007,7 @@ function ClientFormBody({
             {confirmingDiscard ? "Discard changes?" : "Cancel"}
           </Button>
           <Button type="submit" variant="primary" size="sm">
-            Add client
+            {isEdit ? "Update client" : "Add client"}
           </Button>
         </div>
       </div>

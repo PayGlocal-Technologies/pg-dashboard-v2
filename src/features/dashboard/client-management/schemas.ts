@@ -20,7 +20,7 @@ export function validateBusinessName(value: string): string | undefined {
 }
 
 export function validateBusinessType(value: string): string | undefined {
-  return (CLIENT_BUSINESS_TYPES as readonly string[]).includes(value)
+  return CLIENT_BUSINESS_TYPES.some((option) => option.value === value)
     ? undefined
     : "Select a business type";
 }

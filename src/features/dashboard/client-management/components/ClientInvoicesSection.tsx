@@ -89,12 +89,18 @@ function InvoiceRowActions({
       variant="ghost"
       size="sm"
       onClick={onSelect}
+      // Through leftIcon, not as a child alongside the label. Button wraps its
+      // children in a plain non-flex <span>, and preflight renders an <svg> as
+      // display:block — so an Icon passed as a child takes a line of its own above
+      // the label, and the button's own gap/items-center never reach it. The
+      // leftIcon slot is a direct flex child of the button, which is what puts the
+      // two on one line.
+      leftIcon={<Icon name={icon} className="h-3.5 w-3.5 shrink-0" />}
       className={cn(
         "h-auto min-h-0 w-full justify-start gap-2 rounded-md px-2 py-1.5 text-[13px] font-normal",
         destructive && "text-destructive hover:text-destructive"
       )}
     >
-      <Icon name={icon} className="h-3.5 w-3.5 shrink-0" />
       {label}
     </Button>
   );
@@ -149,9 +155,9 @@ interface ClientInvoicesSectionProps {
  * One client's invoice ledger — the list production shows on its client details
  * page, ported with the three row actions and the status filter it carries.
  *
- * Unlike the transactions section beside it, the client link here is exact: the
- * invoice search takes `fieldSearch.clientId`, so these really are this client's
- * invoices rather than a name match (see useClientInvoices).
+ * The client link is exact: the invoice search takes `fieldSearch.clientId`, so
+ * these really are this client's invoices. (The transactions section this replaced
+ * could only match on business name, since no transaction carries a client id.)
  *
  * Row click is deliberately inert. Production navigates to an invoice detail page
  * (or to the invoice editor for a draft), and v2 has neither route — so rather
@@ -283,17 +289,26 @@ export function ClientInvoicesSection({
                   variant="ghost"
                   size="sm"
                   onClick={() => toggleStatus(option.value)}
+                  // A check marks the chosen ones rather than a checkbox column, so
+                  // the row stays one line at this width — and it rides the leftIcon
+                  // slot rather than being a child beside the label, which is what
+                  // keeps it on that line. Button puts its children in a plain
+                  // non-flex <span>, where preflight's display:block <svg> breaks to
+                  // a line of its own; leftIcon is a direct flex child instead.
+                  //
+                  // Transparent rather than absent when unselected, so every row's
+                  // label starts at the same x whatever is ticked.
+                  leftIcon={
+                    <Icon
+                      name="check"
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        statuses.includes(option.value) ? "text-primary" : "text-transparent"
+                      )}
+                    />
+                  }
                   className="h-auto min-h-0 w-full justify-start gap-2 rounded-md px-2 py-1.5 text-[13px] font-normal"
                 >
-                  {/* A check marks the chosen ones rather than a checkbox column,
-                      so the row stays one line at this width. */}
-                  <Icon
-                    name="check"
-                    className={cn(
-                      "h-3.5 w-3.5 shrink-0",
-                      statuses.includes(option.value) ? "text-primary" : "text-transparent"
-                    )}
-                  />
                   {option.label}
                 </Button>
               ))}
