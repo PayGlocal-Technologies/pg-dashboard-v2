@@ -66,6 +66,8 @@ export {
   InputGroupInput,
   InputGroupText,
   Label,
+  MetricText,
+  type MetricTextProps,
   OtpInput,
   PageHeader,
   PasswordInput,

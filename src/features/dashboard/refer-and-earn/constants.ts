@@ -10,6 +10,21 @@ export const REFERRAL_REWARD_LABEL = "$30";
 export const REFERRAL_PAGE_SIZE = 10;
 
 /**
+ * Hero illustration, served from `public/assets`. A raster asset, so it cannot
+ * be an icon-registry entry (that pattern is for SVG forwardRef components) and
+ * goes through `next/image` instead — see CLAUDE.md's Images rule.
+ *
+ * `width`/`height` are the file's real pixel dimensions, handed to next/image as
+ * the intrinsic size only: the rendered size comes from CSS, and these keep the
+ * aspect ratio correct and reserve the right space before the image loads.
+ */
+export const REFERRAL_HERO_ILLUSTRATION = {
+  src: "/assets/Refer&Earn.png",
+  width: 1380,
+  height: 1140,
+} as const;
+
+/**
  * Dashboard origin per environment, built the same way as the CDN URL in
  * `@/features/auth/helpers` — UAT has moved to pygcl.com, dev/test/prod stay
  * on payglocal.in. Derived from NEXT_PUBLIC_ENV rather than

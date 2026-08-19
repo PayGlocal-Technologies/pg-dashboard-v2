@@ -4,7 +4,9 @@ import { useState } from "react";
 import { DataTable, Heading } from "@/components/ui";
 import { buildReferralColumns } from "@/features/dashboard/refer-and-earn/columns";
 import { REFERRAL_PAGE_SIZE } from "@/features/dashboard/refer-and-earn/constants";
+import { summarizeReferrals } from "@/features/dashboard/refer-and-earn/helpers";
 import { ReferralCardList } from "@/features/dashboard/refer-and-earn/components/ReferralCardList";
+import { ReferralSummaryCards } from "@/features/dashboard/refer-and-earn/components/ReferralSummaryCards";
 import type { Referral } from "@/features/dashboard/refer-and-earn/types";
 
 const EMPTY_TITLE = "No referrals yet";
@@ -17,9 +19,9 @@ interface ReferralEarningsProps {
 }
 
 /**
- * "Referral earnings" heading plus the earnings surface: the full table from lg
- * up, the card list below that — the same desktop/mobile pair the Clients, SKU,
- * and Transactions tables use.
+ * "Referral earnings" heading, the analytics row, then the earnings surface: the
+ * full table from lg up, the card list below that — the same desktop/mobile pair
+ * the Clients, SKU, and Transactions tables use.
  */
 export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarningsProps) {
   const [page, setPage] = useState(1);
@@ -28,16 +30,24 @@ export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarni
   const totalCount = referrals.length;
   const pageRows = referrals.slice((page - 1) * REFERRAL_PAGE_SIZE, page * REFERRAL_PAGE_SIZE);
 
+  // Summarised over every referral, not just the visible page — these are
+  // program totals, so they must not change as the table is paged.
+  const summary = summarizeReferrals(referrals);
+
   return (
+    // gap-3 heading-to-content, then a wider gap before the table so the
+    // analytics row and the table read as two surfaces without a divider.
     <section className="flex flex-col gap-3">
       <Heading level={2} size="md">
         Referral earnings
       </Heading>
 
+      <ReferralSummaryCards summary={summary} />
+
       {/* One bordered surface holding both treatments, so the section reads as a
           single card at every width. The table drops its own border and radius
           to avoid doubling this wrapper's. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
+      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-card">
         {/* Desktop (lg+): the full table. Its own empty state keeps the four
             column headers in place, so an empty result still shows the shape of
             the data rather than a blank panel. */}
