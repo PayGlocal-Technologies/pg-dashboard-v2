@@ -41,6 +41,12 @@ export const regularNavigation: NavGroup[] = [
         permission: [],
         children: [
           { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
+          // Second way into /receipts, the first being Finance's own entry
+          // below. Tagged PACB so it only appears while the header's product
+          // context is Multi-Currency Accounts: a receipt is a finance record
+          // wherever you enter from, but it is only an MCA artefact while
+          // that product is the one in view.
+          { label: "Receipts", href: "/receipts", permission: [], product: "PACB" },
           // Two separate entries, both labelled "Transactions": the first is
           // the MCA table, the second the PA (Cards/UPI/NetBanking) one. They
           // used to be a single item whose page carried a segment toggle.
@@ -90,6 +96,18 @@ export const regularNavigation: NavGroup[] = [
         href: "/reports/settlement-report",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
+      },
+      // Same page the Payment Products group links to under Multi Currency
+      // Accounts (see above). Listed in both places deliberately: merchants
+      // reach receipts either as a finance record or from the product they were
+      // raised under, and the sidebar's active state keys off the pathname, so
+      // whichever entry is on screen highlights.
+      {
+        label: "Receipts",
+        href: "/receipts",
+        icon: "receipt",
+        badge: "NEW",
+        permission: [],
       },
       {
         label: "Invoice Management",
