@@ -155,6 +155,12 @@ interface ClientFormModalProps {
   onViewStoredContract?: () => void;
   /** Deletes that stored contract server-side. */
   onRemoveStoredContract?: () => void;
+  /** Merchant id to fetch tag suggestions under, when the caller resolves its MID
+   *  differently from the client-management page (which reads it off the URL).
+   *  The create-invoice flow does — it uses the selected MID with the first PACB
+   *  MID as a fallback — and pg-dashboard threads the same override into this
+   *  form for the same reason, as `selectedMidForAddClient`. */
+  midOverride?: string;
 }
 
 export function ClientFormModal({
@@ -167,6 +173,7 @@ export function ClientFormModal({
   onSubmit,
   onViewStoredContract,
   onRemoveStoredContract,
+  midOverride,
 }: ClientFormModalProps) {
   const { isMobile } = useBreakpoint();
 
@@ -215,6 +222,7 @@ export function ClientFormModal({
       onSubmit={onSubmit}
       onViewStoredContract={onViewStoredContract}
       onRemoveStoredContract={onRemoveStoredContract}
+      midOverride={midOverride}
     />
   );
 
@@ -258,6 +266,7 @@ function ClientFormBody({
   onSubmit,
   onViewStoredContract,
   onRemoveStoredContract,
+  midOverride,
 }: {
   mode: "add" | "edit";
   initialValues?: ClientFormValues;
@@ -265,6 +274,7 @@ function ClientFormBody({
   onSubmit: (values: ClientFormValues, keepOpen: boolean) => void;
   onViewStoredContract?: () => void;
   onRemoveStoredContract?: () => void;
+  midOverride?: string;
 }) {
   // Which button started the submit. A ref, not state: it's read inside the
   // submit handler in the same tick it's written, and re-rendering on it would
@@ -283,7 +293,7 @@ function ClientFormBody({
   // Tag suggestions and the state list are merchant/app configuration rather
   // than constants, so both are fetched (see useClientTagOptions and
   // useClientStateCodes).
-  const { tags: tagSuggestions } = useClientTagOptions();
+  const { tags: tagSuggestions } = useClientTagOptions(midOverride);
   const { states } = useClientStateCodes();
 
   // India has a state list; nothing else does, so every other country gets the

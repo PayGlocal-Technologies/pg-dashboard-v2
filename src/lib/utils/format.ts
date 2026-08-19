@@ -174,7 +174,18 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
     ...options,
   };
 
-  const includeTime = o.hour !== undefined && o.minute !== undefined;
+  // A bare call still gets date and time, which is what most callers want. But
+  // a caller that spells out the parts it wants and names no time field is
+  // asking for a date: spreading its options over the defaults leaves hour and
+  // minute standing, so `{day, month, year}` used to render "19 Aug 2026,
+  // 05:30 AM". That is wrong for a due date or an invoice issue date, neither of
+  // which has a time at all, and callers were passing `hour: undefined,
+  // minute: undefined` to opt back out.
+  const TIME_KEYS = ["hour", "minute", "second", "hour12", "timeStyle"] as const;
+  const callerWantsTime =
+    !options || TIME_KEYS.some((key) => options[key as keyof typeof options] !== undefined);
+
+  const includeTime = callerWantsTime && o.hour !== undefined && o.minute !== undefined;
 
   let datePart: string;
   if (o.month === "long" && o.day === "numeric") {
