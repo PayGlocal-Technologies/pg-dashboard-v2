@@ -5,7 +5,7 @@ import { Button, Card, CardContent, IconButton, Separator } from "@/components/u
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
-import { GlobalCurrenciesDialog } from "@/features/dashboard/multi-currency/components/GlobalCurrenciesDialog";
+import { SupportedCurrenciesModal } from "@/features/dashboard/multi-currency/components/SupportedCurrenciesModal";
 import {
   PaymentMethodInfoDialog,
   hasPaymentMethodInfo,
@@ -116,7 +116,9 @@ export function VirtualAccountDetails({
           </h3>
           {/* The catch-all account's whole point is the 32 currencies it
               accepts, which is too many to name in the caption itself. */}
-          {account.isGlobal && <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />}
+          {account.supportedRegions && (
+            <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />
+          )}
         </div>
       )}
 
@@ -137,7 +139,7 @@ export function VirtualAccountDetails({
               </p>
               <p className="text-[13px] text-muted-foreground">
                 {accountSubtitle(account)}
-                {account.isGlobal && (
+                {account.supportedRegions && (
                   <>
                     {" "}
                     <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />
@@ -212,8 +214,14 @@ export function VirtualAccountDetails({
           </Button>
         </div>
       </Card>
-      {account.isGlobal && (
-        <GlobalCurrenciesDialog open={currenciesOpen} onOpenChange={setCurrenciesOpen} />
+      {/* Mounted only for accounts that carry a list, so it can never open empty.
+          Read-only — see SupportedCurrenciesModal. */}
+      {account.supportedRegions && (
+        <SupportedCurrenciesModal
+          open={currenciesOpen}
+          onOpenChange={setCurrenciesOpen}
+          regions={account.supportedRegions}
+        />
       )}
 
       <PaymentMethodInfoDialog

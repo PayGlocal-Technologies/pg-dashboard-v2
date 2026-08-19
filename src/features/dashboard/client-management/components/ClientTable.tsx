@@ -1,15 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { DataTable } from "@/components/ui";
+import { Button, DataTable } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import {
   CountryFilterChip,
-  DateFilterChip,
-  EmailFilterChip,
-  toEndOfDayMs,
-  toStartOfDayMs,
+  type CountryFilterOption,
 } from "@/components/common/filters/FilterChips";
 import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { reorderColumns } from "@/lib/utils/columns";
@@ -18,15 +17,28 @@ import { ClientCardList } from "@/features/dashboard/client-management/component
 import { ClientDetailsDrawer } from "@/features/dashboard/client-management/components/ClientDetailsDrawer";
 import { ClientDetailsPage } from "@/features/dashboard/client-management/components/ClientDetailsPage";
 import { ClientFormModal } from "@/features/dashboard/client-management/components/ClientFormModal";
-import { toClientFields } from "@/features/dashboard/client-management/schemas";
+import {
+  useClient,
+  useClientContractDelete,
+  useClientContractUpload,
+  useClientContractView,
+  useClientCountryMap,
+  useClients,
+  useCreateClient,
+  useUpdateClient,
+} from "@/features/dashboard/client-management/hooks";
+import {
+  toClientApiPayload,
+  toClientFormValues,
+  useClientPathMid,
+} from "@/features/dashboard/client-management/hooks";
 import type { Client, ClientFormValues } from "@/features/dashboard/client-management/types";
 import {
   CLIENT_PAGE_LIMIT,
   CLIENT_SEARCH_HINTS,
-  clientCountryOptions,
+  countryOptionsFromMap,
   currencyForCountry,
 } from "@/features/dashboard/client-management/constants";
-import { MOCK_CLIENTS } from "@/features/dashboard/client-management/mock-data";
 
 // Sets scrollTop via a standalone function (rather than inline in a handler)
 // since the element comes from useContentAreaElement, and React Compiler's
@@ -34,6 +46,36 @@ import { MOCK_CLIENTS } from "@/features/dashboard/client-management/mock-data";
 // reason, as McaTransactionTable's.
 function restoreScrollTop(el: HTMLElement, value: number): void {
   el.scrollTop = value;
+}
+
+/**
+ * The Country chip, with its popover state held per instance rather than lifted
+ * to the table. Country is the only filter this list has (it is the only one
+ * pg-dashboard's own client list has besides its text search, which v2's search
+ * box already is), so there is no second chip for a shared state to coordinate
+ * with — and one open state shared across the two control rows is exactly what
+ * stopped the chip working. See renderFilterChips below.
+ */
+function ClientFilterChips({
+  options,
+  value,
+  onChange,
+}: {
+  options: CountryFilterOption[];
+  value: string[];
+  onChange: (next: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <CountryFilterChip
+      options={options}
+      value={value}
+      onChange={onChange}
+      open={open}
+      onOpenChange={setOpen}
+    />
+  );
 }
 
 interface ClientTableProps {
@@ -47,27 +89,23 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   const contentEl = useContentAreaElement();
   const [scrollPosition, setScrollPosition] = useState(0);
 
-  // Clients created through the Add client form, newest first. Layered over
-  // MOCK_CLIENTS rather than merged into it, the same arrangement SkuTable
-  // uses for created items: once a real endpoint replaces the mock book, this
-  // becomes the pending-write set rather than a divergent copy of the data.
-  const [createdClients, setCreatedClients] = useState<Client[]>([]);
-  // Counter, not Math.random/Date.now — both are barred during render and this
-  // only ever increments inside the submit handler anyway.
-  const nextClientIdRef = useRef(0);
+  // The id of the client being edited, or null when the form is in Add mode.
+  //
+  // An id rather than the row, because the form is populated from the by-id
+  // record and not from the list: the search response is a subset, so a form
+  // seeded from a row opens missing whatever the list does not carry.
+  // pg-dashboard's own form does exactly this — it refetches
+  // getMcaClientById(mid, selectedRecord.id) on open and calls setFieldsValue
+  // with that response, showing its drawer in a loading state until it lands.
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [emailFilter, setEmailFilter] = useState("");
   const [countryFilters, setCountryFilters] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [page, setPage] = useState(1);
 
   // null until the merchant actually drags a column, at which point DataTable
   // renders that order instead of buildClientColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
-  // Which of the Email/Country/Creation date popovers is open, if any: shared
-  // so opening one closes whichever other one was open.
-  const [openChip, setOpenChip] = useState<"email" | "country" | "date" | null>(null);
 
   // The client whose details are being viewed. Held as an id (not the row) so
   // it survives the source list changing underneath it once a real endpoint
@@ -78,103 +116,115 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   const [detailsId, setDetailsId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  // Set only when Expand was pressed on a transaction inside the client
-  // drawer: the client expands to its full page and that transaction opens
-  // expanded there, since a drawer has nowhere to show a full-page
-  // transaction. Null for an ordinary client expand.
-  const [expandTxnId, setExpandTxnId] = useState<string | null>(null);
 
-  const query = search.trim().toLowerCase();
-  const emailQuery = emailFilter.trim().toLowerCase();
-  // yyyy-mm-dd → epoch ms, the same conversion the Transactions page applies
-  // before handing a range to the server. Here it's compared client-side,
-  // since there is no client endpoint to push the range into yet.
-  const fromMs = dateRange.from ? toStartOfDayMs(dateRange.from) : undefined;
-  const toMs = dateRange.to ? toEndOfDayMs(dateRange.to) : undefined;
-
-  // Search and all three chips narrow the same list, and every one of them
-  // resets paging (below), so this is derived during render rather than held
-  // in state. Swapping in a real query means replacing the source array and
-  // moving these predicates into the request body — the table itself doesn't
-  // change.
-  // Newly created clients lead the book, so one just added is the first row
-  // rather than buried wherever the seeded order would have put it.
-  const sourceRows = [...createdClients, ...MOCK_CLIENTS];
-
-  const filteredRows = sourceRows.filter((client) => {
-    // Matches any of the three fields the placeholder cycles through
-    // (CLIENT_SEARCH_HINTS), the same way the Transactions search spans
-    // remitter/transaction ID/UTR: one box, no mode to pick, a hit on any of
-    // them counts.
-    if (
-      query &&
-      !client.businessName.toLowerCase().includes(query) &&
-      !client.primaryContactName.toLowerCase().includes(query) &&
-      !client.email.toLowerCase().includes(query)
-    ) {
-      return false;
-    }
-    // Substring, not an exact match: the useful case is narrowing to a
-    // domain ("@northwind") as often as it is finding one address.
-    if (emailQuery && !client.email.toLowerCase().includes(emailQuery)) return false;
-    if (countryFilters.length && !countryFilters.includes(client.countryIso2)) return false;
-    if (fromMs != null || toMs != null) {
-      const createdMs = new Date(client.createdAt).getTime();
-      if (fromMs != null && createdMs < fromMs) return false;
-      if (toMs != null && createdMs > toMs) return false;
-    }
-    return true;
+  // Both filters and the page are request inputs, so the rows that arrive are
+  // exactly the rows to draw and totalCount always describes the same set they
+  // came from. See useClients.
+  const { clients, totalCount, isLoading, isFetching, refetch } = useClients({
+    search: search.trim(),
+    countries: countryFilters,
+    page,
   });
 
-  const totalCount = filteredRows.length;
-  // Clamping here (rather than resetting page in every handler) covers every
-  // way the row count can shrink, and is derived during render, so no effect
-  // writes state back.
-  const totalPages = Math.max(1, Math.ceil(totalCount / CLIENT_PAGE_LIMIT));
-  const safePage = Math.min(page, totalPages);
-  const pageRows = filteredRows.slice(
-    (safePage - 1) * CLIENT_PAGE_LIMIT,
-    safePage * CLIENT_PAGE_LIMIT
+  const pageRows = clients;
+
+  // The full record for whichever client is being viewed. The list response is a
+  // subset of it, so the details view refetches by id — the same thing
+  // pg-dashboard's own form does before it can populate its fields. The row is
+  // kept as a fallback so the drawer opens with content immediately rather than
+  // empty for the length of a request.
+  const { client: fullClient } = useClient(detailsId);
+  const detailsRow = fullClient ?? clients.find((c) => c.id === detailsId) ?? null;
+
+  // The same by-id fetch for the edit form. A second useClient call rather than a
+  // shared one because the two selections are independent — Edit is reachable from
+  // a row whose drawer was never opened — and react-query caches by key, so
+  // editing the client already open in the drawer costs no extra request.
+  //
+  // Only the fetched record seeds the form (never the row), which is why the modal
+  // is held in a loading state until it arrives: a form mounted on partial values
+  // and re-seeded when the rest landed would either discard what the merchant had
+  // begun typing or silently keep the partial values.
+  const { client: editingClient, isLoading: isEditingClientLoading } = useClient(editingId);
+  const editingRow = editingClient ?? clients.find((c) => c.id === editingId) ?? null;
+
+  // Every country the map knows, not just the ones on this page: with the list
+  // server-paged, options derived from the loaded rows would change as the
+  // merchant pages (see countryOptionsFromMap). The option *values* are the map's
+  // own keys — country display names, which is how this endpoint keys them and so
+  // what the request has to filter on; each option carries its ISO2 separately,
+  // for the flag beside the name.
+  const countryMap = useClientCountryMap();
+  // The loaded rows are the fallback source when the reference endpoint gives
+  // nothing, so the chip is never an empty popover — which is indistinguishable
+  // from a control that doesn't work.
+  const countryOptions = countryOptionsFromMap(
+    countryMap,
+    clients.map((client) => ({ iso2: client.countryIso2, name: client.countryName }))
   );
 
-  const detailsRow = sourceRows.find((c) => c.id === detailsId) ?? null;
-
-  // The Country chip offers only countries the merchant actually has clients
-  // in, so it can never narrow to an empty table (see clientCountryOptions).
-  // Built from sourceRows, so a client added in a country nobody else is in
-  // brings its own filter option with it.
-  const countryOptions = clientCountryOptions(sourceRows);
+  const { mid } = useClientPathMid();
+  const { createClient } = useCreateClient();
+  const { updateClient } = useUpdateClient();
+  const { uploadContract } = useClientContractUpload();
+  const { viewContract } = useClientContractView();
+  const { deleteContract } = useClientContractDelete();
 
   // Both Add client and Save and add another land here; `keepOpen` is the only
   // difference between them, and the modal itself handles resetting the form.
   const onSubmitClient = (values: ClientFormValues, keepOpen: boolean) => {
-    const fields = toClientFields(values);
-    // Null means validation didn't pass. The form gates submission on the same
-    // check, so this is a guard rather than a path the UI can reach.
-    if (!fields) return;
+    // The country string a write carries is the country map's own key for that
+    // ISO2 — an "NZ", not a "New Zealand" — because that is what pg-dashboard's
+    // select submits. Falls back to the ISO2 itself if the reference call has not
+    // resolved, which is the same string in every environment seen so far.
+    const payload = toClientApiPayload(values, (iso2) =>
+      iso2 ? (countryMap.iso2ToApiCountry[iso2.toUpperCase()] ?? iso2) : ""
+    );
 
-    setCreatedClients((prev) => [
-      {
-        id: `cli-new-${nextClientIdRef.current++}`,
-        ...fields,
-        // A brand-new client has no billing history yet: nothing outstanding
-        // and no invoices raised. The currency is only the denomination those
-        // zeroes are shown in, and follows the client's own country.
-        outstandingAmount: 0,
-        outstandingCurrency: currencyForCountry(fields.countryIso2),
-        totalInvoices: 0,
-        paidInvoices: 0,
-      },
-      ...prev,
-    ]);
-    // Otherwise the new row can land outside the current filters or on a page
-    // the merchant isn't looking at, and the form appears to have done nothing.
+    // The contract is uploaded *after* the client is saved, and only when the
+    // merchant actually picked a file this session: a contract is attached to a
+    // client id, so there is nothing to attach it to until one exists, and an
+    // edit form opened over a stored contract carries a name but no file (see
+    // ClientFormValues.contract).
+    const file = values.contract?.file;
+
+    if (editingRow) {
+      updateClient({
+        id: editingRow.id,
+        rowMid: editingRow.mid,
+        payload,
+        onUpdated: () => {
+          if (file) uploadContract({ clientId: editingRow.id, rowMid: editingRow.mid, file });
+        },
+      });
+      setEditingId(null);
+      onAddClientOpenChange(false);
+      return;
+    }
+
+    createClient(payload, (clientId) => {
+      if (clientId && file) uploadContract({ clientId, file });
+    });
+
+    // Otherwise the new row can land outside the current filters or on a page the
+    // merchant isn't looking at, and the form appears to have done nothing.
     setSearch("");
-    setEmailFilter("");
     setCountryFilters([]);
-    setDateRange({ from: "", to: "" });
     setPage(1);
     if (!keepOpen) onAddClientOpenChange(false);
+  };
+
+  // Opens the same form the Add client button does, pre-filled from the client's
+  // own record. Setting `editingId` is what switches the modal into edit mode and
+  // what starts the by-id fetch that fills it.
+  const onEditClient = (client: Client) => {
+    setEditingId(client.id);
+    onAddClientOpenChange(true);
+  };
+
+  const closeClientForm = (open: boolean) => {
+    if (!open) setEditingId(null);
+    onAddClientOpenChange(open);
   };
 
   // Clicking a row opens the drawer, not the full page. The table stays
@@ -193,18 +243,6 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   const expandToPage = (client: { id: string }) => {
     if (contentEl) setScrollPosition(contentEl.scrollTop);
     setDetailsId(client.id);
-    setExpandTxnId(null);
-    setDrawerOpen(false);
-    setDetailsOpen(true);
-  };
-
-  // Same expand, plus the transaction the drawer was showing, so it opens
-  // expanded on the client's page rather than the action doing nothing from
-  // inside a drawer.
-  const expandToPageWithTransaction = (client: { id: string }, transaction: { gid: string }) => {
-    if (contentEl) setScrollPosition(contentEl.scrollTop);
-    setDetailsId(client.id);
-    setExpandTxnId(transaction.gid);
     setDrawerOpen(false);
     setDetailsOpen(true);
   };
@@ -244,40 +282,30 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // wrapping div: desktop wraps them onto a new line if needed, while mobile
   // scrolls them horizontally on a single line instead, so each layout below
   // supplies its own container.
-  const filterChips = (
-    <>
-      <EmailFilterChip
-        value={emailFilter}
-        onChange={(next) => {
-          setEmailFilter(next);
-          setPage(1);
-        }}
-        open={openChip === "email"}
-        onOpenChange={(next) => setOpenChip(next ? "email" : null)}
-        idPrefix="client-email"
-        hint="Matches any part of the address, including the domain."
-      />
-      <CountryFilterChip
-        options={countryOptions}
-        value={countryFilters}
-        onChange={(next) => {
-          setCountryFilters(next);
-          setPage(1);
-        }}
-        open={openChip === "country"}
-        onOpenChange={(next) => setOpenChip(next ? "country" : null)}
-      />
-      <DateFilterChip
-        label="Creation date"
-        value={dateRange}
-        onChange={(next) => {
-          setDateRange(next);
-          setPage(1);
-        }}
-        open={openChip === "date"}
-        onOpenChange={(next) => setOpenChip(next ? "date" : null)}
-      />
-    </>
+  // Country alone, because that is the only filter pg-dashboard's client list has
+  // besides its text search (which v2's search box already is). The Email and
+  // Creation date chips that used to sit here had no counterpart on this endpoint,
+  // so nothing they sent was ever honoured — they are gone rather than left
+  // looking operable.
+  //
+  // A function, not a stored element: both control rows below are mounted at
+  // once (CSS decides which one is visible), so calling this twice gives each
+  // row its own chip with its own popover state. Sharing one element — and with
+  // it one lifted `openChip` — opened the hidden row's twin of the chip
+  // alongside the visible one, and a Radix popover anchored to a display:none
+  // trigger never positions, so it mounted as a dismissable layer over the real
+  // popover and closed both on the very click that opened them. That is why the
+  // chip appeared to do nothing at all. Same fix, and same reason, as
+  // McaTransactionTable's renderFilterChips.
+  const renderFilterChips = () => (
+    <ClientFilterChips
+      options={countryOptions}
+      value={countryFilters}
+      onChange={(next) => {
+        setCountryFilters(next);
+        setPage(1);
+      }}
+    />
   );
 
   // The details page replaces the table in place (same component instance,
@@ -290,7 +318,6 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
         client={detailsRow}
         onBack={() => setDetailsOpen(false)}
         onCollapse={collapseToDrawer}
-        initialTransactionId={expandTxnId}
       />
     );
   }
@@ -316,9 +343,27 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           className="w-40 sm:w-56"
         />
 
-        <div className="flex flex-wrap items-center gap-1.5">{filterChips}</div>
+        <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* Every mutation already invalidates the client list, so this is for
+              changes made elsewhere — another tab, or another member of the team.
+              Spinning on isFetching (not isLoading) is what makes a press over
+              existing rows visibly do something. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Refresh clients"
+            disabled={isFetching}
+            leftIcon={
+              <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+            }
+            onClick={refetch}
+            className="shrink-0"
+          >
+            Refresh
+          </Button>
           <ReorderColumnsPopover
             columns={reorderableColumns}
             order={currentColumnOrder}
@@ -350,7 +395,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           className="min-w-0 flex-1"
         />
         <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-          {filterChips}
+          {renderFilterChips()}
         </div>
       </div>
 
@@ -364,19 +409,42 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
         rowKey={(row) => row.id}
         pageSize={CLIENT_PAGE_LIMIT}
         totalRows={totalCount}
-        page={safePage}
+        page={page}
         onPageChange={setPage}
         tableLayout="content"
         density="compact"
+        isLoading={isLoading}
+        // Edit rides the rowAction slot rather than a column of its own — the
+        // same arrangement, and the same button treatment, as the Upload Invoice
+        // action on the client's transactions table. Revealed on row hover and on
+        // keyboard focus within the row, pinned right while the columns scroll
+        // under it, and out of the way of column reordering.
+        rowAction={(row) => (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="pencil" className="h-3 w-3" />}
+            onClick={(e) => {
+              // The action floats over the row, whose own click opens the
+              // details drawer — without this, editing would open both.
+              e.stopPropagation();
+              onEditClient(row);
+            }}
+            className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
+          >
+            Edit
+          </Button>
+        )}
       />
 
       {/* Tablet + mobile (below lg): the same page's rows as cards. */}
       <ClientCardList
         className="lg:hidden"
         rows={pageRows}
-        isLoading={false}
+        isLoading={isLoading}
         onOpenDetails={openDetails}
-        page={safePage}
+        page={page}
         onPageChange={setPage}
         totalRows={totalCount}
         pageSize={CLIENT_PAGE_LIMIT}
@@ -391,13 +459,36 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         onExpand={expandToPage}
-        onExpandTransaction={expandToPageWithTransaction}
       />
 
+      {/* One form serving both Add and Edit — the field model is the same, so
+          `editing` is the only thing that distinguishes them. */}
       <ClientFormModal
         open={addClientOpen}
-        onOpenChange={onAddClientOpenChange}
+        onOpenChange={closeClientForm}
+        mode={editingId ? "edit" : "add"}
+        // Identifies which record the form is mounted on, so reopening it on a
+        // different client starts a fresh form rather than reusing the previous
+        // one's state. Absent in Add mode, which has no record.
+        recordId={editingId ?? undefined}
+        // Strictly the fetched record. `editingRow`'s list fallback exists for the
+        // ids the mutations need, not for the fields the form shows.
+        initialValues={editingClient ? toClientFormValues(editingClient) : undefined}
+        // Nothing to fill the form with yet, so the modal holds a loading state —
+        // the same thing pg-dashboard's drawer does while its own refetch is in
+        // flight.
+        isLoading={!!editingId && (isEditingClientLoading || !editingClient)}
         onSubmit={onSubmitClient}
+        onViewStoredContract={
+          editingRow?.contract?.fileId
+            ? () => viewContract({ clientId: editingRow.id, rowMid: editingRow.mid })
+            : undefined
+        }
+        onRemoveStoredContract={
+          editingRow?.contract?.fileId
+            ? () => deleteContract({ clientId: editingRow.id, rowMid: editingRow.mid })
+            : undefined
+        }
       />
     </div>
   );

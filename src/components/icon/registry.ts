@@ -115,12 +115,12 @@ import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
 import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
 import { LinkGreenFilled } from "@/components/icon/LinkGreenFilled";
-import { RecurringOutlined } from "@/components/icon/RecurringOutlined";
-import { ZohoLogo } from "@/components/icon/ZohoLogo";
 import { MdrOfferIcon } from "@/components/icon/MdrOfferIcon";
 import { NoTransactionsIllustration } from "@/components/icon/NoTransactionsIllustration";
+import { RecurringOutlined } from "@/components/icon/RecurringOutlined";
 import { ToptalLogo } from "@/components/icon/ToptalLogo";
 import { UpworkLogo } from "@/components/icon/UpworkLogo";
+import { ZohoLogo } from "@/components/icon/ZohoLogo";
 
 export const ICONS = {
   activity: Activity,

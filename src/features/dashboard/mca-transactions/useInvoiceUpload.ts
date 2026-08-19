@@ -68,7 +68,7 @@ export type InvoiceScanPhase = "idle" | "scanning" | "ready" | "error";
 /** The S3 metadata headers the presigned PUT is signed against — the upload
  *  is rejected outright if any of these is missing or altered. Mirrors
  *  pg-dashboard's getUploadHeaders. */
-function buildS3Headers(fields: {
+export function buildS3Headers(fields: {
   fileExtension: string;
   merchantId: string;
   gid?: string;

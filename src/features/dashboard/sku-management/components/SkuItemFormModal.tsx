@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useForm } from "@tanstack/react-form";
 import {
   Button,
@@ -33,6 +33,7 @@ import {
   SKU_TAX_CODE_FALLBACK,
   SKU_TYPE_OPTIONS,
 } from "@/features/dashboard/sku-management/constants";
+import { useMcaCurrencies } from "@/features/dashboard/sku-management/hooks";
 import {
   emptySkuItemForm,
   validateCurrency,
@@ -44,6 +45,33 @@ import {
 } from "@/features/dashboard/sku-management/schemas";
 import { SkuMediaUpload } from "@/features/dashboard/sku-management/components/SkuMediaUpload";
 import type { SkuItemFormValues, SkuProductType } from "@/features/dashboard/sku-management/types";
+
+/**
+ * The currency select's options: `{ value, country }`, whichever source they
+ * came from.
+ *
+ * Fetched per merchant (useMcaCurrencies) because which rails a merchant holds
+ * is their configuration, not a constant. SKU_CURRENCY_OPTIONS is the fallback
+ * for the window before that call resolves and for the case where it fails, so
+ * the select is never empty — a merchant who can price in nothing at all cannot
+ * finish the form, which is worse than offering the seven common codes.
+ */
+function useCurrencyOptions(): { value: string; country: string }[] {
+  const { currencies } = useMcaCurrencies();
+
+  return useMemo(() => {
+    if (currencies.length === 0) {
+      return SKU_CURRENCY_OPTIONS.map((option) => ({
+        value: option.value as string,
+        country: option.country,
+      }));
+    }
+    return currencies.map((currency) => ({
+      value: currency.currencyCode,
+      country: currency.countryName,
+    }));
+  }, [currencies]);
+}
 
 /** Red asterisk before a required field's label — the same marker the Create
  *  MCA Link form uses, so required-ness reads identically across the product. */
@@ -155,6 +183,8 @@ function SkuItemFormBody({
   // submit handler in the same tick it's written, and re-rendering on it would
   // be pointless.
   const keepOpenRef = useRef(false);
+
+  const currencyOptions = useCurrencyOptions();
 
   const form = useForm({
     defaultValues: initialValues ?? emptySkuItemForm(),
@@ -345,7 +375,7 @@ function SkuItemFormBody({
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            {SKU_CURRENCY_OPTIONS.map((option) => (
+                            {currencyOptions.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
                                 {/* The code never truncates and the country
                                     always does: whichever is dropped, the row

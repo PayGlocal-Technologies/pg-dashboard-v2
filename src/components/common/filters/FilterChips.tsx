@@ -1,11 +1,14 @@
 "use client";
 
-import { forwardRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import { forwardRef, useRef, useState, type ComponentPropsWithoutRef, type ReactNode } from "react";
 import {
   Button,
   Checkbox,
   DatePicker,
   Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -565,6 +568,20 @@ export function EmailFilterChip({
   );
 }
 
+/** Focuses the search field. A standalone function rather than an inline
+ *  `ref.current?.focus()`, matching the convention the tables use for acting on
+ *  ref/hook-returned elements (see restoreScrollTop). */
+function focusSearchInput(el: HTMLInputElement | null): void {
+  el?.focus();
+}
+
+/** The ISO2 to flag an option by: its own, or its value when that is already a
+ *  code. Undefined when neither is, which is what suppresses the flag. */
+function countryOptionIso2(option: CountryFilterOption): string | undefined {
+  if (option.iso2) return option.iso2;
+  return /^[A-Za-z]{2}$/.test(option.value.trim()) ? option.value : undefined;
+}
+
 export interface CountryFilterOption {
   /** Whatever the caller keys its rows by — an ISO2 code in every current
    *  call site, which is why `iso2` below defaults to it. */
@@ -597,6 +614,11 @@ export function CountryFilterChip({
   label?: string;
 }) {
   const [draft, setDraft] = useState<string[]>(value);
+  const searchRef = useRef<HTMLInputElement>(null);
+  // Narrows the list as the merchant types. Deliberately not staged like `draft`
+  // is: it filters what is on screen rather than what will be sent, so Apply has
+  // nothing to do with it and it is reset when the popover reopens.
+  const [query, setQuery] = useState("");
   const isActive = value.length > 0;
 
   const toggle = (code: string) => {
@@ -609,12 +631,37 @@ export function CountryFilterChip({
     onOpenChange(false);
   };
 
+  // Matched on the label and the ISO2 alike, so both "New Zealand" and "nz" find
+  // the same country — a merchant who thinks in codes should not have to know the
+  // display name. Substring rather than prefix: "king" finds "United Kingdom".
+  const needle = query.trim().toLowerCase();
+  const visibleOptions = needle
+    ? options.filter(
+        (option) =>
+          option.label.toLowerCase().includes(needle) ||
+          option.value.toLowerCase().includes(needle) ||
+          (option.iso2 ?? "").toLowerCase().includes(needle)
+      )
+    : options;
+
+  // Selected countries scrolled out of view by a search are still selected, and
+  // Apply still sends them — so the count says so rather than leaving the
+  // merchant to clear the box to check.
+  const hiddenSelectedCount = draft.filter(
+    (selected) => !visibleOptions.some((option) => option.value === selected)
+  ).length;
+
   return (
     <Popover
       open={open}
       onOpenChange={(next) => {
         onOpenChange(next);
-        if (next) setDraft(value);
+        if (next) {
+          setDraft(value);
+          // A stale needle would otherwise reopen the popover onto a filtered
+          // list with no obvious cause.
+          setQuery("");
+        }
       }}
     >
       <FilterChipShell active={isActive}>
@@ -623,22 +670,73 @@ export function CountryFilterChip({
           <FilterChipLabelTrigger label={label} active={isActive} />
         </PopoverTrigger>
       </FilterChipShell>
-      <PopoverContent align="end" className="w-60 p-3">
+      {/* Wider than the other chips' w-60: this one carries a search field above
+          its list, and a country name plus its flag and checkbox needs the room
+          left over. */}
+      <PopoverContent
+        align="end"
+        className="w-72 p-3"
+        // Radix focuses the content container itself when a popover opens, which
+        // would take focus straight back off an autoFocused input. Preventing that
+        // and focusing the field explicitly is what makes the popover open ready
+        // to be typed into — the whole point of the field being here.
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          focusSearchInput(searchRef.current);
+        }}
+      >
+        {/* A search box, because this list is the whole country map — long enough
+            that scrolling to one is slower than typing it. InputGroup puts the
+            magnifier inside the field, the same treatment the app's other search
+            inputs use. */}
+        <InputGroup className="mb-2">
+          <InputGroupAddon>
+            <Icon name="search" className="h-3.5 w-3.5 text-muted-foreground" />
+          </InputGroupAddon>
+          <InputGroupInput
+            ref={searchRef}
+            type="text"
+            autoComplete="off"
+            aria-label={`Search ${label.toLowerCase()}`}
+            placeholder={`Search ${label.toLowerCase()}`}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+        </InputGroup>
+
         <div className="max-h-64 space-y-0.5 overflow-y-auto">
-          {options.map((option) => (
-            <label
-              key={option.value}
-              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
-            >
-              <Checkbox
-                checked={draft.includes(option.value)}
-                onCheckedChange={() => toggle(option.value)}
-              />
-              <CountryFlag iso2={option.iso2 ?? option.value} />
-              <span className="truncate">{option.label}</span>
-            </label>
-          ))}
+          {visibleOptions.length === 0 ? (
+            <p className="px-2 py-3 text-center text-[12px] text-muted-foreground">
+              No {label.toLowerCase()} matches “{query.trim()}”
+            </p>
+          ) : (
+            visibleOptions.map((option) => (
+              <label
+                key={option.value}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[12.5px] text-foreground hover:bg-muted/50"
+              >
+                <Checkbox
+                  checked={draft.includes(option.value)}
+                  onCheckedChange={() => toggle(option.value)}
+                />
+                {/* Only where a real ISO2 is available: an option whose `value` is a
+                    country *name* (which is what the client list filters on) would
+                    otherwise build a flag URL out of that name and render broken. */}
+                {countryOptionIso2(option) ? (
+                  <CountryFlag iso2={countryOptionIso2(option) as string} />
+                ) : null}
+                <span className="truncate">{option.label}</span>
+              </label>
+            ))
+          )}
         </div>
+
+        {hiddenSelectedCount > 0 ? (
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            {hiddenSelectedCount} selected {hiddenSelectedCount === 1 ? "item" : "items"} not shown
+            by this search
+          </p>
+        ) : null}
 
         <Separator className="my-2" />
 

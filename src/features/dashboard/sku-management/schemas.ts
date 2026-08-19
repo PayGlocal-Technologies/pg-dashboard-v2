@@ -1,9 +1,4 @@
-import { SKU_CURRENCIES } from "@/features/dashboard/sku-management/constants";
-import type {
-  SkuCurrency,
-  SkuItemFormValues,
-  SkuProductType,
-} from "@/features/dashboard/sku-management/types";
+import type { SkuItemFormValues } from "@/features/dashboard/sku-management/types";
 
 /**
  * Field validators for the Add/Edit item form. Plain functions rather than a
@@ -25,8 +20,15 @@ export function validateType(value: string): string | undefined {
   return value === "GOODS" || value === "SERVICES" ? undefined : "Select a product type";
 }
 
+/**
+ * Checks that a currency was chosen, not that it is one of a fixed seven: the
+ * options are fetched per merchant (useMcaCurrencies), so the authoritative list
+ * lives on the server and the select can only ever offer codes from it. Testing
+ * membership of SKU_CURRENCIES here would reject a currency the merchant is
+ * genuinely configured for.
+ */
 export function validateCurrency(value: string): string | undefined {
-  return (SKU_CURRENCIES as readonly string[]).includes(value) ? undefined : "Select a currency";
+  return value.trim() ? undefined : "Select a currency";
 }
 
 /**
@@ -75,40 +77,6 @@ export function isSkuItemFormValid(values: SkuItemFormValues): boolean {
     !validateSellingPrice(values.sellingPrice) &&
     !validateProductCost(values.productCost)
   );
-}
-
-/**
- * Turns validated form values into the catalogue row shape. Returns null when
- * the form doesn't pass, so a caller can't accidentally build a half-valid
- * product — the null check is what narrows the form's string-typed enums to
- * SkuProductType/SkuCurrency.
- */
-export function toSkuProductFields(values: SkuItemFormValues): {
-  name: string;
-  type: SkuProductType;
-  hsnSac: string;
-  currency: SkuCurrency;
-  sellingPrice: number;
-  productCost: number;
-  description: string;
-  images?: string[];
-} | null {
-  if (!isSkuItemFormValid(values)) return null;
-
-  const images = values.images.map((image) => image.url);
-
-  return {
-    name: values.name.trim(),
-    type: values.type as SkuProductType,
-    hsnSac: values.hsnSac.trim(),
-    currency: values.currency as SkuCurrency,
-    sellingPrice: Number(values.sellingPrice),
-    // Blank cost is a real answer ("I haven't recorded one"), stored as 0
-    // rather than left undefined so the column always has a figure to format.
-    productCost: values.productCost.trim() ? Number(values.productCost) : 0,
-    description: values.description.trim(),
-    images: images.length ? images : undefined,
-  };
 }
 
 /** A blank form — also what "Save and add another" resets back to. */

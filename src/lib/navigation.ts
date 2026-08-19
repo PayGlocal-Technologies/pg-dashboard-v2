@@ -138,16 +138,15 @@ export const regularNavigation: NavGroup[] = [
     items: [
       // Points at this app's own Client Management page (/client-management)
       // rather than pg-dashboard's /mca-clients route, which has no v2
-      // equivalent. Ungated for the same reason SKU Management is: the page
-      // reads a local client book (MOCK_CLIENTS) rather than the endpoint
-      // getAllMcaClient guards, so gating on that permission would hide a page
-      // that doesn't call it. Restore the permission once the real client
-      // endpoint is wired up.
+      // equivalent. Gated on getAllMcaClient, the permission pg-dashboard puts on
+      // the same page: the page now genuinely calls that endpoint (the client list
+      // is server-backed), so hiding it from a user who cannot call it is correct
+      // — which was not true while it read a local client book.
       {
         label: "Client Management",
         href: "/client-management",
         icon: "users",
-        permission: [],
+        permission: ["getAllMcaClient"],
       },
       {
         label: "Configure",
