@@ -199,7 +199,6 @@ export interface InvoiceFormState {
   /** Server-owned once the draft exists; empty until the first save returns. */
   invoiceNumber: string;
   /** Whether the merchant overrode the auto-generated number. */
-  invoiceNumberManual: boolean;
   /** YYYY-MM-DD. */
   invoiceDate: string;
   /** YYYY-MM-DD, or "" when unset. */
@@ -236,10 +235,12 @@ export interface InvoiceFormState {
 // ─── Client creation ──────────────────────────────────────────────────────────
 // Shapes copied from pg-dashboard/src/features/mca-clients/types.ts.
 //
-// Note on encoding: `address.country` and `address.state` carry NAMES, not ISO
-// codes — production compares against the literal "India" and uses the keys of
-// the stateCodes map ("KARNATAKA", "OTHER COUNTRY"). v2's client-management
-// ClientFormModal uses ISO2 instead, which is why this flow does not reuse it.
+// Note on encoding: `address.country` and `address.state` carry the reference
+// maps' own keys, not display names of our own — production compares state
+// against the literal keys of the stateCodes map ("KARNATAKA", "OTHER COUNTRY")
+// and submits whichever key get-country-details is keyed by. These shapes are
+// still used by AddAddressDialog; client creation itself now goes through
+// client-management's ClientFormModal, as it does in pg-dashboard.
 
 export interface ClientAddress {
   streetAddress1: string;

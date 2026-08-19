@@ -427,8 +427,6 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
                       month: "short",
                       day: "2-digit",
                       year: "numeric",
-                      hour: undefined,
-                      minute: undefined,
                     })}
                   </span>
                 ) : (
@@ -439,8 +437,6 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
                         month: "short",
                         day: "2-digit",
                         year: "numeric",
-                        hour: undefined,
-                        minute: undefined,
                       })}
                     </span>
                     <Separator orientation="vertical" className="h-3" />
@@ -450,8 +446,6 @@ export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatur
                         month: "short",
                         day: "2-digit",
                         year: "numeric",
-                        hour: undefined,
-                        minute: undefined,
                       })}
                     </span>
                   </>

@@ -546,13 +546,17 @@ export function useClientStateCodes(): { states: string[]; isLoading: boolean } 
 
 /** Tags already in use for this merchant's clients, as suggestions in the form.
  *  Entries without a name are dropped rather than offered blank. */
-export function useClientTagOptions(): { tags: string[]; isLoading: boolean } {
-  const { mid, isReady } = useClientPathMid();
+export function useClientTagOptions(midOverride?: string): {
+  tags: string[];
+  isLoading: boolean;
+} {
+  const { mid: pathMid, isReady } = useClientPathMid();
+  const mid = midOverride || pathMid;
 
   const { data, isPending } = useGet<ClientTagOptionsResponse>(
     ["client-tag-options", mid],
     clientTagOptionsApi(mid),
-    { enabled: isReady }
+    { enabled: midOverride ? !!midOverride : isReady }
   );
 
   const tags = useMemo(
@@ -721,11 +725,12 @@ const CLIENT_KEY = ["client"];
 
 /** POST .../create. Resolves with the new client's id, which the contract upload
  *  needs — a contract can only be attached to a client that exists. */
-export function useCreateClient(): {
+export function useCreateClient(midOverride?: string): {
   createClient: (payload: ClientMutationPayload, onCreated?: (clientId: string) => void) => void;
   isPending: boolean;
 } {
-  const { mid } = useClientPathMid();
+  const { mid: pathMid } = useClientPathMid();
+  const mid = midOverride || pathMid;
 
   const { mutate, isPending } = usePost<ClientCreateResponse, ClientMutationPayload>(
     clientCreateApi(mid),
@@ -792,11 +797,12 @@ export function useUpdateClient(): {
  * for. Leg 1's presigned URL is keyed by the file's own name, which is why it is
  * read out of the response by that name rather than from a fixed field.
  */
-export function useClientContractUpload(): {
+export function useClientContractUpload(midOverride?: string): {
   uploadContract: (args: { clientId: string; rowMid?: string; file: File }) => void;
   isPending: boolean;
 } {
-  const { mid } = useClientPathMid();
+  const { mid: pathMid } = useClientPathMid();
+  const mid = midOverride || pathMid;
 
   const { mutate: presign, isPending: isPresigning } = usePut<
     ClientContractPresignResponse,

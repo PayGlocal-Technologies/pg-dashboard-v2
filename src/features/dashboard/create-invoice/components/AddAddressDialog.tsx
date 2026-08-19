@@ -27,14 +27,25 @@ import type {
 } from "@/features/dashboard/create-invoice/types";
 import type { BaseResponse } from "@/types/common";
 
-const EMPTY_ADDRESS: ClientAddress = {
-  streetAddress1: "",
-  streetAddress2: "",
-  city: "",
-  state: "",
-  country: "",
-  zipcode: "",
-};
+/**
+ * The saved address, made safe to drive controlled inputs with.
+ *
+ * The API returns `null` — not `""` — for address fields that were never
+ * filled in, which is exactly the case this dialog exists for (see
+ * clientHasIncompleteAddress, which tests `value == null` for the same
+ * reason). Spreading the record over string defaults would therefore put
+ * `null` back into every missing field, so each key is coerced individually.
+ */
+function toFormAddress(saved: Partial<ClientAddress> | null | undefined): ClientAddress {
+  return {
+    streetAddress1: saved?.streetAddress1 ?? "",
+    streetAddress2: saved?.streetAddress2 ?? "",
+    city: saved?.city ?? "",
+    state: saved?.state ?? "",
+    country: saved?.country ?? "",
+    zipcode: saved?.zipcode ?? "",
+  };
+}
 
 /**
  * Completes a selected client's billing address.
@@ -127,10 +138,7 @@ function AddressBody({
     { invalidateQueries: ["client-list"] }
   );
 
-  const [address, setAddress] = useState<ClientAddress>(() => ({
-    ...EMPTY_ADDRESS,
-    ...(client.address ?? {}),
-  }));
+  const [address, setAddress] = useState<ClientAddress>(() => toFormAddress(client.address));
 
   const patch = (next: Partial<ClientAddress>) => setAddress((prev) => ({ ...prev, ...next }));
 

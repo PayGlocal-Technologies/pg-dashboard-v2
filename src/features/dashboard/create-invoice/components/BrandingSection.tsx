@@ -50,20 +50,24 @@ export function BrandingSection({
         variant="ghost"
         className="h-auto w-full justify-between rounded-none px-4 py-3 text-left"
         onClick={() => setExpanded((value) => !value)}
+        aria-expanded={expanded}
+        rightIcon={
+          <Icon
+            name="chevron-down"
+            className={cn(
+              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
+              expanded && "rotate-180"
+            )}
+            aria-hidden
+          />
+        }
       >
-        <span>
+        <span className="block">
           <span className="block text-[13px] font-semibold text-foreground">Branding</span>
           <span className="block text-[11px] font-normal text-muted-foreground">
             Logo and authorised signature
           </span>
         </span>
-        <Icon
-          name="chevron-down"
-          className={cn(
-            "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-            expanded && "rotate-180"
-          )}
-        />
       </Button>
 
       {expanded && (

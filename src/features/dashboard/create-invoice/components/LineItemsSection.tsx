@@ -3,6 +3,8 @@
 import { useRef, useState } from "react";
 import {
   Button,
+  Callout,
+  CalloutText,
   Input,
   Select,
   SelectContent,
@@ -50,6 +52,8 @@ export function LineItemsSection({
   taxName,
   taxValue,
   onTotalsFieldChange,
+  linkedExpectedTotal,
+  linkedCurrency,
 }: {
   lineItems: LineItemDraft[];
   onLineItemsChange: (next: LineItemDraft[]) => void;
@@ -69,6 +73,12 @@ export function LineItemsSection({
     taxName?: string;
     taxValue?: string;
   }) => void;
+  /** Set only when this invoice is linked to a transaction *and* the items do
+   *  not add up to it. pg-dashboard raises the same mismatch on leaving its
+   *  ITEMS step; the flat editor has no step to leave, so it is shown against
+   *  the items themselves rather than held back until Generate. */
+  linkedExpectedTotal?: string | null;
+  linkedCurrency?: string;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -123,7 +133,7 @@ export function LineItemsSection({
         {/* Currencies come from the merchant's own FFMS configuration, not a
             hard-coded list, so an unsupported one cannot be chosen. */}
         <Select value={currency} onValueChange={onCurrencyChange}>
-          <SelectTrigger className="h-8 w-[7.5rem] rounded-full" aria-label="Invoice currency">
+          <SelectTrigger className="w-[7.5rem]" aria-label="Invoice currency">
             <SelectValue placeholder="Currency" />
           </SelectTrigger>
           <SelectContent>
@@ -433,6 +443,22 @@ export function LineItemsSection({
             Add line item
           </Button>
         </div>
+      )}
+
+      {/* The linked-transaction amount gate, raised here rather than only at
+          Generate: pg-dashboard blocks the ITEMS step on the same mismatch, and
+          the items are what has to change to clear it.
+
+          Both figures are shown as code + amount rather than one as a symbol and
+          the other as a code — "$0.00 vs NZD 100.00" reads as two currencies
+          when it is meant to read as two amounts of one. */}
+      {linkedExpectedTotal && (
+        <Callout variant="error" className="mt-3">
+          <CalloutText>
+            Items total {currency} {total} — must match the linked transaction:{" "}
+            {linkedCurrency || currency} {linkedExpectedTotal}.
+          </CalloutText>
+        </Callout>
       )}
 
       <AddLineItemDialog

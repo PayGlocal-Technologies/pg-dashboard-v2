@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, Checkbox } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { CONSENT_TEXT } from "@/features/dashboard/create-invoice/constants";
 
 /**
@@ -26,18 +27,24 @@ export function ConsentSection({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="rounded-xl border border-border bg-muted/20 p-4">
+    // This gates the whole submit, so an unticked box is styled as something
+    // still to do rather than as a muted footnote: it carries the primary tint
+    // until it is ticked, then recedes to a plain card. The previous bg-muted/20
+    // put an unticked control on a near-invisible surface.
+    <div
+      className={cn(
+        "rounded-xl border p-4 transition-colors",
+        checked ? "border-border bg-card shadow-sm" : "border-primary/45 bg-primary/5"
+      )}
+    >
       <div className="flex items-start gap-3">
         <Checkbox
           id="invoice-consent"
           checked={checked}
           onCheckedChange={(next) => onChange(next === true)}
-          className="mt-0.5"
+          className="mt-0.5 size-5"
         />
-        <label
-          htmlFor="invoice-consent"
-          className="cursor-pointer text-[12.5px] text-muted-foreground"
-        >
+        <label htmlFor="invoice-consent" className="cursor-pointer text-[12.5px] text-foreground">
           {isLinkedToTransaction ? CONSENT_TEXT.linked : CONSENT_TEXT.standard}
           {expanded && <> {CONSENT_TEXT.expanded}</>}{" "}
           <Button

@@ -77,7 +77,6 @@ const BOOTSTRAP_STALL_MS = 8000;
 function emptyForm(today: string, currency: string): InvoiceFormState {
   return {
     invoiceNumber: "",
-    invoiceNumberManual: false,
     invoiceDate: today,
     dueDate: "",
     dueTermId: null,
@@ -143,9 +142,9 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
           variant="primary"
           size="sm"
           disabled
-          leftIcon={<Icon name="send" className="h-3.5 w-3.5" />}
+          leftIcon={<Icon name="file-text" className="h-3.5 w-3.5" />}
         >
-          Finalise &amp; send
+          Generate invoice
         </Button>
       </header>
 
@@ -596,7 +595,20 @@ function InvoiceEditor({
   );
   const [billerDetails, setBillerDetails] = useState<BillerDetails>(() => biller);
 
-  const linkedTxn = useLinkedTransaction(gid);
+  /**
+   * The transaction this invoice is attached to, if any.
+   *
+   * pg-dashboard resolves it as `searchParams.get("gid") ?? invoiceDetails?.gid`
+   * at every one of its four call sites, and the URL is only the first of those
+   * two sources. Reopening a saved draft from the invoice list goes to
+   * /create-invoice?invoiceId=… with no &gid=, so reading the URL alone would
+   * drop the link on an invoice that is still attached to a transaction —
+   * taking the chip with it, and with it both linked gates (remitter match and
+   * amount match) on the one flow that most needs them.
+   */
+  const linkedGid = gid || invoice.gid || "";
+
+  const linkedTxn = useLinkedTransaction(linkedGid);
   const { clients } = useInvoiceClients(invoiceId);
   const { rows: bankRows } = useInvoiceBankAccounts(invoiceId);
   const logo = useInvoiceAsset("LOGO");
@@ -625,10 +637,10 @@ function InvoiceEditor({
         form,
         invoiceDetails: { ...invoice, billerDetails },
         invoiceId,
-        gid,
+        gid: linkedGid,
         clientIdParam,
       }),
-    [form, billerDetails, invoice, invoiceId, gid, clientIdParam]
+    [form, billerDetails, invoice, invoiceId, linkedGid, clientIdParam]
   );
 
   const persistDraft = useCallback(() => {
@@ -665,6 +677,26 @@ function InvoiceEditor({
     linkedTxn?.partnerCustomerFullName
   );
 
+  /**
+   * The total a transaction-linked invoice has to settle, to 2dp.
+   *
+   * Production compares the draft's own stored `totalAmount`, which the server
+   * seeds from the transaction when the draft is created with a gid. The FFMS
+   * record is the same figure read more directly, so it is preferred — but it
+   * arrives from a separate search POST, so the draft's value stands in while
+   * that is in flight or if it comes back empty. Null only when neither is
+   * known yet, which blocks rather than waving the invoice through.
+   */
+  const linkedExpectedTotal: string | null = !linkedGid
+    ? null
+    : linkedTxn?.amount != null && linkedTxn.amount !== ""
+      ? Number(linkedTxn.amount).toFixed(2)
+      : Number.isFinite(invoice?.totalAmount)
+        ? Number(invoice?.totalAmount).toFixed(2)
+        : null;
+
+  const linkedTotalMismatch = !!linkedExpectedTotal && linkedExpectedTotal !== totals.total;
+
   const previewSource = {
     form,
     biller: billerDetails,
@@ -686,6 +718,14 @@ function InvoiceEditor({
       return "The selected client does not match the remitter on the linked transaction.";
     if (!hasCompleteLineItems(form.lineItems))
       return "Every line item needs a name, type, rate and quantity.";
+    // A linked invoice must settle its transaction exactly. Unlike the previous
+    // `if (gid && linkedTxn?.amount)` form, an unresolved lookup no longer skips
+    // the check silently — production always has a figure to compare against, so
+    // having none here is a reason to wait, not to proceed.
+    if (linkedGid && !linkedExpectedTotal)
+      return "Still loading the linked transaction. Try again in a moment.";
+    if (linkedTotalMismatch)
+      return `The invoice totals ${totals.total}, but the linked transaction is for ${linkedExpectedTotal}. Adjust the items to match.`;
     if (!form.accountNo) return "Choose the account this invoice should be paid into.";
     if (!form.invoiceNumber.trim()) return "The invoice needs a number.";
     if (!form.invoiceDate) return "Set the issue date.";
@@ -701,20 +741,6 @@ function InvoiceEditor({
     if (issue) {
       toast.error("Not ready to generate", { description: issue });
       return;
-    }
-
-    // A linked invoice must settle its transaction exactly. Production compares
-    // the draft's stored total; comparing against the transaction itself says
-    // the same thing more directly.
-    if (gid && linkedTxn?.amount) {
-      const expected = Number(linkedTxn.amount).toFixed(2);
-      if (expected !== totals.total) {
-        toast.error("Total does not match the linked transaction", {
-          description: `The invoice totals ${totals.total} but the transaction is for ${expected}. Adjust the items to match.`,
-          duration: 10000,
-        });
-        return;
-      }
     }
 
     saveInvoice(buildPayload(), {
@@ -754,9 +780,9 @@ function InvoiceEditor({
           { isGstInvoice: false },
           {
             onSuccess: () => {
-              if (gid) {
+              if (linkedGid) {
                 toast.success("Invoice generated and linked", {
-                  description: `Attached to transaction ****${gid.slice(-6)}.`,
+                  description: `Attached to transaction ****${linkedGid.slice(-6)}.`,
                 });
                 router.push("/mca-transactions");
                 return;
@@ -807,7 +833,7 @@ function InvoiceEditor({
               <Icon name="refresh" className={isSaving ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
               {isSaving ? "Saving…" : "Auto-saved as you type"}
             </span>
-            {gid && <LinkedTransactionChip gid={gid} record={linkedTxn} />}
+            {linkedGid && <LinkedTransactionChip gid={linkedGid} record={linkedTxn} />}
           </div>
         </div>
 
@@ -816,10 +842,10 @@ function InvoiceEditor({
           variant="primary"
           size="sm"
           disabled={isSaving || isGenerating}
-          leftIcon={<Icon name="send" className="h-3.5 w-3.5" />}
+          leftIcon={<Icon name="file-text" className="h-3.5 w-3.5" />}
           onClick={handleGenerate}
         >
-          {isGenerating ? "Generating…" : "Finalise & send"}
+          {isGenerating ? "Generating…" : "Generate invoice"}
         </Button>
       </header>
 
@@ -829,10 +855,8 @@ function InvoiceEditor({
             <div className="flex flex-wrap items-center gap-2">
               <InvoiceNumberChip
                 value={form.invoiceNumber}
-                isManual={form.invoiceNumberManual}
                 serverValue={invoice.invoiceNumber ?? ""}
                 onChange={(invoiceNumber) => patch({ invoiceNumber })}
-                onManualChange={(invoiceNumberManual) => patch({ invoiceNumberManual })}
               />
               <IssueDateChip
                 value={form.invoiceDate}
@@ -878,6 +902,8 @@ function InvoiceEditor({
               taxName={form.taxName}
               taxValue={form.taxValue}
               onTotalsFieldChange={patch}
+              linkedExpectedTotal={linkedTotalMismatch ? linkedExpectedTotal : null}
+              linkedCurrency={linkedTxn?.currency ?? form.currency}
             />
 
             <PaymentDetailsSection
@@ -903,7 +929,7 @@ function InvoiceEditor({
 
             <ConsentSection
               checked={form.userCreateConsent}
-              isLinkedToTransaction={!!gid}
+              isLinkedToTransaction={!!linkedGid}
               onChange={(userCreateConsent) => patch({ userCreateConsent })}
             />
           </div>

@@ -17,11 +17,21 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { useInvoiceClients } from "@/features/dashboard/create-invoice/hooks";
+import {
+  useInvoiceClients,
+  useInvoiceMerchantId,
+} from "@/features/dashboard/create-invoice/hooks";
 import { validateSelectedClient } from "@/features/dashboard/create-invoice/helpers";
-import { AddClientDialog } from "@/features/dashboard/create-invoice/components/AddClientDialog";
+import { ClientFormModal } from "@/features/dashboard/client-management/components/ClientFormModal";
+import {
+  toClientApiPayload,
+  useClientContractUpload,
+  useClientCountryMap,
+  useCreateClient,
+} from "@/features/dashboard/client-management/hooks";
 import { AddAddressDialog } from "@/features/dashboard/create-invoice/components/AddAddressDialog";
 import type { Address, ClientData } from "@/features/dashboard/create-invoice/types";
+import type { ClientFormValues } from "@/features/dashboard/client-management/types";
 
 /** Initials for the contact avatar, at most two letters. */
 function initialsOf(name: string): string {
@@ -71,6 +81,34 @@ export function BillToSection({
   remitterName: string | null | undefined;
 }) {
   const { clients, refetch } = useInvoiceClients(invoiceId);
+
+  // The same Add client form the client-management page uses, exactly as
+  // pg-dashboard does — its create-invoice step imports mca-clients'
+  // AddClientForm rather than keeping a second one, and passes the MID this flow
+  // resolved (`selectedMidForAddClient`) because the client page reads its own
+  // off the URL. `midOverride` is that argument.
+  const merchantId = useInvoiceMerchantId();
+  const countryMap = useClientCountryMap();
+  const { createClient } = useCreateClient(merchantId);
+  const { uploadContract } = useClientContractUpload(merchantId);
+
+  const onSubmitClient = (values: ClientFormValues, keepOpen: boolean) => {
+    const payload = toClientApiPayload(values, (iso2) =>
+      iso2 ? (countryMap.iso2ToApiCountry[iso2.toUpperCase()] ?? iso2) : ""
+    );
+
+    createClient(payload, (newClientId) => {
+      if (!newClientId) return;
+      // A contract can only be attached to a client that exists, so it follows
+      // the create rather than riding along with it.
+      const file = values.contract?.file;
+      if (file) uploadContract({ clientId: newClientId, file });
+      onClientIdChange(newClientId);
+      refetch();
+    });
+
+    if (!keepOpen) setAddClientOpen(false);
+  };
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -186,8 +224,7 @@ export function BillToSection({
             <Button
               type="button"
               variant="link"
-              size="sm"
-              className="h-auto p-0 align-baseline"
+              className="h-auto p-0 align-baseline text-sm"
               onClick={() => setAddressOpen(true)}
             >
               Complete address
@@ -268,13 +305,12 @@ export function BillToSection({
         </DialogContent>
       </Dialog>
 
-      <AddClientDialog
+      <ClientFormModal
         open={addClientOpen}
         onOpenChange={setAddClientOpen}
-        onCreated={(newClientId) => {
-          onClientIdChange(newClientId);
-          refetch();
-        }}
+        mode="add"
+        onSubmit={onSubmitClient}
+        midOverride={merchantId}
       />
 
       <AddAddressDialog

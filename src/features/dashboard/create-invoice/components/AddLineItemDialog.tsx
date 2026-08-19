@@ -27,7 +27,7 @@ import {
   LINE_ITEM_TYPE_OPTIONS,
 } from "@/features/dashboard/create-invoice/constants";
 import { useLineItemSuggestions } from "@/features/dashboard/create-invoice/hooks";
-import type { LineItemDraft } from "@/features/dashboard/create-invoice/types";
+import type { LineItemDraft, LineItemSuggestion } from "@/features/dashboard/create-invoice/types";
 
 export type LineItemValues = Omit<LineItemDraft, "key">;
 
@@ -129,10 +129,28 @@ function LineItemBody({
 
   const patch = (next: Partial<LineItemValues>) => setValues((prev) => ({ ...prev, ...next }));
 
+  // Suggestions are previously-billed line items and carry no id, so the same
+  // name recurs whenever an item was billed more than once. Two entries that
+  // differ only by name are the same suggestion twice — indistinguishable in the
+  // list and a duplicate React key — so they collapse on the whole tuple, which
+  // keeps a genuine "same item, different rate" pair as two separate rows.
   const matches = useMemo(() => {
     const query = values.description.trim().toLowerCase();
     if (!query) return [];
-    return suggestions.filter((item) => item.name.toLowerCase().includes(query)).slice(0, 6);
+
+    const seen = new Set<string>();
+    const unique: { item: LineItemSuggestion; key: string }[] = [];
+
+    for (const item of suggestions) {
+      if (!item.name.toLowerCase().includes(query)) continue;
+      const key = [item.name, item.unitPrice ?? "", item.hsn ?? "", item.type ?? ""].join("|");
+      if (seen.has(key)) continue;
+      seen.add(key);
+      unique.push({ item, key });
+      if (unique.length === 6) break;
+    }
+
+    return unique;
   }, [suggestions, values.description]);
 
   // Same four fields production requires before it will leave the items step.
@@ -151,7 +169,10 @@ function LineItemBody({
         <RadioGroup
           value={values.type}
           onValueChange={(next) => patch({ type: next })}
-          className="flex items-center gap-5"
+          // flex-row is explicit: RadioGroup defaults to flex-col, and a bare
+          // `flex` does not override a direction tailwind-merge sees no conflict
+          // with — without it the two options stack.
+          className="flex flex-row items-center gap-5"
         >
           {LINE_ITEM_TYPE_OPTIONS.map((option) => (
             <label
@@ -192,9 +213,9 @@ function LineItemBody({
           // Keep focus in the input so typing continues to filter.
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          {matches.map((match) => (
+          {matches.map(({ item: match, key }) => (
             <Button
-              key={match.name}
+              key={key}
               type="button"
               variant="ghost"
               size="sm"

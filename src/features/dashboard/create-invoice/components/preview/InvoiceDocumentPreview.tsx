@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import { Icon } from "@/components/icon";
 import { formatDate } from "@/lib/utils/format";
 import { getAmount, getInvoiceTotals } from "@/features/dashboard/create-invoice/helpers";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";
@@ -62,9 +61,18 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-md">
-      <div className="bg-card p-8">
+      {/* A4 proportions (210:297) so a near-empty draft still reads as a sheet
+          of paper rather than a short card that grows as items are added. This
+          is a floor, not a cap: overflow stays visible here, so a document
+          longer than one page pushes the box past the ratio instead of
+          clipping. The rounding and clipping live on the parent. */}
+      <div className="aspect-[210/297] bg-card p-10">
+        {/* No placeholder when there is no logo. Nova shows a dashed box here,
+            but Nova's is the click target for uploading one; this preview has no
+            such affordance, so the box would only promise a frame the generated
+            PDF will not contain. */}
         <div className="mb-5 flex items-center gap-4">
-          {form.logoEnabled && logoUrl ? (
+          {form.logoEnabled && logoUrl && (
             <Image
               src={logoUrl}
               alt="Business logo"
@@ -73,10 +81,6 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
               unoptimized
               className="h-16 w-16 shrink-0 rounded-xl border border-border object-contain"
             />
-          ) : (
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-border bg-muted/40 text-muted-foreground">
-              <Icon name="image" className="h-5 w-5" />
-            </span>
           )}
           <span className="text-[22px] font-bold tracking-tight text-foreground">Invoice</span>
         </div>
@@ -104,13 +108,13 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
             <p className="text-[13.5px] font-semibold text-foreground">
               {biller?.legalName || "-"}
             </p>
-            {billerLines.map((line) => (
-              <p key={line} className="text-[12px] leading-snug text-muted-foreground">
+            {billerLines.map((line, i) => (
+              <p key={`${line}-${i}`} className="text-[12px] leading-snug text-muted-foreground/70">
                 {line}
               </p>
             ))}
             {biller?.gstIn && (
-              <p className="mt-1 text-[12px] text-muted-foreground">GSTIN {biller.gstIn}</p>
+              <p className="mt-1 text-[12px] text-muted-foreground/70">GSTIN {biller.gstIn}</p>
             )}
           </div>
 
@@ -122,10 +126,10 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
               {client?.businessName || client?.name || "-"}
             </p>
             {client?.businessName && client?.name && (
-              <p className="text-[12px] text-muted-foreground">{client.name}</p>
+              <p className="text-[12px] text-muted-foreground/70">{client.name}</p>
             )}
-            {clientLines.map((line) => (
-              <p key={line} className="text-[12px] leading-snug text-muted-foreground">
+            {clientLines.map((line, i) => (
+              <p key={`${line}-${i}`} className="text-[12px] leading-snug text-muted-foreground/70">
                 {line}
               </p>
             ))}
@@ -137,7 +141,9 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
           {form.dueDate && ` due by ${longDate(form.dueDate)}`}
         </p>
         {form.memo && (
-          <p className="mt-1 whitespace-pre-line text-[12px] text-muted-foreground">{form.memo}</p>
+          <p className="mt-1 whitespace-pre-line text-[12px] text-muted-foreground/70">
+            {form.memo}
+          </p>
         )}
 
         <div className="mt-4 overflow-hidden border border-border">
@@ -191,8 +197,8 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
           </div>
         </div>
 
-        <div className="mt-3 flex justify-end">
-          <div className="w-full max-w-[240px] space-y-1.5 text-[12.5px]">
+        <div className="mt-2 flex justify-end">
+          <div className="w-full max-w-[220px] space-y-1.5 text-[12.5px]">
             <div className="flex items-center justify-between text-muted-foreground">
               <span>Subtotal</span>
               <span className="tabular-nums">{formatMoney(symbol, subtotal)}</span>
@@ -221,22 +227,28 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
             <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Bank details
             </p>
-            <div className="grid grid-cols-2 gap-2 text-[12px] sm:grid-cols-4">
+            <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-[12px]">
               <div>
                 <p className="text-muted-foreground">Account holder</p>
-                <p className="font-medium text-foreground">{account.accountHolderName || "-"}</p>
+                <p className="break-words font-medium text-foreground">
+                  {account.accountHolderName || "-"}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Account no.</p>
-                <p className="font-mono font-medium text-foreground">{account.accountNumber}</p>
+                <p className="break-all font-mono font-medium text-foreground">
+                  {account.accountNumber}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Bank</p>
-                <p className="font-medium text-foreground">{account.bankName || "-"}</p>
+                <p className="break-words font-medium text-foreground">{account.bankName || "-"}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">IFSC / Routing</p>
-                <p className="font-mono font-medium text-foreground">{account.routing || "-"}</p>
+                <p className="break-all font-mono font-medium text-foreground">
+                  {account.routing || "-"}
+                </p>
               </div>
             </div>
           </div>
@@ -245,9 +257,13 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
         {(form.notes || form.lut) && (
           <div className="mt-6 border-t border-border pt-4">
             {form.notes && (
-              <p className="whitespace-pre-line text-[11px] text-muted-foreground">{form.notes}</p>
+              <p className="whitespace-pre-line text-[11px] text-muted-foreground/80">
+                {form.notes}
+              </p>
             )}
-            {form.lut && <p className="mt-2 text-[11px] text-muted-foreground">LUT: {form.lut}</p>}
+            {form.lut && (
+              <p className="mt-2 text-[11px] text-muted-foreground/80">LUT: {form.lut}</p>
+            )}
           </div>
         )}
 
@@ -261,7 +277,7 @@ export function InvoiceDocumentPreview({ source }: { source: PreviewSource }) {
               unoptimized
               className="h-14 w-auto object-contain"
             />
-            <p className="mt-1 text-[11px] text-muted-foreground">Authorised signatory</p>
+            <p className="mt-1 text-[11px] text-muted-foreground/80">Authorised signatory</p>
           </div>
         )}
       </div>
