@@ -18,9 +18,9 @@ export const RECEIPT_PRODUCT_LABEL: Record<ReceiptProduct, string> = {
 /**
  * The product tab bar: the three products receipts are issued under, and no
  * others. Unlike the SKU and Transactions tab bars — which are shortcuts onto a
- * type/status filter — this one selects which product's receipts the table is
- * showing at all, so it changes the column set as well as the rows (see
- * buildReceiptColumns).
+ * type/status filter that the merchant could equally reach from the chips — this
+ * one selects which product's receipts the table is showing at all. The columns
+ * are the same in every tab (see RECEIPT_COLUMNS); only the rows change.
  *
  * Multi-currency accounts leads because it is the product most receipts are
  * raised under, and it is the page's default selection.

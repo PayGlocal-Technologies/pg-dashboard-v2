@@ -3,17 +3,17 @@
 import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { CountryCell } from "@/features/dashboard/mca-transactions/columns";
+import { ReceiptDownloadAction } from "@/features/dashboard/receipts/columns";
 import { formatReceiptAmount, formatReceiptMonth } from "@/features/dashboard/receipts/utils";
 import { RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/receipts/constants";
-import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
+import type { Receipt } from "@/features/dashboard/receipts/types";
 
 function ReceiptCardSkeleton() {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-start justify-between gap-2">
         <Shimmer className="h-4 w-40" />
-        <Shimmer className="h-7 w-28" rounded="md" />
+        <Shimmer className="h-7 w-7" rounded="md" />
       </div>
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <Shimmer className="h-5 w-28" />
@@ -25,38 +25,25 @@ function ReceiptCardSkeleton() {
 }
 
 // The same fields the table's columns show, in the same order, laid out as a
-// stacked card instead of cells — Invoice number, Invoice ID, Amount, Country
-// (MCA only, for the same reason the column is), Month, Product type, and the
-// row's own Download action.
-function ReceiptCard({
-  row,
-  product,
-  onDownload,
-}: {
-  row: Receipt;
-  product: ReceiptProduct;
-  onDownload: (row: Receipt) => void;
-}) {
+// stacked card instead of cells — Invoice number, Invoice ID, Amount, Month,
+// Product type — with the row's own download action in the same place the table
+// pins it: the far right of the leading row.
+function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (row: Receipt) => void }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-muted/40">
-      {/* Invoice number leads and Download closes the row: what identifies the
-          receipt, and the one thing a merchant came here to do with it. The
-          button is labelled and always drawn — nothing here is hover-gated,
-          since there is no hover on touch. */}
+      {/* Invoice number leads and the download icon closes the row: what
+          identifies the receipt, and the one thing a merchant came here to do
+          with it. Literally the same control the table pins to the right of each
+          row, so a tap and a click are the same action with the same accessible
+          name. Always drawn — nothing here is hover-gated, since there is no
+          hover on touch. */}
       <div className="flex items-start justify-between gap-2">
         <span className="font-mono text-[12.5px] font-medium break-all text-foreground">
           {row.invoiceNumber}
         </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-          onClick={() => onDownload(row)}
-          className="h-auto min-h-0 shrink-0 gap-1.5 py-1.5"
-        >
-          Download
-        </Button>
+        <span className="shrink-0">
+          <ReceiptDownloadAction row={row} onDownload={onDownload} />
+        </span>
       </div>
 
       {/* The amount carries the same weight it does on a transaction card, with
@@ -86,12 +73,6 @@ function ReceiptCard({
             {formatReceiptMonth(row.periodMonth)}
           </p>
         </div>
-        {product === "MCA" && (
-          <div className="min-w-0">
-            <p className="text-[11px] text-muted-foreground">Country</p>
-            <CountryCell iso2={row.remitterCountry} />
-          </div>
-        )}
       </div>
     </div>
   );
@@ -99,7 +80,6 @@ function ReceiptCard({
 
 interface ReceiptCardListProps {
   rows: Receipt[];
-  product: ReceiptProduct;
   isLoading: boolean;
   onDownload: (row: Receipt) => void;
   skeletonCount?: number;
@@ -120,7 +100,6 @@ interface ReceiptCardListProps {
  */
 export function ReceiptCardList({
   rows,
-  product,
   isLoading,
   onDownload,
   skeletonCount = 6,
@@ -141,9 +120,7 @@ export function ReceiptCardList({
       ) : rows.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyDescription} />
       ) : (
-        rows.map((row) => (
-          <ReceiptCard key={row.gid} row={row} product={product} onDownload={onDownload} />
-        ))
+        rows.map((row) => <ReceiptCard key={row.gid} row={row} onDownload={onDownload} />)
       )}
 
       {!isLoading && rows.length > 0 && totalPages > 1 && (

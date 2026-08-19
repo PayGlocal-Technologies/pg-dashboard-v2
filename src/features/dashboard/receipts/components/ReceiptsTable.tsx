@@ -3,20 +3,22 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
-import { FilterChipsRow, type DateRangeValue } from "@/components/common/filters/FilterChips";
-import { buildReceiptColumns } from "@/features/dashboard/receipts/columns";
+import { type DateRangeValue } from "@/components/common/filters/FilterChips";
+import { RECEIPT_COLUMNS, ReceiptDownloadAction } from "@/features/dashboard/receipts/columns";
 import { ReceiptCardList } from "@/features/dashboard/receipts/components/ReceiptCardList";
+import { ReceiptFilterChips } from "@/features/dashboard/receipts/components/ReceiptFilterChips";
 import { MOCK_RECEIPTS } from "@/features/dashboard/receipts/mock-data";
-import { filterReceipts, receiptCurrencyOptions } from "@/features/dashboard/receipts/utils";
+import { filterReceipts, formatReceiptMonth } from "@/features/dashboard/receipts/utils";
 import {
   DEFAULT_RECEIPT_PRODUCT,
   RECEIPTS_PAGE_LIMIT,
+  RECEIPT_PRODUCT_LABEL,
   RECEIPT_PRODUCT_TABS,
   RECEIPT_SEARCH_ARIA_LABEL,
   RECEIPT_SEARCH_HINTS,
-  RECEIPT_STATUS_FILTERS,
 } from "@/features/dashboard/receipts/constants";
 import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
 
@@ -34,14 +36,15 @@ const EMPTY_DATE_RANGE: DateRangeValue = { from: "", to: "" };
  * doesn't already need.
  *
  * Unlike SkuTable, the controls row carries no trailing action. Downloading is
- * per receipt, not per table — each row's own Download column (and each card's
- * button below `lg`) fetches that month's document, so there is nothing a single
- * button at the top could unambiguously download.
+ * per receipt, not per table — each row's own pinned download icon (and each
+ * card's, below `lg`) fetches that month's document, so there is nothing a
+ * single button at the top could unambiguously download.
  *
  * The one real difference from SkuTable is what the tabs do. There, they filter
- * by product type; here they select which product's receipts are on screen at
- * all, so they change the column set as well as the rows — see
- * buildReceiptColumns, where Country exists only for MCA.
+ * the catalogue by product type — something the chips could do too. Here they
+ * select which product's receipts are on screen at all: the page's context, not
+ * one more axis on the same list. The columns don't change with them (see
+ * RECEIPT_COLUMNS); only the rows do.
  *
  * There is no receipts endpoint yet, so rows come from MOCK_RECEIPTS and every
  * filter is applied client-side in filterReceipts. When the endpoint lands,
@@ -53,17 +56,7 @@ export function ReceiptsTable() {
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE);
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
-  const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [page, setPage] = useState(1);
-
-  // Only the currencies this product's receipts are actually raised in, so the
-  // chip can't offer a filter that matches nothing. Computed before the other
-  // filters are applied — narrowing the currency list as the merchant filters
-  // would take away the option they just chose.
-  const currencyOptions = useMemo(
-    () => receiptCurrencyOptions(MOCK_RECEIPTS.filter((r) => r.product === product)),
-    [product]
-  );
 
   const filtered = useMemo(
     () =>
@@ -72,9 +65,8 @@ export function ReceiptsTable() {
         search,
         dateRange,
         statusFilters,
-        currencyFilters,
       }),
-    [product, search, dateRange, statusFilters, currencyFilters]
+    [product, search, dateRange, statusFilters]
   );
 
   const totalCount = filtered.length;
@@ -94,55 +86,44 @@ export function ReceiptsTable() {
     setPage(1);
   };
 
-  // Switching products keeps the search query and the Date/Status filters, the
-  // same way SkuTable keeps its search across type tabs: a merchant chasing one
-  // invoice ID shouldn't retype it to check which product it was raised under,
-  // and both of those filters mean the same thing in all three tabs.
-  //
-  // Currency is the exception, and is cleared. Its options are derived from the
-  // selected product's own rows (see currencyOptions), so a code carried across
-  // could be one the new tab has no option for at all — an active filter the
-  // merchant can see the effect of but not find, let alone clear.
+  // Switching products keeps the search query and both filters, the same way
+  // SkuTable keeps its search across type tabs: a merchant chasing one invoice ID
+  // shouldn't retype it to check which product it was raised under, and a month
+  // range and a status mean the same thing in all three tabs. Only the page
+  // resets, since the new tab's list is a different length.
   const onProductChange = (value: string) => {
     setProduct(value as ReceiptProduct);
-    setCurrencyFilters([]);
     setPage(1);
   };
 
-  // One handler for both the table's Download column and the card list's button,
-  // so a tap and a click fetch the same document.
+  // One handler for both the table's pinned action and the card list's, so a tap
+  // and a click fetch the same document. A receipt is addressed by product and
+  // month — one document for the whole month, never one per transaction inside it
+  // — which is exactly what the row already carries.
   const onDownloadReceipt = (row: Receipt) => {
     // TODO: wire up once a receipt-document endpoint exists — the same gap the
     // Transactions and MCA Links tables' own Report buttons have. Per CLAUDE.md
     // the URL and payload must be confirmed against pg-dashboard rather than
     // inferred, so nothing is requested yet.
-    toast.message(`Download receipt ${row.invoiceNumber}`, {
-      description: "Receipt downloads aren't connected to the backend yet.",
-    });
+    toast.message(
+      `Download the ${RECEIPT_PRODUCT_LABEL[row.product]} receipt for ${formatReceiptMonth(row.periodMonth)}`,
+      { description: "Receipt downloads aren't connected to the backend yet." }
+    );
   };
 
-  const columns = buildReceiptColumns(product, onDownloadReceipt);
-
   // Each instance owns its own open-popover state, which is why the two control
-  // rows below can both render one: see FilterChipsRow's own note on why lifting
-  // that state breaks the hidden copy.
+  // rows below can both render one: see ReceiptFilterChips' own note on why
+  // lifting that state breaks the hidden copy.
   const filterChips = (
-    <FilterChipsRow
+    <ReceiptFilterChips
       dateRange={dateRange}
       onDateRangeChange={(next) => {
         setDateRange(next);
         setPage(1);
       }}
-      statusOptions={RECEIPT_STATUS_FILTERS}
       statusFilters={statusFilters}
       onStatusFiltersChange={(next) => {
         setStatusFilters(next);
-        setPage(1);
-      }}
-      currencyOptions={currencyOptions}
-      currencyFilters={currencyFilters}
-      onCurrencyFiltersChange={(next) => {
-        setCurrencyFilters(next);
         setPage(1);
       }}
     />
@@ -188,16 +169,16 @@ export function ReceiptsTable() {
           action on this screen belongs to individual rows. */}
       <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
         {searchInput}
-        {/* Filter group: Date, Status and Currency read as one cohesive
-            filtering control, so the gap within it is tighter than the gap
-            separating it from search. */}
+        {/* Filter group: Date and Status read as one cohesive filtering
+            control, so the gap within it is tighter than the gap separating it
+            from search. */}
         <div className="flex flex-wrap items-center gap-1.5">{filterChips}</div>
       </div>
 
       {/* Tablet + mobile (below lg): search takes the full width on its own row,
           then the chips beneath it on a single line that scrolls horizontally —
-          there's no room for all three beside search, and wrapping them would
-          push the table down a row at a time. Its scrollbar is hidden
+          there's no room for both beside search on a phone, and wrapping them
+          would push the table down a row at a time. Its scrollbar is hidden
           (scrollbar-none, the same utility the Transactions controls use) so the
           chips read as a row of controls rather than a scroll region: the gesture
           still works, there's just no persistent indicator. The scrolling is
@@ -212,10 +193,30 @@ export function ReceiptsTable() {
       {/* Desktop (lg+): the full table. `tableLayout="content"` sizes every
           column to its content and scrolls inside the table's own box once the
           columns outgrow it, so a narrow desktop window keeps usable column
-          widths instead of squeezing all seven — and never scrolls the page. */}
+          widths instead of squeezing all five — and never scrolls the page.
+
+          The download action rides `rowAction`, not a column: DataTable renders
+          that slot in a zero-width cell stuck to the right edge of the viewport,
+          so it stays pinned right and reachable while the five data columns
+          scroll horizontally underneath it, out of their widths and out of any
+          future column reordering. It floats over the row rather than sitting in
+          the flow, so it can overlap the trailing column's text; the outline
+          button's own fill and border are what keep it legible there.
+
+          DataTable reveals that slot on row hover only (opacity-0 on a span it
+          owns), which is wrong for a download — it has to be there before you
+          know to look for it. A child can't undo a parent's opacity, so the
+          override is applied here, scoped to this table's action cell:
+          `td.sticky` is that zero-width cell, and the descendant selector
+          outranks the bare `opacity-0` class without needing !important. z-[2]
+          lifts it above the row's own cells so it always paints on top. The same
+          pair of overrides SkuTable uses for its row menu. */}
       <DataTable
-        className="hidden rounded-none border-0 lg:block"
-        columns={columns}
+        className={cn(
+          "hidden rounded-none border-0 lg:block",
+          "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+        )}
+        columns={RECEIPT_COLUMNS}
         data={pageRows}
         // No endpoint behind this yet (see MOCK_RECEIPTS), so nothing is ever in
         // flight. Plumbed rather than dropped so the loading state is already
@@ -229,6 +230,7 @@ export function ReceiptsTable() {
         totalRows={totalCount}
         page={page}
         onPageChange={setPage}
+        rowAction={(row) => <ReceiptDownloadAction row={row} onDownload={onDownloadReceipt} />}
         tableLayout="content"
         density="compact"
       />
@@ -239,7 +241,6 @@ export function ReceiptsTable() {
       <ReceiptCardList
         className="lg:hidden"
         rows={pageRows}
-        product={product}
         isLoading={false}
         onDownload={onDownloadReceipt}
         page={page}

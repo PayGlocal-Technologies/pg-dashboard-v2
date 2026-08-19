@@ -3,6 +3,7 @@
 import {
   Button,
   type Column,
+  IconButton,
   StatusBadge,
   Tooltip,
   TooltipContent,
@@ -11,10 +12,9 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableCell } from "@/components/common/CopyableCell";
-import { CountryCell } from "@/features/dashboard/mca-transactions/columns";
 import { formatReceiptAmount, formatReceiptMonth } from "@/features/dashboard/receipts/utils";
 import { RECEIPT_MONTH_HINT, RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/receipts/constants";
-import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
+import type { Receipt } from "@/features/dashboard/receipts/types";
 
 /**
  * The Month column's heading, with its info tip.
@@ -59,115 +59,116 @@ function MonthHeader() {
   );
 }
 
-// ── Column definitions ───────────────────────────────────────────────────────
-// Widths, typography (text-[13px] body, muted secondary text) and alignment
-// conventions mirror buildSkuColumns and buildMcaLinkColumns, so every table in
-// the product reads as one system.
-//
-// Order is fixed: Invoice number identifies the receipt and leads, Invoice ID and
-// Amount follow it, and the Download action closes the row with Product type
-// immediately before it. Country sits between Amount and Month, and only on the
-// MCA tab — an MCA merchant holds a separate local receiving account per country,
-// so a month produces one receipt per account and the country is what tells them
-// apart. It's built by spreading a one-or-zero-length array (the same shape
-// buildSkuColumns uses for its optional MID column) rather than rendering a
-// column of dashes, so the other two tabs have no Country column at all instead
-// of an empty one.
-export function buildReceiptColumns(
-  product: ReceiptProduct,
-  onDownload: (row: Receipt) => void
-): Column<Receipt>[] {
-  return [
-    {
-      key: "invoiceNumber",
-      header: "Invoice number",
-      minWidth: 200,
-      // Compact density puts overflow-hidden on every cell, which would clip the
-      // hover-revealed copy button; cancelled here the same way the MCA table
-      // cancels it for its Country cell.
-      cellClassName: "overflow-visible",
-      render: (row) => <CopyableCell value={row.invoiceNumber} label="Invoice number" monospace />,
-    },
-    {
-      key: "invoiceId",
-      header: "Invoice ID",
-      minWidth: 165,
-      cellClassName: "overflow-visible",
-      render: (row) => <CopyableCell value={row.invoiceId} label="Invoice ID" monospace />,
-    },
-    {
-      key: "amount",
-      header: "Amount",
-      minWidth: 160,
-      align: "right",
-      render: (row) => (
-        <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-          <span className="text-[13px] font-semibold tabular-nums text-foreground">
-            {formatReceiptAmount(row)}
-          </span>
-          <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
-        </div>
-      ),
-    },
-    ...(product === "MCA"
-      ? [
-          {
-            key: "remitterCountry",
-            header: "Country",
-            minWidth: 170,
-            // min-w-max inside CountryCell is what grows this column, so its
-            // content must never be clipped by compact density's overflow-hidden.
-            cellClassName: "overflow-visible",
-            render: (row: Receipt) => <CountryCell iso2={row.remitterCountry} />,
-          } satisfies Column<Receipt>,
-        ]
-      : []),
-    {
-      key: "periodMonth",
-      header: <MonthHeader />,
-      minWidth: 165,
-      // The header's info-tip trigger sits proud of the text; compact density
-      // would clip its focus ring without this.
-      cellClassName: "overflow-visible",
-      render: (row) => (
-        <span className="text-[13px] whitespace-nowrap text-foreground">
-          {formatReceiptMonth(row.periodMonth)}
-        </span>
-      ),
-    },
-    {
-      key: "product",
-      header: "Product type",
-      minWidth: 210,
-      // Every row in a tab belongs to the same product, so this reads as a label
-      // rather than a state: one quiet `muted` chip throughout, not a colour per
-      // product. Colour-coding a value that never varies within the view would
-      // imply a distinction the column can't actually draw — compare
-      // buildSkuColumns, which does vary its variant because Goods and Services
-      // rows sit in the same list.
-      render: (row) => (
-        <StatusBadge variant="muted" label={RECEIPT_PRODUCT_LABEL[row.product]} size="sm" />
-      ),
-    },
-    {
-      key: "download",
-      header: "Download",
-      minWidth: 145,
-      render: (row) => (
-        // A real column, not DataTable's `rowAction` slot: that slot only fades
-        // in on row hover, and a receipt's download has to be visible and
-        // tappable without one.
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="download" className="h-3 w-3" />}
-          onClick={() => onDownload(row)}
-          className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-        >
-          Download
-        </Button>
-      ),
-    },
-  ];
+/**
+ * The row's download control.
+ *
+ * Icon only — the action is unambiguous in a table of receipts, and a labelled
+ * button repeated down every row would compete with the data. What it downloads
+ * lives in the accessible name instead, which names the product and the month
+ * because that pair *is* the receipt (see Receipt's own note): one document for
+ * the whole month, never one per transaction inside it. IconButton mirrors that
+ * name into a native `title`, so the same sentence is available on hover without
+ * a second tooltip being wired up.
+ *
+ * Rendered through DataTable's `rowAction` slot rather than as a column, see
+ * RECEIPT_COLUMNS below.
+ */
+export function ReceiptDownloadAction({
+  row,
+  onDownload,
+}: {
+  row: Receipt;
+  onDownload: (row: Receipt) => void;
+}) {
+  return (
+    <IconButton
+      aria-label={`Download the ${RECEIPT_PRODUCT_LABEL[row.product]} receipt for ${formatReceiptMonth(row.periodMonth)}`}
+      variant="outline"
+      size="xs"
+      rounded="md"
+      onClick={() => onDownload(row)}
+    >
+      <Icon name="download" className="h-3.5 w-3.5" />
+    </IconButton>
+  );
 }
+
+/**
+ * The table's columns — identical in all three tabs.
+ *
+ * A constant rather than a `build…()` function like its siblings, because there
+ * is nothing to build from: no column varies by tab, and the Product type cell
+ * reads the product off the row it is drawing. Keeping it a value also gives
+ * DataTable a stable `columns` identity across renders.
+ *
+ * Order is fixed: Invoice number identifies the receipt and leads, Invoice ID and
+ * Amount follow it, then the period it covers and the product it belongs to. The
+ * download action is deliberately *not* among them — it rides `rowAction`, so it
+ * floats pinned to the right edge over the row, takes no column width, never
+ * reorders with the data, and stays reachable while the data columns scroll
+ * under it.
+ *
+ * Widths, typography (text-[13px] body, muted secondary text) and alignment
+ * mirror buildSkuColumns and buildMcaLinkColumns, so every table in the product
+ * reads as one system.
+ */
+export const RECEIPT_COLUMNS: Column<Receipt>[] = [
+  {
+    key: "invoiceNumber",
+    header: "Invoice number",
+    minWidth: 200,
+    // Compact density puts overflow-hidden on every cell, which would clip the
+    // hover-revealed copy button; cancelled here the same way the MCA table
+    // cancels it for its Country cell.
+    cellClassName: "overflow-visible",
+    render: (row) => <CopyableCell value={row.invoiceNumber} label="Invoice number" monospace />,
+  },
+  {
+    key: "invoiceId",
+    header: "Invoice ID",
+    minWidth: 165,
+    cellClassName: "overflow-visible",
+    render: (row) => <CopyableCell value={row.invoiceId} label="Invoice ID" monospace />,
+  },
+  {
+    key: "amount",
+    header: "Amount",
+    minWidth: 160,
+    align: "right",
+    render: (row) => (
+      <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+        <span className="text-[13px] font-semibold tabular-nums text-foreground">
+          {formatReceiptAmount(row)}
+        </span>
+        <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
+      </div>
+    ),
+  },
+  {
+    key: "periodMonth",
+    header: <MonthHeader />,
+    minWidth: 165,
+    // The header's info-tip trigger sits proud of the text; compact density
+    // would clip its focus ring without this.
+    cellClassName: "overflow-visible",
+    render: (row) => (
+      <span className="text-[13px] whitespace-nowrap text-foreground">
+        {formatReceiptMonth(row.periodMonth)}
+      </span>
+    ),
+  },
+  {
+    key: "product",
+    header: "Product type",
+    minWidth: 210,
+    // Every row in a tab belongs to the same product, so this reads as a label
+    // rather than a state: one quiet `muted` chip throughout, not a colour per
+    // product. Colour-coding a value that never varies within the view would
+    // imply a distinction the column can't actually draw — compare
+    // buildSkuColumns, which does vary its variant because Goods and Services
+    // rows sit in the same list.
+    render: (row) => (
+      <StatusBadge variant="muted" label={RECEIPT_PRODUCT_LABEL[row.product]} size="sm" />
+    ),
+  },
+];

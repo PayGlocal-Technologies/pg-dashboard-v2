@@ -1,4 +1,4 @@
-import type { CurrencyOption, DateRangeValue } from "@/components/common/filters/FilterChips";
+import type { DateRangeValue } from "@/components/common/filters/FilterChips";
 import { toEndOfDayMs, toStartOfDayMs } from "@/components/common/filters/FilterChips";
 import { formatCurrency } from "@/lib/utils/format";
 import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
@@ -60,28 +60,11 @@ export function periodMonthRangeMs(periodMonth: string): { start: number; end: n
   return Number.isNaN(start) || Number.isNaN(end) ? null : { start, end };
 }
 
-/**
- * The currencies actually present in one product's receipts, as Currency filter
- * chip options. Derived from the rows rather than from a fixed list, so the chip
- * can only ever offer a currency that has receipts behind it — an MCA merchant
- * never sees INR in the list, and the PA tab never offers AED.
- *
- * No `iso2`, so each option renders the globe glyph instead of a flag: a currency
- * here belongs to a receipt, not to one of the merchant's own country-based
- * receiving accounts (which is what CURRENCY_FILTER_OPTIONS describes, and where
- * the flags come from).
- */
-export function receiptCurrencyOptions(receipts: Receipt[]): CurrencyOption[] {
-  const codes = Array.from(new Set(receipts.map((r) => r.currency))).sort();
-  return codes.map((code) => ({ value: code, label: code }));
-}
-
 export interface ReceiptFilters {
   product: ReceiptProduct;
   search: string;
   dateRange: DateRangeValue;
   statusFilters: string[];
-  currencyFilters: string[];
 }
 
 /**
@@ -118,10 +101,6 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
     }
 
     if (filters.statusFilters.length && !filters.statusFilters.includes(receipt.status)) {
-      return false;
-    }
-
-    if (filters.currencyFilters.length && !filters.currencyFilters.includes(receipt.currency)) {
       return false;
     }
 
