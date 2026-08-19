@@ -2,8 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Button, DataTable } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { DataTable } from "@/components/ui";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { FilterChipsRow, type DateRangeValue } from "@/components/common/filters/FilterChips";
@@ -19,20 +18,25 @@ import {
   RECEIPT_SEARCH_HINTS,
   RECEIPT_STATUS_FILTERS,
 } from "@/features/dashboard/receipts/constants";
-import type { ReceiptProduct } from "@/features/dashboard/receipts/types";
+import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
 
 const EMPTY_DATE_RANGE: DateRangeValue = { from: "", to: "" };
 
 /**
- * The receipts table: product tabs, search/filter/Download controls, and the
- * rows themselves, all inside one bordered surface.
+ * The receipts table: product tabs, search/filter controls, and the rows
+ * themselves, all inside one bordered surface.
  *
  * Structurally a copy of SkuTable — same container (overflow-hidden rounded-xl
- * border border-border bg-card), same tab row, same controls row with the
- * trailing action pushed right by ml-auto, same DataTable configuration with its
- * own border/radius neutralised, same card list below `lg`. A border-b under
- * each of the first two rows stands in for the divider that would otherwise
- * separate them, so no rule is drawn that the layout doesn't already need.
+ * border border-border bg-card), same tab row, same controls row, same DataTable
+ * configuration with its own border/radius neutralised, same card list below
+ * `lg`. A border-b under each of the first two rows stands in for the divider
+ * that would otherwise separate them, so no rule is drawn that the layout
+ * doesn't already need.
+ *
+ * Unlike SkuTable, the controls row carries no trailing action. Downloading is
+ * per receipt, not per table — each row's own Download column (and each card's
+ * button below `lg`) fetches that month's document, so there is nothing a single
+ * button at the top could unambiguously download.
  *
  * The one real difference from SkuTable is what the tabs do. There, they filter
  * by product type; here they select which product's receipts are on screen at
@@ -83,8 +87,6 @@ export function ReceiptsTable() {
     return filtered.slice(start, start + RECEIPTS_PAGE_LIMIT);
   }, [filtered, page]);
 
-  const columns = buildReceiptColumns(product);
-
   // Every control that changes what matches also returns to page 1 — otherwise a
   // merchant filtering while on page 3 lands on an empty page of a shorter list.
   const onSearch = (value: string) => {
@@ -107,30 +109,19 @@ export function ReceiptsTable() {
     setPage(1);
   };
 
-  const handleDownload = () => {
-    // TODO: wire up once a receipts export endpoint exists — the same gap the
-    // Transactions and MCA Links tables' own Report buttons have.
-    toast.message("Download receipts", {
-      description: "Receipt exports aren't connected to the backend yet.",
+  // One handler for both the table's Download column and the card list's button,
+  // so a tap and a click fetch the same document.
+  const onDownloadReceipt = (row: Receipt) => {
+    // TODO: wire up once a receipt-document endpoint exists — the same gap the
+    // Transactions and MCA Links tables' own Report buttons have. Per CLAUDE.md
+    // the URL and payload must be confirmed against pg-dashboard rather than
+    // inferred, so nothing is requested yet.
+    toast.message(`Download receipt ${row.invoiceNumber}`, {
+      description: "Receipt downloads aren't connected to the backend yet.",
     });
   };
 
-  // One button, rendered once per control row (desktop and compact), so the
-  // action is identical at every width — labelled rather than collapsed into an
-  // icon or an overflow menu, matching how the Transactions table keeps its
-  // Report button labelled on mobile.
-  const downloadButton = (
-    <Button
-      type="button"
-      variant="ghost"
-      size="sm"
-      leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-      onClick={handleDownload}
-      className="ml-auto shrink-0"
-    >
-      Download
-    </Button>
-  );
+  const columns = buildReceiptColumns(product, onDownloadReceipt);
 
   // Each instance owns its own open-popover state, which is why the two control
   // rows below can both render one: see FilterChipsRow's own note on why lifting
@@ -163,7 +154,7 @@ export function ReceiptsTable() {
       onSearch={onSearch}
       words={RECEIPT_SEARCH_HINTS}
       ariaLabel={RECEIPT_SEARCH_ARIA_LABEL[product]}
-      className="min-w-0 flex-1 lg:w-56 lg:flex-none"
+      className="w-full lg:w-56"
     />
   );
 
@@ -191,24 +182,20 @@ export function ReceiptsTable() {
         />
       </div>
 
-      {/* Desktop (lg+): search, the filter chip group, and Download all share one
-          row. Search and the chips sit together on the left with tight spacing —
-          the chips read as immediately following search — while ml-auto on the
-          button pushes it to the far right rather than justify-between spreading
-          the controls into a wide gap. */}
+      {/* Desktop (lg+): search and the filter chip group share one row, sitting
+          together on the left with tight spacing so the chips read as
+          immediately following search. Nothing is pushed to the right — the only
+          action on this screen belongs to individual rows. */}
       <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
         {searchInput}
         {/* Filter group: Date, Status and Currency read as one cohesive
             filtering control, so the gap within it is tighter than the gap
             separating it from search. */}
         <div className="flex flex-wrap items-center gap-1.5">{filterChips}</div>
-        {downloadButton}
       </div>
 
-      {/* Tablet + mobile (below lg): search shrinks to whatever room Download
-          leaves it on a row that never wraps, so the button stays visible and
-          labelled at every width instead of moving into a menu. The chips go on
-          their own row beneath, on a single line that scrolls horizontally —
+      {/* Tablet + mobile (below lg): search takes the full width on its own row,
+          then the chips beneath it on a single line that scrolls horizontally —
           there's no room for all three beside search, and wrapping them would
           push the table down a row at a time. Its scrollbar is hidden
           (scrollbar-none, the same utility the Transactions controls use) so the
@@ -216,10 +203,7 @@ export function ReceiptsTable() {
           still works, there's just no persistent indicator. The scrolling is
           inside this row, so the page itself never scrolls sideways. */}
       <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
-        <div className="flex flex-nowrap items-center gap-2">
-          {searchInput}
-          {downloadButton}
-        </div>
+        {searchInput}
         <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
           {filterChips}
         </div>
@@ -228,7 +212,7 @@ export function ReceiptsTable() {
       {/* Desktop (lg+): the full table. `tableLayout="content"` sizes every
           column to its content and scrolls inside the table's own box once the
           columns outgrow it, so a narrow desktop window keeps usable column
-          widths instead of squeezing all five — and never scrolls the page. */}
+          widths instead of squeezing all seven — and never scrolls the page. */}
       <DataTable
         className="hidden rounded-none border-0 lg:block"
         columns={columns}
@@ -257,6 +241,7 @@ export function ReceiptsTable() {
         rows={pageRows}
         product={product}
         isLoading={false}
+        onDownload={onDownloadReceipt}
         page={page}
         onPageChange={setPage}
         totalRows={totalCount}

@@ -1,6 +1,6 @@
-import type { DateRangeValue, CurrencyOption } from "@/components/common/filters/FilterChips";
+import type { CurrencyOption, DateRangeValue } from "@/components/common/filters/FilterChips";
 import { toEndOfDayMs, toStartOfDayMs } from "@/components/common/filters/FilterChips";
-import { formatCurrency, parseApiDateTime } from "@/lib/utils/format";
+import { formatCurrency } from "@/lib/utils/format";
 import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
 
 /**
@@ -16,13 +16,48 @@ export function formatReceiptAmount(receipt: Receipt): string {
   return formatCurrency(amount, currency, currency === "INR" ? "en-IN" : "en-US");
 }
 
-/** Epoch ms for a receipt timestamp, or null when it can't be parsed. */
-function timestampMs(raw: string | null | undefined): number | null {
-  if (!raw) return null;
-  const parsed = parseApiDateTime(raw);
-  if (parsed) return parsed.getTime();
-  const iso = new Date(raw);
-  return Number.isNaN(iso.getTime()) ? null : iso.getTime();
+// Spelled out rather than read from Intl: a receipt's period is a calendar month,
+// not a moment, so the label must not vary with the reader's locale or timezone
+// the way toLocaleString would. "2026-08" reads "August 2026" for everyone.
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** "2026-08" → "August 2026". Returns the raw value if it isn't a "YYYY-MM" pair. */
+export function formatReceiptMonth(periodMonth: string): string {
+  const [year, month] = periodMonth.split("-");
+  const name = MONTH_NAMES[Number(month) - 1];
+  if (!year || !name) return periodMonth;
+  return `${name} ${year}`;
+}
+
+/**
+ * The span a receipt's period covers, as epoch ms — first instant of the month
+ * to last. Used by the date filter, which matches a receipt whose whole month
+ * overlaps the chosen range rather than one that starts inside it: a receipt
+ * "covers all payments made during the month" (the Month column's own info tip
+ * says so), so asking for any few days in August has to return August's receipt.
+ */
+export function periodMonthRangeMs(periodMonth: string): { start: number; end: number } | null {
+  const [year, month] = periodMonth.split("-").map(Number);
+  if (!year || !month || month < 1 || month > 12) return null;
+
+  const start = new Date(year, month - 1, 1).getTime();
+  // Day 0 of the following month is the last day of this one — the arithmetic
+  // that makes December roll into the next January without a special case.
+  const end = new Date(year, month, 0, 23, 59, 59, 999).getTime();
+  return Number.isNaN(start) || Number.isNaN(end) ? null : { start, end };
 }
 
 /**
@@ -31,10 +66,10 @@ function timestampMs(raw: string | null | undefined): number | null {
  * can only ever offer a currency that has receipts behind it — an MCA merchant
  * never sees INR in the list, and the PA tab never offers AED.
  *
- * No `iso2`, so each option renders the globe glyph instead of a flag: a
- * currency here belongs to a receipt, not to one of the merchant's own
- * country-based receiving accounts (which is what CURRENCY_FILTER_OPTIONS
- * describes, and where the flags come from).
+ * No `iso2`, so each option renders the globe glyph instead of a flag: a currency
+ * here belongs to a receipt, not to one of the merchant's own country-based
+ * receiving accounts (which is what CURRENCY_FILTER_OPTIONS describes, and where
+ * the flags come from).
  */
 export function receiptCurrencyOptions(receipts: Receipt[]): CurrencyOption[] {
   const codes = Array.from(new Set(receipts.map((r) => r.currency))).sort();
@@ -53,9 +88,9 @@ export interface ReceiptFilters {
  * Every filter the page offers, applied in one pass.
  *
  * Client-side because there is no receipts endpoint yet (rows come from
- * MOCK_RECEIPTS). When the endpoint lands, replace this with a request body
- * — mirroring buildTxnRequestBody — and a usePostQuery call; the tabs, chips
- * and columns that feed it need no changes.
+ * MOCK_RECEIPTS). When the endpoint lands, replace this with a request body —
+ * mirroring buildTxnRequestBody — and a usePostQuery call; the tabs, chips and
+ * columns that feed it need no changes.
  *
  * The product tab is applied here too, and first: it is the page's context, so
  * the search box and every chip only ever see the selected product's rows.
@@ -68,14 +103,16 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
   return receipts.filter((receipt) => {
     if (receipt.product !== filters.product) return false;
 
-    // The two fields the search hints name, both of them columns the table
+    // The three fields the search hints name, all of them columns the table
     // renders in every tab. The amount is matched on its raw decimal string, so
-    // "24500" finds the row the Amount column shows as 24,500.00 — grouping
+    // "412500" finds the row the Amount column shows as 412,500.00 — grouping
     // separators and the currency symbol are display-only and never part of the
     // query.
     if (
       query &&
-      ![receipt.invoiceId, receipt.amount].some((field) => field.toLowerCase().includes(query))
+      ![receipt.invoiceNumber, receipt.invoiceId, receipt.amount].some((field) =>
+        field.toLowerCase().includes(query)
+      )
     ) {
       return false;
     }
@@ -89,13 +126,15 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
     }
 
     if (fromMs !== null || toMs !== null) {
-      const issued = timestampMs(receipt.issuedOn);
-      // A row whose timestamp can't be read is dropped rather than kept: a date
-      // filter that silently lets unparseable rows through would report a
-      // range it isn't actually showing.
-      if (issued === null) return false;
-      if (fromMs !== null && issued < fromMs) return false;
-      if (toMs !== null && issued > toMs) return false;
+      const period = periodMonthRangeMs(receipt.periodMonth);
+      // A row whose period can't be read is dropped rather than kept: a date
+      // filter that silently let unparseable rows through would report a range
+      // it isn't actually showing.
+      if (!period) return false;
+      // Overlap, not containment — see periodMonthRangeMs. A range ending before
+      // the month starts, or starting after it ends, is the only miss.
+      if (toMs !== null && period.start > toMs) return false;
+      if (fromMs !== null && period.end < fromMs) return false;
     }
 
     return true;
