@@ -42,13 +42,27 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
   }
 
   return (
-    <Card className="gap-0 p-6 sm:p-8 lg:p-10">
-      {/* Two columns from md up — tablet keeps the illustration column and lets
-          the content column shrink instead. Below md this collapses to one
-          column: the copy and the referral link come first, the illustration
-          follows beneath them at a reduced size (see below). */}
-      <div className="grid items-center gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,17rem)] lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-12">
-        <div className="flex flex-col">
+    <Card className="gap-0 p-5 sm:p-6">
+      {/* Two columns from md up: the content takes the slack, the illustration
+          column hugs the illustration itself (`auto`) so there is no dead space
+          beside it. Rows stretch rather than centre, which is what lets the
+          illustration take its height from the row — see below. Below md this
+          collapses to one column: heading, copy, and the referral link come
+          first, the illustration follows beneath them.
+
+          The row carries a min-height so the hero stands 40% taller than its
+          content alone would make it: the heading/copy/link stack measures ~11rem
+          (36px heading + 12 + 52px of copy + 32 + 44px field), which with the
+          card's 1.5rem padding is a ~14rem card — so a ~16.6rem row puts the card
+          at ~19.6rem, i.e. 1.4x. It is a floor, not a fixed height, so longer copy
+          still grows the card rather than being clipped. */}
+      <div className="grid gap-8 md:min-h-[16.6rem] md:grid-cols-[minmax(0,1fr)_auto] md:gap-6 lg:gap-10">
+        {/* The illustration sits close to the card's own edges, so the text
+            block carries the hero's generous horizontal inset itself rather
+            than taking it from the card's padding. Centred on the card's
+            horizontal midline, so the stack sits in the middle of the taller
+            hero instead of riding its top edge. */}
+        <div className="flex flex-col md:justify-center md:pl-3 lg:pl-8">
           {/* Page title — the hero heading is the h1, so this screen has no
               separate PageHeader competing with it. The reward is the one part
               given the primary colour: it is what the merchant is here for. */}
@@ -89,17 +103,24 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
         {/* The referral illustration. A raster asset, so the icon-registry
             forwardRef pattern in CLAUDE.md does not apply (it is for SVG); it
             goes through next/image per the same file's Images rule. Intrinsic
-            dimensions are the file's own and `h-auto` keeps them, so the
-            aspect ratio holds and nothing is cropped — object-contain rather
-            than any cover/crop treatment. Capped and centred on mobile so it
-            stays clearly secondary to the copy above it. */}
+            dimensions are the file's own, so the 1:1 aspect ratio holds and
+            nothing is cropped — object-contain, never a cover/crop treatment.
+
+            From md up it is scaled to the hero itself rather than to a fixed
+            size: `h-full` takes the grid row's height (the min-height above, or
+            the content if that ever runs taller) and `w-auto` lets the square
+            asset derive its own width from it. So the illustration is always
+            exactly as tall as the hero's inner row and rescales with it — there
+            is no second number to keep in step with the card height. On mobile
+            it comes last, as a small centred figure. */}
         <Image
           src={REFERRAL_HERO_ILLUSTRATION.src}
           alt=""
           width={REFERRAL_HERO_ILLUSTRATION.width}
           height={REFERRAL_HERO_ILLUSTRATION.height}
           priority
-          className="mx-auto h-auto w-full max-w-[220px] rounded-xl object-contain sm:max-w-[260px] md:mx-0 md:max-w-none"
+          sizes="(min-width: 768px) 260px, 220px"
+          className="mx-auto h-auto w-full max-w-[220px] rounded-2xl object-contain md:h-full md:w-auto md:max-w-none"
         />
       </div>
     </Card>

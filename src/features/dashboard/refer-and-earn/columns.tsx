@@ -35,20 +35,27 @@ export function formatReferralReward(row: Referral): string {
 }
 
 // ── Column definitions ───────────────────────────────────────────────────────
+// The table renders with tableLayout="content", so every column sizes to its own
+// content and the table ends after the last one — no `minWidth`/`maxWidth` hints
+// here, since those only feed the `fixed` layout's colgroup and would be dead
+// config in this mode. The two free-text columns instead cap themselves with a
+// max-width on their block-level cell content, which is what actually bounds a
+// column under the automatic table algorithm: a long name or address truncates
+// rather than stretching the whole table.
 export function buildReferralColumns(): Column<Referral>[] {
   return [
     {
       key: "fullName",
       header: "Full name",
-      minWidth: 200,
       render: (row) => (
-        <span className="text-[13px] font-medium text-foreground">{row.fullName}</span>
+        <span className="block max-w-[16rem] truncate text-[13px] font-medium text-foreground">
+          {row.fullName}
+        </span>
       ),
     },
     {
       key: "status",
       header: "Status",
-      minWidth: 150,
       render: (row) => {
         const { label, variant, trailIcon } = getReferralStatusMeta(row.status);
         return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
@@ -57,7 +64,6 @@ export function buildReferralColumns(): Column<Referral>[] {
     {
       key: "amount",
       header: "Amount",
-      minWidth: 130,
       align: "right",
       render: (row) => (
         <span
@@ -74,9 +80,10 @@ export function buildReferralColumns(): Column<Referral>[] {
     {
       key: "emailId",
       header: "Email ID",
-      minWidth: 240,
       render: (row) => (
-        <span className="block truncate text-[13px] text-muted-foreground">{row.emailId}</span>
+        <span className="block max-w-[22rem] truncate text-[13px] text-muted-foreground">
+          {row.emailId}
+        </span>
       ),
     },
   ];

@@ -19,9 +19,9 @@ export const REFERRAL_PAGE_SIZE = 10;
  * aspect ratio correct and reserve the right space before the image loads.
  */
 export const REFERRAL_HERO_ILLUSTRATION = {
-  src: "/assets/Refer&Earn.png",
-  width: 1380,
-  height: 1140,
+  src: "/assets/Refer&Earn1.png",
+  width: 1254,
+  height: 1254,
 } as const;
 
 /**

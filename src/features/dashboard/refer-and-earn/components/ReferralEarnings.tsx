@@ -44,34 +44,40 @@ export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarni
 
       <ReferralSummaryCards summary={summary} />
 
-      {/* One bordered surface holding both treatments, so the section reads as a
-          single card at every width. The table drops its own border and radius
-          to avoid doubling this wrapper's. */}
-      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-card">
-        {/* Desktop (lg+): the full table. Its own empty state keeps the four
-            column headers in place, so an empty result still shows the shape of
-            the data rather than a blank panel. */}
-        <DataTable
-          className="hidden rounded-none border-0 lg:block"
-          columns={columns}
-          data={pageRows}
-          rowKey={(row) => row.id}
-          isLoading={isLoading}
-          page={page}
-          onPageChange={setPage}
-          totalRows={totalCount}
-          pageSize={REFERRAL_PAGE_SIZE}
-          density="comfortable"
-          tableLayout="fixed"
-          emptyTitle={EMPTY_TITLE}
-          emptyDescription={EMPTY_DESCRIPTION}
-          footerSummary="count"
-          footerCountLabels={{ singular: "referral", plural: "referrals" }}
-        />
+      {/* Desktop (lg+): the full table, keeping its own Flux surface, border,
+          radius, header, row spacing, and hover state.
 
-        {/* Tablet + mobile (below lg): the same page's rows as cards. */}
+          The card spans the full content width, while the columns keep their
+          content-based widths: that is exactly what `tableLayout="content"`
+          gives — each column sizes to its own content and a greedy, empty
+          trailing column absorbs the leftover width so the table still fills
+          the container. So widening the surface changes nothing about the
+          columns themselves.
+
+          Its own empty state keeps the four column headers in place, so an empty
+          result still shows the shape of the data rather than a blank panel. */}
+      <DataTable
+        className="mt-2 hidden lg:block"
+        columns={columns}
+        data={pageRows}
+        rowKey={(row) => row.id}
+        isLoading={isLoading}
+        page={page}
+        onPageChange={setPage}
+        totalRows={totalCount}
+        pageSize={REFERRAL_PAGE_SIZE}
+        density="comfortable"
+        tableLayout="content"
+        emptyTitle={EMPTY_TITLE}
+        emptyDescription={EMPTY_DESCRIPTION}
+        footerSummary="count"
+        footerCountLabels={{ singular: "referral", plural: "referrals" }}
+      />
+
+      {/* Tablet + mobile (below lg): the same page's rows as cards. Full width
+          here — hugging is a table concern, the cards are the mobile layout. */}
+      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-card lg:hidden">
         <ReferralCardList
-          className="lg:hidden"
           rows={pageRows}
           isLoading={isLoading}
           page={page}
