@@ -2,6 +2,11 @@
 
 import { useMemo } from "react";
 import { toast } from "sonner";
+import { zohoPullSyncApi, zohoStatusApi } from "@/features/dashboard/zoho-integration/services";
+import type {
+  ZohoPullSyncPayload,
+  ZohoStatusResponse,
+} from "@/features/dashboard/zoho-integration/types";
 import { COUNTRIES } from "@/components/ui";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
@@ -25,8 +30,6 @@ import {
   invoiceDeleteApi,
   invoiceDuplicateApi,
   invoiceViewApi,
-  zohoPullSyncApi,
-  zohoStatusApi,
 } from "@/features/dashboard/client-management/services";
 import {
   CLIENT_PAGE_LIMIT,
@@ -51,8 +54,6 @@ import type {
   ClientStateCodesResponse,
   ClientTagOptionsResponse,
   InvoiceViewResponse,
-  ZohoPullSyncPayload,
-  ZohoStatusResponse,
 } from "@/features/dashboard/client-management/types";
 import type { TableReqBody } from "@/types/transactions";
 
