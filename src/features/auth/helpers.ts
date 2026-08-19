@@ -86,7 +86,12 @@ export async function handleSingleSignOn(
   }
 }
 
-export const DEFAULT_AUTHED_PATH = "/mca-transactions";
+/** Where a freshly-authenticated user lands when nothing more specific was
+ * requested (no ?from=, no stored redirect). The MCA dashboard rather than the
+ * MCA transactions table: it's the product's actual landing screen, and the
+ * Header's Multi-Currency Accounts tab points at the same place. Kept in sync
+ * with proxy.ts's and app/page.tsx's AUTHED_HOME. */
+export const DEFAULT_AUTHED_PATH = "/mca-dashboard";
 
 const OLD_FLOW_PATH = "/gl-gcc/redirect";
 const REDIRECT_KEY = "redirect_after_login";
