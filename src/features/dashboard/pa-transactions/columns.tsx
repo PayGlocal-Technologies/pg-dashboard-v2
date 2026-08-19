@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { AppImage } from "@/components/common/AppImage";
 import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { cn } from "@/lib/utils";
@@ -68,8 +69,17 @@ const PAYMENT_METHOD_ICONS: Record<string, string> = {
 function MethodImage({ src, alt }: { src: string; alt: string }) {
   return (
     <span className="inline-flex items-center justify-center w-8 h-5 rounded bg-muted border border-border overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} className="h-3.5 w-5 object-contain" />
+      {/* Absolute STATIC_BASE URL, and next.config declares no remotePatterns,
+          so it is served unoptimized with explicit dimensions (h-3.5/w-5 in
+          px), per CLAUDE.md. AppImage leaves absolute URLs untouched. */}
+      <AppImage
+        src={src}
+        alt={alt}
+        width={20}
+        height={14}
+        unoptimized
+        className="h-3.5 w-5 object-contain"
+      />
     </span>
   );
 }

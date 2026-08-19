@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import type { IconName } from "@/components/icon";

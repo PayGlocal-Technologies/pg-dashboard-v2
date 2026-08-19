@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { formatDate } from "@/lib/utils/format";
 import { getAmount, getInvoiceTotals } from "@/features/dashboard/create-invoice/helpers";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";

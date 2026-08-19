@@ -1,4 +1,5 @@
 import { getApps, getApp, initializeApp } from "firebase/app";
+import { BASE_PATH, withBasePath } from "@/constants/basePath";
 import { getAuth, type Auth } from "firebase/auth";
 import { signInWithPopup, signInWithRedirect, type UserCredential } from "firebase/auth";
 import { authProvider } from "@/features/auth/login/single-sign-on/authProvider";
@@ -7,7 +8,12 @@ import { useApp } from "@/stores/useApp";
 export function firebaseConfigProvider(): Auth {
   const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${window.location.host}/app`,
+    // Falls back to this app's own origin, which the /__/auth/:path* rewrite
+    // then proxies to Firebase. BASE_PATH, not a hardcoded "/app": that was
+    // pg-dashboard's base path, and pointing v2's auth handler at it would
+    // send the popup to the other app.
+    authDomain:
+      process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? `${window.location.host}${BASE_PATH}`,
   };
 
   const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
@@ -100,17 +106,25 @@ function isSafePath(path: string | null): path is string {
   return !!path && path.startsWith("/") && !path.startsWith("//") && path !== "/login";
 }
 
+/**
+ * Where to send the browser after a successful login.
+ *
+ * Every caller assigns this straight to `window.location.href`, which bypasses
+ * the router and so gets no base path from Next — hence withBasePath here
+ * rather than at each call site. It is a no-op for OLD_FLOW_PATH, which points
+ * at the separate legacy GCC app.
+ */
 export function getRedirectionPath(userCreationType?: "NEW_FLOW" | "OLD_FLOW"): string {
-  if (userCreationType === "OLD_FLOW") return OLD_FLOW_PATH;
+  if (userCreationType === "OLD_FLOW") return withBasePath(OLD_FLOW_PATH);
 
-  if (typeof window === "undefined") return DEFAULT_AUTHED_PATH;
+  if (typeof window === "undefined") return withBasePath(DEFAULT_AUTHED_PATH);
 
   const fromParam = new URLSearchParams(window.location.search).get("from");
-  if (isSafePath(fromParam)) return fromParam;
+  if (isSafePath(fromParam)) return withBasePath(fromParam);
 
   const stored = window.sessionStorage.getItem(REDIRECT_KEY);
   window.sessionStorage.removeItem(REDIRECT_KEY);
-  if (isSafePath(stored)) return stored;
+  if (isSafePath(stored)) return withBasePath(stored);
 
-  return DEFAULT_AUTHED_PATH;
+  return withBasePath(DEFAULT_AUTHED_PATH);
 }

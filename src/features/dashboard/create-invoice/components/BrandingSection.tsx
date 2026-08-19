@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { toast } from "sonner";
 import { Button, Switch } from "@/components/ui";
 import { Icon } from "@/components/icon";
