@@ -1,16 +1,17 @@
 "use client";
 
-import type React from "react";
 import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
-import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/format";
+import { TransactionCustomerCell } from "@/features/dashboard/transactions/components/TransactionCustomerCell";
+import { TransactionPaymentMethod } from "@/features/dashboard/transactions/components/TransactionPaymentMethod";
+import { TransactionAmount } from "@/features/dashboard/transactions/components/TransactionAmount";
+import { TransactionId } from "@/features/dashboard/transactions/components/TransactionId";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
-const PA_STATUS_META: Record<string, StatusMeta> = {
+export const PA_STATUS_META: Record<string, StatusMeta> = {
   SUCCESS: { label: "Success", variant: "success", trailIcon: "check" },
   SENT_FOR_CAPTURE: { label: "Sent for capture", variant: "success", trailIcon: "check" },
   AUTHORIZED: { label: "Authorized", variant: "warning" },
@@ -34,184 +35,216 @@ const PA_STATUS_META: Record<string, StatusMeta> = {
   ALTPAY_DECLINE: { label: "Altpay decline", variant: "danger", trailIcon: "x" },
   MARKED_AS_FRAUD: { label: "Marked as fraud", variant: "danger", trailIcon: "x" },
   STEP_UP: { label: "Step up", variant: "warning" },
+  // variant: "warning"/"success"/"danger" here (not "orange") deliberately
+  // reuse the same three variants every other status in this table already
+  // uses, keeping the chip UI consistent instead of introducing a new color.
+  DISPUTED: { label: "Dispute, respond within 6 days", variant: "warning" },
+  UNDER_REVIEW: { label: "Under review", variant: "warning", trailIcon: "clock" },
+  NEEDS_ACTION: { label: "Needs action", variant: "warning" },
+  WON: { label: "Won", variant: "success", trailIcon: "check" },
+  LOST: { label: "Lost", variant: "danger", trailIcon: "x" },
 };
 
-function getStatusMeta(raw?: string): StatusMeta {
+/** Every raw status that represents some stage of a dispute, these all
+ * bucket under "disputed" (see getStatusBucket) rather than following their
+ * badge variant's usual bucket, WON/LOST use "success"/"danger" variants for
+ * their badge color but must still surface under the Disputes tab, not
+ * alongside ordinary payment successes/failures. */
+const DISPUTE_STATUS_KEYS = ["DISPUTED", "UNDER_REVIEW", "NEEDS_ACTION", "WON", "LOST"];
+
+export function getStatusMeta(raw?: string): StatusMeta {
   if (!raw) return { label: "Unknown", variant: "muted" };
   const key = raw.toUpperCase().replace(/ /g, "_");
   return PA_STATUS_META[key] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
 }
 
-// ── Payment method cell ───────────────────────────────────────────────────────
-const STATIC_BASE = "https://static.payglocal.in/";
+// ── Coarse status buckets, drive both the segmented control filter and the
+// Amount column's sign/color, derived from PA_STATUS_META's own variants so
+// the two mappings can never drift apart. ──────────────────────────────────
+export type TransactionStatusBucket = "success" | "refunded" | "failed" | "pending" | "disputed";
 
-const CARD_BRAND_LOGO_MAPPER: Record<string, string> = {
-  VISA: "images/network/visa.v2.svg",
-  MASTERCARD: "images/network/mastercard-new.v1.svg",
-  AMEX: "images/network/american-express.v3.svg",
-  AMERICAN_EXPRESS: "images/network/american-express.v3.svg",
-  DINERS: "images/network/diners.v3.svg",
-  DINERSCLUBINTERNATIONAL: "images/network/diners.v3.svg",
-  JCB: "images/network/jcb.v5.svg",
-  MAESTRO: "images/network/maestro.v2.svg",
-  RUPAY: "images/network/rupay.v3.svg",
-  DISCOVER: "images/network/discover.v3.svg",
+const BUCKET_BY_VARIANT: Partial<Record<BadgeVariant, TransactionStatusBucket>> = {
+  success: "success",
+  refund: "refunded",
+  danger: "failed",
+  warning: "pending",
 };
 
-const PAYMENT_METHOD_ICONS: Record<string, string> = {
-  ALTPAY_UPI_INTENT: "images/payment-methods/upi/upi-name.v2.svg",
-  ALTPAY_UPI_COLLECT: "images/payment-methods/upi/upi-name.v2.svg",
-  PAYMENT_ACCOUNT_GOOGLE_PAY: "images/payment-methods/upi/google-pay.v1.svg",
-  PAYMENT_ACCOUNT_APPLE_PAY: "icons/payflow/apple-pay.v2.svg",
+export function getStatusBucket(raw?: string): TransactionStatusBucket {
+  const key = raw?.toUpperCase().replace(/ /g, "_");
+  if (key && DISPUTE_STATUS_KEYS.includes(key)) return "disputed";
+  const { variant } = getStatusMeta(raw);
+  return BUCKET_BY_VARIANT[variant] ?? "pending";
+}
+
+/** Raw externalStatus codes belonging to each coarse bucket, used to build
+ * the `externalStatus` array sent to the search API when a segmented-control
+ * tab (other than "All") is selected. Dispute statuses are excluded from the
+ * variant-derived success/failed lists (WON/LOST would otherwise double up
+ * there) since they're already listed under "disputed" below. */
+export const STATUS_BUCKET_RAW_VALUES: Record<Exclude<TransactionStatusBucket, "pending">, string[]> = {
+  success: Object.entries(PA_STATUS_META)
+    .filter(([key, meta]) => meta.variant === "success" && !DISPUTE_STATUS_KEYS.includes(key))
+    .map(([key]) => key),
+  refunded: Object.entries(PA_STATUS_META)
+    .filter(([, meta]) => meta.variant === "refund")
+    .map(([key]) => key),
+  failed: Object.entries(PA_STATUS_META)
+    .filter(([key, meta]) => meta.variant === "danger" && !DISPUTE_STATUS_KEYS.includes(key))
+    .map(([key]) => key),
+  disputed: DISPUTE_STATUS_KEYS,
 };
 
-function MethodImage({ src, alt }: { src: string; alt: string }) {
-  return (
-    <span className="inline-flex items-center justify-center w-8 h-5 rounded bg-muted border border-border overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} className="h-3.5 w-5 object-contain" />
-    </span>
-  );
+// ── Date & Time cell, reformats the API's "DD/MM/YYYY, HH:MM:SS" string into
+// a single-line "D MMM 'YY, hh:mm AM/PM" display, same font/color as every
+// other column. ────────────────────────────────────────────────────────────
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+export function formatDisplayDateTime(value?: string): string | null {
+  if (!value) return null;
+  const [datePart, timePart] = value.split(",").map((s) => s.trim());
+  const [day, month, year] = (datePart ?? "").split("/").map(Number);
+  if (!day || !month || !year) return null;
+  const [hours = 0, minutes = 0] = (timePart ?? "").split(":").map(Number);
+  const period = hours >= 12 ? "PM" : "AM";
+  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
+  const hh = String(hour12).padStart(2, "0");
+  const mm = String(minutes).padStart(2, "0");
+  const yy = String(year).slice(-2);
+  return `${day} ${MONTH_ABBR[month - 1]} '${yy}, ${hh}:${mm} ${period}`;
 }
 
-function FallbackBrand({ brand }: { brand?: string }) {
-  return (
-    <span className="inline-flex items-center justify-center min-w-8 h-5 px-1 rounded text-[9px] font-bold text-muted-foreground bg-muted border border-border">
-      {brand ? brand.slice(0, 4).toUpperCase() : "CARD"}
-    </span>
-  );
+function DateTimeCell({ value }: { value?: string }) {
+  const formatted = formatDisplayDateTime(value);
+  return <span className="whitespace-nowrap text-[12px] font-medium text-foreground">{formatted ?? "N/A"}</span>;
 }
 
-function PaymentMethodCell({ row }: { row: PaTransaction }) {
-  const instrument = row.paymentInstrument?.toUpperCase();
-  const last4 = row.maskedCardNumber?.replaceAll("x", "").replaceAll("X", "").trim();
-
-  let logo: React.ReactNode;
-
-  if (row.maskedCardNumber && row.cardBrand) {
-    const path = CARD_BRAND_LOGO_MAPPER[row.cardBrand.toUpperCase()];
-    logo = path ? (
-      <MethodImage src={STATIC_BASE + path} alt={row.cardBrand} />
-    ) : (
-      <FallbackBrand brand={row.cardBrand} />
-    );
-  } else if (instrument && PAYMENT_METHOD_ICONS[instrument]) {
-    logo = <MethodImage src={STATIC_BASE + PAYMENT_METHOD_ICONS[instrument]} alt={instrument} />;
-  } else {
-    logo = <FallbackBrand brand={row.cardBrand} />;
-  }
-
-  return (
-    <div className="flex items-center gap-1.5">
-      {logo}
-      <span className="text-[13px] text-muted-foreground font-mono">
-        {last4 ? `••• ${last4}` : "•••••••"}
-      </span>
-    </div>
-  );
+export function customerName(row: PaTransaction): string {
+  return [row.firstName ?? row.billToFirstName, row.lastName ?? row.billToLastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 }
 
 // ── Column definitions ────────────────────────────────────────────────────────
-export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] {
-  const cols: Column<PaTransaction>[] = [
-    {
-      key: "totalAmount",
-      header: "Amount",
-      minWidth: 135,
-      align: "right",
-      render: (row) => {
-        const currency = row.txnCurrency ?? "INR";
-        const amount = parseFloat(row.totalAmount ?? "0");
-        return (
-          <div className="flex items-baseline gap-1.5 whitespace-nowrap justify-end">
-            <span className="font-semibold text-foreground tabular-nums text-[13px]">
-              {formatCurrency(amount, currency)}
-            </span>
-            <span className="text-[11px] text-muted-foreground font-medium">{currency}</span>
-          </div>
-        );
-      },
-    },
-    {
-      key: "externalStatus",
-      header: "Status",
-      minWidth: 155,
-      render: (row) => {
-        const { label, variant, trailIcon } = getStatusMeta(row.externalStatus);
-        return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
-      },
-    },
-    {
-      key: "paymentInstrument",
-      header: "Payment method",
-      minWidth: 145,
-      render: (row) => <PaymentMethodCell row={row} />,
-    },
-    {
-      key: "customerName",
-      header: "Customer name",
-      minWidth: 145,
-      render: (row) => {
-        const name = [row.firstName ?? row.billToFirstName, row.lastName ?? row.billToLastName]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
-        return (
-          <span className="text-[13px] font-medium text-foreground whitespace-nowrap">
-            {name || "—"}
+// Every reorderable/hideable data column lives here, keyed so
+// TransactionColumnsMenu can toggle visibility and reorder independently of
+// Merchant ID (partner-only, fixed position) and Actions (a rowAction, not a
+// real column).
+export const PA_TRANSACTION_COLUMN_DEFS: { key: string; label: string }[] = [
+  { key: "amount", label: "Amount" },
+  { key: "status", label: "Status" },
+  { key: "paymentMethod", label: "Payment Method" },
+  { key: "customerName", label: "Customer Name" },
+  { key: "customerEmail", label: "Customer Email" },
+  { key: "transactionId", label: "Transaction ID" },
+  { key: "dateTime", label: "Date & Time" },
+];
+
+export const PA_TRANSACTION_COLUMN_ORDER: string[] = PA_TRANSACTION_COLUMN_DEFS.map((d) => d.key);
+
+function buildColumn(key: string): Column<PaTransaction> | null {
+  switch (key) {
+    case "customerName":
+      return {
+        key: "customerName",
+        header: "Customer Name",
+        minWidth: 180,
+        render: (row) => <TransactionCustomerCell name={customerName(row)} />,
+      };
+    case "customerEmail":
+      return {
+        key: "customerEmail",
+        header: "Customer Email",
+        minWidth: 190,
+        render: (row) => (
+          <span className="whitespace-nowrap text-[12px] font-medium text-foreground lowercase">
+            {row.encEmailId ?? "N/A"}
           </span>
-        );
-      },
-    },
-    {
-      key: "encEmailId",
-      header: "Email",
-      minWidth: 185,
-      render: (row) => (
-        <span className="text-[13px] text-muted-foreground whitespace-nowrap lowercase">
-          {row.encEmailId ?? "—"}
-        </span>
-      ),
-    },
-    {
-      key: "gid",
-      header: "Transaction ID",
-      minWidth: 155,
-      render: (row) => (
-        <span
-          className={cn(
-            "text-[13px] font-mono text-primary/70 hover:text-primary transition-colors cursor-pointer whitespace-nowrap"
-          )}
-        >
-          {row.gid ?? "—"}
-        </span>
-      ),
-    },
-    {
-      key: "formattedCreationDateTime",
-      header: "Date and time",
-      minWidth: 150,
-      render: (row) => (
-        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-          {row.formattedCreationDateTime ?? "—"}
-        </span>
-      ),
-    },
-  ];
+        ),
+      };
+    case "paymentMethod":
+      return {
+        key: "paymentMethod",
+        header: "Payment Method",
+        minWidth: 145,
+        render: (row) => <TransactionPaymentMethod row={row} />,
+      };
+    case "amount":
+      return {
+        key: "amount",
+        header: "Amount",
+        minWidth: 135,
+        // Left-aligned (not "right") so every row's amount starts at the same
+        // x position regardless of how many digits it has, a right-aligned
+        // column made shorter amounts look raggedly indented next to longer
+        // ones instead of forming a clean left edge.
+        // Aligns the table's first column with the toolbar/tabs above it,
+        // which sit inside a `pl-5` wrapper (see PaTransactionTable), the
+        // DataTable itself has no equivalent padding of its own.
+        cellClassName: "pl-5",
+        render: (row) => <TransactionAmount amount={parseFloat(row.totalAmount ?? "0")} currency={row.txnCurrency ?? "INR"} />,
+      };
+    case "status":
+      return {
+        key: "status",
+        header: "Status",
+        minWidth: 155,
+        render: (row) => {
+          const { label, variant, trailIcon } = getStatusMeta(row.externalStatus);
+          return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
+        },
+      };
+    case "dateTime":
+      return {
+        key: "dateTime",
+        header: "Date & Time",
+        minWidth: 150,
+        render: (row) => <DateTimeCell value={row.formattedCreationDateTime} />,
+      };
+    case "transactionId":
+      return {
+        key: "transactionId",
+        header: "Transaction ID",
+        minWidth: 170,
+        render: (row) => <TransactionId id={row.gid ?? "N/A"} />,
+      };
+    default:
+      return null;
+  }
+}
 
-  if (!isPartnerUser) return cols;
+interface BuildPaColumnsOptions {
+  isPartnerUser: boolean;
+  columnOrder?: string[];
+  hiddenColumns?: Set<string>;
+}
 
-  // Insert Merchant ID column before Transaction ID for partner users
-  cols.splice(5, 0, {
-    key: "merchantId",
-    header: "Merchant ID",
-    minWidth: 145,
-    render: (row) => (
-      <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-        {row.merchantId ?? "—"}
-      </span>
-    ),
-  });
+export function buildPaColumns({
+  isPartnerUser,
+  columnOrder = PA_TRANSACTION_COLUMN_ORDER,
+  hiddenColumns,
+}: BuildPaColumnsOptions): Column<PaTransaction>[] {
+  const cols: Column<PaTransaction>[] = [];
+
+  for (const key of columnOrder) {
+    if (hiddenColumns?.has(key)) continue;
+    const col = buildColumn(key);
+    if (col) cols.push(col);
+
+    // Merchant ID is partner-only and always sits right after the customer
+    // info columns, not part of the general reorder/visibility set.
+    if (key === "customerEmail" && isPartnerUser) {
+      cols.push({
+        key: "merchantId",
+        header: "Merchant ID",
+        minWidth: 145,
+        render: (row) => (
+          <span className="whitespace-nowrap text-[12px] font-medium text-foreground">{row.merchantId ?? "N/A"}</span>
+        ),
+      });
+    }
+  }
 
   return cols;
 }
