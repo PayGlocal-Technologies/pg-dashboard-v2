@@ -82,7 +82,10 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
             rides the field's own inline-end addon — one control group, and the
             input keeps its own styling. The URL truncates within the field on a
             narrow viewport; the full value is what gets copied either way. */}
-        <InputGroup className="mt-6 max-w-xl">
+        {/* Fills the card's content width: InputGroup is already `w-full` and its
+            input is `flex-1`, so dropping the old max-width is all it takes — the
+            field consumes the slack and the Copy button keeps its natural size. */}
+        <InputGroup className="mt-6">
           <InputGroupInput
             readOnly
             value={referralUrl}
