@@ -1,4 +1,5 @@
 import type { IconName } from "@/components/icon";
+import type { LeagueId } from "@/features/dashboard/refer-and-earn/types";
 
 /**
  * Reward headline. A literal (not a formatCurrency call) because it is display
@@ -10,19 +11,10 @@ export const REFERRAL_REWARD_LABEL = "$30";
 export const REFERRAL_PAGE_SIZE = 10;
 
 /**
- * Hero illustration, served from `public/assets`. A raster asset, so it cannot
- * be an icon-registry entry (that pattern is for SVG forwardRef components) and
- * goes through `next/image` instead — see CLAUDE.md's Images rule.
- *
- * `width`/`height` are the file's real pixel dimensions, handed to next/image as
- * the intrinsic size only: the rendered size comes from CSS, and these keep the
- * aspect ratio correct and reserve the right space before the image loads.
+ * The three referral leagues, in progression order. A merchant advances by
+ * surpassing the #1 position in their current league, so 3 is terminal.
  */
-export const REFERRAL_HERO_ILLUSTRATION = {
-  src: "/assets/Refer&Earn1.png",
-  width: 1254,
-  height: 1254,
-} as const;
+export const LEAGUE_IDS: LeagueId[] = [1, 2, 3];
 
 /**
  * Dashboard origin per environment, built the same way as the CDN URL in

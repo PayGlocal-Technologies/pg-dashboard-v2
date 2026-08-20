@@ -22,3 +22,33 @@ export interface Referral {
   waivedAmount: string | null;
   rewardCurrency: string;
 }
+
+// ── Referral leaderboard ─────────────────────────────────────────────────────
+
+/**
+ * The three referral leagues. A merchant advances by surpassing the #1 position
+ * in their current league, so 3 is the highest and there is nothing beyond it.
+ */
+export type LeagueId = 1 | 2 | 3;
+
+export interface LeaderboardEntry {
+  id: string;
+  /** Position within the league, 1-indexed. */
+  rank: number;
+  /** Display name as the programme publishes it — partially masked for others. */
+  displayName: string;
+  /** Referral earnings this standing is scored on. */
+  amount: number;
+  currency: string;
+}
+
+export interface LeagueLeaderboard {
+  league: LeagueId;
+  /** Top performers, already ordered by rank. */
+  top: LeaderboardEntry[];
+  /**
+   * The signed-in merchant's own standing in this league, or null when they are
+   * not ranked in it (they only ever hold a position in their own league).
+   */
+  currentMerchant: LeaderboardEntry | null;
+}
