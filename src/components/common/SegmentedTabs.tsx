@@ -29,7 +29,13 @@ export function SegmentedTabs({ options, value, onChange, className }: Segmented
             value={opt.value}
             className={cn(
               "h-auto rounded-none border-b-2 border-transparent px-0 py-1.5 text-sm font-medium text-muted-foreground shadow-none transition-colors",
-              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
+              "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none",
+              // Override TabsTrigger's default focus-visible ring (a thick,
+              // rectangular box) which clashes with this flat, underline-only
+              // style, a color shift + the same underline the active tab
+              // already uses reads as focus without the boxy outline.
+              "focus-visible:text-foreground focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none",
+              "focus-visible:border-muted-foreground"
             )}
           >
             {opt.label}

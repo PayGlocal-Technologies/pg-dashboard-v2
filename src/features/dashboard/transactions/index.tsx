@@ -28,32 +28,36 @@ export function TransactionsFeature() {
   const trendCharts = transactionsTrendChartsByTimeframe[timeframe];
 
   return (
-    <div className="max-w-350 mx-auto space-y-4 page-enter">
-      <PageHeader title="Transactions" />
+    // Full-bleed background matching the cards below, rather than the app
+    // shell's default grey (see (dashboard)/layout.tsx), only for this page.
+    <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
+      <div className="max-w-350 mx-auto space-y-4 page-enter">
+        <PageHeader title="Transactions" />
 
-      <MidGuard productType="PA">
-        {/* Same "section title + period control" header, then the card
-         * grid beneath it, as Payment Links' own Metrics section. */}
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-foreground">Metrics</h2>
-            <SegmentedTabs
-              options={TIMEFRAME_OPTIONS}
-              value={timeframe}
-              onChange={(v) => setTimeframe(v as TotalVolumeTimeframe)}
+        <MidGuard productType="PA">
+          {/* Same "section title + period control" header, then the card
+           * grid beneath it, as Payment Links' own Metrics section. */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold text-foreground">Metrics</h2>
+              <SegmentedTabs
+                options={TIMEFRAME_OPTIONS}
+                value={timeframe}
+                onChange={(v) => setTimeframe(v as TotalVolumeTimeframe)}
+              />
+            </div>
+
+            <TransactionStatCards
+              timeframe={timeframe}
+              totalVolumeLabel={formatLakh(metrics.totalVolume)}
+              metrics={metrics}
+              trendCharts={trendCharts}
             />
           </div>
 
-          <TransactionStatCards
-            timeframe={timeframe}
-            totalVolumeLabel={formatLakh(metrics.totalVolume)}
-            metrics={metrics}
-            trendCharts={trendCharts}
-          />
-        </div>
-
-        <PaTransactionTable />
-      </MidGuard>
+          <PaTransactionTable />
+        </MidGuard>
+      </div>
     </div>
   );
 }

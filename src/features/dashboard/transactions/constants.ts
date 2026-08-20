@@ -28,6 +28,7 @@ export const PA_STATUS_SEGMENTS = [
   { value: "success",  label: "Success" },
   { value: "refunded", label: "Refunded" },
   { value: "failed",   label: "Failed" },
+  { value: "disputed", label: "Disputes" },
 ] as const;
 
 // ── PA currency options (for the Currency filter chip) ───────────────────────

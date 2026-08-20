@@ -1,8 +1,8 @@
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
 
-// ── Payment method cell — moved from paColumns.tsx verbatim (same logo maps,
+// Payment method cell, moved from paColumns.tsx verbatim (same logo maps,
 // same fallback rules) so both the column renderer and any future reuse share
-// one implementation instead of two. ──────────────────────────────────────────
+// one implementation instead of two.
 const STATIC_BASE = "https://static.payglocal.in/";
 
 const CARD_BRAND_LOGO_MAPPER: Record<string, string> = {
@@ -64,7 +64,7 @@ export function TransactionPaymentMethod({ row }: { row: PaTransaction }) {
   return (
     <div className="flex items-center gap-1.5">
       {logo}
-      <span className="text-[13px] text-muted-foreground font-mono whitespace-nowrap">
+      <span className="text-[12px] font-medium text-foreground whitespace-nowrap">
         {instrument === "UPI" || instrument?.startsWith("ALTPAY_UPI")
           ? "UPI"
           : instrument?.startsWith("NETBANKING")

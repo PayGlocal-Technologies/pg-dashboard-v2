@@ -22,6 +22,10 @@ export interface TransactionDateTimeValue {
 interface TransactionDateTimeFilterProps {
   value: TransactionDateTimeValue | undefined;
   onChange: (value: TransactionDateTimeValue | undefined) => void;
+  /** Trigger button's placeholder label, lets other features (e.g. Dispute
+   * Management's "Disputed Date" filter) reuse this same popover/preset
+   * logic under a different label instead of duplicating the component. */
+  triggerLabel?: string;
 }
 
 const PRESETS: { value: Exclude<DateTimePreset, "custom">; label: string }[] = [
@@ -44,7 +48,11 @@ function endOfDay(d: Date): number {
   return copy.getTime();
 }
 
-export function TransactionDateTimeFilter({ value, onChange }: TransactionDateTimeFilterProps) {
+export function TransactionDateTimeFilter({
+  value,
+  onChange,
+  triggerLabel = "Date & Time",
+}: TransactionDateTimeFilterProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"presets" | "custom">("presets");
   const [mode, setMode] = useState<DurationPickMode>("range");
@@ -122,7 +130,7 @@ export function TransactionDateTimeFilter({ value, onChange }: TransactionDateTi
             open && "text-foreground"
           )}
         >
-          {value ? value.label : "Date & Time"}
+          {value ? value.label : triggerLabel}
           {value && (
             <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary" aria-hidden="true" />
           )}

@@ -66,14 +66,6 @@ const TIMEFRAME_LABELS: Record<TotalVolumeTimeframe, string[]> = {
   ytd: totalVolumeChartsByTimeframe.ytd.map((p) => p.x),
 };
 
-interface PaymentMethodVolume {
-  key: string;
-  label: string;
-  volume: number;
-  /** Existing app-wide payment-method palette, see home dashboard's paymentMethodSplit. */
-  color: string;
-}
-
 /**
  * Raw inputs only, every derived figure (net volume, success rate, average
  * ticket size, payment method %) is computed in deriveMetrics() below rather
@@ -98,16 +90,12 @@ interface RawPeriodMetrics {
   netVolumePrev: number;
   /** Previous period's own average ticket size, ditto. */
   averageTicketSizePrev: number;
-  /** Raw volume per payment method, should sum to totalVolume. */
-  paymentMethodSplit: PaymentMethodVolume[];
+  /** Amount currently under dispute (any raw dispute status), see the
+   * Dispute Management feature's own mock dataset for the underlying rows. */
+  disputeAmount: number;
+  disputeCount: number;
+  disputeAmountPrev: number;
 }
-
-const PAYMENT_METHOD_COLORS: Record<string, string> = {
-  cards: "#0061E3",
-  upi: "#60a5fa",
-  netBanking: "#0891b2",
-  wallets: "#94a3b8",
-};
 
 const RAW_METRICS_BY_TIMEFRAME: Record<TotalVolumeTimeframe, RawPeriodMetrics> = {
   today: {
@@ -122,12 +110,9 @@ const RAW_METRICS_BY_TIMEFRAME: Record<TotalVolumeTimeframe, RawPeriodMetrics> =
     refundAmountPrev: 980,
     netVolumePrev: 25100,
     averageTicketSizePrev: 340,
-    paymentMethodSplit: [
-      { key: "cards", label: "Cards", volume: 11928, color: PAYMENT_METHOD_COLORS.cards! },
-      { key: "upi", label: "UPI", volume: 7704, color: PAYMENT_METHOD_COLORS.upi! },
-      { key: "netBanking", label: "Net Banking", volume: 2982, color: PAYMENT_METHOD_COLORS.netBanking! },
-      { key: "wallets", label: "Wallets", volume: 2236, color: PAYMENT_METHOD_COLORS.wallets! },
-    ],
+    disputeAmount: 12500,
+    disputeCount: 1,
+    disputeAmountPrev: 9800,
   },
   week: {
     totalVolume: 152640,
@@ -141,12 +126,9 @@ const RAW_METRICS_BY_TIMEFRAME: Record<TotalVolumeTimeframe, RawPeriodMetrics> =
     refundAmountPrev: 6100,
     netVolumePrev: 150200,
     averageTicketSizePrev: 354.15,
-    paymentMethodSplit: [
-      { key: "cards", label: "Cards", volume: 73267, color: PAYMENT_METHOD_COLORS.cards! },
-      { key: "upi", label: "UPI", volume: 47318, color: PAYMENT_METHOD_COLORS.upi! },
-      { key: "netBanking", label: "Net Banking", volume: 18317, color: PAYMENT_METHOD_COLORS.netBanking! },
-      { key: "wallets", label: "Wallets", volume: 13738, color: PAYMENT_METHOD_COLORS.wallets! },
-    ],
+    disputeAmount: 34200,
+    disputeCount: 4,
+    disputeAmountPrev: 28700,
   },
   month: {
     totalVolume: 610000,
@@ -160,12 +142,9 @@ const RAW_METRICS_BY_TIMEFRAME: Record<TotalVolumeTimeframe, RawPeriodMetrics> =
     refundAmountPrev: 19800,
     netVolumePrev: 598000,
     averageTicketSizePrev: 337.46,
-    paymentMethodSplit: [
-      { key: "cards", label: "Cards", volume: 292800, color: PAYMENT_METHOD_COLORS.cards! },
-      { key: "upi", label: "UPI", volume: 189100, color: PAYMENT_METHOD_COLORS.upi! },
-      { key: "netBanking", label: "Net Banking", volume: 73200, color: PAYMENT_METHOD_COLORS.netBanking! },
-      { key: "wallets", label: "Wallets", volume: 54900, color: PAYMENT_METHOD_COLORS.wallets! },
-    ],
+    disputeAmount: 128000,
+    disputeCount: 12,
+    disputeAmountPrev: 141500,
   },
   ytd: {
     totalVolume: 842650,
@@ -179,21 +158,11 @@ const RAW_METRICS_BY_TIMEFRAME: Record<TotalVolumeTimeframe, RawPeriodMetrics> =
     refundAmountPrev: 32612,
     netVolumePrev: 842586,
     averageTicketSizePrev: 3287.34,
-    paymentMethodSplit: [
-      { key: "cards", label: "Cards", volume: 404472, color: PAYMENT_METHOD_COLORS.cards! },
-      { key: "upi", label: "UPI", volume: 261222, color: PAYMENT_METHOD_COLORS.upi! },
-      { key: "netBanking", label: "Net Banking", volume: 101118, color: PAYMENT_METHOD_COLORS.netBanking! },
-      { key: "wallets", label: "Wallets", volume: 75838, color: PAYMENT_METHOD_COLORS.wallets! },
-    ],
+    disputeAmount: 612000,
+    disputeCount: 48,
+    disputeAmountPrev: 545000,
   },
 };
-
-export interface PaymentMethodShare {
-  key: string;
-  label: string;
-  pct: number;
-  color: string;
-}
 
 export interface TransactionsMetrics {
   totalVolume: number;
@@ -213,7 +182,9 @@ export interface TransactionsMetrics {
   /** Total successful volume / number of successful transactions. */
   averageTicketSize: number;
   averageTicketSizeTrendPct: number;
-  paymentMethodSplit: PaymentMethodShare[];
+  disputeAmount: number;
+  disputeCount: number;
+  disputeAmountTrendPct: number;
 }
 
 function round(value: number, decimals: number): number {
@@ -236,8 +207,6 @@ function deriveMetrics(raw: RawPeriodMetrics): TransactionsMetrics {
 
   const averageTicketSize = raw.transactionCount === 0 ? 0 : round(raw.totalVolume / raw.transactionCount, 2);
 
-  const totalMethodVolume = raw.paymentMethodSplit.reduce((sum, m) => sum + m.volume, 0);
-
   return {
     totalVolume: raw.totalVolume,
     totalVolumeTrendPct: pctChange(raw.totalVolume, raw.totalVolumePrev),
@@ -252,12 +221,9 @@ function deriveMetrics(raw: RawPeriodMetrics): TransactionsMetrics {
     refundAmountTrendPct: pctChange(raw.refundAmount, raw.refundAmountPrev),
     averageTicketSize,
     averageTicketSizeTrendPct: pctChange(averageTicketSize, raw.averageTicketSizePrev),
-    paymentMethodSplit: raw.paymentMethodSplit.map((m) => ({
-      key: m.key,
-      label: m.label,
-      color: m.color,
-      pct: totalMethodVolume === 0 ? 0 : round((m.volume / totalMethodVolume) * 100, 1),
-    })),
+    disputeAmount: raw.disputeAmount,
+    disputeCount: raw.disputeCount,
+    disputeAmountTrendPct: pctChange(raw.disputeAmount, raw.disputeAmountPrev),
   };
 }
 
@@ -290,6 +256,7 @@ export interface TransactionsTrendCharts {
   successRate: TransactionsSparklinePoint[];
   refundAmount: TransactionsSparklinePoint[];
   averageTicketSize: TransactionsSparklinePoint[];
+  disputeAmount: TransactionsSparklinePoint[];
 }
 
 function buildTrendCharts(timeframe: TotalVolumeTimeframe): TransactionsTrendCharts {
@@ -301,6 +268,7 @@ function buildTrendCharts(timeframe: TotalVolumeTimeframe): TransactionsTrendCha
     successRate: seededTrendSeries(labels, metrics.successRate, `${timeframe}-success`),
     refundAmount: seededTrendSeries(labels, metrics.refundAmount, `${timeframe}-refund`),
     averageTicketSize: seededTrendSeries(labels, metrics.averageTicketSize, `${timeframe}-ticket`),
+    disputeAmount: seededTrendSeries(labels, metrics.disputeAmount, `${timeframe}-dispute`),
   };
 }
 

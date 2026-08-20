@@ -175,7 +175,6 @@ body {
   -webkit-backdrop-filter: none;
 }
 
-
 /* ─── Shimmer ────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0% {
@@ -208,12 +207,37 @@ body {
   animation: pageFade 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* ─── Gradient border flow (AI/insight callouts) ────────────────────────── */
+@keyframes gradient-border-flow {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+.animate-gradient-border {
+  background-size: 200% 200%;
+  animation: gradient-border-flow 6s ease-in-out infinite;
+}
+
 /* ─── Wave (dashboard greeting) ──────────────────────────────────────────── */
 @keyframes wave {
-  0%,  60%, 100% { transform: rotate(0deg);   }
-  15%            { transform: rotate(16deg);  }
-  30%            { transform: rotate(-8deg);  }
-  45%            { transform: rotate(12deg);  }
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(16deg);
+  }
+  30% {
+    transform: rotate(-8deg);
+  }
+  45% {
+    transform: rotate(12deg);
+  }
 }
 
 /* ─── Focus ──────────────────────────────────────────────────────────────── */

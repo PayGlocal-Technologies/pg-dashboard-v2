@@ -1,7 +1,5 @@
 "use client";
 
-import { Card } from "@/components/ui";
-import { Icon } from "@/components/icon";
 import { PaymentLinkMetricCard } from "@/features/dashboard/payment-links/components/PaymentLinkMetricCard";
 import type {
   TransactionsMetrics,
@@ -35,10 +33,14 @@ interface TransactionStatCardsProps {
 
 /** Same 4-equal-card grid, placement and card chrome as PaymentLinksStatCards
  * (see payment-links/index.tsx's "Metrics" header + this grid), reusing
- * PaymentLinkMetricCard directly rather than a second near-identical card
- * component, only Payment method keeps its own layout since it's a
- * breakdown list, a shape none of Payment Links' cards need. */
-export function TransactionStatCards({ timeframe, totalVolumeLabel, metrics, trendCharts }: TransactionStatCardsProps) {
+ * PaymentLinkMetricCard directly for all four cards, Disputes rather than
+ * a second near-identical card component. */
+export function TransactionStatCards({
+  timeframe,
+  totalVolumeLabel,
+  metrics,
+  trendCharts,
+}: TransactionStatCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <PaymentLinkMetricCard
@@ -64,35 +66,19 @@ export function TransactionStatCards({ timeframe, totalVolumeLabel, metrics, tre
         formatAxisValue={formatRupeeAxis}
       />
 
-      {/* Payment method is a breakdown list, not a single value+trend+chart,
-       * so it keeps its own content while matching the same card chrome
-       * (gap-3 p-5, plain icon + semibold title row) as every other card
-       * here. No reliable PayGlocal-assisted-completions attribution exists
-       * in the data layer yet (see summary.ts's TODO(integration)), so the
-       * one-line insight this card could otherwise carry is left out rather
-       * than showing a fabricated count, per the no-invented-numbers rule. */}
-      <Card className="gap-3 p-5">
-        <div className="flex items-center gap-1.5">
-          <Icon name="pie-chart" size={15} className="text-muted-foreground" aria-hidden />
-          <p className="text-sm font-semibold text-foreground">Payment method</p>
-        </div>
-        <div className="flex flex-col gap-2.5">
-          {metrics.paymentMethodSplit.map((method) => (
-            <div key={method.key} className="flex flex-col gap-1">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-foreground">{method.label}</span>
-                <span className="tabular-nums text-muted-foreground">{method.pct}%</span>
-              </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className="h-full rounded-full"
-                  style={{ width: `${method.pct}%`, backgroundColor: method.color }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </Card>
+      <PaymentLinkMetricCard
+        title="Disputes"
+        icon="alert-triangle"
+        value={`₹${metrics.disputeAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
+        trendLabel={`${metrics.disputeCount.toLocaleString("en-IN")} transaction${metrics.disputeCount === 1 ? "" : "s"} · ${trendLabel(metrics.disputeAmountTrendPct)}`}
+        // Inverted vs. every other card here, more disputes is a bad outcome,
+        // so a rising trend reads red, not green.
+        trendPositive={metrics.disputeAmountTrendPct < 0}
+        data={trendCharts.disputeAmount}
+        accentColor="var(--chart-5)"
+        formatTooltipValue={formatLakhTooltip}
+        formatAxisValue={formatRupeeAxis}
+      />
 
       <PaymentLinkMetricCard
         title="Refunds"

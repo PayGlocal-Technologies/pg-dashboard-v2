@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Card, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
@@ -36,6 +37,8 @@ import {
 } from "@/features/dashboard/transactions/components/TransactionDateTimeFilter";
 import { TransactionColumnsMenu } from "@/features/dashboard/transactions/components/TransactionColumnsMenu";
 import { TransactionDetailsDrawer } from "@/features/dashboard/transactions/components/TransactionDetailsDrawer";
+import { useDisputeResolutions } from "@/stores/useDisputeResolutions";
+import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type {
   PaTransaction,
   PaTransactionsResponse,
@@ -67,7 +70,16 @@ function parseFormattedDate(value?: string): number | undefined {
 }
 
 function downloadCsv(rows: PaTransaction[]) {
-  const header = ["Customer", "Email", "Payment Method", "Amount", "Currency", "Status", "Date & Time", "Transaction ID"];
+  const header = [
+    "Customer",
+    "Email",
+    "Payment Method",
+    "Amount",
+    "Currency",
+    "Status",
+    "Date & Time",
+    "Transaction ID",
+  ];
   const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
   const lines = [header.join(",")];
   for (const row of rows) {
@@ -94,6 +106,9 @@ function downloadCsv(rows: PaTransaction[]) {
 }
 
 export function PaTransactionTable() {
+  const router = useRouter();
+  const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
+  const resolutionByGid = useDisputeResolutions((s) => s.resolutionByGid);
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PA");
 
@@ -150,8 +165,15 @@ export function PaTransactionTable() {
 
   const mockFilteredRows = useMemo(() => {
     if (!usingMockFallback) return EMPTY_ROWS;
-    return MOCK_PA_TRANSACTIONS.filter((row) => {
-      if (statusSegment !== "All" && getStatusBucket(row.externalStatus) !== statusSegment) return false;
+    // Reflects any in-session "accept in full" resolutions (see
+    // useDisputeResolutions/TransactionDetailFeature) so a dispute shows as
+    // Lost here too after being resolved from its detail page.
+    return MOCK_PA_TRANSACTIONS.map((row) => {
+      const override = resolutionByGid[row.gid ?? ""];
+      return override ? { ...row, externalStatus: override } : row;
+    }).filter((row) => {
+      if (statusSegment !== "All" && getStatusBucket(row.externalStatus) !== statusSegment)
+        return false;
       if (method && !method.includes(row.paymentInstrument ?? "")) return false;
       if (currency && !currency.includes(row.txnCurrency ?? "")) return false;
       if (dateTime) {
@@ -170,7 +192,7 @@ export function PaTransactionTable() {
       }
       return true;
     });
-  }, [usingMockFallback, statusSegment, method, currency, dateTime, search]);
+  }, [usingMockFallback, resolutionByGid, statusSegment, method, currency, dateTime, search]);
 
   const rows = usingMockFallback ? mockFilteredRows : apiRows;
   const totalCount = usingMockFallback ? mockFilteredRows.length : apiTotalCount;
@@ -222,7 +244,8 @@ export function PaTransactionTable() {
     setSearch("");
     setPage(1);
   };
-  const hasActive = !!method?.length || !!currency?.length || !!dateTime || !!amountRange || search !== "";
+  const hasActive =
+    !!method?.length || !!currency?.length || !!dateTime || !!amountRange || search !== "";
 
   const onToggleColumn = (key: string) => {
     setHiddenColumns((prev) => {
@@ -238,6 +261,15 @@ export function PaTransactionTable() {
   };
 
   const onViewDetails = (row: PaTransaction) => {
+    // Disputed transactions skip the drawer entirely and open straight into
+    // the full-page view (it needs the two-column dispute layout, not the
+    // narrow single-column drawer), every other status still opens the
+    // drawer first, same as before.
+    if (getStatusBucket(row.externalStatus) === "disputed") {
+      setStoredTransaction(row);
+      router.push(`/transactions/${encodeURIComponent(row.gid ?? "")}`);
+      return;
+    }
     setDetailsTxn(row);
     setDetailsOpen(true);
   };
@@ -253,7 +285,11 @@ export function PaTransactionTable() {
       <Card className="gap-0 overflow-hidden p-0">
         <div className="pl-5 pr-3 pb-3 pt-5">
           <div className="space-y-3">
-            <SegmentedTabs options={PA_STATUS_SEGMENTS} value={statusSegment} onChange={onStatusSegment} />
+            <SegmentedTabs
+              options={PA_STATUS_SEGMENTS}
+              value={statusSegment}
+              onChange={onStatusSegment}
+            />
 
             {/* Toolbar, search + filters on the left, column/export tools
              * pinned right, a thin top divider separates it from the tabs
@@ -365,12 +401,17 @@ export function PaTransactionTable() {
               </Button>
             )}
             density="compact"
+            snug
             className="rounded-none border-0 border-t border-border"
           />
         )}
       </Card>
 
-      <TransactionDetailsDrawer transaction={detailsTxn} open={detailsOpen} onOpenChange={setDetailsOpen} />
+      <TransactionDetailsDrawer
+        transaction={detailsTxn}
+        open={detailsOpen}
+        onOpenChange={setDetailsOpen}
+      />
     </>
   );
 }

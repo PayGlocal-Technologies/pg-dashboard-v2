@@ -58,6 +58,39 @@ function deriveErrorCode(raw: string | undefined, bucket: string): string | unde
   return ERROR_CODES[key] ?? (bucket === "failed" ? "E1000" : "R2000");
 }
 
+/** Per raw dispute status (DISPUTED/UNDER_REVIEW/NEEDS_ACTION/WON/LOST, see
+ * DISPUTE_STATUS_KEYS in paColumns.tsx), the reason a cardholder filed the
+ * dispute, its card-network reason code, and the longer sentence shown in
+ * DisputeActionCard. Statuses not listed here fall back to a generic
+ * "Fraudulent" dispute, only the 5 dispute-bucket statuses ever reach this. */
+const DISPUTE_REASON_META: Record<string, { reason: string; reasonCode: string; description: string }> = {
+  DISPUTED: {
+    reason: "Fraudulent",
+    reasonCode: "10.4",
+    description: "The cardholder claims they did not authorise this purchase.",
+  },
+  NEEDS_ACTION: {
+    reason: "Fraudulent",
+    reasonCode: "10.4",
+    description: "The cardholder claims they did not authorise this purchase.",
+  },
+  UNDER_REVIEW: {
+    reason: "Product not received",
+    reasonCode: "13.1",
+    description: "The cardholder claims they did not receive the goods or services purchased.",
+  },
+  WON: {
+    reason: "Duplicate processing",
+    reasonCode: "12.6",
+    description: "The cardholder was charged more than once for the same purchase.",
+  },
+  LOST: {
+    reason: "Credit not processed",
+    reasonCode: "13.6",
+    description: "The cardholder claims a refund or credit was not issued as expected.",
+  },
+};
+
 function seedFromString(value: string): number {
   let hash = 0;
   for (let i = 0; i < value.length; i++) {
@@ -123,6 +156,22 @@ export interface TransactionDetailView {
   linkedTransactions: PaTransaction[];
   /** null for failed transactions, no funds actually moved. */
   amountBreakdown: { amountReceived: number; fee: number; netAmount: number } | null;
+  /** Only set for the 5 dispute-bucket statuses (see DISPUTE_STATUS_KEYS in
+   * paColumns.tsx), drives DisputeActionCard/DisputeDetailsCard/PaymentTimeline. */
+  dispute: DisputeDetail | null;
+}
+
+export interface DisputeDetail {
+  disputeId: string;
+  amount: number;
+  reason: string;
+  reasonCode: string;
+  /** Longer sentence shown in DisputeActionCard, e.g. "The cardholder claims
+   * they did not authorise this purchase." */
+  description: string;
+  /** Formatted like row.formattedCreationDateTime ("DD/MM/YYYY, HH:MM:SS"). */
+  raisedOn: string;
+  respondBy: string;
 }
 
 export function deriveTransactionDetail(row: PaTransaction): TransactionDetailView {
@@ -177,6 +226,25 @@ export function deriveTransactionDetail(row: PaTransaction): TransactionDetailVi
   const linkedTransactions: PaTransaction[] =
     bucket === "refunded" && row.parentTransaction ? [row.parentTransaction] : [];
 
+  let dispute: DisputeDetail | null = null;
+  if (bucket === "disputed") {
+    const rawKey = row.externalStatus?.toUpperCase().replace(/ /g, "_") ?? "";
+    const reasonMeta = DISPUTE_REASON_META[rawKey] ?? DISPUTE_REASON_META.DISPUTED!;
+    // Disputes are typically filed some days after the original charge, not
+    // the same instant, raisedOn is offset from the payment date so the
+    // Payment Timeline reads as a real sequence of events.
+    const raisedOn = addDaysToFormatted(row.formattedCreationDateTime, 2 + (seed % 5));
+    dispute = {
+      disputeId: `du_${seed.toString(36)}${(row.gid ?? "").slice(-6).replace(/[^a-zA-Z0-9]/g, "")}`,
+      amount: amountReceived,
+      reason: reasonMeta.reason,
+      reasonCode: reasonMeta.reasonCode,
+      description: reasonMeta.description,
+      raisedOn,
+      respondBy: addDaysToFormatted(raisedOn, 6),
+    };
+  }
+
   return {
     merchantTxnId: row.gid ?? "Not available",
     paymentCategory: paymentCategoryLabel(row.paymentInstrument),
@@ -190,5 +258,6 @@ export function deriveTransactionDetail(row: PaTransaction): TransactionDetailVi
     settlement,
     linkedTransactions,
     amountBreakdown,
+    dispute,
   };
 }
