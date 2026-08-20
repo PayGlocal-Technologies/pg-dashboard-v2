@@ -23,11 +23,11 @@ export function ReferAndEarnFeature() {
 
   return (
     <div className="page-enter mx-auto max-w-[1400px] space-y-6 overflow-x-hidden lg:space-y-8">
-      {/* Hero and leaderboard are two separate cards sharing one row. The
+      {/* Hero and leaderboard are two separate cards sharing one row: the
           leaderboard column is a controlled width and the hero takes the
-          remainder; rows stretch, so the two cards match heights and align at
+          remainder. Rows stretch, so the two cards match heights and align at
           the top. Stacked below md, leaderboard full width. */}
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:gap-4 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
         <ReferralHero referralUrl={referralUrl} />
         <ReferralLeaderboard
           standings={MOCK_LEADERBOARD}

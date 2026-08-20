@@ -1,13 +1,23 @@
 import type { IconName } from "@/components/icon";
 
-/**
- * Reward headline. A literal (not a formatCurrency call) because it is display
- * copy in a heading, not a data value — the per-referral amounts in the
- * earnings table are the ones that go through the currency formatter.
- */
-export const REFERRAL_REWARD_LABEL = "$30";
-
 export const REFERRAL_PAGE_SIZE = 10;
+
+/**
+ * Hero banner, served from `public/assets`. A raster asset, so it cannot be an
+ * icon-registry entry (that pattern is for SVG forwardRef components) and goes
+ * through `next/image` instead — see CLAUDE.md's Images rule.
+ *
+ * `width`/`height` are the file's real pixel dimensions, handed to next/image as
+ * the intrinsic size only: the rendered size comes from CSS, and these keep the
+ * 2.3:1 aspect ratio correct and reserve the right space before it loads. The
+ * banner is what states the $30 reward, which is why the heading beside it does
+ * not repeat the figure.
+ */
+export const REFERRAL_HERO_BANNER = {
+  src: "/assets/Refer&Earn2.png",
+  width: 1965,
+  height: 855,
+} as const;
 
 /**
  * Dashboard origin per environment, built the same way as the CDN URL in

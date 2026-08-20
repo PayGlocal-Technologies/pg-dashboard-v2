@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import {
   Button,
   Card,
@@ -11,7 +12,7 @@ import {
   Text,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { REFERRAL_REWARD_LABEL } from "@/features/dashboard/refer-and-earn/constants";
+import { REFERRAL_HERO_BANNER } from "@/features/dashboard/refer-and-earn/constants";
 
 interface ReferralHeroProps {
   /** The full URL that gets copied and shared. */
@@ -19,10 +20,9 @@ interface ReferralHeroProps {
 }
 
 /**
- * Page hero: the reward headline, the one-line explanation, and the referral link
- * with its Copy action — the page's primary promotional surface. It carries no
- * illustration; the space to its right belongs to the leaderboard card, which the
- * page composes beside this one.
+ * Page hero: the reward banner across the top, then the headline, the one-line
+ * explanation, and the referral link with its Copy action. One card, so the
+ * artwork and the copy read as a single surface rather than two stacked panels.
  */
 export function ReferralHero({ referralUrl }: ReferralHeroProps) {
   const [copied, setCopied] = useState(false);
@@ -39,34 +39,54 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
   }
 
   return (
-    <Card className="h-full gap-0 p-5 sm:p-6">
-      {/* Single column now that the illustration is gone. The min-height keeps the
-          hero's established stature — it stood 40% taller than its bare content —
-          so removing the image doesn't collapse the card, and it stays a floor
-          rather than a fixed height so longer copy still expands it. Content sits
-          on the card's horizontal midline. */}
-      <div className="flex h-full flex-col justify-center md:min-h-[16.6rem] md:pl-3">
+    // No padding of its own: the banner runs to the card's edges and the content
+    // below carries its own. `overflow-hidden` clips the banner's top corners to
+    // the card's radius. `h-full` so the card fills its side-by-side grid row.
+    <Card className="h-full gap-0 overflow-hidden p-0">
+      {/* The reward banner. A raster asset, so the icon-registry forwardRef
+          pattern in CLAUDE.md does not apply (it is for SVG); it goes through
+          next/image per the same file's Images rule. `w-full h-auto` with the
+          file's own intrinsic dimensions holds its 2.3:1 ratio at every width,
+          so nothing is scaled unevenly and nothing is cropped — the ticket, the
+          PayGlocal mark, the barcode, and the $30 are all always in frame. The
+          artwork's own gradient resolves to near-white at its foot, which is
+          what lets it meet the card surface without a seam. */}
+      <Image
+        src={REFERRAL_HERO_BANNER.src}
+        alt=""
+        width={REFERRAL_HERO_BANNER.width}
+        height={REFERRAL_HERO_BANNER.height}
+        priority
+        sizes="(min-width: 1024px) 800px, (min-width: 768px) 480px, 100vw"
+        className="h-auto w-full"
+      />
+
+      {/* Content sits below the artwork, left-aligned, with its own padding —
+          generous above so the banner has room to breathe, and the heading, copy
+          and field kept close together beneath it. */}
+      <div className="flex flex-col px-5 pt-6 pb-6 sm:px-8 sm:pt-7 sm:pb-8">
         {/* Page title — the hero heading is the h1, so this screen has no
-            separate PageHeader competing with it. The reward is the one part
-            given the primary colour: it is what the merchant is here for. */}
+            separate PageHeader competing with it. The reward figure lives in the
+            banner above, so it is deliberately not repeated here. */}
         <Heading level={1} size="2xl">
-          Refer and Earn <span className="text-primary">{REFERRAL_REWARD_LABEL}</span>
+          Refer and Earn
         </Heading>
 
-        <Text size="md" color="subtle" className="mt-3 max-w-md leading-relaxed">
-          Share PayGlocal with your friends and get rewarded when they complete a transaction.
+        <Text size="md" color="subtle" className="mt-2 max-w-md leading-relaxed">
+          Share PayGlocal with your friends and get rewarded when they complete a transaction
         </Text>
 
         {/* Read-only: the link is generated, not typed. Copy is the primary
             action on this screen, so it takes the filled primary Button and
-            rides the field's own inline-end addon rather than sitting as a
-            separate button below it — the input keeps its own styling. */}
-        <InputGroup className="mt-8 max-w-xl">
+            rides the field's own inline-end addon — one control group, and the
+            input keeps its own styling. The URL truncates within the field on a
+            narrow viewport; the full value is what gets copied either way. */}
+        <InputGroup className="mt-6 max-w-xl">
           <InputGroupInput
             readOnly
             value={referralUrl}
             aria-label="Your referral link"
-            className="text-[13px]"
+            className="truncate text-[13px]"
           />
           {/* Even spacing around the Copy button. The field is 44px tall with a
               1px border, so its content box is 42px; a 32px button centred in
