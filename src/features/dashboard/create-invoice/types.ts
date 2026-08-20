@@ -225,11 +225,102 @@ export interface InvoiceFormState {
   logoEnabled: boolean;
   signatureEnabled: boolean;
 
+  // ── Branding ───────────────────────────────────────────────────────────────
+  // Client-side only, for now.
+  //
+  // These four drive the on-screen document and the notification-email preview.
+  // None of them is on the wire yet: `toInvoicePayload` lists the fields it
+  // sends explicitly and does not include them, so they cannot leak into a save
+  // and be rejected. When the renderer accepts a layout, a colour pair and a
+  // locale, add them to that builder and to `toFormState` — those two functions
+  // are the whole change. Everything else here already carries them.
+  //
+  // They do persist through a saved template (see InvoiceTemplateSnapshot),
+  // which is what makes a merchant's brand reusable before the API lands.
+  brandingStyleId: string;
+  /** Hex, uppercase, `#RRGGBB`. */
+  primaryColor: string;
+  /** Hex, uppercase, `#RRGGBB`. */
+  accentColor: string;
+  /** Display name from INVOICE_LANGUAGES, e.g. "English", "Japanese". */
+  language: string;
+
   isRecurring: boolean;
   recurringType: RecurringType | "";
   recurringStartDate: string;
 
   userCreateConsent: boolean;
+}
+
+// ─── Branding styles ──────────────────────────────────────────────────────────
+
+/** Which document layout a branding style renders through. */
+export type InvoiceLayoutId =
+  | "classic"
+  | "minimal-mono"
+  | "bold-sidebar"
+  | "playful-border"
+  | "y2k-bold"
+  | "geometric-modern";
+
+export interface InvoiceBrandingStyle {
+  id: string;
+  name: string;
+  layout: InvoiceLayoutId;
+  defaultPrimaryColor: string;
+  defaultAccentColor: string;
+  /** Badged in the picker. */
+  isNew?: boolean;
+}
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+
+/**
+ * What a template actually remembers.
+ *
+ * Deliberately the *reusable shape* of an invoice and nothing that identifies
+ * one: no client, no invoice number, no issue or due date, no consent, no linked
+ * transaction. Applying a template must never quietly re-point an invoice at
+ * last month's customer, and every excluded field is one a merchant has to
+ * decide per invoice anyway.
+ *
+ * `dueTermId` is the exception that proves the rule: the *offset* ("30 days") is
+ * reusable, the resolved date is not, so the term is stored and the date is
+ * recomputed from today when the template is applied.
+ */
+export interface InvoiceTemplateSnapshot {
+  currency: string;
+  lineItems: LineItemDraft[];
+  discountName: string;
+  discountValue: string;
+  discountType: "percentage" | "fixed";
+  taxName: string;
+  taxValue: string;
+  accountNo: string;
+  memo: string;
+  notes: string;
+  lut: string;
+  dueTermId: string | null;
+  logoEnabled: boolean;
+  signatureEnabled: boolean;
+  brandingStyleId: string;
+  primaryColor: string;
+  accentColor: string;
+  language: string;
+  isRecurring: boolean;
+  recurringType: RecurringType | "";
+}
+
+export interface InvoiceTemplate {
+  id: string;
+  name: string;
+  /** Free text, shown under the name in the picker. */
+  description: string;
+  /** YYYY-MM-DD. */
+  createdAt: string;
+  /** Bumped every time the template is applied; drives the "most used" badge. */
+  usageCount: number;
+  snapshot: InvoiceTemplateSnapshot;
 }
 
 // ─── Client creation ──────────────────────────────────────────────────────────

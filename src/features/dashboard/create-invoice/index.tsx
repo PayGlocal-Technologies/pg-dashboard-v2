@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Button, Shimmer, StatusBadge } from "@/components/ui";
+import { Button, Shimmer, SplitButton, SplitButtonItem, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useGet, usePost } from "@/lib/api/hooks";
@@ -19,18 +19,27 @@ import {
   useInvoiceBankAccounts,
   useInvoiceClients,
   useInvoiceMerchantId,
+  useDraftMemory,
   useInvoiceAsset,
+  useInvoiceTemplates,
   useLinkedTransaction,
   useMcaCurrencies,
 } from "@/features/dashboard/create-invoice/hooks";
 import {
+  applyTemplateSnapshot,
   getInvoiceTotals,
   hasCompleteLineItems,
   toFormState,
   toInvoicePayload,
+  toTemplateSnapshot,
   validateSelectedClient,
 } from "@/features/dashboard/create-invoice/helpers";
-import { AUTOSAVE_DEBOUNCE_MS } from "@/features/dashboard/create-invoice/constants";
+import {
+  AUTOSAVE_DEBOUNCE_MS,
+  DEFAULT_BRANDING_STYLE,
+  INVOICE_BRANDING_STYLES,
+} from "@/features/dashboard/create-invoice/constants";
+import { DEFAULT_INVOICE_LANGUAGE } from "@/features/dashboard/create-invoice/i18n";
 import {
   DueDateChip,
   InvoiceNumberChip,
@@ -38,6 +47,10 @@ import {
   dueDateForTerm,
   toDateKey,
 } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
+import { InvoiceTemplatePicker } from "@/features/dashboard/create-invoice/components/InvoiceTemplatePicker";
+import { SaveAsTemplateDialog } from "@/features/dashboard/create-invoice/components/SaveAsTemplateDialog";
+import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
+import { LogoUploadDialog } from "@/features/dashboard/create-invoice/components/LogoUploadDialog";
 import { BillerSection } from "@/features/dashboard/create-invoice/components/BillerSection";
 import { BillToSection } from "@/features/dashboard/create-invoice/components/BillToSection";
 import { LineItemsSection } from "@/features/dashboard/create-invoice/components/LineItemsSection";
@@ -57,6 +70,7 @@ import type {
   InvoiceData,
   InvoiceDetailsResponse,
   InvoiceFormState,
+  InvoiceTemplate,
 } from "@/features/dashboard/create-invoice/types";
 import type { BaseResponse } from "@/types/common";
 
@@ -94,6 +108,14 @@ function emptyForm(today: string, currency: string): InvoiceFormState {
     lut: "",
     logoEnabled: false,
     signatureEnabled: false,
+
+    // Branding defaults to the one theme the server actually renders, so a
+    // merchant who never opens the panel gets a preview that matches their PDF.
+    brandingStyleId: DEFAULT_BRANDING_STYLE.id,
+    primaryColor: DEFAULT_BRANDING_STYLE.defaultPrimaryColor,
+    accentColor: DEFAULT_BRANDING_STYLE.defaultAccentColor,
+    language: DEFAULT_INVOICE_LANGUAGE,
+
     isRecurring: false,
     recurringType: "",
     recurringStartDate: "",
@@ -573,6 +595,67 @@ function InvoiceEditor({
   const logo = useInvoiceAsset("LOGO");
   const signature = useInvoiceAsset("SIGNATURE");
 
+  // ── Templates ──────────────────────────────────────────────────────────────
+  // One seam for the whole feature; see useInvoiceTemplates for what changes
+  // when the endpoint lands.
+  const templateStore = useInvoiceTemplates();
+
+  /** The template this invoice was built from, if any. */
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
+  /** Which asset the cropper is open for, or null when it is closed. */
+  const [cropperType, setCropperType] = useState<"LOGO" | "SIGNATURE" | null>(null);
+
+  /**
+   * Restores what the invoice itself cannot carry: the template it came from and
+   * its branding. Without this, reopening a draft reset the theme to the default
+   * and turned "Update template" back into "Save as template", so editing
+   * yesterday's draft produced a duplicate template.
+   *
+   * The callback runs from the store's rehydrate continuation, which is why the
+   * setState here is legitimate — see useDraftMemory.
+   */
+  const { isReady: memoryReady, remember: rememberDraft } = useDraftMemory(invoiceId, (memory) => {
+    setActiveTemplateId(memory.templateId);
+    setForm((prev) => ({
+      ...prev,
+      brandingStyleId: memory.brandingStyleId,
+      primaryColor: memory.primaryColor,
+      accentColor: memory.accentColor,
+      language: memory.language,
+    }));
+  });
+
+  /**
+   * Write-only, and gated on `memoryReady` so the defaults this form was seeded
+   * with cannot overwrite a stored record before it has been read back in.
+   *
+   * Depends on the individual fields rather than on the hook's return value:
+   * that object is rebuilt every render, so taking it as a dependency would
+   * write to localStorage on every keystroke anywhere in the form. `remember` is
+   * memoised on the invoice id, so these deps only change when the branding or
+   * the template link actually does.
+   */
+  useEffect(() => {
+    if (!memoryReady) return;
+    rememberDraft({
+      templateId: activeTemplateId,
+      brandingStyleId: form.brandingStyleId,
+      primaryColor: form.primaryColor,
+      accentColor: form.accentColor,
+      language: form.language,
+    });
+  }, [
+    memoryReady,
+    rememberDraft,
+    activeTemplateId,
+    form.brandingStyleId,
+    form.primaryColor,
+    form.accentColor,
+    form.language,
+  ]);
+
   const { mutate: saveInvoice, isPending: isSaving } = usePost<
     InvoiceDetailsResponse,
     InvoiceCreatePayload
@@ -616,12 +699,30 @@ function InvoiceEditor({
     });
   }, [saveInvoice, buildPayload]);
 
-  // Value-based signature, so the save fires on real edits rather than on every
-  // render, and so biller changes (which live outside `form`) trigger it too.
-  const editSignature = useMemo(
-    () => JSON.stringify({ form, billerDetails }),
-    [form, billerDetails]
-  );
+  /**
+   * Value-based signature, so the save fires on real edits rather than on every
+   * render, and so biller changes (which live outside `form`) trigger it too.
+   *
+   * The four branding fields are excluded on purpose: nothing sends them yet
+   * (see the branding block in types.ts), so including them would fire a POST
+   * whose payload is byte-identical to the last one and flash "Saving…" for a
+   * change that is not being saved — a worse lie than not saving at all, because
+   * the merchant reads the indicator as confirmation. They ride along in a saved
+   * template instead, which is real storage.
+   *
+   * Delete this destructure when the payload learns those fields, and the
+   * signature goes back to the whole form.
+   */
+  const editSignature = useMemo(() => {
+    const {
+      brandingStyleId: _brandingStyleId,
+      primaryColor: _primaryColor,
+      accentColor: _accentColor,
+      language: _language,
+      ...persisted
+    } = form;
+    return JSON.stringify({ persisted, billerDetails });
+  }, [form, billerDetails]);
 
   useDebouncedAutosave(persistDraft, editSignature, {
     enabled: true,
@@ -633,6 +734,145 @@ function InvoiceEditor({
   const patch = (next: Partial<InvoiceFormState>) => setForm((prev) => ({ ...prev, ...next }));
 
   const totals = getInvoiceTotals(form);
+
+  // ── Template actions ───────────────────────────────────────────────────────
+
+  /** Whether there is anything worth saving, and worth warning before replacing. */
+  const hasTemplatableContent =
+    form.lineItems.length > 0 || !!form.notes.trim() || !!form.memo.trim();
+
+  const activeTemplate = templateStore.templates.find(
+    (template) => template.id === activeTemplateId
+  );
+
+  const handleApplyTemplate = (template: InvoiceTemplate) => {
+    const next = applyTemplateSnapshot(template);
+
+    // "custom" is not a reusable term — it means a date somebody picked by hand
+    // for one invoice — so it is treated like no term at all.
+    const carriesTerm = !!next.dueTermId && next.dueTermId !== "custom";
+
+    /**
+     * Whether to keep the template's receiving account.
+     *
+     * `bankRows` is scoped to the currency the *server* currently holds for this
+     * draft, so it can only judge the account when the template does not change
+     * the currency. When it does, the list on hand is the old currency's and
+     * would reject a perfectly good account — the new list arrives after the
+     * autosave lands, and the payment card resolves it then. Keeping it is
+     * therefore right in that case, and dropping a genuinely stale one is right
+     * in the other: the card reads as unselected and Generate blocks on it,
+     * rather than the form quietly holding an account nobody can see.
+     */
+    const currencyChanged = !!next.currency && next.currency !== form.currency;
+    const accountKept =
+      currencyChanged || bankRows.some((row) => row.accountNumber === next.accountNo);
+
+    setForm((prev) => ({
+      ...prev,
+      ...next,
+      accountNo: accountKept ? (next.accountNo ?? "") : "",
+      dueTermId: carriesTerm ? next.dueTermId : prev.dueTermId,
+      dueDate: carriesTerm ? dueDateForTerm(prev.invoiceDate, next.dueTermId) : prev.dueDate,
+    }));
+
+    setActiveTemplateId(template.id);
+    // Only count a genuine use. Re-applying the template already in force is a
+    // reset, not a use, and counting it inflated the "most used" badge.
+    if (template.id !== activeTemplateId) templateStore.recordUsage(template.id);
+
+    // Ordered by how much it blocks the merchant: a missing account or start date
+    // stops Generate outright, so those are worth saying over the reassurance.
+    const followUp = !accountKept
+      ? "Pick a receiving account: the saved one is not available in this currency."
+      : next.isRecurring && !form.recurringStartDate
+        ? "Set the recurring start date: a schedule cannot be reused from a template."
+        : "Client, invoice number and dates are unchanged.";
+
+    toast.success(`Applied "${template.name}"`, { description: followUp });
+  };
+
+  const handleSaveTemplate = (name: string) => {
+    const id = templateStore.save(name, toTemplateSnapshot(form));
+    setActiveTemplateId(id);
+    toast.success("Template saved", { description: `"${name}" is ready to reuse.` });
+  };
+
+  const handleUpdateTemplate = () => {
+    if (!activeTemplate) return;
+    templateStore.update(activeTemplate.id, toTemplateSnapshot(form));
+    toast.success("Template updated", {
+      description: `"${activeTemplate.name}" now matches this invoice.`,
+    });
+  };
+
+  /**
+   * Unlinks this invoice from the template it came from.
+   *
+   * Deliberately not "start over": everything the merchant has on screen stays,
+   * only the association goes. That is what makes it safe to offer without a
+   * confirmation, and it is the useful direction — the reason to detach is
+   * usually that this invoice has diverged from the template and should stop
+   * being a candidate to overwrite it.
+   *
+   * The header therefore reverts from "Update template" to "Save as template",
+   * so the next save forks rather than overwrites.
+   */
+  const handleDetachTemplate = () => {
+    if (!activeTemplate) return;
+    setActiveTemplateId(null);
+    toast.success("Detached from template", {
+      description: `This invoice is no longer linked to "${activeTemplate.name}". Nothing on it changed.`,
+    });
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    templateStore.remove(templateId);
+    // The invoice keeps its content; it just no longer descends from anything.
+    if (templateId === activeTemplateId) setActiveTemplateId(null);
+    toast.success("Template deleted");
+  };
+
+  // ── Branding actions ───────────────────────────────────────────────────────
+
+  /** Picking a theme also adopts its colours, which is what makes it a theme. */
+  const handleStyleChange = (brandingStyleId: string) => {
+    const style = INVOICE_BRANDING_STYLES.find((candidate) => candidate.id === brandingStyleId);
+    patch({
+      brandingStyleId,
+      ...(style && {
+        primaryColor: style.defaultPrimaryColor,
+        accentColor: style.defaultAccentColor,
+      }),
+    });
+  };
+
+  const handleResetColors = () => {
+    const style =
+      INVOICE_BRANDING_STYLES.find((candidate) => candidate.id === form.brandingStyleId) ??
+      DEFAULT_BRANDING_STYLE;
+    patch({
+      primaryColor: style.defaultPrimaryColor,
+      accentColor: style.defaultAccentColor,
+    });
+  };
+
+  /**
+   * One cropper serves both assets and both entry points (the branding panel and
+   * the placeholder on the document), so there is a single upload path and a
+   * single busy state per asset.
+   */
+  const handleCroppedUpload = (file: File) => {
+    if (cropperType === "SIGNATURE") {
+      signature.upload(file);
+      // Uploading is an intent to show it; leaving the toggle off would put the
+      // merchant's signature nowhere.
+      if (!form.signatureEnabled) patch({ signatureEnabled: true });
+      return;
+    }
+    logo.upload(file);
+    if (!form.logoEnabled) patch({ logoEnabled: true });
+  };
   const symbol = symbolFor(form.currency);
   const selectedAccount = bankRows.find((row) => row.accountNumber === form.accountNo);
   const selectedClient = clients.find((client) => client.id === form.clientId);
@@ -802,16 +1042,59 @@ function InvoiceEditor({
           </div>
         </div>
 
-        <Button
-          type="button"
+        {/* Nova's split button, restored. The menu offers exactly one of "Save
+            as template" or "Update template" depending on whether this invoice
+            came from one, because offering both invites the merchant to guess
+            which of the two they want. */}
+        <SplitButton
+          label={isGenerating ? "Generating…" : "Generate invoice"}
           variant="primary"
           size="sm"
           disabled={isSaving || isGenerating}
-          leftIcon={<Icon name="file-text" className="h-3.5 w-3.5" />}
           onClick={handleGenerate}
         >
-          {isGenerating ? "Generating…" : "Generate invoice"}
-        </Button>
+          {/* `whitespace-nowrap` on every item is load-bearing. flux positions
+              the menu with `right-0` and no `left`, so its width shrinks to fit
+              inside the button's own width — narrower than "Detach from
+              template", which therefore wrapped onto two lines. Refusing to wrap
+              makes each item's min-content the full phrase, which is what lets
+              the menu size itself to its longest entry instead.
+
+              "Update ⟨name⟩" additionally truncates: a merchant-typed template
+              name is unbounded, and nowrap alone would let a long one push the
+              menu off the side of the screen. */}
+          {activeTemplate ? (
+            <>
+              <SplitButtonItem
+                className="max-w-[18rem] truncate whitespace-nowrap"
+                onClick={handleUpdateTemplate}
+              >
+                Update &ldquo;{activeTemplate.name}&rdquo;
+              </SplitButtonItem>
+              {/* Detaching turns the item above back into "Save as template",
+                  which is how an invoice that has outgrown its template becomes
+                  a new one instead of overwriting the old. */}
+              <SplitButtonItem className="whitespace-nowrap" onClick={handleDetachTemplate}>
+                Detach from template
+              </SplitButtonItem>
+            </>
+          ) : (
+            <SplitButtonItem
+              className="whitespace-nowrap"
+              disabled={!hasTemplatableContent}
+              onClick={() => setSaveTemplateOpen(true)}
+            >
+              Save as template
+            </SplitButtonItem>
+          )}
+          <SplitButtonItem
+            className="whitespace-nowrap"
+            disabled={templateStore.templates.length === 0}
+            onClick={() => setManageTemplatesOpen(true)}
+          >
+            Manage templates
+          </SplitButtonItem>
+        </SplitButton>
       </header>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]">
@@ -840,6 +1123,17 @@ function InvoiceEditor({
                 onCustomDateChange={(dueDate) => patch({ dueDate })}
               />
             </div>
+
+            <InvoiceTemplatePicker
+              templates={templateStore.templates}
+              isReady={templateStore.isReady}
+              activeTemplateId={activeTemplateId}
+              hasContent={hasTemplatableContent}
+              onApply={handleApplyTemplate}
+              onDetach={handleDetachTemplate}
+              onManage={() => setManageTemplatesOpen(true)}
+              onSaveCurrent={() => setSaveTemplateOpen(true)}
+            />
 
             <BillerSection
               billerDetails={billerDetails}
@@ -903,15 +1197,51 @@ function InvoiceEditor({
 
         <div className="min-h-0 overflow-y-auto bg-muted">
           <div className="space-y-4 p-4 md:p-6">
-            <InvoicePreviewSidebar source={previewSource} />
+            <InvoicePreviewSidebar
+              source={previewSource}
+              onLogoClick={() => setCropperType("LOGO")}
+            />
             <BrandingSection
               logoEnabled={form.logoEnabled}
               signatureEnabled={form.signatureEnabled}
+              brandingStyleId={form.brandingStyleId}
+              primaryColor={form.primaryColor}
+              accentColor={form.accentColor}
+              language={form.language}
+              logo={logo}
+              signature={signature}
               onChange={patch}
+              onStyleChange={handleStyleChange}
+              onResetColors={handleResetColors}
+              onOpenCropper={setCropperType}
             />
           </div>
         </div>
       </div>
+
+      <SaveAsTemplateDialog
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        snapshot={hasTemplatableContent ? toTemplateSnapshot(form) : null}
+        existingNames={templateStore.templates.map((template) => template.name)}
+        onSave={handleSaveTemplate}
+      />
+
+      <ManageTemplatesDialog
+        open={manageTemplatesOpen}
+        onOpenChange={setManageTemplatesOpen}
+        templates={templateStore.templates}
+        onRename={templateStore.rename}
+        onDelete={handleDeleteTemplate}
+      />
+
+      <LogoUploadDialog
+        open={!!cropperType}
+        onOpenChange={(open) => setCropperType(open ? cropperType : null)}
+        label={cropperType === "SIGNATURE" ? "Signature" : "Logo"}
+        isUploading={cropperType === "SIGNATURE" ? signature.isUploading : logo.isUploading}
+        onUpload={handleCroppedUpload}
+      />
     </>
   );
 }
