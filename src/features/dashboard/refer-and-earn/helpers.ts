@@ -78,12 +78,18 @@ export interface LeaderboardView {
   /** Ranks 1–3, in order. */
   podium: LeaderboardEntry[];
   /**
-   * The entry immediately above the merchant, when there is one worth showing —
-   * null if the merchant is on the podium (the rows above them are already
-   * there), if that neighbour is itself on the podium, or if the standings do
-   * not include it.
+   * The rungs between the podium and the merchant's own row, in rank order —
+   * every entry the standings carry that sits above them and is not already on
+   * the podium. Empty when there is nothing in between, which is the case when
+   * the merchant is on the podium or immediately below it.
    */
-  above: LeaderboardEntry | null;
+  above: LeaderboardEntry[];
+  /**
+   * The rungs the standings carry below the merchant, in rank order — the people
+   * they are currently ahead of. Podium entries are excluded here too, so a
+   * merchant sitting on the podium never re-renders the rows beneath them.
+   */
+  below: LeaderboardEntry[];
   /** The merchant's own row, scored on their live figures. */
   me: LeaderboardEntry | null;
   /** True when the merchant is already inside the podium. */
@@ -117,15 +123,16 @@ export function buildLeaderboardView(
 
   const meOnPodium = me != null && me.rank <= PODIUM_SIZE;
 
-  // The closest entry ranked above the merchant. Skipped when it is already on
-  // the podium, so no row is ever rendered twice.
+  // The rungs either side of the merchant. Podium entries and the merchant
+  // themselves are excluded from both, so no row is ever rendered twice — which
+  // also covers the merchant sitting at one of these ranks.
+  const offPodium = (e: LeaderboardEntry) => e.rank > PODIUM_SIZE && e.id !== me?.id;
   const above =
-    me != null && !meOnPodium
-      ? (ranked.filter((e) => e.rank < me.rank && e.rank > PODIUM_SIZE).pop() ?? null)
-      : null;
+    me == null || meOnPodium ? [] : ranked.filter((e) => offPodium(e) && e.rank < me.rank);
+  const below = me == null ? [] : ranked.filter((e) => offPodium(e) && e.rank > me.rank);
 
   const leaderCount = podium[0]?.referralCount ?? 0;
   const toPassFirst = me == null ? 0 : Math.max(0, leaderCount - me.referralCount);
 
-  return { podium, above, me, meOnPodium, toPassFirst };
+  return { podium, above, below, me, meOnPodium, toPassFirst };
 }

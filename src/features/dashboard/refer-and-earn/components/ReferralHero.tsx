@@ -61,10 +61,10 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
         className="h-auto w-full"
       />
 
-      {/* Content sits below the artwork, left-aligned, with its own padding —
-          generous above so the banner has room to breathe, and the heading, copy
-          and field kept close together beneath it. */}
-      <div className="flex flex-col px-5 pt-6 pb-6 sm:px-8 sm:pt-7 sm:pb-8">
+      {/* Content sits below the artwork, left-aligned, with its own horizontal
+          and bottom padding. No top padding: the banner's own artwork fades out
+          at its foot, so that fade is the breathing room above the heading. */}
+      <div className="flex flex-col px-5 pb-6 sm:px-8 sm:pb-8">
         {/* Page title — the hero heading is the h1, so this screen has no
             separate PageHeader competing with it. The reward figure lives in the
             banner above, so it is deliberately not repeated here. */}
@@ -73,7 +73,8 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
         </Heading>
 
         <Text size="md" color="subtle" className="mt-2 max-w-md leading-relaxed">
-          Share PayGlocal with your friends and get rewarded when they complete a transaction
+          Share PayGlocal with your friends and get rewarded with $30 when they complete a
+          transaction.
         </Text>
 
         {/* Read-only: the link is generated, not typed. Copy is the primary

@@ -139,7 +139,7 @@ export function ReferralLeaderboard({
   currentReferralCount,
   currency,
 }: ReferralLeaderboardProps) {
-  const { podium, above, me, meOnPodium, toPassFirst } = buildLeaderboardView(
+  const { podium, above, below, me, meOnPodium, toPassFirst } = buildLeaderboardView(
     standings,
     currentEarned,
     currentReferralCount,
@@ -147,7 +147,9 @@ export function ReferralLeaderboard({
   );
 
   return (
-    <Card className="h-full justify-center gap-4 p-5 sm:p-6">
+    // Content starts at the top of the card; only the card's own padding sits
+    // above the heading.
+    <Card className="h-full gap-4 p-5 sm:p-6">
       <Heading level={2} size="sm" color="subtle">
         Referral leaderboard
       </Heading>
@@ -175,10 +177,25 @@ export function ReferralLeaderboard({
               <ProgressionMessage toPass={toPassFirst} rank={me.rank} />
             </div>
 
-            {/* The rung immediately above them — the one they pass next. */}
-            {above != null && <LeaderboardRow entry={above} />}
+            {/* The rungs they pass next, each closed off with the same subtle
+                divider the podium rows use. Unlike the podium, the last one keeps
+                its divider: it is what separates this block from the merchant's
+                own highlighted row, and it means the rung above them always has a
+                line beneath it however many rungs the standings return. */}
+            {above.map((entry) => (
+              <div key={entry.id}>
+                <LeaderboardRow entry={entry} />
+                <Separator className="bg-border/70" />
+              </div>
+            ))}
 
             {!meOnPodium && <LeaderboardRow entry={me} isCurrentMerchant />}
+
+            {/* The rungs behind them. No divider above these: the merchant's own
+                tinted row is already the break between the two blocks. */}
+            {below.map((entry) => (
+              <LeaderboardRow key={entry.id} entry={entry} />
+            ))}
           </>
         )}
       </div>

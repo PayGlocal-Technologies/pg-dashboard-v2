@@ -109,8 +109,16 @@ export const MOCK_LEADERBOARD: ReferralStandings = {
     { id: "lb-1", rank: 1, displayName: "Shixxx", amount: 540, currency: "USD", referralCount: 18 },
     { id: "lb-2", rank: 2, displayName: "Zerxxx", amount: 300, currency: "USD", referralCount: 10 },
     { id: "lb-3", rank: 3, displayName: "Jaxxx", amount: 240, currency: "USD", referralCount: 8 },
-    { id: "lb-11", rank: 11, displayName: "Prxxx", amount: 150, currency: "USD", referralCount: 5 },
-    { id: "lb-me", rank: 12, displayName: "You", amount: 120, currency: "USD", referralCount: 4 },
+    {
+      id: "lb-10",
+      rank: 10,
+      displayName: "Abcxxx",
+      amount: 180,
+      currency: "USD",
+      referralCount: 6,
+    },
+    { id: "lb-me", rank: 11, displayName: "You", amount: 120, currency: "USD", referralCount: 4 },
+    { id: "lb-12", rank: 12, displayName: "Vinxxx", amount: 90, currency: "USD", referralCount: 3 },
   ],
   currentMerchantId: "lb-me",
 };
