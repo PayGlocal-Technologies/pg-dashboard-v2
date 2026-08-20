@@ -1,7 +1,8 @@
-import { Card, Heading, Text } from "@/components/ui";
+import { Card, Heading, Separator, Text } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
+import { buildLeaderboardView } from "@/features/dashboard/refer-and-earn/helpers";
 import type {
   LeaderboardEntry,
   ReferralStandings,
@@ -18,23 +19,20 @@ const MEDAL_CLASS: Record<number, string> = {
   3: "bg-orange-500/25 text-orange-900 ring-orange-600/35 dark:bg-orange-500/25 dark:text-orange-100 dark:ring-orange-300/40",
 };
 
-/** Podium ranks get a medal; everyone below reads as a plain figure. */
+/**
+ * Podium ranks get a filled medal; every other rank — including the merchant's
+ * own, unless they are actually on the podium — gets a neutral outlined circle,
+ * so the medals stay meaningful.
+ */
 function RankIndicator({ rank }: { rank: number }) {
   const medal = MEDAL_CLASS[rank];
-
-  if (!medal) {
-    return (
-      <span className="w-7 shrink-0 text-center text-[13px] font-semibold tabular-nums text-foreground">
-        {rank}
-      </span>
-    );
-  }
 
   return (
     <span
       className={cn(
-        "flex size-7 shrink-0 items-center justify-center rounded-full text-[12px] font-bold tabular-nums ring-1 ring-inset",
-        medal
+        "flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] tabular-nums ring-1 ring-inset",
+        medal ?? "bg-transparent font-semibold text-muted-foreground ring-border",
+        medal && "font-bold"
       )}
     >
       {rank}
@@ -42,7 +40,13 @@ function RankIndicator({ rank }: { rank: number }) {
   );
 }
 
-/** [ rank ] [ name ] ……… [ amount ] — one rhythm for every row on the board. */
+/**
+ * [ rank ] [ name / referral count ] ……… [ amount ]
+ *
+ * One rhythm for every row on the board: the name and its referral count are a
+ * tight stack, and the amount is centred against that stack rather than against
+ * either line of it.
+ */
 function LeaderboardRow({
   entry,
   isCurrentMerchant = false,
@@ -53,24 +57,26 @@ function LeaderboardRow({
   return (
     <div
       className={cn(
-        "flex items-center gap-3 rounded-lg px-2.5 py-2",
+        "flex items-center gap-3 rounded-lg px-2.5 py-2.5",
         // The merchant's own row is washed with the brand surface so they can
         // find themselves at a glance, without outweighing the podium above it.
         isCurrentMerchant && "bg-primary/15"
       )}
     >
       <RankIndicator rank={entry.rank} />
-      <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-foreground">
-        {entry.displayName}
-      </span>
-      <span
-        className={cn(
-          "shrink-0 text-right text-[13px] tabular-nums",
-          isCurrentMerchant ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
-        )}
-      >
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <Text size="sm" weight="medium" truncate>
+          {entry.displayName}
+        </Text>
+        <Text size="xs" color="subtle" truncate>
+          {entry.referralCount} {entry.referralCount === 1 ? "Referral" : "Referrals"}
+        </Text>
+      </div>
+
+      <Text size="sm" weight="semibold" className="shrink-0 tabular-nums">
         {formatCurrency(entry.amount, entry.currency, "en-US")}
-      </span>
+      </Text>
     </div>
   );
 }
@@ -80,21 +86,27 @@ function LeaderboardRow({
  * can actually act on. Flanked by up-arrows and set in the dashboard's positive
  * treatment, so it reads as progress rather than as a shortfall.
  */
-function ProgressionMessage({ toPass }: { toPass: number }) {
+function ProgressionMessage({ toPass, rank }: { toPass: number; rank: number }) {
+  const positive = "text-emerald-600 dark:text-emerald-400";
+
+  if (rank === 1) {
+    return (
+      <Text size="xs" weight="medium" className={cn("text-center", positive)}>
+        You&rsquo;re #1 on the leaderboard
+      </Text>
+    );
+  }
+
   if (toPass <= 0) {
     return (
-      <Text
-        size="xs"
-        weight="medium"
-        className="text-center text-emerald-600 dark:text-emerald-400"
-      >
-        You passed #1 — you&rsquo;re top of the leaderboard
+      <Text size="xs" weight="medium" className={cn("text-center", positive)}>
+        You&rsquo;ve matched #1 — one more pulls you ahead
       </Text>
     );
   }
 
   return (
-    <div className="flex items-center justify-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+    <div className={cn("flex items-center justify-center gap-1.5", positive)}>
       <Icon name="arrow-up" size={13} strokeWidth={2.5} />
       <Text size="xs" weight="medium" className="text-inherit">
         {toPass} more referral{toPass === 1 ? "" : "s"} to pass #1
@@ -108,7 +120,7 @@ interface ReferralLeaderboardProps {
   standings: ReferralStandings;
   /**
    * The merchant's earned total and completed-referral count, from the same
-   * summary the analytics row uses, so the "You" row and the gap to #1 can never
+   * summary the analytics row uses, so their row and the gap to #1 can never
    * disagree with the figures above them.
    */
   currentEarned: number;
@@ -117,8 +129,9 @@ interface ReferralLeaderboardProps {
 }
 
 /**
- * Compact ranking panel beside the hero: the podium, the gap to #1, and the
- * merchant's own highlighted row. A single static view — no leagues, no tabs.
+ * Compact ranking panel beside the hero: the podium, the gap to #1, the entry
+ * immediately above the merchant, and the merchant's own highlighted row. A
+ * single static view — no leagues, no tabs.
  */
 export function ReferralLeaderboard({
   standings,
@@ -126,43 +139,46 @@ export function ReferralLeaderboard({
   currentReferralCount,
   currency,
 }: ReferralLeaderboardProps) {
-  const leader = standings.top[0];
-
-  // Amount and referral count come from the live summary rather than the
-  // standings payload; only the rank is the server's to know.
-  const me = standings.currentMerchant
-    ? { ...standings.currentMerchant, amount: currentEarned, currency }
-    : null;
-
-  const onPodium = me != null && me.rank <= standings.top.length;
+  const { podium, above, me, meOnPodium, toPassFirst } = buildLeaderboardView(
+    standings,
+    currentEarned,
+    currentReferralCount,
+    currency
+  );
 
   return (
-    <Card className="h-full justify-center gap-5 p-5 sm:p-6">
+    <Card className="h-full justify-center gap-4 p-5 sm:p-6">
       <Heading level={2} size="sm" color="subtle">
         Referral leaderboard
       </Heading>
 
-      <div className="flex flex-col gap-0.5">
-        {standings.top.map((entry) => (
-          <LeaderboardRow
-            key={entry.id}
-            entry={entry}
-            // If the merchant is already on the podium the highlight rides their
-            // podium row, and nothing is repeated below it.
-            isCurrentMerchant={onPodium && me?.rank === entry.rank}
-          />
+      <div className="flex flex-col">
+        {podium.map((entry, index) => (
+          <div key={entry.id}>
+            <LeaderboardRow
+              entry={entry}
+              // If the merchant is on the podium the highlight rides their podium
+              // row and no separate row is repeated below.
+              isCurrentMerchant={meOnPodium && me?.rank === entry.rank}
+            />
+            {/* Between the podium rows only — nothing trails the third. */}
+            {index < podium.length - 1 && <Separator className="bg-border/70" />}
+          </div>
         ))}
 
         {me != null && (
           <>
-            {/* Sits between the podium and the merchant's row — it is what carries
-                the jump in rank, so there is no separate ellipsis marker. */}
-            <div className="px-2.5 pt-2.5 pb-2.5">
-              <ProgressionMessage toPass={(leader?.referralCount ?? 0) - currentReferralCount} />
+            {/* More breathing room than the row rhythm: this line separates the
+                podium from the merchant's own neighbourhood, which is why there
+                is no ellipsis marker doing that job. */}
+            <div className="px-2.5 pt-5 pb-4">
+              <ProgressionMessage toPass={toPassFirst} rank={me.rank} />
             </div>
-            {/* Only when they are not already in the podium above — the merchant
-                is never listed twice. */}
-            {!onPodium && <LeaderboardRow entry={me} isCurrentMerchant />}
+
+            {/* The rung immediately above them — the one they pass next. */}
+            {above != null && <LeaderboardRow entry={above} />}
+
+            {!meOnPodium && <LeaderboardRow entry={me} isCurrentMerchant />}
           </>
         )}
       </div>

@@ -95,23 +95,22 @@ export const MOCK_REFERRALS: Referral[] = [
  * Placeholder leaderboard standings.
  *
  * Dummy data, like the referrals above: names are masked the way a public
- * leaderboard would publish them. `currentMerchant.amount` and `referralCount`
- * are overridden at render time with the merchant's real earned total and
- * completed-referral count, so the "You" row always agrees with the analytics
- * row above it — only the rank comes from here, since only the server can know it.
+ * leaderboard would publish them. The list is the podium plus the slice around
+ * the merchant — the shape a leaderboard endpoint realistically returns, rather
+ * than every rank in between.
+ *
+ * The merchant's own `amount` and `referralCount` are overridden at render time
+ * with their real earned total and completed-referral count, so their row always
+ * agrees with the analytics row above it; only the rank comes from here, since
+ * only the server can know it.
  */
 export const MOCK_LEADERBOARD: ReferralStandings = {
-  top: [
+  entries: [
     { id: "lb-1", rank: 1, displayName: "Shixxx", amount: 540, currency: "USD", referralCount: 18 },
     { id: "lb-2", rank: 2, displayName: "Zerxxx", amount: 300, currency: "USD", referralCount: 10 },
     { id: "lb-3", rank: 3, displayName: "Jaxxx", amount: 240, currency: "USD", referralCount: 8 },
+    { id: "lb-11", rank: 11, displayName: "Prxxx", amount: 150, currency: "USD", referralCount: 5 },
+    { id: "lb-me", rank: 12, displayName: "You", amount: 120, currency: "USD", referralCount: 4 },
   ],
-  currentMerchant: {
-    id: "lb-me",
-    rank: 12,
-    displayName: "You",
-    amount: 120,
-    currency: "USD",
-    referralCount: 4,
-  },
+  currentMerchantId: "lb-me",
 };

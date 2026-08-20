@@ -43,10 +43,14 @@ export interface LeaderboardEntry {
 }
 
 export interface ReferralStandings {
-  /** Top performers, already ordered by rank. */
-  top: LeaderboardEntry[];
   /**
-   * The signed-in merchant's own standing, or null when they are not ranked yet.
+   * Ranked entries, ordered by rank ascending. Not necessarily exhaustive — the
+   * programme returns the podium plus the slice around the merchant, which is
+   * everything the panel shows. The podium, the merchant's own row, and the
+   * entry immediately above them are all derived from this one list rather than
+   * carried as separate fields, so they cannot disagree.
    */
-  currentMerchant: LeaderboardEntry | null;
+  entries: LeaderboardEntry[];
+  /** Which entry in `entries` is the signed-in merchant. */
+  currentMerchantId: string;
 }

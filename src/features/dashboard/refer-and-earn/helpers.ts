@@ -1,4 +1,8 @@
-import type { Referral } from "@/features/dashboard/refer-and-earn/types";
+import type {
+  LeaderboardEntry,
+  Referral,
+  ReferralStandings,
+} from "@/features/dashboard/refer-and-earn/types";
 
 export interface ReferralSummary {
   /** Sum of every reward already credited to the referrer. */
@@ -64,4 +68,64 @@ export function summarizeReferrals(referrals: Referral[]): ReferralSummary {
     // credited before any of it can come off a fee.
     waivedEligible: totalEarned,
   };
+}
+
+// ── Referral leaderboard ─────────────────────────────────────────────────────
+
+const PODIUM_SIZE = 3;
+
+export interface LeaderboardView {
+  /** Ranks 1–3, in order. */
+  podium: LeaderboardEntry[];
+  /**
+   * The entry immediately above the merchant, when there is one worth showing —
+   * null if the merchant is on the podium (the rows above them are already
+   * there), if that neighbour is itself on the podium, or if the standings do
+   * not include it.
+   */
+  above: LeaderboardEntry | null;
+  /** The merchant's own row, scored on their live figures. */
+  me: LeaderboardEntry | null;
+  /** True when the merchant is already inside the podium. */
+  meOnPodium: boolean;
+  /** Referrals still needed to pass #1; 0 once they are level or ahead. */
+  toPassFirst: number;
+}
+
+/**
+ * Derives everything the leaderboard renders from the ranked list: the podium,
+ * the merchant's row, the neighbour immediately above them, and the gap to #1.
+ *
+ * The merchant's amount and referral count are taken from the live referral
+ * summary rather than the standings payload, so their row and the gap can never
+ * disagree with the analytics figures on the same page. Only their rank comes
+ * from the standings, since only the server can know it.
+ */
+export function buildLeaderboardView(
+  standings: ReferralStandings,
+  currentEarned: number,
+  currentReferralCount: number,
+  currency: string
+): LeaderboardView {
+  const ranked = [...standings.entries].sort((a, b) => a.rank - b.rank);
+  const podium = ranked.filter((e) => e.rank <= PODIUM_SIZE);
+
+  const stored = ranked.find((e) => e.id === standings.currentMerchantId) ?? null;
+  const me = stored
+    ? { ...stored, amount: currentEarned, referralCount: currentReferralCount, currency }
+    : null;
+
+  const meOnPodium = me != null && me.rank <= PODIUM_SIZE;
+
+  // The closest entry ranked above the merchant. Skipped when it is already on
+  // the podium, so no row is ever rendered twice.
+  const above =
+    me != null && !meOnPodium
+      ? (ranked.filter((e) => e.rank < me.rank && e.rank > PODIUM_SIZE).pop() ?? null)
+      : null;
+
+  const leaderCount = podium[0]?.referralCount ?? 0;
+  const toPassFirst = me == null ? 0 : Math.max(0, leaderCount - me.referralCount);
+
+  return { podium, above, me, meOnPodium, toPassFirst };
 }
