@@ -2,13 +2,36 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { MerchantSelector } from "@/components/layout/MerchantSelector";
+import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useProductContext, type NavContext } from "@/stores/useProductContext";
+
+/**
+ * The 4 tabs represent 3 contexts: Home (combined overview), Payments (PA)
+ * and Multi-Currency Accounts (PACB), each carrying a `context` tag read by
+ * useProductContext.ts. Partners is unrelated and carries none.
+ *
+ * Home/Payments/MCA currently share the exact same feature routes
+ * (/dashboard, /transactions, /reports/settlement-report, ...) rather than
+ * each getting their own for every feature. Clicking a tab sets which
+ * context those shared screens resolve data for and which Sidebar nav tree
+ * shows (short Home tree vs the full product tree), rather than navigating
+ * to a distinct per-context page. Multi-Currency Accounts has no dashboard
+ * landing page of its own yet, so its tab opens the settlement dashboard
+ * directly, scoped to PACB.
+ */
+const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
+  { label: "Home", href: "/dashboard", context: "HOME" },
+  { label: "Payments", href: "/transactions", context: "PA" },
+  { label: "Multi-Currency Accounts", href: "/reports/settlement-report", context: "PACB" },
+  { label: "Partners", href: "/refer-and-earn" },
+] as const;
 
 const CREATE_ITEMS = [
   {
@@ -29,16 +52,21 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const paMids = useApp((s) => s.paMids);
   const paCbMids = useApp((s) => s.paCbMids);
   const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
   const tidsInfo = useApp((s) => s.tidsInfo);
 
   const selectedMidDetails = useAccountSetup((s) => s.selectedMidDetails);
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+
+  const activeContext = useProductContext((s) => s.activeContext);
+  const setActiveContext = useProductContext((s) => s.setActiveContext);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createHover, setCreateHover] = useState(false);
 
   const createRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   const isMultiMids = paMids.length > 1 || (paCbMids.length > 1 && isMultiMidUser);
 
@@ -70,8 +98,36 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           <Icon name="menu" size={20} />
         </Button>
 
-        {/* Merchant selector */}
-        <MerchantSelector />
+        {/* Top-level category tabs */}
+        {!isPartnerUser && (
+          <nav className="hidden items-center gap-1 md:flex">
+            {HEADER_TABS.map((tab) => {
+              // Home/Payments/MCA currently share the same feature routes, so
+              // their highlight is driven by the active context, not the
+              // URL, Partners still keys off its own unique route (it has no
+              // context tag, and never touches activeContext on click).
+              const onPartners = pathname === "/refer-and-earn" || pathname.startsWith("/refer-and-earn/");
+              const isActive = tab.context
+                ? activeContext === tab.context && !onPartners
+                : pathname === tab.href || pathname.startsWith(tab.href + "/");
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  onClick={() => tab.context && setActiveContext(tab.context)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
+                    isActive
+                      ? "text-primary"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -187,7 +243,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
       </header>
 
-      {/* "Viewing as" ribbon — shown when a MID is selected in multi-MID mode */}
+      {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode */}
       {showRibbon && (
         <div
           className="flex items-center justify-between px-4 py-1.5 text-[13px]"

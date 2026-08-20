@@ -8,14 +8,19 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { ViewPortal } from "@/components/layout/ViewPortal";
+import { MerchantSelector } from "@/components/layout/MerchantSelector";
+import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
 import {
+  homeNavigation,
   regularNavigation,
+  mcaNavigation,
   partnerNavigation,
   globalNavigation,
   type NavItem,
   type NavGroup,
 } from "@/lib/navigation";
 import { useApp } from "@/stores/useApp";
+import { useProductContext, toProductType } from "@/stores/useProductContext";
 import { useLogout } from "@/lib/hooks/useLogout";
 import useNewPermissions from "@/hooks/useNewPermissions";
 
@@ -133,11 +138,15 @@ function SidebarBody({
   pathname,
   onNavClick,
   navigation,
+  showReferBanner = false,
 }: {
   collapsed: boolean;
   pathname: string;
   onNavClick?: () => void;
   navigation: NavGroup[];
+  /** MCA-only: a compact "Refer & Earn" promo below the nav groups, above the
+   * fixed profile section, see SidebarReferBanner. */
+  showReferBanner?: boolean;
 }) {
   const profile = useApp((s) => s.profile);
   const { logout, isLoading } = useLogout();
@@ -210,6 +219,12 @@ function SidebarBody({
             </div>
           </div>
         ))}
+
+        {showReferBanner && !collapsed && (
+          <div className="mt-1">
+            <SidebarReferBanner />
+          </div>
+        )}
       </nav>
 
       {/* ── Bottom profile section ── */}
@@ -235,7 +250,7 @@ function SidebarBody({
             <>
               <div className="flex-1 min-w-0 overflow-hidden">
                 <p className="text-[13px] font-medium leading-tight text-foreground truncate">
-                  {displayName || "—"}
+                  {displayName || "Not available"}
                 </p>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {formatRole(profile?.role)}
@@ -318,24 +333,45 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGlobalTenant = useApp((s) => s.isGlobalTenant);
+  const activeContext = useProductContext((s) => s.activeContext);
+  const activeProduct = toProductType(activeContext);
 
   const checkPermissions = useNewPermissions();
 
+  // "Home" gets its own short nav tree (see homeNavigation), "Multi-Currency
+  // Accounts" gets its own dedicated tree (see mcaNavigation), "Payments"
+  // uses the shared regularNavigation tree, filtered by product tag.
   const baseNavigation = isPartnerUser
     ? partnerNavigation
     : isGlobalTenant
       ? globalNavigation
-      : regularNavigation;
+      : activeContext === "HOME"
+        ? homeNavigation
+        : activeContext === "PACB"
+          ? mcaNavigation
+          : regularNavigation;
 
-  // Filter groups based on permissions — mirrors pg-dashboard formatMenuItems logic
+  const showReferBanner = !isPartnerUser && !isGlobalTenant && activeContext === "PACB";
+
+  // Filter groups based on permissions, mirrors pg-dashboard formatMenuItems logic.
+  // An item or child tagged with `product` (e.g. the two "Dashboard" entries,
+  // "Payment Links" / "MCA Links") only shows while the Header's active
+  // product context matches, see useProductContext.ts, everything else in
+  // the sidebar is shared by both.
   const filteredNavigation: NavGroup[] = baseNavigation
     .map((group) => {
       const visibleItems = group.items
-        .filter((item) => !item.permission?.length || checkPermissions(item.permission))
+        .filter(
+          (item) =>
+            (!item.permission?.length || checkPermissions(item.permission)) &&
+            (!item.product || item.product === activeProduct)
+        )
         .map((item) => ({
           ...item,
           children: item.children?.filter(
-            (c) => !c.permission?.length || checkPermissions(c.permission)
+            (c) =>
+              (!c.permission?.length || checkPermissions(c.permission)) &&
+              (!c.product || c.product === activeProduct)
           ),
         }))
         // Drop parent items whose children have all been filtered away
@@ -382,7 +418,16 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           </Button>
         </div>
 
-        <SidebarBody collapsed={collapsed} pathname={pathname} navigation={filteredNavigation} />
+        <div className={cn("flex-shrink-0 border-b border-sidebar-border", collapsed ? "px-2 py-2" : "px-2.5 py-2.5")}>
+          <MerchantSelector collapsed={collapsed} />
+        </div>
+
+        <SidebarBody
+          collapsed={collapsed}
+          pathname={pathname}
+          navigation={filteredNavigation}
+          showReferBanner={showReferBanner}
+        />
       </aside>
 
       {/* ── Mobile nav (portaled so fixed layers cover full viewport) ────── */}
@@ -416,11 +461,16 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             </Button>
           </div>
 
+          <div className="flex-shrink-0 border-b border-sidebar-border px-2.5 py-2.5">
+            <MerchantSelector />
+          </div>
+
           <SidebarBody
             collapsed={false}
             pathname={pathname}
             onNavClick={onClose}
             navigation={filteredNavigation}
+            showReferBanner={showReferBanner}
           />
         </aside>
       </ViewPortal>

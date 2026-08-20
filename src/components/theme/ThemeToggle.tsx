@@ -17,17 +17,7 @@ const OPTIONS: { value: ThemeOption; icon: "sun" | "moon" | "monitor"; label: st
 export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
-  // theme/resolvedTheme are undefined during SSR and on the client's first
-  // (pre-hydration) render, only trust them once mounted has flipped true.
-  // setMounted runs inside the timeout callback, not synchronously in the
-  // effect body, per CLAUDE.md's hooks-purity rule.
-  useEffect(() => {
-    const timer = window.setTimeout(() => setMounted(true), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
 
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -37,8 +27,10 @@ export function ThemeToggle() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const currentIcon = !mounted
-    ? undefined
+  // theme/resolvedTheme are undefined during SSR — default to "moon" before hydration
+  const isMounted = typeof document !== "undefined";
+  const currentIcon = !isMounted
+    ? "moon"
     : theme === "system"
       ? "monitor"
       : resolvedTheme === "dark"
@@ -54,17 +46,15 @@ export function ThemeToggle() {
         className="w-9 h-9 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 dark:bg-muted dark:border-border dark:hover:bg-accent flex items-center justify-center transition-colors"
         aria-label="Change theme"
       >
-        {mounted && currentIcon && (
-          <Icon
-            name={currentIcon}
-            size={16}
-            className={
-              theme !== "system" && resolvedTheme === "dark"
-                ? "text-amber-400"
-                : "text-muted-foreground"
-            }
-          />
-        )}
+        <Icon
+          name={currentIcon}
+          size={16}
+          className={
+            isMounted && theme !== "system" && resolvedTheme === "dark"
+              ? "text-amber-400"
+              : "text-muted-foreground"
+          }
+        />
       </Button>
 
       <AnimatePresence>
@@ -78,7 +68,7 @@ export function ThemeToggle() {
             style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06)" }}
           >
             {OPTIONS.map((opt) => {
-              const active = mounted && theme === opt.value;
+              const active = isMounted && theme === opt.value;
               return (
                 <Button
                   key={opt.value}
