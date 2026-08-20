@@ -6,6 +6,7 @@ import {
   ItemMeta,
   MemoLine,
   NotesBlock,
+  PAGE_PADDING,
   PartyBlock,
   SignatureBlock,
   TotalsRows,
@@ -27,7 +28,7 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
   const { labels, totals, money, items, primary } = model;
 
   return (
-    <div className="flex h-full flex-col bg-card px-10 py-10">
+    <div className={`flex min-h-full w-full min-w-0 flex-col bg-card ${PAGE_PADDING}`}>
       <div className="mb-9 flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <LogoSlot
@@ -38,14 +39,12 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
             tint={primary}
           />
           <span className="min-w-0 leading-tight">
+            {/* Wordmark only. GSTIN lives in the Issued-by block below, which is
+                the statutory statement of who raised this invoice; printing it
+                twice on one page was redundant. */}
             <span className="block truncate text-[15px] font-extrabold uppercase tracking-wide text-foreground">
               {model.billerName}
             </span>
-            {model.billerGstIn && (
-              <span className="block text-[11px] text-muted-foreground">
-                GSTIN {model.billerGstIn}
-              </span>
-            )}
           </span>
         </div>
         <span className="shrink-0 text-[30px] font-extrabold uppercase tracking-tight text-foreground">
@@ -64,11 +63,13 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
               labelClassName={LABEL}
               bodyClassName="text-[12.5px] text-muted-foreground"
             />
-            <AccountBlock
-              labels={labels}
-              account={model.account}
-              columns={1}
+            <PartyBlock
+              label={`${labels.issuedBy}:`}
+              name={model.billerName}
+              lines={model.billerLines}
+              gstIn={model.billerGstIn}
               labelClassName={LABEL}
+              bodyClassName="text-[12.5px] text-muted-foreground"
             />
           </div>
 
@@ -88,19 +89,20 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
               </p>
             </div>
 
-            <PartyBlock
-              label={`${labels.issuedBy}:`}
-              name={model.billerName}
-              lines={model.billerLines}
+            <AccountBlock
+              labels={labels}
+              account={model.account}
+              columns={1}
               className="mt-5 text-right"
               labelClassName={LABEL}
-              bodyClassName="text-[12.5px] text-muted-foreground"
             />
           </div>
         </div>
       </div>
 
-      <div className="mb-2 grid grid-cols-[1fr_72px_48px_80px] gap-2 border-b-2 border-foreground pb-2 text-[11px] font-bold uppercase tracking-wide text-foreground">
+      <MemoLine memo={model.memo} className="mb-4" />
+
+      <div className="mb-2 grid grid-cols-[minmax(0,1fr)_72px_48px_80px] gap-2 border-b-2 border-foreground pb-2 text-[11px] font-bold uppercase tracking-wide text-foreground">
         <span>{labels.description}</span>
         <span className="text-right">{labels.unitPrice}</span>
         <span className="text-center">{labels.qty}</span>
@@ -108,7 +110,7 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
       </div>
       <div className="divide-y divide-border">
         {items.map((item) => (
-          <div key={item.key} className="grid grid-cols-[1fr_72px_48px_80px] gap-2 py-3 text-[13px]">
+          <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_72px_48px_80px] gap-2 py-3 text-[13px]">
             <span className="min-w-0">
               <span className="block truncate text-foreground">{item.name}</span>
               <ItemMeta item={item} />
@@ -144,16 +146,17 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
         </div>
       </div>
 
-      <MemoLine memo={model.memo} className="mt-4" />
+      {/* Notes across the full width, then the sign-off on the left.
+          Previously both shared a justify-between row, so with no notes the
+          sign-off collapsed to the left edge while its own text stayed
+          right-aligned — reading as neither one side nor the other. */}
+      <NotesBlock notes={model.notes} lut={model.lut} className="mt-8" />
 
-      <div className="mt-8 flex items-end justify-between gap-6">
-        <NotesBlock notes={model.notes} lut={model.lut} className="max-w-[60%]" />
-        <div className="shrink-0 text-right">
-          <p className="text-[12px] font-bold uppercase tracking-wide text-foreground">
-            {labels.thankYou}
-          </p>
-          <SignatureBlock url={model.signatureUrl} className="mt-1" />
-        </div>
+      <div className="mt-8">
+        <p className="text-[12px] font-bold uppercase tracking-wide text-foreground">
+          {labels.thankYou}
+        </p>
+        <SignatureBlock url={model.signatureUrl} align="left" className="mt-1" />
       </div>
     </div>
   );

@@ -27,9 +27,12 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
   const brandLabel = "mb-1 font-bold";
 
   return (
-    <div className="h-full bg-card p-3">
+    <div className="min-h-full w-full min-w-0 bg-card p-3">
       <div
-        className="flex h-full flex-col rounded-[28px] border-[10px] px-8 py-8"
+        // Not PAGE_PADDING: the 10px frame is drawn inside the sheet's margin,
+        // so the frame plus this inset together come to the same content inset
+        // the other five themes get from p-10.
+        className="flex min-h-full flex-col rounded-[28px] border-[10px] p-7"
         style={{ borderColor: primary, backgroundColor: withAlpha(accent, 0.08) }}
       >
         <div className="mb-6 flex items-center justify-between gap-4">
@@ -90,9 +93,14 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
           />
         </div>
 
+        {/* Memo sits with the amount, not in the footer. It says what this
+            invoice covers; `notes` carries terms and payment instructions. Putting
+            both at the bottom made the memo read as a second terms block. */}
+        <MemoLine memo={model.memo} className="mb-4" />
+
         <div className="overflow-hidden rounded-2xl">
           <div
-            className="grid grid-cols-[1fr_48px_72px_84px] gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white"
+            className="grid grid-cols-[minmax(0,1fr)_48px_72px_84px] gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white"
             style={{ backgroundColor: primary }}
           >
             <span>{labels.description}</span>
@@ -104,7 +112,7 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
           {items.map((item, index) => (
             <div
               key={item.key}
-              className="grid grid-cols-[1fr_48px_72px_84px] gap-2 px-4 py-2.5 text-[12.5px] text-foreground"
+              className="grid grid-cols-[minmax(0,1fr)_48px_72px_84px] gap-2 px-4 py-2.5 text-[12.5px] text-foreground"
               style={{
                 backgroundColor: index % 2 === 0 ? withAlpha(accent, 0.2) : "transparent",
               }}
@@ -119,8 +127,6 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
             </div>
           ))}
         </div>
-
-        <MemoLine memo={model.memo} className="mt-4" />
 
         <div className="mt-5 flex items-start justify-between gap-6">
           <AccountBlock

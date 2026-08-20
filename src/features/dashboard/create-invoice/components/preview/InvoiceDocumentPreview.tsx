@@ -74,7 +74,13 @@ export function InvoiceDocumentPreview({
     // The layouts own their padding, because where the margin sits is part of
     // what distinguishes them — Bold Sidebar's rail runs to the paper's edge.
     <div className="grid overflow-hidden rounded-2xl border border-border bg-card shadow-md">
-      <div className="aspect-[210/297] bg-card">
+      {/* `min-w-0` is as load-bearing as the grid above. A grid item's default
+          `min-width: auto` is a *min-content* minimum, so anything inside that
+          refused to shrink — a nowrap-truncated item name, a fixed-track table —
+          made the sheet itself wider than its column, and the wrapper's
+          overflow-hidden then sliced the right-hand side off the page. Capping
+          the item at its column is what keeps the paper the width of the paper. */}
+      <div className="aspect-[210/297] min-w-0 bg-card">
         <Layout model={model} onLogoClick={offerLogoSlot ? onLogoClick : undefined} />
       </div>
     </div>

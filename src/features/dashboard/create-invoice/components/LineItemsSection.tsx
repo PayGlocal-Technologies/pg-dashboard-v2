@@ -311,12 +311,22 @@ export function LineItemsSection({
             {discountOpen ? (
               <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
                 <div className="flex flex-1 items-center gap-1.5">
+                  {/* A static label naming the row, then a field naming the
+                      discount.
+
+                      The two jobs were previously done by one control: an input
+                      whose placeholder read "Discount". A placeholder that names
+                      the row reads as the row's label, so the box looked like
+                      decoration and nobody could tell it took a value. Splitting
+                      them costs nothing — the label says which row this is, the
+                      placeholder says what the field is for. */}
+                  <span className="w-20 shrink-0 text-muted-foreground">Discount</span>
                   <Input
-                    aria-label="Discount name"
-                    placeholder="Discount"
+                    aria-label="Discount name, optional"
+                    placeholder="Optional name"
                     value={discountName}
                     onChange={(e) => onTotalsFieldChange({ discountName: e.target.value })}
-                    className="h-7 w-28 text-[12px]"
+                    className="h-7 w-32 text-[12px]"
                   />
                   <Select
                     value={discountType}
@@ -377,12 +387,17 @@ export function LineItemsSection({
             {taxOpen ? (
               <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
                 <div className="flex flex-1 items-center gap-1.5">
+                  {/* Same split as the discount row. It matters more here: an
+                      invoice-level tax is VAT or IGST or service tax, and on a
+                      cross-border invoice that word does real work, so the field
+                      naming it has to be recognisable as a field. */}
+                  <span className="w-20 shrink-0 text-muted-foreground">Tax</span>
                   <Input
-                    aria-label="Tax name"
-                    placeholder="Tax"
+                    aria-label="Tax name, optional"
+                    placeholder="e.g. VAT, IGST"
                     value={taxName}
                     onChange={(e) => onTotalsFieldChange({ taxName: e.target.value })}
-                    className="h-7 w-28 text-[12px]"
+                    className="h-7 w-32 text-[12px]"
                   />
                   <Input
                     inputMode="decimal"

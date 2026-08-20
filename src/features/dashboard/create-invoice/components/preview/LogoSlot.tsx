@@ -53,11 +53,17 @@ export function LogoSlot({
     if (!onUpload) return image;
 
     return (
+      // `self-start` and an explicit box are both load-bearing. This Button is a
+      // flex item in several themes, and Bold Sidebar puts it in a *column* —
+      // where the default `align-items: stretch` grew the button to the column's
+      // full width and its `justify-center` then parked the 40px logo in the
+      // middle of the page instead of on the left margin.
       <Button
         type="button"
         variant="ghost"
         aria-label="Replace logo"
-        className={cn("h-auto shrink-0 p-0 hover:opacity-80", radius)}
+        className={cn("h-auto shrink-0 self-start p-0 hover:opacity-80", radius)}
+        style={boxStyle}
         onClick={onUpload}
       >
         {image}
@@ -72,7 +78,7 @@ export function LogoSlot({
       type="button"
       variant="ghost"
       aria-label="Add a logo"
-      className={cn("h-auto shrink-0 border-2 border-dashed p-0", radius, className)}
+      className={cn("h-auto shrink-0 self-start border-2 border-dashed p-0", radius, className)}
       style={{
         ...boxStyle,
         borderColor: tint ? withAlpha(tint, 0.4) : undefined,

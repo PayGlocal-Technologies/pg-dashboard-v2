@@ -6,6 +6,7 @@ import {
   ItemMeta,
   MemoLine,
   NotesBlock,
+  PAGE_PADDING,
   PartyBlock,
   SignatureBlock,
   TotalsRows,
@@ -28,7 +29,7 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
   const { labels, totals, money, items, primary } = model;
 
   return (
-    <div className="flex h-full flex-col bg-card p-10">
+    <div className={`flex min-h-full w-full min-w-0 flex-col bg-card ${PAGE_PADDING}`}>
       <div className="mb-5 flex items-center gap-4">
         <LogoSlot url={model.logoUrl} onUpload={onLogoClick} tint={primary} />
         <span className="text-[22px] font-bold tracking-tight text-foreground">
@@ -73,7 +74,7 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
       <MemoLine memo={model.memo} className="mt-1" />
 
       <div className="mt-4 overflow-hidden border border-border">
-        <div className="grid grid-cols-[1fr_48px_80px_44px_84px] gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
           <span>{labels.description}</span>
           <span className="text-center">{labels.qty}</span>
           <span className="text-right">{labels.unitPrice}</span>
@@ -88,7 +89,7 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
             items.map((item) => (
               <div
                 key={item.key}
-                className="grid grid-cols-[1fr_48px_80px_44px_84px] gap-2 px-3 py-2.5 text-[12px]"
+                className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 px-3 py-2.5 text-[12px]"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-foreground">{item.name}</span>

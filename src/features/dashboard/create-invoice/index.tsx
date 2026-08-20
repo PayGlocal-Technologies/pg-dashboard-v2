@@ -1052,6 +1052,22 @@ function InvoiceEditor({
           size="sm"
           disabled={isSaving || isGenerating}
           onClick={handleGenerate}
+          /**
+           * Squares the two facing corners so the pair reads as one control.
+           *
+           * flux already asks for this — it passes `rounded-r-none` to the label
+           * button and `rounded-l-none` to the caret — but those never take
+           * effect. `cn` is twMerge, and `rounded-lg` (all corners) and
+           * `rounded-r-none` (right corners) are different conflict groups, so
+           * twMerge keeps both and the stylesheet's ordering lets the shorthand
+           * re-round the corners the component just squared. The result is two
+           * separate pills with a sliver of background between them.
+           *
+           * A child selector outranks a plain utility on specificity, so this
+           * wins regardless of sheet order. `button+button` rather than
+           * `:last-child` because the open menu is itself the last child.
+           */
+          className="[&>button+button]:rounded-l-none [&>button:first-child]:rounded-r-none"
         >
           {/* `whitespace-nowrap` on every item is load-bearing. flux positions
               the menu with `right-0` and no `left`, so its width shrinks to fit

@@ -8,6 +8,7 @@ import {
   ItemMeta,
   MemoLine,
   NotesBlock,
+  PAGE_PADDING,
   PartyBlock,
   SignatureBlock,
   TotalsRows,
@@ -28,7 +29,7 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
   const headStyle = { borderColor: accent };
 
   return (
-    <div className="flex h-full flex-col bg-card px-10 py-10 text-center">
+    <div className={`flex min-h-full w-full min-w-0 flex-col bg-card text-center ${PAGE_PADDING}`}>
       <div className="mb-2 flex items-center justify-center gap-2">
         <LogoSlot url={model.logoUrl} onUpload={onLogoClick} size={28} tint={primary} />
         <span className="text-[13px] font-extrabold uppercase tracking-widest text-foreground">
@@ -80,8 +81,13 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
         </span>
       </div>
 
+      {/* Memo sits with the amount, not in the footer. It says what this
+          invoice covers; `notes` carries terms and payment instructions. Putting
+          both at the bottom made the memo read as a second terms block. */}
+      <MemoLine memo={model.memo} className="mb-4 text-left" />
+
       <div
-        className="mb-2 grid grid-cols-[1fr_44px_72px_80px] gap-2 border-b-2 pb-2 text-left text-[12px] font-extrabold uppercase tracking-wide text-foreground"
+        className="mb-2 grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b-2 pb-2 text-left text-[12px] font-extrabold uppercase tracking-wide text-foreground"
         style={{ borderColor: primary }}
       >
         <span>{labels.description}</span>
@@ -93,7 +99,7 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
       {items.map((item) => (
         <div
           key={item.key}
-          className="grid grid-cols-[1fr_44px_72px_80px] gap-2 border-b py-2.5 text-left text-[12px] text-foreground"
+          className="grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b py-2.5 text-left text-[12px] text-foreground"
           style={{ borderColor: withAlpha(accent, 0.33) }}
         >
           <span className="flex min-w-0 items-start gap-1.5">
@@ -136,18 +142,18 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
         </div>
       </div>
 
-      <MemoLine memo={model.memo} className="mt-4 text-left" />
+      {/* Bank details spans the sheet in two columns rather than stacking in
+          one half of a split row, which left the right half of the page empty. */}
+      <AccountBlock
+        labels={labels}
+        account={model.account}
+        columns={2}
+        className="mt-8 text-left"
+        labelClassName={headLabel}
+        labelStyle={headStyle}
+      />
 
-      <div className="mt-8 grid grid-cols-2 gap-6 text-left">
-        <AccountBlock
-          labels={labels}
-          account={model.account}
-          columns={1}
-          labelClassName={headLabel}
-          labelStyle={headStyle}
-        />
-        <NotesBlock notes={model.notes} lut={model.lut} />
-      </div>
+      <NotesBlock notes={model.notes} lut={model.lut} className="mt-6 text-left" />
 
       <SignatureBlock url={model.signatureUrl} className="mt-6" />
     </div>

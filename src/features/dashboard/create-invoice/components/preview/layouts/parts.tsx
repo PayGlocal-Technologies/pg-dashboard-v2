@@ -24,6 +24,27 @@ import type { PreviewItem } from "@/features/dashboard/create-invoice/components
  * Sidebar — without owning the content.
  */
 
+/**
+ * The sheet's margin, shared by every theme.
+ *
+ * One value rather than six hand-picked ones (p-10, px-10 py-9, px-9 py-9 …), so
+ * the document's inset is the same whichever theme is selected and matches what
+ * the server's renderer will use. Playful Border is the single exception, and
+ * only because its 10px frame is drawn inside this margin.
+ */
+export const PAGE_PADDING = "p-10";
+
+/**
+ * Applied to every field a merchant can type into.
+ *
+ * `overflow-wrap: anywhere` is the load-bearing half. A pasted IBAN, a URL in the
+ * notes or a German compound in a memo is one unbreakable word, and one such word
+ * wider than its column pushes the whole sheet sideways — which is how adding a
+ * memo could shove "Authorised signatory" off the right edge of the paper. This
+ * breaks mid-word as a last resort instead, so text can never set the page width.
+ */
+const WRAPS = "[overflow-wrap:anywhere] break-words";
+
 type Tone = {
   className?: string;
   labelClassName?: string;
@@ -80,20 +101,26 @@ export function PartyBlock({
       <PartLabel className={labelClassName} style={labelStyle}>
         {label}
       </PartLabel>
-      <p className="text-[13px] font-semibold text-foreground">{name}</p>
+      <p className={cn("text-[13px] font-semibold text-foreground", WRAPS)}>{name}</p>
       {secondary && (
-        <p className={cn("text-[12px] text-muted-foreground/80", bodyClassName)}>{secondary}</p>
+        <p className={cn("text-[12px] text-muted-foreground/80", WRAPS, bodyClassName)}>
+          {secondary}
+        </p>
       )}
       {lines.map((line, index) => (
         <p
           key={`${line}-${index}`}
-          className={cn("text-[12px] leading-snug text-muted-foreground/80", bodyClassName)}
+          className={cn(
+            "text-[12px] leading-snug text-muted-foreground/80",
+            WRAPS,
+            bodyClassName
+          )}
         >
           {line}
         </p>
       ))}
       {gstIn && (
-        <p className={cn("mt-0.5 text-[12px] text-muted-foreground/80", bodyClassName)}>
+        <p className={cn("mt-0.5 text-[12px] text-muted-foreground/80", WRAPS, bodyClassName)}>
           GSTIN {gstIn}
         </p>
       )}
@@ -210,7 +237,7 @@ export function AccountBlock({
             <p
               className={cn(
                 "font-medium text-foreground",
-                field.mono ? "break-all font-mono" : "break-words"
+                field.mono ? "break-all font-mono" : WRAPS
               )}
             >
               {field.value || "-"}
@@ -226,7 +253,9 @@ export function AccountBlock({
 export function MemoLine({ memo, className }: { memo: string; className?: string }) {
   if (!memo) return null;
   return (
-    <p className={cn("whitespace-pre-line text-[12px] text-muted-foreground/80", className)}>
+    <p
+      className={cn("whitespace-pre-line text-[12px] text-muted-foreground/80", WRAPS, className)}
+    >
       {memo}
     </p>
   );
@@ -260,6 +289,7 @@ export function NotesBlock({
         <p
           className={cn(
             "whitespace-pre-line text-[11px] leading-snug text-muted-foreground/80",
+            WRAPS,
             textClassName
           )}
         >
@@ -267,7 +297,7 @@ export function NotesBlock({
         </p>
       )}
       {lut && (
-        <p className={cn("mt-1.5 text-[11px] text-muted-foreground/80", textClassName)}>
+        <p className={cn("mt-1.5 text-[11px] text-muted-foreground/80", WRAPS, textClassName)}>
           LUT: {lut}
         </p>
       )}
@@ -275,20 +305,34 @@ export function NotesBlock({
   );
 }
 
-/** The authorised signature image, plus its caption. */
+/**
+ * The authorised signature image, plus its caption.
+ *
+ * `align` exists because a signature is not always in the bottom-right corner:
+ * Minimal Mono signs off under its "thank you", on the left. Without it the
+ * caption was right-aligned inside a left-positioned box, which read as neither.
+ */
 export function SignatureBlock({
   url,
+  align = "right",
   className,
   captionClassName,
 }: {
   url: string;
+  align?: "left" | "right";
   className?: string;
   captionClassName?: string;
 }) {
   if (!url) return null;
 
   return (
-    <div className={cn("flex flex-col items-end", className)}>
+    <div
+      className={cn(
+        "flex flex-col",
+        align === "left" ? "items-start" : "items-end",
+        className
+      )}
+    >
       <Image
         src={url}
         alt="Authorised signature"

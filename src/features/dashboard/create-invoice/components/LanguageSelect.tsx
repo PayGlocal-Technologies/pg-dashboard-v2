@@ -20,10 +20,12 @@ import { INVOICE_LANGUAGES } from "@/features/dashboard/create-invoice/i18n";
 /**
  * The language the invoice's fixed labels print in.
  *
- * Nova offers fifteen and silently renders seven of them in English. This splits
- * the list in two and says which is which: a merchant invoicing a Korean
- * customer should find out that "Korean" only changes the setting, not the
- * document, before they send it rather than after.
+ * Every entry does something. Nova offers fifteen and silently renders seven of
+ * them in English; this used to inherit that and merely label the dud half
+ * honestly, which raised the fair objection that a group of options admitting
+ * they change nothing should not be on offer at all. The seven are translated
+ * now, and the list is derived from the translations, so an untranslated
+ * language cannot reappear in the picker.
  *
  * Never translates the merchant's own words — item names, memo, notes and
  * addresses stay exactly as typed. See i18n.ts.
@@ -40,18 +42,10 @@ export function LanguageSelect({
 
   // flux's Command is a presentational shell and does no filtering of its own,
   // so matching happens here — the same pattern BillToSection uses.
-  const { translated, fallback } = useMemo(() => {
+  const matches = useMemo(() => {
     const needle = query.trim().toLowerCase();
-    const matches = INVOICE_LANGUAGES.filter((language) =>
-      language.name.toLowerCase().includes(needle)
-    );
-    return {
-      translated: matches.filter((language) => language.translated),
-      fallback: matches.filter((language) => !language.translated),
-    };
+    return INVOICE_LANGUAGES.filter((language) => language.toLowerCase().includes(needle));
   }, [query]);
-
-  const isTranslated = INVOICE_LANGUAGES.find((language) => language.name === value)?.translated;
 
   const choose = (name: string) => {
     onChange(name);
@@ -99,11 +93,6 @@ export function LanguageSelect({
           <span className="flex min-w-0 items-center gap-2">
             <Icon name="languages" className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
             <span className="truncate text-[13.5px] font-medium text-foreground">{value}</span>
-            {isTranslated === false && (
-              <span className="shrink-0 rounded bg-muted px-1.5 py-px text-[10px] font-medium text-muted-foreground">
-                English labels
-              </span>
-            )}
           </span>
         </Button>
       </PopoverTrigger>
@@ -116,21 +105,10 @@ export function LanguageSelect({
             onChange={(e) => setQuery(e.target.value)}
           />
           <CommandList>
-            {translated.length === 0 && fallback.length === 0 && (
+            {matches.length === 0 && (
               <CommandEmpty>No language matches that search.</CommandEmpty>
             )}
-
-            {translated.length > 0 && (
-              <CommandGroup heading="Translated labels">
-                {translated.map((language) => row(language.name))}
-              </CommandGroup>
-            )}
-
-            {fallback.length > 0 && (
-              <CommandGroup heading="Labels stay in English">
-                {fallback.map((language) => row(language.name))}
-              </CommandGroup>
-            )}
+            <CommandGroup>{matches.map(row)}</CommandGroup>
           </CommandList>
         </Command>
       </PopoverContent>

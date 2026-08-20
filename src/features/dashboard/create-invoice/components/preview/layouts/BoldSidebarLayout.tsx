@@ -6,6 +6,7 @@ import {
   ItemMeta,
   MemoLine,
   NotesBlock,
+  PAGE_PADDING,
   PartyBlock,
   SignatureBlock,
   TotalsRows,
@@ -25,10 +26,10 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
   const brandLabel = "mb-1 font-bold uppercase tracking-wide";
 
   return (
-    <div className="grid h-full grid-cols-[64px_1fr] bg-card">
+    <div className="grid min-h-full w-full min-w-0 grid-cols-[64px_minmax(0,1fr)] bg-card">
       <div className="relative border-r" style={{ borderColor: primary }}>
         <p
-          className="absolute left-1/2 top-6 -translate-x-1/2 whitespace-nowrap text-[15px] font-semibold tracking-wide"
+          className="absolute left-1/2 top-6 max-h-[55%] -translate-x-1/2 overflow-hidden whitespace-nowrap text-[15px] font-semibold tracking-wide"
           style={{ writingMode: "vertical-rl", color: primary }}
         >
           {model.billerName}
@@ -41,12 +42,12 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
         </p>
       </div>
 
-      <div className="flex min-w-0 flex-col px-9 py-9">
+      <div className={`flex min-w-0 flex-col ${PAGE_PADDING}`}>
         <div
           className="mb-6 flex items-start justify-between gap-6 border-b pb-6"
           style={{ borderColor: primary }}
         >
-          <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
             <LogoSlot url={model.logoUrl} onUpload={onLogoClick} size={40} tint={primary} />
             <PartyBlock
               label={labels.issuedBy}
@@ -58,7 +59,7 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
             />
           </div>
 
-          <div className="shrink-0 text-right text-[12px]">
+          <div className="min-w-0 flex-1 text-right text-[12px]">
             <p style={{ color: primary }}>
               {labels.invoiceNumber} {model.invoiceNumber}
             </p>
@@ -82,6 +83,11 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
             />
           </div>
         </div>
+
+        {/* Memo sits with the amount, not in the footer. It says what this
+            invoice covers; `notes` carries terms and payment instructions. Putting
+            both at the bottom made the memo read as a second terms block. */}
+        <MemoLine memo={model.memo} className="mb-5" />
 
         <div className="mb-6 border-b pb-4" style={{ borderColor: primary }}>
           <div
@@ -131,8 +137,6 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
             </div>
           </div>
         </div>
-
-        <MemoLine memo={model.memo} className="mb-4" />
 
         <div className="flex items-end justify-between gap-6">
           <div className="min-w-0" style={{ color: accent }}>

@@ -8,6 +8,7 @@ import {
   ItemMeta,
   MemoLine,
   NotesBlock,
+  PAGE_PADDING,
   PartyBlock,
   SignatureBlock,
   TotalsRows,
@@ -29,7 +30,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
   const brandLabel = "mb-1 font-semibold normal-case tracking-normal";
 
   return (
-    <div className="flex h-full flex-col bg-card px-10 py-9">
+    <div className={`flex min-h-full w-full min-w-0 flex-col bg-card ${PAGE_PADDING}`}>
       <div className="mb-7 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <span
@@ -38,17 +39,6 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
           >
             {labels.invoiceNumber} {model.invoiceNumber}
           </span>
-
-          {model.hasClient && (
-            <div className="mt-3">
-              <span
-                className="inline-flex max-w-full items-center gap-1.5 truncate rounded-full px-3 py-1 text-[11px] font-semibold text-foreground"
-                style={{ backgroundColor: withAlpha(accent, 0.33) }}
-              >
-                {model.clientName}
-              </span>
-            </div>
-          )}
 
           <div className="mt-2 flex items-center gap-2">
             <LogoSlot url={model.logoUrl} onUpload={onLogoClick} size={32} tint={primary} />
@@ -64,25 +54,43 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
         </span>
       </div>
 
-      <div className="mb-6">
-        <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-          {labels.amountDue}
-        </p>
-        <p className="text-[26px] font-extrabold" style={{ color: primary }}>
-          {money(totals.total)} {model.currency}
-        </p>
-        <MemoLine memo={model.memo} className="mt-1" />
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-6">
+        <div className="min-w-0">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            {labels.amountDue}
+          </p>
+          <p className="text-[26px] font-extrabold" style={{ color: primary }}>
+            {money(totals.total)} {model.currency}
+          </p>
+          <MemoLine memo={model.memo} className="mt-1" />
+        </div>
+
+        {/* `shrink-0` is safe here and only here: these are formatted dates, not
+            merchant text, and the row wraps rather than overflowing if a long
+            localised month leaves them no space. */}
+        <div className="flex shrink-0 gap-8 text-[11.5px]">
+          <div>
+            <p className="font-semibold text-foreground">{labels.issueDate}</p>
+            <p className="text-muted-foreground">{model.issueDate}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-foreground">{labels.dueDate}</p>
+            <p className="text-muted-foreground">{model.dueDate || "-"}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-start gap-8 text-[11.5px]">
-        <div>
-          <p className="font-semibold text-foreground">{labels.issueDate}</p>
-          <p className="text-muted-foreground">{model.issueDate}</p>
-        </div>
-        <div>
-          <p className="font-semibold text-foreground">{labels.dueDate}</p>
-          <p className="text-muted-foreground">{model.dueDate || "-"}</p>
-        </div>
+      {/* The two parties, side by side and on their own row.
+
+          All four of these blocks — both dates and both parties — used to share
+          one `flex-wrap` row. Wrapping a row of unequal heights is what broke
+          this theme: the parties are five lines tall and the dates are two, so
+          "Billed to" wrapped onto a second flex line whose top was set by the
+          tallest item on the first, leaving a crater of whitespace and the right
+          half of the sheet empty. Dates now sit beside the amount above, where
+          there was room going spare, and the parties get a real two-column grid
+          that reads as a pair. */}
+      <div className="mb-6 grid grid-cols-2 gap-6">
         <PartyBlock
           label={labels.issuedBy}
           name={model.billerName}
@@ -102,7 +110,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
       </div>
 
       <div
-        className="mb-2 grid grid-cols-[1fr_36px_64px_80px] gap-2 border-b pb-2 text-[11px] font-semibold"
+        className="mb-2 grid grid-cols-[minmax(0,1fr)_36px_64px_80px] gap-2 border-b pb-2 text-[11px] font-semibold"
         style={{ borderColor: withAlpha(primary, 0.2), color: primary }}
       >
         <span>{labels.description}</span>
@@ -115,7 +123,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
         {items.map((item) => (
           <div
             key={item.key}
-            className="grid grid-cols-[1fr_36px_64px_80px] gap-2 py-2.5 text-[12px]"
+            className="grid grid-cols-[minmax(0,1fr)_36px_64px_80px] gap-2 py-2.5 text-[12px]"
           >
             <span className="min-w-0">
               <span className="block truncate font-medium text-foreground">{item.name}</span>
@@ -149,7 +157,10 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
             style={{ color: accent }}
             aria-hidden
           />
-          <span className="text-[12px] font-semibold text-foreground">{labels.amountDue}</span>
+          {/* `total`, not `amountDue`: the headline above already carries
+              "Amount due" with the same figure, and saying it twice on one page
+              reads as two different numbers that happen to match. */}
+          <span className="text-[12px] font-semibold text-foreground">{labels.total}</span>
           <span
             className="ml-auto rounded-full px-4 py-1.5 text-[13px] font-bold tabular-nums text-foreground"
             style={{ backgroundColor: withAlpha(accent, 0.4) }}
@@ -159,18 +170,21 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
         </div>
       </div>
 
+      {/* Two columns and left-aligned. The single right-aligned column it had
+          before put its labels and its values on opposite reading edges, and
+          `shrink-0` on a block holding an IBAN is what let a long account number
+          set the page width and push the signature off the paper. */}
       <div
-        className="mt-8 flex items-start justify-between gap-6 border-t pt-4"
+        className="mt-8 border-t pt-4"
         style={{ borderColor: withAlpha(primary, 0.2) }}
       >
-        <NotesBlock notes={model.notes} lut={model.lut} className="min-w-0" />
         <AccountBlock
           labels={labels}
           account={model.account}
-          columns={1}
-          className="shrink-0 text-right"
+          columns={2}
           labelClassName={brandLabel}
         />
+        <NotesBlock notes={model.notes} lut={model.lut} className="mt-4" />
       </div>
 
       <SignatureBlock url={model.signatureUrl} className="mt-6" />
