@@ -37,6 +37,9 @@ export function ReferAndEarnFeature() {
           leaderboards={MOCK_LEAGUE_LEADERBOARDS}
           currentLeague={MOCK_CURRENT_LEAGUE}
           currentEarned={summary.totalEarned}
+          // Completed referrals are the ones that qualified, so they are what the
+          // leaderboard's gap-to-#1 is measured in.
+          currentReferralCount={summary.completed}
           currency={summary.earnedCurrency}
         />
       </div>

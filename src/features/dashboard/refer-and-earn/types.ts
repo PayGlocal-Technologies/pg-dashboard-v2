@@ -40,6 +40,12 @@ export interface LeaderboardEntry {
   /** Referral earnings this standing is scored on. */
   amount: number;
   currency: string;
+  /**
+   * Qualifying referrals behind that amount. Held alongside it rather than
+   * divided out of it, because the reward per referral is a programme setting
+   * that can change without the historical standings changing with it.
+   */
+  referralCount: number;
 }
 
 export interface LeagueLeaderboard {
