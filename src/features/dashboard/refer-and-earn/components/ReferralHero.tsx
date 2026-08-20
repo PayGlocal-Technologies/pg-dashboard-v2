@@ -45,7 +45,7 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
           so removing the image doesn't collapse the card, and it stays a floor
           rather than a fixed height so longer copy still expands it. Content sits
           on the card's horizontal midline. */}
-      <div className="flex h-full flex-col justify-center md:min-h-[16.6rem] md:pl-3 lg:pl-8">
+      <div className="flex h-full flex-col justify-center md:min-h-[16.6rem] md:pl-3">
         {/* Page title — the hero heading is the h1, so this screen has no
             separate PageHeader competing with it. The reward is the one part
             given the primary colour: it is what the merchant is here for. */}

@@ -157,7 +157,7 @@ export function ReferralLeaderboard({
           <>
             {/* Sits between the podium and the merchant's row — it is what carries
                 the jump in rank, so there is no separate ellipsis marker. */}
-            <div className="px-2.5 pt-2.5 pb-1.5">
+            <div className="px-2.5 pt-2.5 pb-2.5">
               <ProgressionMessage toPass={(leader?.referralCount ?? 0) - currentReferralCount} />
             </div>
             {/* Only when they are not already in the podium above — the merchant
