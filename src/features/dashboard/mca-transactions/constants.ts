@@ -41,21 +41,25 @@ export const INVOICE_ACCEPTED_EXTENSIONS = [".pdf"] as const;
 export const INVOICE_ACCEPTED_MIME_TYPES = ["application/pdf"] as const;
 export const INVOICE_MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
 
-// ── FX rates to INR ──────────────────────────────────────────────────────────
-// TODO: replace with a live FX rate feed once one exists — see CLAUDE.md, do
-// not guess API contracts. These are illustrative static rates only, kept for
-// surfaces still awaiting a real conversion source; anything driven by the
-// settlement timeline reads that response's own conversionRate instead.
-export const MCA_FX_RATES_TO_INR: Record<string, number> = {
-  USD: 83.12,
-  EUR: 90.45,
-  GBP: 105.3,
-  AUD: 54.2,
-  CAD: 61.1,
-  INR: 1,
-};
-
-export const MCA_PROCESSING_FEE_RATE = 0.0075; // 0.75% of the converted INR amount
+// ── No FX rates or fee rates live here ───────────────────────────────────────
+// A static MCA_FX_RATES_TO_INR table and an MCA_PROCESSING_FEE_RATE of 0.0075
+// used to sit at this spot. Both were exported, neither had a single consumer,
+// and both read as authoritative, which made them exactly the constants someone
+// building an FX or fee surface would reach for. Deleted rather than left as a
+// trap.
+//
+// Where these values actually come from:
+//   conversion rate  the settlement timeline response's own `conversionRate`
+//                    (see buildSettlementTimeline), which is the rate that was
+//                    really applied to that transaction
+//   live quote       GET /gcc/v3/merchants/{mid}/exchange-rates/{ccy}/{amount}
+//                    (see multi-currency/services.ts), which also returns the
+//                    PayGlocal fee amount, rate and type for that quote
+//   fee terms        merchant configuration, not a constant. A hardcoded rate is
+//                    a commercial term someone will be billed on.
+//
+// If a surface needs a blended realized rate over a period, that has no endpoint
+// yet: it is the `fx-rate-realized` dashboard widget, on the backend list.
 
 // ── Country name map (ISO2 → display name, matches pg-dashboard) ─────────────
 export const COUNTRY_NAME_MAP: Record<string, string> = {

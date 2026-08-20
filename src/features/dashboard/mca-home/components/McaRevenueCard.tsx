@@ -7,17 +7,31 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import {
-  REVENUE_TIMEFRAME_SCALE,
-  revenueSeries,
-  revenueSummary,
+  revenueByTimeframe,
   revenueTimeframes,
   upcomingSettlement,
   type RevenuePoint,
   type RevenueTimeframe,
 } from "@/features/dashboard/mca-home/mock-data";
 
-function formatLakhAxis(value: number): string {
-  return value === 0 ? "₹0" : `₹${(value / 100_000).toFixed(0)}L`;
+/**
+ * Y-axis tick label, in the unit the values are actually in.
+ *
+ * Two things an earlier `(value / 100_000).toFixed(0)` got wrong. It rounded
+ * every lakh figure to a whole lakh, so a 1.2L / 1.4L / 1.5L band rendered three
+ * consecutive ticks all reading "₹1L" and the axis looked broken. And it forced
+ * lakhs on a daily series, where 18,000 became "₹0L". Below a lakh this reads in
+ * thousands, above it in lakhs with one decimal until the whole-lakh figure is
+ * unambiguous on its own.
+ */
+function formatMoneyAxis(value: number): string {
+  if (value === 0) return "₹0";
+  const abs = Math.abs(value);
+  if (abs >= 100_000) {
+    const lakh = value / 100_000;
+    return `₹${lakh < 10 ? lakh.toFixed(1) : lakh.toFixed(0)}L`;
+  }
+  return `₹${Math.round(value / 1000)}K`;
 }
 
 function formatLakhTotal(value: number): string {
@@ -48,9 +62,10 @@ interface McaRevenueCardProps {
 
 export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
   const [timeframe, setTimeframe] = useState<RevenueTimeframe>("1M");
-  const scale = REVENUE_TIMEFRAME_SCALE[timeframe];
-  const data = revenueSeries.map((p) => ({ ...p, current: p.current * scale, previous: p.previous * scale }));
-  const trendPositive = revenueSummary.trendPct >= 0;
+  // Each timeframe carries its own buckets and its own axis labels, so switching
+  // tabs changes what the chart is measuring, not just how tall it is.
+  const series = revenueByTimeframe[timeframe];
+  const trendPositive = series.trendPct >= 0;
 
   return (
     <Card className="h-full gap-0 p-5">
@@ -79,10 +94,10 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
 
       <div className="mt-3 flex items-baseline gap-2">
         <RollingNumber
-          value={formatLakhTotal(revenueSummary.total * scale)}
+          value={formatLakhTotal(series.total)}
           className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
         />
-        <span className="text-xs font-medium text-muted-foreground">{revenueSummary.currency}</span>
+        <span className="text-xs font-medium text-muted-foreground">{series.currency}</span>
       </div>
       <div
         className={cn(
@@ -93,13 +108,13 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
         <span>
           {trendPositive ? "+" : ""}
-          {revenueSummary.trendPct}% vs last month
+          {series.trendPct}% {series.comparisonLabel}
         </span>
       </div>
 
       <div className="mt-4 min-h-48 w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <AreaChart data={series.points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <defs>
               <linearGradient id="mca-revenue-fill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.22} />
@@ -118,7 +133,7 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
               axisLine={false}
               tickLine={false}
               width={48}
-              tickFormatter={formatLakhAxis}
+              tickFormatter={formatMoneyAxis}
               tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
             />
             <Tooltip content={<RevenueTooltip />} />
