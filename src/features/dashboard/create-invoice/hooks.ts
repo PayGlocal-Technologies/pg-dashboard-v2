@@ -227,7 +227,10 @@ export function useClientGeo(enabled: boolean): ClientGeo {
 
       return Object.keys(stateCodes)
         .filter((name) => name !== "OTHER COUNTRY")
-        .map((name) => ({ label: titleCase(name), value: name }));
+        .map((name) => ({ label: titleCase(name), value: name }))
+        // The API returns its map unordered. Sorted on the *label*, which is
+        // what the user reads and what Select's type-ahead matches against.
+        .sort((a, b) => a.label.localeCompare(b.label));
     },
     [stateData]
   );

@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
+
 import { useForm } from "@tanstack/react-form";
 import {
   Accordion,
@@ -8,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
   Button,
+  COUNTRIES,
   CountrySelect,
   Dialog,
   DialogContent,
@@ -58,6 +61,15 @@ import type { ClientFormValues } from "@/features/dashboard/client-management/ty
 
 /** Red asterisk before a required field's label — the same marker the Add item
  *  form uses, so required-ness reads identically across the product. */
+/**
+ * flux's country list, shaped for SearchableSelect. Module scope because
+ * COUNTRIES is a constant — there is nothing to recompute per render.
+ */
+const countrySelectOptions = COUNTRIES.map((country) => ({
+  value: country.code,
+  label: `${country.flag} ${country.name}`,
+}));
+
 /** The state endpoint returns names in upper case ("KARNATAKA"). Title-cased for
  *  display only — the value submitted is the name exactly as it arrived. */
 function getStateLabel(name: string): string {
@@ -613,8 +625,18 @@ function ClientFormBody({
                   <FieldLabel htmlFor="client-country">
                     <RequiredMark /> Country
                   </FieldLabel>
-                  <CountrySelect
+                  {/* SearchableSelect rather than flux's CountrySelect, for one
+                      reason: CountrySelect builds its own Radix Popover with no
+                      `modal` prop, and a non-modal popover portalled out of a
+                      modal Dialog cannot be scrolled — react-remove-scroll
+                      cancels the wheel. Options are built from flux's own
+                      exported COUNTRIES, so the values are the same ISO codes
+                      and the flag still shows; only the scroll behaviour
+                      changes. Revert this the day CountrySelect takes `modal`. */}
+                  <SearchableSelect
+                    id="client-country"
                     value={field.state.value}
+                    options={countrySelectOptions}
                     onValueChange={(code) => {
                       field.handleChange(code);
                       setAddressCountry(code);
@@ -630,6 +652,9 @@ function ClientFormBody({
                       }
                     }}
                     placeholder="Select country"
+                    searchPlaceholder="Search country…"
+                    emptyMessage="No country matches that search."
+                    invalid={field.state.meta.errors.length > 0}
                   />
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
@@ -717,31 +742,26 @@ function ClientFormBody({
                     <FieldLabel htmlFor="client-state">
                       <RequiredMark /> State
                     </FieldLabel>
-                    {/* A select now that the state list is fetched
-                        (useClientStateCodes). It was a text input while this app
-                        held no state data; the endpoint is that data, and it
-                        covers India only — which is why every other country
-                        collapses to the single "Not Applicable" option here,
-                        exactly as pg-dashboard's own client form does. */}
-                    <Select
+                    {/* Searchable, matching the Country field above it. The
+                        list is fetched (useClientStateCodes) and covers India
+                        only, which is why every other country collapses to the
+                        single "Not Applicable" option — exactly as
+                        pg-dashboard's own client form does, and why the search
+                        box hides itself below a handful of options.
+
+                        A plain Select here meant the only way to reach Karnataka
+                        was scrolling or Radix's type-ahead, and type-ahead lands
+                        on the first DOM match: "k" gave Kerala. */}
+                    <SearchableSelect
+                      id="client-state"
                       value={field.state.value}
-                      onValueChange={(value: string) => field.handleChange(value)}
-                    >
-                      <SelectTrigger
-                        id="client-state"
-                        aria-invalid={field.state.meta.errors.length > 0}
-                        className="w-full [&>span]:min-w-0"
-                      >
-                        <SelectValue placeholder="Select state" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stateOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onValueChange={(value) => field.handleChange(value)}
+                      options={stateOptions}
+                      placeholder="Select state"
+                      searchPlaceholder="Search state…"
+                      emptyMessage="No state matches that search."
+                      invalid={field.state.meta.errors.length > 0}
+                    />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>
                 )}

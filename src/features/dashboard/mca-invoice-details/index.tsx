@@ -56,10 +56,19 @@ function DetailItem({
   overdueDays: number;
 }) {
   return (
-    <div>
+    // `min-w-0` plus a wrap rule, because one of these values is a transaction
+    // gid: a 20-character unbroken string at 17px that, in a grid cell whose
+    // default min-width is min-content, widened its own column and ran straight
+    // into the Remitter beside it.
+    <div className="min-w-0">
       <p className="mb-1 text-[12px] font-medium text-muted-foreground">{field.label}</p>
       <div className="flex flex-wrap items-center gap-2">
-        <p className={cn("text-[17px] font-semibold", field.tone ?? "text-foreground")}>
+        <p
+          className={cn(
+            "min-w-0 text-[17px] font-semibold [overflow-wrap:anywhere]",
+            field.tone ?? "text-foreground"
+          )}
+        >
           {field.value}
         </p>
         {overdueDays > 0 && (
