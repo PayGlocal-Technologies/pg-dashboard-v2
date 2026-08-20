@@ -68,7 +68,20 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
             aria-label="Your referral link"
             className="text-[13px]"
           />
-          <InputGroupAddon align="inline-end">
+          {/* Even spacing around the Copy button. The field is 44px tall with a
+              1px border, so its content box is 42px; a 32px button centred in
+              that leaves 5px above and below, and `pr-[5px]` puts the same 5px
+              to its right — an equal 5px inset on all three of the button's free
+              edges. 32px is Flux's own in-field button height, and the field's
+              height and the input's styling are untouched.
+
+              `has-[>button]:mr-0` carries the same modifier as the addon's own
+              `has-[>button]:-mr-[0.4rem]` on purpose: that is what lets
+              tailwind-merge drop the -0.4rem pull-in. A plain `mr-0` does not —
+              different modifier, so both classes survive the merge and the
+              `:has()` variant then wins on specificity, eating the right-hand
+              padding and leaving the button overhanging by ~1.4px. */}
+          <InputGroupAddon align="inline-end" className="pr-[5px] has-[>button]:mr-0">
             <Button
               type="button"
               variant="primary"
@@ -76,6 +89,7 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
               onClick={handleCopy}
               leftIcon={<Icon name={copied ? "check" : "copy"} size={13} />}
               aria-label={copied ? "Referral link copied" : "Copy referral link"}
+              className="h-8 min-h-8"
             >
               {copied ? "Copied" : "Copy"}
             </Button>
