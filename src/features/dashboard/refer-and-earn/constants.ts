@@ -1,5 +1,4 @@
 import type { IconName } from "@/components/icon";
-import type { LeagueId } from "@/features/dashboard/refer-and-earn/types";
 
 /**
  * Reward headline. A literal (not a formatCurrency call) because it is display
@@ -9,12 +8,6 @@ import type { LeagueId } from "@/features/dashboard/refer-and-earn/types";
 export const REFERRAL_REWARD_LABEL = "$30";
 
 export const REFERRAL_PAGE_SIZE = 10;
-
-/**
- * The three referral leagues, in progression order. A merchant advances by
- * surpassing the #1 position in their current league, so 3 is terminal.
- */
-export const LEAGUE_IDS: LeagueId[] = [1, 2, 3];
 
 /**
  * Dashboard origin per environment, built the same way as the CDN URL in

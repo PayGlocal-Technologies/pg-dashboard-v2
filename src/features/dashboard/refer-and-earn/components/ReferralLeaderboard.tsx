@@ -1,23 +1,10 @@
-"use client";
-
-import { useState } from "react";
-import {
-  Card,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-  Text,
-  VisuallyHidden,
-} from "@/components/ui";
+import { Card, Heading, Text } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { LEAGUE_IDS } from "@/features/dashboard/refer-and-earn/constants";
 import type {
   LeaderboardEntry,
-  LeagueId,
-  LeagueLeaderboard,
+  ReferralStandings,
 } from "@/features/dashboard/refer-and-earn/types";
 
 /**
@@ -78,7 +65,7 @@ function LeaderboardRow({
       </span>
       <span
         className={cn(
-          "shrink-0 text-[13px] tabular-nums",
+          "shrink-0 text-right text-[13px] tabular-nums",
           isCurrentMerchant ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
         )}
       >
@@ -89,47 +76,11 @@ function LeaderboardRow({
 }
 
 /**
- * One league marker: a rotated square with its number counter-rotated upright, so
- * it reads as a diamond rather than a rectangular tab. Three states — the league
- * being viewed carries the strong dark outline from the reference, leagues the
- * merchant has cleared sit a step back, and leagues still ahead of them are muted.
+ * The gap to the top of the board, stated in referrals — the figure the merchant
+ * can actually act on. Flanked by up-arrows and set in the dashboard's positive
+ * treatment, so it reads as progress rather than as a shortfall.
  */
-function LeagueDiamond({
-  league,
-  state,
-}: {
-  league: LeagueId;
-  state: "selected" | "cleared" | "locked";
-}) {
-  return (
-    <span
-      className={cn(
-        "flex size-11 rotate-45 items-center justify-center rounded-[8px] border-2 transition-colors",
-        state === "selected" && "border-foreground",
-        state === "cleared" && "border-foreground/40",
-        state === "locked" && "border-border"
-      )}
-    >
-      <span
-        className={cn(
-          "-rotate-45 text-base font-semibold tabular-nums",
-          state === "selected" && "text-foreground",
-          state === "cleared" && "text-foreground/60",
-          state === "locked" && "text-muted-foreground/70"
-        )}
-      >
-        {league}
-      </span>
-    </span>
-  );
-}
-
-/**
- * The gap to the top of the league, stated in referrals — advancing means passing
- * #1, so this one line is the whole progression rule. Only rendered for the
- * merchant's own league: elsewhere there is no "you" to measure a gap for.
- */
-function ProgressionMessage({ league, toPass }: { league: LeagueId; toPass: number }) {
+function ProgressionMessage({ toPass }: { toPass: number }) {
   if (toPass <= 0) {
     return (
       <Text
@@ -137,9 +88,7 @@ function ProgressionMessage({ league, toPass }: { league: LeagueId; toPass: numb
         weight="medium"
         className="text-center text-emerald-600 dark:text-emerald-400"
       >
-        {league === 3
-          ? "You passed #1 — you're top of the highest league"
-          : "You passed #1 — you've advanced to the next league"}
+        You passed #1 — you&rsquo;re top of the leaderboard
       </Text>
     );
   }
@@ -155,74 +104,12 @@ function ProgressionMessage({ league, toPass }: { league: LeagueId; toPass: numb
   );
 }
 
-/**
- * One league's standings: its podium, then — in the merchant's own league — the
- * progression line and their own highlighted row, however far down they sit.
- */
-function LeaguePanel({
-  board,
-  isOwnLeague,
-  currentEarned,
-  currentReferralCount,
-  currency,
-}: {
-  board: LeagueLeaderboard;
-  isOwnLeague: boolean;
-  currentEarned: number;
-  currentReferralCount: number;
-  currency: string;
-}) {
-  // The merchant only holds a position in their own league. Their amount and
-  // referral count come from the live summary rather than the standings payload,
-  // so this row and the analytics row above can never disagree.
-  const me =
-    isOwnLeague && board.currentMerchant
-      ? { ...board.currentMerchant, amount: currentEarned, currency }
-      : null;
-
-  const leader = board.top[0];
-  const onPodium = me != null && me.rank <= board.top.length;
-
-  return (
-    <div className="flex flex-col gap-0.5">
-      {board.top.map((entry) => (
-        <LeaderboardRow
-          key={entry.id}
-          entry={entry}
-          // If the merchant is already on the podium the highlight rides their
-          // podium row, and nothing is repeated below it.
-          isCurrentMerchant={onPodium && me?.rank === entry.rank}
-        />
-      ))}
-
-      {me != null && (
-        <>
-          {/* Sits between the podium and the merchant's row — it is what carries
-              the elision, so there is no separate ellipsis marker. The gap is
-              (#1's count − theirs), which is the figure the reference states. */}
-          <div className="px-2.5 pt-2.5 pb-1.5">
-            <ProgressionMessage
-              league={board.league}
-              toPass={(leader?.referralCount ?? 0) - currentReferralCount}
-            />
-          </div>
-          {/* Only when they are not already in the podium above — the merchant is
-              never listed twice. */}
-          {!onPodium && <LeaderboardRow entry={me} isCurrentMerchant />}
-        </>
-      )}
-    </div>
-  );
-}
-
 interface ReferralLeaderboardProps {
-  /** Standings per league. */
-  leaderboards: Record<LeagueId, LeagueLeaderboard>;
-  /** The league the merchant currently sits in. */
-  currentLeague: LeagueId;
+  standings: ReferralStandings;
   /**
    * The merchant's earned total and completed-referral count, from the same
-   * summary the analytics row uses.
+   * summary the analytics row uses, so the "You" row and the gap to #1 can never
+   * disagree with the figures above them.
    */
   currentEarned: number;
   currentReferralCount: number;
@@ -230,68 +117,55 @@ interface ReferralLeaderboardProps {
 }
 
 /**
- * Compact gamification panel beside the hero: the three league markers, the
- * podium for the selected league, the gap to #1, and the merchant's own row.
+ * Compact ranking panel beside the hero: the podium, the gap to #1, and the
+ * merchant's own highlighted row. A single static view — no leagues, no tabs.
  */
 export function ReferralLeaderboard({
-  leaderboards,
-  currentLeague,
+  standings,
   currentEarned,
   currentReferralCount,
   currency,
 }: ReferralLeaderboardProps) {
-  // Opens on the merchant's own league — the one standing they can actually move.
-  const [selected, setSelected] = useState<LeagueId>(currentLeague);
+  const leader = standings.top[0];
+
+  // Amount and referral count come from the live summary rather than the
+  // standings payload; only the rank is the server's to know.
+  const me = standings.currentMerchant
+    ? { ...standings.currentMerchant, amount: currentEarned, currency }
+    : null;
+
+  const onPodium = me != null && me.rank <= standings.top.length;
 
   return (
     <Card className="h-full justify-center gap-5 p-5 sm:p-6">
-      {/* No visible title, per the reference — but the card still needs a name in
-          the accessibility tree, so it is announced rather than drawn. */}
-      <VisuallyHidden>
-        <h2>Referral leaderboard</h2>
-      </VisuallyHidden>
+      <Heading level={2} size="sm" color="subtle">
+        Referral leaderboard
+      </Heading>
 
-      <Tabs value={String(selected)} onValueChange={(v) => setSelected(Number(v) as LeagueId)}>
-        {/* TabsList/TabsTrigger keep the segmented-control semantics — one
-            tablist, roving focus, arrow-key navigation — while the Flux chrome
-            (bordered track, active card fill) is stripped back so the diamonds
-            themselves carry the state. */}
-        <TabsList
-          aria-label="Referral league"
-          className="h-auto w-full justify-center gap-3 rounded-none border-0 bg-transparent p-0"
-        >
-          {LEAGUE_IDS.map((league) => (
-            <TabsTrigger
-              key={league}
-              value={String(league)}
-              aria-label={`League ${league}${league > currentLeague ? " (not reached yet)" : ""}`}
-              className="h-auto rounded-lg bg-transparent p-1 shadow-none data-[state=active]:bg-transparent data-[state=active]:shadow-none"
-            >
-              <LeagueDiamond
-                league={league}
-                state={
-                  league === selected ? "selected" : league < currentLeague ? "cleared" : "locked"
-                }
-              />
-            </TabsTrigger>
-          ))}
-        </TabsList>
-
-        {/* One panel per league, each rendering its own league's standings rather
-            than the selected board's — so a panel is correct on its own terms and
-            does not depend on only the active one being mounted. */}
-        {LEAGUE_IDS.map((league) => (
-          <TabsContent key={league} value={String(league)} className="mt-5">
-            <LeaguePanel
-              board={leaderboards[league]}
-              isOwnLeague={league === currentLeague}
-              currentEarned={currentEarned}
-              currentReferralCount={currentReferralCount}
-              currency={currency}
-            />
-          </TabsContent>
+      <div className="flex flex-col gap-0.5">
+        {standings.top.map((entry) => (
+          <LeaderboardRow
+            key={entry.id}
+            entry={entry}
+            // If the merchant is already on the podium the highlight rides their
+            // podium row, and nothing is repeated below it.
+            isCurrentMerchant={onPodium && me?.rank === entry.rank}
+          />
         ))}
-      </Tabs>
+
+        {me != null && (
+          <>
+            {/* Sits between the podium and the merchant's row — it is what carries
+                the jump in rank, so there is no separate ellipsis marker. */}
+            <div className="px-2.5 pt-2.5 pb-1.5">
+              <ProgressionMessage toPass={(leader?.referralCount ?? 0) - currentReferralCount} />
+            </div>
+            {/* Only when they are not already in the podium above — the merchant
+                is never listed twice. */}
+            {!onPodium && <LeaderboardRow entry={me} isCurrentMerchant />}
+          </>
+        )}
+      </div>
     </Card>
   );
 }

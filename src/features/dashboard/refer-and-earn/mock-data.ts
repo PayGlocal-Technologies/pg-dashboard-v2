@@ -1,8 +1,4 @@
-import type {
-  LeagueId,
-  LeagueLeaderboard,
-  Referral,
-} from "@/features/dashboard/refer-and-earn/types";
+import type { Referral, ReferralStandings } from "@/features/dashboard/refer-and-earn/types";
 
 /**
  * Placeholder referral earnings.
@@ -96,110 +92,26 @@ export const MOCK_REFERRALS: Referral[] = [
 // ── Referral leaderboard ─────────────────────────────────────────────────────
 
 /**
- * The league the merchant currently sits in. Placeholder — this comes from the
- * referral programme alongside the standings once that contract exists.
- */
-export const MOCK_CURRENT_LEAGUE: LeagueId = 1;
-
-/**
- * Placeholder league standings, keyed by league.
+ * Placeholder leaderboard standings.
  *
  * Dummy data, like the referrals above: names are masked the way a public
- * leaderboard would publish them, and amounts climb with the league so the
- * progression reads correctly when switching between them. `currentMerchant` is
- * only populated for the merchant's own league — they hold no position in the
- * others — and its `amount` is overridden at render time with the real earned
- * total, so the "You" row always agrees with the analytics row above it.
+ * leaderboard would publish them. `currentMerchant.amount` and `referralCount`
+ * are overridden at render time with the merchant's real earned total and
+ * completed-referral count, so the "You" row always agrees with the analytics
+ * row above it — only the rank comes from here, since only the server can know it.
  */
-export const MOCK_LEAGUE_LEADERBOARDS: Record<LeagueId, LeagueLeaderboard> = {
-  1: {
-    league: 1,
-    top: [
-      {
-        id: "l1-1",
-        rank: 1,
-        displayName: "Shixxx",
-        amount: 540,
-        currency: "USD",
-        referralCount: 18,
-      },
-      {
-        id: "l1-2",
-        rank: 2,
-        displayName: "Zerxxx",
-        amount: 300,
-        currency: "USD",
-        referralCount: 10,
-      },
-      { id: "l1-3", rank: 3, displayName: "Jaxxx", amount: 240, currency: "USD", referralCount: 8 },
-    ],
-    currentMerchant: {
-      id: "l1-me",
-      rank: 12,
-      displayName: "You",
-      amount: 120,
-      currency: "USD",
-      referralCount: 4,
-    },
-  },
-  2: {
-    league: 2,
-    top: [
-      {
-        id: "l2-1",
-        rank: 1,
-        displayName: "Marxxx",
-        amount: 1860,
-        currency: "USD",
-        referralCount: 62,
-      },
-      {
-        id: "l2-2",
-        rank: 2,
-        displayName: "Kenxxx",
-        amount: 1440,
-        currency: "USD",
-        referralCount: 48,
-      },
-      {
-        id: "l2-3",
-        rank: 3,
-        displayName: "Aruxxx",
-        amount: 1170,
-        currency: "USD",
-        referralCount: 39,
-      },
-    ],
-    currentMerchant: null,
-  },
-  3: {
-    league: 3,
-    top: [
-      {
-        id: "l3-1",
-        rank: 1,
-        displayName: "Novxxx",
-        amount: 6300,
-        currency: "USD",
-        referralCount: 210,
-      },
-      {
-        id: "l3-2",
-        rank: 2,
-        displayName: "Tanxxx",
-        amount: 5250,
-        currency: "USD",
-        referralCount: 175,
-      },
-      {
-        id: "l3-3",
-        rank: 3,
-        displayName: "Priyxxx",
-        amount: 4680,
-        currency: "USD",
-        referralCount: 156,
-      },
-    ],
-    currentMerchant: null,
+export const MOCK_LEADERBOARD: ReferralStandings = {
+  top: [
+    { id: "lb-1", rank: 1, displayName: "Shixxx", amount: 540, currency: "USD", referralCount: 18 },
+    { id: "lb-2", rank: 2, displayName: "Zerxxx", amount: 300, currency: "USD", referralCount: 10 },
+    { id: "lb-3", rank: 3, displayName: "Jaxxx", amount: 240, currency: "USD", referralCount: 8 },
+  ],
+  currentMerchant: {
+    id: "lb-me",
+    rank: 12,
+    displayName: "You",
+    amount: 120,
+    currency: "USD",
+    referralCount: 4,
   },
 };

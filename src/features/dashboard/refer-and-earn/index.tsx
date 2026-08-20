@@ -6,15 +6,11 @@ import { ReferralLeaderboard } from "@/features/dashboard/refer-and-earn/compone
 import { ReferralEarnings } from "@/features/dashboard/refer-and-earn/components/ReferralEarnings";
 import { buildReferralUrl } from "@/features/dashboard/refer-and-earn/constants";
 import { summarizeReferrals } from "@/features/dashboard/refer-and-earn/helpers";
-import {
-  MOCK_CURRENT_LEAGUE,
-  MOCK_LEAGUE_LEADERBOARDS,
-  MOCK_REFERRALS,
-} from "@/features/dashboard/refer-and-earn/mock-data";
+import { MOCK_LEADERBOARD, MOCK_REFERRALS } from "@/features/dashboard/refer-and-earn/mock-data";
 
 // TODO(integration): this screen still reads from mock data. Wire it up to the
 // real referral program endpoints (referral code, reward balance, referral
-// history, league standings) once that contract exists — see CLAUDE.md's
+// history, leaderboard standings) once that contract exists — see CLAUDE.md's
 // migration checklist. The referral code that buildReferralUrl takes comes from
 // the same contract.
 export function ReferAndEarnFeature() {
@@ -34,8 +30,7 @@ export function ReferAndEarnFeature() {
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:gap-4 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
         <ReferralHero referralUrl={referralUrl} />
         <ReferralLeaderboard
-          leaderboards={MOCK_LEAGUE_LEADERBOARDS}
-          currentLeague={MOCK_CURRENT_LEAGUE}
+          standings={MOCK_LEADERBOARD}
           currentEarned={summary.totalEarned}
           // Completed referrals are the ones that qualified, so they are what the
           // leaderboard's gap-to-#1 is measured in.
