@@ -72,40 +72,26 @@ export function summarizeReferrals(referrals: Referral[]): ReferralSummary {
 
 // ── Referral leaderboard ─────────────────────────────────────────────────────
 
-const PODIUM_SIZE = 3;
-
 export interface LeaderboardView {
-  /** Ranks 1–3, in order. */
-  podium: LeaderboardEntry[];
   /**
-   * The rungs between the podium and the merchant's own row, in rank order —
-   * every entry the standings carry that sits above them and is not already on
-   * the podium. Empty when there is nothing in between, which is the case when
-   * the merchant is on the podium or immediately below it.
+   * Every standing the payload carries, rank-ordered — one list, rendered as
+   * one scrollable column. There is no podium/nearby split: the medal treatment
+   * is decided per row from its own rank, and the merchant's row is found by id,
+   * so no grouping is needed and no row can be emitted twice.
    */
-  above: LeaderboardEntry[];
-  /**
-   * The rungs the standings carry below the merchant, in rank order — the people
-   * they are currently ahead of. Podium entries are excluded here too, so a
-   * merchant sitting on the podium never re-renders the rows beneath them.
-   */
-  below: LeaderboardEntry[];
-  /** The merchant's own row, scored on their live figures. */
+  rows: LeaderboardEntry[];
+  /** The merchant's own row, scored on their live figures, or null if unranked. */
   me: LeaderboardEntry | null;
-  /** True when the merchant is already inside the podium. */
-  meOnPodium: boolean;
-  /** Referrals still needed to pass #1; 0 once they are level or ahead. */
-  toPassFirst: number;
 }
 
 /**
- * Derives everything the leaderboard renders from the ranked list: the podium,
- * the merchant's row, the neighbour immediately above them, and the gap to #1.
+ * Projects the standings into render order and swaps the merchant's stored
+ * figures for their live ones.
  *
- * The merchant's amount and referral count are taken from the live referral
- * summary rather than the standings payload, so their row and the gap can never
- * disagree with the analytics figures on the same page. Only their rank comes
- * from the standings, since only the server can know it.
+ * The merchant's amount and referral count come from the referral summary rather
+ * than the standings payload, so their row can never disagree with the analytics
+ * figures on the same page. Only their rank comes from the standings, since only
+ * the server can know it.
  */
 export function buildLeaderboardView(
   standings: ReferralStandings,
@@ -113,26 +99,13 @@ export function buildLeaderboardView(
   currentReferralCount: number,
   currency: string
 ): LeaderboardView {
-  const ranked = [...standings.entries].sort((a, b) => a.rank - b.rank);
-  const podium = ranked.filter((e) => e.rank <= PODIUM_SIZE);
+  const rows = [...standings.entries]
+    .sort((a, b) => a.rank - b.rank)
+    .map((entry) =>
+      entry.id === standings.currentMerchantId
+        ? { ...entry, amount: currentEarned, referralCount: currentReferralCount, currency }
+        : entry
+    );
 
-  const stored = ranked.find((e) => e.id === standings.currentMerchantId) ?? null;
-  const me = stored
-    ? { ...stored, amount: currentEarned, referralCount: currentReferralCount, currency }
-    : null;
-
-  const meOnPodium = me != null && me.rank <= PODIUM_SIZE;
-
-  // The rungs either side of the merchant. Podium entries and the merchant
-  // themselves are excluded from both, so no row is ever rendered twice — which
-  // also covers the merchant sitting at one of these ranks.
-  const offPodium = (e: LeaderboardEntry) => e.rank > PODIUM_SIZE && e.id !== me?.id;
-  const above =
-    me == null || meOnPodium ? [] : ranked.filter((e) => offPodium(e) && e.rank < me.rank);
-  const below = me == null ? [] : ranked.filter((e) => offPodium(e) && e.rank > me.rank);
-
-  const leaderCount = podium[0]?.referralCount ?? 0;
-  const toPassFirst = me == null ? 0 : Math.max(0, leaderCount - me.referralCount);
-
-  return { podium, above, below, me, meOnPodium, toPassFirst };
+  return { rows, me: rows.find((e) => e.id === standings.currentMerchantId) ?? null };
 }

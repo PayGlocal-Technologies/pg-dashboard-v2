@@ -1,5 +1,4 @@
 import { Card, Heading, Separator, Text } from "@/components/ui";
-import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { buildLeaderboardView } from "@/features/dashboard/refer-and-earn/helpers";
@@ -18,6 +17,18 @@ const MEDAL_CLASS: Record<number, string> = {
   2: "bg-slate-300/40 text-slate-700 ring-slate-400/40 dark:bg-slate-300/20 dark:text-slate-100 dark:ring-slate-300/40",
   3: "bg-orange-500/25 text-orange-900 ring-orange-600/35 dark:bg-orange-500/25 dark:text-orange-100 dark:ring-orange-300/40",
 };
+
+/** How many rows the scroll viewport shows at once. */
+const VISIBLE_ROWS = 4;
+
+/**
+ * One row's height, composed from the same tokens the row itself uses rather
+ * than measured in pixels: `py-2.5` top and bottom (0.625rem each) around a
+ * two-line stack of `text-sm` (1.25rem) over `text-xs` (1rem). Kept in rem so
+ * the viewport tracks the root font size instead of pinning to a device pixel
+ * count, and stated once so the row and the viewport cannot drift apart.
+ */
+const ROW_HEIGHT = "3.5rem";
 
 /**
  * Podium ranks get a filled medal; every other rank — including the merchant's
@@ -81,47 +92,12 @@ function LeaderboardRow({
   );
 }
 
-/**
- * The gap to the top of the board, stated in referrals — the figure the merchant
- * can actually act on. Flanked by up-arrows and set in the dashboard's positive
- * treatment, so it reads as progress rather than as a shortfall.
- */
-function ProgressionMessage({ toPass, rank }: { toPass: number; rank: number }) {
-  const positive = "text-emerald-600 dark:text-emerald-400";
-
-  if (rank === 1) {
-    return (
-      <Text size="xs" weight="medium" className={cn("text-center", positive)}>
-        You&rsquo;re #1 on the leaderboard
-      </Text>
-    );
-  }
-
-  if (toPass <= 0) {
-    return (
-      <Text size="xs" weight="medium" className={cn("text-center", positive)}>
-        You&rsquo;ve matched #1 — one more pulls you ahead
-      </Text>
-    );
-  }
-
-  return (
-    <div className={cn("flex items-center justify-center gap-1.5", positive)}>
-      <Icon name="arrow-up" size={13} strokeWidth={2.5} />
-      <Text size="xs" weight="medium" className="text-inherit">
-        {toPass} more referral{toPass === 1 ? "" : "s"} to pass #1
-      </Text>
-      <Icon name="arrow-up" size={13} strokeWidth={2.5} />
-    </div>
-  );
-}
-
 interface ReferralLeaderboardProps {
   standings: ReferralStandings;
   /**
    * The merchant's earned total and completed-referral count, from the same
-   * summary the analytics row uses, so their row and the gap to #1 can never
-   * disagree with the figures above them.
+   * summary the analytics row uses, so their row can never disagree with the
+   * figures above it.
    */
   currentEarned: number;
   currentReferralCount: number;
@@ -129,9 +105,9 @@ interface ReferralLeaderboardProps {
 }
 
 /**
- * Compact ranking panel beside the hero: the podium, the gap to #1, the entry
- * immediately above the merchant, and the merchant's own highlighted row. A
- * single static view — no leagues, no tabs.
+ * Compact ranking panel beside the hero: a four-row scroll viewport over the
+ * whole board, with the merchant's own row pinned to the bottom edge until the
+ * scroll reaches its real position.
  */
 export function ReferralLeaderboard({
   standings,
@@ -139,7 +115,7 @@ export function ReferralLeaderboard({
   currentReferralCount,
   currency,
 }: ReferralLeaderboardProps) {
-  const { podium, above, below, me, meOnPodium, toPassFirst } = buildLeaderboardView(
+  const { rows, me } = buildLeaderboardView(
     standings,
     currentEarned,
     currentReferralCount,
@@ -147,69 +123,60 @@ export function ReferralLeaderboard({
   );
 
   return (
-    // Content starts at the top of the card; only the card's own padding sits
-    // above the heading.
-    //
-    // The card's height is exactly its content: the heading, the rows, and its
-    // own padding. `self-start` is what enforces that — dropping `h-full` alone
-    // was not enough, because a grid item still stretches to its row by default,
-    // and the row is as tall as the hero beside it. That stretch is what left the
-    // board's border running on past the last row into dead space. With
-    // `align-self: start` the card ends where its content ends and stops tracking
-    // the hero's height.
-    //
-    // Nothing caps or scrolls the rows, so however many rungs the standings
-    // return are all in frame — the card grows with its own content, and only
-    // with that.
+    // Height is the four-row viewport plus the heading and the card's padding —
+    // nothing else. `self-start` keeps it at exactly that: a grid item stretches
+    // to its row by default, and the row is as tall as the hero beside it.
     <Card className="gap-4 self-start p-5 sm:p-6">
       <Heading level={2} size="sm" color="subtle">
         Referral leaderboard
       </Heading>
 
-      <div className="flex flex-col">
-        {podium.map((entry, index) => (
-          <div key={entry.id}>
-            <LeaderboardRow
-              entry={entry}
-              // If the merchant is on the podium the highlight rides their podium
-              // row and no separate row is repeated below.
-              isCurrentMerchant={meOnPodium && me?.rank === entry.rank}
-            />
-            {/* Between the podium rows only — nothing trails the third. */}
-            {index < podium.length - 1 && <Separator className="bg-border/70" />}
-          </div>
-        ))}
+      {/*
+        The scroll viewport. Its height comes from ROW_HEIGHT × VISIBLE_ROWS plus
+        the separators between those rows, so it is derived from the row's own
+        type scale rather than set to a pixel guess — change the row's padding or
+        text sizes and this follows.
 
-        {me != null && (
-          <>
-            {/* More breathing room than the row rhythm: this line separates the
-                podium from the merchant's own neighbourhood, which is why there
-                is no ellipsis marker doing that job. */}
-            <div className="px-2.5 pt-5 pb-4">
-              <ProgressionMessage toPass={toPassFirst} rank={me.rank} />
+        `scrollbar-none` keeps the surface clean; the clipped row and the pinned
+        merchant row are what signal there is more to scroll.
+      */}
+      <div
+        className="scrollbar-none overflow-y-auto overscroll-contain"
+        style={{
+          maxHeight: `calc(${VISIBLE_ROWS} * ${ROW_HEIGHT} + ${VISIBLE_ROWS - 1} * 1px)`,
+        }}
+      >
+        {rows.map((entry, index) => {
+          const isMe = me != null && entry.id === me.id;
+
+          const row = (
+            <>
+              <LeaderboardRow entry={entry} isCurrentMerchant={isMe} />
+              {index < rows.length - 1 && <Separator className="bg-border/70" />}
+            </>
+          );
+
+          // The merchant's row is the only sticky one, and it is the same single
+          // row from the same list — never a second, separately positioned copy.
+          // `bottom-0` pins it to the foot of the viewport for as long as its real
+          // position is below the fold; once the scroll reaches that position it
+          // releases into normal flow, and scrolling back up re-pins it. So there
+          // is exactly one "You" row at every scroll offset, with no JS and no
+          // duplicate to keep in sync.
+          //
+          // `bg-card` on the wrapper is load-bearing: the row's own tint is
+          // translucent, so without an opaque backing the rows scrolling beneath
+          // it would show through while it is pinned. The tint composites over
+          // `bg-card` here exactly as it does over the card itself, so the pinned
+          // and released states look identical.
+          return isMe ? (
+            <div key={entry.id} className="sticky bottom-0 z-10 bg-card">
+              {row}
             </div>
-
-            {/* The rungs they pass next, each closed off with the same subtle
-                divider the podium rows use. Unlike the podium, the last one keeps
-                its divider: it is what separates this block from the merchant's
-                own highlighted row, and it means the rung above them always has a
-                line beneath it however many rungs the standings return. */}
-            {above.map((entry) => (
-              <div key={entry.id}>
-                <LeaderboardRow entry={entry} />
-                <Separator className="bg-border/70" />
-              </div>
-            ))}
-
-            {!meOnPodium && <LeaderboardRow entry={me} isCurrentMerchant />}
-
-            {/* The rungs behind them. No divider above these: the merchant's own
-                tinted row is already the break between the two blocks. */}
-            {below.map((entry) => (
-              <LeaderboardRow key={entry.id} entry={entry} />
-            ))}
-          </>
-        )}
+          ) : (
+            <div key={entry.id}>{row}</div>
+          );
+        })}
       </div>
     </Card>
   );
