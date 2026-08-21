@@ -192,9 +192,10 @@ export function ReferralLeaderboard({
 
   return (
     // Height is the four-row viewport plus the heading and the card's padding —
-    // nothing else. `self-start` keeps it at exactly that: a grid item stretches
-    // to its row by default, and the row is as tall as the hero beside it.
-    <Card className="gap-4 self-start p-5 sm:p-6">
+    // nothing else. It no longer needs `self-start` for that: it now sits in a
+    // flex column (see index.tsx), where a child takes its own height and the
+    // column carries the `self-start` that stops it stretching to the hero.
+    <Card className="gap-4 p-5 sm:p-6">
       <Heading level={2} size="sm" color="subtle">
         Referral leaderboard
       </Heading>

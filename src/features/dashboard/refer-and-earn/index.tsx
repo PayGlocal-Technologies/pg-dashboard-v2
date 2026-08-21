@@ -3,6 +3,7 @@
 import { ReferralHero } from "@/features/dashboard/refer-and-earn/components/ReferralHero";
 import { HowItWorks } from "@/features/dashboard/refer-and-earn/components/HowItWorks";
 import { ReferralLeaderboard } from "@/features/dashboard/refer-and-earn/components/ReferralLeaderboard";
+import { ReferralTotalsCard } from "@/features/dashboard/refer-and-earn/components/ReferralTotalsCard";
 import { ReferralEarnings } from "@/features/dashboard/refer-and-earn/components/ReferralEarnings";
 import { buildReferralUrl } from "@/features/dashboard/refer-and-earn/constants";
 import { summarizeReferrals } from "@/features/dashboard/refer-and-earn/helpers";
@@ -41,14 +42,24 @@ export function ReferAndEarnFeature() {
           apply. */}
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:items-stretch lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
         <ReferralHero referralUrl={referralUrl} />
-        <ReferralLeaderboard
-          standings={MOCK_LEADERBOARD}
-          currentEarned={summary.totalEarned}
-          // Completed referrals are the ones that qualified, so they are what the
-          // leaderboard's gap-to-#1 is measured in.
-          currentReferralCount={summary.completed}
-          currency={summary.earnedCurrency}
-        />
+
+        {/* Right column: the running totals above the board. `self-start` lives
+            here rather than on either card — as a grid item this column would
+            otherwise stretch to the hero's height. Inside a flex column the two
+            cards keep their own heights and stay full width, which `self-start`
+            on a card would have broken (in a column, align-self is the
+            horizontal axis). */}
+        <div className="flex flex-col gap-4 self-start lg:gap-6">
+          <ReferralTotalsCard summary={summary} />
+          <ReferralLeaderboard
+            standings={MOCK_LEADERBOARD}
+            currentEarned={summary.totalEarned}
+            // Completed referrals are the ones that qualified, so they are what
+            // the leaderboard's gap-to-#1 is measured in.
+            currentReferralCount={summary.completed}
+            currency={summary.earnedCurrency}
+          />
+        </div>
       </div>
 
       <HowItWorks />
