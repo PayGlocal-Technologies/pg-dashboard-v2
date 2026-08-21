@@ -25,9 +25,21 @@ export function ReferAndEarnFeature() {
     <div className="page-enter mx-auto max-w-[1400px] space-y-6 overflow-x-hidden lg:space-y-8">
       {/* Hero and leaderboard are two separate cards sharing one row: the
           leaderboard column is a controlled width and the hero takes the
-          remainder. Rows stretch, so the two cards match heights and align at
-          the top. Stacked below md, leaderboard full width. */}
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
+          remainder.
+
+          Equal heights come from the row, not from the cards. The row is an
+          implicit `auto` track, so it sizes to the content of whichever card
+          needs the most height — the leaderboard, since its rows are what
+          actually vary — and grid's `items-stretch` is what then pulls the
+          other card up to that same height. Neither card declares a height of
+          its own: no pixel value and no `h-full` to resolve against, so when
+          the standings return more or fewer rows the shared height follows on
+          its own with nothing to update here.
+
+          Stacked below md each card sits in its own auto row, so both keep
+          their natural height and the equal-height relationship does not
+          apply. */}
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:items-stretch lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
         <ReferralHero referralUrl={referralUrl} />
         <ReferralLeaderboard
           standings={MOCK_LEADERBOARD}

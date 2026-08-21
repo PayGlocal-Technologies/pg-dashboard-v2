@@ -149,7 +149,17 @@ export function ReferralLeaderboard({
   return (
     // Content starts at the top of the card; only the card's own padding sits
     // above the heading.
-    <Card className="h-full gap-4 p-5 sm:p-6">
+    //
+    // This card is the height source for the row it shares with the hero, so it
+    // carries no height at all — it hugs the heading, the rows, and its own
+    // padding, and that measurement is what the auto grid row in index.tsx
+    // resolves to and what the hero is then stretched to match. Deliberately no
+    // `h-full`: a height here would resolve against the very row this content
+    // is sizing, and it is what used to leave the board padded out with dead
+    // space. Nothing caps or scrolls the rows either, so however many rungs the
+    // standings return, they are all in frame and the row height moves with
+    // them.
+    <Card className="gap-4 p-5 sm:p-6">
       <Heading level={2} size="sm" color="subtle">
         Referral leaderboard
       </Heading>

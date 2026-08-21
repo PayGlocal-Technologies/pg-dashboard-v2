@@ -41,8 +41,18 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
   return (
     // No padding of its own: the banner runs to the card's edges and the content
     // below carries its own. `overflow-hidden` clips the banner's top corners to
-    // the card's radius. `h-full` so the card fills its side-by-side grid row.
-    <Card className="h-full gap-0 overflow-hidden p-0">
+    // the card's radius.
+    //
+    // No height of its own either — not a pixel value and not `h-full`. Beside
+    // the leaderboard this card is a stretched grid item, so the row's own
+    // height (see index.tsx: the leaderboard's content is what sets it) is what
+    // this card takes, and any height the row has over this card's content
+    // settles below the content as card surface. The card is a flex column and
+    // none of its children grow, so nothing inside is stretched to fill that
+    // slack: the banner keeps its aspect ratio and the heading, the copy, and
+    // the link field stay in their own rhythm at the top. Stacked on mobile the
+    // card is the only thing in its row, so it is its natural height.
+    <Card className="gap-0 overflow-hidden p-0">
       {/* The reward banner. A raster asset, so the icon-registry forwardRef
           pattern in CLAUDE.md does not apply (it is for SVG); it goes through
           next/image per the same file's Images rule. `w-full h-auto` with the
