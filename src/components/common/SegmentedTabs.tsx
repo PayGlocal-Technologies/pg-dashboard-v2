@@ -28,7 +28,7 @@ export function SegmentedTabs({ options, value, onChange, className }: Segmented
             key={opt.value}
             value={opt.value}
             className={cn(
-              "h-auto rounded-none border-b-2 border-transparent px-0 py-1.5 text-sm font-medium text-muted-foreground shadow-none transition-colors",
+              "h-auto cursor-pointer rounded-none border-b-2 border-transparent px-0 py-1.5 text-sm font-medium text-muted-foreground shadow-none transition-colors",
               "data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
             )}
           >

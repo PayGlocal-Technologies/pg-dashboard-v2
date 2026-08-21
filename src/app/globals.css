@@ -261,6 +261,43 @@ body {
 @utility slide-out-to-bottom {
   --tw-exit-translate-y: 100%;
 }
+/* Small-distance slide for subtle field/section reveals (the *-from-*-1 scale
+   from tailwindcss-animate that flux and our payment-pages builder use). */
+@utility slide-in-from-top-1 {
+  --tw-enter-translate-y: -0.25rem;
+}
+@utility slide-in-from-bottom-1 {
+  --tw-enter-translate-y: 0.25rem;
+}
+
+/* ─── Accordion open/close ───────────────────────────────────────────────────
+   Flux's Accordion emits `animate-accordion-down` / `animate-accordion-up`
+   (with `--radix-accordion-content-height` set by Radix). The keyframes and
+   utilities aren't registered by default under Tailwind v4, so the accordion
+   snapped open/closed with no motion. Registering them restores the smooth
+   height transition. */
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+@utility animate-accordion-down {
+  animation: accordion-down 0.2s ease-out;
+}
+@utility animate-accordion-up {
+  animation: accordion-up 0.2s ease-out;
+}
 
 /* ─── Shimmer ────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
