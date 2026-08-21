@@ -1,4 +1,7 @@
-FROM public.ecr.aws/docker/library/node:22.22.2-alpine AS base
+# Pinned to patched LTS version (fixes CVE-2026-48933, CVE-2026-48618, and others)
+# Update this version whenever a new Node.js security release is published
+# See: https://nodejs.org/en/blog/vulnerability/june-2026-security-releases
+FROM public.ecr.aws/docker/library/node:22.23.0-alpine AS base
 
 FROM base AS deps
 RUN apk add --no-cache libc6-compat

@@ -32,14 +32,18 @@ import type { ExtractedSkuRow } from "@/features/dashboard/sku-management/types"
  */
 type PreviewRow = ExtractedSkuRow & { rowKey: string };
 
-// Which file types the sheet upload accepts. The backend presigns for xlsx and
-// tells us so in the initiate response's metaData, but the picker has to be
-// narrowed before that call happens, so these are named here too.
-const IMPORT_ACCEPTED_EXTENSIONS = [".xlsx", ".xls", ".csv"] as const;
+// Which file types the sheet upload accepts: .xlsx and nothing else, which is
+// what pg-dashboard's own dragger accepts (`accept=".xlsx"`) and what this flow
+// can actually carry — the initiate response presigns the S3 PUT for xlsx (see
+// metaData.fileType), so an .xls or a .csv is rejected at S3 or fails the parse
+// after the merchant has already waited for the upload. This used to advertise
+// all three, which made the dropzone promise two formats the flow drops.
+//
+// The picker has to be narrowed before the initiate call happens, which is why
+// the type is named here as well as read from that response.
+const IMPORT_ACCEPTED_EXTENSIONS = [".xlsx"] as const;
 const IMPORT_ACCEPTED_MIME_TYPES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.ms-excel",
-  "text/csv",
 ] as const;
 
 /** The three legs the merchant walks, in order. */
@@ -183,6 +187,7 @@ export function ImportSkuFileModal({ open, onOpenChange, mid }: ImportSkuFileMod
     importedCount,
     skipped,
     isImporting,
+    error,
     selectFile,
     commit,
     reset,
@@ -214,7 +219,7 @@ export function ImportSkuFileModal({ open, onOpenChange, mid }: ImportSkuFileMod
       (IMPORT_ACCEPTED_EXTENSIONS as readonly string[]).includes(extension);
 
     if (!typeOk) {
-      setRejection("Choose an .xlsx, .xls or .csv file.");
+      setRejection("Choose an Excel (.xlsx) file.");
       return;
     }
 
@@ -285,6 +290,10 @@ export function ImportSkuFileModal({ open, onOpenChange, mid }: ImportSkuFileMod
                 type="file"
                 accept={IMPORT_ACCEPTED_EXTENSIONS.join(",")}
                 className="sr-only"
+                // pointer-events-none on the label already stops a click, but the
+                // input stays keyboard-reachable without this — pg-dashboard
+                // disables its dragger for the same window.
+                disabled={isProcessing}
                 onChange={(event) => onPick(event.target.files?.[0])}
               />
               {isProcessing ? (
@@ -303,31 +312,64 @@ export function ImportSkuFileModal({ open, onOpenChange, mid }: ImportSkuFileMod
                   <span className="text-[13px] font-medium text-foreground">
                     Drop your file here, or click to choose
                   </span>
-                  <span className="text-[12px] text-muted-foreground">.xlsx, .xls or .csv</span>
+                  <span className="text-[12px] text-muted-foreground">
+                    Excel file (.xlsx) · up to 10 MB
+                  </span>
                 </>
               )}
             </label>
 
-            {rejection ? (
+            {/* Two sources, one slot: `rejection` is this component's own
+                file-type check, `error` is whatever the hook's three legs
+                reported (initiate, the S3 PUT, the parse). Either way the
+                merchant is looking at the same dropzone, so the reason for
+                being back here has to be on screen — a toast alone scrolls
+                away and leaves the step looking like nothing happened. */}
+            {rejection || error ? (
               <Callout variant="error">
                 <CalloutIcon>
                   <Icon name="alert-triangle" className="h-4 w-4" />
                 </CalloutIcon>
-                <CalloutText>{rejection}</CalloutText>
+                <CalloutText>{rejection ?? error}</CalloutText>
               </Callout>
             ) : null}
+
+            {/* Cancel on every step, as production has it — the dialog's own X is
+                the only other way out, and it is not an obvious one while a file
+                is being read. */}
+            <div className="flex items-center justify-end pt-1">
+              <Button type="button" variant="outline" size="sm" onClick={close}>
+                Cancel
+              </Button>
+            </div>
           </div>
         ) : null}
 
         {/* ── Step 2: review what was parsed ──────────────────────────────── */}
         {step === "review" ? (
           <div className="mt-6 space-y-3">
-            <Callout variant="warning">
+            {/* Leads with the count, as production's review banner does — the
+                first thing to know here is whether the parse found what the
+                merchant expected it to. The zero case gets its own wording, since
+                "0 items found" with the generic follow-on would read as an
+                instruction to confirm nothing. */}
+            <Callout variant={rows.length === 0 ? "warning" : "info"}>
               <CalloutIcon>
-                <Icon name="alert-triangle" className="h-4 w-4" />
+                <Icon name={rows.length === 0 ? "alert-triangle" : "info"} className="h-4 w-4" />
               </CalloutIcon>
               <CalloutText>
-                Rows missing required fields (Type, Currency, or Selling price) will be skipped.
+                {rows.length === 0 ? (
+                  <>
+                    No rows could be read from {file?.name}. Check that the sheet uses the
+                    template&apos;s columns, then choose the file again.
+                  </>
+                ) : (
+                  <>
+                    {rows.length} {rows.length === 1 ? "item" : "items"} found in {file?.name}.
+                    Confirm to add {rows.length === 1 ? "it" : "them"} to your catalog. Rows missing
+                    required fields (Type, Currency, or Selling price) will be skipped.
+                  </>
+                )}
               </CalloutText>
             </Callout>
 
@@ -356,6 +398,12 @@ export function ImportSkuFileModal({ open, onOpenChange, mid }: ImportSkuFileMod
                   variant="primary"
                   size="sm"
                   isLoading={isImporting}
+                  // A parse that found nothing still lands here (that is the point
+                  // — see the hook's rowsReady), but committing it would send a
+                  // request that cannot do anything and then report "0 items
+                  // imported" as if that were an outcome. The way out of this state
+                  // is Choose another file, so that is the only live action.
+                  disabled={rows.length === 0}
                   onClick={commit}
                 >
                   Import {rows.length} {rows.length === 1 ? "item" : "items"}

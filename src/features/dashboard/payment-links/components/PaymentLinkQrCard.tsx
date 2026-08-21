@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import QRCode from "qrcode";
 import { Button, Card } from "@/components/ui";
 import { Icon } from "@/components/icon";

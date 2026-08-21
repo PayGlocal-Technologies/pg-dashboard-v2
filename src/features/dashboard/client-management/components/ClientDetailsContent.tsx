@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import {
   Badge,
+  Button,
   Card,
   CardContent,
   Separator,
@@ -13,9 +14,9 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
-import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
   clientAmountLocale,
+  clientBusinessTypeLabel,
   clientInvoiceAmounts,
   type ClientReceivedTotal,
 } from "@/features/dashboard/client-management/constants";
@@ -54,15 +55,52 @@ function SectionTitle({ children, className }: { children: ReactNode; className?
  * transaction.
  */
 function ClientDetailRow({ label, value }: { label: string; value: ReactNode }) {
-  if (value == null || value === "") return null;
+  // An absent value draws a dash rather than dropping the row, which is what
+  // production's own details page does (every field in createClientContactDetails
+  // and friends falls back to "-"). A field that disappears when empty makes the
+  // set of fields differ from one client to the next, so a reader can't tell
+  // "nothing was captured" from "this client has no such field".
+  const isEmpty = value == null || value === "";
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[12px] text-muted-foreground">{label}</span>
-      <div className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-foreground">
-        {value}
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-1.5 text-[13px] font-medium",
+          isEmpty ? "text-muted-foreground" : "text-foreground"
+        )}
+      >
+        {isEmpty ? "-" : value}
       </div>
     </div>
   );
+}
+
+/** A group heading inside the details card — the label production puts on each of
+ *  its accordion panels ("Billing details", "Notes & Contract"). Smaller and
+ *  lighter than SectionTitle, which names the card itself. */
+function FieldGroupTitle({ children, className }: { children: ReactNode; className?: string }) {
+  return <h4 className={cn("text-[12px] font-semibold text-foreground", className)}>{children}</h4>;
+}
+
+/**
+ * Overrides CopyableText's own font-mono/regular-weight value styling so a
+ * copyable value in the Contact card renders in exactly the typography
+ * ClientDetailRow gives every other value: the app's sans stack (font-sans →
+ * --font-geist-sans, the same family Transaction Details' own field values
+ * use), at the row's 13px/medium/foreground. Only the family, weight, and
+ * wrapping are set here — size and colour already come from the row.
+ * whitespace-normal cancels CopyableText's nowrap so a long address can wrap
+ * inside the column rather than overflowing the card.
+ */
+const CONTACT_VALUE_CLASS = "font-sans font-medium whitespace-normal break-all";
+
+/** Wraps a value in the copy affordance only when there is something to copy —
+ *  CopyableText renders a control either way, and a copy button beside an empty
+ *  string is an action that can't do anything. */
+function copyableOrNothing(value: string | undefined): ReactNode {
+  if (!value?.trim()) return null;
+  return <CopyableText value={value} valueClassName={CONTACT_VALUE_CLASS} />;
 }
 
 /**
@@ -85,18 +123,14 @@ export function ClientIdentitySummary({
     // No second column opposite the stack: the identity stays one narrow
     // group at the left of whatever column holds it, rather than spreading
     // across the width. Same structure as the transaction summary — country
-    // mark, mt-1.5, then the headline and its supporting lines.
+    // mark, then the headline and its supporting lines.
     <div className={className}>
-      {/* The Transaction Details flag treatment, exactly: CountryFlag (the
-          rectangular 20×14 CDN flag with its rounded-sm border) beside the
-          country name in muted 13px, laid out with the same
-          flex/min-w-max/gap-1.5 as CountryCell, which is what the transaction
-          summary renders. Not CountryCell itself only because the name is
-          already on the client record, so there's nothing to resolve through
-          the country/currency store — the output is identical. Never a
-          circular avatar. */}
+      {/* The country as text alone. There is no flag image here: the code it
+          would be keyed by is resolved from a reference endpoint the client
+          record does not carry, so a client whose country did not resolve drew a
+          broken image at the very top of the drawer. The name is the fact worth
+          showing, and it is already on the record. */}
       <div className="flex min-w-max items-center gap-1.5">
-        <CountryFlag iso2={client.countryIso2} alt={client.countryName} />
         <span className="text-[13px] whitespace-nowrap text-muted-foreground">
           {client.countryName}
         </span>
@@ -294,24 +328,11 @@ const METRIC_STATUS_FILTERS = {
 
 export function ClientInvoiceMetrics({
   client,
-  floatTitle = false,
   onFilterByStatus,
 }: {
   client: Client;
-  /** Narrows the invoice ledger below to these statuses. Absent in the drawer,
-   *  where there is no ledger on screen to filter. */
+  /** Narrows the invoice ledger below to these statuses. */
   onFilterByStatus?: (statuses: string[]) => void;
-  /**
-   * Lifts the section heading out of the flow (from lg up, where the expanded
-   * view's two columns exist), so this section's box is exactly the KPI row's
-   * box and the row it sits in starts at the cards rather than at the heading
-   * above them. The same device, for the same reason, as the Transaction
-   * Details page's own `floatTitle` — an alternative to offsetting the
-   * neighbouring column, which would only ever be correct at one heading
-   * height. Below lg, and in the drawer's single column, the heading stays in
-   * normal flow.
-   */
-  floatTitle?: boolean;
 }) {
   // Counts and amounts come from two different places, because the API splits
   // them that way: get-invoice-summary returns the three counts and no money,
@@ -326,10 +347,8 @@ export function ClientInvoiceMetrics({
   const metrics = counts ?? { total: 0, paid: 0, outstanding: 0 };
 
   return (
-    <section className={cn(floatTitle && "lg:relative")}>
-      <SectionTitle className={floatTitle ? "lg:absolute lg:-top-7 lg:left-0 lg:mb-0" : undefined}>
-        Invoice summary
-      </SectionTitle>
+    <section>
+      <SectionTitle>Invoice summary</SectionTitle>
       {/* gap-3 at the widths where the main column is tightest, opening to
           gap-4 from xl — the same proportional easing the grid's own column
           gap uses. */}
@@ -372,147 +391,167 @@ export function ClientInvoiceMetrics({
   );
 }
 
+// The card below uses Card size="sm" and CardContent's space-y — the same
+// container and the same field rhythm as the Transaction Details page's Payment
+// Details and Sender Details sections, so the two detail views' side columns are
+// literally the same module with different fields. size="sm" is already the
+// tighter of Card's two paddings (gap-6 px-7 py-7 against the default's px-10
+// py-10); anything narrower would be an arbitrary override rather than a Flux
+// token.
+
 /**
- * Overrides CopyableText's own font-mono/regular-weight value styling so a
- * copyable value in the Contact card renders in exactly the typography
- * ClientDetailRow gives every other value: the app's sans stack (font-sans →
- * --font-geist-sans, the same family Transaction Details' own field values
- * use), at the row's 13px/medium/foreground. Only the family, weight, and
- * wrapping are set here — size and colour already come from the row.
- * whitespace-normal cancels CopyableText's nowrap so a long address can wrap
- * inside the column rather than overflowing the card.
+ * How many columns the fields inside the card flow across, per layout. Fifteen
+ * label/value pairs stacked one per line is a very tall card — tall enough in the
+ * drawer that the invoice ledger under it was off-screen — and every one of these
+ * values is short, so a single column spends height on whitespace to the right of
+ * each. Columns are what buy that height back.
+ *
+ * Set per layout rather than by viewport alone, because the card's own width is
+ * what should decide this and the two layouts give it very different widths at the
+ * same viewport: ~26rem inside the drawer against the full content width on the
+ * page. A viewport breakpoint can't tell those apart. Within each layout the
+ * breakpoints then handle the narrow end — one column on a phone, where two
+ * columns of "Primary contact number" would wrap every label.
  */
-const CONTACT_VALUE_CLASS = "font-sans font-medium whitespace-normal break-all";
+const CONTACT_FIELD_GRID = {
+  // The drawer is a fixed 32rem panel from sm up (see ClientDetailsDrawer), so
+  // two columns is a measured fit there rather than a guess; below sm it is a
+  // full-width bottom sheet on a phone, which takes one.
+  drawer: "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2",
+  // Full content width, so the same two columns from sm and a third from lg,
+  // where the fields would otherwise be far wider than anything in them.
+  page: "grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3",
+} as const;
 
-// Both sections below use Card size="sm" and CardContent's space-y-4 — the
-// same container and the same field rhythm as the Transaction Details page's
-// Payment Details and Sender Details sections, so the two detail views' side
-// columns are literally the same module with different fields. size="sm" is
-// already the tighter of Card's two paddings (gap-6 px-7 py-7 against the
-// default's px-10 py-10); anything narrower would be an arbitrary override
-// rather than a Flux token.
-
+/**
+ * Every field production's client details page shows, in production's own three
+ * groups and production's own order: Contact Details, then Billing details, then
+ * Notes & Contract (see pg-dashboard's createClientContactDetails,
+ * createClientBillingDetails and createClientNotesDetails).
+ *
+ * The groups are stacked inside one card with a rule between them rather than
+ * being three collapsible panels as production has them: there is no width to
+ * reclaim by collapsing, and a merchant who opened a client came for exactly
+ * these fields. Nothing is hidden behind a disclosure. Within each group the
+ * fields flow across columns — see CONTACT_FIELD_GRID.
+ *
+ * Every field renders whether or not the record carries it — an absent one draws
+ * a dash (see ClientDetailRow), which is what production does too. The set of
+ * fields is therefore the same for every client.
+ */
 export function ClientContactSection({
   client,
-  floatTitle = false,
+  layout = "page",
   onViewContract,
 }: {
   client: Client;
   /** Opens the stored contract. Absent where nothing can open it. */
   onViewContract?: () => void;
-  /** Lifts the heading out of the flow from lg up, so this section's box is
-   *  exactly its card's box and the card's top edge — not the heading above
-   *  it — lands level with the KPI cards across the grid. Same device, and
-   *  same offset, as ClientInvoiceMetrics' own floatTitle. */
-  floatTitle?: boolean;
+  /** Which column count the fields flow across. See CONTACT_FIELD_GRID. */
+  layout?: "page" | "drawer";
 }) {
-  // Only the parts that are actually populated, in the order production lists
-  // them (country down to street).
-  const addressRows = (
-    [
-      ["Country", client.countryName],
-      ["State", client.state],
-      ["City", client.city],
-      ["Zipcode", client.zipcode],
-      ["Street address", client.addressLine],
-    ] as const
-  )
-    .filter(([, value]) => !!value?.trim())
-    .map(([label, value]) => ({ label, value: value as string }));
+  const fieldGrid = CONTACT_FIELD_GRID[layout];
 
   return (
-    <section className={cn(floatTitle && "lg:relative")}>
-      <SectionTitle className={floatTitle ? "lg:absolute lg:-top-7 lg:left-0 lg:mb-0" : undefined}>
-        Contact
-      </SectionTitle>
+    <section>
+      <SectionTitle>Contact details</SectionTitle>
       <Card size="sm">
-        <CardContent className="space-y-4">
-          <ClientDetailRow label="Primary contact" value={client.primaryContactName} />
-          {/* Copyable, since an address or number in a details panel is almost
-              always on its way into a message. CopyableText's own button stops
-              at its own click handler, so a copy never reaches whatever row or
-              card this sits inside.
-              CONTACT_VALUE_CLASS is what keeps these values in the same
-              typeface as the plain ones above and below them: CopyableText
-              defaults to font-mono, which is right for an opaque identifier
-              (a transaction id) but makes an email or a phone number read as a
-              different kind of text than the rest of the card. */}
-          <ClientDetailRow
-            label="Email"
-            value={<CopyableText value={client.email} valueClassName={CONTACT_VALUE_CLASS} />}
-          />
-          <ClientDetailRow
-            label="Phone number"
-            value={
-              <CopyableText
-                value={formatPhoneNumber(client.phoneDialCode, client.phoneNumber)}
-                valueClassName={CONTACT_VALUE_CLASS}
-              />
-            }
-          />
-          {/* Client type, GST and tags all come off the record and were being
-              mapped but never drawn. Each is omitted when absent rather than
-              shown as an empty row: the seeded book predates the form that
-              collects them, so a client legitimately has none. */}
-          {client.businessType ? (
-            <ClientDetailRow label="Client type" value={client.businessType} />
-          ) : null}
-          {client.gstin ? (
+        {/* space-y-5 between groups against the space-y-4 between fields inside
+            one: enough that the rule reads as separating three groups rather
+            than crowding the fields either side of it. */}
+        <CardContent className="space-y-5">
+          <div className={fieldGrid}>
+            {/* Business name is repeated here even though the summary above
+                already carries it as the headline: this card is production's
+                Contact Details panel, and a labelled field is what makes it
+                copy-readable as part of the record rather than as a title. */}
+            <ClientDetailRow label="Business name" value={client.businessName} />
+            <ClientDetailRow label="Primary contact name" value={client.primaryContactName} />
+            {/* Copyable, since a number or an address in a details panel is
+                almost always on its way into a message. CopyableText's own
+                button stops at its own click handler, so a copy never reaches
+                whatever row or card this sits inside. */}
             <ClientDetailRow
-              label="GST number"
-              value={<CopyableText value={client.gstin} valueClassName={CONTACT_VALUE_CLASS} />}
+              label="Primary contact number"
+              value={copyableOrNothing(formatPhoneNumber(client.phoneDialCode, client.phoneNumber))}
             />
-          ) : null}
-          {client.tags && client.tags.length > 0 ? (
+            <ClientDetailRow label="Primary email" value={copyableOrNothing(client.email)} />
+            {/* The stored value is an API enum code ("LIMITED_LIABILITY_PARTNERSHIP"),
+                so it is drawn through its label rather than raw. */}
+            <ClientDetailRow
+              label="Client type"
+              value={clientBusinessTypeLabel(client.businessType)}
+            />
+            <ClientDetailRow label="GST number" value={copyableOrNothing(client.gstin)} />
             <ClientDetailRow
               label="Tags"
               value={
-                <span className="flex flex-wrap gap-1">
-                  {client.tags.map((tag) => (
-                    <Badge key={tag} variant="secondary" size="sm">
-                      {tag}
-                    </Badge>
-                  ))}
-                </span>
+                client.tags && client.tags.length > 0 ? (
+                  <span className="flex flex-wrap gap-1">
+                    {client.tags.map((tag) => (
+                      <Badge key={tag} variant="secondary" size="sm">
+                        {tag}
+                      </Badge>
+                    ))}
+                  </span>
+                ) : null
               }
             />
-          ) : null}
+          </div>
 
-          {/* The address, broken into the parts the record carries rather than
-              the one composed line this used to draw. Each part is its own row,
-              as production's details page has them, so a reader can pick out a
-              city or a postcode without reading a sentence. `billingAddress`
-              remains the composed form and is what the table's cells use — this
-              is the only place the parts are addressed individually.
+          <Separator />
 
-              Any part the record lacks is dropped, which is what keeps this from
-              becoming six near-empty rows for a client captured before the form
-              collected them. */}
-          {client.notes ? (
+          {/* The address broken into the parts the record carries rather than one
+              composed line, in production's order (country down to the two street
+              lines), so a reader can pick out a city or a postcode without
+              reading a sentence. `billingAddress` remains the composed form and
+              is what the table's cells use — this is the only place the parts are
+              addressed individually. */}
+          <div className={fieldGrid}>
+            {/* col-span-full so the group's heading sits on its own line above the
+                fields rather than taking the first cell of the grid. */}
+            <FieldGroupTitle className="col-span-full">Billing details</FieldGroupTitle>
+            <ClientDetailRow label="Country" value={client.countryName} />
+            <ClientDetailRow label="State" value={client.state} />
+            <ClientDetailRow label="City" value={client.city} />
+            <ClientDetailRow label="Zipcode" value={client.zipcode} />
+            <ClientDetailRow label="Street address 1" value={client.addressLine} />
+            <ClientDetailRow label="Street address 2" value={client.addressLine2} />
+          </div>
+
+          <Separator />
+
+          <div className={fieldGrid}>
+            <FieldGroupTitle className="col-span-full">Notes &amp; contract</FieldGroupTitle>
             <ClientDetailRow
               label="Notes"
-              value={<span className="whitespace-normal">{client.notes}</span>}
+              value={
+                client.notes ? <span className="whitespace-normal">{client.notes}</span> : null
+              }
             />
-          ) : null}
-
-          {/* The contract, openable rather than just named: the file is stored
-              server-side and reachable only through a presigned GET, so the row
-              is a button that fetches one on the click (see onViewContract).
-              Without a handler it stays a plain filename — which is what the
-              drawer shows, since nothing there can open it. */}
-          {client.contract ? (
+            {/* The contract, openable rather than just named: the file is stored
+                server-side and reachable only through a presigned GET, so the row
+                is a button that fetches one on the click (see onViewContract).
+                Without a handler it stays a plain filename. With no contract at
+                all it says so in production's own words, rather than as the dash
+                every other empty field draws — "no document was attached" is a
+                more specific fact than "this was left blank". */}
             <ClientDetailRow
               label="Contract"
               value={
-                onViewContract && client.contract.fileId ? (
-                  <button
+                !client.contract ? (
+                  <span className="font-normal text-muted-foreground">No contract uploaded</span>
+                ) : onViewContract && client.contract.fileId ? (
+                  <Button
                     type="button"
+                    variant="ghost"
+                    size="sm"
                     onClick={onViewContract}
-                    className="inline-flex items-center gap-1.5 text-left font-medium text-primary underline-offset-2 hover:underline"
+                    leftIcon={<Icon name="file-text" className="h-3.5 w-3.5 shrink-0" />}
+                    className="h-auto min-h-0 justify-start gap-1.5 px-0 py-0 text-[13px] font-medium text-primary underline-offset-2 hover:underline"
                   >
-                    <Icon name="file-text" className="h-3.5 w-3.5 shrink-0" />
                     <span className="whitespace-normal break-all">{client.contract.name}</span>
-                  </button>
+                  </Button>
                 ) : (
                   <span className="inline-flex items-center gap-1.5">
                     <Icon name="file-text" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -521,20 +560,7 @@ export function ClientContactSection({
                 )
               }
             />
-          ) : null}
-
-          {addressRows.length > 0 ? (
-            addressRows.map((row) => (
-              <ClientDetailRow key={row.label} label={row.label} value={row.value} />
-            ))
-          ) : (
-            // Nothing structured to break out, so fall back to the one line the
-            // record does have.
-            <ClientDetailRow
-              label="Billing address"
-              value={<span className="whitespace-normal">{client.billingAddress}</span>}
-            />
-          )}
+          </div>
         </CardContent>
       </Card>
     </section>
@@ -543,22 +569,21 @@ export function ClientContactSection({
 
 interface ClientDetailsContentProps {
   client: Client;
-  /** "page" (default): the expanded view's 2/3 main + 1/3 details grid.
-   *  "drawer": single column, everything stacked in document order, for the
-   *  narrower drawer viewport. */
+  /** Which of the two detail views is rendering. Both stack the same sections in
+   *  the same order; the difference is how wide the content is, and so how many
+   *  columns the Contact card's fields flow across (see CONTACT_FIELD_GRID). */
   layout?: "page" | "drawer";
   /**
-   * The client's transactions section, composed by whichever view is rendering
-   * (each owns the transaction drawer state it needs) but positioned here, so
-   * this module stays the single description of how a client's details are
-   * arranged. Both layouts place it identically: last, after Contact.
-   */
-  transactionsSlot?: ReactNode;
-  /**
-   * The client's invoice ledger, composed by the expanded view (which owns the
-   * status filter the KPI cards drive) and positioned here, between the metrics
-   * those cards show and the transactions below. Absent in the drawer, which is a
-   * single narrow column with no room for a second table.
+   * The client's invoice ledger, composed by whichever view is rendering (each
+   * owns the status filter its own KPI cards drive) but positioned here, so this
+   * module stays the single description of how a client's details are arranged.
+   * Both layouts place it identically: last, after Contact.
+   *
+   * This is the only table in the client detail views. It used to be followed by
+   * the client's transactions, matched to it by business name because no
+   * transaction carries a client id — a looser link than this one, which filters
+   * the invoice search by `clientId` outright. Production shows invoices here and
+   * nothing else, so that is what these views show.
    */
   ledgerSlot?: ReactNode;
   /** Narrows the ledger to the statuses a KPI card describes. */
@@ -567,118 +592,42 @@ interface ClientDetailsContentProps {
   onViewContract?: () => void;
 }
 
+/**
+ * One column, both layouts: identity → invoice summary → contact → invoices.
+ *
+ * That order is the hierarchy this view means — who the client is, what they owe
+ * and have paid, how to reach them, then the invoices behind those figures — and
+ * as a plain stack it is also exactly the DOM order, so a screen reader, a phone,
+ * the drawer, and the expanded page all follow the same sequence with nothing to
+ * keep in step.
+ *
+ * The expanded view used to put the Contact card in a fixed 20rem column to the
+ * right of the metrics and the ledger. That column was what forced the card to
+ * stack all fifteen of its fields one per line, since 20rem fits nothing else —
+ * and a card that tall next to a short KPI row needed an explicit row span and a
+ * floated heading to stop it dragging the ledger down the page. Full width instead
+ * lets the fields flow across columns, which is both shorter and less machinery.
+ * The two layouts now differ in one thing only: how many columns that is.
+ */
 export function ClientDetailsContent({
   client,
   layout = "page",
-  transactionsSlot,
   ledgerSlot,
   onFilterByStatus,
   onViewContract,
 }: ClientDetailsContentProps) {
-  if (layout === "drawer") {
-    // Single column, in the same priority order the expanded view uses:
-    // identity → metrics → contact → transactions. The drawer is the same
-    // content at one column wide rather than a reduced subset, so the two
-    // states read as two levels of one experience; its scroll container (see
-    // ClientDetailsDrawer) is what absorbs the extra height.
-    return (
-      <div className="space-y-6">
-        <ClientIdentitySummary client={client} />
-        {/* No onFilterByStatus: the drawer carries no ledger, so a card here has
-            nothing to filter and stays a plain figure. */}
-        <ClientInvoiceMetrics client={client} />
-        <ClientContactSection client={client} onViewContract={onViewContract} />
-        {transactionsSlot}
-      </div>
-    );
-  }
-
-  // 2/3 main + 1/3 details, as a three-row grid: the summary alone in row 1,
-  // the KPI cards and the Contact card side by side in row 2, and the
-  // transactions table in row 3 under the KPI cards.
-  //
-  // Source order is identity → metrics → contact → transactions, which is the
-  // hierarchy this view means: who the client is, what they owe and have paid,
-  // how to reach them, then the detail behind those figures. Grid placement is
-  // explicit, so that order is what a screen reader and the sub-lg single
-  // column both follow, while the two columns above lg stay exactly where they
-  // were — Contact beside the KPI cards, transactions directly beneath them.
-  //
-  // Contact spans rows 2 and 3 rather than sitting in row 2 alone. That span is
-  // load-bearing: the Contact card is ~3× the height of a KPI card, so confined
-  // to row 2 it would set that row's height and push the transactions table
-  // down, leaving a hole under the cards. Spanning both rows means its height
-  // is measured against rows 2 and 3 together — comfortably taller than it —
-  // so it contributes nothing to either and the transactions table stays where
-  // the KPI cards leave it. (This is why the details column can no longer hold
-  // an arbitrarily tall stack: a spanning item taller than the rows it covers
-  // has its excess distributed back across them, which is exactly the gap this
-  // avoids. Nothing here is close to that.)
-  //
-  // Both row-2 columns lead with a floatTitle section, so the row starts at the
-  // KPI cards and the Contact card respectively, not at their headings: the two
-  // cards' top edges land on the same line, and the headings sit above it in
-  // the row gap. That gap is gap-y-12 from lg up — 48px, of which the floated
-  // heading occupies the lower 28px, leaving ~20px below the summary and ~12px
-  // above the cards, so each heading reads as belonging to the section under
-  // it. Below lg there is no float and no second column, so gap-y-8 is the
-  // whole story and the headings sit in normal flow.
-  //
-  // items-start keeps each column sized to its own content rather than
-  // stretching to the taller one; below lg the grid collapses to a single
-  // column already in the required order.
-  //
-  // The track sizing is `minmax(0,1fr) 20rem`, not `2fr 1fr`. Two things follow
-  // from that, both of them the point:
-  //
-  // - The details column is a fixed 20rem at every desktop width, so the
-  //   Contact card stops resizing as the viewport moves and its label/value
-  //   rows keep one stable measure. The main column takes whatever is left
-  //   after that column and the gap, growing and shrinking with the viewport
-  //   rather than holding a share of it.
-  // - The `0` minimum is what stops the transactions table forcing the grid
-  //   wider than its container. A grid track's implicit minimum is `auto` —
-  //   its content's intrinsic width — so a table needing ~800px would push the
-  //   whole row out, overflowing the page and squeezing the fixed column.
-  //   Flooring it at 0 lets the main column narrow past its content, and
-  //   DataTable's own overflow-x-auto takes over inside the table where the
-  //   scrolling belongs. min-w-0 on each main-column item applies the same
-  //   floor to the grid items themselves, which default to min-width:auto for
-  //   the same reason.
   return (
-    <div className="grid gap-x-6 gap-y-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-y-12 xl:gap-x-10">
-      <div className="min-w-0 lg:col-start-1 lg:row-start-1">
-        <ClientIdentitySummary client={client} />
-      </div>
-
-      <div className="min-w-0 lg:col-start-1 lg:row-start-2">
-        <ClientInvoiceMetrics client={client} floatTitle onFilterByStatus={onFilterByStatus} />
-      </div>
-
-      {/* Supporting detail, deliberately secondary to the column beside it:
-          narrower, no KPI figures, and carrying the one reference module —
-          the same role, and the same label-above-value fields, as the
-          Payment/Sender Details column on a transaction. Spans both content
-          rows so its height lands on neither; see above.
-          row-start-2 + row-end-4, not row-span-2: `row-span-*` compiles to the
-          `grid-row` shorthand, which would overwrite the explicit start
-          depending on rule order. Two longhands can't conflict. */}
-      <div className="lg:col-start-2 lg:row-start-2 lg:row-end-5">
-        <ClientContactSection client={client} floatTitle onViewContract={onViewContract} />
-      </div>
-
-      {/* Pulled up by 16px above lg, so the space between the KPI cards and
-          the Transactions heading is the 32px these two sections had when they
-          shared a column, not the grid's full 48px row gap — that gap is sized
-          for the floated headings in row 2, and there is no floated heading
-          here. Below lg the sections are simply gap-y-8 apart already. */}
-      {/* Invoices, then transactions: the ledger explains the KPI figures
-          directly above it, and the transactions are the money that settled
-          against them. Both sit in the main column under the cards; the Contact
-          card spans past both (see above), so neither affects it. */}
-      <div className="min-w-0 lg:col-start-1 lg:row-start-3 lg:-mt-4">{ledgerSlot}</div>
-
-      <div className="min-w-0 lg:col-start-1 lg:row-start-4">{transactionsSlot}</div>
+    // A plain block stack, which is also what keeps the ledger's table from
+    // forcing the view wider than its container: block children are constrained
+    // to their parent's width, and DataTable's own overflow-x-auto takes over
+    // inside the table where the scrolling belongs. The grid this replaced needed
+    // an explicit min-w-0 on every item for that, since grid items default to
+    // min-width:auto — their content's intrinsic width.
+    <div className="space-y-6">
+      <ClientIdentitySummary client={client} />
+      <ClientInvoiceMetrics client={client} onFilterByStatus={onFilterByStatus} />
+      <ClientContactSection client={client} layout={layout} onViewContract={onViewContract} />
+      {ledgerSlot}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
+
 import { useForm } from "@tanstack/react-form";
 import {
   Accordion,
@@ -8,6 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
   Button,
+  COUNTRIES,
   CountrySelect,
   Dialog,
   DialogContent,
@@ -25,6 +28,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Shimmer,
   Textarea,
   useBreakpoint,
 } from "@/components/ui";
@@ -57,6 +61,15 @@ import type { ClientFormValues } from "@/features/dashboard/client-management/ty
 
 /** Red asterisk before a required field's label — the same marker the Add item
  *  form uses, so required-ness reads identically across the product. */
+/**
+ * flux's country list, shaped for SearchableSelect. Module scope because
+ * COUNTRIES is a constant — there is nothing to recompute per render.
+ */
+const countrySelectOptions = COUNTRIES.map((country) => ({
+  value: country.code,
+  label: `${country.flag} ${country.name}`,
+}));
+
 /** The state endpoint returns names in upper case ("KARNATAKA"). Title-cased for
  *  display only — the value submitted is the name exactly as it arrived. */
 function getStateLabel(name: string): string {
@@ -137,8 +150,15 @@ interface ClientFormModalProps {
   /** "add" (default) or "edit" — the field model is identical, so this only
    *  changes the wording and which values the form opens on. */
   mode?: "add" | "edit";
+  /** The id of the record being edited. Identity only — it keys the form body, so
+   *  reopening on a different client mounts a fresh form. Absent in add mode. */
+  recordId?: string;
   /** Pre-filled values for edit mode. Undefined opens a blank form. */
   initialValues?: ClientFormValues;
+  /** True while the record those values come from is still being fetched, which
+   *  holds the modal in a loading state rather than mounting the form on partial
+   *  values. See ClientTable's by-id fetch. */
+  isLoading?: boolean;
   /** Called with validated values. `keepOpen` distinguishes Add client from
    *  Save and add another, so the caller doesn't need two callbacks. */
   onSubmit: (values: ClientFormValues, keepOpen: boolean) => void;
@@ -147,36 +167,74 @@ interface ClientFormModalProps {
   onViewStoredContract?: () => void;
   /** Deletes that stored contract server-side. */
   onRemoveStoredContract?: () => void;
+  /** Merchant id to fetch tag suggestions under, when the caller resolves its MID
+   *  differently from the client-management page (which reads it off the URL).
+   *  The create-invoice flow does — it uses the selected MID with the first PACB
+   *  MID as a fallback — and pg-dashboard threads the same override into this
+   *  form for the same reason, as `selectedMidForAddClient`. */
+  midOverride?: string;
 }
 
 export function ClientFormModal({
   open,
   onOpenChange,
   mode = "add",
+  recordId,
   initialValues,
+  isLoading = false,
   onSubmit,
   onViewStoredContract,
   onRemoveStoredContract,
+  midOverride,
 }: ClientFormModalProps) {
   const { isMobile } = useBreakpoint();
 
-  const body = (
+  // Announced by the Dialog/Drawer on open, and the heading the loading state
+  // shows before the form itself is mounted.
+  const modalTitle = mode === "edit" ? "Edit client" : "Add client";
+
+  const body = isLoading ? (
+    // The record the form will be built from is still in flight (see
+    // ClientTable's by-id fetch). The body is withheld rather than mounted on
+    // partial values, so the form is seeded exactly once, from the whole record —
+    // pg-dashboard shows the same loading state on its own drawer for the same
+    // reason. Shimmer rather than a spinner, so the modal keeps the shape of the
+    // form that is about to appear in it.
+    <div className="flex min-h-0 flex-col" aria-busy>
+      <div className="flex-shrink-0 border-b border-border px-5 py-4">
+        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{modalTitle}</h2>
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 px-5 py-5">
+        <span className="sr-only" role="status">
+          Loading client details
+        </span>
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Shimmer className="h-3 w-24 rounded" />
+            <Shimmer className="h-9 w-full rounded-lg" />
+          </div>
+        ))}
+      </div>
+    </div>
+  ) : (
     <ClientFormBody
       // Remounts the form whenever the modal opens on a different client (or
       // reopens on a blank one), which is what discards a previous session's
       // half-typed values and validation state. Cheaper and harder to get wrong
       // than resetting every field in an effect.
-      key={
-        open
-          ? `open-${initialValues ? mode : "add"}-${initialValues?.businessName ?? ""}`
-          : "closed"
-      }
+      //
+      // Keyed on the record's id, not its business name: two clients can share a
+      // name, and the id is what actually says "this is a different record". It
+      // also means the key does not change when the fetched record replaces
+      // nothing — the body only ever mounts once the values are final.
+      key={open ? `open-${mode}-${recordId ?? "new"}` : "closed"}
       mode={mode}
       initialValues={initialValues}
       onCancel={() => onOpenChange(false)}
       onSubmit={onSubmit}
       onViewStoredContract={onViewStoredContract}
       onRemoveStoredContract={onRemoveStoredContract}
+      midOverride={midOverride}
     />
   );
 
@@ -186,7 +244,7 @@ export function ClientFormModal({
     return (
       <Drawer open={open} onOpenChange={onOpenChange} side="bottom">
         <DrawerContent className="flex max-h-[90vh] flex-col rounded-t-2xl p-0">
-          <DrawerTitle className="sr-only">Add client</DrawerTitle>
+          <DrawerTitle className="sr-only">{modalTitle}</DrawerTitle>
           {body}
         </DrawerContent>
       </Drawer>
@@ -206,7 +264,7 @@ export function ClientFormModal({
           "gap-0 overflow-hidden rounded-2xl p-0"
         )}
       >
-        <DialogTitle className="sr-only">Add client</DialogTitle>
+        <DialogTitle className="sr-only">{modalTitle}</DialogTitle>
         {body}
       </DialogContent>
     </Dialog>
@@ -220,6 +278,7 @@ function ClientFormBody({
   onSubmit,
   onViewStoredContract,
   onRemoveStoredContract,
+  midOverride,
 }: {
   mode: "add" | "edit";
   initialValues?: ClientFormValues;
@@ -227,10 +286,14 @@ function ClientFormBody({
   onSubmit: (values: ClientFormValues, keepOpen: boolean) => void;
   onViewStoredContract?: () => void;
   onRemoveStoredContract?: () => void;
+  midOverride?: string;
 }) {
   // Which button started the submit. A ref, not state: it's read inside the
   // submit handler in the same tick it's written, and re-rendering on it would
   // be pointless.
+  const isEdit = mode === "edit";
+  const title = isEdit ? "Edit client" : "Add client";
+
   const keepOpenRef = useRef(false);
   // Cancel with typed-in values asks first; an untouched form just closes.
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
@@ -242,7 +305,7 @@ function ClientFormBody({
   // Tag suggestions and the state list are merchant/app configuration rather
   // than constants, so both are fetched (see useClientTagOptions and
   // useClientStateCodes).
-  const { tags: tagSuggestions } = useClientTagOptions();
+  const { tags: tagSuggestions } = useClientTagOptions(midOverride);
   const { states } = useClientStateCodes();
 
   // India has a state list; nothing else does, so every other country gets the
@@ -289,7 +352,7 @@ function ClientFormBody({
       {/* Header — the Dialog/Drawer's own close button sits at the top right,
           so the title row only carries the title. */}
       <div className="flex-shrink-0 border-b border-border px-5 py-4">
-        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">Add client</h2>
+        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{title}</h2>
       </div>
 
       {/* Only this middle band scrolls, so the footer actions stay reachable
@@ -562,8 +625,18 @@ function ClientFormBody({
                   <FieldLabel htmlFor="client-country">
                     <RequiredMark /> Country
                   </FieldLabel>
-                  <CountrySelect
+                  {/* SearchableSelect rather than flux's CountrySelect, for one
+                      reason: CountrySelect builds its own Radix Popover with no
+                      `modal` prop, and a non-modal popover portalled out of a
+                      modal Dialog cannot be scrolled — react-remove-scroll
+                      cancels the wheel. Options are built from flux's own
+                      exported COUNTRIES, so the values are the same ISO codes
+                      and the flag still shows; only the scroll behaviour
+                      changes. Revert this the day CountrySelect takes `modal`. */}
+                  <SearchableSelect
+                    id="client-country"
                     value={field.state.value}
+                    options={countrySelectOptions}
                     onValueChange={(code) => {
                       field.handleChange(code);
                       setAddressCountry(code);
@@ -579,6 +652,9 @@ function ClientFormBody({
                       }
                     }}
                     placeholder="Select country"
+                    searchPlaceholder="Search country…"
+                    emptyMessage="No country matches that search."
+                    invalid={field.state.meta.errors.length > 0}
                   />
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
@@ -666,31 +742,26 @@ function ClientFormBody({
                     <FieldLabel htmlFor="client-state">
                       <RequiredMark /> State
                     </FieldLabel>
-                    {/* A select now that the state list is fetched
-                        (useClientStateCodes). It was a text input while this app
-                        held no state data; the endpoint is that data, and it
-                        covers India only — which is why every other country
-                        collapses to the single "Not Applicable" option here,
-                        exactly as pg-dashboard's own client form does. */}
-                    <Select
+                    {/* Searchable, matching the Country field above it. The
+                        list is fetched (useClientStateCodes) and covers India
+                        only, which is why every other country collapses to the
+                        single "Not Applicable" option — exactly as
+                        pg-dashboard's own client form does, and why the search
+                        box hides itself below a handful of options.
+
+                        A plain Select here meant the only way to reach Karnataka
+                        was scrolling or Radix's type-ahead, and type-ahead lands
+                        on the first DOM match: "k" gave Kerala. */}
+                    <SearchableSelect
+                      id="client-state"
                       value={field.state.value}
-                      onValueChange={(value: string) => field.handleChange(value)}
-                    >
-                      <SelectTrigger
-                        id="client-state"
-                        aria-invalid={field.state.meta.errors.length > 0}
-                        className="w-full [&>span]:min-w-0"
-                      >
-                        <SelectValue placeholder="Select state" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stateOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      onValueChange={(value) => field.handleChange(value)}
+                      options={stateOptions}
+                      placeholder="Select state"
+                      searchPlaceholder="Search state…"
+                      emptyMessage="No state matches that search."
+                      invalid={field.state.meta.errors.length > 0}
+                    />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>
                 )}
@@ -923,20 +994,34 @@ function ClientFormBody({
       </div>
 
       {/* ── Actions ──────────────────────────────────────────────────────
-          Save and add another sits opposite the pair, as a link-style action,
-          so it reads as a secondary route through the same form rather than a
-          third button competing with the primary CTA — same arrangement as the
-          Add item form's footer. */}
-      <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3.5">
-        <Button
-          type="button"
-          variant="link"
-          size="sm"
-          className="px-0"
-          onClick={() => submitWith(true)}
-        >
-          Save and add another
-        </Button>
+          In add mode, Save and add another sits opposite the pair as a
+          link-style action, so it reads as a secondary route through the same
+          form rather than a third button competing with the primary CTA — the
+          same arrangement as the Add item form's footer.
+
+          In edit mode it is not rendered at all: "another" has no meaning when
+          the form is open on one existing record, and the action would either
+          have to save the edit and then open a blank Add form (a different task
+          the merchant did not ask for) or duplicate the client. Nothing to
+          disable, so nothing is shown. justify-end then pulls the remaining pair
+          to the right, where they sit in every other single-action footer. */}
+      <div
+        className={cn(
+          "flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border px-5 py-3.5",
+          isEdit ? "justify-end" : "justify-between"
+        )}
+      >
+        {!isEdit && (
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="px-0"
+            onClick={() => submitWith(true)}
+          >
+            Save and add another
+          </Button>
+        )}
 
         <div className="flex items-center gap-2">
           {/* Cancel turns into its own confirmation once the form has been
@@ -952,7 +1037,7 @@ function ClientFormBody({
             {confirmingDiscard ? "Discard changes?" : "Cancel"}
           </Button>
           <Button type="submit" variant="primary" size="sm">
-            Add client
+            {isEdit ? "Update client" : "Add client"}
           </Button>
         </div>
       </div>

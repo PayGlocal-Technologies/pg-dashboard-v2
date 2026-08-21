@@ -166,16 +166,25 @@ export interface ClientFormValues {
 // shapes; everything above this line is what the components render. The two are
 // deliberately different, and hooks.ts is the only place that knows both.
 
-/** Structured address, as the API stores it. v2 renders `billingAddress` as one
- *  composed string and keeps the parts for the edit form to round-trip. */
+/**
+ * Structured address, as the API stores it. v2 renders `billingAddress` as one
+ * composed string and keeps the parts for the edit form to round-trip.
+ *
+ * Every part is nullable on the way out: all six fields are mounted in
+ * pg-dashboard's form, so all six are registered and an unfilled one serialises to
+ * `null` rather than being dropped. Reads tolerate the same, since that is what
+ * comes back.
+ */
 export interface ClientApiAddress {
-  streetAddress1: string;
-  streetAddress2: string;
-  city: string;
-  state: string;
-  /** Country *name*, not an ISO code — see clientCountryCodesApi. */
-  country: string;
-  zipcode: string;
+  streetAddress1: string | null;
+  streetAddress2: string | null;
+  city: string | null;
+  state: string | null;
+  /** Whatever get-country-details keys its map by, which is the ISO2 code ("NZ")
+   *  in every environment seen so far — *not* the display name. pg-dashboard's
+   *  country select submits that key verbatim; see iso2ToApiCountry. */
+  country: string | null;
+  zipcode: string | null;
 }
 
 /**
@@ -206,7 +215,13 @@ export interface ClientApiRecord {
    *  the table can group every row's digits identically. */
   number: string;
   websiteLink?: string;
-  /** Country name. The ISO2 the flag needs is resolved through the country map. */
+  /**
+   * The client's country, as a top-level convenience field — pg-dashboard's list
+   * column reads this one. Only a fallback here: `address.country` is the copy
+   * either app's form actually writes, and this can be absent on a record created
+   * through one of them. Whether it holds a name or an ISO2 varies by environment,
+   * which is why resolveCountry detects the shape rather than assuming.
+   */
   country: string;
   status: string;
   totalInvoiceAmount: number;
@@ -250,20 +265,33 @@ export interface ClientByIdResponse {
  * v2's form collects neither a shipping address nor a "same as" checkbox, so both
  * are always mirrored — see toClientApiPayload.
  */
+/**
+ * The create/update body, exactly as pg-dashboard sends it — see
+ * toClientApiPayload for how each of these is arrived at and why.
+ *
+ * `null` is a real value throughout, not a stand-in for "omitted": production's
+ * form registers every mounted field, so an optional one the merchant left blank
+ * goes over the wire as an explicit null. The two genuinely optional keys are
+ * `gstIn` and `notes`, which sit behind collapsed accordions there and so are
+ * absent rather than null when unfilled.
+ *
+ * There is no `mid`: it is a path segment on these endpoints.
+ */
 export interface ClientMutationPayload {
-  mid: string;
-  gstIn: string;
   businessName: string;
   name: string;
+  /** Sent because pg-dashboard's checkbox is a registered form field. */
+  sameAsBusinessName: boolean;
   email: string;
   number: string;
-  websiteLink?: string;
-  address?: ClientApiAddress;
-  shippingAddress?: ClientApiAddress;
+  websiteLink: string | null;
+  /** An API enum code — see CLIENT_BUSINESS_TYPES, not a display label. */
+  type: string;
+  tags: string[] | null;
+  address: ClientApiAddress;
+  shippingAddress: ClientApiAddress;
+  gstIn?: string;
   notes?: string;
-  tags?: string[];
-  type?: string;
-  currency?: string;
 }
 
 export interface ClientCreateResponse {
@@ -384,26 +412,6 @@ export interface InvoiceViewResponse {
   data: { url: string };
 }
 
-// ── Zoho integration ────────────────────────────────────────────────────────
-
-/** Mirror of pg-dashboard's ZohoStatusData. `status === "CONNECTED"` is what
- *  production gates the sync action on — not the `connected` boolean. */
-export interface ZohoStatusResponse {
-  status: string;
-  message: string;
-  data: {
-    connected: boolean;
-    status: string;
-    connectedAt: string | null;
-    orgId: string | null;
-    lastSyncedTime: number | null;
-    isFirstSync: boolean;
-  };
-}
-
-/** The pull-sync body. Both flags are sent; the client list sends
- *  `{ isClientSync: true, isInvoiceSync: false }`. */
-export interface ZohoPullSyncPayload {
-  isClientSync: boolean;
-  isInvoiceSync: boolean;
-}
+// Zoho status/pull-sync types now live in
+// @/features/dashboard/zoho-integration/types, shared with the integration
+// card and the invoice list rather than redeclared here.

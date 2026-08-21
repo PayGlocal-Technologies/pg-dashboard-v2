@@ -102,20 +102,9 @@ export const invoiceDeleteApi = (mid: string, invoiceId: string) =>
 export const invoiceViewApi = (mid: string, invoiceId: string) =>
   mid && invoiceId ? `${BASE_URL_V3}/mca-invoice/${mid}/${invoiceId}/view-invoice` : "";
 
-// ── Zoho integration ────────────────────────────────────────────────────────
-// The client list offers a pull-sync when the merchant has connected Zoho.
-// `identifier` is the merchant id. Verbatim from pg-dashboard
-// (zoho-integration/service.ts) — note these are v1, not v3.
-
-const ZOHO_BASE = (identifier: string) => `${BASE_URL_V1}/integrations/zoho/${identifier}`;
-
-/** `{ status: "CONNECTED" | … }` — whether the sync action should appear at all. */
-export const zohoStatusApi = (identifier: string) =>
-  identifier ? `${ZOHO_BASE(identifier)}/status` : "";
-
-/** Pulls clients (and/or invoices) across from the connected Zoho account. */
-export const zohoPullSyncApi = (identifier: string) =>
-  identifier ? `${ZOHO_BASE(identifier)}/pull-sync` : "";
+// Zoho endpoints used by the client list's "Sync from Zoho" action now live in
+// @/features/dashboard/zoho-integration/services, alongside the rest of the
+// integration, rather than being copied per consuming feature.
 
 // ── Not ported ──────────────────────────────────────────────────────────────
 // pg-dashboard also exports `deleteMcaClient` (POST /mca-client/{mid}/delete),

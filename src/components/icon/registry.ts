@@ -11,10 +11,12 @@ import {
   AlertTriangle,
   Angry,
   Archive,
+  Asterisk,
   ArchiveRestore,
   ArrowRight,
   ArrowUpRight,
   BadgeCheck,
+  Bookmark,
   Ban,
   BarChart2,
   Bell,
@@ -30,6 +32,7 @@ import {
   CircleDollarSign,
   Clock,
   Copy,
+  Crop,
   CreditCard,
   Database,
   Download,
@@ -37,6 +40,7 @@ import {
   EyeOff,
   FileText,
   Filter,
+  ImagePlus,
   Frown,
   Gauge,
   Gift,
@@ -73,6 +77,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
+  Percent,
   Phone,
   PieChart,
   PiggyBank,
@@ -93,6 +98,9 @@ import {
   SlidersHorizontal,
   Smartphone,
   Smile,
+  Languages,
+  LayoutTemplate,
+  Palette,
   Sparkles,
   Square,
   Sun,
@@ -108,13 +116,18 @@ import {
   Wallet,
   Wrench,
   X,
+  ZoomIn,
+  ZoomOut,
   type LucideIcon,
 } from "lucide-react";
 import { AmazonLogo } from "@/components/icon/AmazonLogo";
 import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
+import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
+import { LinkGreenFilled } from "@/components/icon/LinkGreenFilled";
 import { MdrOfferIcon } from "@/components/icon/MdrOfferIcon";
 import { NoTransactionsIllustration } from "@/components/icon/NoTransactionsIllustration";
+import { RecurringOutlined } from "@/components/icon/RecurringOutlined";
 import { ToptalLogo } from "@/components/icon/ToptalLogo";
 import { UpworkLogo } from "@/components/icon/UpworkLogo";
 import { ZohoLogo } from "@/components/icon/ZohoLogo";
@@ -142,8 +155,11 @@ export const ICONS = {
   "chevron-right": ChevronRight,
   "chevron-up": ChevronUp,
   "circle-dollar-sign": CircleDollarSign,
+  asterisk: Asterisk,
+  bookmark: Bookmark,
   clock: Clock,
   copy: Copy,
+  crop: Crop,
   "credit-card": CreditCard,
   database: Database,
   download: Download,
@@ -166,6 +182,9 @@ export const ICONS = {
   "grip-vertical": GripVertical,
   "help-circle": HelpCircle,
   image: ImageIcon,
+  "image-plus": ImagePlus,
+  languages: Languages,
+  "layout-template": LayoutTemplate,
   inbox: Inbox,
   "indian-rupee": IndianRupee,
   info: Info,
@@ -193,7 +212,9 @@ export const ICONS = {
   paperclip: Paperclip,
   "panel-left-close": PanelLeftClose,
   "panel-left-open": PanelLeftOpen,
+  palette: Palette,
   pencil: Pencil,
+  percent: Percent,
   phone: Phone,
   "pie-chart": PieChart,
   "piggy-bank": PiggyBank,
@@ -231,6 +252,8 @@ export const ICONS = {
   wallet: Wallet,
   wrench: Wrench,
   x: X,
+  "zoom-in": ZoomIn,
+  "zoom-out": ZoomOut,
 
   // ─── Platform brand marks (Platforms tutorial page) ────────────────────────
   // Placeholder artwork until the official assets land — see each file's own
@@ -242,7 +265,14 @@ export const ICONS = {
   "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
   "toptal-logo": ToptalLogo as unknown as LucideIcon,
   "upwork-logo": UpworkLogo as unknown as LucideIcon,
+
+  // ─── Invoice management ────────────────────────────────────────────────────
+  // Ported from pg-dashboard's public/assets, so the two apps show the same
+  // marks on the same rows. See each component for what changed in the port.
   "zoho-logo": ZohoLogo as unknown as LucideIcon,
+  "recurring-outlined": RecurringOutlined as unknown as LucideIcon,
+  "link-custom-outlined": LinkCustomOutlined as unknown as LucideIcon,
+  "link-green-filled": LinkGreenFilled as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
