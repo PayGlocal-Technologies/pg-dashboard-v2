@@ -44,14 +44,13 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
     // the card's radius.
     //
     // No height of its own either — not a pixel value and not `h-full`. Beside
-    // the leaderboard this card is a stretched grid item, so the row's own
-    // height (see index.tsx: the leaderboard's content is what sets it) is what
-    // this card takes, and any height the row has over this card's content
-    // settles below the content as card surface. The card is a flex column and
-    // none of its children grow, so nothing inside is stretched to fill that
-    // slack: the banner keeps its aspect ratio and the heading, the copy, and
-    // the link field stay in their own rhythm at the top. Stacked on mobile the
-    // card is the only thing in its row, so it is its natural height.
+    // the right-hand column this card is a stretched grid item, so it takes the
+    // row's height. Any slack the row has over this card's content is absorbed
+    // between the banner and the content rather than after it: the content block
+    // carries `mt-auto` (see below), so the banner stays at the top, the heading,
+    // copy, and link field stay pinned to the foot of the card, and the gap
+    // between the two opens up instead. Stacked on mobile the card is the only
+    // thing in its row, so it is its natural height and the two meet directly.
     <Card className="gap-0 overflow-hidden p-0">
       {/* The reward banner. A raster asset, so the icon-registry forwardRef
           pattern in CLAUDE.md does not apply (it is for SVG); it goes through
@@ -73,8 +72,14 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
 
       {/* Content sits below the artwork, left-aligned, with its own horizontal
           and bottom padding. No top padding: the banner's own artwork fades out
-          at its foot, so that fade is the breathing room above the heading. */}
-      <div className="flex flex-col px-5 pb-6 sm:px-8 sm:pb-8">
+          at its foot, so that fade is the breathing room above the heading.
+
+          `mt-auto` keeps this block bottom-aligned in the card. It is the only
+          child that can absorb free space, so whenever the card is taller than
+          the banner plus this content — which is whenever the row beside it is
+          the taller one — the extra height goes above this block and the heading,
+          copy, and field stay at the card's foot rather than floating mid-card. */}
+      <div className="mt-auto flex flex-col px-5 pb-6 sm:px-8 sm:pb-8">
         {/* Page title — the hero heading is the h1, so this screen has no
             separate PageHeader competing with it. The reward figure lives in the
             banner above, so it is deliberately not repeated here. */}

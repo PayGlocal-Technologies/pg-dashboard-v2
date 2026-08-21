@@ -13,9 +13,9 @@ import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helper
  * `aspect-[…]` below, so the artwork is never stretched or awkwardly cropped.
  */
 const BACKGROUND = {
-  src: "/assets/TotalEarnedBG.png",
-  width: 1718,
-  height: 916,
+  src: "/assets/BG1.png",
+  width: 1672,
+  height: 941,
 } as const;
 
 /**
@@ -38,27 +38,28 @@ interface ReferralTotalsCardProps {
 }
 
 /**
- * Earned total above the leaderboard, over the referral artwork. The figures come
- * from the same summarizeReferrals output the analytics row and the leaderboard's
- * own "You" row read, so the three surfaces cannot disagree.
+ * Earned total above the leaderboard, set into the upper left of the referral
+ * artwork. The figures come from the same summarizeReferrals output the analytics
+ * row and the leaderboard's own "You" row read, so the three surfaces cannot
+ * disagree.
  */
 export function ReferralTotalsCard({ summary }: ReferralTotalsCardProps) {
   const referrals = summary.completed;
 
   return (
-    // `aspect-[…]` from the asset's own dimensions: the card's height follows its
+    // `aspectRatio` from the asset's own dimensions: the card's height follows its
     // width, so the artwork keeps its proportions at every breakpoint instead of
     // being cropped harder as the column narrows — and there is no pixel height
     // to maintain. `isolate` scopes the negative z-index below to this card, and
     // `overflow-hidden` clips the artwork to the card's existing radius. No
-    // padding: the content is centred rather than inset.
+    // padding of its own: the content block below carries it.
     <Card
-      className="relative isolate items-center justify-center gap-1 overflow-hidden p-0 text-center"
+      className="relative isolate items-start justify-start overflow-hidden p-0"
       style={{ aspectRatio: `${BACKGROUND.width} / ${BACKGROUND.height}` }}
     >
       {/* Decorative, so `alt=""`. `fill` + `object-cover` covers the card at any
           size; the negative z-index paints it over the card's own surface but
-          under the figures. */}
+          under the text. */}
       <Image
         src={BACKGROUND.src}
         alt=""
@@ -67,16 +68,29 @@ export function ReferralTotalsCard({ summary }: ReferralTotalsCardProps) {
         className="-z-10 object-cover"
       />
 
-      {/* The artwork is a fixed light gradient in both themes — it carries no
-          alpha and does not invert — so these two are pinned to dark values
-          rather than `text-foreground`/`text-muted-foreground`, which would turn
-          near-white in dark mode and vanish against it. */}
-      <MetricText size="xl" className="text-slate-900">
-        {formatHeadlineAmount(summary.totalEarned, summary.earnedCurrency)}
-      </MetricText>
-      <Text size="sm" className="text-slate-600">
-        {referrals.toLocaleString("en-US")} {referrals === 1 ? "referral" : "referrals"}
-      </Text>
+      {/* Upper-left, and capped at two thirds of the width so the text never runs
+          into the mailbox the artwork puts on the lower right. */}
+      <div className="flex max-w-[66%] flex-col gap-0.5 p-5">
+        {/* The artwork is a fixed light gradient in both themes — it carries no
+            alpha and does not invert — so every colour here is pinned to a dark
+            value rather than `text-foreground`/`text-muted-foreground`, which
+            would turn near-white in dark mode and vanish against it. */}
+        <Text size="sm" className="text-slate-500">
+          Total earnings
+        </Text>
+
+        {/* Amount and count share a baseline rather than stacking, per the
+            reference. `flex-wrap` is a safety valve only — at the column's real
+            width the pair sits on one line. */}
+        <div className="flex flex-wrap items-baseline gap-x-2.5">
+          <MetricText size="lg" className="text-slate-900">
+            {formatHeadlineAmount(summary.totalEarned, summary.earnedCurrency)}
+          </MetricText>
+          <Text size="sm" className="text-slate-500">
+            {referrals.toLocaleString("en-US")} {referrals === 1 ? "referral" : "referrals"}
+          </Text>
+        </div>
+      </div>
     </Card>
   );
 }
