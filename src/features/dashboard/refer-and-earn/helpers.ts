@@ -82,6 +82,11 @@ export interface LeaderboardView {
   rows: LeaderboardEntry[];
   /** The merchant's own row, scored on their live figures, or null if unranked. */
   me: LeaderboardEntry | null;
+  /**
+   * Referrals between the merchant and #1, clamped at 0 once they are level or
+   * ahead. The figure the progress line above the sticky row is stated in.
+   */
+  toReachFirst: number;
 }
 
 /**
@@ -107,5 +112,12 @@ export function buildLeaderboardView(
         : entry
     );
 
-  return { rows, me: rows.find((e) => e.id === standings.currentMerchantId) ?? null };
+  const me = rows.find((e) => e.id === standings.currentMerchantId) ?? null;
+  const leaderCount = rows[0]?.referralCount ?? 0;
+
+  return {
+    rows,
+    me,
+    toReachFirst: me == null ? 0 : Math.max(0, leaderCount - me.referralCount),
+  };
 }

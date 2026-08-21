@@ -1,4 +1,8 @@
+"use client";
+
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Card, Heading, Separator, Text } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { buildLeaderboardView } from "@/features/dashboard/refer-and-earn/helpers";
@@ -29,6 +33,9 @@ const VISIBLE_ROWS = 4;
  * count, and stated once so the row and the viewport cannot drift apart.
  */
 const ROW_HEIGHT = "3.5rem";
+
+/** The dashboard's positive-text treatment, as used on the MCA stat cards. */
+const POSITIVE_TEXT = "text-emerald-600 dark:text-emerald-400";
 
 /**
  * Podium ranks get a filled medal; every other rank — including the merchant's
@@ -92,6 +99,31 @@ function LeaderboardRow({
   );
 }
 
+/**
+ * The gap to the top of the board, in referrals — the figure the merchant can
+ * act on. Flanked by up-arrows and set in the dashboard's positive treatment, so
+ * it reads as progress rather than as a shortfall.
+ */
+function ProgressMessage({ toReach }: { toReach: number }) {
+  if (toReach <= 0) {
+    return (
+      <Text size="sm" className={cn("text-center", POSITIVE_TEXT)}>
+        You&rsquo;re #1 on the leaderboard
+      </Text>
+    );
+  }
+
+  return (
+    <div className={cn("flex items-center justify-center gap-1.5", POSITIVE_TEXT)}>
+      <Icon name="arrow-up" size={14} strokeWidth={2.25} />
+      <Text size="sm" className="text-inherit">
+        {toReach} referral{toReach === 1 ? "" : "s"} to reach #1
+      </Text>
+      <Icon name="arrow-up" size={14} strokeWidth={2.25} />
+    </div>
+  );
+}
+
 interface ReferralLeaderboardProps {
   standings: ReferralStandings;
   /**
@@ -106,8 +138,8 @@ interface ReferralLeaderboardProps {
 
 /**
  * Compact ranking panel beside the hero: a four-row scroll viewport over the
- * whole board, with the merchant's own row pinned to the bottom edge until the
- * scroll reaches its real position.
+ * whole board, with the merchant's own row pinned to the bottom edge — under a
+ * fade and its progress line — until the scroll reaches its real position.
  */
 export function ReferralLeaderboard({
   standings,
@@ -115,12 +147,48 @@ export function ReferralLeaderboard({
   currentReferralCount,
   currency,
 }: ReferralLeaderboardProps) {
-  const { rows, me } = buildLeaderboardView(
+  const { rows, me, toReachFirst } = buildLeaderboardView(
     standings,
     currentEarned,
     currentReferralCount,
     currency
   );
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  // Whether the merchant's row is currently pinned rather than sitting at its
+  // real position. The fade and the progress line belong to the pinned state
+  // only: once the row is in normal flow there is nothing behind it to fade, and
+  // a gradient over fully visible rows would read as a stray overlay.
+  //
+  // Starts false so the first paint is the plain list — a short list that does
+  // not scroll never pins, and this way it never flashes a fade it will not keep.
+  const [isPinned, setIsPinned] = useState(false);
+
+  // A 1px sentinel sits immediately after the row in flow, so its top edge is
+  // exactly the row's natural bottom. While the row is pinned, that point is
+  // below the scrollport and the sentinel cannot be seen; the moment the scroll
+  // brings the row to its real position the sentinel enters view. So sentinel
+  // visibility is the release point, observed rather than polled — no scroll
+  // handler, and nothing measured on every frame.
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        // setState lives in the observer callback, not the effect body.
+        if (entry) setIsPinned(!entry.isIntersecting);
+      },
+      { root, threshold: 0 }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     // Height is the four-row viewport plus the heading and the card's padding —
@@ -137,44 +205,83 @@ export function ReferralLeaderboard({
         type scale rather than set to a pixel guess — change the row's padding or
         text sizes and this follows.
 
-        `scrollbar-none` keeps the surface clean; the clipped row and the pinned
+        `scrollbar-none` keeps the surface clean; the faded row and the pinned
         merchant row are what signal there is more to scroll.
       */}
       <div
+        ref={scrollRef}
         className="scrollbar-none overflow-y-auto overscroll-contain"
         style={{
           maxHeight: `calc(${VISIBLE_ROWS} * ${ROW_HEIGHT} + ${VISIBLE_ROWS - 1} * 1px)`,
         }}
       >
+        {/*
+          Every row is a direct child of this scroll container, via keyed
+          fragments rather than per-row wrapper divs. That is what makes the
+          sticky block below work at all: a sticky element can only offset within
+          its containing block, so wrapping it in a div that is exactly its own
+          height leaves it nowhere to slide and it renders as if it were static.
+          Flat children give it the whole list as its containing block.
+        */}
         {rows.map((entry, index) => {
           const isMe = me != null && entry.id === me.id;
+          const separator = index < rows.length - 1 && <Separator className="bg-border/70" />;
 
-          const row = (
-            <>
-              <LeaderboardRow entry={entry} isCurrentMerchant={isMe} />
-              {index < rows.length - 1 && <Separator className="bg-border/70" />}
-            </>
-          );
+          if (!isMe) {
+            return (
+              <Fragment key={entry.id}>
+                <LeaderboardRow entry={entry} />
+                {separator}
+              </Fragment>
+            );
+          }
 
           // The merchant's row is the only sticky one, and it is the same single
           // row from the same list — never a second, separately positioned copy.
-          // `bottom-0` pins it to the foot of the viewport for as long as its real
-          // position is below the fold; once the scroll reaches that position it
-          // releases into normal flow, and scrolling back up re-pins it. So there
-          // is exactly one "You" row at every scroll offset, with no JS and no
-          // duplicate to keep in sync.
-          //
-          // `bg-card` on the wrapper is load-bearing: the row's own tint is
-          // translucent, so without an opaque backing the rows scrolling beneath
-          // it would show through while it is pinned. The tint composites over
-          // `bg-card` here exactly as it does over the card itself, so the pinned
-          // and released states look identical.
-          return isMe ? (
-            <div key={entry.id} className="sticky bottom-0 z-10 bg-card">
-              {row}
-            </div>
-          ) : (
-            <div key={entry.id}>{row}</div>
+          // `bottom-0` anchors it to the foot of the scroll container for as long
+          // as its real position is below the fold; once the scroll reaches that
+          // position it releases into normal flow, and scrolling back up re-anchors
+          // it. So there is exactly one "You" row at every scroll offset, with no
+          // duplicate to keep in sync. The anchor is the container, not the page:
+          // sticky resolves against the nearest scrollport, which is this div.
+          return (
+            <Fragment key={entry.id}>
+              <div className="sticky bottom-0 z-10">
+                {/* The fade, absolutely positioned just above the block's top edge
+                    (`bottom-full`) so it contributes no layout height at all and
+                    the anchor point stays exactly where the row alone would put
+                    it. An earlier version used a negative top margin, which
+                    collapsed into the sticky block and shifted its static position.
+                    Transparent at the top so the row behind stays legible,
+                    resolving to the card surface where the opaque area below
+                    begins — that is what makes it read as the list continuing
+                    rather than as a white slab. */}
+                {isPinned && (
+                  <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 bottom-full h-16 bg-gradient-to-b from-transparent to-card"
+                  />
+                )}
+
+                {/* Opaque from here down: the row's own tint is translucent, so
+                    without this the rows scrolling beneath would show through it
+                    while anchored. The tint composites over `bg-card` exactly as it
+                    does over the card itself, so anchored and released look
+                    identical. */}
+                <div className="bg-card">
+                  {isPinned && (
+                    <div className="px-2.5 pt-1 pb-3">
+                      <ProgressMessage toReach={toReachFirst} />
+                    </div>
+                  )}
+                  <LeaderboardRow entry={entry} isCurrentMerchant />
+                  {separator}
+                </div>
+              </div>
+
+              {/* Release sentinel — see the observer above. */}
+              <div ref={sentinelRef} aria-hidden className="h-px" />
+            </Fragment>
           );
         })}
       </div>
