@@ -1,5 +1,6 @@
 import { AxiosError } from "axios";
 import { api } from "@/lib/api/axios";
+import { stripBasePath, withBasePath } from "@/constants/basePath";
 
 // Session-ending messages that trigger a redirect back to /login.
 const SESSION_MESSAGES = new Set([
@@ -44,12 +45,29 @@ async function reportError(error: AxiosError): Promise<void> {
   }
 }
 
+/**
+ * Sends the browser back to the login page, remembering where it was.
+ *
+ * Both halves have to think about the base path, because `window.location` is a
+ * raw browser navigation: Next's `basePath` only rewrites what goes through the
+ * framework (next/link, next/navigation, next/image, `public/`), so this is
+ * exactly the case `withBasePath` exists for. Without it the redirect lands on
+ * the origin's `/login`, which this app does not serve.
+ *
+ * The path being remembered is normalised the other way. `url.pathname` carries
+ * the base path, and storing it in that shape defeated `isSafePath`'s
+ * `path !== "/login"` guard in auth/helpers.ts — a session that expired *on* the
+ * login page stored "/app-v2/login", which is not literally "/login", so the
+ * next successful login was sent straight back to the login page.
+ */
 function redirectToLogin(): void {
   if (typeof window === "undefined") return;
+
   const url = new URL(window.location.href);
-  const redirectPath = url.pathname + (url.search || "") + (url.hash || "");
+  const redirectPath = stripBasePath(url.pathname) + url.search + url.hash;
   sessionStorage.setItem("redirect_after_login", redirectPath);
-  window.location.replace(`/login?timeout=true`);
+
+  window.location.replace(withBasePath("/login?timeout=true"));
 }
 
 /**

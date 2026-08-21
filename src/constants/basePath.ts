@@ -40,3 +40,19 @@ export function withBasePath(path: string): string {
   if (path === BASE_PATH || path.startsWith(`${BASE_PATH}/`)) return path;
   return `${BASE_PATH}${path}`;
 }
+
+/**
+ * The inverse: turns a real URL's pathname back into an app-relative path.
+ *
+ * `window.location.pathname` carries the base path, so anything captured from a
+ * live URL and stored for later — a redirect-after-login, a "return to" link —
+ * is in a different shape from the app-relative paths the rest of the code
+ * passes around (`?from=`, DEFAULT_AUTHED_PATH, route constants). withBasePath's
+ * already-prefixed guard means the mixture usually survives, but only usually:
+ * any check that compares against a bare route ("is this /login?") silently
+ * fails on the prefixed form. Normalising on the way in keeps one shape in play.
+ */
+export function stripBasePath(path: string): string {
+  if (path === BASE_PATH) return "/";
+  return path.startsWith(`${BASE_PATH}/`) ? path.slice(BASE_PATH.length) : path;
+}

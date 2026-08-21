@@ -131,4 +131,13 @@ export {
   InputGroupButton,
   Switch,
   TimePicker,
+  // Added for the invoice editor: Slider drives the logo crop's zoom, and
+  // SplitButton is the "Generate invoice ▾" control that hosts the template
+  // actions. Both already ship in flux; they were simply not re-exported yet.
+  Slider,
+  type SliderProps,
+  SplitButton,
+  SplitButtonItem,
+  type SplitButtonProps,
+  type SplitButtonItemProps,
 } from "@payglocal_ui/flux-ui";

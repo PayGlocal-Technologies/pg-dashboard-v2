@@ -1,4 +1,7 @@
-import type { RecurringType } from "@/features/dashboard/create-invoice/types";
+import type {
+  InvoiceBrandingStyle,
+  RecurringType,
+} from "@/features/dashboard/create-invoice/types";
 
 /**
  * Production's wizard steps. The flat editor does not render them, but the
@@ -82,3 +85,98 @@ export const REQUIRED_ADDRESS_KEYS = [
 
 /** How long the editor waits after the last keystroke before saving the draft. */
 export const AUTOSAVE_DEBOUNCE_MS = 1200;
+
+// ─── Branding ─────────────────────────────────────────────────────────────────
+
+/**
+ * The document layout the server's generate-invoice actually renders.
+ *
+ * The other five styles below exist in the editor and its preview but the
+ * renderer does not know about them yet, so the picker badges them and this
+ * constant is the single place that fact is encoded. When the renderer accepts a
+ * layout id, delete this constant and the badge that reads it.
+ */
+export const RENDERER_LAYOUT_ID = "classic";
+
+/**
+ * Invoice themes, ported from Nova (lib/mock-data/invoice-create.ts).
+ *
+ * `classic` is deliberately first and is what a fresh invoice gets: it is the
+ * one layout the server can produce, so the default never diverges from the
+ * document a customer receives.
+ */
+export const INVOICE_BRANDING_STYLES: InvoiceBrandingStyle[] = [
+  {
+    id: "style_classic",
+    name: "Classic",
+    layout: "classic",
+    defaultPrimaryColor: "#0061E3",
+    defaultAccentColor: "#0061E3",
+  },
+  {
+    id: "style_minimal_mono",
+    name: "Minimal Mono",
+    layout: "minimal-mono",
+    defaultPrimaryColor: "#1F2937",
+    defaultAccentColor: "#9CA3AF",
+  },
+  {
+    id: "style_bold_sidebar",
+    name: "Bold Sidebar",
+    layout: "bold-sidebar",
+    defaultPrimaryColor: "#1E3A8A",
+    defaultAccentColor: "#C2410C",
+    isNew: true,
+  },
+  {
+    id: "style_playful_border",
+    name: "Playful Border",
+    layout: "playful-border",
+    defaultPrimaryColor: "#3730A3",
+    defaultAccentColor: "#EAB308",
+    isNew: true,
+  },
+  {
+    id: "style_y2k_bold",
+    name: "Y2K Bold",
+    layout: "y2k-bold",
+    defaultPrimaryColor: "#0F0F0F",
+    defaultAccentColor: "#EC4899",
+    isNew: true,
+  },
+  {
+    id: "style_geometric_modern",
+    name: "Geometric Modern",
+    layout: "geometric-modern",
+    defaultPrimaryColor: "#4C4499",
+    defaultAccentColor: "#A3E635",
+  },
+];
+
+export const DEFAULT_BRANDING_STYLE = INVOICE_BRANDING_STYLES[0]!;
+
+/**
+ * Swatches offered beside the hex field in the colour picker.
+ *
+ * flux has no colour-input component and a native `<input type="color">` is
+ * exactly the bare interactive element CLAUDE.md's UI rule forbids, so the
+ * picker is swatches plus a validated hex field. Raised as a design-system gap
+ * rather than bypassed: a flux `<ColorInput>` would replace both halves.
+ */
+export const BRAND_COLOR_SWATCHES = [
+  "#0061E3",
+  "#1E3A8A",
+  "#3730A3",
+  "#4C4499",
+  "#0F766E",
+  "#15803D",
+  "#B45309",
+  "#BE123C",
+  "#0F0F0F",
+  "#4B5563",
+] as const;
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+
+/** Longest a merchant-chosen template name may be. */
+export const TEMPLATE_NAME_MAX_LENGTH = 60;
