@@ -172,3 +172,24 @@ export const RECEIPT_COLUMNS: Column<Receipt>[] = [
     ),
   },
 ];
+
+/**
+ * The columns, with an optional leading Merchant ID column.
+ *
+ * The receipts list merges rows across every one of the merchant's MIDs (see
+ * ReceiptsTable), so a multi-MID merchant with no MID selected needs to see
+ * which account each receipt belongs to — mirrors pg-dashboard's
+ * `showMerchantId` gate. Single-MID (or a selected MID) hides it: the column
+ * would repeat one value down every row.
+ */
+export function buildReceiptColumns(showMerchantId: boolean): Column<Receipt>[] {
+  if (!showMerchantId) return RECEIPT_COLUMNS;
+  const merchantIdColumn: Column<Receipt> = {
+    key: "merchantId",
+    header: "Merchant ID",
+    minWidth: 150,
+    cellClassName: "overflow-visible",
+    render: (row) => <CopyableCell value={row.merchantId ?? ""} label="Merchant ID" monospace />,
+  };
+  return [merchantIdColumn, ...RECEIPT_COLUMNS];
+}

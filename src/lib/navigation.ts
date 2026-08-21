@@ -278,7 +278,6 @@ export const mcaNavigation: NavGroup[] = [
     items: [
       { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
       { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
-      { label: "GST Invoices", href: "/gst-invoices", icon: "percent", permission: [] },
     ],
   },
   {

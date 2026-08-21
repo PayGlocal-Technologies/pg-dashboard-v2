@@ -1,6 +1,11 @@
 import type { AmountRangeValue, FilterChipOption } from "@/components/common/filters/FilterChips";
 import { formatCurrency } from "@/lib/utils/format";
-import type { Receipt, ReceiptProduct } from "@/features/dashboard/receipts/types";
+import type {
+  InvoiceDownloadViewRecord,
+  InvoiceViewRequestParams,
+  Receipt,
+  ReceiptProduct,
+} from "@/features/dashboard/receipts/types";
 
 /**
  * INR receipts read 1,24,999.00 and everything else 124,999.00 — the lakh
@@ -123,4 +128,75 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
 
     return true;
   });
+}
+
+// ── API mapping (ported from pg-dashboard invoice-download) ──────────────────
+
+/**
+ * Default service range = the last ~18 months, ported verbatim from the old
+ * feature's getDefault18MonthRange. Call from a `useState` lazy initialiser or
+ * an effect, never directly during render (uses `new Date()`).
+ */
+export function getDefault18MonthRange(): InvoiceViewRequestParams {
+  const now = new Date();
+  const endYear = now.getFullYear();
+  const endMonth = String(now.getMonth() + 1).padStart(2, "0");
+
+  const start = new Date(now);
+  start.setMonth(start.getMonth() - 15);
+  const startYear = start.getFullYear();
+  const startMonth = String(start.getMonth() + 1).padStart(2, "0");
+
+  return {
+    serviceYearStart: String(startYear),
+    serviceMonthStart: startMonth,
+    serviceYearEnd: String(endYear),
+    serviceMonthEnd: endMonth,
+  };
+}
+
+/**
+ * Backend productType ("PA" | "MCA" | "FS") → the tab union. The old feature's
+ * Fraud value is "FS"; everything else that isn't MCA is treated as PA.
+ * OPEN ITEM: confirm no other productType strings appear in a live response.
+ */
+export function mapProductType(productType: string | null | undefined): ReceiptProduct {
+  if (productType === "MCA") return "MCA";
+  if (productType === "FS" || productType === "FRAUD") return "FRAUD";
+  return "PA";
+}
+
+/**
+ * "YYYY-MM" for the Month column / filter. Prefers the record's
+ * productServicePeriod when it already starts with a year-month; otherwise
+ * parses invoiceDate. OPEN ITEM: confirm both formats against a live response.
+ */
+function toPeriodMonth(servicePeriod?: string | null, invoiceDate?: string | null): string {
+  const ym = servicePeriod?.match(/^(\d{4})-(\d{2})/);
+  if (ym) return `${ym[1]}-${ym[2]}`;
+  if (invoiceDate) {
+    const parsed = new Date(invoiceDate);
+    if (!Number.isNaN(parsed.getTime())) {
+      return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}`;
+    }
+  }
+  return servicePeriod ?? "";
+}
+
+/** Maps a backend invoice record onto the Receipt the table renders. */
+export function mapInvoiceRecordToReceipt(record: InvoiceDownloadViewRecord): Receipt {
+  const merchantId = record.merchantId ?? "";
+  const servicePeriod = record.productServicePeriod ?? "";
+  return {
+    gid: record.invoiceId || `${merchantId}-${servicePeriod}-${record.productType ?? ""}`,
+    product: mapProductType(record.productType),
+    invoiceNumber: record.invoiceNumber ?? "",
+    invoiceId: record.invoiceId ?? "",
+    periodMonth: toPeriodMonth(record.productServicePeriod, record.invoiceDate),
+    amount: String(record.totalAmount ?? ""),
+    // Always INR — the old table has no currency field and these are GST invoices.
+    currency: "INR",
+    merchantId,
+    servicePeriod,
+  };
 }

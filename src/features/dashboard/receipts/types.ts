@@ -48,4 +48,52 @@ export interface Receipt {
    * Amount cell never hardcodes a symbol.
    */
   currency: string;
+  /**
+   * The MID this receipt belongs to. Needed both for the download call and for
+   * the Merchant ID column shown to multi-MID merchants (the list merges
+   * receipts across every MID). Optional so the mock data stays valid.
+   */
+  merchantId?: string;
+  /**
+   * The record's `productServicePeriod` — the path key the download endpoint is
+   * addressed by (NOT invoiceNumber). Carried on the row so the download action
+   * has everything it needs.
+   */
+  servicePeriod?: string;
+}
+
+// ── Real API contracts (ported verbatim from pg-dashboard invoice-download) ──
+
+/** POST body for the invoice list. Year/month bounds define the service range. */
+export interface InvoiceViewRequestParams {
+  serviceYearStart: string | null;
+  serviceMonthStart: string | null;
+  serviceYearEnd: string | null;
+  serviceMonthEnd: string | null;
+  products?: string | null;
+}
+
+/** One invoice as the backend returns it. productType is "PA" | "MCA" | "FS". */
+export interface InvoiceDownloadViewRecord {
+  invoiceNumber?: string | null;
+  invoiceDate?: string | null;
+  gstInvoiceId?: string | null;
+  txnId?: string | null;
+  productType?: string | null;
+  merchantId?: string | null;
+  totalAmount?: number | string | null;
+  productServicePeriod?: string | null;
+  invoiceId?: string | null;
+}
+
+export interface InvoiceDownloadViewResponse {
+  data?: {
+    views?: InvoiceDownloadViewRecord[] | null;
+  } | null;
+}
+
+export interface InvoiceDownloadResponse {
+  data?: {
+    presignedUrl?: string | null;
+  } | null;
 }
