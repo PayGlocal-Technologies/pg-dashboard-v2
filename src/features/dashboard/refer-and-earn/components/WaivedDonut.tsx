@@ -68,9 +68,14 @@ interface WaivedDonutProps {
 }
 
 /**
- * Compact donut showing how much of the earned total has been waived, with the
- * share in its hole. Sized to fit the slack beside the card's amount rather than
- * to add height of its own, so the amount stays the card's primary content.
+ * Compact donut showing how much of the earned total has been waived. Sized to
+ * fit the slack beside the card's amount rather than to add height of its own,
+ * so the amount stays the card's primary content.
+ *
+ * Deliberately no figure in the hole: the card already states the split in
+ * currency right beside it, and the arcs carry the shape of it. The share is
+ * still on the element's accessible name and in the hover tooltip, so nothing
+ * is lost to anyone who cannot read it off the arcs.
  */
 export function WaivedDonut({ waived, eligible, currency, className }: WaivedDonutProps) {
   // Nothing earned means nothing to waive, and no ratio to draw — an empty state
@@ -128,16 +133,6 @@ export function WaivedDonut({ waived, eligible, currency, className }: WaivedDon
           </Pie>
         </PieChart>
       </ResponsiveContainer>
-
-      {/* Centred in the hole. Absolutely positioned rather than a Recharts
-          <Label>, which would need its own viewBox arithmetic to stay centred.
-          `pointer-events-none` so it never blocks the arcs' own hover. */}
-      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-sm font-semibold tabular-nums leading-none text-foreground">
-          {percent}%
-        </span>
-        <span className="mt-0.5 text-[10px] leading-none text-muted-foreground">waived</span>
-      </div>
     </div>
   );
 }

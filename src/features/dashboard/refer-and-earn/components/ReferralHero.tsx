@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import { toast } from "sonner";
 import {
   Button,
   Card,
@@ -27,14 +28,46 @@ interface ReferralHeroProps {
 export function ReferralHero({ referralUrl }: ReferralHeroProps) {
   const [copied, setCopied] = useState(false);
 
-  async function handleCopy() {
+  async function handleCopy(): Promise<boolean> {
     try {
       await navigator.clipboard.writeText(referralUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+      return true;
     } catch {
       // Clipboard access denied — fail silently, the URL is still readable in
       // the field and selectable by hand.
+      return false;
+    }
+  }
+
+  /**
+   * Hands the link to the device's own share sheet where there is one — mobile,
+   * and Safari and Edge on the desktop. Everywhere else there is no sheet to
+   * open, so the link goes to the clipboard instead and says so: the merchant
+   * asked to share it, and a button that appeared to do nothing would be worse
+   * than one that quietly did the next best thing.
+   */
+  async function handleShare() {
+    if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+      try {
+        await navigator.share({
+          title: "Refer and Earn on PayGlocal",
+          text: "Sign up on PayGlocal with my referral link.",
+          url: referralUrl,
+        });
+      } catch {
+        // Dismissed, or the sheet refused it. Nothing to report — the merchant
+        // closed it themselves, and falling back to the clipboard here would
+        // act on a share they just cancelled.
+      }
+      return;
+    }
+
+    if (await handleCopy()) {
+      toast.success("Referral link copied", {
+        description: "Paste it into a message or email to share it.",
+      });
     }
   }
 
@@ -97,17 +130,25 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
             rides the field's own inline-end addon — one control group, and the
             input keeps its own styling. The URL truncates within the field on a
             narrow viewport; the full value is what gets copied either way. */}
-        {/* Fills the card's content width: InputGroup is already `w-full` and its
-            input is `flex-1`, so dropping the old max-width is all it takes — the
-            field consumes the slack and the Copy button keeps its natural size. */}
-        <InputGroup className="mt-6">
-          <InputGroupInput
-            readOnly
-            value={referralUrl}
-            aria-label="Your referral link"
-            className="truncate text-[13px]"
-          />
-          {/* Even spacing around the Copy button. The field is 44px tall with a
+        {/* The field and the share action are two controls on one row, not one
+            control: Share sits outside the InputGroup so the group keeps its own
+            border and its own inline Copy addon untouched.
+
+            Side by side from sm up — the field takes the slack (`flex-1`, with
+            `min-w-0` so a long URL truncates inside it instead of pushing the
+            row wider than the card) and the button keeps its natural width.
+            Below sm they stack full-width, which is what keeps a narrow viewport
+            free of horizontal scroll rather than squeezing two controls onto a
+            line that cannot hold them. */}
+        <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+          <InputGroup className="min-w-0 sm:flex-1">
+            <InputGroupInput
+              readOnly
+              value={referralUrl}
+              aria-label="Your referral link"
+              className="truncate text-[13px]"
+            />
+            {/* Even spacing around the Copy button. The field is 44px tall with a
               1px border, so its content box is 42px; a 32px button centred in
               that leaves 5px above and below, and `pr-[5px]` puts the same 5px
               to its right — an equal 5px inset on all three of the button's free
@@ -120,20 +161,35 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
               different modifier, so both classes survive the merge and the
               `:has()` variant then wins on specificity, eating the right-hand
               padding and leaving the button overhanging by ~1.4px. */}
-          <InputGroupAddon align="inline-end" className="pr-[5px] has-[>button]:mr-0">
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={handleCopy}
-              leftIcon={<Icon name={copied ? "check" : "copy"} size={13} />}
-              aria-label={copied ? "Referral link copied" : "Copy referral link"}
-              className="h-8 min-h-8"
-            >
-              {copied ? "Copied" : "Copy"}
-            </Button>
-          </InputGroupAddon>
-        </InputGroup>
+            <InputGroupAddon align="inline-end" className="pr-[5px] has-[>button]:mr-0">
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                onClick={() => void handleCopy()}
+                leftIcon={<Icon name={copied ? "check" : "copy"} size={13} />}
+                aria-label={copied ? "Referral link copied" : "Copy referral link"}
+                className="h-8 min-h-8"
+              >
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </InputGroupAddon>
+          </InputGroup>
+
+          {/* Secondary to Copy, which is the primary action on this screen, and
+              matched to the field's 44px so the two sit on one line rather than
+              one riding high against the other. Full-width while stacked. */}
+          <Button
+            type="button"
+            variant="secondary"
+            size="md"
+            onClick={() => void handleShare()}
+            leftIcon={<Icon name="share-2" size={14} />}
+            className="h-11 min-h-11 w-full shrink-0 sm:w-auto"
+          >
+            Share link
+          </Button>
+        </div>
       </div>
     </Card>
   );

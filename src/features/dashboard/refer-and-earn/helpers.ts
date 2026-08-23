@@ -2,7 +2,18 @@ import type {
   LeaderboardEntry,
   Referral,
   ReferralStandings,
+  ReferralStatus,
 } from "@/features/dashboard/refer-and-earn/types";
+
+/**
+ * Whether a referral is through its qualifying transaction. A waived referral
+ * earned its reward before any of it could come off an invoice, so it counts as
+ * completed too — the completed figure is "made it to the end", not "has an
+ * untouched reward sitting there".
+ */
+function isCompleted(status: ReferralStatus): boolean {
+  return status === "REWARD_EARNED" || status === "WAIVED";
+}
 
 export interface ReferralSummary {
   /** Sum of every reward already credited to the referrer. */
@@ -41,7 +52,7 @@ export function summarizeReferrals(referrals: Referral[]): ReferralSummary {
   let completed = 0;
 
   for (const referral of referrals) {
-    if (referral.status === "REWARD_EARNED") completed += 1;
+    if (isCompleted(referral.status)) completed += 1;
 
     const waived = referral.waivedAmount == null ? NaN : parseFloat(referral.waivedAmount);
     if (!Number.isNaN(waived)) totalWaived += waived;
@@ -68,6 +79,21 @@ export function summarizeReferrals(referrals: Referral[]): ReferralSummary {
     // credited before any of it can come off a fee.
     waivedEligible: totalEarned,
   };
+}
+
+/**
+ * A metric's share of everyone invited, as a whole-number percentage — what the
+ * analytics bars are drawn from.
+ *
+ * Clamped into 0–100 rather than trusted: a share is only meaningful against a
+ * non-zero denominator, so no referrals invited yet reads as an empty bar
+ * instead of a division by zero. The bars are computed here rather than in the
+ * card so they come from the same module as the figures they sit under, and can
+ * never be derived from a different total.
+ */
+export function shareOfInvited(part: number, totalInvited: number): number {
+  if (totalInvited <= 0) return 0;
+  return Math.round(Math.min(1, Math.max(0, part / totalInvited)) * 100);
 }
 
 // ── Referral leaderboard ─────────────────────────────────────────────────────

@@ -1,5 +1,13 @@
-/** Referral lifecycle, in the order a referral moves through it. */
-export type ReferralStatus = "PENDING" | "ACTIVATED" | "REWARD_EARNED";
+/**
+ * Referral lifecycle, in the order a referral moves through it.
+ *
+ * Four stored values, three states the merchant sees: PENDING and ACTIVATED are
+ * both stages before the qualifying transaction, so the table and the analytics
+ * row both read them as one "in progress" state. REWARD_EARNED is a credited
+ * reward, and WAIVED is one that has been fully drawn down against the
+ * merchant's MDR — the end of the line.
+ */
+export type ReferralStatus = "PENDING" | "ACTIVATED" | "REWARD_EARNED" | "WAIVED";
 
 export interface Referral {
   id: string;

@@ -6,6 +6,8 @@ import { cn } from "@/lib/utils";
 import {
   formatReferralReward,
   getReferralStatusMeta,
+  ReferralRemindButton,
+  type ReferralRemindActions,
 } from "@/features/dashboard/refer-and-earn/columns";
 import type { Referral } from "@/features/dashboard/refer-and-earn/types";
 
@@ -16,14 +18,18 @@ function ReferralCardSkeleton() {
         <Shimmer className="h-5 w-32" />
         <Shimmer className="ml-auto h-5 w-24" rounded="full" />
       </div>
-      <Shimmer className="mt-2.5 h-3 w-40" />
+      <div className="mt-2.5 flex items-center justify-between gap-3">
+        <Shimmer className="h-3 w-40" />
+        <Shimmer className="h-8 w-24" rounded="lg" />
+      </div>
     </div>
   );
 }
 
-// Same three values as the table's columns — name, status, reward, email — just
-// stacked instead of laid out in cells, matching ClientCardList's rhythm.
-function ReferralCard({ row }: { row: Referral }) {
+// Same values as the table's columns — name, status, reward, email, and the
+// Remind action — just stacked instead of laid out in cells, matching
+// ClientCardList's rhythm.
+function ReferralCard({ row, onRemind, remindedIds }: { row: Referral } & ReferralRemindActions) {
   const { label, variant, trailIcon } = getReferralStatusMeta(row.status);
 
   return (
@@ -41,24 +47,29 @@ function ReferralCard({ row }: { row: Referral }) {
         />
       </div>
 
-      {/* Trailing metadata row: email at the left, reward at the right — the
-          reward is the figure the merchant scans for, so it holds the edge. */}
+      {/* Trailing row: email at the left, then the reward and the Remind action
+          at the right — the reward is the figure the merchant scans for, so it
+          keeps its place beside the edge and the action trails it. The email
+          takes the slack and truncates; the pair beside it never shrinks. */}
       <div className="mt-2.5 flex items-center justify-between gap-3">
         <span className="min-w-0 truncate text-[12px] text-muted-foreground">{row.emailId}</span>
-        <span
-          className={cn(
-            "shrink-0 text-[13px] tabular-nums",
-            row.rewardAmount == null ? "text-muted-foreground" : "font-semibold text-foreground"
-          )}
-        >
-          {formatReferralReward(row)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2.5">
+          <span
+            className={cn(
+              "text-[13px] tabular-nums",
+              row.rewardAmount == null ? "text-muted-foreground" : "font-semibold text-foreground"
+            )}
+          >
+            {formatReferralReward(row)}
+          </span>
+          <ReferralRemindButton row={row} onRemind={onRemind} remindedIds={remindedIds} />
+        </div>
       </div>
     </div>
   );
 }
 
-interface ReferralCardListProps {
+interface ReferralCardListProps extends ReferralRemindActions {
   rows: Referral[];
   isLoading: boolean;
   skeletonCount?: number;
@@ -87,6 +98,8 @@ export function ReferralCardList({
   emptyTitle,
   emptyDescription,
   className,
+  onRemind,
+  remindedIds,
 }: ReferralCardListProps) {
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
 
@@ -97,7 +110,9 @@ export function ReferralCardList({
       ) : rows.length === 0 ? (
         <EmptyState title={emptyTitle} description={emptyDescription} />
       ) : (
-        rows.map((row) => <ReferralCard key={row.id} row={row} />)
+        rows.map((row) => (
+          <ReferralCard key={row.id} row={row} onRemind={onRemind} remindedIds={remindedIds} />
+        ))
       )}
 
       {!isLoading && rows.length > 0 && totalPages > 1 && (

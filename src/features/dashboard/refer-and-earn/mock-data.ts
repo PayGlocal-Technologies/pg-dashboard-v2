@@ -12,14 +12,17 @@ import type { Referral, ReferralStandings } from "@/features/dashboard/refer-and
  * Names and email addresses are fictional. `waivedAmount` is the slice of each
  * credited reward already drawn down against fees — deliberately a mix of fully
  * waived, partly waived, and not-yet-started so the analytics row shows a real
- * waived-vs-earned split rather than two identical figures.
+ * waived-vs-earned split rather than two identical figures. A row is only
+ * `WAIVED` once that slice is the whole reward; a partly drawn-down reward is
+ * still `REWARD_EARNED`, which is why status and `waivedAmount` are not
+ * interchangeable.
  */
 export const MOCK_REFERRALS: Referral[] = [
   {
     id: "referral-0001",
     fullName: "Aarav Mehta",
     emailId: "aarav.mehta@brightloom.example",
-    status: "REWARD_EARNED",
+    status: "WAIVED",
     rewardAmount: "30.00",
     waivedAmount: "30.00",
     rewardCurrency: "USD",
@@ -28,7 +31,7 @@ export const MOCK_REFERRALS: Referral[] = [
     id: "referral-0002",
     fullName: "Diane Whitfield",
     emailId: "diane@northquay.example",
-    status: "REWARD_EARNED",
+    status: "WAIVED",
     rewardAmount: "30.00",
     waivedAmount: "30.00",
     rewardCurrency: "USD",

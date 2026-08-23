@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { DataTable, Heading } from "@/components/ui";
 import { buildReferralColumns } from "@/features/dashboard/refer-and-earn/columns";
 import { REFERRAL_PAGE_SIZE } from "@/features/dashboard/refer-and-earn/constants";
@@ -25,7 +26,26 @@ interface ReferralEarningsProps {
  */
 export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarningsProps) {
   const [page, setPage] = useState(1);
-  const columns = buildReferralColumns();
+
+  // Which rows have been nudged. Held here rather than inside each button so it
+  // survives paging and is shared by the table and the card list — the same
+  // referral cannot read "Remind" in one layout and "Sent" in the other. A Set
+  // of ids, so a row keeps its state wherever it lands on the page.
+  const [remindedIds, setRemindedIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  function handleRemind(row: Referral) {
+    // TODO(integration): call the referral reminder endpoint here once that
+    // contract exists, and drive both the sent state and the toast off its
+    // response instead of assuming it. The real endpoint is also where a resend
+    // cooldown would come from — until then a row stays "Sent" for the session,
+    // which is the conservative side to be on for an email nudge.
+    setRemindedIds((prev) => new Set(prev).add(row.id));
+    toast.success("Reminder sent", {
+      description: `We've nudged ${row.fullName} to finish setting up their account.`,
+    });
+  }
+
+  const columns = buildReferralColumns({ onRemind: handleRemind, remindedIds });
 
   const totalCount = referrals.length;
   const pageRows = referrals.slice((page - 1) * REFERRAL_PAGE_SIZE, page * REFERRAL_PAGE_SIZE);
@@ -86,6 +106,8 @@ export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarni
           pageSize={REFERRAL_PAGE_SIZE}
           emptyTitle={EMPTY_TITLE}
           emptyDescription={EMPTY_DESCRIPTION}
+          onRemind={handleRemind}
+          remindedIds={remindedIds}
         />
       </div>
     </section>

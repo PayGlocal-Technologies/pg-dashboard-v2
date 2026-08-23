@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   MetricText,
+  Progress,
   Separator,
   Text,
   Tooltip,
@@ -14,24 +15,51 @@ import {
 import { Icon } from "@/components/icon";
 import { WaivedDonut } from "@/features/dashboard/refer-and-earn/components/WaivedDonut";
 import { formatCurrency } from "@/lib/utils/format";
+import { shareOfInvited } from "@/features/dashboard/refer-and-earn/helpers";
 import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helpers";
+import type { ProgressProps } from "@payglocal_ui/flux-ui";
 
 /**
- * One status row: label at the left, figure at the right. Rendered as two grid
- * cells rather than its own flex row so every row shares the parent's column
- * tracks — that is what keeps the three figures on one right-hand edge no matter
- * how wide the labels get.
+ * One status metric: label and figure on a line, with the bar beneath it.
+ *
+ * `justify-between` on the top line is what keeps the three figures on a single
+ * right-hand edge whatever the labels do, and every block being the same width
+ * means the three bars share one baseline and one full-width scale — so their
+ * fills can be read against each other, not just each against itself.
+ *
+ * The bar is Flux's own Progress at its smallest size (a 1px track), and the
+ * figure keeps the MetricText treatment: the bar restates what the number
+ * already says, so it stays the quieter of the two.
  */
-function StatusMetric({ label, value }: { label: string; value: number }) {
+function StatusMetric({
+  label,
+  value,
+  percent,
+  variant,
+}: {
+  label: string;
+  value: number;
+  /** Share of everyone invited, 0–100. */
+  percent: number;
+  variant: ProgressProps["variant"];
+}) {
   return (
-    <>
-      <Text size="sm" color="subtle">
-        {label}
-      </Text>
-      <MetricText size="sm" className="text-right">
-        {value.toLocaleString("en-US")}
-      </MetricText>
-    </>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-baseline justify-between gap-8">
+        <Text size="sm" color="subtle">
+          {label}
+        </Text>
+        <MetricText size="sm">{value.toLocaleString("en-US")}</MetricText>
+      </div>
+      {/* The figure beside it is the accessible value, so the bar carries the
+          share it draws rather than repeating the count. */}
+      <Progress
+        value={percent}
+        size="xs"
+        variant={variant}
+        aria-label={`${label}: ${percent}% of everyone invited`}
+      />
+    </div>
   );
 }
 
@@ -89,11 +117,34 @@ export function ReferralSummaryCards({ summary }: ReferralSummaryCardsProps) {
                 wrapper's own `items-center` keeps it centred in the card. */}
             <Separator orientation="vertical" className="hidden self-stretch sm:block" />
 
-            {/* Labels take the slack, figures sit flush right in their own track. */}
-            <div className="grid grid-cols-[1fr_auto] items-center gap-x-8 gap-y-2.5 sm:min-w-[12rem]">
-              <StatusMetric label="Total invited" value={summary.totalInvited} />
-              <StatusMetric label="In progress" value={summary.inProgress} />
-              <StatusMetric label="Completed" value={summary.completed} />
+            {/* The three metrics, each over its own bar. Every bar is a share of
+                everyone invited, which is what makes them comparable: the top
+                one is the whole population and so always reads full, and the two
+                below it are the split of that same bar. The shares come from
+                shareOfInvited over this card's own summary — nothing here is a
+                fixed percentage, so the bars follow the data on their own.
+
+                Bar colours follow the status chips in the table below, so "in
+                progress" and "completed" mean the same thing in both places. */}
+            <div className="flex flex-col gap-3 sm:min-w-[13rem]">
+              <StatusMetric
+                label="Total invited"
+                value={summary.totalInvited}
+                percent={shareOfInvited(summary.totalInvited, summary.totalInvited)}
+                variant="default"
+              />
+              <StatusMetric
+                label="In progress"
+                value={summary.inProgress}
+                percent={shareOfInvited(summary.inProgress, summary.totalInvited)}
+                variant="warning"
+              />
+              <StatusMetric
+                label="Completed"
+                value={summary.completed}
+                percent={shareOfInvited(summary.completed, summary.totalInvited)}
+                variant="success"
+              />
             </div>
           </div>
         </div>
