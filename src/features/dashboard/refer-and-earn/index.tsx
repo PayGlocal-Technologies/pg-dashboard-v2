@@ -43,13 +43,17 @@ export function ReferAndEarnFeature() {
       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:items-stretch lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
         <ReferralHero referralUrl={referralUrl} />
 
-        {/* Right column: the running totals above the board. `self-start` lives
-            here rather than on either card — as a grid item this column would
-            otherwise stretch to the hero's height. Inside a flex column the two
-            cards keep their own heights and stay full width, which `self-start`
-            on a card would have broken (in a column, align-self is the
-            horizontal axis). */}
-        <div className="flex flex-col gap-4 self-start lg:gap-6">
+        {/* Right column: the running totals above the board. Deliberately no
+            `self-start` — that is `align-self: start`, which opts a grid item out
+            of stretching, and it is what used to leave this column at its own
+            height while the hero's banner grew with the viewport. Stretched, the
+            column takes the row height, the leaderboard grows into whatever the
+            totals card leaves (its own `md:grow`), and the board's scroll viewport
+            takes the rest. No height is named anywhere in that chain.
+
+            Stacked below md the row holds this column alone, so it is its natural
+            height and nothing is forced to match. */}
+        <div className="flex flex-col gap-4 lg:gap-6">
           <ReferralTotalsCard summary={summary} />
           <ReferralLeaderboard
             standings={MOCK_LEADERBOARD}

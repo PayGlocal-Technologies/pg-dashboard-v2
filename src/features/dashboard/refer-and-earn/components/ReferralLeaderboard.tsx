@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type CSSProperties } from "react";
 import { Card, Heading, Separator, Text } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -191,32 +191,60 @@ export function ReferralLeaderboard({
   }, []);
 
   return (
-    // Height is the four-row viewport plus the heading and the card's padding —
-    // nothing else. It no longer needs `self-start` for that: it now sits in a
-    // flex column (see index.tsx), where a child takes its own height and the
-    // column carries the `self-start` that stops it stretching to the hero.
-    <Card className="gap-4 p-5 sm:p-6">
+    // From md up the card grows into whatever height the column has spare after
+    // the totals card above it, so it ends level with the hero beside it. `grow`
+    // rather than `flex-1`: flex-basis stays `auto`, so the card's own content —
+    // heading, four-row viewport, padding — is its floor and growth is only ever
+    // additive. Below md the column is content-height, so there is nothing to
+    // grow into and this is inert.
+    //
+    // `--lb-viewport` is the four-row measure, published here as a custom property
+    // so the viewport below can use it as both a max- and a min-height without the
+    // figure being written twice.
+    <Card
+      className="gap-4 p-5 sm:p-6 md:grow"
+      style={
+        {
+          "--lb-viewport": `calc(${VISIBLE_ROWS} * ${ROW_HEIGHT} + ${VISIBLE_ROWS - 1} * 1px)`,
+        } as CSSProperties
+      }
+    >
       <Heading level={2} size="sm" color="subtle">
         Referral leaderboard
       </Heading>
 
       {/*
-        The scroll viewport. Its height comes from ROW_HEIGHT × VISIBLE_ROWS plus
-        the separators between those rows, so it is derived from the row's own
-        type scale rather than set to a pixel guess — change the row's padding or
-        text sizes and this follows.
+        The scroll viewport. Its four-row measure comes from ROW_HEIGHT ×
+        VISIBLE_ROWS plus the separators between those rows, so it is derived from
+        the row's own type scale rather than set to a pixel guess — change the
+        row's padding or text sizes and this follows.
+
+        It is a min-height on this frame, and the scroller inside is taken out of
+        flow (`absolute inset-0`). That split is deliberate and load-bearing: an
+        out-of-flow child contributes nothing to its parent's intrinsic height, so
+        this frame measures four rows no matter how many rows the list holds. That
+        is what keeps the card — and therefore the grid row, and therefore the hero
+        beside it — at exactly the height it had before this frame existed. Sizing
+        the scroller directly and lifting its max-height instead would let all
+        twelve rows drive the card's intrinsic height and push the hero taller,
+        which is the opposite of what is wanted here.
+
+        From md up the frame also carries `flex-1`, so when the card grows into the
+        column's spare height the frame takes that growth and the scroller fills it
+        via `inset-0`. More rows come into frame, the sticky block still anchors to
+        the foot of the taller scroller, and the rows are untouched: the scroller is
+        a block container, so its children keep their own heights and no gap opens
+        between them.
 
         `scrollbar-none` keeps the surface clean; the faded row and the pinned
         merchant row are what signal there is more to scroll.
       */}
-      <div
-        ref={scrollRef}
-        className="scrollbar-none overflow-y-auto overscroll-contain"
-        style={{
-          maxHeight: `calc(${VISIBLE_ROWS} * ${ROW_HEIGHT} + ${VISIBLE_ROWS - 1} * 1px)`,
-        }}
-      >
-        {/*
+      <div className="relative min-h-[var(--lb-viewport)] md:flex-1">
+        <div
+          ref={scrollRef}
+          className="scrollbar-none absolute inset-0 overflow-y-auto overscroll-contain"
+        >
+          {/*
           Every row is a direct child of this scroll container, via keyed
           fragments rather than per-row wrapper divs. That is what makes the
           sticky block below work at all: a sticky element can only offset within
@@ -224,31 +252,31 @@ export function ReferralLeaderboard({
           height leaves it nowhere to slide and it renders as if it were static.
           Flat children give it the whole list as its containing block.
         */}
-        {rows.map((entry, index) => {
-          const isMe = me != null && entry.id === me.id;
-          const separator = index < rows.length - 1 && <Separator className="bg-border/70" />;
+          {rows.map((entry, index) => {
+            const isMe = me != null && entry.id === me.id;
+            const separator = index < rows.length - 1 && <Separator className="bg-border/70" />;
 
-          if (!isMe) {
+            if (!isMe) {
+              return (
+                <Fragment key={entry.id}>
+                  <LeaderboardRow entry={entry} />
+                  {separator}
+                </Fragment>
+              );
+            }
+
+            // The merchant's row is the only sticky one, and it is the same single
+            // row from the same list — never a second, separately positioned copy.
+            // `bottom-0` anchors it to the foot of the scroll container for as long
+            // as its real position is below the fold; once the scroll reaches that
+            // position it releases into normal flow, and scrolling back up re-anchors
+            // it. So there is exactly one "You" row at every scroll offset, with no
+            // duplicate to keep in sync. The anchor is the container, not the page:
+            // sticky resolves against the nearest scrollport, which is this div.
             return (
               <Fragment key={entry.id}>
-                <LeaderboardRow entry={entry} />
-                {separator}
-              </Fragment>
-            );
-          }
-
-          // The merchant's row is the only sticky one, and it is the same single
-          // row from the same list — never a second, separately positioned copy.
-          // `bottom-0` anchors it to the foot of the scroll container for as long
-          // as its real position is below the fold; once the scroll reaches that
-          // position it releases into normal flow, and scrolling back up re-anchors
-          // it. So there is exactly one "You" row at every scroll offset, with no
-          // duplicate to keep in sync. The anchor is the container, not the page:
-          // sticky resolves against the nearest scrollport, which is this div.
-          return (
-            <Fragment key={entry.id}>
-              <div className="sticky bottom-0 z-10">
-                {/* The fade, absolutely positioned just above the block's top edge
+                <div className="sticky bottom-0 z-10">
+                  {/* The fade, absolutely positioned just above the block's top edge
                     (`bottom-full`) so it contributes no layout height at all and
                     the anchor point stays exactly where the row alone would put
                     it. An earlier version used a negative top margin, which
@@ -257,34 +285,35 @@ export function ReferralLeaderboard({
                     resolving to the card surface where the opaque area below
                     begins — that is what makes it read as the list continuing
                     rather than as a white slab. */}
-                {isPinned && (
-                  <div
-                    aria-hidden
-                    className="pointer-events-none absolute inset-x-0 bottom-full h-16 bg-gradient-to-b from-transparent to-card"
-                  />
-                )}
+                  {isPinned && (
+                    <div
+                      aria-hidden
+                      className="pointer-events-none absolute inset-x-0 bottom-full h-16 bg-gradient-to-b from-transparent to-card"
+                    />
+                  )}
 
-                {/* Opaque from here down: the row's own tint is translucent, so
+                  {/* Opaque from here down: the row's own tint is translucent, so
                     without this the rows scrolling beneath would show through it
                     while anchored. The tint composites over `bg-card` exactly as it
                     does over the card itself, so anchored and released look
                     identical. */}
-                <div className="bg-card">
-                  {isPinned && (
-                    <div className="px-2.5 pt-1 pb-3">
-                      <ProgressMessage toReach={toReachFirst} />
-                    </div>
-                  )}
-                  <LeaderboardRow entry={entry} isCurrentMerchant />
-                  {separator}
+                  <div className="bg-card">
+                    {isPinned && (
+                      <div className="px-2.5 pt-1 pb-3">
+                        <ProgressMessage toReach={toReachFirst} />
+                      </div>
+                    )}
+                    <LeaderboardRow entry={entry} isCurrentMerchant />
+                    {separator}
+                  </div>
                 </div>
-              </div>
 
-              {/* Release sentinel — see the observer above. */}
-              <div ref={sentinelRef} aria-hidden className="h-px" />
-            </Fragment>
-          );
-        })}
+                {/* Release sentinel — see the observer above. */}
+                <div ref={sentinelRef} aria-hidden className="h-px" />
+              </Fragment>
+            );
+          })}
+        </div>
       </div>
     </Card>
   );
