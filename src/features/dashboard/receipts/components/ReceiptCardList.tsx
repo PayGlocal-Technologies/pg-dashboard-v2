@@ -4,7 +4,8 @@ import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { ReceiptDownloadAction } from "@/features/dashboard/receipts/columns";
-import { formatReceiptAmount, formatReceiptMonth } from "@/features/dashboard/receipts/utils";
+import { formatReceiptAmount } from "@/features/dashboard/receipts/utils";
+import { formatMonthLabel } from "@/lib/utils/format";
 import { RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/receipts/constants";
 import type { Receipt } from "@/features/dashboard/receipts/types";
 
@@ -70,7 +71,7 @@ function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (row: Rece
         <div className="min-w-0">
           <p className="text-[11px] text-muted-foreground">Month</p>
           <p className="truncate text-[12.5px] text-foreground">
-            {formatReceiptMonth(row.periodMonth)}
+            {formatMonthLabel(row.periodMonth)}
           </p>
         </div>
       </div>

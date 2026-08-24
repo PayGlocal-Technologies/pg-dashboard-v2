@@ -12,7 +12,8 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableCell } from "@/components/common/CopyableCell";
-import { formatReceiptAmount, formatReceiptMonth } from "@/features/dashboard/receipts/utils";
+import { formatReceiptAmount } from "@/features/dashboard/receipts/utils";
+import { formatMonthLabel } from "@/lib/utils/format";
 import { RECEIPT_MONTH_HINT, RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/receipts/constants";
 import type { Receipt } from "@/features/dashboard/receipts/types";
 
@@ -82,7 +83,7 @@ export function ReceiptDownloadAction({
 }) {
   return (
     <IconButton
-      aria-label={`Download the ${RECEIPT_PRODUCT_LABEL[row.product]} receipt for ${formatReceiptMonth(row.periodMonth)}`}
+      aria-label={`Download the ${RECEIPT_PRODUCT_LABEL[row.product]} receipt for ${formatMonthLabel(row.periodMonth)}`}
       variant="outline"
       size="xs"
       rounded="md"
@@ -153,7 +154,7 @@ export const RECEIPT_COLUMNS: Column<Receipt>[] = [
     cellClassName: "overflow-visible",
     render: (row) => (
       <span className="text-[13px] whitespace-nowrap text-foreground">
-        {formatReceiptMonth(row.periodMonth)}
+        {formatMonthLabel(row.periodMonth)}
       </span>
     ),
   },

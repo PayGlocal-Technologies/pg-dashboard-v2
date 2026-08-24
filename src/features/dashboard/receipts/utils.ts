@@ -1,4 +1,4 @@
-import type { AmountRangeValue, FilterChipOption } from "@/components/common/filters/FilterChips";
+import type { AmountRangeValue, MonthRange } from "@/components/common/filters/FilterChips";
 import { formatCurrency } from "@/lib/utils/format";
 import type {
   InvoiceDownloadViewRecord,
@@ -20,48 +20,31 @@ export function formatReceiptAmount(receipt: Receipt): string {
   return formatCurrency(amount, currency, currency === "INR" ? "en-IN" : "en-US");
 }
 
-// Spelled out rather than read from Intl: a receipt's period is a calendar month,
-// not a moment, so the label must not vary with the reader's locale or timezone
-// the way toLocaleString would. "2026-08" reads "August 2026" for everyone.
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-/** "2026-08" → "August 2026". Returns the raw value if it isn't a "YYYY-MM" pair. */
-export function formatReceiptMonth(periodMonth: string): string {
-  const [year, month] = periodMonth.split("-");
-  const name = MONTH_NAMES[Number(month) - 1];
-  if (!year || !name) return periodMonth;
-  return `${name} ${year}`;
+/**
+ * The billing months the Month chip may offer, taken from the window the list
+ * request itself covers (getDefault18MonthRange).
+ *
+ * Derived from the request rather than from the rows on purpose: the chip used to
+ * list only the months the response happened to contain, which meant a product
+ * with no receipts yet — or a request that failed — opened an empty popover with
+ * nothing in it but Clear and Apply. The shared year-and-month grid it renders
+ * now always has something to show, and months without a receipt behind them are
+ * marked rather than missing (see MonthFilterChip).
+ */
+export function receiptMonthRange(params: InvoiceViewRequestParams): MonthRange {
+  return {
+    start: `${params.serviceYearStart}-${params.serviceMonthStart}`,
+    end: `${params.serviceYearEnd}-${params.serviceMonthEnd}`,
+  };
 }
 
 /**
- * The months one product actually has receipts for, as Month filter chip options,
- * newest first — the order the table lists its rows in, so the chip reads like
- * the list it filters.
- *
- * Derived from the rows rather than from a generated calendar, so the chip can
- * only ever offer a month with a receipt behind it: Fraud screening starts later
- * than the other two products, and its chip says so instead of listing empty
- * months. There is exactly one receipt per product per month, so each option here
- * corresponds to exactly one row.
+ * The months the given receipts actually cover, as "YYYY-MM". Feeds the chip's
+ * "has a receipt" dot: there is exactly one receipt per product per month, so a
+ * marked month is one row.
  */
-export function receiptMonthOptions(receipts: Receipt[]): FilterChipOption[] {
-  const months = Array.from(new Set(receipts.map((r) => r.periodMonth)))
-    .sort()
-    .reverse();
-  return months.map((month) => ({ value: month, label: formatReceiptMonth(month) }));
+export function receiptMonthsWithData(receipts: Receipt[]): Set<string> {
+  return new Set(receipts.map((r) => r.periodMonth).filter(Boolean));
 }
 
 export interface ReceiptFilters {
@@ -119,8 +102,8 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
       if (hasMax && amount > max) return false;
     }
 
-    // Months are matched as whole periods, not as a range: the chip lists the
-    // months that exist and the merchant ticks the ones they want, so this is a
+    // Months are matched as whole periods, not as a range: the chip offers a
+    // year-and-month grid and the merchant picks the ones they want, so this is a
     // set membership test rather than a comparison.
     if (filters.monthFilters.length && !filters.monthFilters.includes(receipt.periodMonth)) {
       return false;

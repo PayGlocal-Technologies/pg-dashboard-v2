@@ -3,21 +3,21 @@
 import { useState } from "react";
 import {
   AmountFilterChip,
+  MonthFilterChip,
   type AmountRangeValue,
-  type FilterChipOption,
+  type MonthRange,
 } from "@/components/common/filters/FilterChips";
-import { MonthFilterChip } from "@/features/dashboard/receipts/components/MonthFilterChip";
 import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/receipts/constants";
 
 /**
  * Amount and Month as one unit — the two filters the receipts table offers, and
  * no others.
  *
- * Amount is the product's existing AmountFilterChip, unchanged: a min/max range
- * with the same staged-draft-then-Apply semantics every other chip has. Month is
- * this page's own chip, built from the same shared primitives (see
- * MonthFilterChip). Both narrow independently and compose — an amount range and a
- * month applied together match only the rows satisfying both.
+ * Both are shared chips from FilterChips.tsx: Amount is the min/max range every
+ * other table uses, and Month is the year-and-month grid, fed the window the
+ * receipts request covers plus the months that came back with a row in them. They
+ * narrow independently and compose — an amount range and a month applied together
+ * match only the rows satisfying both.
  *
  * This owns the "which popover is open" state itself rather than taking it as a
  * prop, and that ownership is load-bearing: the table renders this row twice —
@@ -35,7 +35,8 @@ export function ReceiptFilterChips({
   idPrefix,
   amountRange,
   onAmountRangeChange,
-  monthOptions,
+  monthRange,
+  monthsWithData,
   monthFilters,
   onMonthFiltersChange,
 }: {
@@ -48,7 +49,8 @@ export function ReceiptFilterChips({
   idPrefix: string;
   amountRange: AmountRangeValue;
   onAmountRangeChange: (next: AmountRangeValue) => void;
-  monthOptions: FilterChipOption[];
+  monthRange: MonthRange;
+  monthsWithData: Set<string>;
   monthFilters: string[];
   onMonthFiltersChange: (next: string[]) => void;
 }) {
@@ -65,7 +67,8 @@ export function ReceiptFilterChips({
         hint={RECEIPT_AMOUNT_HINT}
       />
       <MonthFilterChip
-        options={monthOptions}
+        range={monthRange}
+        monthsWithData={monthsWithData}
         selected={monthFilters}
         onChange={onMonthFiltersChange}
         open={openChip === "month"}

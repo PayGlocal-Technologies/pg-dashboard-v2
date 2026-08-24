@@ -35,7 +35,7 @@ export interface Receipt {
    *
    * Not a timestamp: a receipt is issued *for* a calendar month, so the month is
    * the fact, and both the Month column and the date filter derive from it (see
-   * formatReceiptMonth and periodMonthRangeMs). Held as a literal string rather
+   * formatMonthLabel and periodMonthRangeMs). Held as a literal string rather
    * than a Date so nothing about rendering it depends on the reader's timezone.
    */
   periodMonth: string;

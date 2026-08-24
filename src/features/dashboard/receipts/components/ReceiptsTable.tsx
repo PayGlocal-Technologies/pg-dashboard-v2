@@ -19,10 +19,10 @@ import {
 } from "@/features/dashboard/receipts/services";
 import {
   filterReceipts,
-  formatReceiptMonth,
   getDefault18MonthRange,
   mapInvoiceRecordToReceipt,
-  receiptMonthOptions,
+  receiptMonthRange,
+  receiptMonthsWithData,
 } from "@/features/dashboard/receipts/utils";
 import {
   DEFAULT_RECEIPT_PRODUCT,
@@ -127,11 +127,15 @@ export function ReceiptsTable() {
   // reset state synchronously.
   const sourceRows = enabled ? rows : EMPTY_ROWS;
 
-  // Only the months this product actually has receipts for. Computed before the
-  // other filters are applied — narrowing the list as the merchant filters would
-  // take away the month they just ticked.
-  const monthOptions = useMemo(
-    () => receiptMonthOptions(sourceRows.filter((r) => r.product === product)),
+  // The months the Month grid may offer: the window the request itself covers, so
+  // the chip is drawn even before any row lands (see receiptMonthRange).
+  const monthRange = useMemo(() => receiptMonthRange(reqBody), [reqBody]);
+
+  // Which of those months this product has a receipt for — the grid's dots.
+  // Computed before the other filters are applied: narrowing it as the merchant
+  // filters would unmark the month they just ticked.
+  const monthsWithData = useMemo(
+    () => receiptMonthsWithData(sourceRows.filter((r) => r.product === product)),
     [sourceRows, product]
   );
 
@@ -156,14 +160,15 @@ export function ReceiptsTable() {
     setPage(1);
   };
 
-  // Switching products keeps the search query and the amount range, the same way
-  // SkuTable keeps its search across type tabs. The months are the exception and
-  // are cleared: their options come from the selected product's own rows, and the
-  // products don't cover the same span, so a month carried across could be one the
-  // new tab has no checkbox for.
+  // Switching products keeps every filter — search, amount range and months — the
+  // same way SkuTable keeps its search across type tabs. The months used to be
+  // cleared here because the chip's options were the selected product's own rows,
+  // so a month carried across could be one the new tab had no checkbox for; the
+  // grid now spans the whole fetched window for every product, so a carried-over
+  // month is always a month the new tab can show (and unmark, if it has no receipt
+  // for it).
   const onProductChange = (value: string) => {
     setProduct(value as ReceiptProduct);
-    setMonthFilters([]);
     setPage(1);
   };
 
@@ -193,7 +198,8 @@ export function ReceiptsTable() {
         setAmountRange(next);
         setPage(1);
       }}
-      monthOptions={monthOptions}
+      monthRange={monthRange}
+      monthsWithData={monthsWithData}
       monthFilters={monthFilters}
       onMonthFiltersChange={(next) => {
         setMonthFilters(next);
