@@ -4,18 +4,22 @@ import { formatCurrency } from "@/lib/utils/format";
 import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helpers";
 
 /**
- * Card illustration, served from `public/assets`. A raster asset, so it cannot
- * be an icon-registry entry (that pattern is for SVG forwardRef components) and
- * goes through `next/image` instead — see CLAUDE.md's Images rule.
+ * Card background, served from `public/assets`. A raster asset, so it cannot
+ * be an icon-registry entry (that pattern is for SVG forwardRef components)
+ * and goes through `next/image` instead — see CLAUDE.md's Images rule.
  *
- * Rendered at its own intrinsic ratio (no `fill`), so `width`/`height` do the
- * usual next/image job of reserving the right box before it loads — nothing
- * downstream needs to read the ratio off them separately.
+ * The file's own ratio (1464:1074, ≈1.36:1) is taller than the card's fixed
+ * 16:9 frame, so `object-cover` has to crop it vertically to fill the frame —
+ * there is no ratio that avoids that once the card's own ratio is fixed. The
+ * crop is anchored to the bottom (see the `object-bottom` below) rather than
+ * centred, because the top of this asset is empty gradient with nothing in it,
+ * while the jar sits low in the frame with a soft shadow beneath it — bottom
+ * anchoring is what loses only the empty part and keeps the jar whole.
  */
-const TOTAL_EARNED_IMAGE = {
-  src: "/assets/Total earned.png",
-  width: 1230,
-  height: 1278,
+const TOTAL_EARNED_BACKGROUND = {
+  src: "/assets/Total Earned1.png",
+  width: 1464,
+  height: 1074,
 } as const;
 
 interface ReferralTotalsCardProps {
@@ -23,52 +27,49 @@ interface ReferralTotalsCardProps {
 }
 
 /**
- * Earned total beside the hero: just the figure and the illustration standing
- * in for it — nothing else. The referral journey recap lives in its own
- * sibling now (see ReferralJourneyCard, rendered alongside this one in
- * ReferAndEarnFeature), so this card can hug exactly its own two pieces of
- * content instead of carrying a height rule for both of them together.
- *
- * The figure comes from the same summarizeReferrals output the analytics row
- * reads, so the two surfaces cannot disagree.
+ * Earned total beside the hero: a compact 16:9 banner rather than a tall
+ * content card, with the figure set into the asset's own light upper-left
+ * corner. The figure comes from the same summarizeReferrals output the
+ * analytics row reads, so the two surfaces cannot disagree.
  */
 export function ReferralTotalsCard({ summary }: ReferralTotalsCardProps) {
   const referrals = summary.completed;
 
   return (
-    // Text upper-left, illustration lower-right, per the reference — and nether
-    // is positioned to get there. The text block is the card's first child, so
-    // it lands at the top by plain document order; the illustration is the
-    // second child, so it falls in the space below the text, and `ml-auto`
-    // pushes that block to the right within its own row without needing the
-    // image to also be full width. The gap between the two comes from the
-    // card's own `gap-8`, wide enough to read as the reference's whitespace
-    // without being a pixel figure that would need to change if the text
-    // wrapped to a second line.
-    <Card className="gap-8 p-5 sm:p-6">
-      <div className="flex flex-col items-start gap-1">
-        <MetricText size="lg">
+    // `aspect-video` is Tailwind's literal 16/9 — the card's height is derived
+    // from its own rendered width and nothing else, so it scales with the
+    // column at every breakpoint without ever needing a pixel or `min-h-*`
+    // value. `overflow-hidden` clips the background to the card's own
+    // radius; `isolate` scopes the image's negative z-index to this card.
+    <Card className="relative isolate aspect-video overflow-hidden p-0">
+      {/* Decorative, so `alt=""`. `object-cover` fills the fixed 16:9 frame
+          from the asset's own different ratio without distorting it —
+          scaled uniformly, then cropped, never stretched. */}
+      <Image
+        src={TOTAL_EARNED_BACKGROUND.src}
+        alt=""
+        fill
+        sizes="(min-width: 1024px) 21rem, (min-width: 768px) 17rem, 100vw"
+        className="-z-10 object-cover object-bottom"
+      />
+
+      {/* Upper-left, on the asset's own light corner. Capped at 60% of the
+          width so the text can never run into the jar sitting in the lower
+          right, at every card width. Colours are pinned to fixed dark values
+          rather than `text-foreground`/`text-muted-foreground` — the asset is
+          a fixed light-to-blue gradient in both themes, and the semantic
+          tokens would turn near-white in dark mode and vanish against it. */}
+      <div className="absolute left-0 top-0 flex max-w-[60%] flex-col gap-0.5 p-4 sm:p-6">
+        <Text size="sm" className="text-slate-500">
+          Total earnings
+        </Text>
+        <MetricText size="lg" className="text-slate-900">
           {formatCurrency(summary.totalEarned, summary.earnedCurrency, "en-US")}
         </MetricText>
-        <Text size="sm" color="subtle">
+        <Text size="sm" className="text-slate-500">
           from {referrals.toLocaleString("en-US")} {referrals === 1 ? "referral" : "referrals"}
         </Text>
       </div>
-
-      {/* `w-[58%]` is a fraction of the card's own content width rather than a
-          fixed figure, so the illustration scales with the column at every
-          breakpoint; `h-auto` off the asset's real width/height is what keeps
-          it from ever distorting. `ml-auto` is what sends it to the card's
-          right edge — the rest of the row's width is the whitespace the
-          reference leaves to its left. */}
-      <Image
-        src={TOTAL_EARNED_IMAGE.src}
-        alt=""
-        width={TOTAL_EARNED_IMAGE.width}
-        height={TOTAL_EARNED_IMAGE.height}
-        sizes="(min-width: 1024px) 13rem, (min-width: 768px) 10rem, 45vw"
-        className="ml-auto h-auto w-[58%]"
-      />
     </Card>
   );
 }
