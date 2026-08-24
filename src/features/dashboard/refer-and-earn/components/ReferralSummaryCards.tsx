@@ -20,18 +20,20 @@ import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helper
 import type { ProgressProps } from "@payglocal_ui/flux-ui";
 
 /**
- * One status metric: label and figure on a line, with the bar beneath it.
+ * One row of the referral bar graph: label, bar, count — three cells, not a
+ * nested flex row.
  *
- * `justify-between` on the top line is what keeps the three figures on a single
- * right-hand edge whatever the labels do, and every block being the same width
- * means the three bars share one baseline and one full-width scale — so their
- * fills can be read against each other, not just each against itself.
+ * Rendered as a bare Fragment so the three cells land directly in the graph's
+ * own grid tracks. That is what makes it a graph rather than three independent
+ * widgets: every label sits in one `auto` column sized to the widest of them, so
+ * all three bars start on the same vertical axis, and every count sits in one
+ * right-hand column. Nothing here has a width of its own.
  *
- * The bar is Flux's own Progress at its smallest size (a 1px track), and the
- * figure keeps the MetricText treatment: the bar restates what the number
- * already says, so it stays the quieter of the two.
+ * Flux's Progress is the bar treatment, and the count keeps the MetricText
+ * treatment it has always had — the bar shows the proportion, the figure gives
+ * the exact value, so neither has to be read off the other.
  */
-function StatusMetric({
+function BarRow({
   label,
   value,
   percent,
@@ -39,27 +41,30 @@ function StatusMetric({
 }: {
   label: string;
   value: number;
-  /** Share of everyone invited, 0–100. */
+  /** Length of this bar as a share of Total invited, 0–100. */
   percent: number;
   variant: ProgressProps["variant"];
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-baseline justify-between gap-8">
-        <Text size="sm" color="subtle">
-          {label}
-        </Text>
-        <MetricText size="sm">{value.toLocaleString("en-US")}</MetricText>
-      </div>
-      {/* The figure beside it is the accessible value, so the bar carries the
-          share it draws rather than repeating the count. */}
+    <>
+      {/* `whitespace-nowrap` keeps the label column one line deep: if a label
+          wrapped, its row would grow taller than the other two and the even
+          vertical rhythm across the three rows would break. */}
+      <Text size="sm" color="subtle" className="whitespace-nowrap">
+        {label}
+      </Text>
+      {/* The count beside it carries the value, so the bar's accessible name is
+          the proportion it actually draws. */}
       <Progress
         value={percent}
-        size="xs"
+        size="md"
         variant={variant}
         aria-label={`${label}: ${percent}% of everyone invited`}
       />
-    </div>
+      <MetricText size="sm" className="text-right tabular-nums">
+        {value.toLocaleString("en-US")}
+      </MetricText>
+    </>
   );
 }
 
@@ -85,10 +90,22 @@ export function ReferralSummaryCards({ summary }: ReferralSummaryCardsProps) {
     // Below lg they stack and each takes its natural height.
     <div className="grid items-stretch gap-4 lg:grid-cols-5">
       <Card className="h-full justify-center gap-0 p-5 sm:p-6 lg:col-span-3">
-        {/* Total earned and the status breakdown are two areas of one card — one
-            container throughout, never two cards. Side by side from sm up with a
-            rule between them, stacked below. */}
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between sm:gap-10">
+        {/* Total earned and the referral graph are two areas of one card — one
+            container throughout, never two cards.
+
+            A grid rather than a flex row, because the 40/60 split has to be the
+            split of the card and not of whatever the content happens to
+            measure: `2fr` and `3fr` are exactly two fifths and three fifths of
+            the space the two sections share. The graph column holds the whole
+            graph — its labels, its bars, and its counts — so all of it is inside
+            the 60%, and nothing sits outside the section it belongs to.
+
+            Stacked below sm the grid falls back to its single implicit column,
+            so the three children become three rows in source order: Total
+            earned, the rule, then the graph at the full width of the card. */}
+        <div className="grid gap-5 sm:grid-cols-[minmax(0,2fr)_auto_minmax(0,3fr)] sm:items-center sm:gap-7">
+          {/* Left, two fifths. `sm:items-center` on the grid is what centres it
+              against the taller graph beside it. */}
           <div className="flex flex-col gap-1.5">
             <Text size="sm" color="subtle">
               Total earned
@@ -99,53 +116,51 @@ export function ReferralSummaryCards({ summary }: ReferralSummaryCardsProps) {
             </MetricText>
           </div>
 
-          {/* The divider is grouped with the metrics rather than sitting as a
-              third justify-between sibling, which would have parked it in the
-              middle of the slack instead of just left of the figures it
-              separates. Two elements, not one: `orientation` sets
-              `aria-orientation` as well as the geometry, so the responsive swap
-              cannot be done by class alone.
+          {/* The rule between the two sections. Two elements, not one:
+              `orientation` sets `aria-orientation` as well as the geometry, so
+              the responsive swap cannot be done by class alone. Whichever one is
+              not in play is `display:none`, and a `display:none` child is not a
+              grid item at all — so exactly one of them ever occupies a track and
+              neither leaves a gap behind.
 
-              Below sm the sections stack and the rule turns horizontal, sitting
-              between them on the same gap-6 rhythm as the stack itself. */}
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
-            <Separator className="sm:hidden" />
+              sm+: `self-stretch` sizes the rule to its row, which the graph
+              beside it defines, so it spans that content and stops short of the
+              card's own padding. */}
+          <Separator className="sm:hidden" />
+          <Separator orientation="vertical" className="hidden self-stretch sm:block" />
 
-            {/* sm+: `self-stretch` sizes the rule to the flex line — the metrics
-                block, the tallest thing on it — so it spans that content and
-                stops well short of the card's top and bottom edges, and the
-                wrapper's own `items-center` keeps it centred in the card. */}
-            <Separator orientation="vertical" className="hidden self-stretch sm:block" />
+          {/* Right, three fifths: the graph. Three tracks shared by all three
+              rows — labels sized to the widest label, bars taking every pixel
+              of slack that leaves, counts flush right — so the bars share one
+              axis and one scale and can be read against each other.
 
-            {/* The three metrics, each over its own bar. Every bar is a share of
-                everyone invited, which is what makes them comparable: the top
-                one is the whole population and so always reads full, and the two
-                below it are the split of that same bar. The shares come from
-                shareOfInvited over this card's own summary — nothing here is a
-                fixed percentage, so the bars follow the data on their own.
+              Every length is a share of Total invited, which is what makes the
+              comparison meaningful: the top bar is the whole population and so
+              always reads full, and the two below it are that same bar split up.
+              The shares come from shareOfInvited over this card's own summary,
+              so nothing here is a fixed percentage.
 
-                Bar colours follow the status chips in the table below, so "in
-                progress" and "completed" mean the same thing in both places. */}
-            <div className="flex flex-col gap-3 sm:min-w-[13rem]">
-              <StatusMetric
-                label="Total invited"
-                value={summary.totalInvited}
-                percent={shareOfInvited(summary.totalInvited, summary.totalInvited)}
-                variant="default"
-              />
-              <StatusMetric
-                label="In progress"
-                value={summary.inProgress}
-                percent={shareOfInvited(summary.inProgress, summary.totalInvited)}
-                variant="warning"
-              />
-              <StatusMetric
-                label="Completed"
-                value={summary.completed}
-                percent={shareOfInvited(summary.completed, summary.totalInvited)}
-                variant="success"
-              />
-            </div>
+              Bar colours follow the status chips in the table below, so "in
+              progress" and "completed" mean the same thing in both places. */}
+          <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3 gap-y-3 sm:gap-x-4">
+            <BarRow
+              label="Total invited"
+              value={summary.totalInvited}
+              percent={shareOfInvited(summary.totalInvited, summary.totalInvited)}
+              variant="default"
+            />
+            <BarRow
+              label="In progress"
+              value={summary.inProgress}
+              percent={shareOfInvited(summary.inProgress, summary.totalInvited)}
+              variant="warning"
+            />
+            <BarRow
+              label="Completed"
+              value={summary.completed}
+              percent={shareOfInvited(summary.completed, summary.totalInvited)}
+              variant="success"
+            />
           </div>
         </div>
       </Card>
