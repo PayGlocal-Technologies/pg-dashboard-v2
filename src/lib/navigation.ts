@@ -278,6 +278,17 @@ export const mcaNavigation: NavGroup[] = [
     items: [
       { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
       { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
+      // Same /receipts page the Payments tree reaches under Payment Products and
+      // Finance, labelled for what an MCA merchant comes here for: the GST
+      // invoices PayGlocal raises against them. A compliance record in this tree,
+      // a finance record in that one, one page either way.
+      {
+        label: "GST Invoices",
+        href: "/receipts",
+        icon: "receipt",
+        badge: "NEW",
+        permission: [],
+      },
     ],
   },
   {
