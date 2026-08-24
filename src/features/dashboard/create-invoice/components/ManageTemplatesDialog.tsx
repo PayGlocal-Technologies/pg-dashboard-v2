@@ -10,7 +10,7 @@ import {
   Input,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { formatDate } from "@/lib/utils/format";
+import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
 import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/create-invoice/constants";
 import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
 
@@ -37,14 +37,6 @@ export function ManageTemplatesDialog({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-
-  // The most-used template, ignoring any that have never been applied. Null when
-  // nothing has been used yet, so a fresh list carries no meaningless badge.
-  const mostUsedId = templates.reduce<string | null>((topId, template) => {
-    if (template.usageCount <= 0) return topId;
-    const top = templates.find((candidate) => candidate.id === topId);
-    return !top || template.usageCount > top.usageCount ? template.id : topId;
-  }, null);
 
   const startRename = (template: InvoiceTemplate) => {
     setPendingDeleteId(null);
@@ -145,28 +137,21 @@ export function ManageTemplatesDialog({
                   ) : (
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-[13.5px] font-medium text-foreground">
-                            {template.name}
-                          </p>
-                          {template.id === mostUsedId && (
-                            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                              Most used
-                            </span>
-                          )}
-                        </div>
+                        <p className="truncate text-[13.5px] font-medium text-foreground">
+                          {template.name}
+                        </p>
                         <p className="truncate text-[12px] text-muted-foreground">
                           {template.description}
                         </p>
+                        {/* Recency, not frequency. The API records `lastUsedAt`
+                            and no counter, and for a picker "used last week" is
+                            a better prompt than "used nine times in March". */}
                         <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                          Saved{" "}
-                          {formatDate(template.createdAt, {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                          {template.usageCount > 0 &&
-                            ` · used ${template.usageCount} time${template.usageCount === 1 ? "" : "s"}`}
+                          {template.lastUsedAt
+                            ? `Last used ${formatEpochDay(template.lastUsedAt)}`
+                            : "Never used"}
+                          {formatEpochDay(template.savedAt) &&
+                            ` · saved ${formatEpochDay(template.savedAt)}`}
                         </p>
                       </div>
 

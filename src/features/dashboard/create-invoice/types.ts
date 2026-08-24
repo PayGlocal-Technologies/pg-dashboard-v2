@@ -316,10 +316,22 @@ export interface InvoiceTemplate {
   name: string;
   /** Free text, shown under the name in the picker. */
   description: string;
-  /** YYYY-MM-DD. */
-  createdAt: string;
-  /** Bumped every time the template is applied; drives the "most used" badge. */
-  usageCount: number;
+  /**
+   * Epoch millis as a string, deliberately: it is the shape the templates API
+   * uses for `savedAt`, so adopting it now keeps the eventual swap to changing
+   * where the record comes from rather than also re-unit-ing its timestamps.
+   */
+  savedAt: string;
+  /**
+   * Epoch millis as a string; null until the template has been applied.
+   *
+   * Replaces a local `usageCount`. The API records recency, not frequency, and
+   * bumps this itself as a side effect of reading one template, so a counter
+   * kept here would have nothing behind it and would double-count once the
+   * server takes over. Recency is also the better signal for a picker: what you
+   * used last week is a better guess than what you used most in March.
+   */
+  lastUsedAt: string | null;
   snapshot: InvoiceTemplateSnapshot;
 }
 
