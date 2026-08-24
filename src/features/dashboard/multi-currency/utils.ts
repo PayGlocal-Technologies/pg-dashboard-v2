@@ -97,7 +97,27 @@ const NON_ISO_CURRENCY_LABELS: Record<string, string> = {
   GLOBAL: "Rest of the World",
 };
 
+/**
+ * The ISO code an account's money is actually denominated in.
+ *
+ * Only the SWIFT catch-all needs translating: the accounts mapper labels it
+ * "GLOBAL" (the mock called the same thing "Dollar"), and neither is an ISO
+ * 4217 code, so anything formatting an amount off the raw value printed the
+ * placeholder as its own prefix — "GLOBAL128,400" on the settled-amount card.
+ * That account collects over SWIFT into a US dollar balance, so USD is both the
+ * right unit and the one the figures are quoted in.
+ *
+ * Labels stay separate: `currencyDisplayName` still calls this region "Rest of
+ * the World", because naming the region is a different job from stamping a unit
+ * on a number.
+ */
+export function settlementCurrency(currency: string | null | undefined): string {
+  if (!currency) return "USD";
+  return currency === "GLOBAL" || currency === "Dollar" ? "USD" : currency;
+}
+
 /** "AUD" → "Australian Dollar" — for the email-share preview's Currency
+ *  line. Intl's own currency-name table, not a lookup we'd have to maintain. *//** "AUD" → "Australian Dollar" — for the email-share preview's Currency
  *  line. Intl's own currency-name table, not a lookup we'd have to maintain. */
 export function currencyDisplayName(currencyCode: string): string {
   if (!currencyCode) return "";

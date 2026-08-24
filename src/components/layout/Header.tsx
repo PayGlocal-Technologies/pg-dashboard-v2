@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -180,15 +181,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           <ThemeToggle />
 
-          {/* Help */}
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-9 h-9 rounded-lg bg-muted border border-border hover:bg-accent flex items-center justify-center transition-colors"
-            aria-label="Help"
-          >
-            <Icon name="help-circle" size={17} className="text-muted-foreground" />
-          </Button>
+          {/* Help — support contacts and hours, see HeaderHelpMenu. */}
+          <HeaderHelpMenu />
 
           {/* Create button */}
           <div ref={createRef} className="relative">

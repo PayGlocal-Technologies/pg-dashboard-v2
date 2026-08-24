@@ -36,6 +36,7 @@ import {
   accountDocumentId,
   accountNumberOf,
   formatFullAccount,
+  settlementCurrency,
 } from "@/features/dashboard/multi-currency/utils";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
@@ -101,7 +102,13 @@ function MultiCurrencyContent() {
   // The settled-amount card follows the selected region: its title names that
   // region's currency and its figures are in that currency, so picking a region
   // is the only thing that changes this card.
-  const settledCurrency = selectedAccount?.currency ?? DEFAULT_SETTLED_CURRENCY;
+  //
+  // Through settlementCurrency, so the SWIFT catch-all's "GLOBAL" resolves to
+  // the USD it actually settles in rather than being stamped on the figures as
+  // if it were a currency code.
+  const settledCurrency = selectedAccount
+    ? settlementCurrency(selectedAccount.currency)
+    : DEFAULT_SETTLED_CURRENCY;
   // Falls back rather than rendering an empty card if an account ever carries a
   // currency the summary data has no entry for.
   const settled =
@@ -109,12 +116,11 @@ function MultiCurrencyContent() {
     SETTLED_AMOUNT_BY_CURRENCY[DEFAULT_SETTLED_CURRENCY];
 
   // Every region names its currency in the title except Rest of the World,
-  // which keeps the bare label: its `currency` is the display word "Dollar"
-  // rather than an ISO code — it receives dollars over SWIFT but needs a filter
-  // key distinct from the US account's "USD" (see mock-data.ts) — and "Settled
-  // amount in Dollar" doesn't read as a sentence the way "Settled amount in
-  // USD" does. The symbol on the figure below still says which unit the amount
-  // is in either way.
+  // which keeps the bare label. That account takes 33 currencies over SWIFT
+  // (see GLOBAL_CURRENCIES) and settles them into USD, so "Settled amount in
+  // USD" would read as a claim about what the merchant's clients paid in rather
+  // than what landed. The $ on the figure below still says which unit the
+  // amount itself is in.
   const settledTitle =
     selectedAccount?.iso2 === "ROW" ? "Settled amount" : `Settled amount in ${settledCurrency}`;
 
@@ -243,89 +249,99 @@ function MultiCurrencyContent() {
       {/* Both columns are titled modules of the same shape: a title block, then
           the content it introduces.
 
-          Explicit col-start/row-start rather than one wrapper div per column —
-          the same placement technique the Platforms page's own two-column grid
-          uses. Row 1 carries only the left column's title, so row 2 is where
-          the region Card and the right column both begin, putting the summary
-          row's top edge exactly on the region Card's whatever height that title
-          resolves to. Two column wrappers could only match those edges by
-          hard-coding a header height.
+          One wrapper per column, the same shape the Platforms page's own
+          two-column grid uses, so both columns start on the same top edge. This
+          used to place the title and the list as separate grid items, in rows 1
+          and 2, which put the summary row's top edge exactly on the region
+          Card's rather than on the title's. That arrangement cannot carry a
+          sticky title: a grid item's containing block is its own grid area, and
+          the title's area was only ever as tall as the title, so it had nothing
+          to slide within and scrolled away while the list stayed pinned. The
+          title belongs to the navigation, so it now travels with it.
 
-          DOM order stays left title → left content → right content, so the
-          stacked single-column layout below `lg` (where every explicit
-          placement drops out) still reads in the right order. gap-x-10 is the
-          shared gutter, gap-y-3 the 12px title → container step. */}
+          DOM order stays left column → right column, so the stacked
+          single-column layout below `lg` still reads in the right order.
+          gap-x-10 is the shared gutter, gap-y-3 the 12px step between the
+          stacked columns below `lg`. */}
       <div className="grid gap-x-10 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
-        <div className="lg:col-start-1 lg:row-start-1">
+        {/* lg:sticky, so the region list and its title stay on screen while the
+            column beside it scrolls: this is the page's only navigation, and the
+            account details it selects run well past one screen. Sticks inside
+            <main> (the dashboard's scroll container), and top-6 matches that
+            container's own md:p-6 inset so the column pins level with where it
+            started rather than flush against the header. Works only because the
+            grid sets lg:items-start — a stretched grid item is as tall as its
+            row and has nothing to slide within. */}
+        <div className="lg:sticky lg:top-6 lg:col-start-1">
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
-        </div>
 
-        {isLoading ? (
-          // The region list is this page's only navigation, so its loading
-          // state has to hold the column's footprint — otherwise the right
-          // column snaps sideways when the accounts land. Six rows is the
-          // typical account count; the Card and its p-3 are the same ones the
-          // loaded list sits in, so nothing moves but the row contents.
-          <Card
-            size="sm"
-            aria-busy
-            className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex"
-          >
-            <div className="space-y-1">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-5 py-2.5">
-                  <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
-                  <Shimmer className="h-3.5 w-28" />
-                </div>
-              ))}
-            </div>
-          </Card>
-        ) : (
-          <>
-            {/* Below `lg` the two columns collapse into one stack, where a full
-                vertical list of regions would push the account details most of
-                a screen down. The tiles scroll horizontally instead, so the
-                details stay near the fold. Each tile is its own surface, so
-                this variant needs no Card around it — unlike the list below.
+          {isLoading ? (
+            // The region list is this page's only navigation, so its loading
+            // state has to hold the column's footprint — otherwise the right
+            // column snaps sideways when the accounts land. Six rows is the
+            // typical account count; the Card and its p-3 are the same ones the
+            // loaded list sits in, so nothing moves but the row contents.
+            <Card size="sm" aria-busy className="mt-3 hidden gap-0 p-3 lg:flex">
+              <div className="space-y-1">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-2.5">
+                    <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
+                    <Shimmer className="h-3.5 w-28" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : (
+            <>
+              {/* Below `lg` the two columns collapse into one stack, where a
+                  full vertical list of regions would push the account details
+                  most of a screen down. The tiles scroll horizontally instead,
+                  so the details stay near the fold. Each tile is its own
+                  surface, so this variant needs no Card around it — unlike the
+                  list below.
 
-                Two renderings toggled by `hidden`, not one set of rows bent
-                into both shapes with responsive classes: the layouts differ in
-                direction, in what the selected state looks like, and in whether
-                there's a chevron at all. `display: none` also keeps whichever
-                one is inactive out of the tab order and the accessibility tree,
-                so there is never a second, invisible copy of these controls to
-                land on. */}
-            <RegionSelector
-              accounts={accounts}
-              selectedAccountId={selectedAccount?.id ?? ""}
-              onSelect={selectAccount}
-              label="Select client region"
-              variant="cards"
-              className="-mx-1 lg:hidden"
-            />
-
-            {/* p-3 rather than Card's own 28px inset: the rows carry their own
-                px-5, so the card's padding only has to keep them clear of its
-                edge — anything more and the region names sit adrift of the
-                title above the card. */}
-            <Card size="sm" className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex">
+                  Two renderings toggled by `hidden`, not one set of rows bent
+                  into both shapes with responsive classes: the layouts differ in
+                  direction, in what the selected state looks like, and in
+                  whether there's a chevron at all. `display: none` also keeps
+                  whichever one is inactive out of the tab order and the
+                  accessibility tree, so there is never a second, invisible copy
+                  of these controls to land on. */}
               <RegionSelector
                 accounts={accounts}
                 selectedAccountId={selectedAccount?.id ?? ""}
                 onSelect={selectAccount}
                 label="Select client region"
-                size="md"
+                variant="cards"
+                className="-mx-1 mt-3 lg:hidden"
               />
-            </Card>
-          </>
-        )}
+
+              {/* mt-3 is the 12px title → container step the grid's own gap-y
+                  used to provide while these were separate rows.
+
+                  p-3 rather than Card's own 28px inset: the rows carry their own
+                  px-5, so the card's padding only has to keep them clear of its
+                  edge — anything more and the region names sit adrift of the
+                  title above the card. */}
+              <Card size="sm" className="mt-3 hidden gap-0 p-3 lg:flex">
+                <RegionSelector
+                  accounts={accounts}
+                  selectedAccountId={selectedAccount?.id ?? ""}
+                  onSelect={selectAccount}
+                  label="Select client region"
+                  size="md"
+                />
+              </Card>
+            </>
+          )}
+        </div>
 
         {/* space-y-8 is the 32px section → section step, the loosest on the
             page. mt-5 restores that separation below `lg`, where this column
-            stacks under the region Card and would otherwise inherit the grid's
-            own 12px title → container gap; on `lg` and up it must be zero or
-            the column would no longer start level with that Card. */}
-        <div className="mt-5 space-y-8 lg:col-start-2 lg:row-start-2 lg:mt-0">
+            stacks under the region list and would otherwise inherit only the
+            grid's own 12px gap; on `lg` and up it must be zero or the column
+            would no longer start level with the navigation beside it. */}
+        <div className="mt-5 space-y-8 lg:col-start-2 lg:mt-0">
           {/* Summary row: the first thing in this column, so its top edge
               lands on the region Card's.
 
