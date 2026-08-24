@@ -2,7 +2,6 @@
 
 import { Heading } from "@/components/ui";
 import { ReferralHero } from "@/features/dashboard/refer-and-earn/components/ReferralHero";
-import { HowItWorks } from "@/features/dashboard/refer-and-earn/components/HowItWorks";
 // TEMPORARILY HIDDEN — Referral leaderboard.
 //
 // The component, its helpers (buildLeaderboardView), its types
@@ -87,7 +86,6 @@ export function ReferAndEarnFeature() {
         */}
       </div>
 
-      <HowItWorks />
       <ReferralEarnings referrals={MOCK_REFERRALS} />
     </div>
   );

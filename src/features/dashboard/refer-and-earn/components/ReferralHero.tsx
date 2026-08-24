@@ -87,21 +87,35 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
     <Card className="gap-0 overflow-hidden p-0">
       {/* The reward banner. A raster asset, so the icon-registry forwardRef
           pattern in CLAUDE.md does not apply (it is for SVG); it goes through
-          next/image per the same file's Images rule. `w-full h-auto` with the
-          file's own intrinsic dimensions holds its 2.3:1 ratio at every width,
-          so nothing is scaled unevenly and nothing is cropped — the ticket, the
-          PayGlocal mark, the barcode, and the $30 are all always in frame. The
-          artwork's own gradient resolves to near-white at its foot, which is
-          what lets it meet the card surface without a seam. */}
-      <Image
-        src={REFERRAL_HERO_BANNER.src}
-        alt=""
-        width={REFERRAL_HERO_BANNER.width}
-        height={REFERRAL_HERO_BANNER.height}
-        priority
-        sizes="(min-width: 1024px) 800px, (min-width: 768px) 480px, 100vw"
-        className="h-auto w-full"
-      />
+          next/image per the same file's Images rule.
+
+          Below lg: the box holds the asset's own 1660:948 ratio, so nothing is
+          scaled unevenly and nothing is cropped — the ticket, the PayGlocal
+          mark, the barcode, and the $30 are all always in frame.
+
+          From lg up, the hero's own column is wide enough that this ratio would
+          render a banner taller than the right-hand column's Total Earned and
+          How-it-works cards combined — the two sides used to only match by
+          coincidence at some widths and drift apart at others. `lg:aspect-[1660/705]`
+          is a second, shorter ratio calibrated to this exact file: rows 705–948
+          of the source image are pure flat colour (checked pixel-by-pixel —
+          nothing there but the gradient's own fade), so cropping down to that
+          ratio with `object-cover object-top` only ever removes blank margin,
+          never the ticket or the bills. It closes most, not all, of the gap —
+          the column stays a fixed rem width while the hero's column keeps
+          growing with the viewport, so at very wide screens the safe crop alone
+          isn't enough to fully match; going further would start cutting into
+          the ticket itself. */}
+      <div className="relative aspect-[1660/948] w-full lg:aspect-[1660/705]">
+        <Image
+          src={REFERRAL_HERO_BANNER.src}
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1024px) 800px, (min-width: 768px) 480px, 100vw"
+          className="object-cover object-top"
+        />
+      </div>
 
       {/* Content sits below the artwork, left-aligned, with its own horizontal
           and bottom padding. No top padding: the banner's own artwork fades out
