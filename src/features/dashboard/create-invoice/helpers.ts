@@ -1,3 +1,4 @@
+import { formatDate } from "@/lib/utils/format";
 import {
   DUE_TERM_OPTIONS,
   INVOICE_STEPS,
@@ -482,6 +483,21 @@ export const describeSnapshot = (snapshot: InvoiceTemplateSnapshot): string => {
   if (snapshot.isRecurring) parts.push("recurring");
 
   return parts.join(" · ");
+};
+
+/**
+ * An epoch-millis string as a short date, or "" when there is none.
+ *
+ * The templates API sends its timestamps this way (`savedAt`, `lastUsedAt`), and
+ * `formatDate` takes a Date or a parseable date string: `new Date("175500…")` is
+ * an Invalid Date, so the number has to be converted rather than passed
+ * through. Kept here so every caller formats them identically.
+ */
+export const formatEpochDay = (millis: string | null | undefined): string => {
+  if (!millis) return "";
+  const value = Number(millis);
+  if (!Number.isFinite(value)) return "";
+  return formatDate(new Date(value), { day: "2-digit", month: "short", year: "numeric" });
 };
 
 // ─── Brand colours ────────────────────────────────────────────────────────────

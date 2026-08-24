@@ -14,7 +14,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatDate } from "@/lib/utils/format";
+import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
 import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
 
 /**
@@ -236,12 +236,8 @@ export function InvoiceTemplatePicker({
           {pendingTemplate && (
             <p className="mt-3 rounded-lg bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
               {pendingTemplate.description}
-              {pendingTemplate.createdAt &&
-                ` · saved ${formatDate(pendingTemplate.createdAt, {
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                })}`}
+              {formatEpochDay(pendingTemplate.savedAt) &&
+                ` · saved ${formatEpochDay(pendingTemplate.savedAt)}`}
             </p>
           )}
           <div className="mt-5 flex justify-end gap-2">

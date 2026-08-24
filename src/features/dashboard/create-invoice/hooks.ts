@@ -498,8 +498,8 @@ export interface InvoiceTemplates {
   update: (templateId: string, snapshot: InvoiceTemplateSnapshot) => void;
   rename: (templateId: string, name: string) => void;
   remove: (templateId: string) => void;
-  /** Call when a template is applied to an invoice. */
-  recordUsage: (templateId: string) => void;
+  /** Call when a template is applied. Goes away once the server stamps it. */
+  markUsed: (templateId: string) => void;
 }
 
 /**
@@ -534,7 +534,7 @@ export function useInvoiceTemplates(): InvoiceTemplates {
   const updateSnapshot = useInvoiceTemplatesStore((state) => state.updateSnapshot);
   const renameTemplate = useInvoiceTemplatesStore((state) => state.renameTemplate);
   const deleteTemplate = useInvoiceTemplatesStore((state) => state.deleteTemplate);
-  const recordUsageInStore = useInvoiceTemplatesStore((state) => state.recordUsage);
+  const markUsedInStore = useInvoiceTemplatesStore((state) => state.markUsed);
 
   const [isReady, setIsReady] = useState(false);
 
@@ -551,10 +551,21 @@ export function useInvoiceTemplates(): InvoiceTemplates {
     };
   }, []);
 
-  const templates = useMemo(
-    () => templatesByMid[merchantId] ?? [],
-    [templatesByMid, merchantId]
-  );
+  /**
+   * Most recently used first, then most recently saved.
+   *
+   * The picker used to list templates in the order they were created, so the
+   * one a merchant reaches for weekly sank as they added others. Ordering by
+   * recency is also what the API's `lastUsedAt` is for, so this survives the
+   * swap unchanged.
+   */
+  const templates = useMemo(() => {
+    const mine = templatesByMid[merchantId] ?? [];
+    return [...mine].sort((a, b) => {
+      const used = Number(b.lastUsedAt ?? 0) - Number(a.lastUsedAt ?? 0);
+      return used !== 0 ? used : Number(b.savedAt ?? 0) - Number(a.savedAt ?? 0);
+    });
+  }, [templatesByMid, merchantId]);
 
   const save = useCallback(
     (name: string, snapshot: InvoiceTemplateSnapshot): string => {
@@ -565,7 +576,7 @@ export function useInvoiceTemplates(): InvoiceTemplates {
         id,
         name,
         description: describeSnapshot(snapshot),
-        createdAt: toDateKey(new Date()),
+        savedAt: String(Date.now()),
         snapshot,
       });
       return id;
@@ -591,12 +602,13 @@ export function useInvoiceTemplates(): InvoiceTemplates {
     [merchantId, deleteTemplate]
   );
 
-  const recordUsage = useCallback(
-    (templateId: string) => recordUsageInStore(merchantId, templateId),
-    [merchantId, recordUsageInStore]
+  const markUsed = useCallback(
+    // Date.now() in a handler, never during render.
+    (templateId: string) => markUsedInStore(merchantId, templateId, String(Date.now())),
+    [merchantId, markUsedInStore]
   );
 
-  return { templates, isReady, save, update, rename, remove, recordUsage };
+  return { templates, isReady, save, update, rename, remove, markUsed };
 }
 
 /**

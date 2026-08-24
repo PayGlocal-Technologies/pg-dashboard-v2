@@ -779,7 +779,7 @@ function InvoiceEditor({
     setActiveTemplateId(template.id);
     // Only count a genuine use. Re-applying the template already in force is a
     // reset, not a use, and counting it inflated the "most used" badge.
-    if (template.id !== activeTemplateId) templateStore.recordUsage(template.id);
+    if (template.id !== activeTemplateId) templateStore.markUsed(template.id);
 
     // Ordered by how much it blocks the merchant: a missing account or start date
     // stops Generate outright, so those are worth saying over the reassurance.

@@ -67,7 +67,13 @@ interface InvoiceTemplatesState {
 
   saveTemplate: (
     mid: string,
-    template: { id: string; name: string; description: string; createdAt: string; snapshot: InvoiceTemplateSnapshot }
+    template: {
+      id: string;
+      name: string;
+      description: string;
+      savedAt: string;
+      snapshot: InvoiceTemplateSnapshot;
+    }
   ) => void;
   /**
    * Overwrites an existing template's captured shape, keeping its identity.
@@ -84,8 +90,14 @@ interface InvoiceTemplatesState {
   ) => void;
   renameTemplate: (mid: string, templateId: string, name: string) => void;
   deleteTemplate: (mid: string, templateId: string) => void;
-  /** Bumped when a template is applied, so the picker can badge the most used. */
-  recordUsage: (mid: string, templateId: string) => void;
+  /**
+   * Stamps a template as used, so the list can order by recency.
+   *
+   * Deletes entirely when the API lands: `GET /templates/{id}` bumps
+   * `lastUsedAt` as a side effect of the read, so doing it here as well would
+   * record two uses for one apply.
+   */
+  markUsed: (mid: string, templateId: string, atMillis: string) => void;
 
   rememberDraft: (invoiceId: string, memory: DraftMemory) => void;
 }
@@ -112,7 +124,7 @@ export const useInvoiceTemplatesStore = create<InvoiceTemplatesState>()(
 
       saveTemplate: (mid, template) =>
         set((state) =>
-          mapMerchant(state, mid, (templates) => [...templates, { ...template, usageCount: 0 }])
+          mapMerchant(state, mid, (templates) => [...templates, { ...template, lastUsedAt: null }])
         ),
 
       updateSnapshot: (mid, templateId, snapshot, description) =>
@@ -140,13 +152,11 @@ export const useInvoiceTemplatesStore = create<InvoiceTemplatesState>()(
           )
         ),
 
-      recordUsage: (mid, templateId) =>
+      markUsed: (mid, templateId, atMillis) =>
         set((state) =>
           mapMerchant(state, mid, (templates) =>
             templates.map((template) =>
-              template.id === templateId
-                ? { ...template, usageCount: template.usageCount + 1 }
-                : template
+              template.id === templateId ? { ...template, lastUsedAt: atMillis } : template
             )
           )
         ),
