@@ -79,7 +79,7 @@ export function ReferralRemindButton({
       size="sm"
       disabled={sent}
       onClick={() => onRemind(row)}
-      leftIcon={<Icon name={sent ? "check" : "send-horizontal"} size={13} />}
+      leftIcon={<Icon name={sent ? "check" : "bell"} size={13} />}
       aria-label={sent ? `Reminder already sent to ${row.fullName}` : `Remind ${row.fullName}`}
       className="h-8 min-h-8"
     >

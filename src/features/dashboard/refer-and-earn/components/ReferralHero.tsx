@@ -155,13 +155,21 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
               edges. 32px is Flux's own in-field button height, and the field's
               height and the input's styling are untouched.
 
+              `min-h-0` clears the addon's own `min-h-11`. That 44px minimum is
+              the field's full border-box height, so inside the field's 42px
+              content box the addon overhangs the bottom by 2px and carries the
+              button it centres 1px down with it. Stretched to the content box
+              instead, the button's centre is the field's centre — which is what
+              lets the Share button beside the field line up with it exactly,
+              since that one is centred on the field.
+
               `has-[>button]:mr-0` carries the same modifier as the addon's own
               `has-[>button]:-mr-[0.4rem]` on purpose: that is what lets
               tailwind-merge drop the -0.4rem pull-in. A plain `mr-0` does not —
               different modifier, so both classes survive the merge and the
               `:has()` variant then wins on specificity, eating the right-hand
               padding and leaving the button overhanging by ~1.4px. */}
-            <InputGroupAddon align="inline-end" className="pr-[5px] has-[>button]:mr-0">
+            <InputGroupAddon align="inline-end" className="min-h-0 pr-[5px] has-[>button]:mr-0">
               <Button
                 type="button"
                 variant="primary"
@@ -177,15 +185,19 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
           </InputGroup>
 
           {/* Secondary to Copy, which is the primary action on this screen, and
-              matched to the field's 44px so the two sit on one line rather than
-              one riding high against the other. Full-width while stacked. */}
+              the same 32px tall: `size="sm"` and the identical `h-8 min-h-8`
+              override the Copy button carries, so the two actions are one height
+              whatever Flux's own size scale does. The row's `sm:items-center` is
+              what then centres this button on the taller field beside it, so the
+              two read as one line rather than one riding high against the other.
+              Full-width while stacked, still 32px. */}
           <Button
             type="button"
             variant="secondary"
-            size="md"
+            size="sm"
             onClick={() => void handleShare()}
-            leftIcon={<Icon name="share-2" size={14} />}
-            className="h-11 min-h-11 w-full shrink-0 sm:w-auto"
+            leftIcon={<Icon name="share-2" size={13} />}
+            className="h-8 min-h-8 w-full shrink-0 sm:w-auto"
           >
             Share link
           </Button>

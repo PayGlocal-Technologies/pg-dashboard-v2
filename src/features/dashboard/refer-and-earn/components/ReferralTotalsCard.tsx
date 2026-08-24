@@ -9,8 +9,9 @@ import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helper
  * through `next/image` instead — see CLAUDE.md's Images rule.
  *
  * `width`/`height` are the file's real pixel dimensions. They are not used to
- * size the render (that is `fill`), but the ratio drives the card's own
- * `aspect-[…]` below, so the artwork is never stretched or awkwardly cropped.
+ * size the render (that is `fill`), but the ratio is what the card's stacked
+ * `aspect-[1672/941]` is taken from, so on mobile the artwork keeps its own
+ * proportions instead of being cropped to whatever the text happens to need.
  */
 const BACKGROUND = {
   src: "/assets/BG1.png",
@@ -38,28 +39,34 @@ interface ReferralTotalsCardProps {
 }
 
 /**
- * Earned total above the leaderboard, set into the upper left of the referral
- * artwork. The figures come from the same summarizeReferrals output the analytics
- * row and the leaderboard's own "You" row read, so the three surfaces cannot
- * disagree.
+ * Earned total beside the hero, set into the referral artwork. The figures come
+ * from the same summarizeReferrals output the analytics row reads, so the two
+ * surfaces cannot disagree.
  */
 export function ReferralTotalsCard({ summary }: ReferralTotalsCardProps) {
   const referrals = summary.completed;
 
   return (
-    // `aspectRatio` from the asset's own dimensions: the card's height follows its
-    // width, so the artwork keeps its proportions at every breakpoint instead of
-    // being cropped harder as the column narrows — and there is no pixel height
-    // to maintain. `isolate` scopes the negative z-index below to this card, and
+    // Two height rules, one per layout, and neither is a pixel value.
+    //
+    // From md up the card is a stretched grid item beside the hero, so `h-full`
+    // is the hero's own rendered height — `aspect-auto` is what clears the
+    // stacked ratio out of the way and lets that stretch take effect. The
+    // content is centred rather than parked at the top, so a tall card reads as
+    // composed instead of top-heavy.
+    //
+    // Stacked below md there is nothing beside it to match, so it falls back to
+    // the asset's own ratio and keeps the proportions it has always had.
+    //
+    // `isolate` scopes the negative z-index below to this card, and
     // `overflow-hidden` clips the artwork to the card's existing radius. No
     // padding of its own: the content block below carries it.
-    <Card
-      className="relative isolate items-start justify-start overflow-hidden p-0"
-      style={{ aspectRatio: `${BACKGROUND.width} / ${BACKGROUND.height}` }}
-    >
+    <Card className="relative isolate aspect-[1672/941] items-start justify-start overflow-hidden p-0 md:aspect-auto md:h-full md:justify-center">
       {/* Decorative, so `alt=""`. `fill` + `object-cover` covers the card at any
-          size; the negative z-index paints it over the card's own surface but
-          under the text. */}
+          size and at its own aspect ratio — the artwork is cropped to fit, never
+          stretched to it, which is what keeps it undistorted now that the card's
+          height is the hero's rather than the asset's. The negative z-index
+          paints it over the card's own surface but under the text. */}
       <Image
         src={BACKGROUND.src}
         alt=""

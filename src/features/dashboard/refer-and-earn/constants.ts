@@ -9,14 +9,14 @@ export const REFERRAL_PAGE_SIZE = 10;
  *
  * `width`/`height` are the file's real pixel dimensions, handed to next/image as
  * the intrinsic size only: the rendered size comes from CSS, and these keep the
- * 2.3:1 aspect ratio correct and reserve the right space before it loads. The
+ * 1.74:1 aspect ratio correct and reserve the right space before it loads. The
  * banner is what states the $30 reward, which is why the heading beside it does
  * not repeat the figure.
  */
 export const REFERRAL_HERO_BANNER = {
   src: "/assets/Refer&Earn2.png",
-  width: 1965,
-  height: 855,
+  width: 1656,
+  height: 950,
 } as const;
 
 /**
