@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui";
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -57,6 +63,19 @@ function MidAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md" }) 
 
 type TagUpdateVars = { dynamicUrl: string };
 
+/**
+ * Whether this account has more than one MID to pick between. The selector
+ * itself renders nothing when it doesn't, so the Sidebar reads the same
+ * condition to drop the wrapper holding it, otherwise that wrapper's padding
+ * and bottom border survive as an empty banded strip with a divider under it.
+ */
+export function useHasMultipleMids(): boolean {
+  const paMidIds = useApp((s) => s.paMids);
+  const paCbMidIds = useApp((s) => s.paCbMids);
+  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  return paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+}
+
 interface MerchantSelectorProps {
   /** Sidebar is collapsed to icon-only width, shrink the trigger to match. */
   collapsed?: boolean;
@@ -104,7 +123,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
     [paCbMidInfos, paMidInfos]
   );
 
-  const isMultiMids = paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+  const isMultiMids = useHasMultipleMids();
 
   const {
     data: merchantProductsData,
@@ -350,7 +369,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
               </p>
               {activeProduct ? (
                 <div className="space-y-0.5">
-                  {activeMids.map(({ mid, status, tradeName, displayTag }) =>
+                  {activeMids.map(({ mid, status, tradeName, displayTag, merchantWebsite }) =>
                     editingMid === mid ? (
                       <div
                         key={mid}
@@ -431,9 +450,31 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
                           }}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12.5px] font-medium text-foreground">
-                            {displayTag || tradeName}
-                          </p>
+                          <div className="flex items-center gap-1">
+                            <p className="truncate text-[12.5px] font-medium text-foreground">
+                              {displayTag || tradeName}
+                            </p>
+                            {merchantWebsite && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className="inline-flex flex-shrink-0 text-muted-foreground"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Icon name="info" size={11} />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+                                    sideOffset={4}
+                                  >
+                                    {merchantWebsite}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <p className="truncate text-[10.5px] text-muted-foreground">{mid}</p>
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-1">

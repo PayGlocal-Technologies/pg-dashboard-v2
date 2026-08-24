@@ -11,19 +11,22 @@ import {
   PageHeader,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useReferralLink } from "@/features/dashboard/refer-and-earn/hooks";
 
-// TODO(integration): this screen is a placeholder only. Wire it up to the
-// real referral program endpoints (referral code, reward balance, invite
-// history) once that contract exists — see CLAUDE.md's migration checklist.
-const REFERRAL_LINK = "https://pgcl.com/refer/YOURCODE";
+// The reward balance and invite history have no surface on this screen yet.
+// Their endpoints exist and are recorded in services.ts (referralWalletApi,
+// referralTransactionsApi) for whenever the design grows a rewards section.
 
 export function ReferAndEarnFeature() {
+  const { link, isLoading, isError } = useReferralLink();
+
   async function handleCopy() {
+    if (!link) return;
     try {
-      await navigator.clipboard.writeText(REFERRAL_LINK);
+      await navigator.clipboard.writeText(link);
       toast.success("Referral link copied");
     } catch {
-      // Clipboard access denied — fail silently, non-critical affordance.
+      // Clipboard access denied, fail silently, non-critical affordance.
     }
   }
 
@@ -48,15 +51,37 @@ export function ReferAndEarnFeature() {
         </div>
 
         <InputGroup className="max-w-md">
-          <InputGroupInput readOnly value={REFERRAL_LINK} className="font-mono text-xs" />
+          {/* Same field either way, so the layout never shifts as the link
+              arrives. Its value carries the state instead: production shows
+              "Generating your referral link..." while the call is in flight, and
+              this keeps that behaviour rather than swapping in a skeleton. */}
+          <InputGroupInput
+            readOnly
+            value={
+              link ||
+              (isError ? "Couldn't load your referral link" : "Generating your referral link...")
+            }
+            className="font-mono text-xs"
+          />
           <InputGroupAddon align="inline-end">
-            <InputGroupButton type="button" onClick={handleCopy} aria-label="Copy referral link">
+            <InputGroupButton
+              type="button"
+              onClick={handleCopy}
+              disabled={!link}
+              aria-label="Copy referral link"
+            >
               <Icon name="copy" size={13} />
             </InputGroupButton>
           </InputGroupAddon>
         </InputGroup>
 
-        <Button type="button" variant="primary" size="sm" onClick={handleCopy}>
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          onClick={handleCopy}
+          disabled={!link || isLoading}
+        >
           Copy Referral Link
         </Button>
       </Card>

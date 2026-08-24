@@ -27,6 +27,11 @@ const eslintConfig = [
               name: "@hookform/resolvers/zod",
               message: "Use @tanstack/react-form with zod validators instead.",
             },
+            {
+              name: "next/image",
+              message:
+                "Import <AppImage/> (@/components/common/AppImage) instead. Next does not apply basePath to a local image src, so next/image directly renders a broken image under /app-v2. Only components/common/AppImage.tsx may import next/image.",
+            },
           ],
           patterns: [
             {
@@ -43,6 +48,11 @@ const eslintConfig = [
   {
     // The icon registry is the single source allowed to import the icon package.
     files: ["src/components/icon/registry.ts"],
+    rules: { "no-restricted-imports": "off" },
+  },
+  {
+    // The one wrapper that is allowed to reach next/image directly.
+    files: ["src/components/common/AppImage.tsx"],
     rules: { "no-restricted-imports": "off" },
   },
   {

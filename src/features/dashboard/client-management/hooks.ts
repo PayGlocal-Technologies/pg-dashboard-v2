@@ -2,6 +2,11 @@
 
 import { useMemo } from "react";
 import { toast } from "sonner";
+import { zohoPullSyncApi, zohoStatusApi } from "@/features/dashboard/zoho-integration/services";
+import type {
+  ZohoPullSyncPayload,
+  ZohoStatusResponse,
+} from "@/features/dashboard/zoho-integration/types";
 import { COUNTRIES } from "@/components/ui";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
@@ -25,8 +30,6 @@ import {
   invoiceDeleteApi,
   invoiceDuplicateApi,
   invoiceViewApi,
-  zohoPullSyncApi,
-  zohoStatusApi,
 } from "@/features/dashboard/client-management/services";
 import {
   CLIENT_PAGE_LIMIT,
@@ -51,8 +54,6 @@ import type {
   ClientStateCodesResponse,
   ClientTagOptionsResponse,
   InvoiceViewResponse,
-  ZohoPullSyncPayload,
-  ZohoStatusResponse,
 } from "@/features/dashboard/client-management/types";
 import type { TableReqBody } from "@/types/transactions";
 
@@ -536,8 +537,14 @@ export function useClientStateCodes(): { states: string[]; isLoading: boolean } 
     clientStateCodesApi
   );
 
+  // Sorted, because the endpoint returns its map unordered and Select's
+  // type-ahead jumps to the first DOM match: unsorted, pressing "k" landed on
+  // Kerala rather than Karnataka.
   const states = useMemo(
-    () => Object.keys(data?.data?.stateCodes ?? {}).filter((name) => name !== "OTHER COUNTRY"),
+    () =>
+      Object.keys(data?.data?.stateCodes ?? {})
+        .filter((name) => name !== "OTHER COUNTRY")
+        .sort((a, b) => a.localeCompare(b)),
     [data]
   );
 
@@ -546,13 +553,17 @@ export function useClientStateCodes(): { states: string[]; isLoading: boolean } 
 
 /** Tags already in use for this merchant's clients, as suggestions in the form.
  *  Entries without a name are dropped rather than offered blank. */
-export function useClientTagOptions(): { tags: string[]; isLoading: boolean } {
-  const { mid, isReady } = useClientPathMid();
+export function useClientTagOptions(midOverride?: string): {
+  tags: string[];
+  isLoading: boolean;
+} {
+  const { mid: pathMid, isReady } = useClientPathMid();
+  const mid = midOverride || pathMid;
 
   const { data, isPending } = useGet<ClientTagOptionsResponse>(
     ["client-tag-options", mid],
     clientTagOptionsApi(mid),
-    { enabled: isReady }
+    { enabled: midOverride ? !!midOverride : isReady }
   );
 
   const tags = useMemo(
@@ -721,11 +732,12 @@ const CLIENT_KEY = ["client"];
 
 /** POST .../create. Resolves with the new client's id, which the contract upload
  *  needs — a contract can only be attached to a client that exists. */
-export function useCreateClient(): {
+export function useCreateClient(midOverride?: string): {
   createClient: (payload: ClientMutationPayload, onCreated?: (clientId: string) => void) => void;
   isPending: boolean;
 } {
-  const { mid } = useClientPathMid();
+  const { mid: pathMid } = useClientPathMid();
+  const mid = midOverride || pathMid;
 
   const { mutate, isPending } = usePost<ClientCreateResponse, ClientMutationPayload>(
     clientCreateApi(mid),
@@ -792,11 +804,12 @@ export function useUpdateClient(): {
  * for. Leg 1's presigned URL is keyed by the file's own name, which is why it is
  * read out of the response by that name rather than from a fixed field.
  */
-export function useClientContractUpload(): {
+export function useClientContractUpload(midOverride?: string): {
   uploadContract: (args: { clientId: string; rowMid?: string; file: File }) => void;
   isPending: boolean;
 } {
-  const { mid } = useClientPathMid();
+  const { mid: pathMid } = useClientPathMid();
+  const mid = midOverride || pathMid;
 
   const { mutate: presign, isPending: isPresigning } = usePut<
     ClientContractPresignResponse,

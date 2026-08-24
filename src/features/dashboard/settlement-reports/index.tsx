@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
-import { useProductContext } from "@/stores/useProductContext";
+import { useProductContext, toProductType } from "@/stores/useProductContext";
+import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
 import { useApp } from "@/stores/useApp";
 import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { MidGuard } from "@/components/common/MidGuard";
@@ -16,6 +17,7 @@ import {
   formatDayMonth,
   formatWeekdayDate,
   formatWeekdayName,
+  type SettlementSchedule,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { SettlementCalendarButton } from "@/features/dashboard/settlement-reports/components/SettlementCalendarButton";
 import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementCycleInfoPanel";
@@ -31,14 +33,12 @@ import {
   buildSettlementColumns,
 } from "@/features/dashboard/settlement-reports/columns";
 import {
-  SETTLEMENT_CALENDAR_TODAY,
-  mcaSettlementRows,
   mcaSettlementSummary,
   mcaTotalSettledChartsByTimeframe,
-  settlementRows,
   settlementSummary,
   totalSettledChartsByTimeframe,
 } from "@/features/dashboard/settlement-reports/mock-data";
+import { useSettlementCalendar } from "@/features/dashboard/settlement-reports/hooks";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import {
   ffmsSettlementDownloadApi,
@@ -68,10 +68,10 @@ function formatLakh(amount: number): string {
 /** "Tonight" only holds when today's payments are still on track for a plain
  * T+1 cutoff, once a weekend/holiday pushes the date out, name the actual day
  * instead so the merchant isn't left assuming it's still settling tonight. */
-function upcomingSettlementTimeLabel(summary: typeof settlementSummary): string {
-  if (!summary.upcomingSettlement.affectedByNonWorkingDay) return "Tonight · 12:00 AM IST";
-  const { expectedDate } = summary.upcomingSettlement;
-  return `${formatWeekdayName(expectedDate)} · ${formatDayMonth(expectedDate)}`;
+function upcomingSettlementTimeLabel(schedule: SettlementSchedule): string {
+  if (!schedule.affectedByNonWorkingDay) return "Tonight · 12:00 AM IST";
+  const { settlementDate } = schedule;
+  return `${formatWeekdayName(settlementDate)} · ${formatDayMonth(settlementDate)}`;
 }
 
 export function SettlementReportsFeature() {
@@ -79,10 +79,19 @@ export function SettlementReportsFeature() {
 
   // Which product (Payments / Multi-Currency Accounts) this shared screen is
   // currently scoped to, set by the Header's top-level tabs, see
-  // useProductContext.ts. The real settlement endpoint differs per product:
-  // PA is a GET summary, FFMS (PACB) is a POST summary.
-  const activeProduct = useProductContext((s) => s.activeProduct);
+  // useProductContext.ts. "Home" has no product of its own and falls back to
+  // PA. The real settlement endpoint differs per product: PA is a GET
+  // summary, FFMS (PACB) is a POST summary.
+  const activeContext = useProductContext((s) => s.activeContext);
+  const activeProduct = toProductType(activeContext);
   const isMca = activeProduct === "PACB";
+  const listPath = settlementListPath(activeContext);
+
+  // Real bank-holiday calendar (/gcc/v1/calendar). Everything date-shaped on
+  // this page now derives from it: today, the next settlement, the T+1 pushout
+  // behind the banner, and the calendar popover's holiday markers. Only the
+  // settlement *money* below is still mock.
+  const calendar = useSettlementCalendar();
 
   const { urlMid, midFilter } = useResolvedMids(activeProduct);
   const isGuestUser = useApp((s) => s.isGuestUser);
@@ -176,7 +185,6 @@ export function SettlementReportsFeature() {
   const chartsByTimeframe = isMca
     ? mcaTotalSettledChartsByTimeframe
     : totalSettledChartsByTimeframe;
-  const mockSettlementRows = isMca ? mcaSettlementRows : settlementRows;
 
   const onSearch = (v: string) => setSearch(v);
   const onDuration = (v: SettlementDurationValue | undefined) => setDuration(v);
@@ -219,7 +227,9 @@ export function SettlementReportsFeature() {
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
 
-  const upcoming = summary.upcomingSettlement;
+  // Schedule from the live calendar, amount still from mock-data (no summary
+  // endpoint exists — see BACKEND GAP below).
+  const upcoming = calendar.upcomingSchedule;
   const showHolidayBanner =
     upcoming.affectedByNonWorkingDay && upcoming.nonWorkingDayReason === "holiday";
 
@@ -240,7 +250,7 @@ export function SettlementReportsFeature() {
               <span className="font-semibold">Upcoming bank holiday.</span> Banks are closed on{" "}
               {formatWeekdayDate(upcoming.nonWorkingDayDate!)} for {upcoming.nonWorkingDayName}.
               Settlements due around this date are scheduled for the next working day,{" "}
-              {formatDayMonth(upcoming.expectedDate)}.
+              {formatDayMonth(upcoming.settlementDate)}.
             </p>
           </div>
         )}
@@ -256,7 +266,14 @@ export function SettlementReportsFeature() {
                 bankAccount={summary.bankAccount}
                 bankAccountStatus={summary.bankAccountStatus}
               />
-              <SettlementCalendarButton rows={mockSettlementRows} />
+              <SettlementCalendarButton
+                rows={apiRows}
+                todayKey={calendar.today}
+                nextSettlementDate={calendar.nextSettlement.date}
+                nextSettlementReason={calendar.nextSettlement.reason}
+                nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
+                hasUpcomingHoliday={calendar.hasUpcomingHoliday}
+              />
               <Button
                 variant="outline"
                 size="sm"
@@ -289,7 +306,7 @@ export function SettlementReportsFeature() {
               // download here. Row-level downloads in the table below are wired.
               onDownloadPreviousSettled={() => {}}
               upcomingSettlementLabel={formatCurrency(summary.upcomingSettlement.amount, "INR")}
-              upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(summary)}
+              upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
               pendingInvoiceCount={isMca ? mcaSettlementSummary.pendingInvoiceCount : undefined}
               onUploadInvoice={() => {}}
             />
@@ -384,7 +401,7 @@ export function SettlementReportsFeature() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => router.push(`/reports/settlement-report/${row.id}`)}
+                        onClick={() => router.push(`${listPath}/${row.id}`)}
                         rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
                         className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                       >
@@ -405,12 +422,12 @@ export function SettlementReportsFeature() {
                 previousSettledTimeLabel={summary.previousSettled.timeLabel}
                 previousSettledTransactionCount={summary.previousSettled.transactionCount}
                 upcomingSchedule={{
-                  affectedByNonWorkingDay: summary.upcomingSettlement.affectedByNonWorkingDay,
-                  paymentReceivedDate: SETTLEMENT_CALENDAR_TODAY,
-                  nonWorkingDayDate: summary.upcomingSettlement.nonWorkingDayDate ?? undefined,
-                  nonWorkingDayReason: summary.upcomingSettlement.nonWorkingDayReason ?? undefined,
-                  nonWorkingDayName: summary.upcomingSettlement.nonWorkingDayName ?? undefined,
-                  settlementDate: summary.upcomingSettlement.expectedDate,
+                  affectedByNonWorkingDay: upcoming.affectedByNonWorkingDay,
+                  paymentReceivedDate: calendar.today,
+                  nonWorkingDayDate: upcoming.nonWorkingDayDate ?? undefined,
+                  nonWorkingDayReason: upcoming.nonWorkingDayReason ?? undefined,
+                  nonWorkingDayName: upcoming.nonWorkingDayName ?? undefined,
+                  settlementDate: upcoming.settlementDate,
                 }}
               />
             </aside>

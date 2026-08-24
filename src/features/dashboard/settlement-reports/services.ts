@@ -26,3 +26,14 @@ export const ffmsSettlementSummaryApi = (mid: string): string =>
 /** FFMS per-settlement report download → { data: { presignedUrl } }. POST {}. */
 export const ffmsSettlementDownloadApi = (mid: string, date: string): string =>
   `${BASE_URL_V1}/ffms/settlement-report/${mid}/${date}`;
+
+// ── Bank holiday calendar ───────────────────────────────────────────────────
+// Verbatim from pg-dashboard's src/features/BankHolidayCalendar/services.ts.
+// Both dates are inclusive YYYY-MM-DD keys; production always asks for whole
+// months (getBankHolidayParams snaps to the month's first and last day) and
+// caches each month it has already fetched.
+//
+// Returns "" when either bound is missing so a disabled query cannot build a
+// half-formed URL, the same guard the builders above use.
+export const bankHolidayCalendarApi = (fromDate: string, toDate: string): string =>
+  fromDate && toDate ? `${BASE_URL_V1}/calendar?fromDate=${fromDate}&toDate=${toDate}` : "";

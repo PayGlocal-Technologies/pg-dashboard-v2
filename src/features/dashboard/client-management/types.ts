@@ -412,26 +412,6 @@ export interface InvoiceViewResponse {
   data: { url: string };
 }
 
-// ── Zoho integration ────────────────────────────────────────────────────────
-
-/** Mirror of pg-dashboard's ZohoStatusData. `status === "CONNECTED"` is what
- *  production gates the sync action on — not the `connected` boolean. */
-export interface ZohoStatusResponse {
-  status: string;
-  message: string;
-  data: {
-    connected: boolean;
-    status: string;
-    connectedAt: string | null;
-    orgId: string | null;
-    lastSyncedTime: number | null;
-    isFirstSync: boolean;
-  };
-}
-
-/** The pull-sync body. Both flags are sent; the client list sends
- *  `{ isClientSync: true, isInvoiceSync: false }`. */
-export interface ZohoPullSyncPayload {
-  isClientSync: boolean;
-  isInvoiceSync: boolean;
-}
+// Zoho status/pull-sync types now live in
+// @/features/dashboard/zoho-integration/types, shared with the integration
+// card and the invoice list rather than redeclared here.

@@ -11,23 +11,26 @@ import {
   formatShortDate,
   type CalendarCell,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
-import {
-  bankHolidays,
-  hasUpcomingHoliday,
-  nextSettlementInfo,
-  SETTLEMENT_CALENDAR_TODAY,
-} from "@/features/dashboard/settlement-reports/mock-data";
+import { useBankHolidays } from "@/features/dashboard/settlement-reports/hooks";
 import { isSettlementComplete } from "@/features/dashboard/settlement-reports/columns";
 import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
-function todayParts(): { year: number; month: number } {
-  const [year, month] = SETTLEMENT_CALENDAR_TODAY.split("-").map(Number);
+function todayParts(todayKey: string): { year: number; month: number } {
+  const [year, month] = todayKey.split("-").map(Number);
   return { year: year!, month: month! - 1 };
 }
 
-const holidayMap = new Map(bankHolidays.map((h) => [h.date, h.name]));
+/** First and last day of the month being viewed, as the inclusive YYYY-MM-DD
+ *  window /gcc/v1/calendar takes. Production snaps to whole months the same way
+ *  (getBankHolidayParams), so a month is either fully fetched or not at all. */
+function monthWindow(year: number, monthIndex: number): { from: string; to: string } {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const lastDay = new Date(year, monthIndex + 1, 0).getDate();
+  const month = pad(monthIndex + 1);
+  return { from: `${year}-${month}-01`, to: `${year}-${month}-${pad(lastDay)}` };
+}
 
 type DayDetail =
   | { kind: "settled"; dateKey: string; amount: number }
@@ -35,8 +38,13 @@ type DayDetail =
   | { kind: "next-settlement"; dateKey: string }
   | { kind: "none"; dateKey: string };
 
-function getDayDetail(dateKey: string, settledRowByDate: Map<string, SettlementRow>): DayDetail {
-  if (dateKey === nextSettlementInfo.date) return { kind: "next-settlement", dateKey };
+function getDayDetail(
+  dateKey: string,
+  settledRowByDate: Map<string, SettlementRow>,
+  holidayMap: Map<string, string>,
+  nextSettlementDate: string
+): DayDetail {
+  if (dateKey === nextSettlementDate) return { kind: "next-settlement", dateKey };
   const holidayName = holidayMap.get(dateKey);
   if (holidayName) return { kind: "holiday", dateKey, name: holidayName };
   const settledRow = settledRowByDate.get(dateKey);
@@ -89,11 +97,22 @@ interface DayCellProps {
   isSelected: boolean;
   onSelect: (dateKey: string) => void;
   settledRowByDate: Map<string, SettlementRow>;
+  holidayMap: Map<string, string>;
+  nextSettlementDate: string;
+  todayKey: string;
 }
 
-function DayCell({ cell, isSelected, onSelect, settledRowByDate }: DayCellProps) {
-  const detail = getDayDetail(cell.dateKey, settledRowByDate);
-  const isToday = cell.dateKey === SETTLEMENT_CALENDAR_TODAY;
+function DayCell({
+  cell,
+  isSelected,
+  onSelect,
+  settledRowByDate,
+  holidayMap,
+  nextSettlementDate,
+  todayKey,
+}: DayCellProps) {
+  const detail = getDayDetail(cell.dateKey, settledRowByDate, holidayMap, nextSettlementDate);
+  const isToday = cell.dateKey === todayKey;
 
   return (
     <Button
@@ -129,15 +148,46 @@ interface SettlementCalendarButtonProps {
   /** Which product's settlements to mark as "settled" on the grid, differs
    * by active product context, see useProductContext.ts. */
   rows: SettlementRow[];
+  /** Today, and the next-settlement figures derived from it. Passed in rather
+   * than recomputed here because the page already holds them for its own
+   * bank-holiday banner (useSettlementCalendar), and both must agree. */
+  todayKey: string;
+  nextSettlementDate: string;
+  nextSettlementReason: string | null;
+  nextSettlementSkippedDays: number;
+  hasUpcomingHoliday: boolean;
 }
 
-export function SettlementCalendarButton({ rows }: SettlementCalendarButtonProps) {
-  const { year: todayYear, month: todayMonth } = todayParts();
+export function SettlementCalendarButton({
+  rows,
+  todayKey,
+  nextSettlementDate,
+  nextSettlementReason,
+  nextSettlementSkippedDays,
+  hasUpcomingHoliday,
+}: SettlementCalendarButtonProps) {
+  const { year: todayYear, month: todayMonth } = todayParts(todayKey);
   const [open, setOpen] = useState(false);
   const [viewYear, setViewYear] = useState(todayYear);
   const [viewMonth, setViewMonth] = useState(todayMonth);
-  const [selectedDateKey, setSelectedDateKey] = useState(SETTLEMENT_CALENDAR_TODAY);
+  const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Holidays for the month on screen, refetched as the merchant pages through
+  // months. One month at a time, exactly as production's calendar does, and only
+  // while the popover is open — this button sits in the page header and is always
+  // mounted, so an ungated query would fetch a month nobody is looking at. The
+  // amber badge above needs no fetch of its own: hasUpcomingHoliday arrives as a
+  // prop from the page's own calendar read.
+  const { from: monthFrom, to: monthTo } = monthWindow(viewYear, viewMonth);
+  const { holidays: monthHolidays } = useBankHolidays(
+    open ? monthFrom : "",
+    open ? monthTo : ""
+  );
+  const holidayMap = useMemo(
+    () => new Map(monthHolidays.map((h) => [h.date, h.name])),
+    [monthHolidays]
+  );
 
   const settledRowByDate = useMemo(
     () =>
@@ -159,9 +209,9 @@ export function SettlementCalendarButton({ rows }: SettlementCalendarButtonProps
   }, [open]);
 
   const cells = buildMonthGrid(viewYear, viewMonth);
-  const detail = getDayDetail(selectedDateKey, settledRowByDate);
-  const showDelayBanner = nextSettlementInfo.skippedDays > 0;
-  const daysUntilNextSettlement = diffInDays(SETTLEMENT_CALENDAR_TODAY, nextSettlementInfo.date);
+  const detail = getDayDetail(selectedDateKey, settledRowByDate, holidayMap, nextSettlementDate);
+  const showDelayBanner = nextSettlementSkippedDays > 0;
+  const daysUntilNextSettlement = diffInDays(todayKey, nextSettlementDate);
 
   function goToPrevMonth() {
     if (viewMonth === 0) {
@@ -219,8 +269,8 @@ export function SettlementCalendarButton({ rows }: SettlementCalendarButtonProps
                     Scheduled for the next working day
                   </p>
                   <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300/90">
-                    {nextSettlementInfo.reason ? `${nextSettlementInfo.reason} · ` : ""}
-                    Next settlement: {formatShortDate(nextSettlementInfo.date)} · in{" "}
+                    {nextSettlementReason ? `${nextSettlementReason} · ` : ""}
+                    Next settlement: {formatShortDate(nextSettlementDate)} · in{" "}
                     {daysUntilNextSettlement} days
                   </p>
                 </div>
@@ -267,6 +317,9 @@ export function SettlementCalendarButton({ rows }: SettlementCalendarButtonProps
                   isSelected={cell.dateKey === selectedDateKey}
                   onSelect={setSelectedDateKey}
                   settledRowByDate={settledRowByDate}
+                  holidayMap={holidayMap}
+                  nextSettlementDate={nextSettlementDate}
+                  todayKey={todayKey}
                 />
               ))}
             </div>
