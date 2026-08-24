@@ -4,6 +4,7 @@ import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import {
+  canRemind,
   formatReferralReward,
   getReferralStatusMeta,
   ReferralRemindButton,
@@ -62,7 +63,13 @@ function ReferralCard({ row, onRemind, remindedIds }: { row: Referral } & Referr
           >
             {formatReferralReward(row)}
           </span>
-          <ReferralRemindButton row={row} onRemind={onRemind} remindedIds={remindedIds} />
+          {/* No button at all once a referral is done — completed or waived
+              rows have nothing left to nudge, and a disabled button would
+              suggest otherwise. The reward figure beside it simply stands
+              alone; nothing pads the space where the button would have been. */}
+          {canRemind(row) && (
+            <ReferralRemindButton row={row} onRemind={onRemind} remindedIds={remindedIds} />
+          )}
         </div>
       </div>
     </div>

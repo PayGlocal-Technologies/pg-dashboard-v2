@@ -45,6 +45,15 @@ export function formatReferralReward(row: Referral): string {
 
 // ── Remind action ────────────────────────────────────────────────────────────
 
+/**
+ * Whether a row can still be nudged. Only a referral still in progress has
+ * anything left to complete — one that already earned its reward or had it
+ * waived is done, and reminding it would have nothing to point at.
+ */
+export function canRemind(row: Referral): boolean {
+  return row.status === "PENDING" || row.status === "ACTIVATED";
+}
+
 export interface ReferralRemindActions {
   /** Sends the nudge for one row. */
   onRemind: (row: Referral) => void;
@@ -151,7 +160,12 @@ export function buildReferralColumns(actions: ReferralRemindActions): Column<Ref
       // merged last by DataTable, which is what lets it win over the density
       // padding rather than sitting alongside it.
       cellClassName: "py-2",
-      render: (row) => <ReferralRemindButton row={row} {...actions} />,
+      // No button at all for a completed or waived row, rather than a disabled
+      // one — there is nothing left for it to do. The cell is simply empty:
+      // it is still the same `<td>` in the same column, so the column itself
+      // stays aligned across every row without a placeholder standing in for
+      // the button.
+      render: (row) => (canRemind(row) ? <ReferralRemindButton row={row} {...actions} /> : null),
     },
   ];
 }

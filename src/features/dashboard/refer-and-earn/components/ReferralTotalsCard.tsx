@@ -1,103 +1,74 @@
 import Image from "next/image";
 import { Card, MetricText, Text } from "@/components/ui";
-import { currencySymbol } from "@/lib/utils/format";
+import { formatCurrency } from "@/lib/utils/format";
 import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helpers";
 
 /**
- * Card background, served from `public/assets`. A raster asset, so it cannot be
- * an icon-registry entry (that pattern is for SVG forwardRef components) and goes
- * through `next/image` instead — see CLAUDE.md's Images rule.
+ * Card illustration, served from `public/assets`. A raster asset, so it cannot
+ * be an icon-registry entry (that pattern is for SVG forwardRef components) and
+ * goes through `next/image` instead — see CLAUDE.md's Images rule.
  *
- * `width`/`height` are the file's real pixel dimensions. They are not used to
- * size the render (that is `fill`), but the ratio is what the card's stacked
- * `aspect-[1672/941]` is taken from, so on mobile the artwork keeps its own
- * proportions instead of being cropped to whatever the text happens to need.
+ * Rendered at its own intrinsic ratio (no `fill`), so `width`/`height` do the
+ * usual next/image job of reserving the right box before it loads — nothing
+ * downstream needs to read the ratio off them separately.
  */
-const BACKGROUND = {
-  src: "/assets/BG1.png",
-  width: 1672,
-  height: 941,
+const TOTAL_EARNED_IMAGE = {
+  src: "/assets/Total earned.png",
+  width: 1230,
+  height: 1278,
 } as const;
-
-/**
- * Headline earned figure, without minor units — `$120`, not `$120.00`. This card
- * is the glance value; the exact amount to the cent is already on the analytics
- * row's own "Total earned" card, so cents here would only crowd the display
- * figure. Falls back to showing them if the total ever carries a fraction, so
- * nothing is silently rounded away.
- */
-function formatHeadlineAmount(amount: number, currency: string): string {
-  const hasFraction = !Number.isInteger(amount);
-  return `${currencySymbol(currency)}${amount.toLocaleString("en-US", {
-    minimumFractionDigits: hasFraction ? 2 : 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
 
 interface ReferralTotalsCardProps {
   summary: ReferralSummary;
 }
 
 /**
- * Earned total beside the hero, set into the referral artwork. The figures come
- * from the same summarizeReferrals output the analytics row reads, so the two
- * surfaces cannot disagree.
+ * Earned total beside the hero: just the figure and the illustration standing
+ * in for it — nothing else. The referral journey recap lives in its own
+ * sibling now (see ReferralJourneyCard, rendered alongside this one in
+ * ReferAndEarnFeature), so this card can hug exactly its own two pieces of
+ * content instead of carrying a height rule for both of them together.
+ *
+ * The figure comes from the same summarizeReferrals output the analytics row
+ * reads, so the two surfaces cannot disagree.
  */
 export function ReferralTotalsCard({ summary }: ReferralTotalsCardProps) {
   const referrals = summary.completed;
 
   return (
-    // Two height rules, one per layout, and neither is a pixel value.
-    //
-    // From md up the card is a stretched grid item beside the hero, so `h-full`
-    // is the hero's own rendered height — `aspect-auto` is what clears the
-    // stacked ratio out of the way and lets that stretch take effect. The
-    // content is centred rather than parked at the top, so a tall card reads as
-    // composed instead of top-heavy.
-    //
-    // Stacked below md there is nothing beside it to match, so it falls back to
-    // the asset's own ratio and keeps the proportions it has always had.
-    //
-    // `isolate` scopes the negative z-index below to this card, and
-    // `overflow-hidden` clips the artwork to the card's existing radius. No
-    // padding of its own: the content block below carries it.
-    <Card className="relative isolate aspect-[1672/941] items-start justify-start overflow-hidden p-0 md:aspect-auto md:h-full md:justify-center">
-      {/* Decorative, so `alt=""`. `fill` + `object-cover` covers the card at any
-          size and at its own aspect ratio — the artwork is cropped to fit, never
-          stretched to it, which is what keeps it undistorted now that the card's
-          height is the hero's rather than the asset's. The negative z-index
-          paints it over the card's own surface but under the text. */}
-      <Image
-        src={BACKGROUND.src}
-        alt=""
-        fill
-        sizes="(min-width: 1024px) 21rem, (min-width: 768px) 17rem, 100vw"
-        className="-z-10 object-cover"
-      />
-
-      {/* Upper-left, and capped at two thirds of the width so the text never runs
-          into the mailbox the artwork puts on the lower right. */}
-      <div className="flex max-w-[66%] flex-col gap-0.5 p-5">
-        {/* The artwork is a fixed light gradient in both themes — it carries no
-            alpha and does not invert — so every colour here is pinned to a dark
-            value rather than `text-foreground`/`text-muted-foreground`, which
-            would turn near-white in dark mode and vanish against it. */}
-        <Text size="sm" className="text-slate-500">
-          Total earnings
+    // Text upper-left, illustration lower-right, per the reference — and nether
+    // is positioned to get there. The text block is the card's first child, so
+    // it lands at the top by plain document order; the illustration is the
+    // second child, so it falls in the space below the text, and `ml-auto`
+    // pushes that block to the right within its own row without needing the
+    // image to also be full width. The gap between the two comes from the
+    // card's own `gap-8`, wide enough to read as the reference's whitespace
+    // without being a pixel figure that would need to change if the text
+    // wrapped to a second line.
+    <Card className="gap-8 p-5 sm:p-6">
+      <div className="flex flex-col items-start gap-1">
+        <MetricText size="lg">
+          {formatCurrency(summary.totalEarned, summary.earnedCurrency, "en-US")}
+        </MetricText>
+        <Text size="sm" color="subtle">
+          from {referrals.toLocaleString("en-US")} {referrals === 1 ? "referral" : "referrals"}
         </Text>
-
-        {/* Amount and count share a baseline rather than stacking, per the
-            reference. `flex-wrap` is a safety valve only — at the column's real
-            width the pair sits on one line. */}
-        <div className="flex flex-wrap items-baseline gap-x-2.5">
-          <MetricText size="lg" className="text-slate-900">
-            {formatHeadlineAmount(summary.totalEarned, summary.earnedCurrency)}
-          </MetricText>
-          <Text size="sm" className="text-slate-500">
-            {referrals.toLocaleString("en-US")} {referrals === 1 ? "referral" : "referrals"}
-          </Text>
-        </div>
       </div>
+
+      {/* `w-[58%]` is a fraction of the card's own content width rather than a
+          fixed figure, so the illustration scales with the column at every
+          breakpoint; `h-auto` off the asset's real width/height is what keeps
+          it from ever distorting. `ml-auto` is what sends it to the card's
+          right edge — the rest of the row's width is the whitespace the
+          reference leaves to its left. */}
+      <Image
+        src={TOTAL_EARNED_IMAGE.src}
+        alt=""
+        width={TOTAL_EARNED_IMAGE.width}
+        height={TOTAL_EARNED_IMAGE.height}
+        sizes="(min-width: 1024px) 13rem, (min-width: 768px) 10rem, 45vw"
+        className="ml-auto h-auto w-[58%]"
+      />
     </Card>
   );
 }
