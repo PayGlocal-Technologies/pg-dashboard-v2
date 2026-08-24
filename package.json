@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check-types": "tsc --noEmit",
+    "test": "vitest run",
     "postbuild": "lumen-assert-no-agent"
   },
   "dependencies": {
@@ -65,6 +66,7 @@
     "node-pty": "^1.0.0",
     "prettier": "^3.5.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

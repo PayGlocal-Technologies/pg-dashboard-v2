@@ -1,6 +1,7 @@
-/** Same 5-status vocabulary already established for disputed PA transactions,
+/** Same 6-status vocabulary already established for disputed PA transactions,
  * see PA_STATUS_META in @/features/dashboard/transactions/paColumns. */
-export type DisputeRawStatus = "DISPUTED" | "NEEDS_ACTION" | "UNDER_REVIEW" | "WON" | "LOST";
+export type DisputeRawStatus =
+  "DISPUTED" | "NEEDS_ACTION" | "UNDER_REVIEW" | "INSUFFICIENT_DOCUMENTS" | "WON" | "LOST";
 
 export interface DisputeRow {
   disputeId: string;

@@ -1,6 +1,14 @@
-import { Button, StatusBadge, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import {
+  Button,
+  StatusBadge,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { DetailRow } from "@/features/dashboard/transactions/components/TransactionDetailPrimitives";
+import { formatDisplayDateTime } from "@/features/dashboard/transactions/paColumns";
 import type { TransactionDetailView } from "@/features/dashboard/transactions/deriveTransactionDetail";
 
 interface SettlementDetailsBodyProps {
@@ -38,7 +46,10 @@ export function SettlementNotApplicableNote() {
 
 /** Shared by TransactionDetailsDrawer and TransactionDetailFeature so the
  * Settlement Details card always shows identical fields in both places. */
-export function SettlementDetailsBody({ settlement, onViewSettlement }: SettlementDetailsBodyProps) {
+export function SettlementDetailsBody({
+  settlement,
+  onViewSettlement,
+}: SettlementDetailsBodyProps) {
   if (!settlement.applicable) {
     return <SettlementNotApplicableNote />;
   }
@@ -58,7 +69,10 @@ export function SettlementDetailsBody({ settlement, onViewSettlement }: Settleme
       />
       {settlement.isSettled ? (
         <>
-          <DetailRow label="Settled On" value={settlement.settledOnDate} />
+          <DetailRow
+            label="Settled On"
+            value={formatDisplayDateTime(settlement.settledOnDate) ?? settlement.settledOnDate}
+          />
           <DetailRow
             label="UTR Number"
             value={
@@ -78,7 +92,10 @@ export function SettlementDetailsBody({ settlement, onViewSettlement }: Settleme
           <DetailRow label="Settled To" value={settlement.settledToAccount} />
         </>
       ) : (
-        <DetailRow label="Expected On" value={settlement.expectedOnDate} />
+        <DetailRow
+          label="Expected On"
+          value={formatDisplayDateTime(settlement.expectedOnDate) ?? settlement.expectedOnDate}
+        />
       )}
     </div>
   );

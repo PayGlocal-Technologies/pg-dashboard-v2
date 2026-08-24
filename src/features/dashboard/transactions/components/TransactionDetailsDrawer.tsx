@@ -2,24 +2,29 @@
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button, Card, Drawer, DrawerContent, Separator, StatusBadge } from "@/components/ui";
+import { Button, Card, Drawer, DrawerContent, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn, formatCurrency } from "@/lib/utils";
 import { ProductFeedback } from "@/components/common/ProductFeedback";
 import { ReferAndEarnBanner } from "@/components/common/ReferAndEarnBanner";
-import { customerName, getStatusBucket, getStatusMeta } from "@/features/dashboard/transactions/paColumns";
+import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
+import {
+  customerName,
+  getDisplayStatus,
+  getDisplayStatusBucket,
+} from "@/features/dashboard/transactions/paColumns";
 import { deriveTransactionDetail } from "@/features/dashboard/transactions/deriveTransactionDetail";
-import { DetailRow, SectionLabel } from "@/features/dashboard/transactions/components/TransactionDetailPrimitives";
+import {
+  DetailRow,
+  SectionLabel,
+} from "@/features/dashboard/transactions/components/TransactionDetailPrimitives";
 import { AmountBreakdownBody } from "@/features/dashboard/transactions/components/AmountBreakdownBody";
 import { LinkedTransactionsSection } from "@/features/dashboard/transactions/components/LinkedTransactionsSection";
 import { SettlementDetailsBody } from "@/features/dashboard/transactions/components/SettlementDetailsBody";
 import { TransactionPaymentMethod } from "@/features/dashboard/transactions/components/TransactionPaymentMethod";
 import { truncateId } from "@/features/dashboard/transactions/components/TransactionId";
-import { useIssuedRefunds } from "@/stores/useIssuedRefunds";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
-
-const EMPTY_REFUNDS: PaTransaction[] = [];
 
 /** "07/08/2026, 08:47:05" -> ["07/08/2026", "08:47:05"]. */
 function splitDateTime(value?: string): [string, string | undefined] {
@@ -34,22 +39,27 @@ interface TransactionDetailsDrawerProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function TransactionDetailsDrawer({ transaction, open, onOpenChange }: TransactionDetailsDrawerProps) {
+export function TransactionDetailsDrawer({
+  transaction,
+  open,
+  onOpenChange,
+}: TransactionDetailsDrawerProps) {
   const router = useRouter();
   const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
-  const issuedRefunds = useIssuedRefunds((s) => s.refundsByParentGid[transaction?.gid ?? ""] ?? EMPTY_REFUNDS);
 
   if (!transaction) return null;
 
   const detail = deriveTransactionDetail(transaction);
-  const statusMeta = getStatusMeta(transaction.externalStatus);
+  // Combined status (refund/dispute overlaid on the payment status, see its
+  // own doc comment in paColumns.tsx), not the raw externalStatus directly.
+  const statusMeta = getDisplayStatus(transaction);
   const amount = parseFloat(transaction.totalAmount ?? "0");
   const currency = transaction.txnCurrency ?? "INR";
   const name = customerName(transaction) || "Unknown customer";
-  const showFeedback = getStatusBucket(transaction.externalStatus) === "success";
+  const showFeedback = getDisplayStatusBucket(transaction) === "success";
   const [datePart, timePart] = splitDateTime(transaction.formattedCreationDateTime);
 
-  const linkedTransactions = [...detail.linkedTransactions, ...issuedRefunds];
+  const linkedTransactions = detail.linkedTransactions;
 
   async function handleCopyId() {
     try {
@@ -61,8 +71,25 @@ export function TransactionDetailsDrawer({ transaction, open, onOpenChange }: Tr
   }
 
   function goToDetail(row: PaTransaction) {
-    setStoredTransaction(row);
+    // A refund child (see linkedChildRecords.ts) opens its own detail view,
+    // not the parent, same routing rule as PaTransactionTable/
+    // TransactionDetailFeature's own goToDetail. A refund-only (non-
+    // disputed) transaction opens THIS drawer rather than the full page, so
+    // its Linked Transactions can include refund rows too.
+    setStoredTransaction(transaction);
     onOpenChange(false);
+    if (row.linkedRecordType === "refund") {
+      router.push(
+        `/transactions/${encodeURIComponent(transaction!.gid ?? "")}/refunds/${encodeURIComponent(row.linkedRecordId ?? "")}`
+      );
+      return;
+    }
+    if (row.linkedRecordType === "dispute") {
+      router.push(
+        `/transactions/${encodeURIComponent(transaction!.gid ?? "")}/disputes/${encodeURIComponent(row.linkedRecordId ?? "")}`
+      );
+      return;
+    }
     router.push(`/transactions/${encodeURIComponent(row.gid ?? "")}`);
   }
 
@@ -103,7 +130,10 @@ export function TransactionDetailsDrawer({ transaction, open, onOpenChange }: Tr
           <div className="flex flex-col items-end gap-1">
             <p className="text-[11px] text-muted-foreground">Transaction ID</p>
             <div className="flex min-w-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5">
-              <span title={transaction.gid} className="truncate font-mono text-xs font-semibold text-foreground/85">
+              <span
+                title={transaction.gid}
+                className="truncate font-mono text-xs font-semibold text-foreground/85"
+              >
                 {truncateId(transaction.gid ?? "Not available")}
               </span>
               <Button
@@ -129,10 +159,11 @@ export function TransactionDetailsDrawer({ transaction, open, onOpenChange }: Tr
                   {formatCurrency(amount, currency)}
                   <span className="text-sm font-medium text-muted-foreground">{currency}</span>
                 </p>
-                <StatusBadge
+                <StatusBadgeWithTooltip
                   variant={statusMeta.variant}
                   label={statusMeta.label}
                   trailIcon={statusMeta.trailIcon}
+                  tooltip={statusMeta.tooltip}
                   size="sm"
                 />
               </div>
@@ -160,7 +191,10 @@ export function TransactionDetailsDrawer({ transaction, open, onOpenChange }: Tr
             <div className="flex flex-col gap-1.5">
               <SectionLabel>Settlement Details</SectionLabel>
               <Card className="gap-0 p-3.5">
-                <SettlementDetailsBody settlement={detail.settlement} onViewSettlement={goToSettlement} />
+                <SettlementDetailsBody
+                  settlement={detail.settlement}
+                  onViewSettlement={goToSettlement}
+                />
               </Card>
             </div>
 
@@ -172,6 +206,8 @@ export function TransactionDetailsDrawer({ transaction, open, onOpenChange }: Tr
                   <AmountBreakdownBody
                     amountReceived={detail.amountBreakdown.amountReceived}
                     fee={detail.amountBreakdown.fee}
+                    refundedAmount={detail.amountBreakdown.refundedAmount}
+                    disputedAmount={detail.amountBreakdown.disputedAmount}
                     netAmount={detail.amountBreakdown.netAmount}
                     currency={currency}
                   />
@@ -240,7 +276,10 @@ export function TransactionDetailsDrawer({ transaction, open, onOpenChange }: Tr
              * plus any refunds issued against this one */}
             <div className="flex flex-col gap-1.5">
               <SectionLabel>Linked Transactions</SectionLabel>
-              <LinkedTransactionsSection transactions={linkedTransactions} onViewDetails={goToDetail} />
+              <LinkedTransactionsSection
+                transactions={linkedTransactions}
+                onViewDetails={goToDetail}
+              />
             </div>
           </div>
         </div>

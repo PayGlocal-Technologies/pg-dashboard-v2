@@ -2,14 +2,26 @@
 
 import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
+import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
 import { TransactionCustomerCell } from "@/features/dashboard/transactions/components/TransactionCustomerCell";
 import { TransactionPaymentMethod } from "@/features/dashboard/transactions/components/TransactionPaymentMethod";
 import { TransactionAmount } from "@/features/dashboard/transactions/components/TransactionAmount";
 import { TransactionId } from "@/features/dashboard/transactions/components/TransactionId";
+import {
+  getRefundedAmount,
+  isDisputeActive,
+} from "@/features/dashboard/transactions/financial/deriveFinancials";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
-type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
+type StatusMeta = {
+  label: string;
+  variant: BadgeVariant;
+  trailIcon?: BadgeTrailIcon;
+  /** Extra context shown on hover rather than inline in the badge itself,
+   * e.g. a dispute's response deadline, see StatusBadgeWithTooltip. */
+  tooltip?: string;
+};
 
 export const PA_STATUS_META: Record<string, StatusMeta> = {
   SUCCESS: { label: "Success", variant: "success", trailIcon: "check" },
@@ -21,6 +33,12 @@ export const PA_STATUS_META: Record<string, StatusMeta> = {
   CAPTURE_STARTED: { label: "Capture started", variant: "warning" },
   SENT_FOR_REFUND: { label: "Sent for refund", variant: "refund" },
   REFUND_STARTED: { label: "Refund started", variant: "refund" },
+  // Used for a refund CHILD event's own status badge (see
+  // linkedChildRecords.ts), same label/variant getDisplayStatus already
+  // uses for a fully-refunded parent, kept consistent rather than a second
+  // "refunded" vocabulary.
+  REFUNDED: { label: "Refunded", variant: "refund" },
+  REFUND_FAILED: { label: "Refund failed", variant: "danger", trailIcon: "x" },
   AUTH_REVERSAL_STARTED: { label: "Auth reversal", variant: "warning" },
   ISSUER_DECLINE: { label: "Issuer decline", variant: "danger", trailIcon: "x" },
   GENERAL_DECLINE: { label: "General decline", variant: "danger", trailIcon: "x" },
@@ -38,9 +56,20 @@ export const PA_STATUS_META: Record<string, StatusMeta> = {
   // variant: "warning"/"success"/"danger" here (not "orange") deliberately
   // reuse the same three variants every other status in this table already
   // uses, keeping the chip UI consistent instead of introducing a new color.
-  DISPUTED: { label: "Dispute, respond within 6 days", variant: "warning" },
+  // DISPUTED and NEEDS_ACTION are two raw values for the same merchant-
+  // facing state ("needs the merchant to accept/contest or upload
+  // documents"), both display identically as "Action required" rather than
+  // two different-sounding labels for the same thing.
+  DISPUTED: { label: "Action required", variant: "warning", tooltip: "Respond within 6 days" },
+  NEEDS_ACTION: { label: "Action required", variant: "warning" },
   UNDER_REVIEW: { label: "Under review", variant: "warning", trailIcon: "clock" },
-  NEEDS_ACTION: { label: "Needs action", variant: "warning" },
+  // Only reached once PayGlocal has reviewed submitted evidence and found
+  // it inadequate, distinct from the initial "Action required" state.
+  INSUFFICIENT_DOCUMENTS: {
+    label: "Insufficient documents",
+    variant: "danger",
+    trailIcon: "alert",
+  },
   WON: { label: "Won", variant: "success", trailIcon: "check" },
   LOST: { label: "Lost", variant: "danger", trailIcon: "x" },
 };
@@ -50,7 +79,14 @@ export const PA_STATUS_META: Record<string, StatusMeta> = {
  * badge variant's usual bucket, WON/LOST use "success"/"danger" variants for
  * their badge color but must still surface under the Disputes tab, not
  * alongside ordinary payment successes/failures. */
-const DISPUTE_STATUS_KEYS = ["DISPUTED", "UNDER_REVIEW", "NEEDS_ACTION", "WON", "LOST"];
+const DISPUTE_STATUS_KEYS = [
+  "DISPUTED",
+  "UNDER_REVIEW",
+  "NEEDS_ACTION",
+  "INSUFFICIENT_DOCUMENTS",
+  "WON",
+  "LOST",
+];
 
 export function getStatusMeta(raw?: string): StatusMeta {
   if (!raw) return { label: "Unknown", variant: "muted" };
@@ -77,12 +113,103 @@ export function getStatusBucket(raw?: string): TransactionStatusBucket {
   return BUCKET_BY_VARIANT[variant] ?? "pending";
 }
 
+// ── Transaction-level display status ────────────────────────────────────────
+// getStatusMeta/getStatusBucket above answer "what does this one raw status
+// string mean". They're still correct and still used as-is for any
+// transaction with no refund/dispute history (including real, not-yet-
+// migrated API data, which has no refunds[]/disputes[] at all). The
+// functions below answer the actual question the transaction list/detail
+// page need answered: "what should this transaction's ONE status badge say,
+// given everything that has happened to it" (see the Unified Transaction ID
+// & Financial Event Logic model, refunds/disputes are child events on this
+// same PaTransaction, never separate rows). Every consumer of a
+// transaction's primary status (the table's status column, the drawer, the
+// full detail page) must go through getDisplayStatus, not getStatusMeta
+// directly, so there is one place this logic lives.
+
+/** The transaction's own bucket (see getStatusBucket) for a WON/LOST
+ * dispute's raw status re-uses that same bucket mapping (WON's variant is
+ * "success", LOST's is "danger" but both fall under "disputed" via
+ * DISPUTE_STATUS_KEYS), kept in sync automatically since it's the same
+ * function, not a second copy of the mapping. */
+export function getDisplayStatusBucket(transaction: PaTransaction): TransactionStatusBucket {
+  const rawBucket = getStatusBucket(transaction.externalStatus);
+  if (rawBucket === "failed" || rawBucket === "pending") return rawBucket;
+
+  const dispute = transaction.disputes?.[0];
+  if (isDisputeActive(dispute)) return "disputed";
+  if (dispute) return getStatusBucket(dispute.status);
+
+  const refundedAmount = getRefundedAmount(transaction.refunds ?? []);
+  if (refundedAmount > 0) return "refunded";
+
+  return rawBucket;
+}
+
+/** The single badge {label, variant, trailIcon} shown for a transaction,
+ * combining its refund state with its most recent dispute (if any). A
+ * transaction with neither behaves exactly as getStatusMeta always did, this
+ * is additive, not a replacement, for the common case. */
+export function getDisplayStatus(transaction: PaTransaction): StatusMeta {
+  const rawBucket = getStatusBucket(transaction.externalStatus);
+  // Refund/dispute overlays only ever apply on top of an underlying
+  // successful payment, a failed or still-pending payment's own status is
+  // always the most important thing to show, unchanged.
+  if (rawBucket === "failed" || rawBucket === "pending") {
+    return getStatusMeta(transaction.externalStatus);
+  }
+
+  const originalAmount = parseFloat(transaction.totalAmount ?? "0");
+  const refundedAmount = getRefundedAmount(transaction.refunds ?? []);
+  const isFullyRefunded = refundedAmount > 0 && refundedAmount >= originalAmount;
+  const isPartiallyRefunded = refundedAmount > 0 && !isFullyRefunded;
+  const refundPrefix = isFullyRefunded
+    ? "Refunded"
+    : isPartiallyRefunded
+      ? "Partially refunded"
+      : undefined;
+
+  const dispute = transaction.disputes?.[0];
+
+  if (isDisputeActive(dispute)) {
+    // getStatusMeta(dispute.status) reuses the exact existing labels for
+    // DISPUTED/NEEDS_ACTION/UNDER_REVIEW/INSUFFICIENT_DOCUMENTS ("Action
+    // required", "Under review", "Insufficient documents"), the dispute's
+    // own event status, not the transaction's externalStatus. Any extra
+    // context (e.g. DISPUTED's response deadline) travels via .tooltip,
+    // shown on hover rather than inline in the badge.
+    const disputeMeta = getStatusMeta(dispute!.status);
+    return {
+      label: refundPrefix ? `${refundPrefix} · ${disputeMeta.label}` : disputeMeta.label,
+      variant: "warning",
+      trailIcon: disputeMeta.trailIcon,
+      tooltip: disputeMeta.tooltip,
+    };
+  }
+
+  if (dispute) {
+    // Resolved (WON/LOST), keeps its own existing label/variant regardless
+    // of any independent refund state, see getDisplayStatus's own doc
+    // comment above for why this doesn't get combined with refund text.
+    return getStatusMeta(dispute.status);
+  }
+
+  if (refundPrefix) {
+    return { label: refundPrefix, variant: "refund" };
+  }
+
+  return getStatusMeta(transaction.externalStatus);
+}
+
 /** Raw externalStatus codes belonging to each coarse bucket, used to build
  * the `externalStatus` array sent to the search API when a segmented-control
  * tab (other than "All") is selected. Dispute statuses are excluded from the
  * variant-derived success/failed lists (WON/LOST would otherwise double up
  * there) since they're already listed under "disputed" below. */
-export const STATUS_BUCKET_RAW_VALUES: Record<Exclude<TransactionStatusBucket, "pending">, string[]> = {
+export const STATUS_BUCKET_RAW_VALUES: Record<
+  Exclude<TransactionStatusBucket, "pending">,
+  string[]
+> = {
   success: Object.entries(PA_STATUS_META)
     .filter(([key, meta]) => meta.variant === "success" && !DISPUTE_STATUS_KEYS.includes(key))
     .map(([key]) => key),
@@ -98,7 +225,20 @@ export const STATUS_BUCKET_RAW_VALUES: Record<Exclude<TransactionStatusBucket, "
 // ── Date & Time cell, reformats the API's "DD/MM/YYYY, HH:MM:SS" string into
 // a single-line "D MMM 'YY, hh:mm AM/PM" display, same font/color as every
 // other column. ────────────────────────────────────────────────────────────
-const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTH_ABBR = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 export function formatDisplayDateTime(value?: string): string | null {
   if (!value) return null;
@@ -116,7 +256,11 @@ export function formatDisplayDateTime(value?: string): string | null {
 
 function DateTimeCell({ value }: { value?: string }) {
   const formatted = formatDisplayDateTime(value);
-  return <span className="whitespace-nowrap text-[12px] font-medium text-foreground">{formatted ?? "N/A"}</span>;
+  return (
+    <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+      {formatted ?? "N/A"}
+    </span>
+  );
 }
 
 export function customerName(row: PaTransaction): string {
@@ -183,7 +327,12 @@ function buildColumn(key: string): Column<PaTransaction> | null {
         // which sit inside a `pl-5` wrapper (see PaTransactionTable), the
         // DataTable itself has no equivalent padding of its own.
         cellClassName: "pl-5",
-        render: (row) => <TransactionAmount amount={parseFloat(row.totalAmount ?? "0")} currency={row.txnCurrency ?? "INR"} />,
+        render: (row) => (
+          <TransactionAmount
+            amount={parseFloat(row.totalAmount ?? "0")}
+            currency={row.txnCurrency ?? "INR"}
+          />
+        ),
       };
     case "status":
       return {
@@ -191,8 +340,16 @@ function buildColumn(key: string): Column<PaTransaction> | null {
         header: "Status",
         minWidth: 155,
         render: (row) => {
-          const { label, variant, trailIcon } = getStatusMeta(row.externalStatus);
-          return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
+          const { label, variant, trailIcon, tooltip } = getDisplayStatus(row);
+          return (
+            <StatusBadgeWithTooltip
+              variant={variant}
+              label={label}
+              trailIcon={trailIcon}
+              tooltip={tooltip}
+              size="sm"
+            />
+          );
         },
       };
     case "dateTime":
@@ -240,7 +397,9 @@ export function buildPaColumns({
         header: "Merchant ID",
         minWidth: 145,
         render: (row) => (
-          <span className="whitespace-nowrap text-[12px] font-medium text-foreground">{row.merchantId ?? "N/A"}</span>
+          <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+            {row.merchantId ?? "N/A"}
+          </span>
         ),
       });
     }

@@ -1,6 +1,29 @@
 import { getStatusBucket, getStatusMeta } from "@/features/dashboard/transactions/paColumns";
+import { getDisputeReasonMeta } from "@/features/dashboard/transactions/disputeReasonMeta";
+import { buildLinkedChildRows } from "@/features/dashboard/transactions/linkedChildRecords";
 import { settlementRows } from "@/features/dashboard/settlement-reports/mock-data";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
+import {
+  deriveTransactionStatus,
+  getDisputedAmount,
+  getActiveDisputeAmount,
+  getFailedRefundAmount,
+  getLostDisputeAmount,
+  getNetAmount,
+  getPendingRefundAmount,
+  getRefundedAmount,
+  getRemainingAmount,
+  getSettledAmount,
+  getWonDisputeAmount,
+} from "@/features/dashboard/transactions/financial/deriveFinancials";
+import { generateTimelineEvents } from "@/features/dashboard/transactions/financial/generateTimeline";
+import type {
+  DisputeEvent,
+  DisputeEventStatus,
+  RefundEvent,
+  SettlementEvent,
+  TransactionFinancials,
+} from "@/features/dashboard/transactions/financial/types";
 
 // TODO(integration): the search-result row (PaTransaction) only carries the
 // fields the list needs. A handful of fields below, issuer bank, merchant
@@ -15,7 +38,13 @@ import type { PaTransaction } from "@/features/dashboard/transactions/types";
 // page reached via the drawer's Expand button) so both always show the exact
 // same data for a given transaction.
 
-const ISSUER_BANKS = ["HDFC Bank", "ICICI Bank", "Axis Bank", "State Bank of India", "Kotak Mahindra Bank"];
+const ISSUER_BANKS = [
+  "HDFC Bank",
+  "ICICI Bank",
+  "Axis Bank",
+  "State Bank of India",
+  "Kotak Mahindra Bank",
+];
 const SETTLEMENT_ACCOUNTS = ["HDFC ****4521", "ICICI ****7789", "Axis ****3312"];
 const ADDRESS_POOL = [
   "482 Anna Salai, Chennai, Tamil Nadu 600002, India",
@@ -59,36 +88,17 @@ function deriveErrorCode(raw: string | undefined, bucket: string): string | unde
 }
 
 /** Per raw dispute status (DISPUTED/UNDER_REVIEW/NEEDS_ACTION/WON/LOST, see
- * DISPUTE_STATUS_KEYS in paColumns.tsx), the reason a cardholder filed the
- * dispute, its card-network reason code, and the longer sentence shown in
- * DisputeActionCard. Statuses not listed here fall back to a generic
- * "Fraudulent" dispute, only the 5 dispute-bucket statuses ever reach this. */
-const DISPUTE_REASON_META: Record<string, { reason: string; reasonCode: string; description: string }> = {
-  DISPUTED: {
-    reason: "Fraudulent",
-    reasonCode: "10.4",
-    description: "The cardholder claims they did not authorise this purchase.",
-  },
-  NEEDS_ACTION: {
-    reason: "Fraudulent",
-    reasonCode: "10.4",
-    description: "The cardholder claims they did not authorise this purchase.",
-  },
-  UNDER_REVIEW: {
-    reason: "Product not received",
-    reasonCode: "13.1",
-    description: "The cardholder claims they did not receive the goods or services purchased.",
-  },
-  WON: {
-    reason: "Duplicate processing",
-    reasonCode: "12.6",
-    description: "The cardholder was charged more than once for the same purchase.",
-  },
-  LOST: {
-    reason: "Credit not processed",
-    reasonCode: "13.6",
-    description: "The cardholder claims a refund or credit was not issued as expected.",
-  },
+ * DISPUTE_STATUS_KEYS in paColumns.tsx), the reason assumed for a dispute
+ * with no structured data of its own (real, not-yet-migrated API data, see
+ * the disputeEvents fallback below). Its reasonCode/description/merchant
+ * label come from the shared getDisputeReasonMeta lookup, not duplicated
+ * here, only the 5 dispute-bucket statuses ever reach this. */
+const STATUS_DEFAULT_REASON: Record<string, string> = {
+  DISPUTED: "Fraudulent",
+  NEEDS_ACTION: "Fraudulent",
+  UNDER_REVIEW: "Product not received",
+  WON: "Duplicate processing",
+  LOST: "Credit not processed",
 };
 
 function seedFromString(value: string): number {
@@ -151,21 +161,52 @@ export interface TransactionDetailView {
         isSettled: false;
         expectedOnDate: string;
       };
-  /** Same PaTransaction shape as the main table so the Linked Transactions
-   * section can reuse buildPaColumns()/DataTable instead of a bespoke list. */
+  /** This transaction's own refund/dispute children, as display rows (see
+   * buildLinkedChildRows), never independent transactions, see
+   * PaTransaction.linkedRecordType. "Other transactions from this
+   * customer" has no index to query yet, so this never includes any. */
   linkedTransactions: PaTransaction[];
-  /** null for failed transactions, no funds actually moved. */
-  amountBreakdown: { amountReceived: number; fee: number; netAmount: number } | null;
-  /** Only set for the 5 dispute-bucket statuses (see DISPUTE_STATUS_KEYS in
-   * paColumns.tsx), drives DisputeActionCard/DisputeDetailsCard/PaymentTimeline. */
+  /** null for failed transactions, no funds actually moved. netAmount is
+   * amountReceived - fee - refundedAmount (never disputedAmount, see
+   * getNetAmount's own doc comment), the same refundedAmount financials.
+   * refundedAmount already holds, so this can never disagree with the
+   * header status or timeline. */
+  amountBreakdown: {
+    amountReceived: number;
+    fee: number;
+    refundedAmount: number;
+    disputedAmount: number;
+    netAmount: number;
+  } | null;
+  /** The transaction's own first dispute (see PaTransaction.disputes), null
+   * if it has none, drives DisputeActionCard/DisputeDetailsCard/
+   * PaymentTimeline. Only the first dispute is surfaced here, matching the
+   * current one-dispute-at-a-time UI, financials.disputeEvents below carries
+   * the full list. */
   dispute: DisputeDetail | null;
+  /** Refund/dispute/settlement child events plus every amount/status derived
+   * from them, see the Unified Transaction ID & Financial Event Logic spec.
+   * refundEvents combines the transaction's own mock-seeded row.refunds with
+   * any session-issued ones passed via deriveTransactionDetail's second
+   * argument (see useRefundEvents), disputeEvents/settlementEvents come
+   * straight from row.disputes/row.settlements. */
+  financials: TransactionFinancials;
 }
 
 export interface DisputeDetail {
   disputeId: string;
   amount: number;
+  /** The dispute's own (scheme-level) reason string, e.g. "Duplicate
+   * processing", shown as secondary metadata next to reasonCode, not the
+   * primary heading, see merchantLabel below. */
   reason: string;
   reasonCode: string;
+  /** Short, concise, merchant-facing label derived from `reason` via
+   * getDisputeReasonMeta, e.g. "Duplicate charge", the PRIMARY heading a
+   * merchant should see first (see DisputeActionCard), never invented
+   * per-dispute, always derived from the same reason data reasonCode/
+   * description come from. */
+  merchantLabel: string;
   /** Longer sentence shown in DisputeActionCard, e.g. "The cardholder claims
    * they did not authorise this purchase." */
   description: string;
@@ -174,10 +215,20 @@ export interface DisputeDetail {
   respondBy: string;
 }
 
-export function deriveTransactionDetail(row: PaTransaction): TransactionDetailView {
+export function deriveTransactionDetail(
+  row: PaTransaction,
+  /** Session-issued refund events not yet folded into row.refunds (see
+   * useRefundEvents), merged with row's own refunds below. Defaults to none
+   * so every existing call site keeps working unchanged (Section 34
+   * backwards-compatibility: no extra refunds recorded === []). */
+  additionalRefundEvents: RefundEvent[] = []
+): TransactionDetailView {
   const seed = seedFromString(row.gid ?? row.formattedCreationDateTime ?? "txn");
   const bucket = getStatusBucket(row.externalStatus);
   const statusLabel = getStatusMeta(row.externalStatus).label;
+  const transactionId = row.gid ?? "";
+  const currency = row.txnCurrency ?? "INR";
+  const amountReceived = parseFloat(row.totalAmount ?? "0");
 
   const statusReason =
     bucket === "success"
@@ -190,60 +241,197 @@ export function deriveTransactionDetail(row: PaTransaction): TransactionDetailVi
 
   const errorCode = deriveErrorCode(row.externalStatus, bucket);
 
-  const isSettled = bucket === "success" && seed % 3 !== 0;
-  const settlement: TransactionDetailView["settlement"] =
-    bucket !== "success"
-      ? { applicable: false }
-      : isSettled
+  const fee = Math.round(amountReceived * FEE_RATE * 100) / 100;
+  // Fee-only net, used below for the settlement fallback's own synthesized
+  // amount (what was actually settled AT THAT TIME), deliberately NOT
+  // refund-adjusted, a later refund must never shrink a historical
+  // settlement, see Section 9 of the Payment Breakdown spec. The Payment
+  // Breakdown's own (refund-adjusted) netAmount is computed further down,
+  // once refundedAmount is known.
+  const feeAdjustedAmount = Math.round((amountReceived - fee) * 100) / 100;
+
+  // "Other transactions from this customer" has no index to query yet, see
+  // TransactionDetailView's own doc comment on this field.
+  const linkedTransactions: PaTransaction[] = [];
+
+  // Settlement: the transaction's own settlements[] (see PaTransaction) is
+  // the real source of truth. Rows that don't carry one yet (most of this
+  // mock set, and any real, not-yet-migrated API data) fall back to the
+  // same deterministic synthesis this function always used, so nothing
+  // regresses for a transaction this task didn't touch.
+  let settlement: TransactionDetailView["settlement"];
+  let settlementEvents: SettlementEvent[];
+  if (row.settlements && row.settlements.length > 0) {
+    settlementEvents = row.settlements;
+    const first = row.settlements[0]!;
+    settlement =
+      first.status === "SETTLED"
         ? {
             applicable: true,
             isSettled: true,
-            settledOnDate: addDaysToFormatted(row.formattedCreationDateTime, 1),
-            utrNumber: `UTR${100000 + (seed % 900000)}`,
-            settledToAccount: SETTLEMENT_ACCOUNTS[seed % SETTLEMENT_ACCOUNTS.length]!,
-            settlementId: settlementRows[seed % settlementRows.length]!.id,
+            settledOnDate: first.settledOnDate ?? "Not available",
+            utrNumber: first.utrNumber ?? "Not available",
+            settledToAccount: first.settledToAccount ?? "Not available",
+            settlementId: first.settlementReportId ?? "",
           }
         : {
             applicable: true,
             isSettled: false,
-            expectedOnDate: addDaysToFormatted(row.formattedCreationDateTime, 1),
+            expectedOnDate: first.expectedOnDate ?? "Not available",
           };
+  } else if (bucket === "success") {
+    const isSettled = seed % 3 !== 0;
+    settlement = isSettled
+      ? {
+          applicable: true,
+          isSettled: true,
+          settledOnDate: addDaysToFormatted(row.formattedCreationDateTime, 1),
+          utrNumber: `UTR${100000 + (seed % 900000)}`,
+          settledToAccount: SETTLEMENT_ACCOUNTS[seed % SETTLEMENT_ACCOUNTS.length]!,
+          settlementId: settlementRows[seed % settlementRows.length]!.id,
+        }
+      : {
+          applicable: true,
+          isSettled: false,
+          expectedOnDate: addDaysToFormatted(row.formattedCreationDateTime, 1),
+        };
+    settlementEvents = [
+      {
+        id: `${transactionId}-settlement`,
+        transactionId,
+        amount: feeAdjustedAmount,
+        currency,
+        status: settlement.isSettled ? "SETTLED" : "PENDING",
+        settledOnDate: settlement.isSettled ? settlement.settledOnDate : undefined,
+        utrNumber: settlement.isSettled ? settlement.utrNumber : undefined,
+        settledToAccount: settlement.isSettled ? settlement.settledToAccount : undefined,
+        settlementReportId: settlement.isSettled ? settlement.settlementId : undefined,
+        expectedOnDate: settlement.isSettled ? undefined : settlement.expectedOnDate,
+      },
+    ];
+  } else {
+    settlement = { applicable: false };
+    settlementEvents = [];
+  }
 
-  const amountReceived = parseFloat(row.totalAmount ?? "0");
-  const fee = Math.round(amountReceived * FEE_RATE * 100) / 100;
-  const amountBreakdown: TransactionDetailView["amountBreakdown"] =
-    bucket === "failed"
-      ? null
-      : { amountReceived, fee, netAmount: Math.round((amountReceived - fee) * 100) / 100 };
-
-  // A refund transaction links back to the original (parent) transaction it
-  // was issued against, not the other way around. The parent side of the
-  // link (showing its issued refunds) is handled separately by the caller
-  // via useIssuedRefunds, this only covers viewing the refund's own detail.
-  // A refund with no parentTransaction reference (e.g. a raw seeded mock row
-  // with no known parent) simply shows no linked transactions rather than a
-  // fabricated one.
-  const linkedTransactions: PaTransaction[] =
-    bucket === "refunded" && row.parentTransaction ? [row.parentTransaction] : [];
-
-  let dispute: DisputeDetail | null = null;
-  if (bucket === "disputed") {
-    const rawKey = row.externalStatus?.toUpperCase().replace(/ /g, "_") ?? "";
-    const reasonMeta = DISPUTE_REASON_META[rawKey] ?? DISPUTE_REASON_META.DISPUTED!;
+  // Dispute: the transaction's own disputes[] is the real source of truth.
+  // A row with no structured disputes[] but a "disputed" raw status (real,
+  // not-yet-migrated API data) falls back to the same deterministic
+  // synthesis this function always used.
+  const rawDisputeKey = row.externalStatus?.toUpperCase().replace(/ /g, "_") ?? "";
+  let disputeEvents: DisputeEvent[];
+  if (row.disputes && row.disputes.length > 0) {
+    disputeEvents = row.disputes;
+  } else if (bucket === "disputed") {
+    const defaultReason = STATUS_DEFAULT_REASON[rawDisputeKey] ?? STATUS_DEFAULT_REASON.DISPUTED!;
+    const reasonMeta = getDisputeReasonMeta(defaultReason);
     // Disputes are typically filed some days after the original charge, not
     // the same instant, raisedOn is offset from the payment date so the
     // Payment Timeline reads as a real sequence of events.
     const raisedOn = addDaysToFormatted(row.formattedCreationDateTime, 2 + (seed % 5));
-    dispute = {
-      disputeId: `du_${seed.toString(36)}${(row.gid ?? "").slice(-6).replace(/[^a-zA-Z0-9]/g, "")}`,
-      amount: amountReceived,
-      reason: reasonMeta.reason,
-      reasonCode: reasonMeta.reasonCode,
-      description: reasonMeta.description,
-      raisedOn,
-      respondBy: addDaysToFormatted(raisedOn, 6),
-    };
+    const respondBy = addDaysToFormatted(raisedOn, 6);
+    disputeEvents = [
+      {
+        id: `du_${seed.toString(36)}${(row.gid ?? "").slice(-6).replace(/[^a-zA-Z0-9]/g, "")}`,
+        transactionId,
+        amount: amountReceived,
+        currency,
+        reason: defaultReason,
+        reasonCode: reasonMeta.reasonCode,
+        description: reasonMeta.description,
+        status: (STATUS_DEFAULT_REASON[rawDisputeKey]
+          ? rawDisputeKey
+          : "DISPUTED") as DisputeEventStatus,
+        raisedOn,
+        respondBy,
+        resolvedOn: rawDisputeKey === "WON" || rawDisputeKey === "LOST" ? respondBy : undefined,
+      },
+    ];
+  } else {
+    disputeEvents = [];
   }
+
+  const dispute: DisputeDetail | null = disputeEvents[0]
+    ? {
+        disputeId: disputeEvents[0].id,
+        amount: disputeEvents[0].amount,
+        reason: disputeEvents[0].reason,
+        reasonCode: disputeEvents[0].reasonCode,
+        merchantLabel: getDisputeReasonMeta(disputeEvents[0].reason).merchantLabel,
+        description: disputeEvents[0].description,
+        raisedOn: disputeEvents[0].raisedOn,
+        respondBy: disputeEvents[0].respondBy ?? disputeEvents[0].raisedOn,
+      }
+    : null;
+
+  // Refunds: this transaction's own mock-seeded refunds plus any issued this
+  // session (see useRefundEvents), never a separate merchant-facing
+  // transaction for either.
+  const refundEvents: RefundEvent[] = [...(row.refunds ?? []), ...additionalRefundEvents];
+
+  // Underlying payment bucket a disputed/refunded transaction would have had
+  // absent that later event, deriveTransactionStatus layers dispute/refund
+  // state back on top of this itself, see its own doc comment.
+  const paymentBucketForDerivation =
+    bucket === "failed" || bucket === "pending" ? bucket : "success";
+
+  const refundedAmount = getRefundedAmount(refundEvents);
+  const activeDisputeAmount = getActiveDisputeAmount(disputeEvents);
+  const disputedAmount = getDisputedAmount(disputeEvents);
+  // Uses the fully-resolved refund/dispute arrays (mock-seeded + session-
+  // issued refunds, real or fallback-synthesized disputes), not just
+  // row.refunds/row.disputes, so a refund issued this session shows up
+  // immediately, see buildLinkedChildRows's own doc comment.
+  linkedTransactions.push(...buildLinkedChildRows(row, refundEvents, disputeEvents));
+  const derivedTransactionStatus = deriveTransactionStatus({
+    paymentBucket: paymentBucketForDerivation,
+    originalAmount: amountReceived,
+    refundedAmount,
+    activeDisputeAmount,
+  });
+
+  // Payment Breakdown: same refundedAmount/disputedAmount financials
+  // exposes below, computed here rather than duplicated in the component
+  // (see getNetAmount's own doc comment on why disputedAmount is shown but
+  // never subtracted).
+  const amountBreakdown: TransactionDetailView["amountBreakdown"] =
+    bucket === "failed"
+      ? null
+      : {
+          amountReceived,
+          fee,
+          refundedAmount,
+          disputedAmount,
+          netAmount: getNetAmount(amountReceived, fee, refundedAmount),
+        };
+
+  const financials: TransactionFinancials = {
+    transactionId,
+    originalAmount: amountReceived,
+    currency,
+    refundEvents,
+    disputeEvents,
+    settlementEvents,
+    refundedAmount,
+    pendingRefundAmount: getPendingRefundAmount(refundEvents),
+    failedRefundAmount: getFailedRefundAmount(refundEvents),
+    settledAmount: getSettledAmount(settlementEvents),
+    disputedAmount,
+    activeDisputeAmount,
+    wonDisputeAmount: getWonDisputeAmount(disputeEvents),
+    lostDisputeAmount: getLostDisputeAmount(disputeEvents),
+    remainingAmount: getRemainingAmount(amountReceived, refundedAmount),
+    derivedTransactionStatus,
+    timelineEvents: generateTimelineEvents({
+      currency,
+      originalAmount: amountReceived,
+      paymentInitiatedAt: row.formattedCreationDateTime ?? "",
+      paymentBucket: paymentBucketForDerivation,
+      refundEvents,
+      disputeEvents,
+      settlementEvents,
+    }),
+  };
 
   return {
     merchantTxnId: row.gid ?? "Not available",
@@ -259,5 +447,6 @@ export function deriveTransactionDetail(row: PaTransaction): TransactionDetailVi
     linkedTransactions,
     amountBreakdown,
     dispute,
+    financials,
   };
 }

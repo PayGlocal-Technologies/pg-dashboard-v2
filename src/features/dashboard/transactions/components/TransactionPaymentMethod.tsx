@@ -1,3 +1,4 @@
+import { Icon, type IconName } from "@/components/icon";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
 
 // Payment method cell, moved from paColumns.tsx verbatim (same logo maps,
@@ -19,10 +20,20 @@ const CARD_BRAND_LOGO_MAPPER: Record<string, string> = {
 };
 
 const PAYMENT_METHOD_ICONS: Record<string, string> = {
+  UPI: "images/payment-methods/upi/upi-name.v2.svg",
   ALTPAY_UPI_INTENT: "images/payment-methods/upi/upi-name.v2.svg",
   ALTPAY_UPI_COLLECT: "images/payment-methods/upi/upi-name.v2.svg",
   PAYMENT_ACCOUNT_GOOGLE_PAY: "images/payment-methods/upi/google-pay.v1.svg",
   PAYMENT_ACCOUNT_APPLE_PAY: "icons/payflow/apple-pay.v2.svg",
+};
+
+/** Non-card, non-UPI instruments with no PayGlocal-hosted brand logo of
+ * their own, a generic glyph (from the icon registry, see CLAUDE.md's icon
+ * rule) beats the old fallback, which mislabelled every one of these as
+ * "CARD". */
+const PAYMENT_METHOD_GLYPHS: Record<string, IconName> = {
+  NETBANKING: "building-2",
+  WALLET: "wallet",
 };
 
 function MethodImage({ src, alt }: { src: string; alt: string }) {
@@ -30,6 +41,14 @@ function MethodImage({ src, alt }: { src: string; alt: string }) {
     <span className="inline-flex items-center justify-center w-8 h-5 rounded bg-muted border border-border overflow-hidden">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={src} alt={alt} className="h-3.5 w-5 object-contain" />
+    </span>
+  );
+}
+
+function MethodGlyph({ name }: { name: IconName }) {
+  return (
+    <span className="inline-flex items-center justify-center w-8 h-5 rounded bg-muted border border-border text-muted-foreground">
+      <Icon name={name} size={12} aria-hidden />
     </span>
   );
 }
@@ -45,6 +64,10 @@ function FallbackBrand({ brand }: { brand?: string }) {
 export function TransactionPaymentMethod({ row }: { row: PaTransaction }) {
   const instrument = row.paymentInstrument?.toUpperCase();
   const last4 = row.maskedCardNumber?.replaceAll("x", "").replaceAll("X", "").trim();
+  // Some instrument values carry a suffix (e.g. a specific bank for
+  // NETBANKING), matched by prefix same as the label logic below.
+  const glyphKey =
+    instrument && Object.keys(PAYMENT_METHOD_GLYPHS).find((key) => instrument.startsWith(key));
 
   let logo: React.ReactNode;
 
@@ -57,6 +80,8 @@ export function TransactionPaymentMethod({ row }: { row: PaTransaction }) {
     );
   } else if (instrument && PAYMENT_METHOD_ICONS[instrument]) {
     logo = <MethodImage src={STATIC_BASE + PAYMENT_METHOD_ICONS[instrument]} alt={instrument} />;
+  } else if (glyphKey) {
+    logo = <MethodGlyph name={PAYMENT_METHOD_GLYPHS[glyphKey]!} />;
   } else {
     logo = <FallbackBrand brand={row.cardBrand} />;
   }

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, DataTable, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import { useDisputeResolutions } from "@/stores/useDisputeResolutions";
@@ -35,6 +36,18 @@ import {
   type DisputeTimeframe,
 } from "@/features/dashboard/dispute-management/constants";
 import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
+import { getDisputeReasonMeta } from "@/features/dashboard/transactions/disputeReasonMeta";
+
+/** Chip options for the table's own multi-select "Status" filter, distinct
+ * from the single-select SegmentedTabs above it: this lets a merchant view,
+ * say, Won and Lost together. Reuses DISPUTE_STATUS_SEGMENTS/
+ * DISPUTE_SEGMENT_RAW_STATUSES as the one source of truth for the label <->
+ * raw-status mapping (e.g. "Action required" covers both DISPUTED and
+ * NEEDS_ACTION) instead of a second copy of that vocabulary, "All disputes"
+ * excluded since it isn't a real status to filter by. */
+const STATUS_FILTER_OPTIONS = DISPUTE_STATUS_SEGMENTS.filter(
+  (segment) => segment.value !== "all"
+).map((segment) => ({ value: segment.value, label: segment.label }));
 
 /** "08/08/2026, 10:22:15" -> epoch ms, same shape as PaTransaction's
  * formattedCreationDateTime, this feature's mock rows generate it the
@@ -52,8 +65,13 @@ function parseFormattedDate(value?: string): number | undefined {
 /** Hands a dispute row off to the transaction detail store/page (see
  * useTransactionDetail's TODO(integration)), reusing the full dispute
  * workflow already built for disputed PA transactions instead of building a
- * second detail view just for this table. */
-function toPaTransaction(row: DisputeRow): PaTransaction {
+ * second detail view just for this table. Populates `disputes[]` with this
+ * row's OWN reason/amount/dates rather than leaving it for
+ * deriveTransactionDetail's generic status-keyed fallback to guess, that
+ * fallback exists for real API data with no structured dispute of its own,
+ * not for dispute-management rows, which already have one. */
+export function toPaTransaction(row: DisputeRow): PaTransaction {
+  const reasonMeta = getDisputeReasonMeta(row.reason);
   return {
     gid: row.txnGid,
     externalStatus: row.status,
@@ -66,6 +84,20 @@ function toPaTransaction(row: DisputeRow): PaTransaction {
     formattedCreationDateTime: row.disputedOn,
     firstName: row.customerName.split(" ")[0],
     lastName: row.customerName.split(" ").slice(1).join(" "),
+    disputes: [
+      {
+        id: row.disputeId,
+        transactionId: row.txnGid,
+        amount: row.amount,
+        currency: row.currency,
+        reason: row.reason,
+        reasonCode: reasonMeta.reasonCode,
+        description: reasonMeta.description,
+        status: row.status,
+        raisedOn: row.disputedOn,
+        respondBy: row.respondBy,
+      },
+    ],
   };
 }
 
@@ -93,6 +125,7 @@ export function DisputeManagementFeature() {
 
   const [search, setSearch] = useState("");
   const [statusSegment, setStatusSegment] = useState<DisputeStatusSegment>("all");
+  const [statusFilter, setStatusFilter] = useState<string[] | undefined>(undefined);
   const [reason, setReason] = useState<string | undefined>(undefined);
   const [amountRange, setAmountRange] = useState<AmountRangeValue | undefined>(undefined);
   const [disputedDate, setDisputedDate] = useState<TransactionDateTimeValue | undefined>(undefined);
@@ -132,13 +165,6 @@ export function DisputeManagementFeature() {
     });
   }, [rows, metricsStartMs, nowMs]);
 
-  const needsActionCount = metricsRows.filter(
-    (r) => r.status === "DISPUTED" || r.status === "NEEDS_ACTION"
-  ).length;
-  const inReviewCount = metricsRows.filter((r) => r.status === "UNDER_REVIEW").length;
-  const wonCount = metricsRows.filter((r) => r.status === "WON").length;
-  const lostCount = metricsRows.filter((r) => r.status === "LOST").length;
-
   const reasonBreakdown = useMemo(() => {
     const counts = new Map<string, number>();
     for (const row of metricsRows) {
@@ -153,7 +179,7 @@ export function DisputeManagementFeature() {
         pct: Math.round((count / total) * 100),
       }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 4);
+      .slice(0, 5);
   }, [metricsRows]);
 
   const filteredRows = useMemo(() => {
@@ -161,6 +187,17 @@ export function DisputeManagementFeature() {
       if (
         statusSegment !== "all" &&
         !DISPUTE_SEGMENT_RAW_STATUSES[statusSegment].includes(row.status)
+      ) {
+        return false;
+      }
+      if (
+        statusFilter &&
+        statusFilter.length > 0 &&
+        !statusFilter.some((segmentValue) =>
+          DISPUTE_SEGMENT_RAW_STATUSES[
+            segmentValue as Exclude<DisputeStatusSegment, "all">
+          ].includes(row.status)
+        )
       ) {
         return false;
       }
@@ -185,11 +222,13 @@ export function DisputeManagementFeature() {
       }
       return true;
     });
-  }, [rows, statusSegment, reason, amountRange, disputedDate, search]);
+  }, [rows, statusSegment, statusFilter, reason, amountRange, disputedDate, search]);
 
-  const hasActive = !!reason || !!amountRange || !!disputedDate || search !== "";
+  const hasActive =
+    !!statusFilter?.length || !!reason || !!amountRange || !!disputedDate || search !== "";
 
   const onClear = () => {
+    setStatusFilter(undefined);
     setReason(undefined);
     setAmountRange(undefined);
     setDisputedDate(undefined);
@@ -212,8 +251,12 @@ export function DisputeManagementFeature() {
   const onViewDetails = (row: DisputeRow) => {
     setStoredTransaction(toPaTransaction(row));
     // Stays under /dispute-management (not /transactions), see
-    // TransactionDetailFeature's `origin` prop for the header/back-link text.
-    router.push(`/dispute-management/${encodeURIComponent(row.txnGid)}`);
+    // DisputeDetailFeature's `origin` prop for the back-link text. Opens the
+    // dispute's own detail view directly, not the parent transaction, the
+    // merchant explicitly selected this dispute.
+    router.push(
+      `/dispute-management/${encodeURIComponent(row.txnGid)}/${encodeURIComponent(row.disputeId)}`
+    );
   };
 
   const showRespondBy = RESPOND_BY_SEGMENTS.includes(statusSegment);
@@ -243,10 +286,7 @@ export function DisputeManagementFeature() {
           </div>
 
           <DisputeStatCards
-            needsActionCount={needsActionCount}
-            inReviewCount={inReviewCount}
-            wonCount={wonCount}
-            lostCount={lostCount}
+            disputes={metricsRows}
             recoveredLabel="₹2.1K"
             recoveredTrendPct={19}
             recoveredTrend={RECOVERED_TREND}
@@ -274,6 +314,12 @@ export function DisputeManagementFeature() {
                 <div className="hidden sm:block h-4 w-px bg-border" />
 
                 <div className="flex items-center gap-2 flex-wrap">
+                  <MultiSelectChipFilter
+                    value={statusFilter}
+                    options={STATUS_FILTER_OPTIONS}
+                    onChange={setStatusFilter}
+                    placeholder="Status"
+                  />
                   <DisputeReasonFilter value={reason} onChange={setReason} />
                   <TransactionAmountFilter value={amountRange} onChange={setAmountRange} />
                   <TransactionDateTimeFilter

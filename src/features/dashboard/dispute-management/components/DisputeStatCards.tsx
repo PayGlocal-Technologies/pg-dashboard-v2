@@ -2,6 +2,7 @@ import { StatCardSkeleton } from "@/components/ui";
 import { AmountRecoveredCard } from "@/features/dashboard/dispute-management/components/AmountRecoveredCard";
 import { DisputeOverviewCard } from "@/features/dashboard/dispute-management/components/DisputeOverviewCard";
 import { DisputeReasonsCard } from "@/features/dashboard/dispute-management/components/DisputeReasonsCard";
+import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
 
 interface ReasonBreakdown {
   reason: string;
@@ -10,10 +11,7 @@ interface ReasonBreakdown {
 }
 
 interface DisputeStatCardsProps {
-  needsActionCount: number;
-  inReviewCount: number;
-  wonCount: number;
-  lostCount: number;
+  disputes: DisputeRow[];
   recoveredLabel: string;
   recoveredTrendPct: number;
   recoveredTrend: { x: string; y: number }[];
@@ -21,10 +19,7 @@ interface DisputeStatCardsProps {
 }
 
 export function DisputeStatCards({
-  needsActionCount,
-  inReviewCount,
-  wonCount,
-  lostCount,
+  disputes,
   recoveredLabel,
   recoveredTrendPct,
   recoveredTrend,
@@ -32,13 +27,12 @@ export function DisputeStatCards({
 }: DisputeStatCardsProps) {
   return (
     <div className="grid gap-3 lg:grid-cols-3 lg:items-stretch">
-      <DisputeOverviewCard
-        needsActionCount={needsActionCount}
-        inReviewCount={inReviewCount}
-        wonCount={wonCount}
-        lostCount={lostCount}
+      <DisputeOverviewCard disputes={disputes} />
+      <AmountRecoveredCard
+        recoveredLabel={recoveredLabel}
+        trendPct={recoveredTrendPct}
+        data={recoveredTrend}
       />
-      <AmountRecoveredCard recoveredLabel={recoveredLabel} trendPct={recoveredTrendPct} data={recoveredTrend} />
       <DisputeReasonsCard breakdown={reasonBreakdown} />
     </div>
   );

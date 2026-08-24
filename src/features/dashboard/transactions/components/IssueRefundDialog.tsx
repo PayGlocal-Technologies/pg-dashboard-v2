@@ -45,12 +45,11 @@ interface IssueRefundDialogProps {
 }
 
 /**
- * Unlike a typical PSP refund flow, issuing a refund here does not change the
- * original transaction's own status, it creates a brand new "Refund"
- * transaction for the entered amount and links the two together (see
- * useIssuedRefunds + Linked Transactions). The copy below calls that out
- * explicitly since it's the one place merchants would otherwise expect
- * Stripe-style in-place status behavior.
+ * Issuing a refund here records a child RefundEvent against the original
+ * transaction (see useRefundEvents), it never creates a second
+ * merchant-facing transaction, the same TXN ID's own status updates to
+ * Partially refunded/Refunded once this is submitted (see
+ * deriveTransactionStatus/getDisplayStatus).
  */
 export function IssueRefundDialog({
   open,
@@ -117,9 +116,9 @@ export function IssueRefundDialog({
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-60 text-xs">
-                  Refunds can take 5 to 10 days to appear on the customer&apos;s statement. This creates a new, linked
-                  &quot;Refund&quot; transaction for the amount below, the original transaction&apos;s status
-                  won&apos;t change.
+                  Refunds can take 5 to 10 days to appear on the customer&apos;s statement. This
+                  transaction&apos;s status will update to reflect the refund, no new transaction is
+                  created for it.
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -178,7 +177,13 @@ export function IssueRefundDialog({
             <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="button" variant="primary" size="sm" onClick={handleSubmit} disabled={parsedAmount <= 0}>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleSubmit}
+              disabled={parsedAmount <= 0}
+            >
               Refund {formatCurrency(parsedAmount, currency)}
             </Button>
           </div>

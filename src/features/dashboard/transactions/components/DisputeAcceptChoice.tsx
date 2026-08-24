@@ -41,7 +41,7 @@ export function DisputeAcceptChoice({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={view === "choice" ? "sm:max-w-lg" : "sm:max-w-md"}>
         {view === "choice" ? (
           <>
             <DialogTitle>Accept dispute</DialogTitle>
@@ -55,12 +55,12 @@ export function DisputeAcceptChoice({
              * effect since it only ever has that one wrapper span as a
              * direct child (see DisputeRespondForm's upload dropzone for the
              * same fix). */}
-            <div className="mt-2 flex flex-col gap-2.5">
+            <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => setView("confirm-full")}
-                className="h-auto min-h-0 items-start justify-start rounded-xl p-4 text-left"
+                className="h-full min-h-0 w-full items-start justify-start rounded-xl p-4 text-left"
               >
                 <span className="flex flex-col items-start gap-1">
                   <span className="text-sm font-semibold text-foreground">Accept in full</span>
@@ -78,7 +78,7 @@ export function DisputeAcceptChoice({
                   onOpenChange(false);
                   onAcceptPartially();
                 }}
-                className="h-auto min-h-0 items-start justify-start rounded-xl p-4 text-left"
+                className="h-full min-h-0 w-full items-start justify-start rounded-xl p-4 text-left"
               >
                 <span className="flex flex-col items-start gap-1">
                   <span className="text-sm font-semibold text-foreground">Accept partially</span>

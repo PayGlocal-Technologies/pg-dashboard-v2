@@ -23,7 +23,9 @@ function AmountRecoveredTooltip({
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
       <p className="font-medium text-muted-foreground">{point.x}</p>
-      <p className="font-semibold tabular-nums text-foreground">₹{point.y.toLocaleString("en-IN")}</p>
+      <p className="font-semibold tabular-nums text-foreground">
+        ₹{point.y.toLocaleString("en-IN")}
+      </p>
     </div>
   );
 }
@@ -64,7 +66,7 @@ export function AmountRecoveredCard({ recoveredLabel, trendPct, data }: AmountRe
               stroke="#10b981"
               strokeWidth={2}
               fill="url(#amount-recovered-fill)"
-              dot={{ r: 3, strokeWidth: 0, fill: "#10b981" }}
+              dot={false}
               activeDot={{ r: 5, strokeWidth: 0, fill: "#10b981" }}
             />
           </AreaChart>
@@ -74,7 +76,9 @@ export function AmountRecoveredCard({ recoveredLabel, trendPct, data }: AmountRe
       <div
         className={cn(
           "flex items-center gap-1 text-xs font-medium",
-          trendPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+          trendPositive
+            ? "text-emerald-600 dark:text-emerald-400"
+            : "text-red-600 dark:text-red-400"
         )}
       >
         <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
@@ -87,8 +91,8 @@ export function AmountRecoveredCard({ recoveredLabel, trendPct, data }: AmountRe
       <Separator />
 
       <p className="text-xs text-muted-foreground">
-        <span className="font-semibold text-primary">PayGlocal</span> helped recover {recoveredLabel} in disputed
-        payments this month
+        <span className="font-semibold text-primary">PayGlocal</span> helped recover{" "}
+        {recoveredLabel} in disputed payments this month
       </p>
     </Card>
   );

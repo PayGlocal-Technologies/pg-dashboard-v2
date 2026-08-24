@@ -18,8 +18,14 @@ import {
   STATUS_BUCKET_RAW_VALUES,
   buildPaColumns,
   customerName,
+  getDisplayStatusBucket,
   getStatusBucket,
 } from "@/features/dashboard/transactions/paColumns";
+import { applyDisputeResolutionOverride } from "@/features/dashboard/transactions/resolveDisputeOverride";
+import {
+  flattenDisputeRows,
+  flattenRefundRows,
+} from "@/features/dashboard/transactions/linkedChildRecords";
 import { MOCK_PA_TRANSACTIONS } from "@/features/dashboard/transactions/mockRows";
 import {
   PA_CURRENCY_OPTIONS,
@@ -163,16 +169,43 @@ export function PaTransactionTable() {
   // the toolbar's filters apply. See mockRows.ts's TODO(integration).
   const usingMockFallback = !isPending && !isError && apiRows.length === 0;
 
+  // Reflects any in-session "accept in full"/"submit evidence" resolutions
+  // (see useDisputeResolutions/TransactionDetailFeature) by updating the
+  // row's own disputes[0], so it shows as Lost/Under review here too after
+  // being resolved from its detail page, not by overwriting externalStatus
+  // (which no longer drives the displayed status, see getDisplayStatus).
+  // Also the lookup used to resolve a clicked refund/dispute pseudo-row
+  // back to its real parent (with its own refunds/disputes/settlements
+  // intact) before navigating, see onViewDetails.
+  const resolvedRows = useMemo(
+    () =>
+      MOCK_PA_TRANSACTIONS.map((row) =>
+        applyDisputeResolutionOverride(row, resolutionByGid[row.gid ?? ""])
+      ),
+    [resolutionByGid]
+  );
+
   const mockFilteredRows = useMemo(() => {
     if (!usingMockFallback) return EMPTY_ROWS;
-    // Reflects any in-session "accept in full" resolutions (see
-    // useDisputeResolutions/TransactionDetailFeature) so a dispute shows as
-    // Lost here too after being resolved from its detail page.
-    return MOCK_PA_TRANSACTIONS.map((row) => {
-      const override = resolutionByGid[row.gid ?? ""];
-      return override ? { ...row, externalStatus: override } : row;
-    }).filter((row) => {
-      if (statusSegment !== "All" && getStatusBucket(row.externalStatus) !== statusSegment)
+    // The "Refunded"/"Disputed" segments show the actual child records
+    // themselves (their own amount/status/date), never parent rows
+    // filtered by aggregate bucket, see the parent-child transaction
+    // model's own "Refund row -> Refund detail, Dispute row -> Dispute
+    // detail" requirement (Section 9/24).
+    const baseRows: PaTransaction[] =
+      statusSegment === "refunded"
+        ? flattenRefundRows(resolvedRows)
+        : statusSegment === "disputed"
+          ? flattenDisputeRows(resolvedRows)
+          : resolvedRows;
+
+    return baseRows.filter((row) => {
+      if (
+        statusSegment !== "All" &&
+        statusSegment !== "refunded" &&
+        statusSegment !== "disputed" &&
+        getDisplayStatusBucket(row) !== statusSegment
+      )
         return false;
       if (method && !method.includes(row.paymentInstrument ?? "")) return false;
       if (currency && !currency.includes(row.txnCurrency ?? "")) return false;
@@ -192,7 +225,7 @@ export function PaTransactionTable() {
       }
       return true;
     });
-  }, [usingMockFallback, resolutionByGid, statusSegment, method, currency, dateTime, search]);
+  }, [usingMockFallback, resolvedRows, statusSegment, method, currency, dateTime, search]);
 
   const rows = usingMockFallback ? mockFilteredRows : apiRows;
   const totalCount = usingMockFallback ? mockFilteredRows.length : apiTotalCount;
@@ -261,11 +294,39 @@ export function PaTransactionTable() {
   };
 
   const onViewDetails = (row: PaTransaction) => {
-    // Disputed transactions skip the drawer entirely and open straight into
-    // the full-page view (it needs the two-column dispute layout, not the
-    // narrow single-column drawer), every other status still opens the
-    // drawer first, same as before.
-    if (getStatusBucket(row.externalStatus) === "disputed") {
+    // Navigation is based on the selected record's own type (Section 24 of
+    // the parent-child transaction model spec), not always the parent. A
+    // refund/dispute pseudo-row (see linkedChildRecords.ts, only ever
+    // produced when the "Refunded"/"Disputed" segment is active) carries no
+    // refunds/disputes/settlements of its own, so the REAL parent is looked
+    // up by gid before storing it, the child detail page still needs the
+    // parent's full data (e.g. RefundDetailFeature reads transaction.refunds).
+    if (row.linkedRecordType === "refund") {
+      const parent = resolvedRows.find((t) => t.gid === row.gid) ?? row;
+      setStoredTransaction(parent);
+      router.push(
+        `/transactions/${encodeURIComponent(row.gid ?? "")}/refunds/${encodeURIComponent(row.linkedRecordId ?? "")}`
+      );
+      return;
+    }
+    if (row.linkedRecordType === "dispute") {
+      const parent = resolvedRows.find((t) => t.gid === row.gid) ?? row;
+      setStoredTransaction(parent);
+      router.push(
+        `/transactions/${encodeURIComponent(row.gid ?? "")}/disputes/${encodeURIComponent(row.linkedRecordId ?? "")}`
+      );
+      return;
+    }
+    // A payment row: any transaction with a dispute (active or resolved)
+    // skips the drawer entirely and opens straight into the full-page view,
+    // which has more room for the Linked Transactions section pointing at
+    // the dispute's own detail page. Real, not-yet-migrated API data with no
+    // structured disputes[] yet falls back to its own raw externalStatus
+    // bucket, same check this used before.
+    const hasDispute =
+      (row.disputes && row.disputes.length > 0) ||
+      getStatusBucket(row.externalStatus) === "disputed";
+    if (hasDispute) {
       setStoredTransaction(row);
       router.push(`/transactions/${encodeURIComponent(row.gid ?? "")}`);
       return;
