@@ -158,6 +158,50 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
+// Spelled out rather than read from Intl: a billing period is a calendar month,
+// not a moment, so the label must not vary with the reader's locale or timezone
+// the way toLocaleString would. "2026-08" reads "August 2026" for everyone, and
+// the same reasoning that keeps formatDate on fixed English strings (below)
+// keeps these here.
+export const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** The same twelve, abbreviated — for anything laying months out in a grid. */
+export const MONTH_SHORT_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** "2026-08" → "August 2026". Returns the raw value if it isn't a "YYYY-MM" pair. */
+export function formatMonthLabel(periodMonth: string): string {
+  const [year, month] = periodMonth.split("-");
+  const name = MONTH_LABELS[Number(month) - 1];
+  if (!year || !name) return periodMonth;
+  return `${name} ${year}`;
+}
+
 /**
  * Formats dates for UI. Uses fixed English strings (not Intl) so server and
  * client render identical markup and avoid hydration mismatches.
