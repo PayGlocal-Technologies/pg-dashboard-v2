@@ -62,3 +62,40 @@ export interface ReferralStandings {
   /** Which entry in `entries` is the signed-in merchant. */
   currentMerchantId: string;
 }
+
+// ── Reward wallet + transactions (pg-dashboard influencer service) ───────────
+
+export interface ReferralWallet {
+  availableBalance: string;
+  heldBalance: string;
+  totalEarnings: string;
+  totalWithdrawn: string;
+  currency: string;
+  creditTransactionCount: string;
+  debitTransactionCount: string;
+  status: string;
+  creationTime: string;
+}
+
+export interface ReferralWalletResponse {
+  data: { wallet: ReferralWallet | null };
+  message?: string;
+  status?: string;
+}
+
+export interface ReferralTransaction {
+  walletId: string;
+  referenceNumber: string;
+  amount: string;
+  currency: string;
+  status: "PENDING" | "COMPLETED";
+  transactionType: "CREDIT" | "DEBIT";
+  creationTime: string;
+  meta: { name: string; email: string };
+}
+
+export interface ReferralTransactionsResponse {
+  data: { transactions: ReferralTransaction[] };
+  message?: string;
+  status?: string;
+}

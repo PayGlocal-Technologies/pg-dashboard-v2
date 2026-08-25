@@ -3,6 +3,7 @@ import type {
   Referral,
   ReferralStandings,
   ReferralStatus,
+  ReferralTransaction,
 } from "@/features/dashboard/refer-and-earn/types";
 
 /**
@@ -146,4 +147,29 @@ export function buildLeaderboardView(
     me,
     toReachFirst: me == null ? 0 : Math.max(0, leaderCount - me.referralCount),
   };
+}
+
+// ── Wire-up: influencer transactions → the Referral rows the UI consumes ─────
+
+/**
+ * Maps the influencer service's CREDIT transactions onto the `Referral` rows the
+ * earnings table and analytics already read. Each CREDIT is one referred
+ * merchant's reward; DEBITs are wallet withdrawals (not per-referral) and are
+ * reconciled separately from the wallet totals, so they are dropped here.
+ *
+ * `waivedAmount` stays null: the transactions feed has no per-referral waived
+ * slice, so the table shows a dash and the waived total comes from the wallet.
+ */
+export function mapTransactionsToReferrals(transactions: ReferralTransaction[]): Referral[] {
+  return transactions
+    .filter((txn) => txn.transactionType === "CREDIT")
+    .map((txn) => ({
+      id: txn.referenceNumber,
+      fullName: txn.meta?.name || "—",
+      emailId: txn.meta?.email ?? "",
+      status: txn.status === "COMPLETED" ? "REWARD_EARNED" : "PENDING",
+      rewardAmount: txn.status === "COMPLETED" ? txn.amount : null,
+      waivedAmount: null,
+      rewardCurrency: txn.currency,
+    }));
 }

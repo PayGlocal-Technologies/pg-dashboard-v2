@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Heading } from "@/components/ui";
 import { ReferralHero } from "@/features/dashboard/refer-and-earn/components/ReferralHero";
 // TEMPORARILY HIDDEN — Referral leaderboard.
@@ -14,22 +15,40 @@ import { ReferralTotalsCard } from "@/features/dashboard/refer-and-earn/componen
 import { ReferralJourneyCard } from "@/features/dashboard/refer-and-earn/components/ReferralJourneyCard";
 import { ReferralEarnings } from "@/features/dashboard/refer-and-earn/components/ReferralEarnings";
 import { buildReferralUrl } from "@/features/dashboard/refer-and-earn/constants";
-import { summarizeReferrals } from "@/features/dashboard/refer-and-earn/helpers";
+import {
+  mapTransactionsToReferrals,
+  summarizeReferrals,
+} from "@/features/dashboard/refer-and-earn/helpers";
+import {
+  useReferralLink,
+  useReferralTransactions,
+  useReferralWallet,
+} from "@/features/dashboard/refer-and-earn/hooks";
 // import { MOCK_LEADERBOARD } from "@/features/dashboard/refer-and-earn/mock-data";
-import { MOCK_REFERRALS } from "@/features/dashboard/refer-and-earn/mock-data";
 
-// TODO(integration): this screen still reads from mock data. Wire it up to the
-// real referral program endpoints (referral code, reward balance, referral
-// history, leaderboard standings) once that contract exists — see CLAUDE.md's
-// migration checklist. The referral code that buildReferralUrl takes comes from
-// the same contract.
+// Wired to pg-dashboard's influencer service: the referral link, the reward
+// wallet and the referral history all come from the real endpoints (see
+// hooks.ts / services.ts). The leaderboard has no backend contract yet and
+// stays hidden below.
 export function ReferAndEarnFeature() {
-  const referralUrl = buildReferralUrl();
+  const { link } = useReferralLink();
+  const { transactions, isLoading: transactionsLoading } = useReferralTransactions();
+  const { wallet } = useReferralWallet();
+
+  // Fall back to the bare referrals landing page until the merchant's link has
+  // loaded, so the hero never renders an empty field.
+  const referralUrl = link || buildReferralUrl();
+
+  const referrals = useMemo(() => mapTransactionsToReferrals(transactions), [transactions]);
 
   // The analytics row and the totals card are both derived from this one pure
   // summary, so the two can never disagree, and ReferralEarnings keeps
-  // computing its own over the same rows.
-  const summary = summarizeReferrals(MOCK_REFERRALS);
+  // computing its own over the same rows. The waived total is the one figure the
+  // per-row feed can't carry, so it's taken from the wallet's withdrawn total.
+  const summary = useMemo(() => {
+    const base = summarizeReferrals(referrals);
+    return wallet ? { ...base, totalWaived: Number(wallet.totalWithdrawn) || base.totalWaived } : base;
+  }, [referrals, wallet]);
 
   return (
     <div className="page-enter mx-auto max-w-[1400px] space-y-6 overflow-x-hidden lg:space-y-8">
@@ -86,7 +105,7 @@ export function ReferAndEarnFeature() {
         */}
       </div>
 
-      <ReferralEarnings referrals={MOCK_REFERRALS} />
+      <ReferralEarnings referrals={referrals} isLoading={transactionsLoading} />
     </div>
   );
 }
