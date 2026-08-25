@@ -1,18 +1,32 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { DataTable, Heading } from "@/components/ui";
+import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildReferralColumns } from "@/features/dashboard/refer-and-earn/columns";
-import { REFERRAL_PAGE_SIZE } from "@/features/dashboard/refer-and-earn/constants";
+import {
+  DEFAULT_REFERRAL_STATUS_TAB,
+  REFERRAL_PAGE_SIZE,
+  REFERRAL_STATUS_TABS,
+  type ReferralStatusTab,
+} from "@/features/dashboard/refer-and-earn/constants";
 import { summarizeReferrals } from "@/features/dashboard/refer-and-earn/helpers";
 import { ReferralCardList } from "@/features/dashboard/refer-and-earn/components/ReferralCardList";
 import { ReferralSummaryCards } from "@/features/dashboard/refer-and-earn/components/ReferralSummaryCards";
 import type { Referral } from "@/features/dashboard/refer-and-earn/types";
 
-const EMPTY_TITLE = "No referrals yet";
-const EMPTY_DESCRIPTION =
-  "Share your referral link to get started. Referrals appear here as soon as someone signs up with it.";
+const EMPTY_STATE: Record<ReferralStatusTab, { title: string; description: string }> = {
+  ALL: {
+    title: "No referrals yet",
+    description:
+      "Share your referral link to get started. Referrals appear here as soon as someone signs up with it.",
+  },
+  WAIVED: {
+    title: "No waived referrals yet",
+    description: "Referrals appear here once their reward has been fully waived against your fees.",
+  },
+};
 
 interface ReferralEarningsProps {
   referrals: Referral[];
@@ -26,6 +40,19 @@ interface ReferralEarningsProps {
  */
 export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarningsProps) {
   const [page, setPage] = useState(1);
+
+  // Which of the two tabs is active. Filters the table/card list only —
+  // ReferralSummaryCards above stays summarised over every referral, since
+  // those are program totals rather than a view of this one tab.
+  const [statusTab, setStatusTab] = useState<ReferralStatusTab>(DEFAULT_REFERRAL_STATUS_TAB);
+
+  const onStatusTabChange = (value: string) => {
+    setStatusTab(value as ReferralStatusTab);
+    // Switching tabs changes what matches, so it returns to page 1 the same
+    // way every other filter on this page does — otherwise a merchant on
+    // page 2 of "All" could land on an empty page of "Waived".
+    setPage(1);
+  };
 
   // Which rows have been nudged. Held here rather than inside each button so it
   // survives paging and is shared by the table and the card list — the same
@@ -47,11 +74,22 @@ export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarni
 
   const columns = buildReferralColumns({ onRemind: handleRemind, remindedIds });
 
-  const totalCount = referrals.length;
-  const pageRows = referrals.slice((page - 1) * REFERRAL_PAGE_SIZE, page * REFERRAL_PAGE_SIZE);
+  // "Waived" narrows to referrals whose reward has been fully drawn down
+  // (status "WAIVED" — see types.ts); "All" is every referral, unfiltered.
+  const visibleReferrals = useMemo(
+    () => (statusTab === "WAIVED" ? referrals.filter((r) => r.status === "WAIVED") : referrals),
+    [referrals, statusTab]
+  );
+
+  const totalCount = visibleReferrals.length;
+  const pageRows = visibleReferrals.slice(
+    (page - 1) * REFERRAL_PAGE_SIZE,
+    page * REFERRAL_PAGE_SIZE
+  );
 
   // Summarised over every referral, not just the visible page — these are
-  // program totals, so they must not change as the table is paged.
+  // program totals, so they must not change as the table is paged or filtered
+  // by tab.
   const summary = summarizeReferrals(referrals);
 
   return (
@@ -64,48 +102,63 @@ export function ReferralEarnings({ referrals, isLoading = false }: ReferralEarni
 
       <ReferralSummaryCards summary={summary} />
 
-      {/* Desktop (lg+): the full table, keeping its own Flux surface, border,
-          radius, header, row spacing, and hover state.
+      {/* One shared card — tabs, desktop table and mobile card list all
+          inside the same bordered/rounded surface, the same structure
+          ReceiptsTable uses for its own product tabs. DataTable and
+          ReferralCardList both drop their own border/radius (rounded-none
+          border-0, and no extra wrapping div) so there's a single outer edge
+          rather than a card nested inside a card. */}
+      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-card">
+        <div className="scrollbar-none overflow-x-auto border-b border-border px-4 pt-3">
+          <UnderlineTabs
+            tabs={REFERRAL_STATUS_TABS}
+            value={statusTab}
+            onValueChange={onStatusTabChange}
+          />
+        </div>
 
-          The card spans the full content width, while the columns keep their
-          content-based widths: that is exactly what `tableLayout="content"`
-          gives — each column sizes to its own content and a greedy, empty
-          trailing column absorbs the leftover width so the table still fills
-          the container. So widening the surface changes nothing about the
-          columns themselves.
+        {/* Desktop (lg+): the full table, keeping its own Flux row spacing
+            and hover state — just not its own border/radius, since the card
+            above already supplies those.
 
-          Its own empty state keeps the four column headers in place, so an empty
-          result still shows the shape of the data rather than a blank panel. */}
-      <DataTable
-        className="mt-2 hidden lg:block"
-        columns={columns}
-        data={pageRows}
-        rowKey={(row) => row.id}
-        isLoading={isLoading}
-        page={page}
-        onPageChange={setPage}
-        totalRows={totalCount}
-        pageSize={REFERRAL_PAGE_SIZE}
-        density="comfortable"
-        tableLayout="content"
-        emptyTitle={EMPTY_TITLE}
-        emptyDescription={EMPTY_DESCRIPTION}
-        footerSummary="count"
-        footerCountLabels={{ singular: "referral", plural: "referrals" }}
-      />
+            The card spans the full content width, while the columns keep their
+            content-based widths: that is exactly what `tableLayout="content"`
+            gives — each column sizes to its own content and a greedy, empty
+            trailing column absorbs the leftover width so the table still fills
+            the container. So widening the surface changes nothing about the
+            columns themselves.
 
-      {/* Tablet + mobile (below lg): the same page's rows as cards. Full width
-          here — hugging is a table concern, the cards are the mobile layout. */}
-      <div className="mt-2 overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+            Its own empty state keeps the four column headers in place, so an empty
+            result still shows the shape of the data rather than a blank panel. */}
+        <DataTable
+          className="hidden rounded-none border-0 lg:block"
+          columns={columns}
+          data={pageRows}
+          rowKey={(row) => row.id}
+          isLoading={isLoading}
+          page={page}
+          onPageChange={setPage}
+          totalRows={totalCount}
+          pageSize={REFERRAL_PAGE_SIZE}
+          density="comfortable"
+          tableLayout="content"
+          emptyTitle={EMPTY_STATE[statusTab].title}
+          emptyDescription={EMPTY_STATE[statusTab].description}
+          footerSummary="count"
+          footerCountLabels={{ singular: "referral", plural: "referrals" }}
+        />
+
+        {/* Tablet + mobile (below lg): the same page's rows as cards. */}
         <ReferralCardList
+          className="lg:hidden"
           rows={pageRows}
           isLoading={isLoading}
           page={page}
           onPageChange={setPage}
           totalRows={totalCount}
           pageSize={REFERRAL_PAGE_SIZE}
-          emptyTitle={EMPTY_TITLE}
-          emptyDescription={EMPTY_DESCRIPTION}
+          emptyTitle={EMPTY_STATE[statusTab].title}
+          emptyDescription={EMPTY_STATE[statusTab].description}
           onRemind={handleRemind}
           remindedIds={remindedIds}
         />
