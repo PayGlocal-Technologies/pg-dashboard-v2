@@ -10,7 +10,7 @@ import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transac
  * Compact companion to SettlementAnalyticsCard: same Card size/border/radius
  * (so the two match height and visual weight side by side), a top row
  * pairing the icon badge with the pending-count chip, then a tight
- * title/KPI stack, then explanatory text. Doesn't use flux-ui's own
+ * title/KPI stack, nothing else. Doesn't use flux-ui's own
  * MetricSparklineCard, both for that reason and because its fixed p-5
  * padding wouldn't match Card size="sm"'s px-7 py-7 next to it.
  *
@@ -19,9 +19,9 @@ import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transac
  * conversion beside it, but settlementsDue only ever comes back from
  * useMcaOverview in INR, there's no USD figure behind it to convert from, so
  * the KPI below is that one real value alone rather than a fabricated second
- * currency). The actual fundsOnHold figure that used to sit under the KPI as
- * a supporting line moved out entirely, at the design's request, rather than
- * being replaced by another value.
+ * currency). The fundsOnHold figure and the explanatory line that used to sit
+ * under the KPI both moved out entirely, at the design's request, rather than
+ * being replaced by other content.
  */
 export function OutstandingAmountCard({ className }: { className?: string }) {
   const { overview, isLoading } = useMcaOverview();
@@ -32,12 +32,10 @@ export function OutstandingAmountCard({ className }: { className?: string }) {
 
   return (
     <Card size="sm" className={cn("w-full", className)}>
-      {/* flex flex-1 flex-col: gives the zones below a shared flex-col
-          context, so mt-auto on the description can push it toward the
-          card's own bottom edge once Card is stretched taller than its
-          content (see the grow className this component receives from
-          TransactionsAnalyticsCarousel), instead of leaving that space
-          sitting between the KPI and the description. */}
+      {/* flex flex-1 flex-col: still needed even with the description gone,
+          so Card being stretched taller than its content (see the grow
+          className this component receives from TransactionsAnalyticsCarousel)
+          leaves the extra space below the KPI rather than centering it. */}
       <CardContent className="flex flex-1 flex-col">
         {/* Top row: icon left, pending-count chip right. items-start (not
             center) keeps the chip pinned to the top of the card rather than
@@ -73,15 +71,6 @@ export function OutstandingAmountCard({ className }: { className?: string }) {
             </p>
           )}
         </div>
-
-        {/* mt-auto pins this to the card's bottom edge instead of sitting
-            directly under the KPI, matching the reference's comfortable
-            bottom gap without a fixed spacer height. pt-6 is the floor for
-            that gap on a card short enough that mt-auto alone wouldn't clear
-            the KPI stack by much. */}
-        <p className="mt-auto pt-6 text-[13px] text-muted-foreground">
-          Amount received from customers that is yet to be settled.
-        </p>
       </CardContent>
     </Card>
   );

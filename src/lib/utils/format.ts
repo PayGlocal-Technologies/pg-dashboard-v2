@@ -28,6 +28,23 @@ const MONTHS_LONG = [
   "December",
 ] as const;
 
+const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** 1st/2nd/3rd/4th..., with the 11th-13th exception. */
+function ordinalSuffix(day: number): string {
+  if (day % 100 >= 11 && day % 100 <= 13) return "th";
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   // Major Global Currencies
   USD: "$",
@@ -285,6 +302,19 @@ export function formatTransactionDateOnly(raw: string | null | undefined): strin
   if (!raw) return "—";
   const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
   return parsed ? formatTransactionDate(parsed) : raw;
+}
+
+/**
+ * Weekday, ordinal day, month, no year, e.g. "Mon, 24th Aug". Used for the
+ * Analytics card's "Next settlement" line, where naming the day of the week
+ * reads better than a bare calendar date this close to the present.
+ */
+export function formatNextSettlementDate(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  if (!parsed) return raw;
+  const day = parsed.getDate();
+  return `${DAYS_SHORT[parsed.getDay()]}, ${day}${ordinalSuffix(day)} ${MONTHS_SHORT[parsed.getMonth()]}`;
 }
 
 /**
