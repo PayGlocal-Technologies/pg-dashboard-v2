@@ -2,6 +2,18 @@ import type { IconName } from "@/components/icon";
 
 export const REFERRAL_PAGE_SIZE = 10;
 
+/** Which referrals the earnings table shows: every one, or only those whose
+ *  reward has been fully waived against the merchant's MDR (status
+ *  "WAIVED" — see types.ts's note on the lifecycle). */
+export type ReferralStatusTab = "ALL" | "WAIVED";
+
+export const REFERRAL_STATUS_TABS = [
+  { value: "ALL", label: "All" },
+  { value: "WAIVED", label: "Waived" },
+] as const satisfies readonly { value: ReferralStatusTab; label: string }[];
+
+export const DEFAULT_REFERRAL_STATUS_TAB: ReferralStatusTab = "ALL";
+
 /**
  * Hero banner, served from `public/assets`. A raster asset, so it cannot be an
  * icon-registry entry (that pattern is for SVG forwardRef components) and goes
