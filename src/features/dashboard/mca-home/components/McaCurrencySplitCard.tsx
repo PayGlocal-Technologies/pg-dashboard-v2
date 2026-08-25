@@ -37,8 +37,8 @@ export function McaCurrencySplitCard() {
 
   return (
     <Card className="h-full gap-4 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-nowrap items-start justify-between gap-3">
+        <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">Currency split</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {metric === "volume"

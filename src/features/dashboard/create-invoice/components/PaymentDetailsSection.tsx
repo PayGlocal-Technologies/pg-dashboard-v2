@@ -31,17 +31,21 @@ import type { BaseResponse } from "@/types/common";
  */
 export function PaymentDetailsSection({
   invoiceId,
+  currency,
   accountNo,
   onAccountNoChange,
 }: {
   invoiceId: string;
+  /** The currency the server's copy of the draft holds, see
+   * useInvoiceBankAccounts — changing it re-resolves the suggested account. */
+  currency: string;
   accountNo: string;
   onAccountNoChange: (accountNo: string) => void;
 }) {
   const merchantId = useInvoiceMerchantId();
   const [addOpen, setAddOpen] = useState(false);
 
-  const { rows, isLoading, refetchAdded } = useInvoiceBankAccounts(invoiceId);
+  const { rows, isLoading, refetchAdded } = useInvoiceBankAccounts(invoiceId, currency);
 
   const { mutate: deleteAccount } = useDelete<BaseResponse<null>, { uniqueId: string }>(
     deleteBankAccountApi(merchantId),

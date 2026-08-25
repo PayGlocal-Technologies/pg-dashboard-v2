@@ -537,8 +537,14 @@ export function useClientStateCodes(): { states: string[]; isLoading: boolean } 
     clientStateCodesApi
   );
 
+  // Sorted, because the endpoint returns its map unordered and Select's
+  // type-ahead jumps to the first DOM match: unsorted, pressing "k" landed on
+  // Kerala rather than Karnataka.
   const states = useMemo(
-    () => Object.keys(data?.data?.stateCodes ?? {}).filter((name) => name !== "OTHER COUNTRY"),
+    () =>
+      Object.keys(data?.data?.stateCodes ?? {})
+        .filter((name) => name !== "OTHER COUNTRY")
+        .sort((a, b) => a.localeCompare(b)),
     [data]
   );
 

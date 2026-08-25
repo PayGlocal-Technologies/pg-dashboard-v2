@@ -1,7 +1,5 @@
 import {
-  computeNextSettlement,
   computeSettlementSchedule,
-  isHolidayWithinDays,
   type HolidayInfo,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { isSettlementComplete } from "@/features/dashboard/settlement-reports/columns";
@@ -20,31 +18,25 @@ import type {
 // for the exact contract) once engineering wires this screen up. All bank
 // account numbers and settlement/UTR identifiers below are fake demo values.
 
-/** Fixed "today" reference for the settlement calendar and the "Upcoming
- * settlement" card below. Not real-time; this is a mock-only screen (see
- * TODO(integration) above). */
-export const SETTLEMENT_CALENDAR_TODAY = "2026-03-12";
+/**
+ * Fixed "today" and holiday list, used ONLY to keep the mock settlement rows
+ * and the mock per-settlement detail dataset below internally consistent.
+ *
+ * These are no longer what the screen renders. The settlement calendar, the
+ * bank-holiday banner and the next-settlement date all read the live
+ * /gcc/v1/calendar endpoint now (see useSettlementCalendar in hooks.ts), so
+ * neither of these is exported any more — a real date and a real holiday list
+ * must never come from this file again.
+ */
+const SETTLEMENT_CALENDAR_TODAY = "2026-03-12";
 
-export const bankHolidays: HolidayInfo[] = [
+const bankHolidays: HolidayInfo[] = [
   { date: "2026-01-26", name: "Republic Day" },
   { date: "2026-03-13", name: "Bank Holiday" },
   { date: "2026-08-15", name: "Independence Day" },
   { date: "2026-10-02", name: "Gandhi Jayanti" },
   { date: "2026-12-25", name: "Christmas" },
 ];
-
-export const nextSettlementInfo = computeNextSettlement(SETTLEMENT_CALENDAR_TODAY, bankHolidays);
-export const hasUpcomingHoliday = isHolidayWithinDays(SETTLEMENT_CALENDAR_TODAY, bankHolidays, 7);
-
-// Today's captured payments haven't formed their own settlement batch yet,
-// so this is computed straight from "today" rather than read off a row, T+1
-// from 2026-03-12 lands on the 2026-03-13 bank holiday (see bankHolidays
-// above), which is exactly what pushes it to Monday below, not a hardcoded
-// date.
-const upcomingSettlementSchedule = computeSettlementSchedule(
-  SETTLEMENT_CALENDAR_TODAY,
-  bankHolidays
-);
 
 export const settlementSummary = {
   totalSettled: 507000,
@@ -61,13 +53,10 @@ export const settlementSummary = {
     tax: 380,
     fee: 1200,
   },
+  // Amount only. The date, and whether a weekend or holiday pushed it out, come
+  // from the live calendar (useSettlementCalendar) — see index.tsx.
   upcomingSettlement: {
     amount: 124890.5,
-    expectedDate: upcomingSettlementSchedule.settlementDate,
-    affectedByNonWorkingDay: upcomingSettlementSchedule.affectedByNonWorkingDay,
-    nonWorkingDayDate: upcomingSettlementSchedule.nonWorkingDayDate,
-    nonWorkingDayReason: upcomingSettlementSchedule.nonWorkingDayReason,
-    nonWorkingDayName: upcomingSettlementSchedule.nonWorkingDayName,
   },
   bankAccount: "HDFC ****4521",
   cycle: { value: "T+1", frequency: "Daily" },
@@ -92,13 +81,9 @@ export const mcaSettlementSummary = {
     tax: 125,
     fee: 500,
   },
+  // Amount only, as above.
   upcomingSettlement: {
     amount: 8420,
-    expectedDate: upcomingSettlementSchedule.settlementDate,
-    affectedByNonWorkingDay: upcomingSettlementSchedule.affectedByNonWorkingDay,
-    nonWorkingDayDate: upcomingSettlementSchedule.nonWorkingDayDate,
-    nonWorkingDayReason: upcomingSettlementSchedule.nonWorkingDayReason,
-    nonWorkingDayName: upcomingSettlementSchedule.nonWorkingDayName,
   },
   // Transactions still sitting at "invoice_pending" (see McaPaymentStatus in
   // types.ts), not yet bundled into any settlement, they're what the

@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui";
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -363,7 +369,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
               </p>
               {activeProduct ? (
                 <div className="space-y-0.5">
-                  {activeMids.map(({ mid, status, tradeName, displayTag }) =>
+                  {activeMids.map(({ mid, status, tradeName, displayTag, merchantWebsite }) =>
                     editingMid === mid ? (
                       <div
                         key={mid}
@@ -444,9 +450,31 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
                           }}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12.5px] font-medium text-foreground">
-                            {displayTag || tradeName}
-                          </p>
+                          <div className="flex items-center gap-1">
+                            <p className="truncate text-[12.5px] font-medium text-foreground">
+                              {displayTag || tradeName}
+                            </p>
+                            {merchantWebsite && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className="inline-flex flex-shrink-0 text-muted-foreground"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Icon name="info" size={11} />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+                                    sideOffset={4}
+                                  >
+                                    {merchantWebsite}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <p className="truncate text-[10.5px] text-muted-foreground">{mid}</p>
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-1">

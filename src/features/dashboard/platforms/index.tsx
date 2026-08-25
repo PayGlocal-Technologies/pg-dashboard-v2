@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { toast } from "sonner";
 import {
   Accordion,
@@ -240,7 +240,16 @@ function PlatformsContent() {
           control first, then the workflow. */}
       <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start xl:gap-x-10">
         {/* ─── Platform navigation ─────────────────────────────────────── */}
-        <div className="lg:col-start-1">
+        {/* lg:sticky, so the platform list stays on screen while the workflow
+            beside it scrolls: it is this page's only navigation, and the
+            connect steps, account fields and documents run well past one
+            screen. Sticks inside <main> (the dashboard's scroll container), and
+            top-6 matches that container's own md:p-6 inset so the column pins
+            level with where it started rather than flush against the header.
+            Works only because the grid sets lg:items-start — a stretched grid
+            item is as tall as its row and has nothing to slide within. The
+            caption sticks with the list, since both live in this one item. */}
+        <div className="lg:sticky lg:top-6 lg:col-start-1">
           {/* The smallest, muted, uppercase step: the navigation is how you
               reach the content rather than content itself, so its caption stays
               lighter than any title in the workflow beside it. The list's own

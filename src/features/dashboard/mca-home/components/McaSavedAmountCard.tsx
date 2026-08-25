@@ -1,22 +1,99 @@
-import { Card } from "@/components/ui";
-import { Icon } from "@/components/icon";
-import { RollingNumber } from "@/components/common/RollingNumber";
-import { mcaSavedAmount } from "@/features/dashboard/mca-home/mock-data";
+"use client";
 
+import { useState } from "react";
+import { Button, Card, Shimmer } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
+import { RollingNumber } from "@/components/common/RollingNumber";
+import { formatCurrency } from "@/lib/utils/format";
+import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transactions/hooks";
+
+/**
+ * The two windows getPacbOverview reports a saved amount for. Keys, not labels:
+ * each value indexes straight into `amountSaved`, so a third window appearing in
+ * the response is one entry here and nothing else.
+ *
+ * "overall" leads and is the default, matching production's own Amount Saved
+ * card (its radio defaults to the lifetime figure).
+ */
+const SAVED_AMOUNT_DURATIONS = [
+  { value: "overall", label: "Overall" },
+  { value: "last30", label: "30 days" },
+] as const;
+
+type SavedAmountDuration = (typeof SAVED_AMOUNT_DURATIONS)[number]["value"];
+
+/** Reads the same window the value does, so the figure and the sentence under it
+ *  can never describe different periods. */
+const DURATION_CAPTION: Record<SavedAmountDuration, string> = {
+  overall: "Amount saved on transaction fees through PayGlocal.",
+  last30: "Saved on transaction fees in the last 30 days.",
+};
+
+/**
+ * Reads the same MCA business-overview endpoint the Transactions page's own
+ * SavedAmountCard does (getPacbOverview, see useMcaOverview), one query shared
+ * through react-query's cache, so putting both on screen costs one request.
+ *
+ * That endpoint returns both windows in a single response, so the toggle below
+ * switches between two figures already in hand: no refetch, and no loading state
+ * on toggle. The Transactions card stays on the lifetime figure alone, by design
+ * (see its own doc comment).
+ */
 export function McaSavedAmountCard() {
+  const { overview, isLoading } = useMcaOverview();
+  const [duration, setDuration] = useState<SavedAmountDuration>("overall");
+  const savedInr = toMetricNumber(overview?.amountSaved?.[duration]?.value);
+
   return (
     <Card className="gap-3 p-5">
-      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10">
-        <Icon name="piggy-bank" className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+      {/* Icon left, toggle right: the same top-row split OutstandingAmountCard
+          uses for its icon and pending chip, rather than a second row. */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10">
+          <Icon name="piggy-bank" className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+        </div>
+        {/* Same segmented-toggle treatment as McaCurrencySplitCard's Volume /
+            Count switch, one step tighter because this card is a third the
+            width. The widget picker renders it pointer-events-none, so the
+            preview shows the control without it being operable there. */}
+        <div
+          role="group"
+          aria-label="Saved amount period"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted/50 p-0.5"
+        >
+          {SAVED_AMOUNT_DURATIONS.map((opt) => (
+            <Button
+              key={opt.value}
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-pressed={duration === opt.value}
+              onClick={() => setDuration(opt.value)}
+              className={cn(
+                "h-auto min-h-0 whitespace-nowrap rounded-md px-2.5 py-1 text-[11px] font-medium",
+                duration === opt.value
+                  ? "bg-card text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {opt.label}
+            </Button>
+          ))}
+        </div>
       </div>
       <div>
         <p className="text-[13px] font-medium text-muted-foreground">Saved amount</p>
-        <RollingNumber
-          value={mcaSavedAmount.valueLabel}
-          className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-        />
+        {isLoading ? (
+          <Shimmer className="mt-1 h-8 w-32" />
+        ) : (
+          <RollingNumber
+            value={formatCurrency(savedInr, "INR", "en-IN")}
+            className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+          />
+        )}
       </div>
-      <p className="text-xs text-muted-foreground">{mcaSavedAmount.description}</p>
+      <p className="text-xs text-muted-foreground">{DURATION_CAPTION[duration]}</p>
     </Card>
   );
 }

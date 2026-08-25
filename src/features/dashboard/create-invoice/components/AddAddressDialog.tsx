@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
 import {
   Button,
   Dialog,
@@ -194,45 +195,37 @@ function AddressBody({
         <div className="grid gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="client-address-country">Country</FieldLabel>
-            <Select
-              value={address.country}
-              onValueChange={(next) =>
-                patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })
-              }
-            >
-              <SelectTrigger id="client-address-country" className="w-full">
-                <SelectValue placeholder="Select country" />
-              </SelectTrigger>
-              <SelectContent>
-                {countryOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Searchable for the same reason State is, only more so: this list
+              runs to roughly 200 entries. flux's own CountrySelect is not usable
+              here — it is hardwired to its internal COUNTRIES array, while these
+              options come from the API and carry the country *names* the address
+              is stored under. */}
+          <SearchableSelect
+            id="client-address-country"
+            value={address.country}
+            onValueChange={(next) => patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })}
+            options={countryOptions}
+            placeholder="Select country"
+            searchPlaceholder="Search country…"
+            emptyMessage="No country matches that search."
+          />
           </Field>
 
           <Field>
             <FieldLabel htmlFor="client-address-state">State</FieldLabel>
-            <Select
+            {/* Searchable, like the country field above. India's list runs to 36
+                entries; the search box hides itself for every other country,
+                whose only option is "Not Applicable". */}
+            <SearchableSelect
+              id="client-address-state"
               value={address.state}
               onValueChange={(next) => patch({ state: next })}
+              options={stateOptions}
               disabled={!address.country}
-            >
-              <SelectTrigger id="client-address-state" className="w-full">
-                <SelectValue
-                  placeholder={address.country ? "Select state" : "Pick a country first"}
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {stateOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder={address.country ? "Select state" : "Pick a country first"}
+              searchPlaceholder="Search state…"
+              emptyMessage="No state matches that search."
+            />
           </Field>
         </div>
 

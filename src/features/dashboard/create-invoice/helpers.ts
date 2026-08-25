@@ -1,4 +1,6 @@
+import { formatDate } from "@/lib/utils/format";
 import {
+  DUE_TERM_OPTIONS,
   INVOICE_STEPS,
   REQUIRED_ADDRESS_KEYS,
 } from "@/features/dashboard/create-invoice/constants";
@@ -7,6 +9,8 @@ import type {
   InvoiceCreatePayload,
   InvoiceData,
   InvoiceFormState,
+  InvoiceTemplate,
+  InvoiceTemplateSnapshot,
   LineItemDraft,
 } from "@/features/dashboard/create-invoice/types";
 
@@ -245,6 +249,34 @@ export const toInvoicePayload = ({
 
 // ─── Wire payload → form state ────────────────────────────────────────────────
 
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * Recovers which due-term chip produced a stored due date.
+ *
+ * The server keeps only the resolved date, never the term that generated it, so
+ * this used to report "custom" for every reopened draft. That was not merely
+ * cosmetic once templates existed: a template captures the *term*, so applying
+ * one, letting it autosave, reopening it and saving it as a template again
+ * downgraded "30 days" to "custom" — and "custom" is treated as no term at all,
+ * because a date somebody picked by hand for one invoice is not reusable. The
+ * reusable part of the template therefore evaporated after one round trip.
+ *
+ * Comparing the two dates recovers it exactly, since every preset is a whole
+ * number of days from the issue date. A gap matching no preset really is custom.
+ */
+export const dueTermForDates = (invoiceDate: string, dueDate: string): string | null => {
+  if (!dueDate) return null;
+  if (!invoiceDate) return "custom";
+
+  const from = Date.parse(`${invoiceDate}T00:00:00`);
+  const to = Date.parse(`${dueDate}T00:00:00`);
+  if (Number.isNaN(from) || Number.isNaN(to)) return "custom";
+
+  const days = Math.round((to - from) / MS_PER_DAY);
+  return DUE_TERM_OPTIONS.find((option) => option.days === days)?.id ?? "custom";
+};
+
 /** Rehydrates the editor from a draft the server returned. */
 export const toFormState = (
   invoice: InvoiceData,
@@ -254,9 +286,7 @@ export const toFormState = (
   invoiceNumber: invoice.invoiceNumber || fallback.invoiceNumber,
   invoiceDate: invoice.invoiceDate || fallback.invoiceDate,
   dueDate: invoice.dueDate || "",
-  // The server stores only the resolved date, never which chip produced it, so
-  // a reopened draft shows an explicit date rather than "Due in 30 days".
-  dueTermId: invoice.dueDate ? "custom" : null,
+  dueTermId: dueTermForDates(invoice.invoiceDate || fallback.invoiceDate, invoice.dueDate || ""),
 
   clientId: invoice.clientId || "",
   currency: invoice.currency || fallback.currency,
@@ -344,4 +374,168 @@ export const validateSelectedClient = (
   }
 
   return { kind: "none" };
+};
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+
+/**
+ * Captures the reusable shape of the invoice on screen.
+ *
+ * What is *not* captured is the point of this function: no client, no invoice
+ * number, no issue or due date, no consent, no linked transaction. Those either
+ * identify one specific invoice or are attestations that must be made fresh, and
+ * a template that carried them would let a merchant bill last month's customer
+ * by accident. See InvoiceTemplateSnapshot for the field-by-field reasoning.
+ *
+ * Line-item keys are dropped here and reassigned on apply, so two invoices built
+ * from the same template never share a key.
+ */
+export const toTemplateSnapshot = (form: InvoiceFormState): InvoiceTemplateSnapshot => ({
+  currency: form.currency,
+  lineItems: form.lineItems.map((item) => ({ ...item })),
+  discountName: form.discountName,
+  discountValue: form.discountValue,
+  discountType: form.discountType,
+  taxName: form.taxName,
+  taxValue: form.taxValue,
+  accountNo: form.accountNo,
+  memo: form.memo,
+  notes: form.notes,
+  lut: form.lut,
+  // The offset, never the resolved date: "30 days" is reusable, "12 Sep" is not.
+  dueTermId: form.dueTermId,
+  logoEnabled: form.logoEnabled,
+  signatureEnabled: form.signatureEnabled,
+  brandingStyleId: form.brandingStyleId,
+  primaryColor: form.primaryColor,
+  accentColor: form.accentColor,
+  language: form.language,
+  isRecurring: form.isRecurring,
+  recurringType: form.recurringType,
+});
+
+/**
+ * Turns a template back into a patch for the live form.
+ *
+ * Returns everything the snapshot holds and nothing it does not, so spreading it
+ * over the current form leaves the client, the invoice number, the dates and the
+ * consent tick exactly as they were.
+ *
+ * `dueDate` is deliberately absent from the result. The snapshot stores a term,
+ * and resolving a term against an issue date is the date-chip's job — the caller
+ * spreads this patch and then sets `dueDate` from `dueDateForTerm`, which is the
+ * same function the chip itself uses. Recomputing it here would duplicate that
+ * arithmetic in a second place.
+ *
+ * `recurringStartDate` is likewise left alone: a schedule that started in the
+ * past cannot be reused, so the merchant re-picks it.
+ */
+export const applyTemplateSnapshot = (
+  template: InvoiceTemplate
+): Partial<InvoiceFormState> & { dueTermId: string | null } => {
+  const { snapshot } = template;
+
+  return {
+    currency: snapshot.currency,
+    // Fresh keys, derived from the template id and the row's position, so they
+    // are unique and stable without reaching for Date.now() during a render.
+    lineItems: snapshot.lineItems.map((item, index) => ({
+      ...item,
+      key: `tpl_${template.id}_${index}`,
+    })),
+    discountName: snapshot.discountName,
+    discountValue: snapshot.discountValue,
+    discountType: snapshot.discountType,
+    taxName: snapshot.taxName,
+    taxValue: snapshot.taxValue,
+    accountNo: snapshot.accountNo,
+    memo: snapshot.memo,
+    notes: snapshot.notes,
+    lut: snapshot.lut,
+    dueTermId: snapshot.dueTermId,
+    logoEnabled: snapshot.logoEnabled,
+    signatureEnabled: snapshot.signatureEnabled,
+    brandingStyleId: snapshot.brandingStyleId,
+    primaryColor: snapshot.primaryColor,
+    accentColor: snapshot.accentColor,
+    language: snapshot.language,
+    isRecurring: snapshot.isRecurring,
+    recurringType: snapshot.recurringType,
+  };
+};
+
+/**
+ * A one-line summary of what a template holds, shown under its name.
+ *
+ * Generated rather than typed by the merchant: a description they have to invent
+ * is a description they leave empty, and "3 items · INR · 30 days" is what
+ * actually helps them tell two templates apart.
+ */
+export const describeSnapshot = (snapshot: InvoiceTemplateSnapshot): string => {
+  const itemCount = snapshot.lineItems.length;
+  const parts = [`${itemCount} item${itemCount === 1 ? "" : "s"}`];
+
+  if (snapshot.currency) parts.push(snapshot.currency);
+
+  const term = DUE_TERM_OPTIONS.find((option) => option.id === snapshot.dueTermId);
+  if (term) parts.push(`due ${term.label.toLowerCase()}`);
+
+  if (snapshot.isRecurring) parts.push("recurring");
+
+  return parts.join(" · ");
+};
+
+/**
+ * An epoch-millis string as a short date, or "" when there is none.
+ *
+ * The templates API sends its timestamps this way (`savedAt`, `lastUsedAt`), and
+ * `formatDate` takes a Date or a parseable date string: `new Date("175500…")` is
+ * an Invalid Date, so the number has to be converted rather than passed
+ * through. Kept here so every caller formats them identically.
+ */
+export const formatEpochDay = (millis: string | null | undefined): string => {
+  if (!millis) return "";
+  const value = Number(millis);
+  if (!Number.isFinite(value)) return "";
+  return formatDate(new Date(value), { day: "2-digit", month: "short", year: "numeric" });
+};
+
+// ─── Brand colours ────────────────────────────────────────────────────────────
+
+/**
+ * Normalises typed hex to `#RRGGBB`, or null when it is not a colour.
+ *
+ * Accepts a leading hash or not, and the three-digit shorthand, because those
+ * are what people paste out of a brand guideline.
+ */
+export const normalizeHexColor = (value: string): string | null => {
+  const raw = value.trim().replace(/^#/, "");
+
+  if (/^[0-9a-fA-F]{3}$/.test(raw)) {
+    const [r, g, b] = raw.split("");
+    return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+  }
+
+  return /^[0-9a-fA-F]{6}$/.test(raw) ? `#${raw.toUpperCase()}` : null;
+};
+
+/**
+ * `color` at `alpha` opacity, as an 8-digit hex.
+ *
+ * The layouts tint backgrounds and hairlines with the merchant's brand colour
+ * and need it faint. Nova appends raw suffixes inline (`${accentColor}55`),
+ * which silently produces garbage if the colour is ever shorthand or malformed;
+ * this validates first and falls back to fully opaque.
+ */
+export const withAlpha = (color: string, alpha: number): string => {
+  const normalized = normalizeHexColor(color);
+  if (!normalized) return color;
+
+  const clamped = Math.max(0, Math.min(1, alpha));
+  const suffix = Math.round(clamped * 255)
+    .toString(16)
+    .padStart(2, "0")
+    .toUpperCase();
+
+  return `${normalized}${suffix}`;
 };

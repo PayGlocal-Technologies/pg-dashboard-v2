@@ -63,8 +63,12 @@ export function McaDashboardFeature() {
     router.push("/create-invoice");
   }
 
+  function handleViewClients() {
+    router.push("/client-management");
+  }
+
   function handleViewSettlements() {
-    toast.message("View settlements", { description: "This action isn't wired up yet." });
+    router.push("/mca-settlement-report");
   }
 
   function handleViewAll(section: string) {
@@ -138,7 +142,7 @@ export function McaDashboardFeature() {
           <McaRevenueCard onViewSettlements={handleViewSettlements} />
         </div>
         <div className="flex flex-col gap-4 lg:col-span-4">
-          <McaClientAnalyticsCard onViewAll={() => handleViewAll("Client analytics")} />
+          <McaClientAnalyticsCard onViewAll={handleViewClients} />
           <McaNeedsAttentionCard
             onViewAll={() => handleViewAll("Needs attention")}
             onAction={handleNeedsAttentionAction}

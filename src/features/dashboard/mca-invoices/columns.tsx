@@ -294,36 +294,49 @@ export function buildInvoiceColumns(
                   stays a labelled button rather than hiding behind "…" —
                   the same treatment Upload Invoice gets on transactions.
                   Everything else reveals a View button on hover only, so
-                  the column stays quiet while scanning. */}
-              {isDraft ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="pencil" className="h-3 w-3" />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    open(row);
-                  }}
-                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                >
-                  Continue
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<Icon name="eye" className="h-3 w-3" />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    open(row);
-                  }}
-                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100"
-                >
-                  View
-                </Button>
-              )}
+                  the column stays quiet while scanning.
 
-              <RowActionsMenu actions={actions} />
+                  The CTA sits in a shared min-width slot: "Continue" is the
+                  wider of the two labels, and without a common footprint the
+                  overflow "…" landed at a different x on draft rows than on
+                  active/paid ones. min-w rather than w so an unexpectedly wide
+                  label pushes the menu out instead of overlapping it. */}
+              <span className="flex min-w-[84px] shrink-0 items-center">
+                {isDraft ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Icon name="pencil" className="h-3 w-3" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      open(row);
+                    }}
+                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                  >
+                    Continue
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<Icon name="eye" className="h-3 w-3" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      open(row);
+                    }}
+                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100"
+                  >
+                    View
+                  </Button>
+                )}
+              </span>
+
+              {/* Fixed slot too: PAID_OUTSIDE/UPLOADED rows can end up with no
+                  menu items at all, and an absent trigger would otherwise pull
+                  the column's right edge in on those rows alone. */}
+              <span className="flex w-8 shrink-0 items-center justify-center">
+                <RowActionsMenu actions={actions} />
+              </span>
             </div>
           </RowClick>
         );

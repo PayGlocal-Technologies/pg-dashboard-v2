@@ -4,6 +4,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGet, usePost, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useInvoiceTemplatesStore, type DraftMemory } from "@/stores/useInvoiceTemplates";
+import { describeSnapshot } from "@/features/dashboard/create-invoice/helpers";
+// toDateKey is local-timezone YYYY-MM-DD. Imported from the chips module for the
+// same reason mca-invoices and mca-invoice-details do: it is the one
+// implementation, and `toISOString().slice(0, 10)` rolls the date back a day for
+// any IST time before 05:30.
+import { toDateKey } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
 import {
   addedAccountsApi,
   clientCountryCodesApi,
@@ -26,6 +33,8 @@ import type {
   ClientListResponse,
   CountryCodesResponse,
   CurrencyData,
+  InvoiceTemplate,
+  InvoiceTemplateSnapshot,
   LineItemSuggestion,
   LineItemsResponse,
   McaCurrencyListResponse,
@@ -227,7 +236,10 @@ export function useClientGeo(enabled: boolean): ClientGeo {
 
       return Object.keys(stateCodes)
         .filter((name) => name !== "OTHER COUNTRY")
-        .map((name) => ({ label: titleCase(name), value: name }));
+        .map((name) => ({ label: titleCase(name), value: name }))
+        // The API returns its map unordered. Sorted on the *label*, which is
+        // what the user reads and what Select's type-ahead matches against.
+        .sort((a, b) => a.label.localeCompare(b.label));
     },
     [stateData]
   );
@@ -299,8 +311,20 @@ const addedToRow = (account: AddedAccountDetails): BankAccountRow => ({
  *
  * Recommendation follows production: only meaningful when there is a choice,
  * and the local account wins when one exists.
+ *
+ * `currency` is not sent — the endpoint reads the currency off the stored
+ * invoice — but it IS part of the cache key, because which account is suggested
+ * depends on it: a USD invoice gets the USD local account, a EUR one the EUR
+ * account. Pass the currency the *server's* copy of the draft is known to
+ * carry, not the one in the form. Keying on the form's value would fire this
+ * the instant the merchant picks a new currency, ahead of the debounced
+ * autosave that tells the server about it, and the answer would come back for
+ * the currency the invoice still had.
  */
-export function useInvoiceBankAccounts(invoiceId: string): {
+export function useInvoiceBankAccounts(
+  invoiceId: string,
+  currency: string
+): {
   rows: BankAccountRow[];
   isLoading: boolean;
   refetchAdded: () => void;
@@ -309,10 +333,12 @@ export function useInvoiceBankAccounts(invoiceId: string): {
 
   const suggestedUrl = suggestedAccountsApi(merchantId, invoiceId);
   const { data: suggested, isLoading } = useGet<AccountListResponse>(
-    ["suggested-accounts", merchantId, invoiceId],
+    ["suggested-accounts", merchantId, invoiceId, currency],
     suggestedUrl,
     undefined,
-    { enabled: !!suggestedUrl }
+    // Without a currency the server rejects the request outright, so there is
+    // nothing to gain from asking.
+    { enabled: !!suggestedUrl && !!currency }
   );
 
   const addedUrl = addedAccountsApi(merchantId);
@@ -460,3 +486,189 @@ export function useDebouncedAutosave(
 
 /** Convenience wrapper so callers can type the envelope without repeating it. */
 export type SimpleResponse = BaseResponse<Record<string, unknown>>;
+
+// ─── Templates ────────────────────────────────────────────────────────────────
+
+export interface InvoiceTemplates {
+  templates: InvoiceTemplate[];
+  /** False until the persisted list has been read in; see the store's note. */
+  isReady: boolean;
+  /** Returns the new template's id, so the caller can select it. */
+  save: (name: string, snapshot: InvoiceTemplateSnapshot) => string;
+  update: (templateId: string, snapshot: InvoiceTemplateSnapshot) => void;
+  rename: (templateId: string, name: string) => void;
+  remove: (templateId: string) => void;
+  /** Call when a template is applied. Goes away once the server stamps it. */
+  markUsed: (templateId: string) => void;
+}
+
+/**
+ * THE SEAM.
+ *
+ * Every template-aware component in this feature — the picker card, the save
+ * dialog, the manage dialog, the header's split button — talks to templates
+ * only through this hook. Nothing above it knows where they are stored.
+ *
+ * Today: a per-merchant slice of a persisted zustand store (localStorage).
+ * Tomorrow: `useGet(invoiceTemplatesApi(mid))` for the list and three
+ * `usePost`/`useDelete` calls for the mutators, once the contract is known.
+ *
+ * Replacing the body is the entire migration. Keep the interface identical and
+ * no consumer changes:
+ *
+ *   - `templates` becomes `data?.data?.templates ?? []`
+ *   - `isReady` becomes `!isLoading`
+ *   - `save` posts and returns the server's id instead of minting one
+ *   - `update` / `rename` / `remove` post and let react-query invalidate
+ *
+ * The one thing that will change shape is id minting: the server will own ids,
+ * so `save` becomes async and callers that select the new template will need to
+ * do it in an onSuccess. Both current callers already handle the id as a return
+ * value rather than assuming it, which is why that is a small change.
+ */
+export function useInvoiceTemplates(): InvoiceTemplates {
+  const merchantId = useInvoiceMerchantId();
+
+  const templatesByMid = useInvoiceTemplatesStore((state) => state.templatesByMid);
+  const saveTemplate = useInvoiceTemplatesStore((state) => state.saveTemplate);
+  const updateSnapshot = useInvoiceTemplatesStore((state) => state.updateSnapshot);
+  const renameTemplate = useInvoiceTemplatesStore((state) => state.renameTemplate);
+  const deleteTemplate = useInvoiceTemplatesStore((state) => state.deleteTemplate);
+  const markUsedInStore = useInvoiceTemplatesStore((state) => state.markUsed);
+
+  const [isReady, setIsReady] = useState(false);
+
+  // The store sets skipHydration, so the persisted list is read in here, on the
+  // client, after the first paint. setState lives in the promise continuation
+  // rather than the effect body, per CLAUDE.md's purity rule.
+  useEffect(() => {
+    let cancelled = false;
+    void useInvoiceTemplatesStore.persist.rehydrate()?.then(() => {
+      if (!cancelled) setIsReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * Most recently used first, then most recently saved.
+   *
+   * The picker used to list templates in the order they were created, so the
+   * one a merchant reaches for weekly sank as they added others. Ordering by
+   * recency is also what the API's `lastUsedAt` is for, so this survives the
+   * swap unchanged.
+   */
+  const templates = useMemo(() => {
+    const mine = templatesByMid[merchantId] ?? [];
+    return [...mine].sort((a, b) => {
+      const used = Number(b.lastUsedAt ?? 0) - Number(a.lastUsedAt ?? 0);
+      return used !== 0 ? used : Number(b.savedAt ?? 0) - Number(a.savedAt ?? 0);
+    });
+  }, [templatesByMid, merchantId]);
+
+  const save = useCallback(
+    (name: string, snapshot: InvoiceTemplateSnapshot): string => {
+      // Date.now() in an event handler, never during render. The server will own
+      // this once the endpoint exists.
+      const id = `tpl_${Date.now().toString(36)}`;
+      saveTemplate(merchantId, {
+        id,
+        name,
+        description: describeSnapshot(snapshot),
+        savedAt: String(Date.now()),
+        snapshot,
+      });
+      return id;
+    },
+    [merchantId, saveTemplate]
+  );
+
+  const update = useCallback(
+    (templateId: string, snapshot: InvoiceTemplateSnapshot) =>
+      // The description is derived from the snapshot, so it is recomputed here
+      // rather than left behind describing the previous contents.
+      updateSnapshot(merchantId, templateId, snapshot, describeSnapshot(snapshot)),
+    [merchantId, updateSnapshot]
+  );
+
+  const rename = useCallback(
+    (templateId: string, name: string) => renameTemplate(merchantId, templateId, name),
+    [merchantId, renameTemplate]
+  );
+
+  const remove = useCallback(
+    (templateId: string) => deleteTemplate(merchantId, templateId),
+    [merchantId, deleteTemplate]
+  );
+
+  const markUsed = useCallback(
+    // Date.now() in a handler, never during render.
+    (templateId: string) => markUsedInStore(merchantId, templateId, String(Date.now())),
+    [merchantId, markUsedInStore]
+  );
+
+  return { templates, isReady, save, update, rename, remove, markUsed };
+}
+
+/**
+ * Per-draft memory for the two things the invoice cannot hold: which template it
+ * came from, and its branding.
+ *
+ * Restoration is pushed through `onRestore` rather than returned as state on
+ * purpose. The persisted record is only readable after `rehydrate()` resolves,
+ * and calling setState from an effect *body* to apply it is exactly what
+ * CLAUDE.md's purity rule forbids. Handing it back from the promise continuation
+ * keeps the update in an async callback, where it is allowed.
+ *
+ * `onRestore` fires at most once per invoice, and only when there is something
+ * stored. A fresh draft never triggers it, so nothing overwrites the defaults
+ * the form was seeded with.
+ */
+export function useDraftMemory(
+  invoiceId: string,
+  onRestore: (memory: DraftMemory) => void
+): { isReady: boolean; remember: (memory: DraftMemory) => void } {
+  const [isReady, setIsReady] = useState(false);
+
+  // The continuation below outlives this render, so the callback is read through
+  // a ref rather than captured. Written in an effect, never during render.
+  const onRestoreRef = useRef(onRestore);
+  useEffect(() => {
+    onRestoreRef.current = onRestore;
+  });
+
+  useEffect(() => {
+    if (!invoiceId) return;
+
+    let cancelled = false;
+    void useInvoiceTemplatesStore.persist.rehydrate()?.then(() => {
+      if (cancelled) return;
+      const stored = useInvoiceTemplatesStore.getState().draftMemory[invoiceId];
+      if (stored) onRestoreRef.current(stored);
+      setIsReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [invoiceId]);
+
+  /**
+   * Writes straight through `getState()` rather than subscribing.
+   *
+   * The editor calls this from an effect on every branding change. Subscribing
+   * to `draftMemory` as well would re-render the editor on its own write, which
+   * would fire the effect again — a loop. Nothing reads this slice reactively;
+   * it is written here and read once, above.
+   */
+  const remember = useCallback(
+    (memory: DraftMemory) => {
+      if (!invoiceId) return;
+      useInvoiceTemplatesStore.getState().rememberDraft(invoiceId, memory);
+    },
+    [invoiceId]
+  );
+
+  return { isReady, remember };
+}

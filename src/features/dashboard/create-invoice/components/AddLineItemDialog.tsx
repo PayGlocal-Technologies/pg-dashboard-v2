@@ -134,20 +134,37 @@ function LineItemBody({
   // differ only by name are the same suggestion twice — indistinguishable in the
   // list and a duplicate React key — so they collapse on the whole tuple, which
   // keeps a genuine "same item, different rate" pair as two separate rows.
+  /**
+   * The suggestion list, matching pg-dashboard's ItemsTable exactly.
+   *
+   * Two behaviours copied deliberately, because both were wrong here before:
+   *
+   *  - An empty query lists *everything*, not nothing. Production seeds its
+   *    search from the field's current value on focus, so focusing an empty
+   *    field shows the whole catalogue. Requiring a keystroke first hid the
+   *    feature from anyone who did not already know it was there.
+   *  - No cap. This used to stop at six, so a merchant with thirty SKUs saw an
+   *    arbitrary six and reasonably concluded it was broken. The list scrolls
+   *    instead.
+   *
+   * The one departure: production does not de-duplicate, so an item billed
+   * three times appears three times. Collapsing on the whole tuple keeps a
+   * genuine "same name, different rate" pair as two rows while dropping exact
+   * repeats, which are indistinguishable in the list and duplicate React keys.
+   */
   const matches = useMemo(() => {
     const query = values.description.trim().toLowerCase();
-    if (!query) return [];
 
     const seen = new Set<string>();
     const unique: { item: LineItemSuggestion; key: string }[] = [];
 
     for (const item of suggestions) {
-      if (!item.name.toLowerCase().includes(query)) continue;
+      if (!item.name) continue;
+      if (query && !item.name.toLowerCase().includes(query)) continue;
       const key = [item.name, item.unitPrice ?? "", item.hsn ?? "", item.type ?? ""].join("|");
       if (seen.has(key)) continue;
       seen.add(key);
       unique.push({ item, key });
-      if (unique.length === 6) break;
     }
 
     return unique;
@@ -186,7 +203,18 @@ function LineItemBody({
         </RadioGroup>
       </Field>
 
-      <Popover open={suggestionsOpen && matches.length > 0} onOpenChange={setSuggestionsOpen}>
+      {/* `modal` for the same reason SearchableSelect needs it: this popover
+          lives inside a Dialog, and flux's PopoverContent always portals to
+          document.body — outside the Dialog's subtree. A modal Dialog mounts
+          react-remove-scroll and sets `pointer-events: none` on the body, so a
+          non-modal popover out there has its wheel events cancelled. Without
+          this the list rendered but would not scroll, which with the old
+          six-item cap is most of why this looked broken. */}
+      <Popover
+        modal
+        open={suggestionsOpen && matches.length > 0}
+        onOpenChange={setSuggestionsOpen}
+      >
         <PopoverAnchor asChild>
           <Field>
             <FieldLabel htmlFor="line-item-name">Item name</FieldLabel>
@@ -196,6 +224,7 @@ function LineItemBody({
               autoComplete="off"
               placeholder="e.g. Logo design, Consulting fee…"
               value={values.description}
+              onFocus={() => setSuggestionsOpen(true)}
               onChange={(e) => {
                 patch({ description: e.target.value });
                 setSuggestionsOpen(true);
@@ -209,36 +238,54 @@ function LineItemBody({
             the endpoint — typing the name again should not mean retyping those. */}
         <PopoverContent
           align="start"
-          className="w-[var(--radix-popover-trigger-width)] p-1"
+          className="max-h-64 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
           // Keep focus in the input so typing continues to filter.
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          {matches.map(({ item: match, key }) => (
-            <Button
-              key={key}
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full justify-between"
-              onClick={() => {
-                patch({
-                  description: match.name,
-                  unitPrice: match.unitPrice ?? values.unitPrice,
-                  hsn: match.hsn ?? values.hsn,
-                  type: match.type ?? values.type,
-                });
-                setSuggestionsOpen(false);
-              }}
-            >
-              <span className="truncate">{match.name}</span>
-              {match.unitPrice && (
-                <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
-                  {currencySymbol}
-                  {match.unitPrice}
+          {matches.map(({ item: match, key }) => {
+            // The secondary line production shows: type, HSN and last rate,
+            // joined. It is the whole reason to pick a suggestion rather than
+            // retype the name, so it has to be visible *before* choosing.
+            const meta = [
+              match.type ? (match.type === "SERVICE" ? "Service" : "Good") : "",
+              match.hsn ? `${match.type === "SERVICE" ? "SAC" : "HSN"} ${match.hsn}` : "",
+              match.unitPrice ? `${currencySymbol}${match.unitPrice}` : "",
+            ]
+              .filter(Boolean)
+              .join(" · ");
+
+            return (
+              <Button
+                key={key}
+                type="button"
+                variant="ghost"
+                className="h-auto w-full justify-start px-2 py-1.5 text-left [&>span]:min-w-0 [&>span]:flex-1"
+                onClick={() => {
+                  patch({
+                    description: match.name,
+                    unitPrice: match.unitPrice ?? values.unitPrice,
+                    hsn: match.hsn ?? values.hsn,
+                    type: match.type ?? values.type,
+                    // Production clears this on select: picking an item that is
+                    // already in the catalogue must not queue it for re-import.
+                    saveAsSku: false,
+                  });
+                  setSuggestionsOpen(false);
+                }}
+              >
+                <span className="block min-w-0">
+                  <span className="block truncate text-[13px] font-medium text-foreground">
+                    {match.name}
+                  </span>
+                  {meta && (
+                    <span className="block truncate text-[11.5px] font-normal text-muted-foreground">
+                      {meta}
+                    </span>
+                  )}
                 </span>
-              )}
-            </Button>
-          ))}
+              </Button>
+            );
+          })}
         </PopoverContent>
       </Popover>
 

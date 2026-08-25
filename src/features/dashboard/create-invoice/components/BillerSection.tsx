@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SearchableSelect } from "@/components/common/SearchableSelect";
 import {
   Button,
   Dialog,
@@ -207,43 +208,37 @@ function EditBillerBody({
       <div className="grid gap-3 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="biller-country">Country</FieldLabel>
-          <Select
+          {/* Searchable for the same reason State is, only more so: this list
+              runs to roughly 200 entries. flux's own CountrySelect is not usable
+              here — it is hardwired to its internal COUNTRIES array, while these
+              options come from the API and carry the country *names* the address
+              is stored under. */}
+          <SearchableSelect
+            id="biller-country"
             value={values.country ?? ""}
-            onValueChange={(next) =>
-              patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })
-            }
-          >
-            <SelectTrigger id="biller-country" className="w-full">
-              <SelectValue placeholder="Select country" />
-            </SelectTrigger>
-            <SelectContent>
-              {countryOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onValueChange={(next) => patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })}
+            options={countryOptions}
+            placeholder="Select country"
+            searchPlaceholder="Search country…"
+            emptyMessage="No country matches that search."
+          />
         </Field>
 
         <Field>
           <FieldLabel htmlFor="biller-state">State</FieldLabel>
-          <Select
+          {/* Searchable: 36 states is past the point where scrolling a listbox
+              is reasonable. Hides its own search box for non-India countries,
+              whose only option is "Not Applicable". */}
+          <SearchableSelect
+            id="biller-state"
             value={values.state ?? ""}
             onValueChange={(next) => patch({ state: next })}
+            options={stateOptions}
             disabled={!values.country}
-          >
-            <SelectTrigger id="biller-state" className="w-full">
-              <SelectValue placeholder={values.country ? "Select state" : "Pick a country first"} />
-            </SelectTrigger>
-            <SelectContent>
-              {stateOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            placeholder={values.country ? "Select state" : "Pick a country first"}
+            searchPlaceholder="Search state…"
+            emptyMessage="No state matches that search."
+          />
         </Field>
       </div>
 

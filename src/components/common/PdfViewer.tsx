@@ -99,7 +99,14 @@ export function PdfViewer({
     const observer = new ResizeObserver(measure);
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+    // Re-run when the container appears. On mount `url` is undefined — the
+    // presigned link is still being fetched — so the component returns the
+    // shimmer and this div does not exist yet. With an empty dep array the
+    // effect ran once against a null ref, bailed, and never attached the
+    // observer, so `pageWidth` stayed at its 560px initial guess forever: in
+    // any column narrower than that the page rendered too wide and the
+    // overflow-x-hidden below sliced the right-hand side off the document.
+  }, [url, failure]);
 
   const handleLoad = useCallback(({ numPages }: { numPages: number }) => {
     setTotalPages(numPages);
