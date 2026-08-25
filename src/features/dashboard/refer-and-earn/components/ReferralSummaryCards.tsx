@@ -192,8 +192,35 @@ export function ReferralSummaryCards({ summary }: ReferralSummaryCardsProps) {
                       <Icon name="info" size={11} />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[220px] text-xs">
-                    The earned amount will be waived off from your MDR.
+                  <TooltipContent side="top" className="max-w-[260px] p-3">
+                    {/* A single fragment of a timeline, not a self-contained
+                        step: the line runs off both the top and bottom of the
+                        box rather than stopping at the dot, which is what
+                        reads as "one entry in an ongoing running total" rather
+                        than "the one and only waiver". The slight grey
+                        background is what separates this figure from the
+                        explanation below it without a rule between them. */}
+                    <div className="flex gap-3 rounded-lg bg-muted/50 p-3">
+                      <div className="flex flex-col items-center">
+                        <span className="w-px flex-1 bg-border" />
+                        <span className="my-1 size-2.5 shrink-0 rounded-full border-2 border-muted-foreground/50 bg-card" />
+                        <span className="w-px flex-1 bg-border" />
+                      </div>
+                      <Text size="sm" color="subtle" className="leading-relaxed">
+                        {formatCurrency(summary.totalWaived, currency, "en-US")} waived from your
+                        MDR charges
+                      </Text>
+                    </div>
+
+                    <div className="mt-3 flex flex-col gap-1">
+                      <Text size="sm" className="font-semibold text-foreground">
+                        Referral earnings go towards MDR
+                      </Text>
+                      <Text size="xs" color="subtle" className="leading-relaxed">
+                        The amount you earn through Refer &amp; Earn will be waived off from your
+                        MDR charges.
+                      </Text>
+                    </div>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
