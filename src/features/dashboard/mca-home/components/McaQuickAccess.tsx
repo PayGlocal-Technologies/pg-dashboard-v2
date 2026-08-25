@@ -30,7 +30,7 @@ const QUICK_ACCESS_ROUTES: Record<string, string> = {
 // quick-access rows read as the same component even though the item lists
 // differ (this one is MCA-specific: invoices, international accounts, forex).
 const quickAccessCardClass = cn(
-  "group flex h-auto w-[9rem] shrink-0 flex-col items-start gap-2 rounded-xl border border-border bg-card text-left sm:w-[9.25rem]",
+  "group flex h-auto w-[11rem] shrink-0 flex-col items-start gap-2 rounded-xl border border-border bg-card text-left sm:w-[11.5rem]",
   "px-3.5 pb-2.5 pt-3.5 shadow-sm transition-shadow duration-150",
   "hover:bg-muted/40 hover:shadow"
 );

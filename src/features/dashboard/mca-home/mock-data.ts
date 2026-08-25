@@ -164,7 +164,7 @@ export interface QuickAccessItem {
 }
 
 export const mcaQuickAccessItems: QuickAccessItem[] = [
-  { id: "invoice-links", label: "Invoice", icon: "file-text" },
+  { id: "invoice-links", label: "Create invoice", icon: "file-text" },
   { id: "international-accounts", label: "International accounts", icon: "globe-2" },
   { id: "platform-withdrawal", label: "Platform withdrawal", icon: "download" },
   { id: "client-management", label: "Client management", icon: "users" },
