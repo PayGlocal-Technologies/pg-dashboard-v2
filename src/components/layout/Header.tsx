@@ -245,21 +245,23 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
       </header>
 
       {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode.
-          Flux primary blue rather than the per-merchant `selectedMidDetails.color`
-          this used to carry — that colour still lives in the store and still
-          marks the row in MerchantSelector's own list, but this ribbon reads as
-          a system-level notice, so it takes the app's one fixed primary
-          treatment instead of a colour that changes with which merchant is
-          selected. */}
+          Flux's primary-light tint rather than the per-merchant
+          `selectedMidDetails.color` this used to carry — that colour still
+          lives in the store and still marks the row in MerchantSelector's own
+          list, but this ribbon reads as a system-level notice, so it takes the
+          app's one fixed primary treatment instead of a colour that changes
+          with which merchant is selected. primary-light (not the solid
+          primary blue) plus primary-text keeps this a quiet strip rather than
+          a loud banner, while staying on the same primary token family. */}
       {showRibbon && (
-        <div className="flex items-center justify-between bg-primary px-4 py-1.5 text-[13px] text-primary-foreground">
+        <div className="flex items-center justify-between bg-primary-light px-4 py-1.5 text-[13px] text-[var(--primary-text)]">
           <span>
             Viewing as <strong>{tradeName}</strong>
           </span>
           <Button
             type="button"
             variant="ghost"
-            className="h-auto min-h-0 p-0 font-medium text-primary-foreground underline transition-opacity hover:opacity-70 hover:bg-transparent"
+            className="h-auto min-h-0 p-0 font-medium text-[var(--primary-text)] underline transition-opacity hover:opacity-70 hover:bg-transparent"
             onClick={() => setSelectedMidDetails({ mid: "", status: "", color: "" })}
           >
             Switch to main view

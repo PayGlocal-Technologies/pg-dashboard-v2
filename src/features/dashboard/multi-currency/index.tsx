@@ -21,7 +21,7 @@ import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/compo
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
 import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
 import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/components/AccountCurrencyNotice";
-import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
+import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
 import {
   DEFAULT_SETTLED_CURRENCY,
   SETTLED_AMOUNT_BY_CURRENCY,
@@ -216,17 +216,6 @@ function MultiCurrencyContent() {
 
       <FxCalculatorModal open={fxModalOpen} onOpenChange={setFxModalOpen} />
 
-      {/* Keyed to the selected account: the rail and its timeline differ per
-          currency, so the guide follows the selection rather than being a
-          single page-level explainer. */}
-      {selectedAccount && (
-        <HowItWorksDialog
-          currency={selectedAccount.currency}
-          open={howItWorksOpen}
-          onOpenChange={setHowItWorksOpen}
-        />
-      )}
-
       {selectedAccount && (
         <ShareAccountDetailsModal
           open={shareModalOpen}
@@ -252,9 +241,13 @@ function MultiCurrencyContent() {
           two occupants without hard-coding either height.
 
           DOM order stays left title → left content → right title → right
-          content, so the stacked single-column layout below `lg` (where every
-          explicit placement drops out) still reads in that order. gap-x-10 is
-          the shared gutter, gap-y-3 the 12px title → container step. */}
+          content, so the stacked single-column layout below `lg` (where
+          every explicit placement drops out) still reads in that order.
+          gap-x-10 is the shared gutter, gap-y-3 the 12px title → container
+          step. Region and Account Details keep this same 288px/flexible-1fr
+          shape whether or not How it works is open — that panel is a flex
+          child *inside* the Account Details column below, not a third track
+          here, so it never resizes these two. */}
       <div className="grid gap-x-10 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
         <div className="lg:col-start-1 lg:row-start-1">
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
@@ -358,41 +351,61 @@ function MultiCurrencyContent() {
             // settled/outstanding figures. key remounts the section on every
             // region change so the fade replays on each switch, not just the
             // first render.
-            <section key={selectedAccount.id} className="page-enter">
-              {/* Details and their currency's caveat as one stack: the notice is
-                  about the account whose details sit beside it, so it travels
-                  with them. Renders nothing for a currency that carries no
-                  caveat. space-y-3 keeps it bound to the card rather than
-                  reading as the section below it.
+            //
+            // flex-wrap, not a fixed third grid column: How it works is a
+            // plain card, not a modal or drawer, so there is never an overlay
+            // behind it — it either sits beside the account-details card (when
+            // there's room) or wraps onto its own line below it (when there
+            // isn't), the same way the Metrics row further down wraps its own
+            // two cards. The account-details <section> below has no min-w-0,
+            // so this never squeezes its 3-column field grid narrower than its
+            // own content needs (which would clip it) — instead the wrap
+            // happens at the flex level, before that grid is ever threatened.
+            <div className="flex flex-wrap items-start gap-x-10 gap-y-8">
+              <section key={selectedAccount.id} className="flex-1 page-enter">
+                {/* Details and their currency's caveat as one stack: the notice is
+                    about the account whose details sit beside it, so it travels
+                    with them. Renders nothing for a currency that carries no
+                    caveat. space-y-3 keeps it bound to the card rather than
+                    reading as the section below it.
 
-                  Rest of the World's FX notice goes *before* the account
-                  details — a client reading it needs the "don't convert to
-                  GBP" instruction before, not after, the account number they're
-                  about to send a payment to. Every other notice (currently just
-                  AUD's) keeps its original placement after the details, since
-                  only Rest of the World's is a pre-payment instruction the
-                  client-facing hierarchy calls out specifically.
+                    Rest of the World's FX notice goes *before* the account
+                    details — a client reading it needs the "don't convert to
+                    GBP" instruction before, not after, the account number they're
+                    about to send a payment to. Every other notice (currently just
+                    AUD's) keeps its original placement after the details, since
+                    only Rest of the World's is a pre-payment instruction the
+                    client-facing hierarchy calls out specifically.
 
-                  `inside` moves the flag/name/subtitle into the card — there's
-                  no carousel here naming the account any more — and the width
-                  override drops the card's default shrink-wrapping so it fills
-                  this column. */}
-              <div className="space-y-3">
-                {selectedAccount.isGlobal && (
-                  <AccountCurrencyNotice currency={selectedAccount.currency} />
-                )}
-                <VirtualAccountDetails
-                  account={selectedAccount}
-                  onCopy={handleCopyFullAccount}
-                  onShare={() => setShareModalOpen(true)}
-                  headerPlacement="inside"
-                  className="w-full max-w-none"
+                    `inside` moves the flag/name/subtitle into the card — there's
+                    no carousel here naming the account any more — and the width
+                    override drops the card's default shrink-wrapping so it fills
+                    this column. */}
+                <div className="space-y-3">
+                  {selectedAccount.isGlobal && (
+                    <AccountCurrencyNotice currency={selectedAccount.currency} />
+                  )}
+                  <VirtualAccountDetails
+                    account={selectedAccount}
+                    onCopy={handleCopyFullAccount}
+                    onShare={() => setShareModalOpen(true)}
+                    headerPlacement="inside"
+                    className="w-full max-w-none"
+                  />
+                  {!selectedAccount.isGlobal && (
+                    <AccountCurrencyNotice currency={selectedAccount.currency} />
+                  )}
+                </div>
+              </section>
+
+              {howItWorksOpen && (
+                <HowItWorksPanel
+                  currency={selectedAccount.currency}
+                  onClose={() => setHowItWorksOpen(false)}
+                  className="w-full shrink-0 sm:w-[340px]"
                 />
-                {!selectedAccount.isGlobal && (
-                  <AccountCurrencyNotice currency={selectedAccount.currency} />
-                )}
-              </div>
-            </section>
+              )}
+            </div>
           )}
 
           <section>
