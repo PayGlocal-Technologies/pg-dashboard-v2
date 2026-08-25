@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { Card, MetricText, Text } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils/format";
 import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helpers";
