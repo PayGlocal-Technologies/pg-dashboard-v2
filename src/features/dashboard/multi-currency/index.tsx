@@ -243,12 +243,12 @@ function MultiCurrencyContent() {
           DOM order stays left title → left content → right title → right
           content, so the stacked single-column layout below `lg` (where
           every explicit placement drops out) still reads in that order.
-          gap-x-10 is the shared gutter, gap-y-3 the 12px title → container
+          gap-x-5 is the shared gutter, gap-y-3 the 12px title → container
           step. Region and Account Details keep this same 288px/flexible-1fr
           shape whether or not How it works is open — that panel is a flex
           child *inside* the Account Details column below, not a third track
           here, so it never resizes these two. */}
-      <div className="grid gap-x-10 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
+      <div className="grid gap-x-5 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
         <div className="lg:col-start-1 lg:row-start-1">
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
         </div>
@@ -361,7 +361,7 @@ function MultiCurrencyContent() {
             // so this never squeezes its 3-column field grid narrower than its
             // own content needs (which would clip it) — instead the wrap
             // happens at the flex level, before that grid is ever threatened.
-            <div className="flex flex-wrap items-start gap-x-10 gap-y-8">
+            <div className="flex flex-wrap items-start gap-x-5 gap-y-8">
               <section key={selectedAccount.id} className="flex-1 page-enter">
                 {/* Details and their currency's caveat as one stack: the notice is
                     about the account whose details sit beside it, so it travels
@@ -390,6 +390,14 @@ function MultiCurrencyContent() {
                     onCopy={handleCopyFullAccount}
                     onShare={() => setShareModalOpen(true)}
                     headerPlacement="inside"
+                    // How it works sits beside this card on the same flex
+                    // row, so its available width shrinks well before the
+                    // viewport itself crosses `sm` — collapsing to two
+                    // columns (and offering the `»` to undo it) responds to
+                    // that shrink directly instead of waiting on a media
+                    // query that can't see how much room is actually left.
+                    collapsed={howItWorksOpen}
+                    onExpand={() => setHowItWorksOpen(false)}
                     className="w-full max-w-none"
                   />
                   {!selectedAccount.isGlobal && (

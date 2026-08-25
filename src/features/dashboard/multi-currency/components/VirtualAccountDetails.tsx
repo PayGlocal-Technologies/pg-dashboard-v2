@@ -38,6 +38,21 @@ interface VirtualAccountDetailsProps {
    * details becomes the sole, full-width action instead.
    */
   showShare?: boolean;
+  /**
+   * Collapses the field grid from three columns to two (hiding the third —
+   * Bank Name / Beneficiary Address on most accounts) and shows a `»` icon
+   * beside the header that restores the full layout. For the Virtual
+   * Accounts page while the How it works panel is open beside this card:
+   * `sm:` breakpoints key off the viewport, not this card's own shrunken
+   * share of it, so without this the 3-column grid would still try to render
+   * at full width and clip against the panel next to it. Has no effect
+   * unless `onExpand` is also given, since collapsing without a way back out
+   * would strand the merchant on a narrower card forever.
+   */
+  collapsed?: boolean;
+  /** Called when the `»` restore icon is clicked. Only rendered while
+   *  `collapsed`. */
+  onExpand?: () => void;
   /** Merged onto the Card — e.g. to override its default shrink-wrapped width. */
   className?: string;
 }
@@ -100,6 +115,8 @@ export function VirtualAccountDetails({
   onShare,
   headerPlacement = "above",
   showShare = true,
+  collapsed = false,
+  onExpand,
   className,
 }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
@@ -122,29 +139,48 @@ export function VirtualAccountDetails({
 
       <Card size="sm" className={cn("w-fit max-w-[730px] gap-4", className)}>
         {headerPlacement === "inside" && (
-          <div className="flex items-center gap-3">
-            {/* Rectangular, matching RegionSelector and every table cell in
-                the product. CountryFlagAvatar (not CountryFlag) for its globe
-                fallback on regions with no flag on the CDN. */}
-            <CountryFlagAvatar
-              iso2={account.iso2}
-              countryName={account.countryName}
-              className="h-8 w-11 rounded-md"
-            />
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold text-foreground">
-                {account.accountName}
-              </p>
-              <p className="text-[13px] text-muted-foreground">
-                {accountSubtitle(account)}
-                {account.isGlobal && (
-                  <>
-                    {" "}
-                    <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />
-                  </>
-                )}
-              </p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              {/* Rectangular, matching RegionSelector and every table cell in
+                  the product. CountryFlagAvatar (not CountryFlag) for its globe
+                  fallback on regions with no flag on the CDN. */}
+              <CountryFlagAvatar
+                iso2={account.iso2}
+                countryName={account.countryName}
+                className="h-8 w-11 rounded-md"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold text-foreground">
+                  {account.accountName}
+                </p>
+                <p className="text-[13px] text-muted-foreground">
+                  {accountSubtitle(account)}
+                  {account.isGlobal && (
+                    <>
+                      {" "}
+                      <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />
+                    </>
+                  )}
+                </p>
+              </div>
             </div>
+
+            {/* Restores the full 3-column layout — the only way back out of
+                `collapsed`, so it only renders alongside a handler for it.
+                -mr-2 -mt-1 cancels the button's own padding, the same trick
+                "How it works?" uses beside this card, so the glyph sits flush
+                with the card's corner rather than adrift of it. */}
+            {collapsed && onExpand && (
+              <IconButton
+                aria-label="Show full account details"
+                variant="ghost"
+                size="sm"
+                className="-mr-2 -mt-1 shrink-0 text-muted-foreground hover:text-foreground"
+                onClick={onExpand}
+              >
+                <Icon name="chevrons-right" className="h-4 w-4" />
+              </IconButton>
+            )}
           </div>
         )}
 
@@ -157,7 +193,18 @@ export function VirtualAccountDetails({
               page's own detail fields use: the label sits a size down and
               muted, the value a size up at medium weight, so the value leads
               without the two competing. */}
-          <dl className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-3">
+          {/* Collapsed: forced 2 columns, plus every 3rd field (in source
+              order — the same order the 3-column layout would have placed
+              in its own third column) hidden via nth-child. Since a hidden
+              item drops out of grid auto-placement entirely, the remaining
+              two-per-original-row survive intact rather than reflowing into
+              a denser 2-column pack of every field. */}
+          <dl
+            className={cn(
+              "grid grid-cols-1 gap-x-5 gap-y-3",
+              collapsed ? "grid-cols-2 [&>*:nth-child(3n)]:hidden" : "sm:grid-cols-3"
+            )}
+          >
             {fields.map((field) => (
               <div key={field.label} className="min-w-[160px] space-y-1">
                 <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
