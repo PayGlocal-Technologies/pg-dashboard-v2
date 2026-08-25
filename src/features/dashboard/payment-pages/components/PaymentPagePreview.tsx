@@ -80,7 +80,7 @@ export function PaymentPagePreview({ values, device }: PaymentPagePreviewProps) 
       className={cn(
         "mx-auto w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm",
         "transition-[max-width] duration-500 ease-in-out",
-        isMobile ? "max-w-[400px]" : "max-w-[760px]"
+        isMobile ? "max-w-100" : "max-w-190"
       )}
     >
       {/* Browser chrome */}
@@ -97,7 +97,7 @@ export function PaymentPagePreview({ values, device }: PaymentPagePreviewProps) 
       </div>
 
       {/* Hosted page body */}
-      <div className={cn("flex", isMobile ? "flex-col" : "min-h-[480px] flex-row")}>
+      <div className={cn("flex", isMobile ? "flex-col" : "min-h-120 flex-row")}>
         {/* Left blue panel */}
         <div
           className={cn(
@@ -133,17 +133,21 @@ export function PaymentPagePreview({ values, device }: PaymentPagePreviewProps) 
               // the panel briefly widens during the desktop/mobile switch.
               // object-contain shows any aspect ratio fully (no crop); the tinted
               // backdrop fills the letterbox.
-              className="mx-auto mt-6 h-44 w-full max-w-[340px] rounded-lg bg-primary-foreground/10 object-contain"
+              className="mx-auto mt-6 h-44 w-full max-w-85 rounded-lg bg-primary-foreground/10 object-contain"
             />
           )}
 
           {firstProduct && (
-            <div className="mt-4">
+            <div className="mb-6 mt-4">
               <p className="text-lg font-semibold">{firstProduct.title}</p>
               {firstProduct.description && (
-                <p className="mt-0.5 text-[13px] text-primary-foreground/80">
-                  {firstProduct.description}
-                </p>
+                // Rich-text description authored in the builder. Content is the
+                // merchant's own page copy (mock/local), so rendering its HTML
+                // here is acceptable.
+                <div
+                  className="mt-1 text-[13px] leading-relaxed text-primary-foreground/80 [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_ul]:list-disc [&_ul]:pl-5"
+                  dangerouslySetInnerHTML={{ __html: firstProduct.description }}
+                />
               )}
             </div>
           )}
@@ -186,6 +190,12 @@ export function PaymentPagePreview({ values, device }: PaymentPagePreviewProps) 
               Enter information to continue to payment.
             </p>
           </div>
+
+          {/* Payer chooses the amount, so the hosted page asks for it. */}
+          {values.amountType === "customer" &&
+            labelledField("Amount", "0.00", {
+              prefix: CURRENCY_SYMBOLS[values.currency] ?? values.currency,
+            })}
 
           {values.collectEmail && labelledField("Email", "you@example.com")}
           {values.collectPhone && labelledField("Phone number", "7011458408", { prefix: "+91" })}

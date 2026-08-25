@@ -10,10 +10,10 @@ import {
   Field,
   FieldLabel,
   Input,
-  Textarea,
 } from "@/components/ui";
-import { Icon, type IconName } from "@/components/icon";
+import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { RichTextEditor } from "@/features/dashboard/payment-pages/components/RichTextEditor";
 import { PAYMENT_PAGE_RECENT_PRODUCTS } from "@/features/dashboard/payment-pages/constants";
 import type { PaymentPageProduct } from "@/features/dashboard/payment-pages/types";
 
@@ -24,18 +24,6 @@ interface AddProductModalProps {
 }
 
 type Step = "search" | "details";
-
-// Decorative rich-text toolbar (non-functional) — mirrors the reference design.
-const TOOLBAR_ICONS: IconName[] = [
-  "bold",
-  "italic",
-  "underline",
-  "list",
-  "list-ordered",
-  "link",
-  "image",
-  "video",
-];
 
 function slugify(title: string): string {
   return title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
@@ -94,9 +82,9 @@ export function AddProductModal({ open, onOpenChange, onAdd }: AddProductModalPr
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[calc(100%-2rem)] max-w-[420px] gap-0 p-0">
+      <DialogContent className="w-[calc(100%-2rem)] max-w-120 gap-0 p-0">
         {step === "search" ? (
-          <div className="flex flex-col">
+          <div key="search" className="flex flex-col duration-200 animate-in fade-in-0">
             <div className="px-6 pt-6">
               <DialogTitle>Add a product</DialogTitle>
             </div>
@@ -121,43 +109,45 @@ export function AddProductModal({ open, onOpenChange, onAdd }: AddProductModalPr
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Recent
               </p>
-              <div className="divide-y divide-border overflow-hidden rounded-xl border border-border">
+              {/* Native <button> here (not flux Button): flux Button forces
+               * `justify-center` on its content, which centres the icon+text; a
+               * left-aligned list row needs plain flex-start, so it's a
+               * documented exception to the flux-ui rule. */}
+              <div className="overflow-hidden rounded-xl border border-border">
                 {matches.map((product) => (
-                  <Button
+                  <button
                     key={product.id}
                     type="button"
-                    variant="ghost"
                     onClick={() => selectProduct(product)}
-                    className="h-auto min-h-0 w-full cursor-pointer items-center justify-start gap-3 rounded-none px-3 py-2 text-left hover:bg-muted/60"
+                    className="flex w-full cursor-pointer items-center gap-3.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-muted/60"
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Icon name="package" className="h-4 w-4" />
+                      <Icon name="package" className="h-3.5 w-3.5" />
                     </span>
-                    <span className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-[13px] font-semibold leading-none text-foreground">
+                    <span className="flex min-w-0 flex-col">
+                      <span className="truncate text-[13px] font-semibold text-foreground">
                         {product.title}
                       </span>
-                      <span className="truncate text-[12px] leading-none text-muted-foreground">
+                      <span className="truncate text-[12px] text-muted-foreground">
                         {product.description}
                       </span>
                     </span>
-                  </Button>
+                  </button>
                 ))}
 
                 {q && !hasExact && (
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
                     onClick={() => selectProduct({ id: "", title: query.trim(), description: "" })}
-                    className="h-auto min-h-0 w-full cursor-pointer items-center justify-start gap-3 rounded-none px-3 py-2 text-left hover:bg-muted/60"
+                    className="flex w-full cursor-pointer items-center gap-3.5 border-b border-border px-4 py-2.5 text-left transition-colors last:border-b-0 hover:bg-muted/60"
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Icon name="plus" className="h-4 w-4" />
+                      <Icon name="plus" className="h-3.5 w-3.5" />
                     </span>
                     <span className="text-[13px] font-semibold text-foreground">
                       Add &quot;{query.trim()}&quot;
                     </span>
-                  </Button>
+                  </button>
                 )}
               </div>
             </div>
@@ -174,7 +164,7 @@ export function AddProductModal({ open, onOpenChange, onAdd }: AddProductModalPr
             </div>
           </div>
         ) : (
-          <div className="flex flex-col">
+          <div key="details" className="flex flex-col duration-200 animate-in fade-in-0">
             <div className="px-6 pt-6">
               <DialogTitle>Product details</DialogTitle>
               <Button
@@ -191,7 +181,7 @@ export function AddProductModal({ open, onOpenChange, onAdd }: AddProductModalPr
 
             <div className="flex flex-col gap-4 px-6 py-4">
               <Field>
-                <FieldLabel htmlFor="product-title">Page title</FieldLabel>
+                <FieldLabel htmlFor="product-title">Product title</FieldLabel>
                 <Input
                   id="product-title"
                   value={draft.title}
@@ -200,7 +190,7 @@ export function AddProductModal({ open, onOpenChange, onAdd }: AddProductModalPr
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="product-cover">Cover image</FieldLabel>
+                <FieldLabel htmlFor="product-cover">Product image</FieldLabel>
                 {draft.coverImage ? (
                   <Button
                     type="button"
@@ -210,7 +200,7 @@ export function AddProductModal({ open, onOpenChange, onAdd }: AddProductModalPr
                   >
                     <Image
                       src={draft.coverImage}
-                      alt="Cover image"
+                      alt="Product image"
                       width={472}
                       height={176}
                       unoptimized
@@ -243,32 +233,12 @@ export function AddProductModal({ open, onOpenChange, onAdd }: AddProductModalPr
               </Field>
 
               <Field>
-                <FieldLabel htmlFor="product-description">Page description</FieldLabel>
-                <div className="overflow-hidden rounded-lg border border-border">
-                  <Textarea
-                    id="product-description"
-                    rows={3}
-                    value={draft.description}
-                    onChange={(e) =>
-                      setDraft((prev) => ({ ...prev, description: e.target.value }))
-                    }
-                    className="resize-none border-0 shadow-none focus-visible:ring-0"
-                  />
-                  <div className="flex items-center gap-1 border-t border-border bg-muted/40 px-2 py-1.5">
-                    {TOOLBAR_ICONS.map((name) => (
-                      <Button
-                        key={name}
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        aria-label={name}
-                        className="h-7 w-7 min-h-0 min-w-0 cursor-pointer rounded-md p-0 text-muted-foreground hover:text-foreground"
-                      >
-                        <Icon name={name} className="h-3.5 w-3.5" />
-                      </Button>
-                    ))}
-                  </div>
-                </div>
+                <FieldLabel htmlFor="product-description">Product description</FieldLabel>
+                <RichTextEditor
+                  value={draft.description}
+                  onChange={(html) => setDraft((prev) => ({ ...prev, description: html }))}
+                  placeholder="Describe your product…"
+                />
               </Field>
             </div>
 

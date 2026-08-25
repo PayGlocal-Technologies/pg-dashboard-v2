@@ -65,6 +65,14 @@ function buildInitialValues(row?: PaymentPageRow | null): PaymentPageBuilderValu
   };
 }
 
+// Description may contain rich-text HTML; strip tags for the compact one-line
+// row under "What are you selling".
+const stripHtml = (html: string): string =>
+  html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 const COLLECT_FIELDS: {
   name: "collectEmail" | "collectPhone" | "collectBilling";
   label: string;
@@ -146,7 +154,7 @@ export function CreatePaymentPage({ open, onClose, row }: CreatePaymentPageProps
         {/* Left: form. Reserve the scrollbar gutter so expanding a section
          * (e.g. Advanced options) doesn't introduce a scrollbar that shifts
          * the whole column sideways. */}
-        <div className="min-h-0 overflow-y-auto px-5 py-6 [scrollbar-gutter:stable]">
+        <div className="min-h-0 overflow-y-auto bg-card px-14 py-6 scrollbar-gutter-stable">
           <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4">
             {/* What are you selling */}
             <Card className="gap-4 p-5">
@@ -183,7 +191,7 @@ export function CreatePaymentPage({ open, onClose, row }: CreatePaymentPageProps
                         </span>
                         {products[0].description && (
                           <span className="truncate text-[12px] text-muted-foreground">
-                            {products[0].description}
+                            {stripHtml(products[0].description)}
                           </span>
                         )}
                       </span>
@@ -502,8 +510,8 @@ export function CreatePaymentPage({ open, onClose, row }: CreatePaymentPageProps
         {/* Right: live preview. The device toggle stays pinned while the
          * preview itself scrolls, so the taller mobile mock-up is fully
          * reachable instead of being clipped. */}
-        <div className="hidden min-h-0 flex-col border-l border-border bg-muted/30 lg:flex">
-          <div className="flex shrink-0 items-center justify-between p-6 pb-4">
+        <div className="hidden min-h-0 flex-col border-l border-border bg-sidebar lg:flex">
+          <div className="flex shrink-0 items-center justify-between p-10 pb-4">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
               Preview
             </p>
@@ -528,7 +536,7 @@ export function CreatePaymentPage({ open, onClose, row }: CreatePaymentPageProps
             </div>
           </div>
 
-          <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-6 pb-6">
+          <div className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-14 pb-6">
             <form.Subscribe selector={(s) => s.values}>
               {(values) => <PaymentPagePreview values={values} device={device} />}
             </form.Subscribe>

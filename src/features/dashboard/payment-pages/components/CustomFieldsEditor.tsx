@@ -42,7 +42,7 @@ export function CustomFieldsEditor({ value, onChange }: CustomFieldsEditorProps)
           key={index}
           className="flex flex-col gap-3 duration-200 animate-in fade-in-0 slide-in-from-top-1"
         >
-          {index > 0 && <div className="border-t border-border" />}
+          {index > 0 && <div className="my-2 border-t border-border" />}
 
           <div className="flex items-start gap-2">
             <Select
