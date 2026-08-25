@@ -143,6 +143,12 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   // amounts rendering with a real symbol rather than the word falling through
   // as its own prefix.
   Dollar: "$",
+  // The real accounts endpoint's SWIFT catch-all bucket, renamed "GLOBAL" for
+  // display (see multi-currency/mapAccounts.ts) — the live counterpart to
+  // "Dollar" above. Without this entry the Rest of the World account's
+  // settled-amount figure fell back to showing "GLOBAL" itself as the
+  // fallback prefix instead of a real symbol.
+  GLOBAL: "$",
 };
 
 /**

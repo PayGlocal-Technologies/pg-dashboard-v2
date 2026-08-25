@@ -317,10 +317,11 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
       { x: "Jul", y: 87_400 },
     ],
   },
-  // The Rest of the World account is dollar-denominated and carries "Dollar"
-  // as its currency value — see the note on that entry above for why it isn't
-  // the ISO "USD".
-  Dollar: {
+  // The real accounts endpoint's Rest of the World account carries "GLOBAL" as
+  // its currency value (see mapAccounts.ts's toViewAccount), not the "Dollar"
+  // MOCK_VIRTUAL_ACCOUNTS above uses — this key has to match that or the
+  // lookup in index.tsx misses and silently falls back to USD's figures.
+  GLOBAL: {
     amount: 22_750,
     amountInr: 2_411_500,
     trendLabel: "+3.9% vs last period",

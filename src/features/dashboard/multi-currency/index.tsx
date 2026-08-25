@@ -56,7 +56,7 @@ export function MultiCurrencyFeature() {
   if (needsMidSelection) {
     return (
       <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-        <PageHeader title="Virtual accounts" />
+        <PageHeader title="International accounts" />
         <SelectMidView midType="PACB" />
       </div>
     );
@@ -109,12 +109,11 @@ function MultiCurrencyContent() {
     SETTLED_AMOUNT_BY_CURRENCY[DEFAULT_SETTLED_CURRENCY];
 
   // Every region names its currency in the title except Rest of the World,
-  // which keeps the bare label: its `currency` is the display word "Dollar"
-  // rather than an ISO code — it receives dollars over SWIFT but needs a filter
-  // key distinct from the US account's "USD" (see mock-data.ts) — and "Settled
-  // amount in Dollar" doesn't read as a sentence the way "Settled amount in
-  // USD" does. The symbol on the figure below still says which unit the amount
-  // is in either way.
+  // which keeps the bare label: its `currency` is "GLOBAL" (see
+  // mapAccounts.ts), the accounts endpoint's SWIFT-catch-all bucket key
+  // renamed for display, and "Settled amount in GLOBAL" doesn't read as a
+  // sentence the way "Settled amount in USD" does. The symbol on the figure
+  // below still says which unit the amount is in either way.
   const settledTitle =
     selectedAccount?.iso2 === "ROW" ? "Settled amount" : `Settled amount in ${settledCurrency}`;
 
@@ -201,7 +200,7 @@ function MultiCurrencyContent() {
           card's own heading row instead — that dialog is per-currency, so it
           belongs to the selection, not to the page. */}
       <PageHeader
-        title="Virtual accounts"
+        title="International accounts"
         subtitle="Receive international payments using your virtual accounts."
         actions={
           <Button
@@ -326,8 +325,78 @@ function MultiCurrencyContent() {
             own 12px title → container gap; on `lg` and up it must be zero or
             the column would no longer start level with that Card. */}
         <div className="mt-5 space-y-8 lg:col-start-2 lg:row-start-2 lg:mt-0">
-          {/* Summary row: the first thing in this column, so its top edge
-              lands on the region Card's.
+          {selectedAccount && (
+            // Account details come before the analytics row below: a merchant
+            // opens this page to find the numbers to hand a client, and that has
+            // to be the first thing they see, not the settled/outstanding
+            // figures. Also the first thing in this column, so its top edge
+            // lands on the region Card's. key remounts the section on every
+            // region change so the fade replays on each switch, not just the
+            // first render.
+            <section key={selectedAccount.id} className="page-enter">
+              {/* mb-3 is the 12px title → container step, deliberately much
+                  tighter than the 32px between this section and its
+                  neighbours: the heading belongs to the card beneath it, not to
+                  the analytics section below it. */}
+              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <h2 className={MODULE_TITLE}>
+                  Receive payments from {selectedAccount.countryName}
+                </h2>
+                {/* Tertiary action: the link variant carries no fill or
+                    border, so it reads as one step below the module title it
+                    sits beside. -mr-2 cancels the variant's own horizontal
+                    padding so the label's right edge lines up with the card
+                    edge below it, and -mt-1 pulls it back onto the title's own
+                    line after items-start has top-aligned the row. Opens the
+                    per-currency guide, which is why it sits with the selection
+                    rather than in the page header. */}
+                <Button
+                  variant="link"
+                  className="-mr-2 -mt-1 text-[13px] underline"
+                  onClick={() => setHowItWorksOpen(true)}
+                >
+                  How it works?
+                </Button>
+              </div>
+
+              {/* Details and their currency's caveat as one stack: the notice is
+                  about the account whose details sit beside it, so it travels
+                  with them. Renders nothing for a currency that carries no
+                  caveat. space-y-3 keeps it bound to the card rather than
+                  reading as the section below it.
+
+                  Rest of the World's FX notice goes *before* the account
+                  details — a client reading it needs the "don't convert to
+                  GBP" instruction before, not after, the account number they're
+                  about to send a payment to. Every other notice (currently just
+                  AUD's) keeps its original placement after the details, since
+                  only Rest of the World's is a pre-payment instruction the
+                  client-facing hierarchy calls out specifically.
+
+                  `inside` moves the flag/name/subtitle into the card — there's
+                  no carousel here naming the account any more — and the width
+                  override drops the card's default shrink-wrapping so it fills
+                  this column. */}
+              <div className="space-y-3">
+                {selectedAccount.isGlobal && (
+                  <AccountCurrencyNotice currency={selectedAccount.currency} />
+                )}
+                <VirtualAccountDetails
+                  account={selectedAccount}
+                  onCopy={handleCopyFullAccount}
+                  onShare={() => setShareModalOpen(true)}
+                  headerPlacement="inside"
+                  className="w-full max-w-none"
+                />
+                {!selectedAccount.isGlobal && (
+                  <AccountCurrencyNotice currency={selectedAccount.currency} />
+                )}
+              </div>
+            </section>
+          )}
+
+          {/* Analytics: settled/outstanding figures, now second — see the
+              account-details section above for why.
 
               flex-wrap rather than a grid, because grid tracks cannot wrap.
               Flexbox decides line breaks from each item's hypothetical main
@@ -507,58 +576,6 @@ function MultiCurrencyContent() {
                 there. */}
             <OutstandingAmountCard className="min-w-[min(300px,100%)] flex-1" />
           </div>
-
-          {selectedAccount && (
-            // key remounts the section on every region change so the fade
-            // replays on each switch, not just the first render.
-            <section key={selectedAccount.id} className="page-enter">
-              {/* mb-3 is the 12px title → container step, deliberately much
-                  tighter than the 32px between this section and its
-                  neighbours: the heading belongs to the card beneath it, not
-                  to the summary row above it. */}
-              <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-                <h2 className={MODULE_TITLE}>
-                  Receive payments from {selectedAccount.countryName}
-                </h2>
-                {/* Tertiary action: the link variant carries no fill or
-                    border, so it reads as one step below the module title it
-                    sits beside. -mr-2 cancels the variant's own horizontal
-                    padding so the label's right edge lines up with the card
-                    edge below it, and -mt-1 pulls it back onto the title's own
-                    line after items-start has top-aligned the row. Opens the
-                    per-currency guide, which is why it sits with the selection
-                    rather than in the page header. */}
-                <Button
-                  variant="link"
-                  className="-mr-2 -mt-1 text-[13px] underline"
-                  onClick={() => setHowItWorksOpen(true)}
-                >
-                  How it works?
-                </Button>
-              </div>
-
-              {/* Details and their currency's caveat as one stack: the notice is
-                  about the account whose details sit above it, so it travels
-                  with them. Renders nothing for a currency that carries no
-                  caveat. space-y-3 keeps it bound to the card rather than
-                  reading as the section below it.
-
-                  `inside` moves the flag/name/subtitle into the card — there's
-                  no carousel here naming the account any more — and the width
-                  override drops the card's default shrink-wrapping so it fills
-                  this column. */}
-              <div className="space-y-3">
-                <VirtualAccountDetails
-                  account={selectedAccount}
-                  onCopy={handleCopyFullAccount}
-                  onShare={() => setShareModalOpen(true)}
-                  headerPlacement="inside"
-                  className="w-full max-w-none"
-                />
-                <AccountCurrencyNotice currency={selectedAccount.currency} />
-              </div>
-            </section>
-          )}
 
           {selectedAccount && (
             <section>
