@@ -1,8 +1,18 @@
 "use client";
 
-import { usePostQuery } from "@/lib/api/hooks";
+import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
-import { referralLinkApi } from "@/features/dashboard/refer-and-earn/services";
+import {
+  referralLinkApi,
+  referralTransactionsApi,
+  referralWalletApi,
+} from "@/features/dashboard/refer-and-earn/services";
+import type {
+  ReferralTransaction,
+  ReferralTransactionsResponse,
+  ReferralWallet,
+  ReferralWalletResponse,
+} from "@/features/dashboard/refer-and-earn/types";
 
 /**
  * Which programme the link is for. "mca" verbatim from pg-dashboard's
@@ -51,4 +61,52 @@ export function useReferralLink(): { link: string; isLoading: boolean; isError: 
     isLoading: !!profile && !isGuestUser && isPending,
     isError,
   };
+}
+
+/**
+ * The merchant's reward wallet (available / held / earned / withdrawn totals).
+ *
+ * Keyed by the merchant's ucicId, which the influencer service scopes the wallet
+ * to. Disabled for guests and until the profile (and its ucicId) has loaded, the
+ * same gate the referral link uses.
+ */
+export function useReferralWallet(): {
+  wallet: ReferralWallet | null;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const ucicId = useApp((s) => s.profile?.ucicId);
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const enabled = !!ucicId && !isGuestUser;
+
+  const { data, isLoading, isError } = useGet<ReferralWalletResponse>(
+    ["referral-wallet", ucicId],
+    referralWalletApi(ucicId ?? ""),
+    { enabled }
+  );
+
+  return { wallet: data?.data.wallet ?? null, isLoading, isError };
+}
+
+/**
+ * The merchant's referral credit/debit history. CREDITs become the earnings
+ * rows the table renders; DEBITs are wallet withdrawals reconciled from
+ * useReferralWallet.
+ */
+export function useReferralTransactions(): {
+  transactions: ReferralTransaction[];
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const ucicId = useApp((s) => s.profile?.ucicId);
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const enabled = !!ucicId && !isGuestUser;
+
+  const { data, isLoading, isError } = useGet<ReferralTransactionsResponse>(
+    ["referral-transactions", ucicId],
+    referralTransactionsApi(ucicId ?? ""),
+    { enabled }
+  );
+
+  return { transactions: data?.data.transactions ?? [], isLoading, isError };
 }
