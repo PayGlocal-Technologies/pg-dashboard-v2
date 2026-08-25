@@ -392,12 +392,10 @@ function MultiCurrencyContent() {
                     headerPlacement="inside"
                     // How it works sits beside this card on the same flex
                     // row, so its available width shrinks well before the
-                    // viewport itself crosses `sm` — collapsing to two
-                    // columns (and offering the `»` to undo it) responds to
-                    // that shrink directly instead of waiting on a media
-                    // query that can't see how much room is actually left.
+                    // viewport itself crosses `sm` — reflowing to two columns
+                    // responds to that shrink directly instead of waiting on
+                    // a media query that can't see how much room is left.
                     collapsed={howItWorksOpen}
-                    onExpand={() => setHowItWorksOpen(false)}
                     className="w-full max-w-none"
                   />
                   {!selectedAccount.isGlobal && (
