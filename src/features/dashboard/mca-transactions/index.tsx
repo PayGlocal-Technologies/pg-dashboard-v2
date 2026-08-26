@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { PageHeader } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
 import { MidGuard } from "@/components/common/MidGuard";
 import { McaTransactionTable } from "@/features/dashboard/mca-transactions/components/McaTransactionTable";
 import { TransactionsAnalyticsCarousel } from "@/features/dashboard/mca-transactions/components/TransactionsAnalyticsCarousel";
+import { AnalyticsTimeRangeControl } from "@/features/dashboard/mca-transactions/components/AnalyticsTimeRangeControl";
 import { SEGMENT_MCA } from "@/features/dashboard/mca-transactions/constants";
+import type { TimeRange } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
 
 // MCA (Multi-Currency Accounts) transactions, at /mca-transactions. The
 // segment toggle that used to switch this page between the MCA and PA tables
@@ -14,10 +17,21 @@ import { SEGMENT_MCA } from "@/features/dashboard/mca-transactions/constants";
 export function McaTransactionsFeature() {
   const merchantEnabledProducts = useApp((s) => s.merchantEnabledProducts);
   const isMCAEnabled = (merchantEnabledProducts?.pgProducts ?? []).includes(SEGMENT_MCA);
+  // Owned here, not inside the Analytics section itself, so it can render as
+  // the page header's action (in line with the "Transactions" title) while
+  // still reaching down into TransactionsAnalyticsCarousel.
+  const [timeRange, setTimeRange] = useState<TimeRange>("year");
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
-      <PageHeader title="Transactions" />
+      <PageHeader
+        title="Transactions"
+        actions={
+          isMCAEnabled ? (
+            <AnalyticsTimeRangeControl value={timeRange} onValueChange={setTimeRange} />
+          ) : undefined
+        }
+      />
 
       {isMCAEnabled ? (
         <MidGuard productType="PACB">
@@ -27,7 +41,9 @@ export function McaTransactionsFeature() {
               only the table component owns those. It still renders above
               everything else at md and up, exactly as when it sat here
               directly. */}
-          <McaTransactionTable analyticsSection={<TransactionsAnalyticsCarousel />} />
+          <McaTransactionTable
+            analyticsSection={<TransactionsAnalyticsCarousel timeRange={timeRange} />}
+          />
         </MidGuard>
       ) : (
         <div className="bg-card rounded-xl border border-border p-10 text-center">

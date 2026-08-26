@@ -4,21 +4,6 @@ export interface AccountDetail {
   value: string;
 }
 
-/**
- * One region a multi-region account can receive from — a row in the Supported
- * currencies modal. `currencyName` is stored rather than derived from the code
- * so it can be searched alongside the code and the region name.
- */
-export interface SupportedRegion {
-  /** ISO 3166-1 alpha-2 country code; drives the flag asset. */
-  iso2: string;
-  countryName: string;
-  /** ISO 4217 code, e.g. "JPY". */
-  currency: string;
-  /** Full name, e.g. "Japanese Yen". */
-  currencyName: string;
-}
-
 /** A single virtual receiving account in one of the supported countries. */
 export interface VirtualAccount {
   /** Stable key — also used as the clipboard/share subject id. */
@@ -43,13 +28,6 @@ export interface VirtualAccount {
   /** Machine-readable routing code type, e.g. "ach_routing_number". Not every
    *  country's rail has one worth surfacing. */
   routingCodeType?: string;
-  /**
-   * Every region this account can receive from, for accounts that cover many
-   * (Rest of the World's SWIFT rail). Its presence is what makes the account
-   * offer a "See supported currency" link; the seven single-country accounts
-   * leave it unset and show none.
-   */
-  supportedRegions?: SupportedRegion[];
   /**
    * USD accounts reach the same account over two rails and the API returns a
    * separate code for each: `routingCode` is the ACH one, this is the Fedwire

@@ -5,7 +5,7 @@ import { Button, Card, CardContent, IconButton, Separator } from "@/components/u
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
-import { SupportedCurrenciesModal } from "@/features/dashboard/multi-currency/components/SupportedCurrenciesModal";
+import { GlobalCurrenciesDialog } from "@/features/dashboard/multi-currency/components/GlobalCurrenciesDialog";
 import {
   PaymentMethodInfoDialog,
   hasPaymentMethodInfo,
@@ -38,6 +38,15 @@ interface VirtualAccountDetailsProps {
    * details becomes the sole, full-width action instead.
    */
   showShare?: boolean;
+  /**
+   * Reflows the field grid from three columns to two — every field still
+   * shown, just regrouped into two columns instead of three. For the Virtual
+   * Accounts page while the How it works panel is open beside this card:
+   * `sm:` breakpoints key off the viewport, not this card's own shrunken
+   * share of it, so without this the 3-column grid would still try to render
+   * at full width and clip against the panel next to it.
+   */
+  collapsed?: boolean;
   /** Merged onto the Card — e.g. to override its default shrink-wrapped width. */
   className?: string;
 }
@@ -100,6 +109,7 @@ export function VirtualAccountDetails({
   onShare,
   headerPlacement = "above",
   showShare = true,
+  collapsed = false,
   className,
 }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
@@ -116,9 +126,7 @@ export function VirtualAccountDetails({
           </h3>
           {/* The catch-all account's whole point is the 32 currencies it
               accepts, which is too many to name in the caption itself. */}
-          {account.supportedRegions && (
-            <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />
-          )}
+          {account.isGlobal && <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />}
         </div>
       )}
 
@@ -139,7 +147,7 @@ export function VirtualAccountDetails({
               </p>
               <p className="text-[13px] text-muted-foreground">
                 {accountSubtitle(account)}
-                {account.supportedRegions && (
+                {account.isGlobal && (
                   <>
                     {" "}
                     <SupportedCurrenciesLink onClick={() => setCurrenciesOpen(true)} />
@@ -159,7 +167,16 @@ export function VirtualAccountDetails({
               page's own detail fields use: the label sits a size down and
               muted, the value a size up at medium weight, so the value leads
               without the two competing. */}
-          <dl className="grid grid-cols-1 gap-x-10 gap-y-6 sm:grid-cols-3">
+          {/* Collapsed: forced 2 columns rather than the usual 3 — every
+              field still renders, CSS grid auto-placement just regroups them
+              two-per-row instead of three, so nothing here needs to change
+              per field, only the track count. */}
+          <dl
+            className={cn(
+              "grid grid-cols-1 gap-x-5 gap-y-3",
+              collapsed ? "grid-cols-2" : "sm:grid-cols-3"
+            )}
+          >
             {fields.map((field) => (
               <div key={field.label} className="min-w-[160px] space-y-1">
                 <dt className="text-[12px] text-muted-foreground">{field.label}</dt>
@@ -214,14 +231,8 @@ export function VirtualAccountDetails({
           </Button>
         </div>
       </Card>
-      {/* Mounted only for accounts that carry a list, so it can never open empty.
-          Read-only — see SupportedCurrenciesModal. */}
-      {account.supportedRegions && (
-        <SupportedCurrenciesModal
-          open={currenciesOpen}
-          onOpenChange={setCurrenciesOpen}
-          regions={account.supportedRegions}
-        />
+      {account.isGlobal && (
+        <GlobalCurrenciesDialog open={currenciesOpen} onOpenChange={setCurrenciesOpen} />
       )}
 
       <PaymentMethodInfoDialog

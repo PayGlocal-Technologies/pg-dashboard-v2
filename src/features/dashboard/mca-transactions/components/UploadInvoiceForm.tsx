@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm, useStore } from "@tanstack/react-form";
 import {
   Alert,
@@ -55,7 +54,6 @@ export function UploadInvoiceForm({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const purposeCodeRef = useRef<PurposeCodeComboboxHandle>(null);
-  const router = useRouter();
   const dropzoneRef = useRef<HTMLDivElement>(null);
 
   // Which codes this merchant may choose from, and which one they last used,
@@ -231,14 +229,8 @@ export function UploadInvoiceForm({
             invalid={!!invoiceError}
             errorId="invoice-error"
             onCreateInvoice={() => {
-              // The create flow exists now, so this hands off to it. Only the
-              // gid is passed: the editor creates its own draft and writes the
-              // resulting invoiceId into the URL itself, and a draft raised this
-              // way stays attached to the transaction — which is what makes the
-              // remitter-match and exact-amount gates apply.
-              //
-              // router.push, not window.location, so Next adds the base path.
-              router.push(`/create-invoice?gid=${row.gid}`);
+              // TODO: hand off to the /invoices/create flow and populate this
+              // field with the created invoice once that flow exists here.
             }}
           />
           <FieldError id="invoice-error">{invoiceError}</FieldError>

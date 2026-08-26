@@ -259,17 +259,17 @@ export function buildMcaColumns(
       key: "amount",
       header: "Amount",
       minWidth: 135,
-      align: "right",
+      align: "left",
       render: (row) => {
         const amount = parseFloat(row.amount ?? "0");
         const currency = row.currency ?? "USD";
         return (
-          <RowClick onClick={() => onOpenDetails(row)} align="right">
+          <RowClick onClick={() => onOpenDetails(row)} align="left">
             {/* The offer badge leads the amount (items-center against the
                 amount block's own baseline alignment) so a discounted
                 transaction is identifiable while scanning the column, the
                 same placement pg-dashboard uses. */}
-            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
               <MdrOfferBadge totalMdrDiscount={row.totalMdrDiscount} />
               <FrmPendingBadge frmStatus={row.frmStatus} />
               <span className="flex items-baseline gap-1.5">

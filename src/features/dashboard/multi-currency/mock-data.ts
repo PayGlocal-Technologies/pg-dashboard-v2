@@ -1,6 +1,5 @@
 import type { MetricSparklinePoint } from "@/components/ui";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
-import { SWIFT_SUPPORTED_REGIONS } from "@/features/dashboard/multi-currency/mapAccounts";
 
 /** Same legal entity receives every currency, so the holder name is shared. */
 const ACCOUNT_HOLDER_NAME = "Acme Exports Pvt Ltd";
@@ -164,11 +163,6 @@ export const MOCK_VIRTUAL_ACCOUNTS: VirtualAccount[] = [
     bankName: "PayGlocal International Ltd",
     beneficiaryAddress: "1 King Street, London, EC2V 8AU, UK",
     routingCodeType: "swift_bic",
-    // Shared with the mapper rather than duplicated: the Virtual Accounts page
-    // renders API-mapped accounts while several other surfaces still read this
-    // mock, and the two showing different region lists for the same account
-    // would be a bug nobody would think to look for.
-    supportedRegions: SWIFT_SUPPORTED_REGIONS,
   },
 ];
 
@@ -323,10 +317,11 @@ export const SETTLED_AMOUNT_BY_CURRENCY: Record<string, SettledAmountSummary> = 
       { x: "Jul", y: 87_400 },
     ],
   },
-  // The Rest of the World account is dollar-denominated and carries "Dollar"
-  // as its currency value — see the note on that entry above for why it isn't
-  // the ISO "USD".
-  Dollar: {
+  // The real accounts endpoint's Rest of the World account carries "GLOBAL" as
+  // its currency value (see mapAccounts.ts's toViewAccount), not the "Dollar"
+  // MOCK_VIRTUAL_ACCOUNTS above uses — this key has to match that or the
+  // lookup in index.tsx misses and silently falls back to USD's figures.
+  GLOBAL: {
     amount: 22_750,
     amountInr: 2_411_500,
     trendLabel: "+3.9% vs last period",
