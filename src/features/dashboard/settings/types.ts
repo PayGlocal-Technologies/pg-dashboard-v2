@@ -34,33 +34,3 @@ export interface ContactData {
 export interface ContactDataResponse {
   data?: ContactData | null;
 }
-
-// ── Zoho integration ─────────────────────────────────────────────────────────
-// Mirrored from pg-dashboard's zoho-integration/types.ts.
-
-export interface ZohoStatusData {
-  connected: boolean;
-  status: string;
-  connectedAt: string | null;
-  orgId: string | null;
-  lastSyncedTime: number | null;
-  isFirstSync: boolean;
-}
-
-export interface ZohoStatusResponse {
-  data?: ZohoStatusData | null;
-}
-
-export interface ZohoConnectData {
-  connectUrl: string;
-}
-
-export interface ZohoConnectResponse {
-  data?: ZohoConnectData | null;
-}
-
-/** POST body pg-dashboard sends to pull-sync. */
-export interface ZohoPullSyncBody {
-  isClientSync: boolean;
-  isInvoiceSync: boolean;
-}
