@@ -66,22 +66,23 @@ export function useReferralLink(): { link: string; isLoading: boolean; isError: 
 /**
  * The merchant's reward wallet (available / held / earned / withdrawn totals).
  *
- * Keyed by the merchant's ucicId, which the influencer service scopes the wallet
- * to. Disabled for guests and until the profile (and its ucicId) has loaded, the
- * same gate the referral link uses.
+ * The influencer service scopes the wallet by the merchant's `mid` — pg-dashboard
+ * passes `profile.mid` into the path segment it names "ucicId". They are the same
+ * value for most merchants but not all, so passing `profile.ucicId` here 403s for
+ * merchants where the two differ. Match pg-dashboard exactly: use `profile.mid`.
  */
 export function useReferralWallet(): {
   wallet: ReferralWallet | null;
   isLoading: boolean;
   isError: boolean;
 } {
-  const ucicId = useApp((s) => s.profile?.ucicId);
+  const mid = useApp((s) => s.profile?.mid);
   const isGuestUser = useApp((s) => s.isGuestUser);
-  const enabled = !!ucicId && !isGuestUser;
+  const enabled = !!mid && !isGuestUser;
 
   const { data, isLoading, isError } = useGet<ReferralWalletResponse>(
-    ["referral-wallet", ucicId],
-    referralWalletApi(ucicId ?? ""),
+    ["referral-wallet", mid],
+    referralWalletApi(mid ?? ""),
     { enabled }
   );
 
@@ -98,13 +99,13 @@ export function useReferralTransactions(): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const ucicId = useApp((s) => s.profile?.ucicId);
+  const mid = useApp((s) => s.profile?.mid);
   const isGuestUser = useApp((s) => s.isGuestUser);
-  const enabled = !!ucicId && !isGuestUser;
+  const enabled = !!mid && !isGuestUser;
 
   const { data, isLoading, isError } = useGet<ReferralTransactionsResponse>(
-    ["referral-transactions", ucicId],
-    referralTransactionsApi(ucicId ?? ""),
+    ["referral-transactions", mid],
+    referralTransactionsApi(mid ?? ""),
     { enabled }
   );
 
