@@ -21,7 +21,9 @@ import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/compo
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
 import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
 import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/components/AccountCurrencyNotice";
-import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
+// Side-panel variant, kept for reference — superseded below by the modal.
+// import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
+import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
 import {
   DEFAULT_SETTLED_CURRENCY,
   SETTLED_AMOUNT_BY_CURRENCY,
@@ -352,15 +354,6 @@ function MultiCurrencyContent() {
             // region change so the fade replays on each switch, not just the
             // first render.
             //
-            // flex-wrap, not a fixed third grid column: How it works is a
-            // plain card, not a modal or drawer, so there is never an overlay
-            // behind it — it either sits beside the account-details card (when
-            // there's room) or wraps onto its own line below it (when there
-            // isn't), the same way the Metrics row further down wraps its own
-            // two cards. The account-details <section> below has no min-w-0,
-            // so this never squeezes its 3-column field grid narrower than its
-            // own content needs (which would clip it) — instead the wrap
-            // happens at the flex level, before that grid is ever threatened.
             <div className="flex flex-wrap items-start gap-x-5 gap-y-8">
               <section key={selectedAccount.id} className="flex-1 page-enter">
                 {/* Details and their currency's caveat as one stack: the notice is
@@ -390,12 +383,6 @@ function MultiCurrencyContent() {
                     onCopy={handleCopyFullAccount}
                     onShare={() => setShareModalOpen(true)}
                     headerPlacement="inside"
-                    // How it works sits beside this card on the same flex
-                    // row, so its available width shrinks well before the
-                    // viewport itself crosses `sm` — reflowing to two columns
-                    // responds to that shrink directly instead of waiting on
-                    // a media query that can't see how much room is left.
-                    collapsed={howItWorksOpen}
                     className="w-full max-w-none"
                   />
                   {!selectedAccount.isGlobal && (
@@ -404,6 +391,8 @@ function MultiCurrencyContent() {
                 </div>
               </section>
 
+              {/* Side-panel variant, kept for reference — superseded below
+                  by the modal.
               {howItWorksOpen && (
                 <HowItWorksPanel
                   currency={selectedAccount.currency}
@@ -411,7 +400,16 @@ function MultiCurrencyContent() {
                   className="w-full shrink-0 sm:w-[340px]"
                 />
               )}
+              */}
             </div>
+          )}
+
+          {selectedAccount && (
+            <HowItWorksDialog
+              open={howItWorksOpen}
+              onOpenChange={setHowItWorksOpen}
+              currency={selectedAccount.currency}
+            />
           )}
 
           <section>
