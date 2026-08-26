@@ -249,7 +249,7 @@ function MultiCurrencyContent() {
           step. Region and Account Details keep this same 288px/flexible-1fr
           shape whether or not How it works is open — that panel is a flex
           child *inside* the Account Details column below, not a third track
-          here, so it never resizes these two. */}
+          here, so it never resizes these two things. */}
       <div className="grid gap-x-5 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
         <div className="lg:col-start-1 lg:row-start-1">
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
