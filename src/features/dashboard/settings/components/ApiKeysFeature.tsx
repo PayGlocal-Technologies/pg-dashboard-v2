@@ -10,6 +10,7 @@ import {
   MOCK_API_KEYS,
   type ApiKeyEnvFilter,
 } from "@/features/dashboard/settings/apiKeys";
+import { BackendGapNotice } from "@/features/dashboard/settings/components/BackendGapNotice";
 
 const ENV_TABS: { value: ApiKeyEnvFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -44,6 +45,8 @@ export function ApiKeysFeature() {
   return (
     <div className="space-y-5">
       <PageHeader title="API keys" subtitle="Live and test credentials for your integration." />
+
+      <BackendGapNotice message="No API-key management endpoint exists yet — the keys shown are illustrative placeholders." />
 
       <Card className="gap-0 p-5">
         <div className="inline-flex w-fit items-center gap-0.5 rounded-full bg-muted p-1">

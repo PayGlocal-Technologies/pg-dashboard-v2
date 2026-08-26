@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Badge, Button, Card, PageHeader } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
+import { BackendGapNotice } from "@/features/dashboard/settings/components/BackendGapNotice";
 
 interface PaymentProduct {
   key: string;
@@ -54,6 +55,8 @@ export function PaymentsFeature() {
   return (
     <div className="space-y-5">
       <PageHeader title="Payments" subtitle="The payment products enabled on your account." />
+
+      <BackendGapNotice message="No payment-product enablement endpoint exists yet — toggles change local state only for this session." />
 
       <div className="grid gap-4 sm:grid-cols-3">
         {products.map((product) => (

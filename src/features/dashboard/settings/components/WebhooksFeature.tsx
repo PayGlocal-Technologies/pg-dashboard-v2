@@ -2,6 +2,7 @@
 
 import { toast } from "sonner";
 import { Badge, Button, Card, PageHeader, StatusBadge } from "@/components/ui";
+import { BackendGapNotice } from "@/features/dashboard/settings/components/BackendGapNotice";
 
 interface WebhookEndpoint {
   id: string;
@@ -37,6 +38,8 @@ export function WebhooksFeature() {
           </Button>
         }
       />
+
+      <BackendGapNotice message="No webhook-management endpoint exists yet — endpoints and actions here are illustrative." />
 
       <Card className="gap-0 p-5">
         <div className="flex flex-col gap-3">
