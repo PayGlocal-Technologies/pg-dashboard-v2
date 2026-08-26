@@ -69,11 +69,13 @@ function scrollToPage(el: HTMLDivElement, index: number): void {
  * The time-range control itself lives in the page header now (see
  * McaTransactionsFeature/AnalyticsTimeRangeControl), in line with the
  * "Transactions" title rather than inside this section; timeRange just
- * arrives here as a prop to pass down to Settlement Analytics. It only
- * actually redraws that card's own placeholder per-account bars (see its own
- * TIME_RANGE_MULTIPLIERS comment for why): Outstanding and Saved's real
- * figures have no period parameter on the live endpoint they read from, so
- * they show the same lifetime values regardless of the chosen range.
+ * arrives here as a prop to pass down to Settlement Analytics and Saved
+ * Amount. Neither's live endpoint actually has a period parameter (see
+ * SettlementAnalyticsCard's own TIME_RANGE_MULTIPLIERS comment), so both
+ * scale a real lifetime figure by the same approximation multiplier rather
+ * than showing a genuine per-period total. Outstanding Amount isn't wired to
+ * it at all: its own KPI (settlementsDue) is a live balance, not something a
+ * historical time window applies to.
  */
 export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRange }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -123,7 +125,7 @@ export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRa
             stretches by the same default), from lg up via the grid. */}
         <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
           <OutstandingAmountCard className="grow" />
-          <SavedAmountCard className="grow" />
+          <SavedAmountCard className="grow" timeRange={timeRange} />
         </div>
       </div>
 

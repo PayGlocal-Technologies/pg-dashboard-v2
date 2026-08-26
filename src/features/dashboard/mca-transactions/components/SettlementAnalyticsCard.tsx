@@ -42,10 +42,12 @@ export const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
 // bars below, which are already placeholder data pending a real endpoint (see
 // mock-data.ts's own TODO). The KPI above comes from the live
 // business-overview endpoint, which has no period parameter today, so the
-// time range can't drive it without a real API change — moving the control
+// time range can't drive it without a real API change; moving the control
 // out to the whole section (see TransactionsAnalyticsCarousel) doesn't change
-// that; it's still just these placeholder bars that actually redraw.
-const TIME_RANGE_MULTIPLIERS: Record<TimeRange, number> = {
+// that, it's still just these placeholder bars (and, by the same
+// approximation, SavedAmountCard's real lifetime figure) that actually
+// redraw.
+export const TIME_RANGE_MULTIPLIERS: Record<TimeRange, number> = {
   year: 1,
   month: 1 / 12,
   week: 1 / 52,
@@ -100,7 +102,7 @@ function AccountBarRow({ row, maxValue }: { row: AccountBarRowData; maxValue: nu
           }}
         />
       </div>
-      <span className="w-16 shrink-0 text-right text-xs font-semibold tabular-nums text-foreground">
+      <span className="w-16 shrink-0 text-left text-xs font-semibold tabular-nums text-foreground">
         {row.valueLabel}
       </span>
     </li>

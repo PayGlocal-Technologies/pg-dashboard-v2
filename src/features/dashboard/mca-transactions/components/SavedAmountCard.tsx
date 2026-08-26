@@ -5,6 +5,10 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transactions/hooks";
+import {
+  TIME_RANGE_MULTIPLIERS,
+  type TimeRange,
+} from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
 
 /**
  * Single-KPI card stacked below OutstandingAmountCard, forming a secondary
@@ -14,12 +18,29 @@ import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transac
  * chart, no secondary metric, no toggle, no chip (this card has no
  * equivalent secondary figure to pair one with).
  */
-export function SavedAmountCard({ className }: { className?: string }) {
+export function SavedAmountCard({
+  className,
+  timeRange,
+}: {
+  className?: string;
+  /** Chosen by the page-level time-range control (see
+   *  AnalyticsTimeRangeControl). The live endpoint only ever returns a
+   *  lifetime figure, no per-period breakdown, so this scales that one real
+   *  number by the same approximation SettlementAnalyticsCard's placeholder
+   *  bars use (see TIME_RANGE_MULTIPLIERS), rather than leaving the KPI
+   *  static while every other card on the page visibly reacts to the filter.
+   *  Today/This week's figures are therefore estimates, not real per-period
+   *  totals, pending a real endpoint. */
+  timeRange: TimeRange;
+}) {
   const { overview, isLoading } = useMcaOverview();
   // amountSaved.overall is the lifetime figure; last30 is also returned, but
   // the card's own title ("Saved amount vs banks") carries no time
-  // qualifier, so it reads the lifetime one to match.
-  const savedInr = toMetricNumber(overview?.amountSaved?.overall?.value);
+  // qualifier, so it reads the lifetime one to match, then scales it by
+  // timeRange below.
+  const savedInr = Math.round(
+    toMetricNumber(overview?.amountSaved?.overall?.value) * TIME_RANGE_MULTIPLIERS[timeRange]
+  );
 
   return (
     <Card size="sm" className={cn("w-full", className)}>
