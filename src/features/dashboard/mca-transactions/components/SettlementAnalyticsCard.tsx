@@ -134,11 +134,16 @@ export function SettlementAnalyticsCard({
       label: account?.accountName ?? entry.accountId,
       iso2: account?.iso2 ?? "",
       value,
-      valueLabel: isAmountMode
-        ? value >= 1000
-          ? `$${(value / 1000).toFixed(1)}K`
-          : `$${value}`
-        : value.toLocaleString("en-US"),
+      // MOCK: per-account settlement figures have no live endpoint yet (see
+      // mock-data.ts TODO). Real label computation preserved below for when the
+      // backend lands; until then the figure is surfaced as "MOCK" so nobody
+      // reads placeholder numbers as real.
+      // valueLabel: isAmountMode
+      //   ? value >= 1000
+      //     ? `$${(value / 1000).toFixed(1)}K`
+      //     : `$${value}`
+      //   : value.toLocaleString("en-US"),
+      valueLabel: "MOCK",
     };
   }).sort((a, b) => b.value - a.value);
 

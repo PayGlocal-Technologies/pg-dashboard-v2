@@ -5,10 +5,8 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transactions/hooks";
-import {
-  TIME_RANGE_MULTIPLIERS,
-  type TimeRange,
-} from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
+// TIME_RANGE_MULTIPLIERS import dropped with the mock per-period scaling below.
+import type { TimeRange } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
 
 /**
  * Single-KPI card stacked below OutstandingAmountCard, forming a secondary
@@ -20,7 +18,6 @@ import {
  */
 export function SavedAmountCard({
   className,
-  timeRange,
 }: {
   className?: string;
   /** Chosen by the page-level time-range control (see
@@ -38,9 +35,14 @@ export function SavedAmountCard({
   // the card's own title ("Saved amount vs banks") carries no time
   // qualifier, so it reads the lifetime one to match, then scales it by
   // timeRange below.
-  const savedInr = Math.round(
-    toMetricNumber(overview?.amountSaved?.overall?.value) * TIME_RANGE_MULTIPLIERS[timeRange]
-  );
+  // MOCK: the live endpoint returns only a lifetime figure, so per-period
+  // values were faked by scaling it with TIME_RANGE_MULTIPLIERS. That scaling
+  // is mock — commented out. The card now shows the real lifetime figure as-is,
+  // regardless of the selected time range, until a per-period endpoint exists.
+  // const savedInr = Math.round(
+  //   toMetricNumber(overview?.amountSaved?.overall?.value) * TIME_RANGE_MULTIPLIERS[timeRange]
+  // );
+  const savedInr = toMetricNumber(overview?.amountSaved?.overall?.value);
 
   return (
     <Card size="sm" className={cn("w-full", className)}>
