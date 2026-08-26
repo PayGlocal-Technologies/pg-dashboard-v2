@@ -24,6 +24,7 @@ import {
   ChevronUp,
   CircleDollarSign,
   Clock,
+  Copy,
   CreditCard,
   Database,
   Download,
@@ -40,6 +41,7 @@ import {
   Inbox,
   Info,
   KeyRound,
+  Landmark,
   LayoutGrid,
   LineChart,
   Link2,
@@ -60,6 +62,7 @@ import {
   Phone,
   PieChart,
   Plus,
+  Puzzle,
   Receipt,
   RefreshCw,
   Repeat2,
@@ -81,6 +84,7 @@ import {
   UserPlus,
   Users,
   Wallet,
+  Webhook,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -104,6 +108,7 @@ export const ICONS = {
   "chevron-up": ChevronUp,
   "circle-dollar-sign": CircleDollarSign,
   clock: Clock,
+  copy: Copy,
   "credit-card": CreditCard,
   database: Database,
   download: Download,
@@ -120,6 +125,7 @@ export const ICONS = {
   "indian-rupee": IndianRupee,
   info: Info,
   "key-round": KeyRound,
+  landmark: Landmark,
   "layout-grid": LayoutGrid,
   "line-chart": LineChart,
   link: Link2,
@@ -140,6 +146,7 @@ export const ICONS = {
   phone: Phone,
   "pie-chart": PieChart,
   plus: Plus,
+  puzzle: Puzzle,
   receipt: Receipt,
   refresh: RefreshCw,
   repeat: Repeat2,
@@ -161,8 +168,8 @@ export const ICONS = {
   "user-plus": UserPlus,
   users: Users,
   wallet: Wallet,
+  webhook: Webhook,
   x: X,
-
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

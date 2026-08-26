@@ -46,6 +46,7 @@ export {
   Separator,
   Shimmer,
   StatCardSkeleton,
+  Switch,
   TableRowSkeleton,
   ChartSkeleton,
   StatusBadge,
