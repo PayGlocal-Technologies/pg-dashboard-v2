@@ -7,7 +7,10 @@ import { OtpForm } from "@/features/auth/login/components/OtpForm";
 import { TwoFAOtpForm } from "@/features/auth/login/components/TwoFAOtpForm";
 import { ChangePasswordForm } from "@/features/auth/login/components/ChangePasswordForm";
 import { UsernameForm } from "@/features/auth/login/components/UsernameForm";
-import { PhoneNumberForm, NamePhoneNumberForm } from "@/features/auth/login/components/PhoneNumberForm";
+import {
+  PhoneNumberForm,
+  NamePhoneNumberForm,
+} from "@/features/auth/login/components/PhoneNumberForm";
 import { CountryQuestionnaireForm } from "@/features/auth/login/components/CountryQuestionnaireForm";
 import type { LoginScreen, LoginScreenProps } from "@/features/auth/login/types";
 

@@ -145,6 +145,30 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ─── Form controls ─────────────────────────────────────────────────────────
+   A typed-in value is always --foreground, whatever it happens to be nested in.
+
+   flux's Input/Textarea set `placeholder:text-muted-foreground` but no colour for
+   the value itself, so the value inherits from its container. Inside anything that
+   mutes its own subtree the two then resolve to the *same* colour and a real value
+   is indistinguishable from a placeholder — which is what flux's own
+   AccordionContent does (it carries `text-sm text-muted-foreground`), and every
+   form that sections its fields into an accordion inherited it: the Add/Edit
+   client modal and the Create payment link page both did.
+
+   Fixed here rather than by un-muting each accordion, because the rule belongs to
+   the control and not to whatever wraps it — a future form nested in any muted
+   container gets it for free.
+
+   Bare element selectors, so this loses to every Tailwind utility: flux's own
+   `read-only:text-muted-foreground` and `disabled:` treatments still win, and
+   ::placeholder is a pseudo-element the element's own colour never reaches. */
+input,
+textarea,
+select {
+  color: var(--foreground);
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 4px;
@@ -167,6 +191,17 @@ body {
   background: #6b7280;
 }
 
+/* Hides the scrollbar while leaving wheel/trackpad/touch scrolling intact —
+   used for the multi-currency account carousel, which scrolls via gesture
+   only and doesn't need a persistent visual scroll indicator. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 /* ─── Overlay blur ───────────────────────────────────────────────────────────
    Flux's DrawerOverlay hardcodes `backdrop-blur-sm`. In Tailwind v4 an
    unlayered rule beats @layer utilities, so no !important needed.          */
@@ -175,6 +210,81 @@ body {
   -webkit-backdrop-filter: none;
 }
 
+/* ─── Enter/exit animations ──────────────────────────────────────────────────
+   Flux's Drawer (and Blanket) components emit `animate-in`, `animate-out`,
+   `fade-in-0`, `fade-out-0`, `slide-in-from-*` and `slide-out-to-*` classes
+   assuming the `tailwindcss-animate` plugin is present. It isn't installed
+   (Tailwind v4 doesn't ship it), so those classes were silently no-ops and
+   the Drawer just popped in/out with no motion. `@utility` registers the
+   subset flux-ui actually uses as real Tailwind utilities so `data-[state=*]:`
+   variants apply to them correctly, restoring the slide/fade behavior the
+   component was designed for. */
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1));
+  }
+}
+@keyframes exit {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0)
+      scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1));
+  }
+}
+@utility animate-in {
+  animation-name: enter;
+  animation-duration: 150ms;
+  --tw-enter-opacity: initial;
+  --tw-enter-scale: initial;
+  --tw-enter-translate-x: initial;
+  --tw-enter-translate-y: initial;
+}
+@utility animate-out {
+  animation-name: exit;
+  animation-duration: 150ms;
+  --tw-exit-opacity: initial;
+  --tw-exit-scale: initial;
+  --tw-exit-translate-x: initial;
+  --tw-exit-translate-y: initial;
+}
+@utility fade-in-0 {
+  --tw-enter-opacity: 0;
+}
+@utility fade-out-0 {
+  --tw-exit-opacity: 0;
+}
+@utility zoom-in-95 {
+  --tw-enter-scale: 0.95;
+}
+@utility zoom-out-95 {
+  --tw-exit-scale: 0.95;
+}
+@utility slide-in-from-right {
+  --tw-enter-translate-x: 100%;
+}
+@utility slide-in-from-left {
+  --tw-enter-translate-x: -100%;
+}
+@utility slide-in-from-top {
+  --tw-enter-translate-y: -100%;
+}
+@utility slide-in-from-bottom {
+  --tw-enter-translate-y: 100%;
+}
+@utility slide-out-to-right {
+  --tw-exit-translate-x: 100%;
+}
+@utility slide-out-to-left {
+  --tw-exit-translate-x: -100%;
+}
+@utility slide-out-to-top {
+  --tw-exit-translate-y: -100%;
+}
+@utility slide-out-to-bottom {
+  --tw-exit-translate-y: 100%;
+}
 
 /* ─── Shimmer ────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
@@ -210,10 +320,20 @@ body {
 
 /* ─── Wave (dashboard greeting) ──────────────────────────────────────────── */
 @keyframes wave {
-  0%,  60%, 100% { transform: rotate(0deg);   }
-  15%            { transform: rotate(16deg);  }
-  30%            { transform: rotate(-8deg);  }
-  45%            { transform: rotate(12deg);  }
+  0%,
+  60%,
+  100% {
+    transform: rotate(0deg);
+  }
+  15% {
+    transform: rotate(16deg);
+  }
+  30% {
+    transform: rotate(-8deg);
+  }
+  45% {
+    transform: rotate(12deg);
+  }
 }
 
 /* ─── Focus ──────────────────────────────────────────────────────────────── */

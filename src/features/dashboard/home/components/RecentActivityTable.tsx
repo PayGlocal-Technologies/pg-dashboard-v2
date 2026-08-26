@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { useRouter } from "next/navigation";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import {
@@ -259,7 +259,7 @@ export function RecentActivityTable({
           size="sm"
           className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
           onClick={() =>
-            router.push(tab === "transactions" ? "/transactions" : "/settlement-reports")
+            router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-report")
           }
           rightIcon={<Icon name="arrow-right" className="h-3 w-3" aria-hidden />}
         >

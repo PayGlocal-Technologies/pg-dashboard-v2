@@ -2,13 +2,38 @@
 
 import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { MerchantSelector } from "@/components/layout/MerchantSelector";
+import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
+import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useProductContext, type NavContext } from "@/stores/useProductContext";
+
+/**
+ * The 4 tabs represent 3 contexts: Home (combined overview), Payments (PA)
+ * and Multi-Currency Accounts (PACB), each carrying a `context` tag read by
+ * useProductContext.ts. Partners is unrelated and carries none.
+ *
+ * Each tab lands on its context's own dashboard (/dashboard, /pa-dashboard,
+ * /mca-dashboard) and sets the active context, which decides both the Sidebar
+ * nav tree shown (the short Home tree, the MCA tree, or the full Payments
+ * tree) and the data the feature screens beneath it resolve. Many of those
+ * screens are shared by all three contexts (/team-management, ...), so the
+ * same URL renders different data depending on the tab last picked, while a
+ * few, like Transactions, are genuinely separate routes per product.
+ */
+const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
+  { label: "Home", href: "/dashboard", context: "HOME" },
+  // Each product tab lands on that product's own dashboard, the same way Home
+  // lands on /dashboard, rather than on one of its inner feature tables.
+  { label: "Payments", href: "/pa-dashboard", context: "PA" },
+  { label: "Multi-Currency Accounts", href: "/mca-dashboard", context: "PACB" },
+  { label: "Partners", href: "/refer-and-earn" },
+] as const;
 
 const CREATE_ITEMS = [
   {
@@ -29,18 +54,56 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const paMids = useApp((s) => s.paMids);
   const paCbMids = useApp((s) => s.paCbMids);
   const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
   const tidsInfo = useApp((s) => s.tidsInfo);
 
   const selectedMidDetails = useAccountSetup((s) => s.selectedMidDetails);
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+
+  const activeContext = useProductContext((s) => s.activeContext);
+  const setActiveContext = useProductContext((s) => s.setActiveContext);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createHover, setCreateHover] = useState(false);
 
   const createRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const pathname = usePathname();
 
   const isMultiMids = paMids.length > 1 || (paCbMids.length > 1 && isMultiMidUser);
+
+  // Only the products this account actually holds MIDs for get a tab. "Home"
+  // is the *combined* overview of both, so it only earns its place when the
+  // account has both, a single-product merchant's Home would just duplicate
+  // that product's own dashboard. Partners is unrelated to MIDs and always
+  // shows. Note both MID lists start empty and fill in once the account loads,
+  // so the tab row grows in rather than flashing tabs the account can't use.
+  const hasPa = paMids.length > 0;
+  const hasPacb = paCbMids.length > 0;
+  const visibleTabs = useMemo(
+    () =>
+      HEADER_TABS.filter((tab) => {
+        if (tab.context === "HOME") return hasPa && hasPacb;
+        if (tab.context === "PA") return hasPa;
+        if (tab.context === "PACB") return hasPacb;
+        return true;
+      }),
+    [hasPa, hasPacb]
+  );
+
+  // A persisted context whose tab this account doesn't have (most commonly the
+  // "HOME" default on a single-product merchant) would leave no tab
+  // highlighted and the Sidebar rendering a nav tree with no way back to it.
+  // Fall back to the first product tab the account does have. Deferred through
+  // a zero-delay timer rather than called straight from the effect body, per
+  // the no-synchronous-setState-in-effects rule in CLAUDE.md.
+  useEffect(() => {
+    if (visibleTabs.some((tab) => tab.context === activeContext)) return;
+    const fallback = visibleTabs.find((tab) => tab.context)?.context;
+    if (!fallback) return;
+    const timer = window.setTimeout(() => setActiveContext(fallback), 0);
+    return () => window.clearTimeout(timer);
+  }, [visibleTabs, activeContext, setActiveContext]);
 
   const tradeName = useMemo(
     () => tidsInfo.find((t) => t.mid === selectedMidDetails.mid)?.tradeName ?? "",
@@ -70,8 +133,35 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           <Icon name="menu" size={20} />
         </Button>
 
-        {/* Merchant selector */}
-        <MerchantSelector />
+        {/* Top-level category tabs */}
+        {!isPartnerUser && (
+          <nav className="hidden items-center gap-1 md:flex">
+            {visibleTabs.map((tab) => {
+              // Home/Payments/MCA currently share the same feature routes, so
+              // their highlight is driven by the active context, not the URL.
+              // Partners still keys off its own unique route (it has no
+              // context tag, and never touches activeContext on click).
+              const onPartners =
+                pathname === "/refer-and-earn" || pathname.startsWith("/refer-and-earn/");
+              const isActive = tab.context
+                ? activeContext === tab.context && !onPartners
+                : pathname === tab.href || pathname.startsWith(tab.href + "/");
+              return (
+                <Link
+                  key={tab.href}
+                  href={tab.href}
+                  onClick={() => tab.context && setActiveContext(tab.context)}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
+                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tab.label}
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Spacer */}
         <div className="flex-1" />
@@ -91,15 +181,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           <ThemeToggle />
 
-          {/* Help */}
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-9 h-9 rounded-lg bg-muted border border-border hover:bg-accent flex items-center justify-center transition-colors"
-            aria-label="Help"
-          >
-            <Icon name="help-circle" size={17} className="text-muted-foreground" />
-          </Button>
+          {/* Help — support contacts and hours, see HeaderHelpMenu. */}
+          <HeaderHelpMenu />
 
           {/* Create button */}
           <div ref={createRef} className="relative">
@@ -187,19 +270,24 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         </div>
       </header>
 
-      {/* "Viewing as" ribbon — shown when a MID is selected in multi-MID mode */}
+      {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode.
+          Flux's primary-light tint rather than the per-merchant
+          `selectedMidDetails.color` this used to carry — that colour still
+          lives in the store and still marks the row in MerchantSelector's own
+          list, but this ribbon reads as a system-level notice, so it takes the
+          app's one fixed primary treatment instead of a colour that changes
+          with which merchant is selected. primary-light (not the solid
+          primary blue) plus primary-text keeps this a quiet strip rather than
+          a loud banner, while staying on the same primary token family. */}
       {showRibbon && (
-        <div
-          className="flex items-center justify-between px-4 py-1.5 text-[13px]"
-          style={{ backgroundColor: selectedMidDetails.color || "#f3f4f6" }}
-        >
-          <span className="text-gray-800">
+        <div className="flex items-center justify-between bg-primary-light px-4 py-1.5 text-[13px] text-[var(--primary-text)]">
+          <span>
             Viewing as <strong>{tradeName}</strong>
           </span>
           <Button
             type="button"
             variant="ghost"
-            className="h-auto min-h-0 p-0 font-medium text-gray-800 underline transition-opacity hover:opacity-70 hover:bg-transparent"
+            className="h-auto min-h-0 p-0 font-medium text-[var(--primary-text)] underline transition-opacity hover:opacity-70 hover:bg-transparent"
             onClick={() => setSelectedMidDetails({ mid: "", status: "", color: "" })}
           >
             Switch to main view

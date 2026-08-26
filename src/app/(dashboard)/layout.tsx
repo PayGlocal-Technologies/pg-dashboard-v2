@@ -5,12 +5,15 @@ import { useFetchCommonData } from "@/lib/hooks/useFetchCommonData";
 import { useApp } from "@/stores/useApp";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { ContentAreaProvider } from "@/components/layout/ContentAreaContext";
 import { Icon } from "@/components/icon";
+import { FeedbackSheet } from "@/features/dashboard/feedback/FeedbackSheet";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { isError } = useFetchCommonData();
   const profile = useApp((s) => s.profile);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [contentEl, setContentEl] = useState<HTMLElement | null>(null);
 
   if (!profile && !isError) {
     return (
@@ -25,10 +28,17 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
       <div className="flex flex-1 flex-col min-w-0 overflow-hidden">
         <Header onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 overflow-y-auto">
-          <div className="p-4 md:p-6 page-enter">{children}</div>
+        <main ref={setContentEl} className="relative flex-1 overflow-y-auto">
+          <ContentAreaProvider value={contentEl}>
+            <div className="p-4 md:p-6 page-enter">{children}</div>
+          </ContentAreaProvider>
         </main>
       </div>
+
+      {/* App-wide, not tied to any page: the survey asks about PayGlocal as a
+          whole. Whether it actually appears is the server's call — see the
+          eligibility check inside. */}
+      <FeedbackSheet />
     </div>
   );
 }

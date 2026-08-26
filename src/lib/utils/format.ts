@@ -28,6 +28,23 @@ const MONTHS_LONG = [
   "December",
 ] as const;
 
+const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** 1st/2nd/3rd/4th..., with the 11th-13th exception. */
+function ordinalSuffix(day: number): string {
+  if (day % 100 >= 11 && day % 100 <= 13) return "th";
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
+
 const CURRENCY_SYMBOLS: Record<string, string> = {
   // Major Global Currencies
   USD: "$",
@@ -63,7 +80,10 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   BYN: "Br",
   ALL: "L",
   // Middle Eastern Currencies
-  AED: "د.إ",
+  // Latin code rather than the د.إ glyph: the dashboard is LTR throughout, and
+  // the RTL mark reorders badly against the Latin digits it prefixes. Also
+  // affects the AED figures on Multi-Currency and Transactions.
+  AED: "AED ",
   SAR: "﷼",
   BHD: ".د.ب",
   QAR: "﷼",
@@ -117,7 +137,30 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   BZD: "BZ$",
   BMD: "BD$",
   KYD: "CI$",
+  // Not an ISO code: the Rest of the World virtual account is dollar-
+  // denominated but needs a currency value distinct from the US account's
+  // "USD" (see multi-currency/mock-data.ts), and this is what keeps its
+  // amounts rendering with a real symbol rather than the word falling through
+  // as its own prefix.
+  Dollar: "$",
+  // The real accounts endpoint's SWIFT catch-all bucket, renamed "GLOBAL" for
+  // display (see multi-currency/mapAccounts.ts) — the live counterpart to
+  // "Dollar" above. Without this entry the Rest of the World account's
+  // settled-amount figure fell back to showing "GLOBAL" itself as the
+  // fallback prefix instead of a real symbol.
+  GLOBAL: "$",
 };
+
+/**
+ * The bare symbol for a currency code, e.g. "EUR" → "€". Falls back to the
+ * code itself when there's no symbol for it, so callers never render an empty
+ * string. Exposed for the few places that show a symbol beside a code rather
+ * than beside an amount (the Create MCA Link currency selector); anything
+ * rendering an amount should use formatCurrency below instead.
+ */
+export function currencySymbol(currency: string): string {
+  return CURRENCY_SYMBOLS[currency] ?? currency;
+}
 
 /**
  * Single source of truth for currency formatting (replaces the ~8 ad-hoc
@@ -138,6 +181,50 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
+// Spelled out rather than read from Intl: a billing period is a calendar month,
+// not a moment, so the label must not vary with the reader's locale or timezone
+// the way toLocaleString would. "2026-08" reads "August 2026" for everyone, and
+// the same reasoning that keeps formatDate on fixed English strings (below)
+// keeps these here.
+export const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** The same twelve, abbreviated — for anything laying months out in a grid. */
+export const MONTH_SHORT_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** "2026-08" → "August 2026". Returns the raw value if it isn't a "YYYY-MM" pair. */
+export function formatMonthLabel(periodMonth: string): string {
+  const [year, month] = periodMonth.split("-");
+  const name = MONTH_LABELS[Number(month) - 1];
+  if (!year || !name) return periodMonth;
+  return `${name} ${year}`;
+}
+
 /**
  * Formats dates for UI. Uses fixed English strings (not Intl) so server and
  * client render identical markup and avoid hydration mismatches.
@@ -154,18 +241,33 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
     ...options,
   };
 
-  const includeTime = o.hour !== undefined && o.minute !== undefined;
+  // A bare call still gets date and time, which is what most callers want. But
+  // a caller that spells out the parts it wants and names no time field is
+  // asking for a date: spreading its options over the defaults leaves hour and
+  // minute standing, so `{day, month, year}` used to render "19 Aug 2026,
+  // 05:30 AM". That is wrong for a due date or an invoice issue date, neither of
+  // which has a time at all, and callers were passing `hour: undefined,
+  // minute: undefined` to opt back out.
+  const TIME_KEYS = ["hour", "minute", "second", "hour12", "timeStyle"] as const;
+  const callerWantsTime =
+    !options || TIME_KEYS.some((key) => options[key as keyof typeof options] !== undefined);
+
+  const includeTime = callerWantsTime && o.hour !== undefined && o.minute !== undefined;
 
   let datePart: string;
   if (o.month === "long" && o.day === "numeric") {
     const y =
-      o.year === "numeric" ? String(d.getFullYear()) : String(d.getFullYear() % 100).padStart(2, "0");
+      o.year === "numeric"
+        ? String(d.getFullYear())
+        : String(d.getFullYear() % 100).padStart(2, "0");
     datePart = `${MONTHS_LONG[d.getMonth()]} ${d.getDate()}, ${y}`;
   } else {
     const day = String(d.getDate()).padStart(2, "0");
     const mon = o.month === "long" ? MONTHS_LONG[d.getMonth()] : MONTHS_SHORT[d.getMonth()];
     const yr =
-      o.year === "numeric" ? String(d.getFullYear()) : String(d.getFullYear() % 100).padStart(2, "0");
+      o.year === "numeric"
+        ? String(d.getFullYear())
+        : String(d.getFullYear() % 100).padStart(2, "0");
     datePart = `${day} ${mon} ${yr}`;
   }
 
@@ -187,7 +289,169 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
   return `${datePart}, ${timePart}`;
 }
 
+/**
+ * Parses the transactions API's "DD/MM/YYYY HH:mm:ss" display strings.
+ * Date.parse can't be trusted with slash-separated dates (it assumes
+ * MM/DD/YYYY in en-US), so this is matched manually. Returns null when the
+ * input doesn't match that shape (e.g. a date-only value).
+ */
+export function parseApiDateTime(display: string | null | undefined): Date | null {
+  if (!display) return null;
+  const match = display.match(/^(\d{2})\/(\d{2})\/(\d{4})[,\s]+(\d{2}):(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const [, dd, mm, yyyy, hh, min, ss] = match;
+  const date = new Date(
+    Number(yyyy),
+    Number(mm) - 1,
+    Number(dd),
+    Number(hh),
+    Number(min),
+    Number(ss)
+  );
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * The single transaction timestamp format used across the Transactions
+ * table and the Transaction Details page, e.g. "24 Jul '26, 03:32 PM".
+ */
+export function formatTransactionDateTime(date: Date): string {
+  const hours24 = date.getHours();
+  const hours12 = hours24 % 12 || 12;
+  const ampm = hours24 >= 12 ? "PM" : "AM";
+  const yy = String(date.getFullYear() % 100).padStart(2, "0");
+  const hh = String(hours12).padStart(2, "0");
+  const min = String(date.getMinutes()).padStart(2, "0");
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}, ${hh}:${min} ${ampm}`;
+}
+
+/**
+ * Reformats a transaction timestamp into formatTransactionDateTime's display
+ * format. The transactions API is inconsistent about the shape it sends
+ * these in — formattedCreationDateTime comes as "DD/MM/YYYY HH:mm:ss", but
+ * settlementDate comes as a raw ISO 8601 string (e.g.
+ * "2026-07-22T09:36:55.553580498Z") — so both are tried before falling back
+ * to the raw string rather than showing nothing.
+ */
+export function formatTransactionTimestamp(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  return parsed ? formatTransactionDateTime(parsed) : raw;
+}
+
+function parseIsoDateTime(raw: string): Date | null {
+  const date = new Date(raw);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Date-only variant of formatTransactionDateTime, e.g. "24 Jul '26" — same
+ * day/month/year formatting, no time-of-day portion.
+ */
+export function formatTransactionDate(date: Date): string {
+  const yy = String(date.getFullYear() % 100).padStart(2, "0");
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}`;
+}
+
+/**
+ * Reformats a transaction timestamp into formatTransactionDate's date-only
+ * display format; same dual DD/MM/YYYY-or-ISO parsing as
+ * formatTransactionTimestamp, since settlementDate can arrive in either
+ * shape.
+ */
+export function formatTransactionDateOnly(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  return parsed ? formatTransactionDate(parsed) : raw;
+}
+
+/**
+ * Weekday, ordinal day, month, no year, e.g. "Mon, 24th Aug". Used for the
+ * Analytics card's "Next settlement" line, where naming the day of the week
+ * reads better than a bare calendar date this close to the present.
+ */
+export function formatNextSettlementDate(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  if (!parsed) return raw;
+  const day = parsed.getDate();
+  return `${DAYS_SHORT[parsed.getDay()]}, ${day}${ordinalSuffix(day)} ${MONTHS_SHORT[parsed.getMonth()]}`;
+}
+
+/**
+ * Groups a phone number for display, e.g. ("+44", "7911123456") →
+ * "+44 791 112 3456". One grouping rule for every country rather than a
+ * per-country mask: a table of numbers from a dozen countries reads far better
+ * when the digit groups line up than when each row follows its own national
+ * convention, and there is no libphonenumber-style dependency in the app to
+ * supply those conventions anyway.
+ *
+ * Digits are taken three at a time from the left while more than five remain,
+ * so the number always ends on a group of three to five and never on an orphan
+ * digit or pair — the shape that makes "+65 812 345 67" look like a typo.
+ */
+export function formatPhoneNumber(dialCode: string, nationalNumber: string): string {
+  const digits = nationalNumber.replace(/\D/g, "");
+  const groups: string[] = [];
+  let rest = digits;
+  while (rest.length > 5) {
+    groups.push(rest.slice(0, 3));
+    rest = rest.slice(3);
+  }
+  if (rest) groups.push(rest);
+  return `${dialCode} ${groups.join(" ")}`.trim();
+}
+
 export function truncate(str: string, length: number): string {
   if (str.length <= length) return str;
   return `${str.slice(0, length)}...`;
+}
+
+/**
+ * Shortens from the middle, keeping the head and tail visible, e.g. an IBAN
+ * as "DE89 3704 00…130 00".
+ *
+ * The right shape for identifiers a user verifies rather than reads: with an
+ * account number or an IBAN, the leading characters say which rail and bank
+ * it is and the trailing ones are what a merchant eyeballs against the copy
+ * they already hold, while the middle carries neither. `truncate` above drops
+ * the tail entirely, which loses exactly the half that does the checking.
+ *
+ * Returns the string untouched unless eliding it hides a worthwhile number of
+ * characters. A bare `length > head + tail` guard isn't enough: a 20-character
+ * account holder's name against a head of 12 and a tail of 6 would come back
+ * one character shorter and unreadable, having traded a whole word for an
+ * ellipsis. MIN_ELIDED below is what buys that case out.
+ */
+const MIN_ELIDED = 4;
+
+export function truncateMiddle(str: string, head = 12, tail = 6): string {
+  if (str.length <= head + tail + MIN_ELIDED) return str;
+  return `${str.slice(0, head)}…${str.slice(-tail)}`;
+}
+
+/** Byte count -> human readable size, e.g. 245_000 -> "245 KB", 3_400_000 -> "3.4 MB". */
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(kb < 10 ? 1 : 0)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(mb < 10 ? 1 : 0)} MB`;
+}
+
+/**
+ * Hands a blob to the browser as a file download. The API returns exports as
+ * a blob rather than a URL, so there is nothing to navigate to — an anchor is
+ * synthesised, clicked, and torn down. The object URL is revoked afterwards
+ * so the blob can be garbage collected.
+ */
+export function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }

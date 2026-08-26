@@ -1,9 +1,13 @@
 import type { IconName } from "@/components/icon";
+import type { ProductType } from "@/lib/hooks/useResolvedMids";
 
 export type NavChild = {
   label: string;
   href: string;
   permission?: string[];
+  /** Only shown while the header's product context matches, see
+   * useProductContext.ts. Omit for items shared by both products. */
+  product?: ProductType;
 };
 
 export type NavItem = {
@@ -13,6 +17,9 @@ export type NavItem = {
   badge?: string;
   permission?: string[];
   children?: NavChild[];
+  /** Only shown while the header's product context matches, see
+   * useProductContext.ts. Omit for items shared by both products. */
+  product?: ProductType;
 };
 
 export type NavGroup = {
@@ -20,21 +27,62 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+// ─── Home navigation (Header's "Home" tab, the combined overview) ─────────────
+// Deliberately short, 3 top-level items only, the full Payments/MCA feature
+// tree below only makes sense once the merchant has picked a product.
+
+export const homeNavigation: NavGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: "layout-grid", permission: [] },
+      { label: "Reports", href: "/settlement-report", icon: "file-text", permission: [] },
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: "settings",
+        permission: [],
+        children: [{ label: "Team Management", href: "/team-management", permission: [] }],
+      },
+    ],
+  },
+];
+
 // ─── Regular merchant navigation ──────────────────────────────────────────────
+// Shown once the Header's "Payments" tab is active (see useProductContext.ts),
+// not for "Home" or "Multi-Currency Accounts", which have their own trees
+// above and below.
 
 export const regularNavigation: NavGroup[] = [
   {
     label: "Overview",
     items: [
-      { label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] },
+      {
+        label: "Dashboard",
+        href: "/pa-dashboard",
+        icon: "layout-grid",
+        permission: [],
+        product: "PA",
+      },
+      {
+        label: "Dashboard",
+        href: "/mca-dashboard",
+        icon: "layout-grid",
+        permission: [],
+        product: "PACB",
+      },
     ],
   },
   {
     label: "Payments",
     items: [
       {
+        // Top-level rather than nested under Payment Products, mirroring the
+        // MCA tree. /pa-transactions is this tree's table: regularNavigation
+        // only renders while the Header's "Payments" tab is active, MCA has
+        // its own tree with its own /mca-transactions entry.
         label: "Transactions",
-        href: "/transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
@@ -44,12 +92,29 @@ export const regularNavigation: NavGroup[] = [
         icon: "shopping-cart",
         permission: [],
         children: [
-          { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
-          { label: "MCA Links", href: "/mca-links", permission: [] },
-          { label: "Payment Links", href: "/payment-links", permission: [] },
+          // Multi Currency Accounts and Platforms live in the MCA tree only
+          // (as "International Accounts" and "Connect Platforms"), they are
+          // not Payments products.
+          //
+          // Receipts is this branch's own: uat carries no entry for it. Second
+          // way into /receipts, the first being Finance's own entry below.
+          // Tagged PACB so it only surfaces while the header's product context
+          // is Multi-Currency Accounts — a receipt is a finance record wherever
+          // you enter from, but it is only an MCA artefact while that product is
+          // the one in view.
+          { label: "Receipts", href: "/receipts", permission: [], product: "PACB" },
+          { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
+          { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },
         ],
+      },
+      {
+        label: "SKU Management",
+        href: "/sku-management",
+        icon: "package",
+        badge: "NEW",
+        permission: [],
       },
       {
         label: "Manage Mandates",
@@ -64,15 +129,26 @@ export const regularNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/reports/settlement-report",
+        href: "/settlement-report",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
+      },
+      // Same page the Payment Products group links to under Multi Currency
+      // Accounts (see above). Listed in both places deliberately: merchants
+      // reach receipts either as a finance record or from the product they were
+      // raised under, and the sidebar's active state keys off the pathname, so
+      // whichever entry is on screen highlights.
+      {
+        label: "Receipts",
+        href: "/receipts",
+        icon: "receipt",
+        badge: "NEW",
+        permission: [],
       },
       {
         label: "Invoice Management",
         href: "/mca-invoices",
         icon: "receipt",
-        badge: "NEW",
         permission: ["getAllMerchantInvoice"],
       },
       {
@@ -114,9 +190,15 @@ export const regularNavigation: NavGroup[] = [
   {
     label: "Configure",
     items: [
+      // Points at this app's own Client Management page (/client-management)
+      // rather than pg-dashboard's /mca-clients route, which has no v2
+      // equivalent. Gated on getAllMcaClient, the permission pg-dashboard puts on
+      // the same page: the page now genuinely calls that endpoint (the client list
+      // is server-backed), so hiding it from a user who cannot call it is correct
+      // — which was not true while it read a local client book.
       {
         label: "Client Management",
-        href: "/mca-clients",
+        href: "/client-management",
         icon: "users",
         permission: ["getAllMcaClient"],
       },
@@ -144,22 +226,108 @@ export const regularNavigation: NavGroup[] = [
   },
 ];
 
+// ─── MCA navigation ────────────────────────────────────────────────────────────
+// Shown instead of regularNavigation while the Header's "Multi-Currency
+// Accounts" tab is active, a dedicated tree (not the PA/PACB-shared one
+// above) since MCA's feature set and grouping differ enough that tagging
+// items with product:"PACB" on the shared tree stopped making sense.
+
+export const mcaNavigation: NavGroup[] = [
+  {
+    label: "Home",
+    items: [{ label: "Dashboard", href: "/mca-dashboard", icon: "layout-grid", permission: [] }],
+  },
+  {
+    label: "Payments",
+    items: [
+      {
+        // /mca-transactions, not /transactions: the single segment-toggled
+        // page this tree was designed against has since been split into the
+        // PA and MCA tables, and the MCA one is this tree's product.
+        label: "Transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        // /mca-settlement-report, the MCA twin of the shared /settlement-report
+        // route the Home and Payments trees use, see settlement-reports/routes.ts.
+        label: "Settlements",
+        href: "/mca-settlement-report",
+        icon: "file-text",
+        permission: ["getAllSettlementDetailReports", "getSettlementReport"],
+      },
+      { label: "Invoice Management", href: "/mca-invoices", icon: "receipt", permission: [] },
+    ],
+  },
+  {
+    label: "Accounts",
+    items: [
+      // /multi-currency, this app's existing virtual-accounts page, rather
+      // than the /international-accounts route this tree was designed
+      // against, which was never built.
+      { label: "International Accounts", href: "/multi-currency", icon: "globe-2", permission: [] },
+      // /platforms, this app's existing Platforms page, rather than the
+      // /connect-platforms route this tree was designed against, which was
+      // never built.
+      { label: "Connect Platforms", href: "/platforms", icon: "link", permission: [] },
+    ],
+  },
+  {
+    label: "Compliance Center",
+    items: [
+      { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
+      { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
+      // Same /receipts page the Payments tree reaches under Payment Products and
+      // Finance, labelled for what an MCA merchant comes here for: the GST
+      // invoices PayGlocal raises against them. A compliance record in this tree,
+      // a finance record in that one, one page either way.
+      {
+        label: "GST Invoices",
+        href: "/receipts",
+        icon: "receipt",
+        badge: "NEW",
+        permission: [],
+      },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      // /client-management, not pg-dashboard's /mca-clients route: this app
+      // has its own page, gated on the same getAllMcaClient permission.
+      {
+        label: "Client management",
+        href: "/client-management",
+        icon: "users",
+        permission: ["getAllMcaClient"],
+      },
+      { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
+      { label: "Team management", href: "/team-management", icon: "user-plus", permission: [] },
+    ],
+  },
+];
+
 // ─── Partner navigation ────────────────────────────────────────────────────────
 
 export const partnerNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/manage-merchants", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/manage-merchants", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Merchant",
     items: [
       { label: "Merchant Activation", href: "/my-merchants", icon: "users", permission: [] },
       {
-        label: "Transaction Overview",
-        href: "/transactions",
+        label: "Transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
@@ -199,16 +367,20 @@ export const partnerNavigation: NavGroup[] = [
 export const globalNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [
-      { label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] },
-    ],
+    items: [{ label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Payments",
     items: [
       {
         label: "Transactions",
-        href: "/transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        label: "Transactions",
+        href: "/pa-transactions",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
@@ -217,9 +389,7 @@ export const globalNavigation: NavGroup[] = [
         href: "/payment-products",
         icon: "shopping-cart",
         permission: [],
-        children: [
-          { label: "Payment Links", href: "/payment-links", permission: [] },
-        ],
+        children: [{ label: "Payment Links", href: "/payment-links", permission: [] }],
       },
     ],
   },
@@ -228,7 +398,7 @@ export const globalNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/reports/settlement-report",
+        href: "/settlement-report",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
       },

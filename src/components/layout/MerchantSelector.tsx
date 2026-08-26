@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui";
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -57,7 +63,25 @@ function MidAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md" }) 
 
 type TagUpdateVars = { dynamicUrl: string };
 
-export function MerchantSelector() {
+/**
+ * Whether this account has more than one MID to pick between. The selector
+ * itself renders nothing when it doesn't, so the Sidebar reads the same
+ * condition to drop the wrapper holding it, otherwise that wrapper's padding
+ * and bottom border survive as an empty banded strip with a divider under it.
+ */
+export function useHasMultipleMids(): boolean {
+  const paMidIds = useApp((s) => s.paMids);
+  const paCbMidIds = useApp((s) => s.paCbMids);
+  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  return paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+}
+
+interface MerchantSelectorProps {
+  /** Sidebar is collapsed to icon-only width, shrink the trigger to match. */
+  collapsed?: boolean;
+}
+
+export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
   const paMidIds = useApp((s) => s.paMids);
   const paCbMidIds = useApp((s) => s.paCbMids);
   const tidsInfo = useApp((s) => s.tidsInfo);
@@ -68,6 +92,7 @@ export function MerchantSelector() {
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
 
   const [open, setOpen] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
   const [activeProduct, setActiveProduct] = useState<string | null>(null);
   const [hoveredMid, setHoveredMid] = useState<string | null>(null);
   const [editingMid, setEditingMid] = useState<string | null>(null);
@@ -98,7 +123,7 @@ export function MerchantSelector() {
     [paCbMidInfos, paMidInfos]
   );
 
-  const isMultiMids = paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+  const isMultiMids = useHasMultipleMids();
 
   const {
     data: merchantProductsData,
@@ -162,7 +187,7 @@ export function MerchantSelector() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Suppress unused-variable warning — data drives tidsInfo via useFetchCommonData
+  // Suppress unused-variable warning, data drives tidsInfo via useFetchCommonData
   void merchantProductsData;
 
   const allMids = useMemo(() => products.flatMap((p) => p.mids), [products]);
@@ -185,46 +210,75 @@ export function MerchantSelector() {
 
   const activeMids = products.find((p) => p.key === activeProduct)?.mids ?? [];
 
+  function toggleOpen() {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) setCoords({ top: rect.bottom + 8, left: rect.left });
+    setOpen(true);
+  }
+
   return (
-    <div ref={ref} className="relative flex-shrink-0">
+    <div ref={ref} className="relative w-full flex-shrink-0">
       {/* Trigger */}
       <div
         role="button"
         tabIndex={0}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggleOpen}
+        title={
+          collapsed
+            ? triggerName
+              ? `${selectedProductLabel} / ${triggerName}`
+              : "All Businesses"
+            : undefined
+        }
         onKeyDown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setOpen((v) => !v);
+            toggleOpen();
           }
         }}
         className={cn(
-          "flex cursor-pointer items-center gap-2 rounded-lg py-1.5 pl-2 pr-2.5 transition-colors",
-          open ? "bg-muted" : "hover:bg-muted"
+          "flex w-full cursor-pointer items-center gap-2 rounded-lg border border-border transition-colors",
+          collapsed ? "justify-center p-1.5" : "px-2.5 py-2",
+          open ? "bg-muted" : "bg-card hover:bg-muted"
         )}
       >
         {triggerName ? (
           <MidAvatar name={triggerName} />
         ) : (
-          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center">
+          <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-muted">
             <Icon name="building-2" size={14} className="text-muted-foreground" />
           </div>
         )}
-        <span className="max-w-[160px] truncate text-[13px] font-semibold text-foreground">
-          {triggerName ? `${selectedProductLabel} / ${triggerName}` : "All accounts"}
-        </span>
-        <Icon
-          name="chevron-down"
-          size={14}
-          className={cn("text-muted-foreground transition-transform", open && "rotate-180")}
-        />
+        {!collapsed && (
+          <>
+            <span className="min-w-0 flex-1 truncate text-left text-[13px] font-semibold text-foreground">
+              {triggerName ? `${selectedProductLabel} / ${triggerName}` : "All Businesses"}
+            </span>
+            <Icon
+              name="chevron-down"
+              size={14}
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform",
+                open && "rotate-180"
+              )}
+            />
+          </>
+        )}
       </div>
 
-      {/* Dropdown */}
-      {open && (
+      {/* Dropdown, fixed positioning escapes the sidebar's clipped overflow */}
+      {open && coords && (
         <div
-          className="absolute left-0 top-full z-50 mt-2 min-w-[480px] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground"
-          style={{ boxShadow: "0 12px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)" }}
+          className="fixed z-50 min-w-[480px] overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground"
+          style={{
+            top: coords.top,
+            left: coords.left,
+            boxShadow: "0 12px 32px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06)",
+          }}
         >
           {/* Header */}
           <div className="border-b border-border px-4 pb-3.5 pt-4">
@@ -256,7 +310,7 @@ export function MerchantSelector() {
 
           {/* Two-column body */}
           <div className="grid grid-cols-2 divide-x divide-border">
-            {/* Left — products */}
+            {/* Left, products */}
             <div className="px-3 py-3">
               <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Active Products
@@ -308,14 +362,14 @@ export function MerchantSelector() {
               </div>
             </div>
 
-            {/* Right — MIDs */}
+            {/* Right, MIDs */}
             <div className="px-3 py-3">
               <p className="mb-1.5 px-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
                 Accounts
               </p>
               {activeProduct ? (
                 <div className="space-y-0.5">
-                  {activeMids.map(({ mid, status, tradeName, displayTag }) =>
+                  {activeMids.map(({ mid, status, tradeName, displayTag, merchantWebsite }) =>
                     editingMid === mid ? (
                       <div
                         key={mid}
@@ -396,9 +450,31 @@ export function MerchantSelector() {
                           }}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12.5px] font-medium text-foreground">
-                            {displayTag || tradeName}
-                          </p>
+                          <div className="flex items-center gap-1">
+                            <p className="truncate text-[12.5px] font-medium text-foreground">
+                              {displayTag || tradeName}
+                            </p>
+                            {merchantWebsite && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className="inline-flex flex-shrink-0 text-muted-foreground"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Icon name="info" size={11} />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+                                    sideOffset={4}
+                                  >
+                                    {merchantWebsite}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <p className="truncate text-[10.5px] text-muted-foreground">{mid}</p>
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-1">

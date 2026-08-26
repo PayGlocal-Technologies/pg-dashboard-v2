@@ -1,0 +1,189 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { type Column, StatusBadge } from "@/components/ui";
+import { RowClick } from "@/components/common/table/RowClick";
+import { SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
+import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
+import { EditablePriceCell } from "@/features/dashboard/sku-management/components/EditablePriceCell";
+import type { SkuPriceField, SkuProduct } from "@/features/dashboard/sku-management/types";
+
+// The two price columns' headers are declared once and reused as the popover's
+// label and assistive line ("This will update the selling price of this
+// product"), so renaming a column renames what its editor says about itself.
+const SELLING_PRICE_HEADER = "Selling price";
+const PRODUCT_COST_HEADER = "Product cost";
+
+/**
+ * Fences an interactive control off from the row click wrapped around it.
+ *
+ * The guard sits on this wrapper rather than on the control itself: the price
+ * editors open a Radix popover whose trigger composes its own click handler,
+ * and adding a second handler to that chain is exactly the arrangement the row
+ * overflow menu failed to open from. Stopping one level out leaves the
+ * control's own handlers untouched — the click simply never reaches RowClick's
+ * div. Any future control added inside a row cell should be wrapped the same
+ * way.
+ */
+function StopRowClick({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+      {children}
+    </span>
+  );
+}
+
+// Column widths, typography (text-[13px] body, muted secondary text), and
+// alignment conventions mirror buildMcaColumns so the two tables read as one
+// system. Every cell is wrapped in RowClick, so the whole row opens the
+// product preview — including each cell's padding, which a bare span would
+// leave dead. The two price editors are fenced off with StopRowClick above.
+//
+// These are the table's whole column set, plus the optional MID column below.
+// The row's overflow menu is
+// deliberately not among them — it rides DataTable's `rowAction` slot instead
+// (see SkuTable), so it never takes column width, never reorders with the
+// data, and stays pinned to the right while the columns scroll.
+export function buildSkuColumns(
+  onPriceChange: (id: string, field: SkuPriceField, next: number) => void,
+  onPreview: (product: SkuProduct) => void,
+  /**
+   * Adds the MID column, second from the left. Only true when the merchant
+   * holds several PACB MIDs and has selected none — the one state where rows
+   * from different accounts sit in the same table and the row's own name is not
+   * enough to tell you which account it belongs to. Same condition and same
+   * position pg-dashboard uses (`hidden: !showMid`).
+   */
+  showMid = false
+): Column<SkuProduct>[] {
+  return [
+    {
+      key: "name",
+      header: "Product",
+      // The floor, not the final width: `tableLayout="content"` sizes this
+      // column to its widest cell, and min-w-max below keeps that measurement
+      // honest, so the longest product name sets the column width. 340 covers
+      // the 70px thumbnail plus a typical name, so the column doesn't jump
+      // around while the table is still filling in.
+      minWidth: 340,
+      // Compact density puts overflow-hidden on every cell, which would clip
+      // the un-wrapped name back to the column's current width and defeat the
+      // min-w-max measurement — cancelled here, same as mcaColumns does for
+      // its Country cell.
+      cellClassName: "overflow-visible",
+      render: (row) => (
+        <RowClick onClick={() => onPreview(row)}>
+          {/* min-w-max: the cell never shrinks below thumbnail + full name, so
+              the column widens to fit rather than truncating or wrapping. */}
+          <div className="flex min-w-max items-center gap-3">
+            <ProductThumbnail product={row} className="shrink-0" />
+            <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
+              {row.name}
+            </span>
+          </div>
+        </RowClick>
+      ),
+    },
+    ...(showMid
+      ? [
+          {
+            key: "mid",
+            header: "MID",
+            minWidth: 120,
+            render: (row: SkuProduct) => (
+              <RowClick onClick={() => onPreview(row)}>
+                <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
+                  {row.mid || "—"}
+                </span>
+              </RowClick>
+            ),
+          } satisfies Column<SkuProduct>,
+        ]
+      : []),
+    {
+      key: "type",
+      header: "Type of product",
+      minWidth: 150,
+      render: (row) => (
+        <RowClick onClick={() => onPreview(row)}>
+          <StatusBadge
+            variant={row.type === "GOODS" ? "info" : "muted"}
+            label={row.type ? SKU_TYPE_LABEL[row.type] : "—"}
+            size="sm"
+          />
+        </RowClick>
+      ),
+    },
+    {
+      key: "hsnSac",
+      header: "HSN/SAC",
+      minWidth: 130,
+      render: (row) => (
+        <RowClick onClick={() => onPreview(row)}>
+          <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
+            {row.hsnSac}
+          </span>
+        </RowClick>
+      ),
+    },
+    {
+      key: "sellingPrice",
+      header: SELLING_PRICE_HEADER,
+      minWidth: 140,
+      align: "right",
+      // Compact density clips cells; the trigger's hover fill sits slightly
+      // proud of the text box and would be cut off without this.
+      cellClassName: "overflow-visible",
+      render: (row) => (
+        <RowClick onClick={() => onPreview(row)} align="right">
+          <StopRowClick>
+            <EditablePriceCell
+              label={SELLING_PRICE_HEADER}
+              value={row.sellingPrice}
+              currency={row.currency}
+              onSave={(next) => onPriceChange(row.id, "sellingPrice", next)}
+              emphasis
+            />
+          </StopRowClick>
+        </RowClick>
+      ),
+    },
+    {
+      key: "productCost",
+      header: PRODUCT_COST_HEADER,
+      minWidth: 140,
+      align: "right",
+      cellClassName: "overflow-visible",
+      render: (row) => (
+        <RowClick onClick={() => onPreview(row)} align="right">
+          <StopRowClick>
+            <EditablePriceCell
+              label={PRODUCT_COST_HEADER}
+              value={row.productCost}
+              currency={row.currency}
+              onSave={(next) => onPriceChange(row.id, "productCost", next)}
+            />
+          </StopRowClick>
+        </RowClick>
+      ),
+    },
+    {
+      key: "description",
+      header: "Description",
+      minWidth: 260,
+      // Descriptions are full sentences: they get a fixed width and truncate
+      // (with the full text in `title`) rather than widening the column to fit
+      // the longest one, which would push the priced columns off screen.
+      render: (row) => (
+        <RowClick onClick={() => onPreview(row)}>
+          <span
+            className="block w-[240px] truncate text-[13px] text-muted-foreground"
+            title={row.description}
+          >
+            {row.description}
+          </span>
+        </RowClick>
+      ),
+    },
+  ];
+}
