@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { Avatar, AvatarFallback } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -56,7 +56,7 @@ export function ProductThumbnail({
         />
       ) : (
         <AvatarFallback className="rounded-lg bg-muted text-muted-foreground">
-          <Icon name={product.type === "GOODS" ? "package" : "wrench"} className="h-6 w-6" />
+          <Icon name={product.type === "SERVICES" ? "wrench" : "package"} className="h-6 w-6" />
         </AvatarFallback>
       )}
     </Avatar>

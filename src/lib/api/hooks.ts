@@ -108,6 +108,7 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
               });
 
         useApp.getState().resetTimer();
+
         return res.data;
       } catch (error) {
         return handleApiError(error as AxiosError);

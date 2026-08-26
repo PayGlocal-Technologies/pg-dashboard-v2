@@ -36,7 +36,7 @@ export function DeleteSkuDialog({ product, onOpenChange, onConfirm }: DeleteSkuD
                   sentence. */}
               <span className="font-medium text-foreground">{product?.name ?? "This item"}</span>{" "}
               will be permanently deleted, along with its pricing and tax details. This can&apos;t
-              be undone — archive it instead if you only want it out of the active list.
+              be undone. Past invoices that used this item are unaffected.
             </DialogDescription>
           </div>
         </div>

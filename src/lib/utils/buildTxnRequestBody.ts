@@ -41,6 +41,12 @@ export function buildTxnRequestBody(
     fieldSearch.currency = filters.currency;
   }
 
+  // Country filter (client list) — names, not codes. Same key pg-dashboard's
+  // tableRequestbodyBuilder writes for its client-list country dropdown.
+  if (filters.country?.length) {
+    fieldSearch.country = filters.country;
+  }
+
   // Merchant ID filter (partner / multi-mid scenarios)
   if (selectedMid?.key && selectedMid?.value?.length) {
     fieldSearch[selectedMid.key] = selectedMid.value;

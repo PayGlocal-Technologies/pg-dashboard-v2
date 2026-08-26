@@ -135,7 +135,7 @@ Every SVG asset — logos, wordmarks, brand illustrations, payment-method icons,
 grep -rn '\.png\|\.svg\|\.jpg\|\.webp\|<Image' pg-dashboard-v2/src --include="*.tsx" --include="*.ts"
 ```
 
-Every hit must be either a `next/image` used for dynamic/remote images (e.g. flag CDN URLs) or have a documented reason why the registry pattern doesn't apply.
+Every hit must be either an `<AppImage>` used for dynamic/remote images (e.g. flag CDN URLs) or have a documented reason why the registry pattern doesn't apply.
 
 ## UI components — COMPULSORY RULE
 
@@ -156,17 +156,63 @@ Every hit must be either a `next/image` used for dynamic/remote images (e.g. fla
 | Status chip            | `<StatusBadge>`                           | hand-rolled `<span>` with colour classes            |
 | Loading skeleton       | `<Shimmer>`, `<StatCardSkeleton>`, etc.   | `<div>` with `animate-pulse`                        |
 | Page title bar         | `<PageHeader>`                            | hand-rolled heading + breadcrumb                    |
-| Images                 | `<Image>` from `next/image`               | `<img>`                                             |
+| Images                 | `<AppImage>` from `@/components/common/AppImage` | `<img>`, `next/image` directly                |
 
-**`<img>` is never allowed.** Always use `<Image>` from `next/image`. For blob URLs (e.g. `URL.createObjectURL`) or other sources that cannot be optimised, pass `unoptimized` and provide explicit `width`/`height` props:
+**`<img>` is never allowed, and neither is importing `next/image` directly.** Always use `<AppImage>`. For blob URLs (e.g. `URL.createObjectURL`) or other sources that cannot be optimised, pass `unoptimized` and provide explicit `width`/`height` props:
 
 ```tsx
 // CORRECT — blob URL from file upload
+import { AppImage } from "@/components/common/AppImage";
+<AppImage src={previewUrl} alt="Preview" width={64} height={64} unoptimized className="..." />
+
+// WRONG — renders broken under the app's base path
 import Image from "next/image";
-<Image src={previewUrl} alt="Preview" width={64} height={64} unoptimized className="..." />
+<Image src="/assets/logo.png" alt="Logo" width={64} height={64} />
 
 // WRONG
 <img src={previewUrl} alt="Preview" className="..." />
+```
+
+### Why AppImage and not `next/image` — COMPULSORY RULE
+
+The app is served from a base path (`/app-v2`, see `src/constants/basePath.ts`).
+Next applies that prefix to the image **optimizer route** but *not* to the `src`
+it points at, and for `unoptimized` images it does not touch the src at all. A
+`public/` file therefore fails **both** ways round:
+
+```
+optimized:   src="/app-v2/_next/image?url=%2Fassets%2Flogo.png"   → 400 "not a valid image"
+unoptimized: src="/assets/logo.png"                                → 404
+```
+
+`<AppImage>` is a thin `next/image` wrapper that runs `src` through
+`withBasePath()`, fixing both. It only touches root-relative paths — `blob:`,
+`data:` and absolute CDN URLs pass through untouched — so it is a safe drop-in
+everywhere.
+
+`src/components/common/AppImage.tsx` is the only file allowed to import
+`next/image`; an ESLint `no-restricted-imports` rule enforces this. **Never
+hardcode the base path into a src** (`src="/app-v2/assets/…"`) — that is what
+pg-dashboard does in 41 places, and it means every base-path change is a
+find-and-replace.
+
+**The one case the lint rule cannot catch** is a CSS background, because the
+path is a string inside a style object rather than an import. Wrap those by
+hand:
+
+```tsx
+// CORRECT
+style={{ backgroundImage: `url(${withBasePath("/assets/banner.png")})` }}
+
+// WRONG — 404s under the base path
+style={{ backgroundImage: "url(/assets/banner.png)" }}
+```
+
+**How to audit:**
+
+```bash
+grep -rn 'from "next/image"' src --include="*.tsx"   # must only match AppImage.tsx
+grep -rn 'url(/' src                                 # CSS backgrounds needing withBasePath
 ```
 
 ### When a bare element is acceptable

@@ -185,3 +185,26 @@ export interface FfmsSettlementDownloadResponse {
   };
   message?: string;
 }
+
+// ── Bank holiday calendar (real contract, from pg-dashboard) ─────────────────
+// pg-dashboard/src/features/BankHolidayCalendar/types.ts. This one IS backed by
+// a live endpoint, unlike the summary and detail shapes above.
+
+/** One holiday. `currency` is the settlement rail it closes, not the country's
+ *  own currency in general: production filters on it and defaults to INR (BASE
+ *  in its constants.ts), which is the only rail INR settlements care about. */
+export interface CalendarHoliday {
+  date: string;
+  name: string;
+  currency: string;
+  countryCode: string;
+}
+
+/** Bucketed by country code, so the same holiday can appear under several
+ *  countries when they share a currency. Callers flatten and dedupe by date. */
+export interface HolidayCalendarResponse {
+  data: {
+    holidays: Record<string, CalendarHoliday[]>;
+  };
+  message?: string;
+}

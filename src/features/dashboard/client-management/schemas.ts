@@ -20,7 +20,7 @@ export function validateBusinessName(value: string): string | undefined {
 }
 
 export function validateBusinessType(value: string): string | undefined {
-  return (CLIENT_BUSINESS_TYPES as readonly string[]).includes(value)
+  return CLIENT_BUSINESS_TYPES.some((option) => option.value === value)
     ? undefined
     : "Select a business type";
 }
@@ -111,60 +111,6 @@ export function countryNameFor(countryIso2: string): string {
   return COUNTRIES.find((c) => c.code === countryIso2)?.name ?? countryIso2;
 }
 
-/**
- * Turns validated form values into the client-record shape, minus the fields
- * the caller owns (`id`, and the invoice/outstanding figures a brand-new
- * client has none of). Returns null when the form doesn't pass, so a caller
- * can't build a half-valid client.
- *
- * `createdAt` is stamped here from the clock rather than being a form field —
- * it's generated, never entered. Safe because this only ever runs inside a
- * submit handler; the same call during render would break React's idempotency
- * guarantee (see CLAUDE.md).
- */
-export function toClientFields(
-  values: ClientFormValues
-): Omit<
-  Client,
-  "id" | "outstandingAmount" | "outstandingCurrency" | "totalInvoices" | "paidInvoices"
-> | null {
-  if (!isClientFormValid(values)) return null;
-
-  const countryName = countryNameFor(values.country);
-  const addressLine = values.addressLine.trim();
-  const city = values.city.trim();
-  const state = values.state.trim();
-  const zipcode = values.zipcode.trim();
-  const website = values.website.trim();
-
-  return {
-    businessName: values.businessName.trim(),
-    primaryContactName: values.primaryContactName.trim(),
-    email: values.primaryContactEmail.trim(),
-    phoneDialCode: dialCodeFor(values.phoneCountry),
-    phoneNumber: values.phoneNumber.replace(/\D/g, ""),
-    // Composed once, here, from the parts the form collected: the Contact
-    // section renders this one string, while the parts stay on the record for
-    // a future edit form to read back.
-    billingAddress: [addressLine, city, state, zipcode, countryName].filter(Boolean).join(", "),
-    countryIso2: values.country,
-    countryName,
-    createdAt: new Date().toISOString(),
-    businessType: values.businessType,
-    // Normalised so a bare "acme.com" is still a working link wherever this is
-    // eventually rendered as one.
-    website: website ? (/^https?:\/\//i.test(website) ? website : `https://${website}`) : undefined,
-    tags: values.tags.length ? values.tags : undefined,
-    addressLine,
-    city,
-    state,
-    zipcode,
-    gstin: values.gstin.trim() || undefined,
-    notes: values.notes.trim() || undefined,
-    contract: values.contract ?? undefined,
-  };
-}
-
 /** A blank form — also what "Save and add another" resets back to. */
 export function emptyClientForm(): ClientFormValues {
   return {
@@ -179,8 +125,19 @@ export function emptyClientForm(): ClientFormValues {
     country: "",
     state: "",
     addressLine: "",
+    addressLine2: "",
     city: "",
     zipcode: "",
+    // Both default to the case that needs no extra typing: one name, one
+    // address. Either can be unticked to reveal the fields it collapses.
+    sameAsBusinessName: false,
+    sameAsBillingAddress: true,
+    shippingAddressLine: "",
+    shippingAddressLine2: "",
+    shippingCity: "",
+    shippingState: "",
+    shippingZipcode: "",
+    shippingCountry: "",
     gstin: "",
     notes: "",
     contract: null,

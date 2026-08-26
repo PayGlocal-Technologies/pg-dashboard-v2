@@ -181,6 +181,50 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
+// Spelled out rather than read from Intl: a billing period is a calendar month,
+// not a moment, so the label must not vary with the reader's locale or timezone
+// the way toLocaleString would. "2026-08" reads "August 2026" for everyone, and
+// the same reasoning that keeps formatDate on fixed English strings (below)
+// keeps these here.
+export const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+/** The same twelve, abbreviated — for anything laying months out in a grid. */
+export const MONTH_SHORT_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/** "2026-08" → "August 2026". Returns the raw value if it isn't a "YYYY-MM" pair. */
+export function formatMonthLabel(periodMonth: string): string {
+  const [year, month] = periodMonth.split("-");
+  const name = MONTH_LABELS[Number(month) - 1];
+  if (!year || !name) return periodMonth;
+  return `${name} ${year}`;
+}
+
 /**
  * Formats dates for UI. Uses fixed English strings (not Intl) so server and
  * client render identical markup and avoid hydration mismatches.
@@ -197,7 +241,18 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
     ...options,
   };
 
-  const includeTime = o.hour !== undefined && o.minute !== undefined;
+  // A bare call still gets date and time, which is what most callers want. But
+  // a caller that spells out the parts it wants and names no time field is
+  // asking for a date: spreading its options over the defaults leaves hour and
+  // minute standing, so `{day, month, year}` used to render "19 Aug 2026,
+  // 05:30 AM". That is wrong for a due date or an invoice issue date, neither of
+  // which has a time at all, and callers were passing `hour: undefined,
+  // minute: undefined` to opt back out.
+  const TIME_KEYS = ["hour", "minute", "second", "hour12", "timeStyle"] as const;
+  const callerWantsTime =
+    !options || TIME_KEYS.some((key) => options[key as keyof typeof options] !== undefined);
+
+  const includeTime = callerWantsTime && o.hour !== undefined && o.minute !== undefined;
 
   let datePart: string;
   if (o.month === "long" && o.day === "numeric") {

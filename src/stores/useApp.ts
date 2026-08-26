@@ -57,6 +57,7 @@ export interface MidConfig {
   paFeatures: string[];
   paCbFeatures: string[];
   pacboFeatures: string[];
+  merchantWebsite?: string | null;
 }
 
 export interface MerchantEnabledProducts {

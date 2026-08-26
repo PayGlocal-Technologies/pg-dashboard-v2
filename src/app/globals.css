@@ -145,6 +145,30 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* ─── Form controls ─────────────────────────────────────────────────────────
+   A typed-in value is always --foreground, whatever it happens to be nested in.
+
+   flux's Input/Textarea set `placeholder:text-muted-foreground` but no colour for
+   the value itself, so the value inherits from its container. Inside anything that
+   mutes its own subtree the two then resolve to the *same* colour and a real value
+   is indistinguishable from a placeholder — which is what flux's own
+   AccordionContent does (it carries `text-sm text-muted-foreground`), and every
+   form that sections its fields into an accordion inherited it: the Add/Edit
+   client modal and the Create payment link page both did.
+
+   Fixed here rather than by un-muting each accordion, because the rule belongs to
+   the control and not to whatever wraps it — a future form nested in any muted
+   container gets it for free.
+
+   Bare element selectors, so this loses to every Tailwind utility: flux's own
+   `read-only:text-muted-foreground` and `disabled:` treatments still win, and
+   ::placeholder is a pseudo-element the element's own colour never reaches. */
+input,
+textarea,
+select {
+  color: var(--foreground);
+}
+
 /* ─── Scrollbar ─────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 4px;

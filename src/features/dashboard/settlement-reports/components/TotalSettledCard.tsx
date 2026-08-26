@@ -116,7 +116,7 @@ export function TotalSettledCard({
         </div>
       </div>
 
-      <div className="h-48 w-full">
+      <div className="h-76 w-full">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <defs>
