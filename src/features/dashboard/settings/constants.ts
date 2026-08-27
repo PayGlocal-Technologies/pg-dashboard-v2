@@ -40,15 +40,18 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     label: "Payments & Platform",
     items: [
       { label: "Payments", href: "/settings/payments", icon: "credit-card" },
-      {
-        label: "Developer",
-        href: "/settings/developer",
-        icon: "key-round",
-        children: [
-          { label: "API keys", href: "/settings/developer/api-keys" },
-          { label: "Webhooks", href: "/settings/developer/webhooks" },
-        ],
-      },
+      // TEMPORARILY HIDDEN — Developer section (API keys + Webhooks). Removed
+      // from the nav for now (no backing endpoints yet); the routes/pages and
+      // components stay in the codebase. Restore by un-commenting this item.
+      // {
+      //   label: "Developer",
+      //   href: "/settings/developer",
+      //   icon: "key-round",
+      //   children: [
+      //     { label: "API keys", href: "/settings/developer/api-keys" },
+      //     { label: "Webhooks", href: "/settings/developer/webhooks" },
+      //   ],
+      // },
       { label: "Integrations", href: "/settings/integrations", icon: "puzzle" },
       { label: "Notifications", href: "/settings/notifications", icon: "bell" },
     ],
