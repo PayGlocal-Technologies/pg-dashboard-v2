@@ -183,7 +183,7 @@ export function TutorialTile({ video }: { video: TutorialVideo }) {
             open();
           }
         }}
-        className={ready ? "cursor-pointer" : "cursor-default"}
+        className={ready ? "group cursor-pointer" : "cursor-default"}
       >
         <div
           className={cn(
@@ -204,9 +204,13 @@ export function TutorialTile({ video }: { video: TutorialVideo }) {
                 unoptimized
                 className="object-cover"
               />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20 transition-colors group-hover:bg-black/30">
-                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/90 text-foreground shadow-lg">
-                  <Icon name="play-circle" className="h-7 w-7" />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10 transition-colors group-hover:bg-black/20">
+                {/* A plain triangle (no ring of its own) inside a
+                    translucent, blurred grey circle — the circle itself
+                    supplies the ring look, so a "play-circle" glyph here
+                    would double up into two concentric circles. */}
+                <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-500/50 backdrop-blur-md">
+                  <Icon name="play" className="h-6 w-6 text-white" fill="currentColor" />
                 </span>
               </div>
             </>

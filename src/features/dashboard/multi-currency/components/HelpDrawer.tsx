@@ -13,7 +13,6 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
-import { HELP_SUPPORT_EMAIL } from "@/components/layout/HeaderHelpMenu";
 import {
   TutorialTile,
   type TutorialVideo,
@@ -42,6 +41,7 @@ const GUIDE_ITEMS = [
 // (see the CopyableText below) is still the full dialable number.
 const HELP_PHONE_DISPLAY = "+91 92402 31940";
 const HELP_PHONE_DIALABLE = "+919240231940";
+const HELP_SUPPORT_EMAIL = "merchant.support@payglocal.in";
 
 // The only tutorial recorded so far — see TutorialVideoTile.tsx for what
 // happens with this id (real thumbnail, real duration off the IFrame Player
@@ -66,9 +66,9 @@ const TUTORIAL_VIDEOS: TutorialVideo[] = [
  * mousedown/Escape listeners rather than any dialog primitive's built-in
  * dismissal.
  *
- * Owns its own trigger (the Help icon) so the button and the panel it opens
- * can never drift apart, the same pattern HeaderHelpMenu uses for the
- * header's own Help control.
+ * Owns its own trigger — the header's existing '?' control, which used to
+ * open a contacts-only popover and now opens this instead — so the button
+ * and the panel it opens can never drift apart.
  */
 export function HelpDrawer() {
   const [open, setOpen] = useState(false);
@@ -128,15 +128,18 @@ export function HelpDrawer() {
 
   return (
     <>
+      {/* Icon-only, matching the header's other square controls (the
+          notification bell, theme toggle) it sits beside — this isn't a
+          page action like Forex calculator, it's a header-level control. */}
       <Button
         ref={triggerRef}
         type="button"
-        variant="outline"
-        size="sm"
-        leftIcon={<Icon name="help-circle" className="h-4 w-4" />}
+        variant="ghost"
+        aria-label="Help"
         onClick={toggle}
+        className="flex h-10 w-10 items-center justify-center rounded-lg border border-border bg-muted p-0 transition-colors hover:bg-accent"
       >
-        Help
+        <Icon name="help-circle" size={17} className="text-muted-foreground" />
       </Button>
 
       {everOpened &&
@@ -208,7 +211,8 @@ export function HelpDrawer() {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-auto min-h-0 justify-start p-0 text-[13px] font-medium text-primary hover:bg-transparent hover:underline"
+                    leftIcon={<Icon name="message-circle" className="h-3.5 w-3.5" />}
+                    className="h-auto min-h-0 justify-start gap-1.5 p-0 text-[13px] font-medium text-primary hover:bg-transparent hover:underline"
                     onClick={() => {
                       window.location.href = `mailto:${HELP_SUPPORT_EMAIL}?subject=Feedback`;
                     }}
@@ -219,15 +223,21 @@ export function HelpDrawer() {
                     {/* font-sans overrides CopyableText's default font-mono —
                         this spec wants the same body font as the rest of the
                         drawer, not a distinct typeface for these two lines. */}
-                    <CopyableText
-                      value={HELP_PHONE_DIALABLE}
-                      displayValue={HELP_PHONE_DISPLAY}
-                      valueClassName="font-sans text-[13px] text-foreground"
-                    />
-                    <CopyableText
-                      value={HELP_SUPPORT_EMAIL}
-                      valueClassName="font-sans text-[13px] text-foreground"
-                    />
+                    <div className="flex items-center gap-2">
+                      <Icon name="phone" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <CopyableText
+                        value={HELP_PHONE_DIALABLE}
+                        displayValue={HELP_PHONE_DISPLAY}
+                        valueClassName="font-sans text-[13px] text-foreground"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Icon name="mail" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                      <CopyableText
+                        value={HELP_SUPPORT_EMAIL}
+                        valueClassName="font-sans text-[13px] text-foreground"
+                      />
+                    </div>
                   </div>
                 </div>
               </motion.div>

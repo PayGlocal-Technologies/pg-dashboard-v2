@@ -24,7 +24,6 @@ import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/compo
 // Side-panel variant, kept for reference — superseded below by the modal.
 // import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
 import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
-import { HelpDrawer } from "@/features/dashboard/multi-currency/components/HelpDrawer";
 import {
   DEFAULT_SETTLED_CURRENCY,
   SETTLED_AMOUNT_BY_CURRENCY,
@@ -206,17 +205,14 @@ function MultiCurrencyContent() {
         title="International accounts"
         subtitle="Receive international payments using your virtual accounts."
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="calculator" className="h-4 w-4" />}
-              onClick={() => setFxModalOpen(true)}
-            >
-              Forex calculator
-            </Button>
-            <HelpDrawer />
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="calculator" className="h-4 w-4" />}
+            onClick={() => setFxModalOpen(true)}
+          >
+            Forex calculator
+          </Button>
         }
       />
 

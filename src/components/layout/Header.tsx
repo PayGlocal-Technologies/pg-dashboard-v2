@@ -7,7 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
+import { HelpDrawer } from "@/features/dashboard/multi-currency/components/HelpDrawer";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -185,8 +185,10 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           <ThemeToggle />
 
-          {/* Help — support contacts and hours, see HeaderHelpMenu. */}
-          <HeaderHelpMenu />
+          {/* Help — the same '?' control as before, now opening the
+              Guide/Tutorials/feedback drawer (see HelpDrawer) instead of the
+              old contacts-only popover. */}
+          <HelpDrawer />
 
           {/* Create button */}
           <div ref={createRef} className="relative">
