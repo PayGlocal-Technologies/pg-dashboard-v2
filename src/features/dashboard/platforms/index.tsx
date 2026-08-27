@@ -38,6 +38,11 @@ import { SettlementStatementDrawer } from "@/features/dashboard/platforms/compon
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
 import { SUPPORTED_PLATFORMS, accountsForPlatform } from "@/features/dashboard/platforms/constants";
+import { GuideTour } from "@/components/common/guide/GuideTour";
+import {
+  MCA_PLATFORMS_GUIDE_KEY,
+  MCA_PLATFORMS_GUIDE_STEPS,
+} from "@/features/dashboard/platforms/guide";
 
 /** Module title — the step below the page's own h1, shared by every module
  *  here. Same tokens the Virtual Accounts page uses, so the two read as one
@@ -249,7 +254,7 @@ function PlatformsContent() {
             Works only because the grid sets lg:items-start — a stretched grid
             item is as tall as its row and has nothing to slide within. The
             caption sticks with the list, since both live in this one item. */}
-        <div className="lg:sticky lg:top-6 lg:col-start-1">
+        <div className="lg:sticky lg:top-6 lg:col-start-1" data-guide="mca-platform-selector">
           {/* The smallest, muted, uppercase step: the navigation is how you
               reach the content rather than content itself, so its caption stays
               lighter than any title in the workflow beside it. The list's own
@@ -466,7 +471,7 @@ function PlatformsContent() {
               default py-7 on top of those would double the padding around a
               collapsed row. */}
           {selectedAccount && (
-            <Card size="sm" className="gap-0 px-7 py-0">
+            <Card size="sm" className="gap-0 px-7 py-0" data-guide="mca-account-details">
               <Accordion type="single" collapsible>
                 <AccordionItem value="account-details" className="border-b-0">
                   {/* Sized on the trigger rather than by wrapping the label in a
@@ -683,6 +688,12 @@ function PlatformsContent() {
           </section>
         </div>
       </div>
+
+      {/* First-visit onboarding coach-marks for Connect Platforms. */}
+      <GuideTour
+        steps={MCA_PLATFORMS_GUIDE_STEPS}
+        storageKey={MCA_PLATFORMS_GUIDE_KEY}
+      />
     </div>
   );
 }

@@ -19,6 +19,11 @@ import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/com
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
+import { GuideTour } from "@/components/common/guide/GuideTour";
+import {
+  MCA_INTL_ACCOUNTS_GUIDE_KEY,
+  MCA_INTL_ACCOUNTS_GUIDE_STEPS,
+} from "@/features/dashboard/multi-currency/guide";
 import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
 import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/components/AccountCurrencyNotice";
 // Side-panel variant, kept for reference — superseded below by the modal.
@@ -290,20 +295,25 @@ function MultiCurrencyContent() {
                 one is inactive out of the tab order and the accessibility tree,
                 so there is never a second, invisible copy of these controls to
                 land on. */}
-            <RegionSelector
-              accounts={accounts}
-              selectedAccountId={selectedAccount?.id ?? ""}
-              onSelect={selectAccount}
-              label="Select client region"
-              variant="cards"
-              className="-mx-1 lg:hidden"
-            />
+            <div data-guide="mca-region-selector" className="-mx-1 lg:hidden">
+              <RegionSelector
+                accounts={accounts}
+                selectedAccountId={selectedAccount?.id ?? ""}
+                onSelect={selectAccount}
+                label="Select client region"
+                variant="cards"
+              />
+            </div>
 
             {/* p-3 rather than Card's own 28px inset: the rows carry their own
                 px-5, so the card's padding only has to keep them clear of its
                 edge — anything more and the region names sit adrift of the
                 title above the card. */}
-            <Card size="sm" className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex">
+            <Card
+              size="sm"
+              className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex"
+              data-guide="mca-region-selector"
+            >
               <RegionSelector
                 accounts={accounts}
                 selectedAccountId={selectedAccount?.id ?? ""}
@@ -633,6 +643,12 @@ function MultiCurrencyContent() {
           )}
         </div>
       </div>
+
+      {/* First-visit onboarding coach-marks for International Accounts. */}
+      <GuideTour
+        steps={MCA_INTL_ACCOUNTS_GUIDE_STEPS}
+        storageKey={MCA_INTL_ACCOUNTS_GUIDE_KEY}
+      />
     </div>
   );
 }

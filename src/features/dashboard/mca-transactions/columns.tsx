@@ -355,18 +355,20 @@ export function buildMcaColumns(
                   to take, and burying it behind "…" would cost a click on the
                   transactions that most need one. */}
               {isPendingInvoice ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="upload" className="w-3 h-3" />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlers.onOpenDetails(row);
-                  }}
-                  className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-                >
-                  Upload Invoice
-                </Button>
+                <span data-guide="mca-txn-upload-invoice" className="inline-flex">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Icon name="upload" className="w-3 h-3" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlers.onOpenDetails(row);
+                    }}
+                    className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+                  >
+                    Upload Invoice
+                  </Button>
+                </span>
               ) : (
                 /* Hidden until the row is hovered/focused, opacity-only (no
                    display/width change) so revealing it never shifts the

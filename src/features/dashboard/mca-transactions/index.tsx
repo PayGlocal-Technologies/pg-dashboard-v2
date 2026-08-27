@@ -9,6 +9,11 @@ import { TransactionsAnalyticsCarousel } from "@/features/dashboard/mca-transact
 import { AnalyticsTimeRangeControl } from "@/features/dashboard/mca-transactions/components/AnalyticsTimeRangeControl";
 import { SEGMENT_MCA } from "@/features/dashboard/mca-transactions/constants";
 import type { TimeRange } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
+import { GuideTour } from "@/components/common/guide/GuideTour";
+import {
+  MCA_TRANSACTIONS_GUIDE_KEY,
+  MCA_TRANSACTIONS_GUIDE_STEPS,
+} from "@/features/dashboard/mca-transactions/guide";
 
 // MCA (Multi-Currency Accounts) transactions, at /mca-transactions. The
 // segment toggle that used to switch this page between the MCA and PA tables
@@ -51,6 +56,14 @@ export function McaTransactionsFeature() {
             Multi-Currency Accounts is not enabled for this account.
           </p>
         </div>
+      )}
+
+      {/* First-visit onboarding coach-marks (analytics + row Upload Invoice). */}
+      {isMCAEnabled && (
+        <GuideTour
+          steps={MCA_TRANSACTIONS_GUIDE_STEPS}
+          storageKey={MCA_TRANSACTIONS_GUIDE_KEY}
+        />
       )}
     </div>
   );
