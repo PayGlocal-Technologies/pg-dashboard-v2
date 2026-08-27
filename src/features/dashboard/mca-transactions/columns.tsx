@@ -355,14 +355,21 @@ export function buildMcaColumns(
       render: (row) => {
         const actions = buildRowActions(row, handlers);
         const isPendingInvoice = isWaitingForInvoice(row);
+        const isFircSettled = row.externalStatus === "FIRC_SETTLED";
+        // Both leave exactly one entry in buildRowActions' own switch (Upload
+        // Invoice, FIRC Download) that becomes redundant once shown as its
+        // own button below; sliced off the menu for the same reason in both
+        // cases rather than duplicating the action in two places at once.
+        const hasVisibleActionButton = isPendingInvoice || isFircSettled;
 
         return (
           <RowClick onClick={() => handlers.onOpenDetails(row)}>
             <div className="flex items-center gap-1">
-              {/* Upload Invoice stays a labelled button rather than hiding in
-                  the menu: it is the one action the merchant is being asked
-                  to take, and burying it behind "…" would cost a click on the
-                  transactions that most need one. */}
+              {/* Upload Invoice and Download FIRC both stay labelled buttons
+                  rather than hiding in the menu: each is the one action a
+                  merchant on that status is actually here to take, and
+                  burying it behind "…" would cost a click on every
+                  transaction that needs one. */}
               {isPendingInvoice ? (
                 <Button
                   variant="outline"
@@ -375,6 +382,19 @@ export function buildMcaColumns(
                   className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
                 >
                   Upload Invoice
+                </Button>
+              ) : isFircSettled ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Icon name="download" className="w-3 h-3" />}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlers.onDownloadFirc(row);
+                  }}
+                  className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+                >
+                  Download FIRC
                 </Button>
               ) : (
                 /* Hidden until the row is hovered/focused, opacity-only (no
@@ -395,11 +415,12 @@ export function buildMcaColumns(
                 </Button>
               )}
 
-              {/* The status-specific extras. On an invoice-pending row Upload
-                  Invoice is already the button above, so it only appears here
-                  when there is something else alongside it. */}
-              {actions.length > (isPendingInvoice ? 1 : 0) && (
-                <RowActionsMenu actions={isPendingInvoice ? actions.slice(1) : actions} />
+              {/* The status-specific extras. On an invoice-pending or
+                  FIRC-settled row the one available action is already the
+                  button above, so the menu only appears when there is
+                  something else alongside it. */}
+              {actions.length > (hasVisibleActionButton ? 1 : 0) && (
+                <RowActionsMenu actions={hasVisibleActionButton ? actions.slice(1) : actions} />
               )}
             </div>
           </RowClick>
