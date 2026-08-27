@@ -19,7 +19,12 @@ export interface BusinessUpdatePayload {
 
 export interface SettlementData {
   ifscCode?: string | null;
+  /** Masked value from the /settlement endpoint (e.g. ****1234). */
   maskedAccountNumber?: string | null;
+  /** Full number from the secure /settlement-details endpoint. pg-dashboard's
+   *  form binds this key (its field is literally named `accountNumber`), which
+   *  is why the two endpoints return the number under different keys. */
+  accountNumber?: string | null;
 }
 
 export interface SettlementDataResponse {
