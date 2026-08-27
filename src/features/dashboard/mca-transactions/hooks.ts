@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useGet } from "@/lib/api/hooks";
 import {
+  mcaCurrencySplitApi,
   mcaFircDownloadApi,
+  mcaInvoiceOriginsApi,
   mcaOverviewByMidApi,
   mcaOverviewByUcicApi,
   mcaTxnDocumentPresignApi,
@@ -19,7 +21,11 @@ import {
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import type {
+  CurrencySplitData,
+  CurrencySplitResponse,
   FircDownloadResponse,
+  InvoiceOriginsData,
+  InvoiceOriginsResponse,
   McaOverviewData,
   McaOverviewResponse,
   MerchantProfileResponse,
@@ -203,6 +209,55 @@ export function useMcaOverview(): {
     isLoading: isPending,
     isError,
   };
+}
+
+/**
+ * Per-country invoice origins over a date range, scoped like useMcaOverview
+ * (selected MID, else the UCIC roll-up). Empty dates let the backend default
+ * the window. Backs McaInvoiceOriginsCard.
+ */
+export function useInvoiceOrigins(
+  startDate: string,
+  endDate: string
+): { origins: InvoiceOriginsData | undefined; isLoading: boolean; isError: boolean } {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<InvoiceOriginsResponse>(
+    ["mca-invoice-origins", merchantId, startDate, endDate],
+    mcaInvoiceOriginsApi(merchantId, startDate, endDate),
+    { enabled: isReady && !!merchantId }
+  );
+
+  return { origins: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+}
+
+/**
+ * Per-currency amount/count split over a date range, scoped like useMcaOverview.
+ * Envelope-tolerant: reads `data` if present, else the flat body. Backs
+ * McaCurrencySplitCard.
+ */
+export function useCurrencySplit(
+  startDate: string,
+  endDate: string
+): { split: CurrencySplitData | undefined; isLoading: boolean; isError: boolean } {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<CurrencySplitResponse>(
+    ["mca-currency-split", merchantId, startDate, endDate],
+    mcaCurrencySplitApi(merchantId, startDate, endDate),
+    { enabled: isReady && !!merchantId }
+  );
+
+  const body = data?.data ?? data;
+  const split = body?.slices ? (body as CurrencySplitData) : undefined;
+
+  return { split, isLoading: isReady && !!merchantId && isPending, isError };
 }
 
 /** Metric values arrive as either a number or a numeric string. */
