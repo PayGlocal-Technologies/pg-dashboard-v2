@@ -17,3 +17,52 @@ import { BASE_URL_V3 } from "@/api";
  */
 export const clientAnalyticsApi = (days: string): string =>
   days ? `${BASE_URL_V3}/analytics/getClientData?days=${days}` : "";
+
+/**
+ * Revenue trend for McaRevenueCard's chart — current vs previous period series
+ * plus the headline total/trend. Two scopes, as the backend spec gives: the
+ * per-merchant path (with `/merchant`) and the UCIC roll-up (without it).
+ * Empty dates let the backend default the window.
+ */
+export const mcaRevenueTrendByMidApi = (mid: string, startDate: string, endDate: string): string =>
+  mid
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(mid)}/merchant/mca/revenue-trend` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
+export const mcaRevenueTrendByUcicApi = (
+  ucicId: string,
+  startDate: string,
+  endDate: string
+): string =>
+  ucicId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/mca/revenue-trend` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
+/**
+ * Top clients by amount over a date range — backs the Client analytics list.
+ * Two scopes as the spec gives (per-merchant with `/merchant`, UCIC without).
+ * `limit` defaults to 5 on the backend but is sent explicitly.
+ */
+export const mcaTopClientsByMidApi = (
+  mid: string,
+  startDate: string,
+  endDate: string,
+  limit: number
+): string =>
+  mid
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(mid)}/merchant/mca/top-clients` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&limit=${limit}`
+    : "";
+
+export const mcaTopClientsByUcicApi = (
+  ucicId: string,
+  startDate: string,
+  endDate: string,
+  limit: number
+): string =>
+  ucicId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/mca/top-clients` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&limit=${limit}`
+    : "";

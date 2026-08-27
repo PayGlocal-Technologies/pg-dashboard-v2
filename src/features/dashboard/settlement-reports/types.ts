@@ -208,3 +208,53 @@ export interface HolidayCalendarResponse {
   };
   message?: string;
 }
+
+// ── Settlement overview analytics ────────────────────────────────────────────
+// Backs the Total settled card. Per-timeframe (week | month | ytd).
+
+export interface SettlementOverviewSeriesPoint {
+  label: string;
+  periodStart: string;
+  value: number;
+  count: number;
+}
+
+export interface SettlementOverviewPreviousSettlement {
+  settlementDate: string;
+  amount: number;
+  transactionCount: number;
+}
+
+export interface SettlementOverviewData {
+  timeframe: string;
+  currency: string;
+  totalSettled: number;
+  previousTotalSettled: number;
+  totalSettledTrendPct: number;
+  comparisonLabel: string;
+  transactionCount: number;
+  series: SettlementOverviewSeriesPoint[];
+  previousSettlement: SettlementOverviewPreviousSettlement | null;
+}
+
+export interface SettlementOverviewResponse {
+  data: SettlementOverviewData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Upcoming settlement ──────────────────────────────────────────────────────
+
+export interface SettlementUpcomingData {
+  amount: number;
+  currency: string;
+  transactionCount: number;
+  pendingInvoiceCount: number;
+  pendingInvoiceAmount: number;
+}
+
+export interface SettlementUpcomingResponse {
+  data: SettlementUpcomingData;
+  message?: string;
+  errors?: unknown;
+}

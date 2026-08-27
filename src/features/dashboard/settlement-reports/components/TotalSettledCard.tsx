@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -55,20 +54,29 @@ function TotalSettledTooltip({
 interface TotalSettledCardProps {
   totalSettledLabel: string;
   totalSettledTrendPct: number;
-  /** Per-timeframe series, differs by which product (PA/PACB) is active, see useProductContext.ts. */
-  chartsByTimeframe: Record<TotalSettledTimeframe, SparklinePoint[]>;
+  /** Trend comparison caption from the overview API (e.g. "vs last week").
+   *  Falls back to "vs last" for the mock/PA path. */
+  comparisonLabel?: string;
+  /** Controlled: the selected timeframe drives the overview fetch upstream, so
+   *  total/trend/chart all change together. */
+  timeframe: TotalSettledTimeframe;
+  onTimeframeChange: (timeframe: TotalSettledTimeframe) => void;
+  /** The chart series for the selected timeframe. */
+  chartData: SparklinePoint[];
   className?: string;
 }
 
 export function TotalSettledCard({
   totalSettledLabel,
   totalSettledTrendPct,
-  chartsByTimeframe,
+  comparisonLabel,
+  timeframe,
+  onTimeframeChange,
+  chartData,
   className,
 }: TotalSettledCardProps) {
-  const [timeframe, setTimeframe] = useState<TotalSettledTimeframe>("ytd");
   const trendPositive = totalSettledTrendPct >= 0;
-  const data = chartsByTimeframe[timeframe];
+  const data = chartData;
   const { domain, ticks } = computeYAxisTicks(data);
 
   return (
@@ -90,7 +98,7 @@ export function TotalSettledCard({
           >
             <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
             <RollingNumber
-              value={`${trendPositive ? "+" : ""}${totalSettledTrendPct}% vs last`}
+              value={`${trendPositive ? "+" : ""}${totalSettledTrendPct}% ${comparisonLabel ?? "vs last"}`}
               className="tabular-nums"
             />
           </div>
@@ -102,7 +110,7 @@ export function TotalSettledCard({
               key={t.value}
               variant="ghost"
               size="sm"
-              onClick={() => setTimeframe(t.value)}
+              onClick={() => onTimeframeChange(t.value)}
               className={cn(
                 "h-auto min-h-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium",
                 timeframe === t.value

@@ -1,13 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import useNewPermissions from "@/hooks/useNewPermissions";
-import { useMcaClientAnalytics } from "@/features/dashboard/mca-home/hooks";
+import { useTopClients } from "@/features/dashboard/mca-home/hooks";
 
 function formatAmount(amount: number): string {
   if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(2)}L`;
   return `₹${(amount / 1_000).toFixed(1)}K`;
+}
+
+/** Last 30 days, once on mount (no `new Date()` in render). This card has no
+ *  date picker, so the window is fixed. */
+function buildLast30Range(): { startDate: string; endDate: string } {
+  const end = new Date();
+  const start = new Date(end);
+  start.setDate(start.getDate() - 30);
+  const iso = (d: Date): string => d.toISOString().slice(0, 10);
+  return { startDate: iso(start), endDate: iso(end) };
 }
 
 interface McaClientAnalyticsCardProps {
@@ -17,16 +28,15 @@ interface McaClientAnalyticsCardProps {
 }
 
 export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProps) {
-  const { rows, days, isLoading } = useMcaClientAnalytics();
+  const [range] = useState(buildLast30Range);
+  const { clients, isLoading, isError } = useTopClients(range.startDate, range.endDate, 5);
   const checkPermissions = useNewPermissions();
   // "View all" lands on Client management, which the sidebar gates on this same
   // action. Without the check a user who cannot open that page would still be
   // offered the link, so the button is hidden rather than left to fail on arrival.
   const canViewClients = checkPermissions(["getAllMcaClient"]);
 
-  // Guarded rather than Math.max(...[]) directly: the spread of an empty list is
-  // -Infinity, which would make every bar width NaN.
-  const maxAmount = rows.length > 0 ? Math.max(...rows.map((c) => c.amount)) : 0;
+  const hasData = !isLoading && !isError && clients.length > 0;
 
   return (
     <Card className="gap-4 p-5">
@@ -36,10 +46,8 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <h2 className="text-sm font-semibold text-foreground">Client analytics</h2>
-          {/* Names the window the query actually used, so the figures below can't
-              be read as all-time. */}
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Top clients by amount, last {days} days
+            Top clients by amount, last 30 days
           </p>
         </div>
         {onViewAll && canViewClients && (
@@ -56,34 +64,40 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
       </div>
 
       <div className="flex flex-col gap-3.5">
-        {isLoading
-          ? // Same row footprint as a real row (label line + bar), so the card
-            // doesn't resize when the data lands.
-            Array.from({ length: 5 }, (_, i) => (
-              <div key={`skeleton-${i}`} className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <Shimmer className="h-4 w-28" />
-                  <Shimmer className="h-4 w-12" />
-                </div>
-                <Shimmer className="h-1.5 w-full rounded-full" />
+        {isLoading ? (
+          // Same row footprint as a real row (label line + bar), so the card
+          // doesn't resize when the data lands.
+          Array.from({ length: 5 }, (_, i) => (
+            <div key={`skeleton-${i}`} className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <Shimmer className="h-4 w-28" />
+                <Shimmer className="h-4 w-12" />
               </div>
-            ))
-          : rows.map((client) => (
-              <div key={client.name} className="flex flex-col gap-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[13px] font-medium text-foreground">{client.name}</span>
-                  <span className="text-[13px] font-semibold tabular-nums text-foreground">
-                    {formatAmount(client.amount)}
-                  </span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${maxAmount > 0 ? (client.amount / maxAmount) * 100 : 0}%` }}
-                  />
-                </div>
+              <Shimmer className="h-1.5 w-full rounded-full" />
+            </div>
+          ))
+        ) : isError ? (
+          <p className="py-4 text-sm text-muted-foreground">Couldn&apos;t load client analytics.</p>
+        ) : !hasData ? (
+          <p className="py-4 text-sm text-muted-foreground">No client activity in this period.</p>
+        ) : (
+          clients.map((client) => (
+            <div key={client.client} className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[13px] font-medium text-foreground">{client.client}</span>
+                <span className="text-[13px] font-semibold tabular-nums text-foreground">
+                  {formatAmount(client.amount)}
+                </span>
               </div>
-            ))}
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary"
+                  style={{ width: `${Math.min(100, Math.max(0, client.barPct))}%` }}
+                />
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </Card>
   );

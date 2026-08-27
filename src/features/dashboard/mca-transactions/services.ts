@@ -115,6 +115,23 @@ export const mcaOverviewByMidApi = (mid: string) =>
 export const mcaOverviewByUcicApi = (ucicId: string) =>
   ucicId ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/getPacbOverview` : "";
 
+/** Invoice origins: per-country invoiced totals + trend headline figures, over
+ *  a date range (YYYY-MM-DD). Empty dates let the backend default the window
+ *  (~last 30 days). Backs McaInvoiceOriginsCard. */
+export const mcaInvoiceOriginsApi = (merchantId: string, startDate: string, endDate: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/mca/invoice-origins` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
+/** Currency split: per-currency amount + count shares over a date range. Drives
+ *  the currency-split donut's Volume (amountPct) and Count (countPct) toggle. */
+export const mcaCurrencySplitApi = (merchantId: string, startDate: string, endDate: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/mca/currency-split` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
 /** Transactions export. POST the same OpenSearch body the table uses; the
  *  response is an xlsx blob, not JSON. */
 export const mcaTxnReportDownloadApi = (mid: string) =>

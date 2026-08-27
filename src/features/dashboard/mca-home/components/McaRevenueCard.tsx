@@ -2,17 +2,33 @@
 
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Badge, Button, Card, Separator } from "@/components/ui";
+import { Badge, Button, Card, Separator, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import {
-  revenueByTimeframe,
   revenueTimeframes,
   upcomingSettlement,
   type RevenuePoint,
   type RevenueTimeframe,
 } from "@/features/dashboard/mca-home/mock-data";
+import { useRevenueTrend } from "@/features/dashboard/mca-home/hooks";
+
+/** Day window per timeframe. The revenue-trend endpoint is date-ranged, so each
+ *  tab asks for its own window and gets its own series — the chart is NOT one
+ *  fixed curve. Computed once on mount (no `new Date()` in render). */
+const TIMEFRAME_DAYS: Record<RevenueTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
+
+function buildRevenueRanges(): Record<RevenueTimeframe, { startDate: string; endDate: string }> {
+  const end = new Date();
+  const iso = (d: Date): string => d.toISOString().slice(0, 10);
+  const back = (days: number): { startDate: string; endDate: string } => {
+    const start = new Date(end);
+    start.setDate(start.getDate() - days);
+    return { startDate: iso(start), endDate: iso(end) };
+  };
+  return { "1W": back(TIMEFRAME_DAYS["1W"]), "1M": back(TIMEFRAME_DAYS["1M"]), "3M": back(TIMEFRAME_DAYS["3M"]) };
+}
 
 /**
  * Y-axis tick label, in the unit the values are actually in.
@@ -62,10 +78,19 @@ interface McaRevenueCardProps {
 
 export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
   const [timeframe, setTimeframe] = useState<RevenueTimeframe>("1M");
-  // Each timeframe carries its own buckets and its own axis labels, so switching
-  // tabs changes what the chart is measuring, not just how tall it is.
-  const series = revenueByTimeframe[timeframe];
-  const trendPositive = series.trendPct >= 0;
+  const [ranges] = useState(buildRevenueRanges);
+
+  const { startDate, endDate } = ranges[timeframe];
+  const { trend, isLoading, isError } = useRevenueTrend(startDate, endDate);
+
+  // API points → the chart's shape (label → x). Empty until the call resolves.
+  const chartData: RevenuePoint[] = (trend?.points ?? []).map((p) => ({
+    x: p.label,
+    current: p.current,
+    previous: p.previous,
+  }));
+  const trendPositive = (trend?.trendPct ?? 0) >= 0;
+  const hasData = !isLoading && !isError && chartData.length > 0;
 
   return (
     <Card className="h-full gap-0 p-5">
@@ -93,70 +118,97 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
       </div>
 
       <div className="mt-3 flex items-baseline gap-2">
-        <RollingNumber
-          value={formatLakhTotal(series.total)}
-          className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-        />
-        <span className="text-xs font-medium text-muted-foreground">{series.currency}</span>
-      </div>
-      <div
-        className={cn(
-          "mt-1 flex items-center gap-1 text-xs font-medium",
-          trendPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+        {isLoading ? (
+          <Shimmer className="h-8 w-32" />
+        ) : (
+          <>
+            <RollingNumber
+              value={trend ? formatLakhTotal(trend.total) : "—"}
+              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+            />
+            {trend && (
+              <span className="text-xs font-medium text-muted-foreground">{trend.currency}</span>
+            )}
+          </>
         )}
-      >
-        <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
-        <span>
-          {trendPositive ? "+" : ""}
-          {series.trendPct}% {series.comparisonLabel}
-        </span>
       </div>
 
+      {isLoading ? (
+        <Shimmer className="mt-1 h-4 w-40" />
+      ) : trend ? (
+        <div
+          className={cn(
+            "mt-1 flex items-center gap-1 text-xs font-medium",
+            trendPositive
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-red-600 dark:text-red-400"
+          )}
+        >
+          <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
+          <span>
+            {trendPositive ? "+" : ""}
+            {trend.trendPct}% {trend.comparisonLabel}
+          </span>
+        </div>
+      ) : null}
+
       <div className="mt-4 min-h-48 w-full flex-1">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={series.points} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="mca-revenue-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
-            <XAxis
-              dataKey="x"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
-              height={24}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              width={48}
-              tickFormatter={formatMoneyAxis}
-              tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
-            />
-            <Tooltip content={<RevenueTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="current"
-              stroke="var(--chart-1)"
-              strokeWidth={2.5}
-              fill="url(#mca-revenue-fill)"
-              dot={false}
-              activeDot={{ r: 5, strokeWidth: 0, fill: "var(--chart-1)" }}
-            />
-            <Line
-              type="monotone"
-              dataKey="previous"
-              stroke="var(--muted-foreground)"
-              strokeWidth={1.5}
-              strokeDasharray="5 4"
-              dot={false}
-              activeDot={false}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+        {isLoading ? (
+          <Shimmer className="h-full min-h-48 w-full" />
+        ) : isError ? (
+          <p className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
+            Couldn&apos;t load revenue.
+          </p>
+        ) : !hasData ? (
+          <p className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
+            No revenue in this period.
+          </p>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="mca-revenue-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.22} />
+                  <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+              <XAxis
+                dataKey="x"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
+                height={24}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                width={48}
+                tickFormatter={formatMoneyAxis}
+                tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
+              />
+              <Tooltip content={<RevenueTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="current"
+                stroke="var(--chart-1)"
+                strokeWidth={2.5}
+                fill="url(#mca-revenue-fill)"
+                dot={false}
+                activeDot={{ r: 5, strokeWidth: 0, fill: "var(--chart-1)" }}
+              />
+              <Line
+                type="monotone"
+                dataKey="previous"
+                stroke="var(--muted-foreground)"
+                strokeWidth={1.5}
+                strokeDasharray="5 4"
+                dot={false}
+                activeDot={false}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
       <Separator className="my-4" />
