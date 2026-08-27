@@ -21,10 +21,9 @@ import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transac
 
 type AnalyticsMode = "amount" | "count";
 
-/** The whole Analytics section's time-range values (see
- *  TransactionsAnalyticsCarousel, which owns the control itself now).
- *  Exported so that control can build its options against this same type
- *  without duplicating it. */
+/** The whole Analytics section's time-range values, driving both this
+ *  card's own time-range tabs and SavedAmountCard's approximated figure
+ *  (see TransactionsAnalyticsCarousel, which owns the shared state). */
 export type TimeRange = "year" | "month" | "week" | "today";
 
 /** Order and labels match the reference: Today, then widening windows up to
@@ -33,7 +32,7 @@ export const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "week", label: "This week" },
   { value: "month", label: "This month" },
-  { value: "year", label: "Year to date" },
+  { value: "year", label: "Year" },
 ];
 
 // SETTLEMENT_ANALYTICS_BY_ACCOUNT is a full year's placeholder figures; every
@@ -42,11 +41,12 @@ export const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
 // bars below, which are already placeholder data pending a real endpoint (see
 // mock-data.ts's own TODO). The KPI above comes from the live
 // business-overview endpoint, which has no period parameter today, so the
-// time range can't drive it without a real API change; moving the control
-// out to the whole section (see TransactionsAnalyticsCarousel) doesn't change
-// that, it's still just these placeholder bars (and, by the same
-// approximation, SavedAmountCard's real lifetime figure) that actually
-// redraw.
+// time range can't drive it without a real API change. Nothing else on the
+// Analytics section is wired to this multiplier either (an earlier round
+// briefly scaled SavedAmountCard's real figure by it, then reverted that at
+// the design's request): every live KPI here stays the same regardless of
+// the selected range, on purpose, rather than showing an approximated number
+// with no real period behind it.
 export const TIME_RANGE_MULTIPLIERS: Record<TimeRange, number> = {
   year: 1,
   month: 1 / 12,
@@ -56,12 +56,13 @@ export const TIME_RANGE_MULTIPLIERS: Record<TimeRange, number> = {
 
 /**
  * Settlement analytics for the Transactions page: a headline KPI beside the
- * amount/count toggle, over a ranked per-account bar list.
+ * Today/This week/This month/Year time-range tabs, over the amount/count
+ * toggle and a ranked per-account bar list.
  *
- * The time-range control used to live in this card's own header; it's now
- * owned by TransactionsAnalyticsCarousel instead, sitting above the whole
- * Analytics section since it's meant to drive every card in it, so this
- * component just takes the chosen range as a prop.
+ * timeRange is lifted to TransactionsAnalyticsCarousel rather than owned
+ * locally, so the state stays in one place even though this is currently its
+ * only consumer. The KPI itself never reacts to it, only the per-account
+ * bars below do (see TIME_RANGE_MULTIPLIERS' own comment).
  */
 
 // Matches the reference: five rows visible by default, the rest behind
@@ -112,10 +113,13 @@ function AccountBarRow({ row, maxValue }: { row: AccountBarRowData; maxValue: nu
 export function SettlementAnalyticsCard({
   className,
   timeRange,
+  onTimeRangeChange,
 }: {
   className?: string;
-  /** Chosen by TransactionsAnalyticsCarousel's section-level control. */
+  /** Lifted to TransactionsAnalyticsCarousel; see this module's own doc
+   *  comment for why. */
   timeRange: TimeRange;
+  onTimeRangeChange: (value: TimeRange) => void;
 }) {
   const [mode, setMode] = useState<AnalyticsMode>("amount");
   const [expanded, setExpanded] = useState(false);
@@ -164,13 +168,11 @@ export function SettlementAnalyticsCard({
 
   return (
     <Card size="sm" className={cn("w-full", className)}>
-      {/* KPI (+ next settlement) on the left, Amount settled/No. of
-          transactions on the right: stacked below sm (CardHeader's own
-          default is two auto rows, so with no column override the toggle
-          just falls onto its own row under the KPI, full width via the Tabs
-          classes below), side by side from sm up. This is the slot the
-          time-range control used to occupy before it moved out to the whole
-          Analytics section (see TransactionsAnalyticsCarousel). */}
+      {/* KPI (+ next settlement) on the left, the Today/This week/This
+          month/Year tabs on the right: stacked below sm (CardHeader's own
+          default is two auto rows, so with no column override the tabs just
+          fall onto their own row under the KPI, full width via the Tabs
+          classes below), side by side from sm up. */}
       <CardHeader className="gap-3 sm:grid-cols-[1fr_auto] sm:gap-0">
         <div>
           {/* Label belongs to the KPI beneath it, not the other way round:
@@ -201,20 +203,19 @@ export function SettlementAnalyticsCard({
           </div>
         </div>
 
-        {/* w-full/flex-1: fills whatever width this column ends up with
-            (the whole card below sm where the header stacks, just this
-            column's auto width from sm up) rather than hugging its own
-            trigger text, unlike the time-range control that used to sit
-            here. */}
+        {/* Same segmented-pill Tabs styling as the Amount settled/No. of
+            transactions toggle below (w-full/flex-1 triggers, no custom
+            overrides): this is the slot that toggle used to occupy, and the
+            instruction was to match it exactly rather than introduce a
+            second visual treatment. */}
         <div className="sm:justify-self-end">
-          <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
+          <Tabs value={timeRange} onValueChange={(v) => onTimeRangeChange(v as TimeRange)}>
             <TabsList className="w-full">
-              <TabsTrigger value="amount" className="flex-1">
-                Amount settled
-              </TabsTrigger>
-              <TabsTrigger value="count" className="flex-1">
-                No. of transactions
-              </TabsTrigger>
+              {TIME_RANGE_OPTIONS.map((option) => (
+                <TabsTrigger key={option.value} value={option.value} className="flex-1">
+                  {option.label}
+                </TabsTrigger>
+              ))}
             </TabsList>
           </Tabs>
         </div>
@@ -225,6 +226,20 @@ export function SettlementAnalyticsCard({
           up), CardHeader keeps its own intrinsic height and this region
           absorbs whatever's left. */}
       <CardContent className="flex flex-1 flex-col gap-3">
+        {/* Amount settled/No. of transactions: directly below the KPI,
+            unchanged styling/behaviour from before, just relocated out of
+            the header (which now carries the time-range tabs instead). */}
+        <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
+          <TabsList className="w-full">
+            <TabsTrigger value="amount" className="flex-1">
+              Amount settled
+            </TabsTrigger>
+            <TabsTrigger value="count" className="flex-1">
+              No. of transactions
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         {/* Per-account graph. Still placeholder-fed, see the module comment
             above and mock-data.ts's TODO. Capped at five rows on every
             breakpoint; the rest sit behind Show more. */}
@@ -235,7 +250,10 @@ export function SettlementAnalyticsCard({
         </ul>
 
         {canExpand && (
-          <>
+          // gap-2 here, tighter than the gap-3 CardContent uses everywhere
+          // else, so Show more sits closer to the rows it reveals than the
+          // spacing between this card's other sections.
+          <div className="flex flex-col gap-2">
             {/* grid-rows-[0fr]→[1fr] is a plain CSS expand: no measured
                 height needed, and it animates cleanly whatever the revealed
                 row count is. The card's own height (and with it Outstanding
@@ -255,11 +273,15 @@ export function SettlementAnalyticsCard({
             </div>
 
             <div className="flex justify-center">
+              {/* variant="link" reads as plain text, not a button (no
+                  background/border/shadow), same treatment
+                  buildSettlementTimeline.tsx's RejectionReason already uses
+                  for its own Show more/less. */}
               <Button
                 type="button"
-                variant="ghost"
-                size="sm"
+                variant="link"
                 onClick={() => setExpanded((prev) => !prev)}
+                className="h-auto min-h-0 px-0 py-0 text-[12px] font-normal"
                 rightIcon={
                   <Icon name={expanded ? "chevron-up" : "chevron-down"} className="h-3.5 w-3.5" />
                 }
@@ -267,7 +289,7 @@ export function SettlementAnalyticsCard({
                 {expanded ? "Show less" : "Show more"}
               </Button>
             </div>
-          </>
+          </div>
         )}
       </CardContent>
     </Card>

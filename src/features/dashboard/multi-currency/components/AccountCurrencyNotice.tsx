@@ -141,7 +141,7 @@ export function AccountCurrencyNotice({
           elsewhere, and items-start so the icon sits on the first line of a
           message that wraps to two or three. */}
       <div
-        className={`flex items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 ${className ?? ""}`}
+        className={`flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 ${className ?? ""}`}
       >
         <Icon name="alert-triangle" className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
         <p className="text-[13px] text-muted-foreground">

@@ -327,11 +327,20 @@ export function buildMcaColumns(
       key: "partnerMaskedCustomerFullName",
       header: "Remitter Name",
       minWidth: 200,
+      // DataTable's compact-density cells always add overflow-hidden (see
+      // the Country column's own note above); cancelled here for the same
+      // reason, so the table's own auto layout sizes this column to the
+      // longest remitter name actually in it instead of clipping every name
+      // to a fixed width regardless of length.
+      cellClassName: "overflow-visible",
       render: (row) => {
         const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
         return (
           <RowClick onClick={() => onOpenDetails(row)}>
-            <span className="block w-[150px] truncate text-[13px] text-foreground">
+            {/* min-w-max: the same fix CountryCell above uses, so this
+                span's rendered width is its full unwrapped text rather than
+                whatever the column would otherwise collapse to. */}
+            <span className="block min-w-max whitespace-nowrap text-[13px] text-foreground">
               {name ?? "—"}
             </span>
           </RowClick>

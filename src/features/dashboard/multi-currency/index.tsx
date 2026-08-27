@@ -358,26 +358,15 @@ function MultiCurrencyContent() {
               <section key={selectedAccount.id} className="flex-1 page-enter">
                 {/* Details and their currency's caveat as one stack: the notice is
                     about the account whose details sit beside it, so it travels
-                    with them. Renders nothing for a currency that carries no
-                    caveat. space-y-3 keeps it bound to the card rather than
-                    reading as the section below it.
-
-                    Rest of the World's FX notice goes *before* the account
-                    details — a client reading it needs the "don't convert to
-                    GBP" instruction before, not after, the account number they're
-                    about to send a payment to. Every other notice (currently just
-                    AUD's) keeps its original placement after the details, since
-                    only Rest of the World's is a pre-payment instruction the
-                    client-facing hierarchy calls out specifically.
+                    with them, directly underneath. Renders nothing for a
+                    currency that carries no caveat. space-y-3 keeps it bound to
+                    the card rather than reading as the section below it.
 
                     `inside` moves the flag/name/subtitle into the card — there's
                     no carousel here naming the account any more — and the width
                     override drops the card's default shrink-wrapping so it fills
                     this column. */}
                 <div className="space-y-3">
-                  {selectedAccount.isGlobal && (
-                    <AccountCurrencyNotice currency={selectedAccount.currency} />
-                  )}
                   <VirtualAccountDetails
                     account={selectedAccount}
                     onCopy={handleCopyFullAccount}
@@ -385,9 +374,7 @@ function MultiCurrencyContent() {
                     headerPlacement="inside"
                     className="w-full max-w-none"
                   />
-                  {!selectedAccount.isGlobal && (
-                    <AccountCurrencyNotice currency={selectedAccount.currency} />
-                  )}
+                  <AccountCurrencyNotice currency={selectedAccount.currency} />
                 </div>
               </section>
 

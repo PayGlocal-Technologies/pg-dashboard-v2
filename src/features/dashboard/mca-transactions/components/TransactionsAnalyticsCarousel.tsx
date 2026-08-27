@@ -66,20 +66,20 @@ function scrollToPage(el: HTMLDivElement, index: number): void {
  *   overall height. No carousel and no indicator there, so desktop layout is
  *   unchanged beyond that column split and height match.
  *
- * The time-range control itself lives in the page header now (see
- * McaTransactionsFeature/AnalyticsTimeRangeControl), in line with the
- * "Transactions" title rather than inside this section; timeRange just
- * arrives here as a prop to pass down to Settlement Analytics and Saved
- * Amount. Neither's live endpoint actually has a period parameter (see
- * SettlementAnalyticsCard's own TIME_RANGE_MULTIPLIERS comment), so both
- * scale a real lifetime figure by the same approximation multiplier rather
- * than showing a genuine per-period total. Outstanding Amount isn't wired to
- * it at all: its own KPI (settlementsDue) is a live balance, not something a
- * historical time window applies to.
+ * timeRange is owned here rather than locally inside Settlement Analytics,
+ * which renders the actual Today/This week/This month/Year tabs in its own
+ * header. Only that card's own placeholder per-account bars actually redraw
+ * against it (see SettlementAnalyticsCard's own TIME_RANGE_MULTIPLIERS
+ * comment): the live endpoint it and every other card here read from has no
+ * period parameter, so Total settled amount, Outstanding Amount, and Saved
+ * Amount all show the same figures regardless of the selected range, real
+ * data with nothing to approximate rather than a number that moves without
+ * a real period behind it.
  */
-export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRange }) {
+export function TransactionsAnalyticsCarousel() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activePage, setActivePage] = useState(0);
+  const [timeRange, setTimeRange] = useState<TimeRange>("year");
 
   return (
     // gap-2 (8px) between the carousel and its indicator: deliberately much
@@ -111,7 +111,11 @@ export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRa
             page instead (see PAGE_CLASSES), where the card's own height is
             left alone, unchanged from before. */}
         <div className={PAGE_CLASSES}>
-          <SettlementAnalyticsCard className="lg:h-full" timeRange={timeRange} />
+          <SettlementAnalyticsCard
+            className="lg:h-full"
+            timeRange={timeRange}
+            onTimeRangeChange={setTimeRange}
+          />
         </div>
 
         {/* grow (not flex-1, whose 0 basis would force both cards to the same
@@ -125,7 +129,7 @@ export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRa
             stretches by the same default), from lg up via the grid. */}
         <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
           <OutstandingAmountCard className="grow" />
-          <SavedAmountCard className="grow" timeRange={timeRange} />
+          <SavedAmountCard className="grow" />
         </div>
       </div>
 
