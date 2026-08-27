@@ -15,7 +15,7 @@ const CATEGORIES: OverviewCategory[] = [
     href: "/settings/personal",
     icon: "users",
     title: "Personal settings",
-    description: "Profile photo, name, email, and contact details for your signed-in user.",
+    description: "Name, email, contact details and change password for your signed-in user.",
   },
   {
     href: "/settings/business",
