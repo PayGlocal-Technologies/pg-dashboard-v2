@@ -15,6 +15,8 @@ import type { IconName } from "@/components/icon/registry";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { SkuTable } from "@/features/dashboard/sku-management/components/SkuTable";
 import { ImportSkuFileModal } from "@/features/dashboard/sku-management/components/ImportSkuFileModal";
+import { GuideTour } from "@/components/common/guide/GuideTour";
+import { SKU_GUIDE_KEY, SKU_GUIDE_STEPS } from "@/features/dashboard/sku-management/guide";
 import { useSkuMidScope, useSkuPathMid } from "@/features/dashboard/sku-management/hooks";
 
 /**
@@ -145,6 +147,9 @@ export function SkuManagementFeature() {
       />
 
       <ImportSkuFileModal open={importOpen} onOpenChange={setImportOpen} mid={importMid} />
+
+      {/* First-visit onboarding coach-mark — add images to SKUs. */}
+      <GuideTour steps={SKU_GUIDE_STEPS} storageKey={SKU_GUIDE_KEY} />
     </div>
   );
 }

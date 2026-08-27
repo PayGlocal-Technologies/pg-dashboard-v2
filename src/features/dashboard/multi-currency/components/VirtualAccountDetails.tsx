@@ -210,7 +210,10 @@ export function VirtualAccountDetails({
           </p>
         )}
 
-        <div className={cn("flex flex-col gap-3", showShare && "sm:flex-row")}>
+        <div
+          className={cn("flex flex-col gap-3", showShare && "sm:flex-row")}
+          data-guide="mca-share-copy"
+        >
           {showShare && (
             <Button
               variant="outline"

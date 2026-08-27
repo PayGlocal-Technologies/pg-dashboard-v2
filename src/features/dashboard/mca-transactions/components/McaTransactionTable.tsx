@@ -448,7 +448,11 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
           at lg, the same breakpoint TransactionsAnalyticsCarousel itself
           switches from the carousel (with its indicator) to the plain grid,
           where the flex gap alone matches the previous spacing. */}
-      {analyticsSection && <div className="mb-4 lg:mb-0">{analyticsSection}</div>}
+      {analyticsSection && (
+        <div className="mb-4 lg:mb-0" data-guide="mca-txn-analytics">
+          {analyticsSection}
+        </div>
+      )}
 
       {/* Tab bar, search/filters, and the table itself all share one
           bordered surface (rounded-xl border border-border bg-card,
