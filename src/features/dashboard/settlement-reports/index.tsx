@@ -25,6 +25,11 @@ import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-report
 // re-enable with its usage in the header actions below.
 // import { SettlementDetailsDialog } from "@/features/dashboard/settlement-reports/components/SettlementDetailsDialog";
 import { SettlementStatCards } from "@/features/dashboard/settlement-reports/components/SettlementStatCards";
+import { GuideTour } from "@/components/common/guide/GuideTour";
+import {
+  MCA_SETTLEMENT_GUIDE_KEY,
+  MCA_SETTLEMENT_GUIDE_STEPS,
+} from "@/features/dashboard/settlement-reports/guide";
 import {
   SettlementDurationFilter,
   type SettlementDurationValue,
@@ -308,14 +313,16 @@ export function SettlementReportsFeature() {
                 bankAccount={summary.bankAccount}
                 bankAccountStatus={summary.bankAccountStatus}
               /> */}
-              <SettlementCalendarButton
-                rows={apiRows}
-                todayKey={calendar.today}
-                nextSettlementDate={calendar.nextSettlement.date}
-                nextSettlementReason={calendar.nextSettlement.reason}
-                nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
-                hasUpcomingHoliday={calendar.hasUpcomingHoliday}
-              />
+              <span data-guide="mca-settlement-calendar" className="inline-flex">
+                <SettlementCalendarButton
+                  rows={apiRows}
+                  todayKey={calendar.today}
+                  nextSettlementDate={calendar.nextSettlement.date}
+                  nextSettlementReason={calendar.nextSettlement.reason}
+                  nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
+                  hasUpcomingHoliday={calendar.hasUpcomingHoliday}
+                />
+              </span>
               <Button
                 variant="outline"
                 size="sm"
@@ -330,6 +337,7 @@ export function SettlementReportsFeature() {
         <div className="flex items-start gap-4">
           <div className="min-w-0 flex-1 space-y-4">
             {/* BACKEND GAP: mock summary — see the banner note above. */}
+            <div data-guide="mca-settlement-analytics">
             <SettlementStatCards
               totalSettledLabel={totalSettledLabel}
               totalSettledTrendPct={totalSettledTrendPct}
@@ -358,6 +366,7 @@ export function SettlementReportsFeature() {
               pendingInvoiceCount={upcomingPendingInvoiceCount}
               onUploadInvoice={() => {}}
             />
+            </div>
 
             <Card className="gap-0 overflow-hidden p-0">
               <div className="pl-5 pr-3 pb-3 pt-5">
@@ -481,6 +490,14 @@ export function SettlementReportsFeature() {
             </aside>
           )}
         </div>
+
+        {/* First-visit onboarding coach-marks — MCA settlement view only. */}
+        {isMca && (
+          <GuideTour
+            steps={MCA_SETTLEMENT_GUIDE_STEPS}
+            storageKey={MCA_SETTLEMENT_GUIDE_KEY}
+          />
+        )}
       </div>
     </MidGuard>
   );

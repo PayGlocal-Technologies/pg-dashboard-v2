@@ -15,6 +15,11 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { truncateMiddle } from "@/lib/utils/format";
 import { TransactionDetailsContent } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
+import { GuideTour } from "@/components/common/guide/GuideTour";
+import {
+  TXN_DETAIL_GUIDE_KEY,
+  TXN_DETAIL_GUIDE_STEPS,
+} from "@/features/dashboard/mca-transactions/guide";
 
 interface TransactionDetailsDrawerProps {
   row: McaTransaction | null;
@@ -115,16 +120,18 @@ export function TransactionDetailsDrawer({
                 at there. Close stays the only way out, same interaction as
                 everywhere else. */}
             {!isBottomSheet && (
-              <IconButton
-                aria-label="Expand to full page"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (row) onExpand(row);
-                }}
-              >
-                <Icon name="expand" className="h-4 w-4" />
-              </IconButton>
+              <span data-guide="mca-txn-detail-expand" className="inline-flex">
+                <IconButton
+                  aria-label="Expand to full page"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (row) onExpand(row);
+                  }}
+                >
+                  <Icon name="expand" className="h-4 w-4" />
+                </IconButton>
+              </span>
             )}
           </div>
           {row && (
@@ -150,6 +157,17 @@ export function TransactionDetailsDrawer({
             />
           )}
         </div>
+
+        {/* First-visit coach-mark pointing at the expand-to-full-page action.
+            Lives inside the drawer so it runs the first time a merchant opens a
+            transaction; the expand action only exists on the side drawer, not
+            the bottom sheet. */}
+        {open && !isBottomSheet && (
+          <GuideTour
+            steps={TXN_DETAIL_GUIDE_STEPS}
+            storageKey={TXN_DETAIL_GUIDE_KEY}
+          />
+        )}
       </DrawerContent>
     </Drawer>
   );
