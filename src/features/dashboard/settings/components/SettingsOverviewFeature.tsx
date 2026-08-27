@@ -15,7 +15,7 @@ const CATEGORIES: OverviewCategory[] = [
     href: "/settings/personal",
     icon: "users",
     title: "Personal settings",
-    description: "Profile photo, name, email, and contact details for your signed-in user.",
+    description: "Profile photo, name, email, contact details and change password for your signed-in user.",
   },
   {
     href: "/settings/business",
@@ -28,7 +28,7 @@ const CATEGORIES: OverviewCategory[] = [
     href: "/settings/payments",
     icon: "credit-card",
     title: "Payments & platform",
-    description: "Payment methods, security, API keys, webhooks, and how we notify you.",
+    description: "Payment methods, integrations, and how we notify you.",
   },
 ];
 
