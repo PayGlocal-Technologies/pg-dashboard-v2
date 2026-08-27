@@ -15,7 +15,10 @@ export function BankingFeature() {
   const [masked, setMasked] = useState(true);
   const { settlement, isLoading } = useSettlementDetails(masked);
 
-  const accountNumber = settlement?.maskedAccountNumber ?? "—";
+  // The secure endpoint returns the full number under `accountNumber`, the
+  // masked one under `maskedAccountNumber` — prefer whichever the current
+  // response carries (see SettlementData).
+  const accountNumber = settlement?.accountNumber ?? settlement?.maskedAccountNumber ?? "—";
   const ifscCode = settlement?.ifscCode ?? "—";
 
   return (
