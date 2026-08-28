@@ -11,6 +11,7 @@ import { AccountsHelpDrawer } from "@/features/dashboard/multi-currency/componen
 import { TransactionsHelpDrawer } from "@/features/dashboard/mca-transactions/components/TransactionsHelpDrawer";
 import { SettlementsHelpDrawer } from "@/features/dashboard/settlement-reports/components/SettlementsHelpDrawer";
 import { DashboardHelpDrawer } from "@/features/dashboard/home/components/DashboardHelpDrawer";
+import { PlatformsHelpDrawer } from "@/features/dashboard/platforms/components/PlatformsHelpDrawer";
 import {
   SETTLEMENT_LIST_PATH,
   MCA_SETTLEMENT_LIST_PATH,
@@ -195,9 +196,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           {/* Help: the same '?' control as before, opening the
               Guide/Tutorials/feedback drawer (see HelpDrawer) instead of the
               old contacts-only popover. Content is screen-specific: the
-              Transactions and Settlements routes get their own
-              Guide/Glossary, every other route keeps the Accounts content
-              this control originally shipped with. */}
+              Transactions, Settlements, Dashboard and Platforms routes each
+              get their own Guide/Glossary, every other route keeps the
+              Accounts content this control originally shipped with. */}
           {pathname === "/mca-transactions" || pathname.startsWith("/mca-transactions/") ? (
             <TransactionsHelpDrawer />
           ) : pathname === SETTLEMENT_LIST_PATH ||
@@ -209,6 +210,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             pathname === "/pa-dashboard" ||
             pathname === "/mca-dashboard" ? (
             <DashboardHelpDrawer />
+          ) : pathname === "/platforms" || pathname.startsWith("/platforms/") ? (
+            <PlatformsHelpDrawer />
           ) : (
             <AccountsHelpDrawer />
           )}
