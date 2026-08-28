@@ -7,15 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { AccountsHelpDrawer } from "@/features/dashboard/multi-currency/components/AccountsHelpDrawer";
-import { TransactionsHelpDrawer } from "@/features/dashboard/mca-transactions/components/TransactionsHelpDrawer";
-import { SettlementsHelpDrawer } from "@/features/dashboard/settlement-reports/components/SettlementsHelpDrawer";
-import { DashboardHelpDrawer } from "@/features/dashboard/home/components/DashboardHelpDrawer";
-import { PlatformsHelpDrawer } from "@/features/dashboard/platforms/components/PlatformsHelpDrawer";
-import {
-  SETTLEMENT_LIST_PATH,
-  MCA_SETTLEMENT_LIST_PATH,
-} from "@/features/dashboard/settlement-reports/routes";
+import { HelpTrigger } from "@/components/layout/HelpTrigger";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -193,28 +185,13 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           <ThemeToggle />
 
-          {/* Help: the same '?' control as before, opening the
-              Guide/Tutorials/feedback drawer (see HelpDrawer) instead of the
-              old contacts-only popover. Content is screen-specific: the
-              Transactions, Settlements, Dashboard and Platforms routes each
-              get their own Guide/Glossary, every other route keeps the
-              Accounts content this control originally shipped with. */}
-          {pathname === "/mca-transactions" || pathname.startsWith("/mca-transactions/") ? (
-            <TransactionsHelpDrawer />
-          ) : pathname === SETTLEMENT_LIST_PATH ||
-            pathname.startsWith(`${SETTLEMENT_LIST_PATH}/`) ||
-            pathname === MCA_SETTLEMENT_LIST_PATH ||
-            pathname.startsWith(`${MCA_SETTLEMENT_LIST_PATH}/`) ? (
-            <SettlementsHelpDrawer />
-          ) : pathname === "/dashboard" ||
-            pathname === "/pa-dashboard" ||
-            pathname === "/mca-dashboard" ? (
-            <DashboardHelpDrawer />
-          ) : pathname === "/platforms" || pathname.startsWith("/platforms/") ? (
-            <PlatformsHelpDrawer />
-          ) : (
-            <AccountsHelpDrawer />
-          )}
+          {/* Help: one shared '?' slot. Transactions, Settlements, Dashboard,
+              Platforms and Accounts each have their own Guide/Glossary/
+              Tutorials drawer; every other screen falls back to the original
+              lightweight contacts popover. See HelpTrigger for the config
+              map that decides which — nothing here needs to change to add a
+              sixth screen's drawer. */}
+          <HelpTrigger />
 
           {/* Create button */}
           <div ref={createRef} className="relative">

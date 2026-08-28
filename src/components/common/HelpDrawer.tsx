@@ -252,7 +252,10 @@ export function HelpDrawer({
                           as Guide/Tutorials above. */}
                       <div className="mt-2 divide-y divide-border rounded-xl border border-border">
                         {glossary.map((row) => (
-                          <div key={row.label} className="grid grid-cols-2 items-start gap-3 px-3.5 py-3">
+                          <div
+                            key={row.label}
+                            className="grid grid-cols-2 items-start gap-3 px-3.5 py-3"
+                          >
                             <StatusBadge
                               variant={row.variant}
                               label={row.label}
@@ -281,7 +284,9 @@ export function HelpDrawer({
                       <div className="mt-2 divide-y divide-border rounded-xl border border-border">
                         {columnGlossary.map((row) => (
                           <div key={row.column} className="grid grid-cols-2 gap-3 px-3.5 py-3">
-                            <p className="text-[13px] font-semibold text-foreground">{row.column}</p>
+                            <p className="text-[13px] font-semibold text-foreground">
+                              {row.column}
+                            </p>
                             <p className="text-[13px] text-muted-foreground">{row.meaning}</p>
                           </div>
                         ))}
@@ -293,19 +298,24 @@ export function HelpDrawer({
                 {/* Footer: fixed to the bottom of the drawer, never the
                     bottom of the (possibly shorter) body content above it. */}
                 <div className="shrink-0 border-t border-border px-5 py-4">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<Icon name="message-circle" className="h-3.5 w-3.5" />}
-                    className="h-auto min-h-0 justify-start gap-1.5 p-0 text-[13px] font-medium text-primary hover:bg-transparent hover:underline"
-                    onClick={() => {
-                      window.location.href = `mailto:${HELP_SUPPORT_EMAIL}?subject=Feedback`;
-                    }}
-                  >
-                    Send us feedback
-                  </Button>
-                  <div className="mt-3 space-y-1.5">
+                  {/* One stack, one gap for all three rows — feedback, phone
+                      and email read as three equal entries in the same list,
+                      not "feedback, then a phone+email pair" (which is what
+                      a smaller nested space-y around just the last two used
+                      to read as). */}
+                  <div className="flex flex-col gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<Icon name="message-circle" className="h-3.5 w-3.5" />}
+                      className="h-auto min-h-0 justify-start gap-1.5 p-0 text-[13px] font-medium text-primary hover:bg-transparent hover:underline"
+                      onClick={() => {
+                        window.location.href = `mailto:${HELP_SUPPORT_EMAIL}?subject=Feedback`;
+                      }}
+                    >
+                      Send us feedback
+                    </Button>
                     {/* font-sans overrides CopyableText's default font-mono.
                         This spec wants the same body font as the rest of the
                         drawer, not a distinct typeface for these two lines. */}
