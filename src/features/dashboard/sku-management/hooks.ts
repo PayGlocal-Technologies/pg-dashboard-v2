@@ -228,22 +228,25 @@ export function useSkuCatalogue({ search, type, page }: SkuCatalogueArgs): SkuCa
   // Stable across renders as long as its inputs are — usePostQuery folds the
   // body into the query key, so an object rebuilt every render would refetch
   // forever. `midFilter` is memoised by useResolvedMids, so it is safe here.
-  const body = useMemo<TableReqBody>(
-    () => ({
+  const body = useMemo<TableReqBody>(() => {
+    // Two possible keys. `mid` is not `merchantId`: midFilter names itself
+    // "merchantId" because that is what the OpenSearch txn endpoints want,
+    // while the catalogue search wants `mid`, so only the values carry over.
+    // `type` carries the API's own enum — see the note above.
+    const fieldSearch = buildCatalogueFieldSearch(midFilter?.value, type);
+    return {
       queryString: search || undefined,
-      // Verbatim from pg-dashboard: a query switches the filter type, an empty
-      // box is DEFAULT.
-      searchFilterType: search ? "QUERY_FILTER_TYPE" : "DEFAULT",
-      // Two possible keys. `mid` is not `merchantId`: midFilter names itself
-      // "merchantId" because that is what the OpenSearch txn endpoints want,
-      // while the catalogue search wants `mid`, so only the values carry over.
-      // `type` carries the API's own enum — see the note above.
-      fieldSearch: buildCatalogueFieldSearch(midFilter?.value, type),
+      // A text query switches to QUERY_FILTER_TYPE. A type/mid filter with no
+      // query needs FILTER_TYPE — the backend ignores `fieldSearch` under
+      // DEFAULT, which is why clicking the Goods/Services tab returned every
+      // type. Only a bare, unfiltered request is DEFAULT. Same rule the
+      // team-management list body follows.
+      searchFilterType: search ? "QUERY_FILTER_TYPE" : fieldSearch ? "FILTER_TYPE" : "DEFAULT",
+      fieldSearch,
       from: (page - 1) * SKU_PAGE_LIMIT,
       pageLimit: SKU_PAGE_LIMIT,
-    }),
-    [search, midFilter, type, page]
-  );
+    };
+  }, [search, midFilter, type, page]);
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     SkuSearchResponse,

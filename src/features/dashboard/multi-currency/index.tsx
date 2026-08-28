@@ -269,7 +269,7 @@ function MultiCurrencyContent() {
           <Card
             size="sm"
             aria-busy
-            className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex"
+            className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex lg:sticky lg:top-6 lg:self-start"
           >
             <div className="space-y-1">
               {Array.from({ length: 6 }).map((_, i) => (
@@ -311,7 +311,7 @@ function MultiCurrencyContent() {
                 title above the card. */}
             <Card
               size="sm"
-              className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex"
+              className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex lg:sticky lg:top-6 lg:self-start"
               data-guide="mca-region-selector"
             >
               <RegionSelector
