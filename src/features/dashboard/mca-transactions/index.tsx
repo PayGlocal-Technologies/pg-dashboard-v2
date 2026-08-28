@@ -9,7 +9,7 @@ import { TransactionsAnalyticsCarousel } from "@/features/dashboard/mca-transact
 import { AnalyticsTimeRangeControl } from "@/features/dashboard/mca-transactions/components/AnalyticsTimeRangeControl";
 import { SEGMENT_MCA } from "@/features/dashboard/mca-transactions/constants";
 import type { TimeRange } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
-import { GuideTour } from "@/components/common/guide/GuideTour";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import {
   MCA_TRANSACTIONS_GUIDE_KEY,
   MCA_TRANSACTIONS_GUIDE_STEPS,
@@ -58,12 +58,9 @@ export function McaTransactionsFeature() {
         </div>
       )}
 
-      {/* First-visit onboarding coach-marks (analytics + row Upload Invoice). */}
+      {/* Guide launcher (analytics + row Upload Invoice). */}
       {isMCAEnabled && (
-        <GuideTour
-          steps={MCA_TRANSACTIONS_GUIDE_STEPS}
-          storageKey={MCA_TRANSACTIONS_GUIDE_KEY}
-        />
+        <GuideLauncher steps={MCA_TRANSACTIONS_GUIDE_STEPS} storageKey={MCA_TRANSACTIONS_GUIDE_KEY} />
       )}
     </div>
   );

@@ -38,7 +38,7 @@ import { SettlementStatementDrawer } from "@/features/dashboard/platforms/compon
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
 import { SUPPORTED_PLATFORMS, accountsForPlatform } from "@/features/dashboard/platforms/constants";
-import { GuideTour } from "@/components/common/guide/GuideTour";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import {
   MCA_PLATFORMS_GUIDE_KEY,
   MCA_PLATFORMS_GUIDE_STEPS,
@@ -689,11 +689,8 @@ function PlatformsContent() {
         </div>
       </div>
 
-      {/* First-visit onboarding coach-marks for Connect Platforms. */}
-      <GuideTour
-        steps={MCA_PLATFORMS_GUIDE_STEPS}
-        storageKey={MCA_PLATFORMS_GUIDE_KEY}
-      />
+      {/* Guide launcher for Connect Platforms. */}
+      <GuideLauncher steps={MCA_PLATFORMS_GUIDE_STEPS} storageKey={MCA_PLATFORMS_GUIDE_KEY} />
     </div>
   );
 }

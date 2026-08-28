@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -16,6 +17,7 @@ import { truncateMiddle } from "@/lib/utils/format";
 import { TransactionDetailsContent } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 import { GuideTour } from "@/components/common/guide/GuideTour";
+import { isGuideCompleted, markGuideCompleted } from "@/components/common/guide/storage";
 import {
   TXN_DETAIL_GUIDE_KEY,
   TXN_DETAIL_GUIDE_STEPS,
@@ -52,6 +54,24 @@ export function TransactionDetailsDrawer({
   // the DOM until a row is clicked, which is client-only by definition.
   const { isBelow } = useBreakpoint();
   const isBottomSheet = isBelow("md");
+
+  // Contextual coach-mark: runs once, the first time a merchant opens the drawer
+  // on desktop (the expand action it points at doesn't exist on the bottom
+  // sheet). No launcher button here — the drawer is transient, so the tour is
+  // tied to the open event instead. setState lives in the rAF callback.
+  const [tourOpen, setTourOpen] = useState(false);
+  useEffect(() => {
+    if (!open || isBottomSheet) return;
+    const raf = requestAnimationFrame(() => {
+      if (!isGuideCompleted(TXN_DETAIL_GUIDE_KEY)) setTourOpen(true);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [open, isBottomSheet]);
+
+  function closeTour() {
+    markGuideCompleted(TXN_DETAIL_GUIDE_KEY);
+    setTourOpen(false);
+  }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} side={isBottomSheet ? "bottom" : "right"}>
@@ -158,16 +178,8 @@ export function TransactionDetailsDrawer({
           )}
         </div>
 
-        {/* First-visit coach-mark pointing at the expand-to-full-page action.
-            Lives inside the drawer so it runs the first time a merchant opens a
-            transaction; the expand action only exists on the side drawer, not
-            the bottom sheet. */}
-        {open && !isBottomSheet && (
-          <GuideTour
-            steps={TXN_DETAIL_GUIDE_STEPS}
-            storageKey={TXN_DETAIL_GUIDE_KEY}
-          />
-        )}
+        {/* First-open coach-mark pointing at the expand-to-full-page action. */}
+        <GuideTour steps={TXN_DETAIL_GUIDE_STEPS} open={tourOpen} onClose={closeTour} />
       </DrawerContent>
     </Drawer>
   );
