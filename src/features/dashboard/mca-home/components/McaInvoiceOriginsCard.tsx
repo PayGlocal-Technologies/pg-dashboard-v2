@@ -2,29 +2,47 @@
 
 import { useState } from "react";
 import { COUNTRIES } from "@payglocal_ui/flux-ui";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
-import {
-  INVOICE_ORIGIN_TIMEFRAME_SCALE,
-  invoiceOriginTimeframes,
-  invoiceOriginTotals,
-  invoiceOrigins,
-  type InvoiceOriginTimeframe,
-} from "@/features/dashboard/mca-home/mock-data";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
+import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
+
+type InvoiceOriginTimeframe = "1W" | "1M" | "3M";
+
+const TIMEFRAMES: { value: InvoiceOriginTimeframe; label: string }[] = [
+  { value: "1W", label: "1W" },
+  { value: "1M", label: "1M" },
+  { value: "3M", label: "3M" },
+];
+
+const TIMEFRAME_DAYS: Record<InvoiceOriginTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
 
 function countryFlag(countryCode: string): string {
   return COUNTRIES.find((c) => c.code === countryCode)?.flag ?? "🌍";
 }
 
-function formatUsd(amount: number): string {
-  return `$${Math.round(amount).toLocaleString("en-US")}`;
+function countryName(countryCode: string): string {
+  return COUNTRIES.find((c) => c.code === countryCode)?.name ?? countryCode;
 }
 
-function formatCompactUsd(amount: number): string {
-  return `$${Math.round(amount / 1000)}K`;
+/** Currency-aware — the invoice-origins API reports its own reportingCurrency. */
+function formatAmount(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatCompact(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
 }
 
 const BAR_COLORS = ["var(--chart-1)", "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-3)", "var(--chart-4)"];
@@ -32,11 +50,12 @@ const BAR_COLORS = ["var(--chart-1)", "var(--chart-1)", "var(--chart-2)", "var(-
 interface StatCellProps {
   label: string;
   valueLabel: string;
-  trendPct: number;
+  /** null hides the trend chip (e.g. an empty period has no top country). */
+  trendPct: number | null;
 }
 
 function StatCell({ label, valueLabel, trendPct }: StatCellProps) {
-  const positive = trendPct >= 0;
+  const positive = (trendPct ?? 0) >= 0;
   return (
     <div>
       <p className="text-xs text-muted-foreground">{label}</p>
@@ -45,41 +64,75 @@ function StatCell({ label, valueLabel, trendPct }: StatCellProps) {
           value={valueLabel}
           className="block text-xl font-bold tracking-tight text-foreground tabular-nums"
         />
-        <span
-          className={cn(
-            "flex items-center gap-0.5 text-xs font-medium",
-            positive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
-          )}
-        >
-          <Icon name={positive ? "trending-up" : "trending-down"} size={11} aria-hidden />
-          {positive ? "+" : ""}
-          {trendPct}%
-        </span>
+        {trendPct !== null && (
+          <span
+            className={cn(
+              "flex items-center gap-0.5 text-xs font-medium",
+              positive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+            )}
+          >
+            <Icon name={positive ? "trending-up" : "trending-down"} size={11} aria-hidden />
+            {positive ? "+" : ""}
+            {trendPct}%
+          </span>
+        )}
       </div>
     </div>
   );
 }
 
+/** Date windows for the 1W/1M/3M buttons, computed once on mount so `new Date()`
+ *  never runs during render (React Compiler rule, see CLAUDE.md). */
+function buildTimeframeRanges(): Record<
+  InvoiceOriginTimeframe,
+  { startDate: string; endDate: string }
+> {
+  const end = new Date();
+  const toIso = (d: Date): string => d.toISOString().slice(0, 10);
+  const back = (days: number): { startDate: string; endDate: string } => {
+    const start = new Date(end);
+    start.setDate(start.getDate() - days);
+    return { startDate: toIso(start), endDate: toIso(end) };
+  };
+  return {
+    "1W": back(TIMEFRAME_DAYS["1W"]),
+    "1M": back(TIMEFRAME_DAYS["1M"]),
+    "3M": back(TIMEFRAME_DAYS["3M"]),
+  };
+}
+
 export function McaInvoiceOriginsCard() {
   const [timeframe, setTimeframe] = useState<InvoiceOriginTimeframe>("1M");
-  const scale = INVOICE_ORIGIN_TIMEFRAME_SCALE[timeframe];
-  const scaledOrigins = invoiceOrigins.map((o) => ({
-    ...o,
-    amount: o.amount * scale,
-    invoiceCount: Math.max(1, Math.round(o.invoiceCount * scale)),
+  const [ranges] = useState(buildTimeframeRanges);
+
+  const { startDate, endDate } = ranges[timeframe];
+  const { origins, isLoading, isError } = useInvoiceOrigins(startDate, endDate);
+
+  const currency = origins?.reportingCurrency ?? "USD";
+  const rows = (origins?.rows ?? []).map((r) => ({
+    countryCode: r.countryCode,
+    countryName: countryName(r.countryCode),
+    amount: r.amount,
+    invoiceCount: r.invoiceCount,
   }));
-  const maxAmount = Math.max(...scaledOrigins.map((o) => o.amount));
-  const scaledTotalInvoiced = invoiceOriginTotals.totalInvoiced * scale;
-  const globeHighlights = scaledOrigins.map((origin, i) => ({
+  const totals = origins?.totals;
+  const totalInvoiced = totals?.totalInvoiced ?? 0;
+  const maxAmount = Math.max(...rows.map((o) => o.amount), 1);
+
+  const globeHighlights = rows.map((origin, i) => ({
     countryCode: origin.countryCode,
     color: BAR_COLORS[i % BAR_COLORS.length]!,
     countryName: origin.countryName,
     flag: countryFlag(origin.countryCode),
-    amountLabel: formatUsd(origin.amount),
+    amountLabel: formatAmount(origin.amount, currency),
     invoiceCountLabel: `${origin.invoiceCount} invoice${origin.invoiceCount === 1 ? "" : "s"}`,
-    sharePct: Math.round((origin.amount / scaledTotalInvoiced) * 100),
+    sharePct: Math.round((origin.amount / (totalInvoiced || 1)) * 100),
     rank: i + 1,
   }));
+
+  const topCode = totals?.topCountry?.countryCode;
+  const topShareLabel = topCode ? `${countryName(topCode)} share` : "Top country share";
+  const showData = !isLoading && !isError;
 
   return (
     <Card className="@container gap-0 overflow-hidden p-0">
@@ -96,7 +149,7 @@ export function McaInvoiceOriginsCard() {
               <p className="mt-0.5 text-xs text-muted-foreground">Total transaction volume by country</p>
             </div>
             <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
-              {invoiceOriginTimeframes.map((opt) => (
+              {TIMEFRAMES.map((opt) => (
                 <Button
                   key={opt.value}
                   type="button"
@@ -116,54 +169,82 @@ export function McaInvoiceOriginsCard() {
             </div>
           </div>
 
-          <div className="mt-5 flex flex-col gap-3">
-            {scaledOrigins.map((origin, i) => (
-              <div key={origin.countryCode} className="flex items-center gap-3">
-                <div className="flex w-36 shrink-0 items-center gap-1.5">
-                  <span className="text-sm leading-none" aria-hidden>
-                    {countryFlag(origin.countryCode)}
+          {/* Bar list — loading skeleton, error, empty, or the real rows. */}
+          {isLoading ? (
+            <div className="mt-5 flex flex-col gap-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Shimmer className="h-4 w-36 shrink-0" />
+                  <Shimmer className="h-2 flex-1" />
+                  <Shimmer className="h-4 w-16 shrink-0" />
+                </div>
+              ))}
+            </div>
+          ) : isError ? (
+            <p className="mt-5 text-sm text-muted-foreground">Couldn&apos;t load invoice origins.</p>
+          ) : rows.length === 0 ? (
+            <p className="mt-5 text-sm text-muted-foreground">No invoiced volume in this period.</p>
+          ) : (
+            <div className="mt-5 flex flex-col gap-3">
+              {rows.map((origin, i) => (
+                <div key={origin.countryCode} className="flex items-center gap-3">
+                  <div className="flex w-36 shrink-0 items-center gap-1.5">
+                    <span className="text-sm leading-none" aria-hidden>
+                      {countryFlag(origin.countryCode)}
+                    </span>
+                    <span className="truncate text-[13px] font-medium text-foreground">{origin.countryName}</span>
+                  </div>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${(origin.amount / maxAmount) * 100}%`,
+                        backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
+                      }}
+                    />
+                  </div>
+                  <span className="w-24 shrink-0 text-right text-[13px] font-semibold tabular-nums text-foreground">
+                    {formatAmount(origin.amount, currency)}
                   </span>
-                  <span className="truncate text-[13px] font-medium text-foreground">{origin.countryName}</span>
                 </div>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full"
-                    style={{
-                      width: `${(origin.amount / maxAmount) * 100}%`,
-                      backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
-                    }}
-                  />
-                </div>
-                <span className="w-24 shrink-0 text-right text-[13px] font-semibold tabular-nums text-foreground">
-                  {formatUsd(origin.amount)}
-                </span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           <div className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4 @2xl:grid-cols-4">
-            <StatCell
-              label="Total invoiced"
-              valueLabel={formatCompactUsd(invoiceOriginTotals.totalInvoiced * scale)}
-              trendPct={invoiceOriginTotals.totalInvoicedTrendPct}
-            />
-            <StatCell
-              label="Avg per country"
-              valueLabel={formatCompactUsd(invoiceOriginTotals.avgPerCountry * scale)}
-              trendPct={invoiceOriginTotals.avgPerCountryTrendPct}
-            />
-            <StatCell
-              label="United States share"
-              valueLabel={`${invoiceOriginTotals.unitedStatesSharePct}%`}
-              trendPct={invoiceOriginTotals.unitedStatesShareTrendPct}
-            />
-            <div>
-              <p className="text-xs text-muted-foreground">Active markets</p>
-              <RollingNumber
-                value={String(invoiceOriginTotals.activeMarkets)}
-                className="mt-1 block text-xl font-bold tracking-tight text-foreground tabular-nums"
-              />
-            </div>
+            {isLoading || !showData ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i}>
+                  <Shimmer className="h-3 w-20" />
+                  <Shimmer className="mt-2 h-6 w-16" />
+                </div>
+              ))
+            ) : (
+              <>
+                <StatCell
+                  label="Total invoiced"
+                  valueLabel={formatCompact(totalInvoiced, currency)}
+                  trendPct={totals?.totalInvoicedTrendPct ?? null}
+                />
+                <StatCell
+                  label="Avg per country"
+                  valueLabel={formatCompact(totals?.avgPerCountry ?? 0, currency)}
+                  trendPct={totals?.avgPerCountryTrendPct ?? null}
+                />
+                <StatCell
+                  label={topShareLabel}
+                  valueLabel={totals?.topCountry ? `${totals.topCountry.sharePct}%` : "—"}
+                  trendPct={totals?.topCountry?.shareTrendPct ?? null}
+                />
+                <div>
+                  <p className="text-xs text-muted-foreground">Active markets</p>
+                  <RollingNumber
+                    value={String(totals?.activeMarkets ?? 0)}
+                    className="mt-1 block text-xl font-bold tracking-tight text-foreground tabular-nums"
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
 

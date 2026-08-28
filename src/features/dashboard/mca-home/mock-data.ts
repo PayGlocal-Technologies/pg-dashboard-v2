@@ -172,47 +172,9 @@ export const mcaQuickAccessItems: QuickAccessItem[] = [
   { id: "customise-dashboard", label: "Customise dashboard", icon: "sliders-horizontal" },
 ];
 
-export interface InvoiceOriginRow {
-  countryCode: string;
-  countryName: string;
-  amount: number;
-  invoiceCount: number;
-}
-
-/** Base ("1M") dataset, "1W"/"3M" scale off this, see INVOICE_ORIGIN_TIMEFRAME_SCALE.
- * Already sorted descending by amount, that order doubles as each market's rank. */
-export const invoiceOrigins: InvoiceOriginRow[] = [
-  { countryCode: "US", countryName: "United States", amount: 118400, invoiceCount: 30 },
-  { countryCode: "GB", countryName: "United Kingdom", amount: 59200, invoiceCount: 18 },
-  { countryCode: "SG", countryName: "Singapore", amount: 44600, invoiceCount: 14 },
-  { countryCode: "DE", countryName: "Germany", amount: 33100, invoiceCount: 10 },
-  { countryCode: "AE", countryName: "UAE", amount: 24800, invoiceCount: 7 },
-  { countryCode: "AU", countryName: "Australia", amount: 17500, invoiceCount: 5 },
-];
-
-export type InvoiceOriginTimeframe = "1W" | "1M" | "3M";
-
-export const invoiceOriginTimeframes: { value: InvoiceOriginTimeframe; label: string }[] = [
-  { value: "1W", label: "1W" },
-  { value: "1M", label: "1M" },
-  { value: "3M", label: "3M" },
-];
-
-export const INVOICE_ORIGIN_TIMEFRAME_SCALE: Record<InvoiceOriginTimeframe, number> = {
-  "1W": 0.23,
-  "1M": 1,
-  "3M": 3.1,
-};
-
-export const invoiceOriginTotals = {
-  totalInvoiced: 298000,
-  totalInvoicedTrendPct: 18,
-  avgPerCountry: 50000,
-  avgPerCountryTrendPct: 6,
-  unitedStatesSharePct: 40,
-  unitedStatesShareTrendPct: -3,
-  activeMarkets: 6,
-};
+// Invoice-origins mock removed — the card is now backed by the live
+// /analytics/{merchantId}/merchant/mca/invoice-origins endpoint
+// (see McaInvoiceOriginsCard + useInvoiceOrigins).
 
 export interface McaStatCardData {
   title: string;
@@ -351,25 +313,6 @@ export const invoiceTrend: InvoiceTrendPoint[] = [
   { month: "Jul", paid: 9, outstanding: 6 },
 ];
 
-export interface CurrencySplitSlice {
-  key: string;
-  label: string;
-  volumePct: number;
-  countPct: number;
-  color: string;
-}
-
-export const currencySplit: CurrencySplitSlice[] = [
-  { key: "usd", label: "USD", volumePct: 52, countPct: 38, color: "var(--chart-1)" },
-  { key: "eur", label: "EUR", volumePct: 22, countPct: 30, color: "var(--chart-3)" },
-  { key: "gbp", label: "GBP", volumePct: 13, countPct: 15, color: "var(--chart-2)" },
-  { key: "sgd", label: "SGD", volumePct: 8, countPct: 12, color: "var(--chart-4)" },
-  { key: "other", label: "Other", volumePct: 5, countPct: 5, color: "var(--muted-foreground)" },
-];
-
-export type CurrencySplitMetric = "volume" | "count";
-
-export const currencySplitMetrics: { value: CurrencySplitMetric; label: string }[] = [
-  { value: "volume", label: "Volume" },
-  { value: "count", label: "Count" },
-];
+// Currency-split mock removed — the card is now backed by the live
+// /analytics/{merchantId}/merchant/mca/currency-split endpoint
+// (see McaCurrencySplitCard + useCurrencySplit).

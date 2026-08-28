@@ -27,6 +27,26 @@ export const ffmsSettlementSummaryApi = (mid: string): string =>
 export const ffmsSettlementDownloadApi = (mid: string, date: string): string =>
   `${BASE_URL_V1}/ffms/settlement-report/${mid}/${date}`;
 
+/**
+ * Settlement overview analytics — total settled + trend + chart series +
+ * previous-settlement headline, for a timeframe (week | month | ytd). Backs the
+ * Total settled card. Merchant-scoped.
+ */
+export const settlementOverviewApi = (merchantId: string, timeframe: string): string =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settlement/overview` +
+      `?timeframe=${encodeURIComponent(timeframe)}`
+    : "";
+
+/**
+ * Upcoming settlement — current-state headline (amount, txn count, pending
+ * invoices). No query params; always reflects the present. Merchant-scoped.
+ */
+export const settlementUpcomingApi = (merchantId: string): string =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settlement/upcoming`
+    : "";
+
 // ── Bank holiday calendar ───────────────────────────────────────────────────
 // Verbatim from pg-dashboard's src/features/BankHolidayCalendar/services.ts.
 // Both dates are inclusive YYYY-MM-DD keys; production always asks for whole
