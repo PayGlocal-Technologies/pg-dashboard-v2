@@ -155,19 +155,33 @@ export function EditablePriceCell({
               currency *selector*).
 
               justify-end keeps the symbol and the amount together as one group
-              flush with the field's right edge (items-stretch plus the text's
-              own items-center centre them vertically), rather than the default
+              flush with the field's right edge, rather than the default
               inline-start addon pinning the symbol to the left with the amount
               stranded opposite it. The grey fill replaces the default card
               background/border/shadow, and the focus ring InputGroup normally
               raises on the inner control is suppressed here. */}
           <InputGroup
             className={cn(
-              "h-10 min-h-10 justify-end gap-1 border-transparent bg-muted pr-3.5 shadow-none",
+              // items-baseline, not the default items-stretch: the symbol and
+              // the number now sit on one shared text baseline instead of each
+              // being positioned independently inside its own full-height box,
+              // which is what made the symbol ride high against the digits.
+              //
+              // The fixed h-10 goes with it — a baseline-aligned row can't also
+              // be centred by stretching. py-2.5 around a 20px line box
+              // reproduces the same 40px field height, with the pair centred by
+              // its padding rather than by its alignment.
+              "h-auto min-h-0 items-baseline justify-end gap-1 py-2.5 pr-3.5",
+              "border-transparent bg-muted shadow-none",
               "has-[[data-slot=input-group-control]:focus-visible]:ring-0"
             )}
           >
-            <InputGroupText className="flex-none text-[13px] font-medium text-foreground">
+            {/* block, not the component's own flex: a flex box contributes its
+                own baseline rather than its text's, so the symbol has to be an
+                ordinary text box for items-baseline to have anything to align.
+                Font size and line height are stated here and matched exactly on
+                the input below — a shared baseline needs both. */}
+            <InputGroupText className="block flex-none p-0 text-[13px] leading-5 font-medium text-foreground">
               {currencySymbol(currency)}
             </InputGroupText>
             <InputGroupInput
@@ -202,7 +216,10 @@ export function EditablePriceCell({
               // separators (a decimal point or thousands comma) plus the caret.
               style={{ width: `${Math.max(5, draft.length + 1)}ch` }}
               className={cn(
-                "flex-none bg-transparent px-0 text-left text-[13px] tabular-nums",
+                // h-auto/p-0/leading-5 strip the input's own height and vertical
+                // padding, which would otherwise offset its baseline from the
+                // symbol's. text-[13px] leading-5 matches the symbol exactly.
+                "h-auto min-h-0 flex-none bg-transparent p-0 text-left text-[13px] leading-5 tabular-nums",
                 "focus-visible:outline-none focus-visible:ring-0",
                 // Number inputs render stepper arrows on hover/focus, which
                 // would sit in the middle of the centred group.

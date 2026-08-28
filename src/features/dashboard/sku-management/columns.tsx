@@ -60,24 +60,47 @@ export function buildSkuColumns(
     {
       key: "name",
       header: "Product",
-      // The floor, not the final width: `tableLayout="content"` sizes this
-      // column to its widest cell, and min-w-max below keeps that measurement
-      // honest, so the longest product name sets the column width. 340 covers
-      // the 70px thumbnail plus a typical name, so the column doesn't jump
-      // around while the table is still filling in.
-      minWidth: 340,
-      // Compact density puts overflow-hidden on every cell, which would clip
-      // the un-wrapped name back to the column's current width and defeat the
-      // min-w-max measurement — cancelled here, same as mcaColumns does for
-      // its Country cell.
+      // 70px thumbnail + 12px gap + the name's 160px width = 242. Floor and
+      // ceiling are the same number: the name has a fixed width, so there is
+      // nothing for extra column width to do, and the column can't jump around
+      // while the table fills in.
+      minWidth: 242,
+      // Without this, DataTable puts whitespace-nowrap on the cell at compact
+      // density, and that inherits into the name — line-clamp sets a line
+      // limit but never touches white-space, so the text would sit on one
+      // clipped line and never reach a second. This is the column API's own
+      // opt-out, so the nowrap is simply not emitted.
+      wrap: true,
+      // Compact density also puts overflow-hidden on every cell, which would
+      // clip the thumbnail's rounded frame — cancelled here, same as
+      // mcaColumns does for its Country cell. The name clips itself below.
       cellClassName: "overflow-visible",
       render: (row) => (
         <RowClick onClick={() => onPreview(row)}>
-          {/* min-w-max: the cell never shrinks below thumbnail + full name, so
-              the column widens to fit rather than truncating or wrapping. */}
-          <div className="flex min-w-max items-center gap-3">
+          {/* items-center, and no min-w-max: the container used to be sized to
+              the full unwrapped name, which is what let the column grow without
+              limit. The name is capped below instead, so the row's height is
+              set by the 70px thumbnail whether the name runs to one line or
+              two. */}
+          <div className="flex items-center gap-3">
             <ProductThumbnail product={row} className="shrink-0" />
-            <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
+            {/* Wraps at 160px, then stops at two lines with an ellipsis.
+                A fixed w- with shrink-0, not max-w-: line-clamp sets
+                overflow:hidden, which drops a flex item's automatic minimum to
+                zero, so under max-w- alone this span was free to be squeezed by
+                the columns beside it and wrapped far narrower than its cap —
+                what the reported screenshot showed. A fixed basis it cannot
+                shrink out of is what makes the wrap point predictable. Matches
+                how the Description column below is sized.
+
+                whitespace-normal is stated here as well as via the column's
+                `wrap` flag, so the name keeps wrapping even if an ancestor
+                reintroduces nowrap. `title` keeps the full name reachable on
+                hover once it has been cut. */}
+            <span
+              className="line-clamp-2 w-[160px] shrink-0 text-[13px] font-medium break-words whitespace-normal text-foreground"
+              title={row.name}
+            >
               {row.name}
             </span>
           </div>
