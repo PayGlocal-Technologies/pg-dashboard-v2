@@ -33,6 +33,19 @@ export interface HelpGlossaryRow {
   meaning: string;
 }
 
+/**
+ * A plain "table column name → what it means" pair, distinct from
+ * HelpGlossaryRow above: that one is built around a live StatusBadge
+ * (variant/trailIcon) for status-chip glossaries, this one is just a label
+ * and explanation for a table's column headers. Kept generic (not tied to
+ * Settlements) so any screen's column glossary can reuse this same shape and
+ * the row renderer below rather than a bespoke one per screen.
+ */
+export interface HelpColumnGlossaryRow {
+  column: string;
+  meaning: string;
+}
+
 // Same PayGlocal support line for every screen this drawer opens on, so it
 // isn't threaded through as a prop.
 const HELP_PHONE_DISPLAY = "+91 92402 31940";
@@ -63,11 +76,14 @@ export function HelpDrawer({
   guideItems,
   tutorials,
   glossary,
+  columnGlossary,
 }: {
   guideItems: HelpGuideItem[];
   tutorials: TutorialVideo[];
   /** Omitted entirely on screens with no glossary (e.g. Accounts). */
   glossary?: HelpGlossaryRow[];
+  /** Omitted entirely on screens with no column glossary (e.g. Accounts, Transactions). */
+  columnGlossary?: HelpColumnGlossaryRow[];
 }) {
   const [open, setOpen] = useState(false);
   // Both open and close are one continuous animated transition; a second tap
@@ -224,6 +240,28 @@ export function HelpDrawer({
                               size="sm"
                               className="mt-0.5 shrink-0"
                             />
+                            <p className="text-[13px] text-muted-foreground">{row.meaning}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {columnGlossary && columnGlossary.length > 0 && (
+                    <>
+                      <p className="mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Table Column Glossary
+                      </p>
+                      {/* A bordered card of stacked rows, not the flat
+                          divide-y list the status Glossary above uses: the
+                          spec calls for a distinct card surface for this
+                          section. Generic label/meaning row shape so a
+                          future screen's column glossary can reuse this same
+                          block rather than a bespoke one. */}
+                      <div className="mt-2 divide-y divide-border rounded-xl border border-border">
+                        {columnGlossary.map((row) => (
+                          <div key={row.column} className="grid grid-cols-2 gap-3 px-3.5 py-3">
+                            <p className="text-[13px] font-semibold text-foreground">{row.column}</p>
                             <p className="text-[13px] text-muted-foreground">{row.meaning}</p>
                           </div>
                         ))}
