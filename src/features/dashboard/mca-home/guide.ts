@@ -4,7 +4,7 @@ import type { GuideStep } from "@/components/common/guide/types";
  * Storage id for the MCA dashboard walkthrough. Bump the version suffix if the
  * steps below change enough that returning merchants should see it again.
  */
-export const MCA_DASHBOARD_GUIDE_KEY = "mca-dashboard-v2";
+export const MCA_DASHBOARD_GUIDE_KEY = "mca-dashboard-v3";
 
 /**
  * First-visit coach-marks for the MCA dashboard home. `target` values match the
