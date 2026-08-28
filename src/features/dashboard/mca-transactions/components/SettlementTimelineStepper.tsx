@@ -87,22 +87,52 @@ function titleClass(status: SettlementStepStatus): string {
   }
 }
 
+/** The masking gutter behind every marker variant: an opaque, card-coloured
+ *  circle filling the same h-5 w-5 box the connector line segments are
+ *  measured against (see the rail column below), so the line's up/down
+ *  segments always terminate underneath it rather than showing through a
+ *  glyph's own hollow strokes (the checkmark and alert-circle icons have no
+ *  fill of their own to hide behind). Every status variant routes through
+ *  this, including the dot ones that already happened to mask themselves
+ *  well enough, so the whitespace ring is uniform rather than incidental. */
+function MarkerGutter({ children }: { children: ReactNode }) {
+  return (
+    <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-card">
+      {children}
+    </span>
+  );
+}
+
 function StatusGlyph({ status }: { status: SettlementStepStatus }) {
   switch (status) {
     case "success":
-      return <Icon name="check" className="h-4 w-4 text-green-600" strokeWidth={3} />;
+      return (
+        <MarkerGutter>
+          <Icon name="check" className="h-4 w-4 text-green-600" strokeWidth={3} />
+        </MarkerGutter>
+      );
     case "inProgress":
-      return <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-primary" />;
+      return (
+        <MarkerGutter>
+          <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-primary" />
+        </MarkerGutter>
+      );
     case "error":
-      return <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />;
+      return (
+        <MarkerGutter>
+          <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+        </MarkerGutter>
+      );
     case "reversal":
       return (
-        <span
-          aria-hidden
-          className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white"
-        >
-          <Icon name="rotate-ccw" className="h-2.5 w-2.5" strokeWidth={3} />
-        </span>
+        <MarkerGutter>
+          <span
+            aria-hidden
+            className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white"
+          >
+            <Icon name="rotate-ccw" className="h-2.5 w-2.5" strokeWidth={3} />
+          </span>
+        </MarkerGutter>
       );
     default:
       return <PendingGlyph />;
@@ -110,7 +140,11 @@ function StatusGlyph({ status }: { status: SettlementStepStatus }) {
 }
 
 function PendingGlyph() {
-  return <span aria-hidden className="h-2.5 w-2.5 rounded-full border-2 border-border bg-card" />;
+  return (
+    <MarkerGutter>
+      <span aria-hidden className="h-2.5 w-2.5 rounded-full border-2 border-border bg-card" />
+    </MarkerGutter>
+  );
 }
 
 export function SettlementTimelineStepper({ items }: { items: SettlementTimelineStep[] }) {

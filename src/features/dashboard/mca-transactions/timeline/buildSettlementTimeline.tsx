@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { Alert, AlertDescription, Button } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { InvoiceAttachmentCard } from "@/components/common/InvoiceAttachmentCard";
 import {
   SettlementBreakdown,
   DownloadFircButton,
@@ -146,21 +146,6 @@ function RejectionReason({ reason }: { reason: string }) {
   );
 }
 
-/** The uploaded invoice as a downloadable attachment chip. */
-function InvoiceAttachment({ fileName, onDownload }: { fileName: string; onDownload: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onDownload}
-      className="mt-2 inline-flex max-w-full items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-left transition-colors hover:bg-muted"
-    >
-      <Icon name="paperclip" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-      <span className="truncate text-[12px] font-medium text-primary">{fileName}</span>
-      <Icon name="download" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-    </button>
-  );
-}
-
 export interface BuildTimelineArgs {
   data: PaymentTimelineData;
   multipleTimelineEvents?: MultipleTimelineEvents;
@@ -251,7 +236,8 @@ export function buildSettlementTimeline({
     let uploadChildren: ReactNode = null;
     if (uploadStatus === "SUCCESS" && displayFileName && downloadPath) {
       uploadChildren = (
-        <InvoiceAttachment
+        <InvoiceAttachmentCard
+          className="mt-2"
           fileName={displayFileName}
           onDownload={() => onDownloadDocument(downloadPath)}
         />
