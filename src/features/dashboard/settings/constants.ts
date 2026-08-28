@@ -39,7 +39,9 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
   {
     label: "Payments & Platform",
     items: [
-      { label: "Payments", href: "/settings/payments", icon: "credit-card" },
+      // OUT OF SCOPE — Payments settings tab hidden for now. The route/page and
+      // components stay in the codebase. Restore by un-commenting this item.
+      // { label: "Payments", href: "/settings/payments", icon: "credit-card" },
       // TEMPORARILY HIDDEN — Developer section (API keys + Webhooks). Removed
       // from the nav for now (no backing endpoints yet); the routes/pages and
       // components stay in the codebase. Restore by un-commenting this item.
@@ -53,7 +55,9 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
       //   ],
       // },
       { label: "Integrations", href: "/settings/integrations", icon: "puzzle" },
-      { label: "Notifications", href: "/settings/notifications", icon: "bell" },
+      // OUT OF SCOPE — Notifications settings tab hidden for now. The route/page
+      // and components stay in the codebase. Restore by un-commenting this item.
+      // { label: "Notifications", href: "/settings/notifications", icon: "bell" },
     ],
   },
 ];
