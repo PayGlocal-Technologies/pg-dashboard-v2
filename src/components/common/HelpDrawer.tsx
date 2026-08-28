@@ -10,6 +10,9 @@ import {
   AccordionTrigger,
   Button,
   IconButton,
+  StatusBadge,
+  type BadgeTrailIcon,
+  type BadgeVariant,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
@@ -18,67 +21,62 @@ import {
   type TutorialVideo,
 } from "@/features/dashboard/multi-currency/components/TutorialVideoTile";
 
-/** Verbatim per the International Accounts help spec — do not reword. */
-const GUIDE_ITEMS = [
-  {
-    question: "What is this USD account, exactly?",
-    answer:
-      "A dedicated local account for U.S. inbound payments, mapped to your business. Funds land here first, then move into your chosen settlement currency on your regular cycle.",
-  },
-  {
-    question: "ACH or Fedwire — which should my client use?",
-    answer:
-      "ACH is lower-cost and takes 1–2 business days; Fedwire settles same-day for larger amounts. Share both fields — the sender's bank picks the rail based on the amount and urgency.",
-  },
-  {
-    question: "Is it safe to share these details externally?",
-    answer:
-      "Yes. The Share link exposes only the fields a client needs to send a payment, and it expires automatically. Avoid pasting the full account or routing numbers into chat or email.",
-  },
-];
+export interface HelpGuideItem {
+  question: string;
+  answer: string;
+}
 
-// Grouped for readability rather than a raw digit string; the copied value
-// (see the CopyableText below) is still the full dialable number.
+export interface HelpGlossaryRow {
+  label: string;
+  variant: BadgeVariant;
+  trailIcon?: BadgeTrailIcon;
+  meaning: string;
+}
+
+// Same PayGlocal support line for every screen this drawer opens on, so it
+// isn't threaded through as a prop.
 const HELP_PHONE_DISPLAY = "+91 92402 31940";
 const HELP_PHONE_DIALABLE = "+919240231940";
 const HELP_SUPPORT_EMAIL = "merchant.support@payglocal.in";
 
-// The only tutorial recorded so far — see TutorialVideoTile.tsx for what
-// happens with this id (real thumbnail, real duration off the IFrame Player
-// API, and the spotlight player on click).
-const TUTORIAL_VIDEOS: TutorialVideo[] = [
-  {
-    title: "Google Pay on PayGlocal International Checkout",
-    videoId: "bj3h6IzrYus",
-  },
-];
-
 /**
- * Help for the International Accounts screen — a floating panel docked to
- * the right edge, detached from all four edges, with NO backdrop: the rest
- * of the dashboard stays fully visible and interactive while it's open, so
- * this deliberately isn't a modal. That rules out flux-ui's Drawer (which
- * always renders its own dimmed overlay, see that component's own source)
- * and Radix Dialog (whose focus trap/aria-hiding of the rest of the page
- * assumes a modal even with no visible overlay rendered) — this is a plain
- * floating div, portaled to <body> so its fixed positioning can't be
- * clipped by an ancestor's overflow/transform, closed by its own
- * mousedown/Escape listeners rather than any dialog primitive's built-in
- * dismissal.
+ * The shared Help drawer shell: a floating panel docked to the right edge,
+ * detached from all four edges, with NO backdrop. The rest of the dashboard
+ * stays fully visible and interactive while it's open, so this deliberately
+ * isn't a modal. That rules out flux-ui's Drawer (which always renders its
+ * own dimmed overlay, see that component's own source) and Radix Dialog
+ * (whose focus trap/aria-hiding of the rest of the page assumes a modal even
+ * with no visible overlay rendered). This is a plain floating div, portaled
+ * to <body> so its fixed positioning can't be clipped by an ancestor's
+ * overflow/transform, closed by its own mousedown/Escape listeners rather
+ * than any dialog primitive's built-in dismissal.
  *
- * Owns its own trigger — the header's existing '?' control, which used to
- * open a contacts-only popover and now opens this instead — so the button
- * and the panel it opens can never drift apart.
+ * Owns its own trigger, the header's '?' control, so the button and the
+ * panel it opens can never drift apart.
+ *
+ * Content-only differs per screen (guideItems/tutorials/glossary); the shell
+ * itself (positioning, animation, close behaviour, footer) is shared so a
+ * second screen's Help drawer is a config, not a second component. See
+ * AccountsHelpDrawer and TransactionsHelpDrawer for the two current callers.
  */
-export function HelpDrawer() {
+export function HelpDrawer({
+  guideItems,
+  tutorials,
+  glossary,
+}: {
+  guideItems: HelpGuideItem[];
+  tutorials: TutorialVideo[];
+  /** Omitted entirely on screens with no glossary (e.g. Accounts). */
+  glossary?: HelpGlossaryRow[];
+}) {
   const [open, setOpen] = useState(false);
   // Both open and close are one continuous animated transition; a second tap
   // mid-transition is ignored rather than starting a competing one.
   const [isAnimating, setIsAnimating] = useState(false);
   // `document.body` (the portal target below) doesn't exist during SSR.
   // Rather than an effect+setState just to detect the client, this flips
-  // true inside the trigger's own click handler — which can only ever fire
-  // post-hydration — and then stays true, so the portal (and the
+  // true inside the trigger's own click handler, which can only ever fire
+  // post-hydration, and then stays true, so the portal (and the
   // AnimatePresence inside it that plays the close animation) keeps
   // rendering after the first open rather than disappearing the instant
   // `open` goes back to false.
@@ -101,7 +99,7 @@ export function HelpDrawer() {
   };
 
   // Escape and click-outside both only listen while open, and both check the
-  // trigger too — otherwise the same tap that reopens the drawer via the
+  // trigger too, otherwise the same tap that reopens the drawer via the
   // trigger's own onClick would first be seen here as an outside click and
   // close it, flickering shut-then-open.
   useEffect(() => {
@@ -129,7 +127,7 @@ export function HelpDrawer() {
   return (
     <>
       {/* Icon-only, matching the header's other square controls (the
-          notification bell, theme toggle) it sits beside — this isn't a
+          notification bell, theme toggle) it sits beside, this isn't a
           page action like Forex calculator, it's a header-level control. */}
       <Button
         ref={triggerRef}
@@ -159,7 +157,7 @@ export function HelpDrawer() {
                 transition={{ duration: 0.28, ease: "easeOut" }}
                 onAnimationComplete={() => setIsAnimating(false)}
               >
-                {/* Header — fixed, does not scroll. */}
+                {/* Header: fixed, does not scroll. */}
                 <div className="shrink-0 border-b border-border px-5 py-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-base font-semibold text-foreground">Help</h2>
@@ -180,9 +178,9 @@ export function HelpDrawer() {
                     Guide
                   </p>
                   <Accordion type="single" collapsible className="mt-2">
-                    {GUIDE_ITEMS.map((item) => (
+                    {guideItems.map((item) => (
                       <AccordionItem key={item.question} value={item.question}>
-                        {/* No brand blue on hover — flux-ui's own AccordionTrigger
+                        {/* No brand blue on hover, flux-ui's own AccordionTrigger
                             defaults to hover:text-primary; overridden to a plain
                             gray tint here, since this list is informational,
                             not a set of links. */}
@@ -200,11 +198,41 @@ export function HelpDrawer() {
                     Tutorials
                   </p>
                   <div className="mt-2">
-                    <TutorialTile video={TUTORIAL_VIDEOS[0]} />
+                    <TutorialTile video={tutorials[0]} />
                   </div>
+
+                  {glossary && glossary.length > 0 && (
+                    <>
+                      <p className="mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Glossary
+                      </p>
+                      {/* A plain row list, not flux-ui's DataTable: DataTable is
+                          built for paginated/loading/empty-state-aware data
+                          grids (a non-omittable "Showing X of Y" footer, a
+                          card surface of its own), which is the wrong shape
+                          for a static, seven-row reference list embedded
+                          inside an already-scrollable panel. Scrolls with the
+                          rest of the body rather than independently, same as
+                          Guide/Tutorials above. */}
+                      <div className="mt-2 divide-y divide-border">
+                        {glossary.map((row) => (
+                          <div key={row.label} className="flex items-start gap-3 py-2.5">
+                            <StatusBadge
+                              variant={row.variant}
+                              label={row.label}
+                              trailIcon={row.trailIcon}
+                              size="sm"
+                              className="mt-0.5 shrink-0"
+                            />
+                            <p className="text-[13px] text-muted-foreground">{row.meaning}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
 
-                {/* Footer — fixed to the bottom of the drawer, never the
+                {/* Footer: fixed to the bottom of the drawer, never the
                     bottom of the (possibly shorter) body content above it. */}
                 <div className="shrink-0 border-t border-border px-5 py-4">
                   <Button
@@ -220,8 +248,8 @@ export function HelpDrawer() {
                     Send us feedback
                   </Button>
                   <div className="mt-3 space-y-1.5">
-                    {/* font-sans overrides CopyableText's default font-mono —
-                        this spec wants the same body font as the rest of the
+                    {/* font-sans overrides CopyableText's default font-mono.
+                        This spec wants the same body font as the rest of the
                         drawer, not a distinct typeface for these two lines. */}
                     <div className="flex items-center gap-2">
                       <Icon name="phone" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />

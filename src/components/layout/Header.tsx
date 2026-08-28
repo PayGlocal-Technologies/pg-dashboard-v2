@@ -7,7 +7,8 @@ import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
-import { HelpDrawer } from "@/features/dashboard/multi-currency/components/HelpDrawer";
+import { AccountsHelpDrawer } from "@/features/dashboard/multi-currency/components/AccountsHelpDrawer";
+import { TransactionsHelpDrawer } from "@/features/dashboard/mca-transactions/components/TransactionsHelpDrawer";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -185,10 +186,17 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           <ThemeToggle />
 
-          {/* Help — the same '?' control as before, now opening the
+          {/* Help: the same '?' control as before, opening the
               Guide/Tutorials/feedback drawer (see HelpDrawer) instead of the
-              old contacts-only popover. */}
-          <HelpDrawer />
+              old contacts-only popover. Content is screen-specific: the
+              Transactions route gets its own Guide/Glossary, every other
+              route keeps the Accounts content this control originally
+              shipped with. */}
+          {pathname === "/mca-transactions" || pathname.startsWith("/mca-transactions/") ? (
+            <TransactionsHelpDrawer />
+          ) : (
+            <AccountsHelpDrawer />
+          )}
 
           {/* Create button */}
           <div ref={createRef} className="relative">

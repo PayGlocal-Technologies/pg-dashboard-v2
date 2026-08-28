@@ -96,6 +96,7 @@ export {
   ChartSkeleton,
   StatusBadge,
   type BadgeVariant,
+  type BadgeTrailIcon,
   Tabs,
   TabsList,
   TabsTrigger,
