@@ -168,8 +168,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Notification bell */}
-          <Button
+          {/* OUT OF SCOPE — Notification bell hidden for now (no notifications
+              backend yet). Restore by un-commenting this block. */}
+          {/* <Button
             type="button"
             variant="ghost"
             className="relative w-9 h-9 rounded-lg bg-muted border border-border hover:bg-accent flex items-center justify-center transition-colors"
@@ -177,7 +178,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           >
             <Icon name="bell" size={17} className="text-muted-foreground" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-header" />
-          </Button>
+          </Button> */}
 
           <ThemeToggle />
 

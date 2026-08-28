@@ -24,12 +24,15 @@ const CATEGORIES: OverviewCategory[] = [
     description: "Merchant account, legal entity, banking, tax IDs, and customer-facing branding.",
     note: "GST and compliance live under Tax; eBRC stays in Finance in the main nav.",
   },
-  {
-    href: "/settings/payments",
-    icon: "credit-card",
-    title: "Payments & platform",
-    description: "Payment methods, integrations, and how we notify you.",
-  },
+  // OUT OF SCOPE — Payments & platform landing card hidden for now (it links
+  // straight to /settings/payments, which is currently hidden). The route/page
+  // and components stay in the codebase. Restore by un-commenting this entry.
+  // {
+  //   href: "/settings/payments",
+  //   icon: "credit-card",
+  //   title: "Payments & platform",
+  //   description: "Payment methods, integrations, and how we notify you.",
+  // },
 ];
 
 /** "All settings" landing page: 3 clickable category cards. */
