@@ -49,6 +49,45 @@ export interface PlatformDocument {
   opensSettlementForm?: boolean;
 }
 
+/**
+ * One storefront a platform runs, e.g. Amazon.com or Amazon.de.
+ *
+ * Deliberately not the same list as `accountCurrencies`: several storefronts
+ * settle into one receiving account (Amazon.de, .fr, .it, .es and .nl all pay
+ * into the euro account), so a marketplace is its own choice that *resolves* to
+ * an account rather than being one. Selecting a marketplace is what scopes the
+ * account details, the Quick Access values and the settlement form beneath it.
+ */
+export interface PlatformMarketplace {
+  /**
+   * The storefront's real domain, e.g. "amazon.co.uk" — the option's value in
+   * code, not just its label. Verified against Amazon's published marketplace
+   * list; re-check when adding entries, since Amazon does add storefronts.
+   */
+  domain: string;
+  /**
+   * The country the storefront serves, e.g. "Germany". Not displayed — the
+   * selector shows the domain alone — but kept as the match key
+   * `marketplaceForAccount` uses to map a legacy country selection onto its
+   * storefront.
+   */
+  label: string;
+  /** ISO 3166-1 alpha-2 for that country, which drives the flag beside it. */
+  iso2: string;
+  /**
+   * Currency the storefront settles into, matched against the merchant's real
+   * accounts the same way `accountCurrencies` is. A storefront whose currency
+   * the merchant holds no account for is dropped from the selector rather than
+   * offered as an option that resolves to nothing.
+   */
+  currency: string;
+  /**
+   * Group header this entry sits under, e.g. "Europe". Entries with no group
+   * are offered flat at the top of the list, above every group.
+   */
+  group?: string;
+}
+
 /** A payout platform a merchant can point a PayGlocal virtual account at. */
 export interface Platform {
   /** Stable key — also the selected-row identity and the tutorial's remount key. */
@@ -78,6 +117,14 @@ export interface Platform {
    * endpoint doesn't bucket yet (AED, SGD) can safely stay listed.
    */
   accountCurrencies: string[];
+  /**
+   * The platform's storefronts, in the order the selector should offer them.
+   *
+   * Present only where payout setup genuinely differs per storefront — Amazon,
+   * today. A platform without them keeps the plain currency selector, which
+   * reads off `accountCurrencies` above.
+   */
+  marketplaces?: PlatformMarketplace[];
   /** The numbered walkthrough, in order. */
   steps: PlatformStep[];
   /**

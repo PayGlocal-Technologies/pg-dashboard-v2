@@ -14,7 +14,9 @@ import {
   PageHeader,
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui";
@@ -37,7 +39,13 @@ import { SelectMidView } from "@/components/common/SelectMidView";
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms/components/SettlementStatementDrawer";
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
-import { SUPPORTED_PLATFORMS, accountsForPlatform } from "@/features/dashboard/platforms/constants";
+import {
+  SUPPORTED_PLATFORMS,
+  accountsForPlatform,
+  groupMarketplaces,
+  marketplaceForAccount,
+  marketplacesForPlatform,
+} from "@/features/dashboard/platforms/constants";
 
 /** Module title — the step below the page's own h1, shared by every module
  *  here. Same tokens the Virtual Accounts page uses, so the two read as one
@@ -138,7 +146,41 @@ function PlatformsContent() {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const platformAccounts = selectedPlatform?.id === "amazon" ? amazonAccounts : generalAccounts;
   const accounts = selectedPlatform ? accountsForPlatform(selectedPlatform, platformAccounts) : [];
-  const selectedAccount = accounts.find((a) => a.id === selectedAccountId) ?? accounts[0] ?? null;
+  const accountById = accounts.find((a) => a.id === selectedAccountId) ?? null;
+
+  // Which Amazon storefront the walkthrough is scoped to.
+  //
+  // Payout setup differs per marketplace, not per country in the abstract, so
+  // on a platform that declares storefronts the merchant picks one of those and
+  // the receiving account is *derived* from it — five euro storefronts resolve
+  // to the one euro account. Platforms without storefronts keep the plain
+  // currency control, and `accountById` above is what drives them.
+  //
+  // Resolved rather than reset by an effect (see CLAUDE.md's
+  // no-setState-in-effect rule): a domain the selected platform doesn't run
+  // falls out of the lookup, and marketplaceForAccount is the fallback for a
+  // currency chosen on another platform before switching here — the same
+  // mapping a saved legacy country value would land on.
+  const [selectedDomain, setSelectedDomain] = useState("");
+  const marketplaces = selectedPlatform
+    ? marketplacesForPlatform(selectedPlatform, accounts)
+    : [];
+  const selectedMarketplace =
+    marketplaces.find((m) => m.domain === selectedDomain) ??
+    marketplaceForAccount(marketplaces, accountById) ??
+    marketplaces[0] ??
+    null;
+
+  // One account feeds everything below — Account Details, Quick Access and the
+  // settlement drawer all read it — so pointing the storefront at it here is
+  // the only wiring the change needs; nothing downstream knows or cares which
+  // control chose it.
+  const selectedAccount =
+    (selectedMarketplace
+      ? accounts.find((a) => a.currency === selectedMarketplace.currency)
+      : accountById) ??
+    accounts[0] ??
+    null;
 
   // Amazon is the only platform with documents (see the Platform type), so on
   // every other one this section doesn't render at all.
@@ -186,30 +228,79 @@ function PlatformsContent() {
 
   if (!selectedPlatform) return null;
 
+  /**
+   * The last row of the platform list: same height, padding and hover as a
+   * platform row, but deliberately not one of them.
+   *
+   * It is never `secondary`, never `aria-current`, and never passed to
+   * setSelectedPlatformId — it opens the request dialog instead — so no state
+   * on this page can come to hold it as the selected platform. It also sits
+   * outside the `role="list"` above rather than inside it as a sixth
+   * `listitem`, which is what stops a screen reader announcing it as another
+   * platform to choose. A "+" in place of a brand mark, in the same 36x24 box
+   * every logo occupies, is what carries that difference visually.
+   *
+   * Rendered at both widths — inside the Card on desktop, under the Select
+   * below `lg` — because a Select option would be exactly the selectable value
+   * this must not become.
+   */
+  const requestPlatformRow = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="md"
+      // The dashed outline is what marks it as the odd row out: every platform
+      // above sits on a solid surface or none at all, so a border that is
+      // visibly neither says "this adds a platform" rather than "this is a
+      // platform".
+      //
+      // Three deliberate departures from the platform rows, measured off the
+      // design: border-2 for the chunkier dash pattern a hairline can't produce
+      // (a browser scales dash length off border width, so `border` gives a
+      // dotted hairline, not this); h-12 against their h-10, the ~1.2x that
+      // gives the row its drop-zone weight; and rounded-xl for the softer
+      // corner that reads on a dashed edge where rounded-lg looks clipped.
+      // ghost already carries `border border-transparent`, so only the width,
+      // style and colour change here — the outline costs no extra height.
+      //
+      // Everything that governs alignment is untouched: same w-full, same
+      // gap-2.5, same px-5 from size="md", so the label still starts on exactly
+      // the platform names' line.
+      className="h-12 min-h-12 w-full justify-start gap-2.5 rounded-xl border-2 border-dashed border-border text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
+      // The same 36x24 box the platform logos occupy, centred within it: every
+      // logo is 3:2 and fills that box, so centring the "+" puts it on their
+      // shared vertical axis, and the identical box width is what lands the
+      // label on exactly the platform names' line.
+      //
+      // A div, not a span, and that matters: flux renders leftIcon as a direct
+      // child of the button (only `children` gets wrapped), so the
+      // `[&>span]:flex-1` above — which exists to grow that children wrapper —
+      // would match a span here too and stretch this box off its 36px. The
+      // logos dodge it by being <img>; this dodges it by not being a span.
+      leftIcon={
+        <div className="flex h-6 w-9 shrink-0 items-center justify-center">
+          <Icon name="plus" className="h-4 w-4" />
+        </div>
+      }
+      onClick={() => setRequestPlatformOpen(true)}
+    >
+      <span className="truncate">Request a platform</span>
+    </Button>
+  );
+
   return (
     <div className="mx-auto max-w-[1400px] page-enter">
       {/* mb-8 widens PageHeader's own mb-6 to the 32px this page puts between
           the page header and the two columns — same step as Virtual Accounts.
 
-          The action goes through PageHeader's own actions slot rather than a
-          wrapper row, so the alignment and the header's spacing stay the
-          component's business. It answers "mine isn't here", which a merchant
-          asks while scanning the platform column below — not after working
-          through a walkthrough for a platform they don't use. */}
+          No action in the header any more: "Request a platform" now sits at the
+          foot of the platform list itself, which is where a merchant discovers
+          theirs is missing — while scanning that list, not while reading the
+          page title. See requestPlatformRow below. */}
       <PageHeader
         title="Platforms"
         subtitle="Connect your PayGlocal receiving account to the platforms that pay you."
         className="mb-8"
-        actions={
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="plus" className="h-4 w-4" />}
-            onClick={() => setRequestPlatformOpen(true)}
-          >
-            Request a platform
-          </Button>
-        }
       />
 
       <RequestPlatformDialog open={requestPlatformOpen} onOpenChange={setRequestPlatformOpen} />
@@ -285,6 +376,10 @@ function PlatformsContent() {
                 ))}
               </SelectContent>
             </Select>
+
+            {/* mt-1 matches the desktop list's own row gap, so the request row
+                trails the platform choices at both widths. */}
+            <div className="mt-1">{requestPlatformRow}</div>
           </div>
 
           {/* At `lg` and up, the vertical tab list. Wrapped rather than hiding
@@ -307,12 +402,12 @@ function PlatformsContent() {
                       aria-current={isSelected}
                       variant={isSelected ? "secondary" : "ghost"}
                       size="md"
-                      // flux-ui's Button lays leftIcon / label / rightIcon out
-                      // as three direct flex children, so the chevron would
-                      // otherwise sit immediately after the platform name.
-                      // Letting the label span take the free space pushes it to
-                      // the far right of the row instead.
                       className={cn(
+                        // flux renders leftIcon and rightIcon as direct
+                        // children and wraps only `children` in a bare span, so
+                        // `> span` is that wrapper and nothing else. Growing it
+                        // is what pushes the chevron to the row's trailing edge
+                        // instead of leaving it against the platform name.
                         "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
                         // The selected row is the only one at full emphasis:
                         // `secondary` carries the design system's own selected
@@ -351,6 +446,11 @@ function PlatformsContent() {
                   );
                 })}
               </div>
+
+              {/* Outside the list above, so it is a row in the same card rather
+                  than a sixth option in the same list. mt-1 is that list's own
+                  row gap, which is what makes it read as the next row down. */}
+              <div className="mt-1">{requestPlatformRow}</div>
             </Card>
           </div>
         </div>
@@ -393,11 +493,71 @@ function PlatformsContent() {
                 </p>
               </div>
 
-              {/* Which of the platform's receiving accounts the steps below are
-                  about. Shown wherever the platform has accounts — pg-dashboard
-                  offers the same currency picker on every platform, not only on
-                  Amazon. */}
-              {accounts.length > 0 && selectedAccount && (
+              {/* On a platform that runs storefronts, the control names the
+                  storefront rather than a country in the abstract, because
+                  that is what payout setup actually varies by: the merchant
+                  picks the Amazon domain they sell on, and the receiving
+                  account follows from it. Two levels — the four storefronts with a
+                  currency of their own, then a non-selectable "Europe" header
+                  over the five that all settle into the euro account — built
+                  from flux-ui's own SelectGroup/SelectLabel, which is the
+                  design system's grouped-option pattern. */}
+              {marketplaces.length > 0 && selectedMarketplace ? (
+                <Select value={selectedMarketplace.domain} onValueChange={setSelectedDomain}>
+                  {/* Back to the same width as the plain currency trigger
+                      below, now that a row is a domain alone — "amazon.com.au"
+                      is the longest one and clears it comfortably. */}
+                  <SelectTrigger
+                    className="w-full shrink-0 sm:w-[190px]"
+                    aria-label={`${selectedPlatform.name} marketplace`}
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(() => {
+                      const { flat, groups } = groupMarketplaces(marketplaces);
+                      // The domain alone — it is both what the option carries
+                      // in code and what a merchant recognises the storefront
+                      // by, so naming the country beside it only restated it.
+                      // The flag stays: it is the same affordance every other
+                      // option list in the product leads with, and it is what
+                      // keeps the five euro domains apart at a glance.
+                      const row = (marketplace: (typeof marketplaces)[number]) => (
+                        <span className="flex items-center gap-2">
+                          <CountryFlag iso2={marketplace.iso2} />
+                          {marketplace.domain}
+                        </span>
+                      );
+                      return (
+                        <>
+                          {flat.map((marketplace) => (
+                            <SelectItem key={marketplace.domain} value={marketplace.domain}>
+                              {row(marketplace)}
+                            </SelectItem>
+                          ))}
+                          {groups.map((group) => (
+                            <SelectGroup key={group.label}>
+                              <SelectLabel>{group.label}</SelectLabel>
+                              {group.items.map((marketplace) => (
+                                <SelectItem
+                                  key={marketplace.domain}
+                                  value={marketplace.domain}
+                                  // Indented under its header, so the nesting
+                                  // is visible in the list and not only in the
+                                  // header's own presence.
+                                  className="pl-8"
+                                >
+                                  {row(marketplace)}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </>
+                      );
+                    })()}
+                  </SelectContent>
+                </Select>
+              ) : accounts.length > 0 && selectedAccount ? (
                 <Select value={selectedAccount.id} onValueChange={setSelectedAccountId}>
                   {/* A secondary control beside a primary title: the Select's
                       own default (outlined, not filled) is already that step
@@ -439,7 +599,7 @@ function PlatformsContent() {
                     ))}
                   </SelectContent>
                 </Select>
-              )}
+              ) : null}
             </div>
           </section>
 

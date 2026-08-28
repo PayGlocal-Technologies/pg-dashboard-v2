@@ -1,4 +1,8 @@
-import type { Platform, PlatformDocument } from "@/features/dashboard/platforms/types";
+import type {
+  Platform,
+  PlatformDocument,
+  PlatformMarketplace,
+} from "@/features/dashboard/platforms/types";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 /**
@@ -28,6 +32,30 @@ const AMAZON_DOCUMENTS: PlatformDocument[] = [
 ];
 
 /**
+ * Amazon's storefronts, in the order the selector offers them: the four that
+ * settle into a currency of their own first, then the euro ones under a Europe
+ * group, since all five of those resolve to the same receiving account and
+ * differ only in which storefront the merchant sells on.
+ *
+ * Domains verified against Amazon's published marketplace list (August 2026).
+ * Amazon does add storefronts — Belgium, Ireland, Poland, Sweden and Turkey all
+ * exist in Europe alone — so re-check this table rather than treating it as
+ * final. Adding one is an entry here plus a matching currency the accounts
+ * endpoint buckets.
+ */
+const AMAZON_MARKETPLACES: PlatformMarketplace[] = [
+  { domain: "amazon.com", label: "United States", iso2: "US", currency: "USD" },
+  { domain: "amazon.co.uk", label: "United Kingdom", iso2: "GB", currency: "GBP" },
+  { domain: "amazon.ca", label: "Canada", iso2: "CA", currency: "CAD" },
+  { domain: "amazon.com.au", label: "Australia", iso2: "AU", currency: "AUD" },
+  { domain: "amazon.de", label: "Germany", iso2: "DE", currency: "EUR", group: "Europe" },
+  { domain: "amazon.fr", label: "France", iso2: "FR", currency: "EUR", group: "Europe" },
+  { domain: "amazon.it", label: "Italy", iso2: "IT", currency: "EUR", group: "Europe" },
+  { domain: "amazon.es", label: "Spain", iso2: "ES", currency: "EUR", group: "Europe" },
+  { domain: "amazon.nl", label: "Netherlands", iso2: "NL", currency: "EUR", group: "Europe" },
+];
+
+/**
  * The platforms the tutorial page covers, in display order.
  *
  * Everything the page renders comes from this list — the sidebar rows, the
@@ -48,6 +76,7 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
     logo: "amazon-logo",
     logoSrc: "/assets/Platform/Amazon.png",
     accountCurrencies: ["USD", "GBP", "EUR", "CAD", "AUD"],
+    marketplaces: AMAZON_MARKETPLACES,
     steps: [
       {
         instruction: "Log in to Amazon Seller Central, open Settings and click 'Account info'",
@@ -271,6 +300,71 @@ export function accountsForPlatform(
   return platform.accountCurrencies
     .map((currency) => accounts.find((account) => account.currency === currency))
     .filter((account): account is VirtualAccount => Boolean(account));
+}
+
+/**
+ * The storefronts a platform offers *that the merchant can actually be paid
+ * into*, in declared order. A storefront whose currency the accounts endpoint
+ * returned nothing for is dropped, exactly as accountsForPlatform drops a
+ * currency with no account — so the selector can never offer an option that
+ * resolves to an empty panel.
+ */
+export function marketplacesForPlatform(
+  platform: Platform,
+  accounts: VirtualAccount[]
+): PlatformMarketplace[] {
+  return (platform.marketplaces ?? []).filter((marketplace) =>
+    accounts.some((account) => account.currency === marketplace.currency)
+  );
+}
+
+/**
+ * Splits a marketplace list into the ungrouped entries and the groups, both in
+ * first-seen order, which is the shape the two-level Select renders: flat items
+ * at the top, then a non-selectable group header with its own items beneath.
+ */
+export function groupMarketplaces(marketplaces: PlatformMarketplace[]): {
+  flat: PlatformMarketplace[];
+  groups: { label: string; items: PlatformMarketplace[] }[];
+} {
+  const flat = marketplaces.filter((marketplace) => !marketplace.group);
+  const groups: { label: string; items: PlatformMarketplace[] }[] = [];
+
+  for (const marketplace of marketplaces) {
+    if (!marketplace.group) continue;
+    const existing = groups.find((group) => group.label === marketplace.group);
+    if (existing) existing.items.push(marketplace);
+    else groups.push({ label: marketplace.group, items: [marketplace] });
+  }
+
+  return { flat, groups };
+}
+
+/**
+ * Fallback for a selection made before this selector existed, or made on
+ * another platform's plain currency control.
+ *
+ * The dropdown this replaced carried the account's own country name ("Germany",
+ * "United States"), so a legacy value is matched on that label first and on the
+ * account's currency second — which is what maps a euro selection onto a euro
+ * storefront when the country name isn't one Amazon runs a store in. Returns
+ * null when neither matches, and the caller then falls back to the first
+ * storefront rather than showing nothing.
+ *
+ * Nothing persists a selection today (it lives in component state for the life
+ * of the page), so this exists for cross-platform switching within a session
+ * and as the landing point if a saved selection is ever added.
+ */
+export function marketplaceForAccount(
+  marketplaces: PlatformMarketplace[],
+  account: VirtualAccount | null
+): PlatformMarketplace | null {
+  if (!account) return null;
+  return (
+    marketplaces.find((marketplace) => marketplace.label === account.countryName) ??
+    marketplaces.find((marketplace) => marketplace.currency === account.currency) ??
+    null
+  );
 }
 
 /**
