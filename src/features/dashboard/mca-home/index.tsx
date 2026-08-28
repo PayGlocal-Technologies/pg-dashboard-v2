@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
-import { GuideTour } from "@/components/common/guide/GuideTour";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import {
   MCA_DASHBOARD_GUIDE_KEY,
   MCA_DASHBOARD_GUIDE_STEPS,
@@ -172,10 +172,13 @@ export function McaDashboardFeature() {
         onDoneEdit={handleDoneCustomise}
       />
 
-      {/* First-visit onboarding coach-marks — suppressed while customising. */}
-      {!editMode && (
-        <GuideTour steps={MCA_DASHBOARD_GUIDE_STEPS} storageKey={MCA_DASHBOARD_GUIDE_KEY} />
-      )}
+      {/* Guide launcher — highlighted once here (the main dashboard), a plain
+          button on every other screen. */}
+      <GuideLauncher
+        steps={MCA_DASHBOARD_GUIDE_STEPS}
+        storageKey={MCA_DASHBOARD_GUIDE_KEY}
+        highlightOnFirstVisit
+      />
     </div>
   );
 }

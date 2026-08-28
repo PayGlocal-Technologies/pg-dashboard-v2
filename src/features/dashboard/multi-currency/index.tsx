@@ -19,7 +19,7 @@ import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/com
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
-import { GuideTour } from "@/components/common/guide/GuideTour";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import {
   MCA_INTL_ACCOUNTS_GUIDE_KEY,
   MCA_INTL_ACCOUNTS_GUIDE_STEPS,
@@ -644,11 +644,8 @@ function MultiCurrencyContent() {
         </div>
       </div>
 
-      {/* First-visit onboarding coach-marks for International Accounts. */}
-      <GuideTour
-        steps={MCA_INTL_ACCOUNTS_GUIDE_STEPS}
-        storageKey={MCA_INTL_ACCOUNTS_GUIDE_KEY}
-      />
+      {/* Guide launcher for International Accounts. */}
+      <GuideLauncher steps={MCA_INTL_ACCOUNTS_GUIDE_STEPS} storageKey={MCA_INTL_ACCOUNTS_GUIDE_KEY} />
     </div>
   );
 }

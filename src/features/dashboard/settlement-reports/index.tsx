@@ -25,7 +25,7 @@ import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-report
 // re-enable with its usage in the header actions below.
 // import { SettlementDetailsDialog } from "@/features/dashboard/settlement-reports/components/SettlementDetailsDialog";
 import { SettlementStatCards } from "@/features/dashboard/settlement-reports/components/SettlementStatCards";
-import { GuideTour } from "@/components/common/guide/GuideTour";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import {
   MCA_SETTLEMENT_GUIDE_KEY,
   MCA_SETTLEMENT_GUIDE_STEPS,
@@ -491,12 +491,9 @@ export function SettlementReportsFeature() {
           )}
         </div>
 
-        {/* First-visit onboarding coach-marks — MCA settlement view only. */}
+        {/* Guide launcher — MCA settlement view only. */}
         {isMca && (
-          <GuideTour
-            steps={MCA_SETTLEMENT_GUIDE_STEPS}
-            storageKey={MCA_SETTLEMENT_GUIDE_KEY}
-          />
+          <GuideLauncher steps={MCA_SETTLEMENT_GUIDE_STEPS} storageKey={MCA_SETTLEMENT_GUIDE_KEY} />
         )}
       </div>
     </MidGuard>
