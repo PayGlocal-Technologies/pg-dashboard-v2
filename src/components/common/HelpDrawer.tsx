@@ -222,23 +222,26 @@ export function HelpDrawer({
                       <p className="mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Glossary
                       </p>
-                      {/* A plain row list, not flux-ui's DataTable: DataTable is
+                      {/* Same bordered-card shell as the Table Column
+                          Glossary below (and not flux-ui's DataTable: that's
                           built for paginated/loading/empty-state-aware data
-                          grids (a non-omittable "Showing X of Y" footer, a
-                          card surface of its own), which is the wrong shape
-                          for a static, seven-row reference list embedded
-                          inside an already-scrollable panel. Scrolls with the
-                          rest of the body rather than independently, same as
-                          Guide/Tutorials above. */}
-                      <div className="mt-2 divide-y divide-border">
+                          grids with a non-omittable "Showing X of Y" footer,
+                          the wrong shape for a short static reference list
+                          embedded inside an already-scrollable panel). Only
+                          the left cell differs: a live StatusBadge instead of
+                          plain bold text, so a row visually matches the same
+                          chip the table renders for that status. Scrolls with
+                          the rest of the body rather than independently, same
+                          as Guide/Tutorials above. */}
+                      <div className="mt-2 divide-y divide-border rounded-xl border border-border">
                         {glossary.map((row) => (
-                          <div key={row.label} className="flex items-start gap-3 py-2.5">
+                          <div key={row.label} className="grid grid-cols-2 items-start gap-3 px-3.5 py-3">
                             <StatusBadge
                               variant={row.variant}
                               label={row.label}
                               trailIcon={row.trailIcon}
                               size="sm"
-                              className="mt-0.5 shrink-0"
+                              className="justify-self-start"
                             />
                             <p className="text-[13px] text-muted-foreground">{row.meaning}</p>
                           </div>
@@ -252,12 +255,12 @@ export function HelpDrawer({
                       <p className="mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
                         Table Column Glossary
                       </p>
-                      {/* A bordered card of stacked rows, not the flat
-                          divide-y list the status Glossary above uses: the
-                          spec calls for a distinct card surface for this
-                          section. Generic label/meaning row shape so a
-                          future screen's column glossary can reuse this same
-                          block rather than a bespoke one. */}
+                      {/* Same bordered-card shell as the status Glossary
+                          above; this section has no badge/icon to show, just
+                          a bold column name in place of the StatusBadge cell.
+                          Generic label/meaning row shape so a future screen's
+                          column glossary can reuse this same block rather
+                          than a bespoke one. */}
                       <div className="mt-2 divide-y divide-border rounded-xl border border-border">
                         {columnGlossary.map((row) => (
                           <div key={row.column} className="grid grid-cols-2 gap-3 px-3.5 py-3">

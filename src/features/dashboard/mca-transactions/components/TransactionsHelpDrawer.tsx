@@ -25,11 +25,8 @@ const TUTORIAL_VIDEOS: TutorialVideo[] = [{ title: "Tutorial coming soon" }];
 
 // One row per status chip the transactions table actually renders (see
 // columns.tsx's MCA_STATUS_META), read through getStatusMeta so the label,
-// colour and icon here can never drift from the real table's chip. The two
-// reversal statuses collapse to the same "Funds reversed" chip in the table,
-// so only one representative key is listed here to match what a merchant
-// actually sees. The `meaning` column is the one piece getStatusMeta doesn't
-// carry, authored per the Transactions help spec.
+// colour and icon here can never drift from the real table's chip. Funds
+// reversed is intentionally left out per the Transactions help spec.
 const GLOSSARY_STATUS_KEYS: { raw: string; meaning: string }[] = [
   {
     raw: "FUNDS_ON_HOLD",
@@ -55,10 +52,6 @@ const GLOSSARY_STATUS_KEYS: { raw: string; meaning: string }[] = [
   {
     raw: "FIRC_SETTLED",
     meaning: "Funds are settled and your FIRC (proof of foreign remittance) is ready to download.",
-  },
-  {
-    raw: "REVERSAL_FOR_RISK_REJECTED",
-    meaning: "The payment couldn't be completed, and any funds received have been reversed.",
   },
 ];
 
