@@ -15,7 +15,8 @@ import { teamMemberColumns } from "@/features/dashboard/team-management/columns"
 import { TeamMemberRowActions } from "@/features/dashboard/team-management/components/TeamMemberRowActions";
 import { AddTeamMemberModal } from "@/features/dashboard/team-management/components/AddTeamMemberModal";
 import { DeactivateMemberDialog } from "@/features/dashboard/team-management/components/DeactivateMemberDialog";
-import { LimitedTimeAccessDrawer } from "@/features/dashboard/team-management/components/LimitedTimeAccessDrawer";
+// OUT OF SCOPE — limited-time access not required for now. Component kept.
+// import { LimitedTimeAccessDrawer } from "@/features/dashboard/team-management/components/LimitedTimeAccessDrawer";
 import {
   buildRoleOptions,
   TEAM_MEMBERS_PAGE_LIMIT,
@@ -57,7 +58,8 @@ export function TeamManagementFeature() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [deactivatingRow, setDeactivatingRow] = useState<TeamMemberRow | null>(null);
-  const [limitedTimeRow, setLimitedTimeRow] = useState<TeamMemberRow | null>(null);
+  // OUT OF SCOPE — limited-time access not required for now.
+  // const [limitedTimeRow, setLimitedTimeRow] = useState<TeamMemberRow | null>(null);
 
   const enabled = !!mid && !isGuestUser;
   const invalidateKey: QueryKey[] = isPartnerUser ? [["team-partner"]] : [["team-merchant"]];
@@ -269,7 +271,6 @@ export function TeamManagementFeature() {
                 onDeactivate={setDeactivatingRow}
                 onReactivate={reactivate}
                 onResend={resend}
-                onSetLimitedTime={setLimitedTimeRow}
               />
             )}
           />
@@ -288,11 +289,14 @@ export function TeamManagementFeature() {
         onOpenChange={(open) => !open && setDeactivatingRow(null)}
         onConfirm={() => confirmDeactivate()}
       />
+      {/* OUT OF SCOPE — limited-time access not required for now. Restore this
+          drawer, the limitedTimeRow state, the import, and the onSetLimitedTime
+          wiring in TeamMemberRowActions to re-enable.
       <LimitedTimeAccessDrawer
         row={limitedTimeRow}
         onOpenChange={(open) => !open && setLimitedTimeRow(null)}
         invalidateKey={invalidateKey}
-      />
+      /> */}
     </div>
   );
 }
