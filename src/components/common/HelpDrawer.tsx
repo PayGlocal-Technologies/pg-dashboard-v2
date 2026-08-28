@@ -77,18 +77,30 @@ export function HelpDrawer({
   tutorials,
   glossary,
   columnGlossary,
+  columnGlossaryLabel = "Table Column Glossary",
 }: {
   guideItems: HelpGuideItem[];
-  tutorials: TutorialVideo[];
+  /** Omitted entirely on screens with no Tutorials section (e.g. Dashboard). */
+  tutorials?: TutorialVideo[];
   /** Omitted entirely on screens with no glossary (e.g. Accounts). */
   glossary?: HelpGlossaryRow[];
   /** Omitted entirely on screens with no column glossary (e.g. Accounts, Transactions). */
   columnGlossary?: HelpColumnGlossaryRow[];
+  /** Section header above columnGlossary; defaults to the Settlements wording. */
+  columnGlossaryLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   // Both open and close are one continuous animated transition; a second tap
-  // mid-transition is ignored rather than starting a competing one.
-  const [isAnimating, setIsAnimating] = useState(false);
+  // mid-transition is ignored rather than starting a competing one. A ref,
+  // not state: requestClose/toggle are read by the Escape/click-outside
+  // listeners below, which are attached once per open (effect deps: [open])
+  // rather than re-attached on every animation-state change. If this were
+  // state, those listeners would close over the isAnimating value from the
+  // render that ran the effect (always true, since opening sets it
+  // immediately) and never see it flip back to false, permanently
+  // latching Escape/click-outside closed while the trigger button's onClick
+  // (bound fresh every render) kept working — a real bug this once was.
+  const isAnimatingRef = useRef(false);
   // `document.body` (the portal target below) doesn't exist during SSR.
   // Rather than an effect+setState just to detect the client, this flips
   // true inside the trigger's own click handler, which can only ever fire
@@ -102,14 +114,14 @@ export function HelpDrawer({
   const panelRef = useRef<HTMLDivElement>(null);
 
   const requestClose = () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
     setOpen(false);
   };
 
   const toggle = () => {
-    if (isAnimating) return;
-    setIsAnimating(true);
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
     setEverOpened(true);
     setOpen((prev) => !prev);
   };
@@ -137,7 +149,6 @@ export function HelpDrawer({
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   return (
@@ -171,7 +182,9 @@ export function HelpDrawer({
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: "100%", opacity: 0 }}
                 transition={{ duration: 0.28, ease: "easeOut" }}
-                onAnimationComplete={() => setIsAnimating(false)}
+                onAnimationComplete={() => {
+                  isAnimatingRef.current = false;
+                }}
               >
                 {/* Header: fixed, does not scroll. */}
                 <div className="shrink-0 border-b border-border px-5 py-4">
@@ -210,12 +223,16 @@ export function HelpDrawer({
                     ))}
                   </Accordion>
 
-                  <p className="mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Tutorials
-                  </p>
-                  <div className="mt-2">
-                    <TutorialTile video={tutorials[0]} />
-                  </div>
+                  {tutorials && tutorials.length > 0 && (
+                    <>
+                      <p className="mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Tutorials
+                      </p>
+                      <div className="mt-2">
+                        <TutorialTile video={tutorials[0]} />
+                      </div>
+                    </>
+                  )}
 
                   {glossary && glossary.length > 0 && (
                     <>
@@ -253,7 +270,7 @@ export function HelpDrawer({
                   {columnGlossary && columnGlossary.length > 0 && (
                     <>
                       <p className="mt-6 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Table Column Glossary
+                        {columnGlossaryLabel}
                       </p>
                       {/* Same bordered-card shell as the status Glossary
                           above; this section has no badge/icon to show, just

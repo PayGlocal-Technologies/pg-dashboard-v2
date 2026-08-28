@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { AccountsHelpDrawer } from "@/features/dashboard/multi-currency/components/AccountsHelpDrawer";
 import { TransactionsHelpDrawer } from "@/features/dashboard/mca-transactions/components/TransactionsHelpDrawer";
 import { SettlementsHelpDrawer } from "@/features/dashboard/settlement-reports/components/SettlementsHelpDrawer";
+import { DashboardHelpDrawer } from "@/features/dashboard/home/components/DashboardHelpDrawer";
 import {
   SETTLEMENT_LIST_PATH,
   MCA_SETTLEMENT_LIST_PATH,
@@ -204,6 +205,10 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             pathname === MCA_SETTLEMENT_LIST_PATH ||
             pathname.startsWith(`${MCA_SETTLEMENT_LIST_PATH}/`) ? (
             <SettlementsHelpDrawer />
+          ) : pathname === "/dashboard" ||
+            pathname === "/pa-dashboard" ||
+            pathname === "/mca-dashboard" ? (
+            <DashboardHelpDrawer />
           ) : (
             <AccountsHelpDrawer />
           )}
