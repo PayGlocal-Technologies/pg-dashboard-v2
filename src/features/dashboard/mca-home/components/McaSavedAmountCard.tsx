@@ -6,19 +6,16 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { formatCurrency } from "@/lib/utils/format";
-import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transactions/hooks";
+import { useSavedAmount } from "@/features/dashboard/mca-transactions/hooks";
 
 /**
- * The two windows getPacbOverview reports a saved amount for. Keys, not labels:
- * each value indexes straight into `amountSaved`, so a third window appearing in
- * the response is one entry here and nothing else.
- *
- * "overall" leads and is the default, matching production's own Amount Saved
- * card (its radio defaults to the lifetime figure).
+ * The two windows this card shows. "overall" reads the endpoint's overallAmount;
+ * "month" indexes the per-timeframe breakdown. "overall" leads and is the
+ * default, matching production's Amount Saved card.
  */
 const SAVED_AMOUNT_DURATIONS = [
   { value: "overall", label: "Overall" },
-  { value: "last30", label: "30 days" },
+  { value: "month", label: "This month" },
 ] as const;
 
 type SavedAmountDuration = (typeof SAVED_AMOUNT_DURATIONS)[number]["value"];
@@ -27,23 +24,23 @@ type SavedAmountDuration = (typeof SAVED_AMOUNT_DURATIONS)[number]["value"];
  *  can never describe different periods. */
 const DURATION_CAPTION: Record<SavedAmountDuration, string> = {
   overall: "Amount saved on transaction fees through PayGlocal.",
-  last30: "Saved on transaction fees in the last 30 days.",
+  month: "Saved on transaction fees this month.",
 };
 
 /**
- * Reads the same MCA business-overview endpoint the Transactions page's own
- * SavedAmountCard does (getPacbOverview, see useMcaOverview), one query shared
- * through react-query's cache, so putting both on screen costs one request.
- *
- * That endpoint returns both windows in a single response, so the toggle below
- * switches between two figures already in hand: no refetch, and no loading state
- * on toggle. The Transactions card stays on the lifetime figure alone, by design
- * (see its own doc comment).
+ * Reads the same saved-amount endpoint the Transactions page's own
+ * SavedAmountCard does (useSavedAmount), one query shared through react-query's
+ * cache. The response carries the overall figure and a per-timeframe breakdown,
+ * so the toggle switches between two figures already in hand — no refetch.
  */
 export function McaSavedAmountCard() {
-  const { overview, isLoading } = useMcaOverview();
+  const { saved, isLoading } = useSavedAmount();
   const [duration, setDuration] = useState<SavedAmountDuration>("overall");
-  const savedInr = toMetricNumber(overview?.amountSaved?.[duration]?.value);
+  const savedInr =
+    duration === "overall"
+      ? saved?.overallAmount ?? 0
+      : saved?.timeframes.find((t) => t.timeframe === duration)?.amount ?? 0;
+  const currency = saved?.currency ?? "INR";
 
   return (
     <Card className="gap-3 p-5">
@@ -88,7 +85,7 @@ export function McaSavedAmountCard() {
           <Shimmer className="mt-1 h-8 w-32" />
         ) : (
           <RollingNumber
-            value={formatCurrency(savedInr, "INR", "en-IN")}
+            value={formatCurrency(savedInr, currency, "en-IN")}
             className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
         )}

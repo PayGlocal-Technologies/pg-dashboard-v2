@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { formatCurrency, formatNextSettlementDate } from "@/lib/utils/format";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { useMcaOverview, useSettledByAccount } from "@/features/dashboard/mca-transactions/hooks";
+import type { SettledAccountRow } from "@/features/dashboard/mca-transactions/types";
 
 type AnalyticsMode = "amount" | "count";
 
@@ -51,11 +52,38 @@ const ACCOUNT_META: Record<string, { label: string; iso2: string }> = {
   AED: { label: "AED Account", iso2: "AE" },
   SGD: { label: "SGD Account", iso2: "SG" },
   AUD: { label: "AUD Account", iso2: "AU" },
+  CNY: { label: "CNY Account", iso2: "CN" },
   REST_OF_WORLD: { label: "Rest of world", iso2: "" },
 };
 
 function accountMeta(currency: string): { label: string; iso2: string } {
   return ACCOUNT_META[currency] ?? { label: `${currency} Account`, iso2: "" };
+}
+
+/** Currencies that don't get their own bar — their amount + count are folded
+ *  into REST_OF_WORLD instead. */
+const FOLD_INTO_REST = new Set(["AED", "SGD"]);
+
+/** Collapse AED + SGD into the REST_OF_WORLD bucket, leaving every other
+ *  currency as its own bar. */
+function foldRestOfWorld(accounts: SettledAccountRow[]): SettledAccountRow[] {
+  const kept: SettledAccountRow[] = [];
+  let restAmount = 0;
+  let restCount = 0;
+  let hasRest = false;
+
+  for (const account of accounts) {
+    if (account.currency === "REST_OF_WORLD" || FOLD_INTO_REST.has(account.currency)) {
+      restAmount += account.amount;
+      restCount += account.count;
+      hasRest = true;
+    } else {
+      kept.push(account);
+    }
+  }
+
+  if (hasRest) kept.push({ currency: "REST_OF_WORLD", amount: restAmount, count: restCount });
+  return kept;
 }
 
 /** Compact ₹ for the narrow bar-value column (amounts share one reporting
@@ -137,7 +165,7 @@ export function SettlementAnalyticsCard({
   const { overview } = useMcaOverview();
   const { settled, isLoading } = useSettledByAccount(TIMEFRAME_BY_RANGE[timeRange]);
 
-  const accountRows = (settled?.accounts ?? [])
+  const accountRows = foldRestOfWorld(settled?.accounts ?? [])
     .map((account) => {
       const meta = accountMeta(account.currency);
       return {
