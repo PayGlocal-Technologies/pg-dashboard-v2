@@ -5,7 +5,7 @@ import { useGet, usePost, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { useInvoiceTemplatesStore, type DraftMemory } from "@/stores/useInvoiceTemplates";
-import { describeSnapshot } from "@/features/dashboard/create-invoice/helpers";
+import { describeSnapshot, themeFor } from "@/features/dashboard/create-invoice/helpers";
 // toDateKey is local-timezone YYYY-MM-DD. Imported from the chips module for the
 // same reason mca-invoices and mca-invoice-details do: it is the one
 // implementation, and `toISOString().slice(0, 10)` rolls the date back a day for
@@ -18,11 +18,18 @@ import {
   clientStateCodesApi,
   getAssetApi,
   getLineItemsApi,
+  invoiceThemesApi,
   mcaCurrenciesApi,
   suggestedAccountsApi,
   uploadAssetApi,
   ffmsTxnSearchApi,
 } from "@/features/dashboard/create-invoice/services";
+import {
+  FALLBACK_THEME_ACCENTS,
+  FALLBACK_THEME_COLORS,
+  FALLBACK_THEME_NAMES,
+  UNKNOWN_COLOR_HEX,
+} from "@/features/dashboard/create-invoice/constants";
 import type {
   AccountData,
   AccountListResponse,
@@ -35,10 +42,13 @@ import type {
   CurrencyData,
   InvoiceTemplate,
   InvoiceTemplateSnapshot,
+  InvoiceTheme,
+  InvoiceThemesResponse,
   LineItemSuggestion,
   LineItemsResponse,
   McaCurrencyListResponse,
   StateCodesResponse,
+  ThemePaletteOption,
 } from "@/features/dashboard/create-invoice/types";
 import type { BaseResponse } from "@/types/common";
 
@@ -97,6 +107,74 @@ export function useMcaCurrencies(): McaCurrencies {
       isError,
     };
   }, [data, isError]);
+}
+
+// ─── Themes ───────────────────────────────────────────────────────────────────
+
+export interface InvoiceThemePalette {
+  /** Every theme the renderer can produce, in the order the server lists them. */
+  themes: InvoiceTheme[];
+  colors: ThemePaletteOption[];
+  accents: ThemePaletteOption[];
+  /** Hex for a stored colour name, for the preview only. Never sent back. */
+  colorHexFor: (name: string) => string;
+  accentHexFor: (name: string) => string;
+  /**
+   * True only while the first request is in flight. Callers gate their first
+   * paint on this so the document is not drawn in the fallback palette and then
+   * repainted in the server's. It goes false on failure too, which is what keeps
+   * a themes outage from blocking the editor.
+   */
+  isLoading: boolean;
+}
+
+/**
+ * The renderer's palette: which themes exist, and what its named colours look
+ * like.
+ *
+ * Two things make this different from every other query in this feature. It is
+ * not merchant-scoped, because the vocabulary belongs to the renderer and is the
+ * same for everyone, so it is cached indefinitely under a single key and shared
+ * by the picker, the thumbnails and the document preview. And it never blocks:
+ * only NAMES go on the wire, so an invoice saves and renders correctly whether
+ * or not this call succeeded. A failure therefore falls back to the local table
+ * rather than being surfaced — the merchant may see a hex that is a release
+ * behind, which is a far better outcome than a colourless editor or a bootstrap
+ * error on a document that would have generated perfectly.
+ */
+export function useInvoiceThemes(): InvoiceThemePalette {
+  const { data, isLoading } = useGet<InvoiceThemesResponse>(
+    ["invoice-themes"],
+    invoiceThemesApi,
+    undefined,
+    { staleTime: Infinity }
+  );
+
+  return useMemo(() => {
+    const names = data?.data?.themes?.length ? data.data.themes : FALLBACK_THEME_NAMES;
+    const colors = data?.data?.colors?.length ? data.data.colors : FALLBACK_THEME_COLORS;
+    const accents = data?.data?.accents?.length ? data.data.accents : FALLBACK_THEME_ACCENTS;
+
+    // Both maps are consulted for a name the *invoice* holds, which may be one
+    // the endpoint has since dropped, so the local table backs up the response
+    // rather than the other way round.
+    const hexes = new Map<string, string>();
+    for (const option of [...FALLBACK_THEME_COLORS, ...FALLBACK_THEME_ACCENTS]) {
+      hexes.set(option.name, option.hex);
+    }
+    for (const option of [...colors, ...accents]) hexes.set(option.name, option.hex);
+
+    const hexFor = (name: string) => hexes.get(name) ?? UNKNOWN_COLOR_HEX;
+
+    return {
+      themes: names.map(themeFor),
+      colors,
+      accents,
+      colorHexFor: hexFor,
+      accentHexFor: hexFor,
+      isLoading,
+    };
+  }, [data, isLoading]);
 }
 
 // ─── Linked transaction (?gid=) ───────────────────────────────────────────────
@@ -612,8 +690,8 @@ export function useInvoiceTemplates(): InvoiceTemplates {
 }
 
 /**
- * Per-draft memory for the two things the invoice cannot hold: which template it
- * came from, and its branding.
+ * Per-draft memory for the one thing the invoice cannot hold: which template it
+ * came from.
  *
  * Restoration is pushed through `onRestore` rather than returned as state on
  * purpose. The persisted record is only readable after `rehydrate()` resolves,

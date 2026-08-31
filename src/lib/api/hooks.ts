@@ -165,12 +165,22 @@ export function useGet<TData = unknown, TError = Error>(
   let dynamicUrl: string | null | undefined;
   let options: GetOptions<TData, TError> | undefined;
 
-  if (typeof dynamicUrlOrOptions === "string" || dynamicUrlOrOptions === null) {
+  // Only a non-null OBJECT in the third slot means the legacy 3-arg form. A
+  // string, null or undefined is a dynamicUrl, and the options are in the fourth.
+  //
+  // `undefined` has to fall through to the fourth argument. It used to take the
+  // legacy branch, where `options = undefined` silently discarded whatever was
+  // passed in the fourth slot — and `(key, url, undefined, { ... })` is the
+  // dominant call shape in this codebase, because it mirrors pg-dashboard's
+  // signature. Every one of those call sites was running with client defaults
+  // instead of its own options: `enabled: !!url` gates were dead, so queries
+  // fired against empty URLs; `enabled: false` queries meant for manual refetch
+  // fetched on mount anyway; and a per-query staleTime never applied.
+  if (dynamicUrlOrOptions !== null && typeof dynamicUrlOrOptions === "object") {
+    options = dynamicUrlOrOptions;
+  } else {
     dynamicUrl = dynamicUrlOrOptions;
     options = optionsMaybe;
-  } else {
-    dynamicUrl = undefined;
-    options = dynamicUrlOrOptions;
   }
 
   const { headers, ...queryOptions } = options ?? {};

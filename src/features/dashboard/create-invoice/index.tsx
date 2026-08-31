@@ -14,6 +14,7 @@ import {
   getInvoiceDetailsApi,
   skuImportPreviousItemsApi,
 } from "@/features/dashboard/create-invoice/services";
+import type { InvoiceThemePalette } from "@/features/dashboard/create-invoice/hooks";
 import {
   useDebouncedAutosave,
   useInvoiceBankAccounts,
@@ -22,11 +23,13 @@ import {
   useDraftMemory,
   useInvoiceAsset,
   useInvoiceTemplates,
+  useInvoiceThemes,
   useLinkedTransaction,
   useMcaCurrencies,
 } from "@/features/dashboard/create-invoice/hooks";
 import {
   applyTemplateSnapshot,
+  brandingFrom,
   getInvoiceTotals,
   hasCompleteLineItems,
   toFormState,
@@ -36,10 +39,8 @@ import {
 } from "@/features/dashboard/create-invoice/helpers";
 import {
   AUTOSAVE_DEBOUNCE_MS,
-  DEFAULT_BRANDING_STYLE,
-  INVOICE_BRANDING_STYLES,
+  DEFAULT_THEME_METADATA,
 } from "@/features/dashboard/create-invoice/constants";
-import { DEFAULT_INVOICE_LANGUAGE } from "@/features/dashboard/create-invoice/i18n";
 import {
   DueDateChip,
   InvoiceNumberChip,
@@ -71,6 +72,7 @@ import type {
   InvoiceDetailsResponse,
   InvoiceFormState,
   InvoiceTemplate,
+  ThemeMetadata,
 } from "@/features/dashboard/create-invoice/types";
 import type { BaseResponse } from "@/types/common";
 
@@ -109,12 +111,6 @@ function emptyForm(today: string, currency: string): InvoiceFormState {
     logoEnabled: false,
     signatureEnabled: false,
 
-    // Branding defaults to the one theme the server actually renders, so a
-    // merchant who never opens the panel gets a preview that matches their PDF.
-    brandingStyleId: DEFAULT_BRANDING_STYLE.id,
-    primaryColor: DEFAULT_BRANDING_STYLE.defaultPrimaryColor,
-    accentColor: DEFAULT_BRANDING_STYLE.defaultAccentColor,
-    language: DEFAULT_INVOICE_LANGUAGE,
 
     isRecurring: false,
     recurringType: "",
@@ -251,6 +247,18 @@ export function CreateInvoiceFeature() {
   const { currencies, symbolFor, isError: currenciesFailed } = useMcaCurrencies();
 
   /**
+   * Fetched here rather than inside the editor so the first paint can wait for
+   * it. The invoice stores theme NAMES, so a save is correct whether or not this
+   * resolved — but the preview needs the hexes to draw them, and rendering the
+   * document in the local fallback palette and then repainting it in the
+   * server's is exactly the abrupt flip this gate exists to avoid.
+   *
+   * It cannot block indefinitely: on failure `isLoading` goes false and the
+   * fallback palette stands, so a themes outage costs a shade, not an invoice.
+   */
+  const palette = useInvoiceThemes();
+
+  /**
    * Draft creation.
    *
    * The handlers live in the hook options, NOT on the `mutate()` call.
@@ -313,13 +321,22 @@ export function CreateInvoiceFeature() {
   const {
     data: detailsData,
     isError: detailsFailed,
-    status: detailsStatus,
-    fetchStatus: detailsFetchStatus,
+    isFetchedAfterMount: detailsFetchedAfterMount,
   } = useGet<InvoiceDetailsResponse>(
     ["invoice-details", merchantId, invoiceId],
     detailsUrl,
     undefined,
-    { enabled: !!detailsUrl }
+    /**
+     * Always revalidated on mount.
+     *
+     * The app's default staleTime is 30s and nothing invalidates this key —
+     * autosave posts with `invalidateQueries: false` on purpose, so typing does
+     * not refetch — so reopening a draft within 30s used to make no request at
+     * all and rebind the editor to the document as it was before the session's
+     * saves. `staleTime: 0` is what guarantees the request; `isReady` below is
+     * what makes the first paint wait for it.
+     */
+    { enabled: !!detailsUrl, staleTime: 0 }
   );
 
   const billerUrl = billerDetailsApi(merchantId);
@@ -363,7 +380,24 @@ export function CreateInvoiceFeature() {
 
   const invoice = detailsData?.data?.invoice;
   const biller = invoice?.billerDetails ?? billerData?.data;
-  const isReady = !!invoice && !!biller && currencies.length > 0;
+  /**
+   * `detailsFetchedAfterMount` is load-bearing, not a nicety.
+   *
+   * react-query hands over whatever it has cached on the first render and
+   * revalidates behind it. Painting that copy means showing a document that is
+   * about to change under the merchant — which is precisely how a theme picked
+   * and saved appeared as the old one and then snapped to the new one a moment
+   * later. Requiring a fetch from THIS mount means the shimmer covers the round
+   * trip and the editor opens on the invoice the server actually holds.
+   *
+   * It only ever goes false → true, so it cannot unmount the editor mid-edit.
+   */
+  const isReady =
+    detailsFetchedAfterMount &&
+    !!invoice &&
+    !!biller &&
+    currencies.length > 0 &&
+    !palette.isLoading;
 
   // The editor needs all three of the draft, the biller profile and the
   // currency list. If any of them has failed outright, waiting is pointless:
@@ -382,9 +416,10 @@ export function CreateInvoiceFeature() {
   const readiness = [
     { label: "Merchant account", ok: !!merchantId },
     { label: "Draft invoice", ok: !!invoiceId },
-    { label: "Invoice details", ok: !!invoice },
+    { label: "Invoice details", ok: detailsFetchedAfterMount && !!invoice },
     { label: "Biller profile", ok: !!biller },
     { label: "Currencies", ok: currencies.length > 0 },
+    { label: "Invoice themes", ok: !palette.isLoading },
   ];
 
   // Above every early return: hooks must run in the same order on every render.
@@ -521,6 +556,7 @@ export function CreateInvoiceFeature() {
           invoice={invoice}
           biller={biller}
           currencies={currencies}
+          palette={palette}
           symbolFor={symbolFor}
           merchantId={merchantId}
           invoiceId={invoiceId}
@@ -539,6 +575,7 @@ function InvoiceEditor({
   invoice,
   biller,
   currencies,
+  palette,
   symbolFor,
   merchantId,
   invoiceId,
@@ -549,6 +586,7 @@ function InvoiceEditor({
   invoice: InvoiceData;
   biller: BillerDetails;
   currencies: CurrencyData[];
+  palette: InvoiceThemePalette;
   symbolFor: (code: string) => string;
   merchantId: string;
   invoiceId: string;
@@ -558,11 +596,44 @@ function InvoiceEditor({
 }) {
   const router = useRouter();
 
-  const [form, setForm] = useState<InvoiceFormState>(() =>
+  /**
+   * The form, derived rather than copied.
+   *
+   * `edits` holds only the fields the merchant has changed this session; the rest
+   * are read from the fetched document on every render. That is the same shape as
+   * `brandingOverride` below, and for the same reason.
+   *
+   * The alternative — one `useState` seeded from the document, which is what this
+   * was — makes the editor's copy authoritative from the first render. Anything
+   * the server later reports is then unreachable, and worse, every subsequent
+   * autosave posts the whole seeded form back: a draft opened from a stale cache
+   * would quietly write last session's line items over the newer ones on the
+   * first keystroke anywhere in the form. Deriving means an untouched field is
+   * never something this editor can revert, because it never held a stale copy
+   * of it to send.
+   *
+   * Reads go through `form`; writes go through `patch`. Nothing else touches
+   * `edits`.
+   */
+  const [edits, setEdits] = useState<Partial<InvoiceFormState>>({});
+
+  const serverForm = useMemo(
     // The fallback carries the default currency, so a fresh draft with no
     // currency of its own lands on the merchant's first available one.
-    toFormState(invoice, emptyForm(today, currencies[0]?.currencyCode ?? ""))
+    () => toFormState(invoice, emptyForm(today, currencies[0]?.currencyCode ?? "")),
+    [invoice, today, currencies]
   );
+
+  const form = useMemo<InvoiceFormState>(() => ({ ...serverForm, ...edits }), [serverForm, edits]);
+
+  /**
+   * The biller is still seeded, not derived, and that is deliberate.
+   *
+   * It is edited as a whole block by <BillerSection> rather than field by field,
+   * and it reaches the editor from `invoice.billerDetails` — the same document
+   * `serverForm` reads — so the first paint already has the server's copy. There
+   * is no partial-override to express.
+   */
   const [billerDetails, setBillerDetails] = useState<BillerDetails>(() => biller);
 
   /**
@@ -592,6 +663,33 @@ function InvoiceEditor({
   const [persistedCurrency, setPersistedCurrency] = useState<string>(() => invoice.currency ?? "");
 
   const { rows: bankRows } = useInvoiceBankAccounts(invoiceId, persistedCurrency);
+
+  /**
+   * Branding, derived rather than seeded.
+   *
+   * Every other field in this editor is copied into `form` once, in a useState
+   * initializer. Branding deliberately is not, and the difference is the whole
+   * fix for the theme reverting: react-query paints the cached document first and
+   * revalidates behind it, so anything copied in on that first render keeps the
+   * stale value even after the fresh document arrives, because the form seeds
+   * once and `key={invoice.id}` does not change.
+   *
+   * So: the invoice's own `themeMetadata` is the source, read on every render, and
+   * this state holds only what the merchant has picked *this session*. A
+   * revalidation therefore corrects the theme on its own, and a merchant who has
+   * chosen one keeps it, because their override outranks the document.
+   *
+   * `edits` above is the same pattern for the rest of the form, so nothing in
+   * this editor holds a stale copy of a field the merchant has not touched.
+   */
+  const [brandingOverride, setBrandingOverride] = useState<ThemeMetadata | null>(null);
+  const branding = useMemo(
+    () => brandingOverride ?? brandingFrom(invoice.themeMetadata),
+    [brandingOverride, invoice.themeMetadata]
+  );
+  const patchBranding = (next: Partial<ThemeMetadata>) =>
+    setBrandingOverride({ ...branding, ...next });
+
   const logo = useInvoiceAsset("LOGO");
   const signature = useInvoiceAsset("SIGNATURE");
 
@@ -608,24 +706,21 @@ function InvoiceEditor({
   const [cropperType, setCropperType] = useState<"LOGO" | "SIGNATURE" | null>(null);
 
   /**
-   * Restores what the invoice itself cannot carry: the template it came from and
-   * its branding. Without this, reopening a draft reset the theme to the default
-   * and turned "Update template" back into "Save as template", so editing
-   * yesterday's draft produced a duplicate template.
+   * Restores the one thing the invoice itself cannot carry: the template it came
+   * from. Without this, reopening a draft turned "Update template" back into
+   * "Save as template", so editing yesterday's draft produced a duplicate
+   * template. Local because templates themselves still are.
+   *
+   * The theme and its colours used to be restored here too. They are now read
+   * off the draft in `toFormState`, so reapplying a local copy on top would let
+   * a stale one win over what the server holds.
    *
    * The callback runs from the store's rehydrate continuation, which is why the
    * setState here is legitimate — see useDraftMemory.
    */
-  const { isReady: memoryReady, remember: rememberDraft } = useDraftMemory(invoiceId, (memory) => {
-    setActiveTemplateId(memory.templateId);
-    setForm((prev) => ({
-      ...prev,
-      brandingStyleId: memory.brandingStyleId,
-      primaryColor: memory.primaryColor,
-      accentColor: memory.accentColor,
-      language: memory.language,
-    }));
-  });
+  const { isReady: memoryReady, remember: rememberDraft } = useDraftMemory(invoiceId, (memory) =>
+    setActiveTemplateId(memory.templateId)
+  );
 
   /**
    * Write-only, and gated on `memoryReady` so the defaults this form was seeded
@@ -639,22 +734,8 @@ function InvoiceEditor({
    */
   useEffect(() => {
     if (!memoryReady) return;
-    rememberDraft({
-      templateId: activeTemplateId,
-      brandingStyleId: form.brandingStyleId,
-      primaryColor: form.primaryColor,
-      accentColor: form.accentColor,
-      language: form.language,
-    });
-  }, [
-    memoryReady,
-    rememberDraft,
-    activeTemplateId,
-    form.brandingStyleId,
-    form.primaryColor,
-    form.accentColor,
-    form.language,
-  ]);
+    rememberDraft({ templateId: activeTemplateId });
+  }, [memoryReady, rememberDraft, activeTemplateId]);
 
   const { mutate: saveInvoice, isPending: isSaving } = usePost<
     InvoiceDetailsResponse,
@@ -677,12 +758,13 @@ function InvoiceEditor({
     (): InvoiceCreatePayload =>
       toInvoicePayload({
         form,
+        branding,
         invoiceDetails: { ...invoice, billerDetails },
         invoiceId,
         gid: linkedGid,
         clientIdParam,
       }),
-    [form, billerDetails, invoice, invoiceId, linkedGid, clientIdParam]
+    [form, branding, billerDetails, invoice, invoiceId, linkedGid, clientIdParam]
   );
 
   const persistDraft = useCallback(() => {
@@ -703,26 +785,20 @@ function InvoiceEditor({
    * Value-based signature, so the save fires on real edits rather than on every
    * render, and so biller changes (which live outside `form`) trigger it too.
    *
-   * The four branding fields are excluded on purpose: nothing sends them yet
-   * (see the branding block in types.ts), so including them would fire a POST
-   * whose payload is byte-identical to the last one and flash "Saving…" for a
-   * change that is not being saved — a worse lie than not saving at all, because
-   * the merchant reads the indicator as confirmation. They ride along in a saved
-   * template instead, which is real storage.
+   * Keyed on the merchant's own changes — `edits` and `brandingOverride` — and
+   * deliberately NOT on the effective `form` or `branding`, both of which also
+   * move when a revalidation brings a newer document.
    *
-   * Delete this destructure when the payload learns those fields, and the
-   * signature goes back to the whole form.
+   * An incoming server change is not an edit. Treating it as one would fire a
+   * save immediately after every refetch, which at best writes back what the
+   * server just sent and at worst races it. Reacting only to what the merchant
+   * did keeps revalidation silent, and every real edit still schedules a save
+   * that carries the whole document.
    */
-  const editSignature = useMemo(() => {
-    const {
-      brandingStyleId: _brandingStyleId,
-      primaryColor: _primaryColor,
-      accentColor: _accentColor,
-      language: _language,
-      ...persisted
-    } = form;
-    return JSON.stringify({ persisted, billerDetails });
-  }, [form, billerDetails]);
+  const editSignature = useMemo(
+    () => JSON.stringify({ edits, brandingOverride, billerDetails }),
+    [edits, brandingOverride, billerDetails]
+  );
 
   useDebouncedAutosave(persistDraft, editSignature, {
     enabled: true,
@@ -731,7 +807,7 @@ function InvoiceEditor({
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const patch = (next: Partial<InvoiceFormState>) => setForm((prev) => ({ ...prev, ...next }));
+  const patch = (next: Partial<InvoiceFormState>) => setEdits((prev) => ({ ...prev, ...next }));
 
   const totals = getInvoiceTotals(form);
 
@@ -747,6 +823,8 @@ function InvoiceEditor({
 
   const handleApplyTemplate = (template: InvoiceTemplate) => {
     const next = applyTemplateSnapshot(template);
+    // A template's branding is an explicit choice, so it becomes the override.
+    setBrandingOverride(brandingFrom(template.snapshot));
 
     // "custom" is not a reusable term — it means a date somebody picked by hand
     // for one invoice — so it is treated like no term at all.
@@ -768,13 +846,17 @@ function InvoiceEditor({
     const accountKept =
       currencyChanged || bankRows.some((row) => row.accountNumber === next.accountNo);
 
-    setForm((prev) => ({
-      ...prev,
+    // Reads the current effective values rather than a `prev` callback: applying
+    // a template is a deliberate act on what is on screen, and `form` IS what is
+    // on screen. The three carried-over fields are written back explicitly so a
+    // template that has no term of its own cannot leave the due date derived from
+    // one it does not carry.
+    patch({
       ...next,
       accountNo: accountKept ? (next.accountNo ?? "") : "",
-      dueTermId: carriesTerm ? next.dueTermId : prev.dueTermId,
-      dueDate: carriesTerm ? dueDateForTerm(prev.invoiceDate, next.dueTermId) : prev.dueDate,
-    }));
+      dueTermId: carriesTerm ? next.dueTermId : form.dueTermId,
+      dueDate: carriesTerm ? dueDateForTerm(form.invoiceDate, next.dueTermId) : form.dueDate,
+    });
 
     setActiveTemplateId(template.id);
     // Only count a genuine use. Re-applying the template already in force is a
@@ -793,14 +875,14 @@ function InvoiceEditor({
   };
 
   const handleSaveTemplate = (name: string) => {
-    const id = templateStore.save(name, toTemplateSnapshot(form));
+    const id = templateStore.save(name, toTemplateSnapshot(form, branding));
     setActiveTemplateId(id);
     toast.success("Template saved", { description: `"${name}" is ready to reuse.` });
   };
 
   const handleUpdateTemplate = () => {
     if (!activeTemplate) return;
-    templateStore.update(activeTemplate.id, toTemplateSnapshot(form));
+    templateStore.update(activeTemplate.id, toTemplateSnapshot(form, branding));
     toast.success("Template updated", {
       description: `"${activeTemplate.name}" now matches this invoice.`,
     });
@@ -835,27 +917,20 @@ function InvoiceEditor({
 
   // ── Branding actions ───────────────────────────────────────────────────────
 
-  /** Picking a theme also adopts its colours, which is what makes it a theme. */
-  const handleStyleChange = (brandingStyleId: string) => {
-    const style = INVOICE_BRANDING_STYLES.find((candidate) => candidate.id === brandingStyleId);
-    patch({
-      brandingStyleId,
-      ...(style && {
-        primaryColor: style.defaultPrimaryColor,
-        accentColor: style.defaultAccentColor,
-      }),
+  /**
+   * Back to the pair the server itself defaults to.
+   *
+   * Picking a theme no longer touches the colours, which is a change from when
+   * each theme carried its own two hexes. The renderer applies one colour pair to
+   * whichever layout it is given, so a theme that reassigned them would be
+   * inventing a relationship the document does not have — and would silently
+   * discard a merchant's brand colour the moment they tried a different layout.
+   */
+  const handleResetColors = () =>
+    patchBranding({
+      color: DEFAULT_THEME_METADATA.color,
+      accent: DEFAULT_THEME_METADATA.accent,
     });
-  };
-
-  const handleResetColors = () => {
-    const style =
-      INVOICE_BRANDING_STYLES.find((candidate) => candidate.id === form.brandingStyleId) ??
-      DEFAULT_BRANDING_STYLE;
-    patch({
-      primaryColor: style.defaultPrimaryColor,
-      accentColor: style.defaultAccentColor,
-    });
-  };
 
   /**
    * One cropper serves both assets and both entry points (the branding panel and
@@ -910,6 +985,11 @@ function InvoiceEditor({
     logoUrl: logo.url,
     signatureUrl: signature.url,
     symbol,
+    // Names are what the invoice stores; the document has to be drawn in
+    // something, so the hexes are resolved here and go no further than the paper.
+    theme: branding.theme,
+    primaryHex: palette.colorHexFor(branding.color),
+    accentHex: palette.accentHexFor(branding.accent),
   };
 
   // ── Generate ───────────────────────────────────────────────────────────────
@@ -1220,14 +1300,12 @@ function InvoiceEditor({
             <BrandingSection
               logoEnabled={form.logoEnabled}
               signatureEnabled={form.signatureEnabled}
-              brandingStyleId={form.brandingStyleId}
-              primaryColor={form.primaryColor}
-              accentColor={form.accentColor}
-              language={form.language}
+              branding={branding}
+              palette={palette}
               logo={logo}
               signature={signature}
               onChange={patch}
-              onStyleChange={handleStyleChange}
+              onBrandingChange={patchBranding}
               onResetColors={handleResetColors}
               onOpenCropper={setCropperType}
             />
@@ -1238,7 +1316,7 @@ function InvoiceEditor({
       <SaveAsTemplateDialog
         open={saveTemplateOpen}
         onOpenChange={setSaveTemplateOpen}
-        snapshot={hasTemplatableContent ? toTemplateSnapshot(form) : null}
+        snapshot={hasTemplatableContent ? toTemplateSnapshot(form, branding) : null}
         existingNames={templateStore.templates.map((template) => template.name)}
         onSave={handleSaveTemplate}
       />

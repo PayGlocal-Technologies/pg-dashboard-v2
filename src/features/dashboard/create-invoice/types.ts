@@ -82,6 +82,8 @@ export interface InvoiceData {
   zohoPaymentSyncStatus?: "SUCCESS" | "PENDING" | "FAILED" | null;
   source?: "PAYGLOCAL" | "ZOHO" | null;
   lastSyncedTime?: number | null;
+  /** Absent on drafts created before themes existed; treat as the default. */
+  themeMetadata?: ThemeMetadata | null;
 }
 
 export interface LinkedTxnDetails {
@@ -168,6 +170,37 @@ export type McaCurrencyListResponse = BaseResponse<{
 
 export type AssetResponse = BaseResponse<{ fileUrl: string }>;
 
+// ─── Themes ───────────────────────────────────────────────────────────────────
+
+/**
+ * An invoice's look, as the server stores it.
+ *
+ * Three enum NAMES, not three hex values: the renderer owns what "SLATE" is
+ * worth, so the invoice records the choice and never the colour. The names come
+ * from GET /mca-invoice/themes, which is also where the hexes for the on-screen
+ * preview come from.
+ *
+ * Optional on the wire in both directions — omit it on create and the server
+ * defaults to CLASSIC / SLATE / AMBER.
+ */
+export interface ThemeMetadata {
+  theme: string;
+  color: string;
+  accent: string;
+}
+
+/** One named colour, e.g. `{ name: "SLATE", hex: "#475569" }`. */
+export interface ThemePaletteOption {
+  name: string;
+  hex: string;
+}
+
+export type InvoiceThemesResponse = BaseResponse<{
+  themes: string[];
+  colors: ThemePaletteOption[];
+  accents: ThemePaletteOption[];
+}>;
+
 // ─── Editor state ─────────────────────────────────────────────────────────────
 // The flat form the Nova-derived editor binds to. This is deliberately NOT the
 // wire shape: it holds strings where the form needs strings, and it is mapped
@@ -225,25 +258,11 @@ export interface InvoiceFormState {
   logoEnabled: boolean;
   signatureEnabled: boolean;
 
-  // ── Branding ───────────────────────────────────────────────────────────────
-  // Client-side only, for now.
-  //
-  // These four drive the on-screen document and the notification-email preview.
-  // None of them is on the wire yet: `toInvoicePayload` lists the fields it
-  // sends explicitly and does not include them, so they cannot leak into a save
-  // and be rejected. When the renderer accepts a layout, a colour pair and a
-  // locale, add them to that builder and to `toFormState` — those two functions
-  // are the whole change. Everything else here already carries them.
-  //
-  // They do persist through a saved template (see InvoiceTemplateSnapshot),
-  // which is what makes a merchant's brand reusable before the API lands.
-  brandingStyleId: string;
-  /** Hex, uppercase, `#RRGGBB`. */
-  primaryColor: string;
-  /** Hex, uppercase, `#RRGGBB`. */
-  accentColor: string;
-  /** Display name from INVOICE_LANGUAGES, e.g. "English", "Japanese". */
-  language: string;
+  // Branding is deliberately NOT here. The invoice carries `themeMetadata`, so
+  // the editor derives it from the fetched document and holds only the
+  // merchant's in-session override — see the branding block in InvoiceEditor.
+  // Copying it into this form once, as every other field is, is what made a
+  // theme revert when a cached document seeded the editor.
 
   isRecurring: boolean;
   recurringType: RecurringType | "";
@@ -263,12 +282,20 @@ export type InvoiceLayoutId =
   | "y2k-bold"
   | "geometric-modern";
 
-export interface InvoiceBrandingStyle {
-  id: string;
+/**
+ * What this app knows about one of the server's themes.
+ *
+ * The server sends a bare list of names; everything visual about them lives
+ * here, keyed by that name. A theme the server offers but this table does not
+ * describe still renders — see `themeFor` — so a backend that adds a seventh
+ * does not break the picker.
+ */
+export interface InvoiceTheme {
+  /** The server's enum name, e.g. "BOLD_SIDEBAR". */
   name: string;
+  /** What the picker calls it, e.g. "Bold Sidebar". */
+  label: string;
   layout: InvoiceLayoutId;
-  defaultPrimaryColor: string;
-  defaultAccentColor: string;
   /** Badged in the picker. */
   isNew?: boolean;
 }
@@ -303,10 +330,9 @@ export interface InvoiceTemplateSnapshot {
   dueTermId: string | null;
   logoEnabled: boolean;
   signatureEnabled: boolean;
-  brandingStyleId: string;
-  primaryColor: string;
-  accentColor: string;
-  language: string;
+  theme: string;
+  color: string;
+  accent: string;
   isRecurring: boolean;
   recurringType: RecurringType | "";
 }

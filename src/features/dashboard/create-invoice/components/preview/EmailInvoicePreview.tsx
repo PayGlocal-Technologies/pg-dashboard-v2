@@ -16,7 +16,7 @@ import {
  *
  * The ground is the merchant's primary colour rather than the product's, which
  * is the whole reason Nova's email tab looks like branded mail and v2's looked
- * like a neutral card. Labels follow the language selection for the same reason
+ * like a neutral card. Labels come from the same fixed set for the same reason
  * the document's do.
  */
 export function EmailInvoicePreview({ source }: { source: PreviewSource }) {

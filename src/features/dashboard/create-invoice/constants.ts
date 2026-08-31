@@ -1,6 +1,8 @@
 import type {
-  InvoiceBrandingStyle,
+  InvoiceTheme,
   RecurringType,
+  ThemeMetadata,
+  ThemePaletteOption,
 } from "@/features/dashboard/create-invoice/types";
 
 /**
@@ -89,92 +91,79 @@ export const AUTOSAVE_DEBOUNCE_MS = 1200;
 // ─── Branding ─────────────────────────────────────────────────────────────────
 
 /**
- * The document layout the server's generate-invoice actually renders.
- *
- * The other five styles below exist in the editor and its preview but the
- * renderer does not know about them yet, so the picker badges them and this
- * constant is the single place that fact is encoded. When the renderer accepts a
- * layout id, delete this constant and the badge that reads it.
+ * What a fresh invoice looks like, and what the server falls back to when the
+ * create body omits `themeMetadata` entirely. Kept identical to that default on
+ * purpose: an invoice saved before this feature existed and one saved with the
+ * panel untouched must render the same way.
  */
-export const RENDERER_LAYOUT_ID = "classic";
+export const DEFAULT_THEME_METADATA: ThemeMetadata = {
+  theme: "CLASSIC",
+  color: "SLATE",
+  accent: "AMBER",
+};
 
 /**
- * Invoice themes, ported from Nova (lib/mock-data/invoice-create.ts).
+ * Everything visual this app knows about the server's themes, keyed by the enum
+ * name the invoice stores.
  *
- * `classic` is deliberately first and is what a fresh invoice gets: it is the
- * one layout the server can produce, so the default never diverges from the
- * document a customer receives.
+ * The server owns the vocabulary and sends a bare list of names; this table only
+ * says what each one is called and which layout draws it. That split is what
+ * lets the backend add a seventh theme without a frontend release — `themeFor`
+ * renders an unknown name through the Classic layout under a title-cased label
+ * rather than dropping it.
+ *
+ * MODERN maps to the geometric-modern layout and MINIMAL to minimal-mono: the
+ * two names the server uses are shorter than the two layout ids Nova shipped,
+ * and these are the pairings the layouts were designed against.
  */
-export const INVOICE_BRANDING_STYLES: InvoiceBrandingStyle[] = [
-  {
-    id: "style_classic",
-    name: "Classic",
-    layout: "classic",
-    defaultPrimaryColor: "#0061E3",
-    defaultAccentColor: "#0061E3",
-  },
-  {
-    id: "style_minimal_mono",
-    name: "Minimal Mono",
-    layout: "minimal-mono",
-    defaultPrimaryColor: "#1F2937",
-    defaultAccentColor: "#9CA3AF",
-  },
-  {
-    id: "style_bold_sidebar",
-    name: "Bold Sidebar",
+export const INVOICE_THEMES: Record<string, InvoiceTheme> = {
+  CLASSIC: { name: "CLASSIC", label: "Classic", layout: "classic" },
+  MODERN: { name: "MODERN", label: "Modern", layout: "geometric-modern" },
+  MINIMAL: { name: "MINIMAL", label: "Minimal", layout: "minimal-mono" },
+  BOLD_SIDEBAR: {
+    name: "BOLD_SIDEBAR",
+    label: "Bold Sidebar",
     layout: "bold-sidebar",
-    defaultPrimaryColor: "#1E3A8A",
-    defaultAccentColor: "#C2410C",
     isNew: true,
   },
-  {
-    id: "style_playful_border",
-    name: "Playful Border",
+  PLAYFUL_BORDER: {
+    name: "PLAYFUL_BORDER",
+    label: "Playful Border",
     layout: "playful-border",
-    defaultPrimaryColor: "#3730A3",
-    defaultAccentColor: "#EAB308",
     isNew: true,
   },
-  {
-    id: "style_y2k_bold",
-    name: "Y2K Bold",
-    layout: "y2k-bold",
-    defaultPrimaryColor: "#0F0F0F",
-    defaultAccentColor: "#EC4899",
-    isNew: true,
-  },
-  {
-    id: "style_geometric_modern",
-    name: "Geometric Modern",
-    layout: "geometric-modern",
-    defaultPrimaryColor: "#4C4499",
-    defaultAccentColor: "#A3E635",
-  },
+  Y2K_BOLD: { name: "Y2K_BOLD", label: "Y2K Bold", layout: "y2k-bold", isNew: true },
+};
+
+/**
+ * The palette, as it stands if GET /themes cannot be reached.
+ *
+ * Deliberately a fallback and not a source of truth: the hexes belong to the
+ * renderer, so the endpoint's values always win. Without this, a themes outage
+ * would leave the preview with no colour to draw at all — and the invoice would
+ * still save and render correctly server-side, since only NAMES go on the wire.
+ * Ordered as the endpoint returns them, so the swatch rows do not reshuffle when
+ * the real list lands.
+ */
+export const FALLBACK_THEME_NAMES = Object.keys(INVOICE_THEMES);
+
+export const FALLBACK_THEME_COLORS: ThemePaletteOption[] = [
+  { name: "SLATE", hex: "#475569" },
+  { name: "NAVY", hex: "#1E3A5F" },
+  { name: "FOREST", hex: "#166534" },
+  { name: "MAROON", hex: "#7F1D1D" },
+  { name: "CHARCOAL", hex: "#27272A" },
 ];
 
-export const DEFAULT_BRANDING_STYLE = INVOICE_BRANDING_STYLES[0]!;
+export const FALLBACK_THEME_ACCENTS: ThemePaletteOption[] = [
+  { name: "AMBER", hex: "#B45309" },
+  { name: "TEAL", hex: "#0F766E" },
+  { name: "CRIMSON", hex: "#B91C1C" },
+  { name: "INDIGO", hex: "#4338CA" },
+];
 
-/**
- * Swatches offered beside the hex field in the colour picker.
- *
- * flux has no colour-input component and a native `<input type="color">` is
- * exactly the bare interactive element CLAUDE.md's UI rule forbids, so the
- * picker is swatches plus a validated hex field. Raised as a design-system gap
- * rather than bypassed: a flux `<ColorInput>` would replace both halves.
- */
-export const BRAND_COLOR_SWATCHES = [
-  "#0061E3",
-  "#1E3A8A",
-  "#3730A3",
-  "#4C4499",
-  "#0F766E",
-  "#15803D",
-  "#B45309",
-  "#BE123C",
-  "#0F0F0F",
-  "#4B5563",
-] as const;
+/** Drawn for a colour name neither the endpoint nor the table above knows. */
+export const UNKNOWN_COLOR_HEX = "#475569";
 
 // ─── Templates ────────────────────────────────────────────────────────────────
 

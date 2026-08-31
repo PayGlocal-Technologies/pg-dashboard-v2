@@ -91,7 +91,7 @@ function SaveBody({
         "Discount and tax",
         "Receiving account",
         "Memo, notes and LUT",
-        "Branding: theme, colours, language",
+        "Branding: theme and colours",
         snapshot.isRecurring ? "Recurring schedule" : "Due-date term",
       ]
     : [];

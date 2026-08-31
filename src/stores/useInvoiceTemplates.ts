@@ -36,27 +36,22 @@ import type { InvoiceTemplate, InvoiceTemplateSnapshot } from "@/features/dashbo
  * afterwards.
  */
 /**
- * What the editor remembers about one draft that the invoice itself cannot hold.
+ * What the editor remembers about one draft that the invoice itself cannot hold:
+ * which template it was built from.
  *
- * Two things, both of which were being silently dropped on reload:
+ * Without it the header falls back from "Update template" to "Save as template",
+ * so a merchant who reopens yesterday's draft and saves it creates a duplicate
+ * template instead of updating the one they started from. Local because
+ * templates themselves still are, and it goes away with them.
  *
- *  - `templateId`: which template the invoice was built from. Without it the
- *    header falls back from "Update template" to "Save as template", so a
- *    merchant who reopens yesterday's draft and saves it creates a duplicate
- *    template instead of updating the one they started from.
- *  - the four branding fields, which are not on the wire yet. Applying a
- *    template, reloading, and finding the theme back at its default is exactly
- *    the data loss the whole branding block is meant to avoid.
+ * Branding and the document language used to live here too. Neither does now:
+ * the invoice carries `themeMetadata` (so reading a local copy back would let a
+ * stale one overwrite the server's), and the language picker is gone.
  *
  * Keyed by invoice id, which is globally unique, so this needs no mid nesting.
- * All of it becomes redundant the moment the invoice carries these fields.
  */
 export interface DraftMemory {
   templateId: string | null;
-  brandingStyleId: string;
-  primaryColor: string;
-  accentColor: string;
-  language: string;
 }
 
 interface InvoiceTemplatesState {

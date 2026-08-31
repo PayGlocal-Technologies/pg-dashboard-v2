@@ -1,7 +1,9 @@
 import { formatDate } from "@/lib/utils/format";
 import {
+  DEFAULT_THEME_METADATA,
   DUE_TERM_OPTIONS,
   INVOICE_STEPS,
+  INVOICE_THEMES,
   REQUIRED_ADDRESS_KEYS,
 } from "@/features/dashboard/create-invoice/constants";
 import type {
@@ -11,7 +13,9 @@ import type {
   InvoiceFormState,
   InvoiceTemplate,
   InvoiceTemplateSnapshot,
+  InvoiceTheme,
   LineItemDraft,
+  ThemeMetadata,
 } from "@/features/dashboard/create-invoice/types";
 
 // ─── Totals ───────────────────────────────────────────────────────────────────
@@ -142,6 +146,8 @@ export const deriveCurrentStep = (form: InvoiceFormState): string => {
 
 export interface BuildPayloadArgs {
   form: InvoiceFormState;
+  /** The effective theme trio: the merchant's override, or the invoice's own. */
+  branding: ThemeMetadata;
   /** Last document the server sent back; unspecified fields are preserved. */
   invoiceDetails: Partial<InvoiceData> | undefined;
   invoiceId: string;
@@ -161,6 +167,7 @@ export interface BuildPayloadArgs {
  */
 export const toInvoicePayload = ({
   form,
+  branding,
   invoiceDetails,
   invoiceId,
   gid,
@@ -230,6 +237,11 @@ export const toInvoicePayload = ({
     lut: form.lut,
     logoEnabled: form.logoEnabled,
     signatureEnabled: form.signatureEnabled,
+    // Three enum names, never the hexes beside them on screen: the renderer
+    // owns what each name is worth. Always sent rather than omitted-when-default
+    // so that switching *back* to Classic is a change the server records, not a
+    // field it stops seeing.
+    themeMetadata: branding,
 
     // DATE
     invoiceNumber: form.invoiceNumber,
@@ -316,6 +328,7 @@ export const toFormState = (
   logoEnabled: invoice.logoEnabled ?? false,
   signatureEnabled: invoice.signatureEnabled ?? false,
 
+
   isRecurring: invoice.type === "RECURRING",
   recurringType: invoice.recurringType || "",
   recurringStartDate: invoice.recurringStartDate || "",
@@ -390,7 +403,10 @@ export const validateSelectedClient = (
  * Line-item keys are dropped here and reassigned on apply, so two invoices built
  * from the same template never share a key.
  */
-export const toTemplateSnapshot = (form: InvoiceFormState): InvoiceTemplateSnapshot => ({
+export const toTemplateSnapshot = (
+  form: InvoiceFormState,
+  branding: ThemeMetadata
+): InvoiceTemplateSnapshot => ({
   currency: form.currency,
   lineItems: form.lineItems.map((item) => ({ ...item })),
   discountName: form.discountName,
@@ -406,10 +422,9 @@ export const toTemplateSnapshot = (form: InvoiceFormState): InvoiceTemplateSnaps
   dueTermId: form.dueTermId,
   logoEnabled: form.logoEnabled,
   signatureEnabled: form.signatureEnabled,
-  brandingStyleId: form.brandingStyleId,
-  primaryColor: form.primaryColor,
-  accentColor: form.accentColor,
-  language: form.language,
+  theme: branding.theme,
+  color: branding.color,
+  accent: branding.accent,
   isRecurring: form.isRecurring,
   recurringType: form.recurringType,
 });
@@ -455,10 +470,6 @@ export const applyTemplateSnapshot = (
     dueTermId: snapshot.dueTermId,
     logoEnabled: snapshot.logoEnabled,
     signatureEnabled: snapshot.signatureEnabled,
-    brandingStyleId: snapshot.brandingStyleId,
-    primaryColor: snapshot.primaryColor,
-    accentColor: snapshot.accentColor,
-    language: snapshot.language,
     isRecurring: snapshot.isRecurring,
     recurringType: snapshot.recurringType,
   };
@@ -500,15 +511,55 @@ export const formatEpochDay = (millis: string | null | undefined): string => {
   return formatDate(new Date(value), { day: "2-digit", month: "short", year: "numeric" });
 };
 
+// ─── Themes ───────────────────────────────────────────────────────────────────
+
+/**
+ * What to draw for a theme name.
+ *
+ * The server owns the vocabulary, so a name this build has never heard of is a
+ * normal outcome rather than an error: it renders through the Classic layout
+ * under a title-cased version of its own name, which is legible enough to pick
+ * from a grid. That is what lets the backend ship a seventh theme ahead of the
+ * frontend that describes it.
+ */
+export const themeFor = (name: string): InvoiceTheme =>
+  INVOICE_THEMES[name] ?? {
+    name,
+    label: name
+      .toLowerCase()
+      .split("_")
+      .map((word) => (word ? word[0]!.toUpperCase() + word.slice(1) : word))
+      .join(" "),
+    layout: "classic",
+  };
+
+/**
+ * A complete theme trio out of a partial or missing one.
+ *
+ * Used for both sources the editor resolves branding from: the invoice's own
+ * `themeMetadata`, absent on drafts that predate the feature, and a template
+ * snapshot saved before it, which holds the old hex-based fields and none of
+ * these three. Both cases mean "the server's default", which is what this
+ * returns rather than letting `undefined` reach the wire.
+ */
+export const brandingFrom = (
+  source: Partial<ThemeMetadata> | null | undefined
+): ThemeMetadata => ({
+  theme: source?.theme || DEFAULT_THEME_METADATA.theme,
+  color: source?.color || DEFAULT_THEME_METADATA.color,
+  accent: source?.accent || DEFAULT_THEME_METADATA.accent,
+});
+
 // ─── Brand colours ────────────────────────────────────────────────────────────
 
 /**
- * Normalises typed hex to `#RRGGBB`, or null when it is not a colour.
+ * Normalises a hex string to `#RRGGBB`, or null when it is not a colour.
  *
- * Accepts a leading hash or not, and the three-digit shorthand, because those
- * are what people paste out of a brand guideline.
+ * Module-private since the colour picker stopped taking typed hex: the palette
+ * is now the server's named vocabulary, so the only caller left is `withAlpha`,
+ * which needs a known-shaped value before it can append an alpha byte.
  */
-export const normalizeHexColor = (value: string): string | null => {
+const normalizeHexColor = (value: string): string | null => {
   const raw = value.trim().replace(/^#/, "");
 
   if (/^[0-9a-fA-F]{3}$/.test(raw)) {

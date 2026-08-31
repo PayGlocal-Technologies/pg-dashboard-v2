@@ -33,10 +33,9 @@ const LAYOUTS: Record<InvoiceLayoutId, (props: LayoutProps) => React.JSX.Element
  * them.
  *
  * This is a preview, never the artifact. The PDF that is stored and emailed is
- * the server's, so nothing here rasterizes or downloads, and the server renders
- * one layout in English with no colour parameters. Until it takes a layout, a
- * colour pair and a locale, only `classic` matches the document a customer
- * receives — which is why the theme picker badges it and why it is the default.
+ * the server's, so nothing here rasterizes or downloads. The theme and its two
+ * colours travel with the invoice as `themeMetadata`, so all six layouts match
+ * what the customer receives.
  */
 export function InvoiceDocumentPreview({
   source,
@@ -47,7 +46,7 @@ export function InvoiceDocumentPreview({
   onLogoClick?: () => void;
 }) {
   const model = buildPreviewModel(source);
-  const Layout = LAYOUTS[model.style.layout] ?? ClassicLayout;
+  const Layout = LAYOUTS[model.theme.layout] ?? ClassicLayout;
 
   /**
    * Whether the logo slot is offered at all, which is not the same question as
