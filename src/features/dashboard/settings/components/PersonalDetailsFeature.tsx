@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppImage } from "@/components/common/AppImage";
-import { Badge, Button, Card, PageHeader, Shimmer } from "@/components/ui";
+import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
 import { SettingsDetailRow } from "@/features/dashboard/settings/components/SettingsDetailRow";
 import {
@@ -121,23 +121,6 @@ export function PersonalDetailsFeature() {
               a signed-in user's own email/phone, so the Edit dialog is a mocked
               OTP flow. The displayed value itself is real. */}
           <div className="flex items-center justify-between gap-4 py-3">
-            <p className="text-sm text-muted-foreground">Email ID</p>
-            <div className="flex items-center gap-3">
-              {isLoading && !emailOverride ? (
-                <Shimmer className="h-4 w-40" />
-              ) : (
-                <span className="text-sm font-semibold text-foreground">{email}</span>
-              )}
-              <Badge variant="secondary" size="sm">
-                Edit not available yet
-              </Badge>
-              <Button variant="outline" size="sm" onClick={() => setEditingContact("email")}>
-                Edit
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 py-3">
             <p className="text-sm text-muted-foreground">Phone number</p>
             <div className="flex items-center gap-3">
               {isLoading && !phoneOverride ? (
@@ -145,10 +128,18 @@ export function PersonalDetailsFeature() {
               ) : (
                 <span className="text-sm font-semibold text-foreground">{phone}</span>
               )}
-              <Badge variant="secondary" size="sm">
-                Edit not available yet
-              </Badge>
-              <Button variant="outline" size="sm" onClick={() => setEditingContact("phone")}>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 py-3">
+            <p className="text-sm text-muted-foreground">Email ID</p>
+            <div className="flex items-center gap-3">
+              {isLoading && !emailOverride ? (
+                <Shimmer className="h-4 w-40" />
+              ) : (
+                <span className="text-sm font-semibold text-foreground">{email}</span>
+              )}
+              <Button variant="outline" size="sm" onClick={() => setEditingContact("email")}>
                 Edit
               </Button>
             </div>
