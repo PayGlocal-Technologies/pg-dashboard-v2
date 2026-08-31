@@ -9,8 +9,10 @@ import {
   merchantProfileApi,
   secureSettlementDetailsApi,
   settlementDetailsApi,
+  updateAccountDetailsApi,
 } from "@/features/dashboard/settings/services";
 import type {
+  AccountDetailsUpdatePayload,
   BusinessData,
   BusinessDataResponse,
   BusinessUpdatePayload,
@@ -95,6 +97,31 @@ export function useSettlementDetails(masked: boolean): {
     { enabled: !!onbId }
   );
   return { settlement: data?.data ?? null, isLoading: !!onbId && isPending, isError };
+}
+
+/** The merchant id (profile.mid) the account-details update endpoint is scoped
+ *  by. Distinct from the onboarding id the read endpoints use. Empty string
+ *  until the profile resolves — callers gate the Save action on it. */
+function useMerchantId(): string {
+  return useApp((s) => s.profile?.mid) ?? "";
+}
+
+/** Update the settlement bank account (number + IFSC) via
+ *  PUT /gcc/v2/merchants/{merchantId}/account-details. Plain JSON body, no JWE.
+ *  Invalidates both masked/unmasked settlement reads on success so the card
+ *  reflects the new account. `canEdit` is false until the merchant id resolves. */
+export function useUpdateAccountDetails(): {
+  updateAccount: UseMutateFunction<unknown, Error, AccountDetailsUpdatePayload>;
+  isSaving: boolean;
+  canEdit: boolean;
+} {
+  const merchantId = useMerchantId();
+  const onbId = useOnboardingId();
+  const { mutate, isPending } = usePut<unknown, AccountDetailsUpdatePayload>(
+    updateAccountDetailsApi(merchantId),
+    { invalidateQueries: [["settings-settlement", onbId]] }
+  );
+  return { updateAccount: mutate, isSaving: isPending, canEdit: !!merchantId };
 }
 
 /** Contact phone + email (read-only, as in pg-dashboard). */

@@ -49,6 +49,15 @@ export interface SettlementDataResponse {
   data?: SettlementData | null;
 }
 
+/** PUT body for updating the settlement bank account. Endpoint:
+ *  PUT /gcc/v2/merchants/{merchantId}/account-details — note the key is
+ *  `number` (not `accountNumber`), and it is scoped by merchant id, not
+ *  onboarding id. `ifscCode` must resolve via IFSC lookup or the API 4xxs. */
+export interface AccountDetailsUpdatePayload {
+  number: string;
+  ifscCode: string;
+}
+
 export interface ContactData {
   phoneNumber?: string | null;
   emailId?: string | null;

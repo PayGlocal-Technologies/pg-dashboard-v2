@@ -1,4 +1,4 @@
-import { BASE_URL_V1, BASE_URL_V3 } from "@/api";
+import { BASE_URL_V1, BASE_URL_V2, BASE_URL_V3 } from "@/api";
 
 // Endpoint URL builders only, copied verbatim from pg-dashboard's
 // src/features/my-account/services.ts. Every one is scoped by the merchant's
@@ -16,6 +16,11 @@ export const settlementDetailsApi = (onbId: string): string =>
  *  swaps to this endpoint when the eye toggle reveals the number. */
 export const secureSettlementDetailsApi = (onbId: string): string =>
   `${BASE_URL_V3}/merchants/profile/${onbId}/settlement-details`;
+
+/** Update the settlement bank account (account number + IFSC). Scoped by the
+ *  merchant id (profile.mid), NOT the onboarding id the read endpoints use. */
+export const updateAccountDetailsApi = (merchantId: string): string =>
+  `${BASE_URL_V2}/merchants/${merchantId}/account-details`;
 
 /** Contact phone + email. Read-only in pg-dashboard (no update endpoint). */
 export const contactDetailsApi = (onbId: string): string =>
