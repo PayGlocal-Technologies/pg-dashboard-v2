@@ -1,14 +1,11 @@
 import {
   EMPTY_RELATIVE_RANGE,
-  relativeRangeToEpochMs,
   toEndOfDayMs,
   toStartOfDayMs,
-  type RelativeRangeValue,
 } from "@/components/common/filters/FilterChips";
 import {
   ALL_TIME_RANGE_VALUE,
-  CUSTOM_RANGE_VALUE,
-  SUMMARY_RANGE_DAYS,
+  type SummaryRange,
 } from "@/features/dashboard/mca-invoices/constants";
 import type {
   InvoiceDateFilter,
@@ -73,43 +70,15 @@ export function buildInvoiceRequestBody(
   };
 }
 
-// ─── The Date filter, shared by the summary's range picker and the chip ───────
+// ─── The table's Date filter ──────────────────────────────────────────────────
+// Owned by the table alone. The summary's range is its own state and its own
+// arithmetic, further down.
 
 export const EMPTY_INVOICE_DATE_FILTER: InvoiceDateFilter = {
   range: { from: "", to: "" },
   relative: EMPTY_RELATIVE_RANGE,
   window: null,
 };
-
-/**
- * The whole-day count a relative range represents, or null when it isn't a
- * whole number of days ("last 6 hours", "last 2 weeks 3 days"). Only a plain
- * day count can be shown in the summary's picker.
- */
-export function relativeRangeDays(value: RelativeRangeValue): number | null {
-  if (value.weeks || value.hours || value.minutes) return null;
-  const days = parseInt(value.days || "", 10);
-  return Number.isNaN(days) || days <= 0 ? null : days;
-}
-
-/** Which of the summary picker's options describes the current Date filter. */
-export function summaryRangeValue(filter: InvoiceDateFilter): string {
-  const days = relativeRangeDays(filter.relative);
-  if (days !== null && SUMMARY_RANGE_DAYS.includes(days)) return String(days);
-  if (filter.window || (filter.range.from && filter.range.to)) return CUSTOM_RANGE_VALUE;
-  return ALL_TIME_RANGE_VALUE;
-}
-
-/**
- * A Date filter for "last `days` days", as the summary's picker means it.
- *
- * Reads the clock, so call it from an event handler and never during render:
- * "last 7 days" is counted back from now, and now moves.
- */
-export function relativeDaysDateFilter(days: number): InvoiceDateFilter {
-  const relative: RelativeRangeValue = { ...EMPTY_RELATIVE_RANGE, days: String(days) };
-  return { range: { from: "", to: "" }, relative, window: relativeRangeToEpochMs(relative) };
-}
 
 /** Epoch millis at the end of the local day containing `now`. */
 export function endOfDayMs(now: Date): number {
@@ -133,19 +102,25 @@ export function dateFilterToEpochMs(filter: InvoiceDateFilter): {
   };
 }
 
+/** Milliseconds in a day, for the summary's day-count ranges. */
+const MS_PER_DAY = 86_400_000;
+
 /**
- * The same bounds as the summary endpoint wants them: epoch SECONDS, with an
- * unset start meaning 0 ("all time") and an unset end falling back to
- * `defaultEndMs` — the end of today, passed in rather than read here so the
- * value stays stable across renders (it is part of the summary's query key).
+ * The summary's window, in the epoch SECONDS its endpoint wants.
+ *
+ * "All time" is a start of 0. Everything else counts `range` days back from the
+ * end of today. `endMs` is passed in rather than read here so it stays stable
+ * across renders: it is part of the summary's react-query key, and a
+ * second-resolution "now" would mint a fresh key on every render and never hit
+ * the cache.
  */
 export function summaryWindowSeconds(
-  filter: InvoiceDateFilter,
-  defaultEndMs: number
+  range: SummaryRange,
+  endMs: number
 ): { start: number; end: number } {
-  const { startTime, endTime } = dateFilterToEpochMs(filter);
-  return {
-    start: startTime === undefined ? 0 : Math.floor(startTime / 1000),
-    end: Math.floor((endTime ?? defaultEndMs) / 1000),
-  };
+  const end = Math.floor(endMs / 1000);
+  if (range === ALL_TIME_RANGE_VALUE) return { start: 0, end };
+
+  const days = Number(range);
+  return { start: Math.floor((endMs - days * MS_PER_DAY) / 1000), end };
 }

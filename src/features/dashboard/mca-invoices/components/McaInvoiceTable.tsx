@@ -30,6 +30,7 @@ import {
 import {
   buildInvoiceRequestBody,
   dateFilterToEpochMs,
+  EMPTY_INVOICE_DATE_FILTER,
 } from "@/features/dashboard/mca-invoices/helpers";
 import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
 import {
@@ -117,10 +118,6 @@ interface McaInvoiceTableProps {
    *  what pg-dashboard's summary does. */
   statusFilters: string[];
   onStatusFiltersChange: (next: string[]) => void;
-  /** The Date chip's value, owned by the page so the summary's range picker is
-   *  a view of the same filter. */
-  dateFilter: InvoiceDateFilter;
-  onDateFilterChange: (next: InvoiceDateFilter) => void;
 }
 
 /**
@@ -135,8 +132,6 @@ export function McaInvoiceTable({
   summarySection,
   statusFilters,
   onStatusFiltersChange,
-  dateFilter,
-  onDateFilterChange,
 }: McaInvoiceTableProps) {
   const router = useRouter();
 
@@ -144,6 +139,17 @@ export function McaInvoiceTable({
   const paCbMids = useApp((s) => s.paCbMids);
 
   const [search, setSearch] = useState("");
+  /**
+   * The Date chip's own value, and nobody else's.
+   *
+   * This used to be lifted to the page so the summary's range picker could be a
+   * second view of it. That made each control silently move the other, so the
+   * chip could read "Date · last 7 days" because someone had scoped the counts
+   * above. The summary keeps its own period now, and this lives here — where the
+   * only control that edits it lives — so the two cannot be re-coupled by
+   * threading one prop.
+   */
+  const [dateFilter, setDateFilter] = useState<InvoiceDateFilter>(EMPTY_INVOICE_DATE_FILTER);
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
@@ -308,12 +314,12 @@ export function McaInvoiceTable({
       onDateRangeChange={(next) => {
         // The chip's two modes are exclusive, so applying an absolute range
         // drops the relative one and the window it had resolved to.
-        onDateFilterChange({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
+        setDateFilter({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
         setPage(1);
       }}
       relativeRange={dateFilter.relative}
       onRelativeRangeChange={(next) => {
-        onDateFilterChange({
+        setDateFilter({
           range: { from: "", to: "" },
           relative: next,
           // Clock reads belong in the handler, never in render.
