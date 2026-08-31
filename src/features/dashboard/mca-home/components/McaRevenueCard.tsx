@@ -2,17 +2,18 @@
 
 import { useState } from "react";
 import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Badge, Button, Card, Separator, Shimmer } from "@/components/ui";
+import { Button, Card, Separator, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import {
   revenueTimeframes,
-  upcomingSettlement,
   type RevenuePoint,
   type RevenueTimeframe,
 } from "@/features/dashboard/mca-home/mock-data";
 import { useRevenueTrend } from "@/features/dashboard/mca-home/hooks";
+import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useSettlementUpcoming } from "@/features/dashboard/settlement-reports/hooks";
 
 /** Day window per timeframe. The revenue-trend endpoint is date-ranged, so each
  *  tab asks for its own window and gets its own series — the chart is NOT one
@@ -82,6 +83,12 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
 
   const { startDate, endDate } = ranges[timeframe];
   const { trend, isLoading, isError } = useRevenueTrend(startDate, endDate);
+
+  // Upcoming settlement — the same live endpoint the settlement-report screen
+  // uses (useSettlementUpcoming). Merchant-scoped, so resolve the PACB MID here.
+  const { urlMid, midFilter } = useResolvedMids("PACB");
+  const settlementMid = urlMid || midFilter?.value?.[0] || "";
+  const { upcoming } = useSettlementUpcoming(settlementMid);
 
   // API points → the chart's shape (label → x). Empty until the call resolves.
   const chartData: RevenuePoint[] = (trend?.points ?? []).map((p) => ({
@@ -216,16 +223,15 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-muted-foreground">Upcoming settlement</p>
-          <div className="mt-1 flex items-center gap-2">
-            <RollingNumber
-              value={`₹${upcomingSettlement.amount.toLocaleString("en-IN")}`}
-              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-            />
-            <Badge size="sm">{upcomingSettlement.cycle}</Badge>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Settles at {upcomingSettlement.settlesAtLabel} · {upcomingSettlement.bankAccountLabel}
-          </p>
+          <RollingNumber
+            value={upcoming ? `₹${upcoming.amount.toLocaleString("en-IN")}` : "—"}
+            className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+          />
+          {upcoming && upcoming.transactionCount > 0 && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {upcoming.transactionCount} transaction{upcoming.transactionCount === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
         <Button
           type="button"

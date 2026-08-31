@@ -14,7 +14,7 @@ import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transac
  * MetricSparklineCard, both for that reason and because its fixed p-5
  * padding wouldn't match Card size="sm"'s px-7 py-7 next to it.
  *
- * Titled "Funds on hold" even though the KPI itself is still settlementsDue
+ * Titled "Documents pending" even though the KPI itself is still settlementsDue
  * (the reference this was redesigned against shows a USD KPI with an INR
  * conversion beside it, but settlementsDue only ever comes back from
  * useMcaOverview in INR, there's no USD figure behind it to convert from, so
@@ -62,7 +62,7 @@ export function OutstandingAmountCard({ className }: { className?: string }) {
             row, mt-1 within the stack itself for the tight title-to-amount
             pairing. */}
         <div className="mt-4">
-          <p className="text-sm font-semibold text-foreground">Funds on hold</p>
+          <p className="text-sm font-semibold text-foreground">Documents pending</p>
           {isLoading ? (
             <Shimmer className="mt-1 h-9 w-32" />
           ) : (
