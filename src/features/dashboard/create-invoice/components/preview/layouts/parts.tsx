@@ -4,7 +4,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";
-import type { InvoiceLabels } from "@/features/dashboard/create-invoice/i18n";
+import type { InvoiceLabels } from "@/features/dashboard/create-invoice/labels";
 import type { PreviewItem } from "@/features/dashboard/create-invoice/components/preview/previewModel";
 
 /**

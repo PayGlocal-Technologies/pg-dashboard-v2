@@ -5,21 +5,43 @@ import { AppImage as Image } from "@/components/common/AppImage";
 import { Button, Separator, Switch } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { InvoiceBrandingStylePicker } from "@/features/dashboard/create-invoice/components/InvoiceBrandingStylePicker";
+import { themeFor } from "@/features/dashboard/create-invoice/helpers";
+import { InvoiceThemePicker } from "@/features/dashboard/create-invoice/components/InvoiceThemePicker";
 import { InvoiceColorPicker } from "@/features/dashboard/create-invoice/components/InvoiceColorPicker";
-import { LanguageSelect } from "@/features/dashboard/create-invoice/components/LanguageSelect";
-import type { InvoiceAsset } from "@/features/dashboard/create-invoice/hooks";
+import type { InvoiceAsset, InvoiceThemePalette } from "@/features/dashboard/create-invoice/hooks";
+import type {
+  InvoiceTheme,
+  ThemeMetadata,
+  ThemePaletteOption,
+} from "@/features/dashboard/create-invoice/types";
+
+/**
+ * Guarantees the value an invoice actually holds is one of the options offered.
+ *
+ * The palette is the server's and can shrink between releases, so a draft saved
+ * against a theme or colour that has since been withdrawn would otherwise render
+ * a picker with nothing selected — and the merchant's next click would silently
+ * discard a choice they never revisited. Carrying it into the list keeps what is
+ * on the document and what is highlighted the same thing.
+ */
+function withSelected<T extends { name: string }>(options: T[], selected: T): T[] {
+  return options.some((option) => option.name === selected.name)
+    ? options
+    : [...options, selected];
+}
 
 /**
  * Advanced branding options.
  *
- * Restores the whole of Nova's panel: invoice theme, brand colours, document
- * language, logo and signature. Two of those five are backed end to end today —
- * the assets upload to S3 and the invoice carries logoEnabled / signatureEnabled
- * — and three drive the preview while the renderer catches up. That distinction
- * is stated where the merchant makes the choice (the theme grid badges which
- * layout the server produces) rather than left for them to discover after
- * sending. See the branding block in types.ts for the wiring that remains.
+ * Nova's panel: invoice theme, brand colours, logo and signature. All four are
+ * backed end to end — the assets upload to S3, the invoice carries logoEnabled /
+ * signatureEnabled, and the theme and its two colours ride along as
+ * `themeMetadata` — so nothing here shows the merchant something the generated
+ * document will not reproduce.
+ *
+ * Nova's fifth control, a document language, is deliberately absent: the
+ * server's renderer takes no locale, so the picker could only ever have styled a
+ * preview of a document that would arrive in English.
  *
  * Note the asymmetry, which is production's and not a bug here: the toggles are
  * per invoice, the images are per merchant. Replacing a logo changes it on every
@@ -28,37 +50,33 @@ import type { InvoiceAsset } from "@/features/dashboard/create-invoice/hooks";
 export function BrandingSection({
   logoEnabled,
   signatureEnabled,
-  brandingStyleId,
-  primaryColor,
-  accentColor,
-  language,
+  branding,
+  palette,
   logo,
   signature,
   onChange,
-  onStyleChange,
+  onBrandingChange,
   onResetColors,
-  onOpenCropper,
+  onOpenUpload,
 }: {
   logoEnabled: boolean;
   signatureEnabled: boolean;
-  brandingStyleId: string;
-  primaryColor: string;
-  accentColor: string;
-  language: string;
+  /** The effective theme trio, all three of them enum names. */
+  branding: ThemeMetadata;
+  /** The server's vocabulary, and the hexes to draw it with on screen. */
+  palette: InvoiceThemePalette;
   /** Lifted to the editor so the panel and the document share one upload state. */
   logo: InvoiceAsset;
   signature: InvoiceAsset;
-  onChange: (patch: {
-    logoEnabled?: boolean;
-    signatureEnabled?: boolean;
-    primaryColor?: string;
-    accentColor?: string;
-    language?: string;
-  }) => void;
-  /** Separate from onChange: picking a theme also resets its two colours. */
-  onStyleChange: (brandingStyleId: string) => void;
+  onChange: (patch: { logoEnabled?: boolean; signatureEnabled?: boolean }) => void;
+  /**
+   * Separate from `onChange` because branding is not part of the form: it lives
+   * beside it as an override on what the invoice already carries.
+   */
+  onBrandingChange: (patch: Partial<ThemeMetadata>) => void;
+  /** Puts the colour pair back to the server's own default. */
   onResetColors: () => void;
-  onOpenCropper: (type: "LOGO" | "SIGNATURE") => void;
+  onOpenUpload: (type: "LOGO" | "SIGNATURE") => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -86,7 +104,7 @@ export function BrandingSection({
             Advanced branding options
           </span>
           <span className="block text-[11px] font-normal text-muted-foreground">
-            Invoice theme, colours, language and signature
+            Invoice theme, colours, logo and signature
           </span>
         </span>
       </Button>
@@ -95,32 +113,32 @@ export function BrandingSection({
         <div className="border-t border-border">
           <div className="border-b border-border p-4">
             <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice theme</p>
-            <InvoiceBrandingStylePicker
-              brandingStyleId={brandingStyleId}
-              primaryColor={primaryColor}
-              accentColor={accentColor}
-              onChange={onStyleChange}
+            <InvoiceThemePicker
+              themes={withSelected<InvoiceTheme>(palette.themes, themeFor(branding.theme))}
+              theme={branding.theme}
+              primaryHex={palette.colorHexFor(branding.color)}
+              accentHex={palette.accentHexFor(branding.accent)}
+              onChange={(theme) => onBrandingChange({ theme })}
             />
           </div>
 
           <div className="border-b border-border p-4">
             <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice colours</p>
             <InvoiceColorPicker
-              primaryColor={primaryColor}
-              accentColor={accentColor}
-              onPrimaryColorChange={(primary) => onChange({ primaryColor: primary })}
-              onAccentColorChange={(accent) => onChange({ accentColor: accent })}
+              color={branding.color}
+              accent={branding.accent}
+              colors={withSelected<ThemePaletteOption>(palette.colors, {
+                name: branding.color,
+                hex: palette.colorHexFor(branding.color),
+              })}
+              accents={withSelected<ThemePaletteOption>(palette.accents, {
+                name: branding.accent,
+                hex: palette.accentHexFor(branding.accent),
+              })}
+              onColorChange={(color) => onBrandingChange({ color })}
+              onAccentChange={(accent) => onBrandingChange({ accent })}
               onReset={onResetColors}
             />
-          </div>
-
-          <div className="border-b border-border p-4">
-            <p className="mb-1 text-[13px] font-semibold text-foreground">Invoice language</p>
-            <p className="mb-2.5 text-[11px] text-muted-foreground">
-              Changes the invoice&apos;s own labels. Your item names, memo and notes are never
-              translated.
-            </p>
-            <LanguageSelect value={language} onChange={(next) => onChange({ language: next })} />
           </div>
 
           <AssetRow
@@ -129,7 +147,7 @@ export function BrandingSection({
             enabled={logoEnabled}
             onEnabledChange={(next) => onChange({ logoEnabled: next })}
             asset={logo}
-            onOpen={() => onOpenCropper("LOGO")}
+            onOpen={() => onOpenUpload("LOGO")}
           />
           <AssetRow
             label="Signature"
@@ -137,7 +155,7 @@ export function BrandingSection({
             enabled={signatureEnabled}
             onEnabledChange={(next) => onChange({ signatureEnabled: next })}
             asset={signature}
-            onOpen={() => onOpenCropper("SIGNATURE")}
+            onOpen={() => onOpenUpload("SIGNATURE")}
           />
         </div>
       )}
@@ -191,7 +209,7 @@ function AssetRow({
                 variant="secondary"
                 size="sm"
                 disabled={asset.isUploading}
-                leftIcon={<Icon name="crop" className="h-3.5 w-3.5" />}
+                leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
                 onClick={onOpen}
               >
                 {asset.isUploading ? "Uploading…" : "Replace"}

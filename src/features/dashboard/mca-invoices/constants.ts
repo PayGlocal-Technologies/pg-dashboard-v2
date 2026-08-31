@@ -101,3 +101,25 @@ export const STATUS_PINNED_TABS = INVOICE_VIEW_TABS.filter(
 
 /** Columns the table is meaningless without, so they cannot be hidden. */
 export const FIXED_COLUMN_KEYS = ["invoiceNumber", "totalAmount", "status"];
+
+/**
+ * The summary's range picker, from pg-dashboard's own options. Values are day
+ * counts, so each one maps straight onto the Date chip's "Last N days" mode.
+ */
+export const ALL_TIME_RANGE_VALUE = "ALL_TIME";
+/** Not selectable: it only labels the picker when the Date chip holds a range
+ *  the picker's own options cannot express (an absolute range, or a "Last …"
+ *  value that is not one of the day counts below). */
+export const CUSTOM_RANGE_VALUE = "CUSTOM";
+
+export const SUMMARY_RANGE_OPTIONS = [
+  { value: ALL_TIME_RANGE_VALUE, label: "All time" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+] as const;
+
+/** Day counts the picker can display, i.e. every option bar "All time". */
+export const SUMMARY_RANGE_DAYS = SUMMARY_RANGE_OPTIONS.map((o) => Number(o.value)).filter(
+  (n) => !Number.isNaN(n)
+);

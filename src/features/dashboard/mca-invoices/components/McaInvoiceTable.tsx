@@ -15,8 +15,6 @@ import {
   StatusFilterChip,
   hasRelativeRange,
   relativeRangeToEpochMs,
-  toEndOfDayMs,
-  toStartOfDayMs,
   type RelativeRangeValue,
 } from "@/components/common/filters/FilterChips";
 import { useDelete, usePost, usePostQuery } from "@/lib/api/hooks";
@@ -29,7 +27,10 @@ import {
   duplicateInvoiceApi,
   viewInvoiceApi,
 } from "@/features/dashboard/mca-invoices/services";
-import { buildInvoiceRequestBody } from "@/features/dashboard/mca-invoices/helpers";
+import {
+  buildInvoiceRequestBody,
+  dateFilterToEpochMs,
+} from "@/features/dashboard/mca-invoices/helpers";
 import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
 import {
   FIXED_COLUMN_KEYS,
@@ -47,6 +48,7 @@ import { ConfirmActionDialog } from "@/features/dashboard/mca-invoices/component
 import { LinkTransactionModal } from "@/features/dashboard/mca-invoices/components/LinkTransactionModal";
 import { toDateKey } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
 import type {
+  InvoiceDateFilter,
   InvoiceSearchBody,
   McaInvoiceRow,
   McaInvoicesResponse,
@@ -115,8 +117,10 @@ interface McaInvoiceTableProps {
    *  what pg-dashboard's summary does. */
   statusFilters: string[];
   onStatusFiltersChange: (next: string[]) => void;
-  relativeWindow: { startTime: number; endTime: number } | null;
-  onRelativeWindowChange: (next: { startTime: number; endTime: number } | null) => void;
+  /** The Date chip's value, owned by the page so the summary's range picker is
+   *  a view of the same filter. */
+  dateFilter: InvoiceDateFilter;
+  onDateFilterChange: (next: InvoiceDateFilter) => void;
 }
 
 /**
@@ -131,8 +135,8 @@ export function McaInvoiceTable({
   summarySection,
   statusFilters,
   onStatusFiltersChange,
-  relativeWindow,
-  onRelativeWindowChange,
+  dateFilter,
+  onDateFilterChange,
 }: McaInvoiceTableProps) {
   const router = useRouter();
 
@@ -141,8 +145,6 @@ export function McaInvoiceTable({
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
-  const [relativeRange, setRelativeRange] = useState<RelativeRangeValue>(EMPTY_RELATIVE_RANGE);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -163,9 +165,7 @@ export function McaInvoiceTable({
     {
       status: statusFilters.length ? statusFilters : undefined,
       type: typeFilter.length ? typeFilter : undefined,
-      startTime:
-        relativeWindow?.startTime ?? (dateRange.from ? toStartOfDayMs(dateRange.from) : undefined),
-      endTime: relativeWindow?.endTime ?? (dateRange.to ? toEndOfDayMs(dateRange.to) : undefined),
+      ...dateFilterToEpochMs(dateFilter),
     },
     {
       mids,
@@ -304,18 +304,21 @@ export function McaInvoiceTable({
   // keeps the hidden row's chips from opening alongside the visible ones.
   const renderFilterChips = () => (
     <InvoiceFilterChips
-      dateRange={dateRange}
+      dateRange={dateFilter.range}
       onDateRangeChange={(next) => {
-        setDateRange(next);
-        setRelativeRange(EMPTY_RELATIVE_RANGE);
-        onRelativeWindowChange(null);
+        // The chip's two modes are exclusive, so applying an absolute range
+        // drops the relative one and the window it had resolved to.
+        onDateFilterChange({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
         setPage(1);
       }}
-      relativeRange={relativeRange}
+      relativeRange={dateFilter.relative}
       onRelativeRangeChange={(next) => {
-        setRelativeRange(next);
-        // Clock reads belong in the handler, never in render.
-        onRelativeWindowChange(hasRelativeRange(next) ? relativeRangeToEpochMs(next) : null);
+        onDateFilterChange({
+          range: { from: "", to: "" },
+          relative: next,
+          // Clock reads belong in the handler, never in render.
+          window: hasRelativeRange(next) ? relativeRangeToEpochMs(next) : null,
+        });
         setPage(1);
       }}
       statusFilters={statusFilters}

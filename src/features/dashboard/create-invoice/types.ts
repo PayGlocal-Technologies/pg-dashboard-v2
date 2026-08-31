@@ -82,6 +82,10 @@ export interface InvoiceData {
   zohoPaymentSyncStatus?: "SUCCESS" | "PENDING" | "FAILED" | null;
   source?: "PAYGLOCAL" | "ZOHO" | null;
   lastSyncedTime?: number | null;
+  /** Absent on drafts created before themes existed; treat as the default. */
+  themeMetadata?: ThemeMetadata | null;
+  /** The template this invoice was built from, if any. */
+  templateId?: string | null;
 }
 
 export interface LinkedTxnDetails {
@@ -168,6 +172,37 @@ export type McaCurrencyListResponse = BaseResponse<{
 
 export type AssetResponse = BaseResponse<{ fileUrl: string }>;
 
+// ─── Themes ───────────────────────────────────────────────────────────────────
+
+/**
+ * An invoice's look, as the server stores it.
+ *
+ * Three enum NAMES, not three hex values: the renderer owns what "SLATE" is
+ * worth, so the invoice records the choice and never the colour. The names come
+ * from GET /mca-invoice/themes, which is also where the hexes for the on-screen
+ * preview come from.
+ *
+ * Optional on the wire in both directions — omit it on create and the server
+ * defaults to CLASSIC / SLATE / AMBER.
+ */
+export interface ThemeMetadata {
+  theme: string;
+  color: string;
+  accent: string;
+}
+
+/** One named colour, e.g. `{ name: "SLATE", hex: "#475569" }`. */
+export interface ThemePaletteOption {
+  name: string;
+  hex: string;
+}
+
+export type InvoiceThemesResponse = BaseResponse<{
+  themes: string[];
+  colors: ThemePaletteOption[];
+  accents: ThemePaletteOption[];
+}>;
+
 // ─── Editor state ─────────────────────────────────────────────────────────────
 // The flat form the Nova-derived editor binds to. This is deliberately NOT the
 // wire shape: it holds strings where the form needs strings, and it is mapped
@@ -225,25 +260,11 @@ export interface InvoiceFormState {
   logoEnabled: boolean;
   signatureEnabled: boolean;
 
-  // ── Branding ───────────────────────────────────────────────────────────────
-  // Client-side only, for now.
-  //
-  // These four drive the on-screen document and the notification-email preview.
-  // None of them is on the wire yet: `toInvoicePayload` lists the fields it
-  // sends explicitly and does not include them, so they cannot leak into a save
-  // and be rejected. When the renderer accepts a layout, a colour pair and a
-  // locale, add them to that builder and to `toFormState` — those two functions
-  // are the whole change. Everything else here already carries them.
-  //
-  // They do persist through a saved template (see InvoiceTemplateSnapshot),
-  // which is what makes a merchant's brand reusable before the API lands.
-  brandingStyleId: string;
-  /** Hex, uppercase, `#RRGGBB`. */
-  primaryColor: string;
-  /** Hex, uppercase, `#RRGGBB`. */
-  accentColor: string;
-  /** Display name from INVOICE_LANGUAGES, e.g. "English", "Japanese". */
-  language: string;
+  // Branding is deliberately NOT here. The invoice carries `themeMetadata`, so
+  // the editor derives it from the fetched document and holds only the
+  // merchant's in-session override — see the branding block in InvoiceEditor.
+  // Copying it into this form once, as every other field is, is what made a
+  // theme revert when a cached document seeded the editor.
 
   isRecurring: boolean;
   recurringType: RecurringType | "";
@@ -263,12 +284,20 @@ export type InvoiceLayoutId =
   | "y2k-bold"
   | "geometric-modern";
 
-export interface InvoiceBrandingStyle {
-  id: string;
+/**
+ * What this app knows about one of the server's themes.
+ *
+ * The server sends a bare list of names; everything visual about them lives
+ * here, keyed by that name. A theme the server offers but this table does not
+ * describe still renders — see `themeFor` — so a backend that adds a seventh
+ * does not break the picker.
+ */
+export interface InvoiceTheme {
+  /** The server's enum name, e.g. "BOLD_SIDEBAR". */
   name: string;
+  /** What the picker calls it, e.g. "Bold Sidebar". */
+  label: string;
   layout: InvoiceLayoutId;
-  defaultPrimaryColor: string;
-  defaultAccentColor: string;
   /** Badged in the picker. */
   isNew?: boolean;
 }
@@ -296,40 +325,113 @@ export interface InvoiceTemplateSnapshot {
   discountType: "percentage" | "fixed";
   taxName: string;
   taxValue: string;
-  accountNo: string;
   memo: string;
   notes: string;
   lut: string;
   dueTermId: string | null;
   logoEnabled: boolean;
   signatureEnabled: boolean;
-  brandingStyleId: string;
-  primaryColor: string;
-  accentColor: string;
-  language: string;
+  theme: string;
+  color: string;
+  accent: string;
   isRecurring: boolean;
   recurringType: RecurringType | "";
+  /**
+   * Carried, never edited here.
+   *
+   * The API stores it on a template and the editor has no GST control at all —
+   * `generate-invoice` is hard-coded to false, exactly as pg-dashboard's create
+   * flow is. Holding it means an update round-trips whatever the template
+   * already had instead of overwriting it with a guess.
+   */
+  isGstInvoice: boolean;
 }
 
+/**
+ * A line item as the templates API carries it.
+ *
+ * Two departures from the invoice's own line items, both mandated by the
+ * endpoint: amounts are numbers rather than the strings production posts, and
+ * there is a `name` alongside `description`. The editor has one label per item,
+ * so both fields receive it — see `toTemplateWriteBody`.
+ */
+export interface TemplateLineItem {
+  name: string;
+  description: string;
+  type: string;
+  quantity: number;
+  unitPrice: number;
+  gstRate: number;
+  hsn: string;
+}
+
+/** The body POSTed to /templates, and PUT to /templates/{id} unchanged. */
+export interface TemplateWriteBody {
+  name: string;
+  currency: string;
+  lineItems: TemplateLineItem[];
+  isGstInvoice: boolean;
+  themeMetadata: ThemeMetadata;
+  discount: {
+    discountName?: string;
+    value?: string;
+    type?: string;
+    discountAmount?: string;
+  };
+  tax: {
+    taxName?: string;
+    value?: string;
+    taxAmount?: string;
+  };
+  memo: string;
+  notes: string;
+  lut: string;
+  /** Whole days from the issue date. Omitted when the template carries no term. */
+  dueTermDays?: number;
+  /** The invoice's own recurringType vocabulary. Omitted when not recurring. */
+  recurring?: RecurringType;
+  logoEnabled: boolean;
+  signatureEnabled: boolean;
+}
+
+/** A template as the API returns it: the body above plus server-managed fields. */
+export type ApiInvoiceTemplate = TemplateWriteBody & {
+  templateId: string;
+  /** Epoch millis as a string. */
+  savedAt: string;
+  /** Epoch millis as a string; null until the template has been read once. */
+  lastUsedAt: string | null;
+};
+
+export type TemplateListResponse = BaseResponse<{ templates: ApiInvoiceTemplate[] }>;
+
+export type TemplateResponse = BaseResponse<{ template: ApiInvoiceTemplate }>;
+
+export type TemplateWriteResponse = BaseResponse<{ templateId: string }>;
+
+/**
+ * A template as this feature consumes it: identity, plus the snapshot the editor
+ * applies. Mapped from ApiInvoiceTemplate by `fromApiTemplate`.
+ */
 export interface InvoiceTemplate {
+  /** The server's `templateId`. */
   id: string;
   name: string;
-  /** Free text, shown under the name in the picker. */
-  description: string;
   /**
-   * Epoch millis as a string, deliberately: it is the shape the templates API
-   * uses for `savedAt`, so adopting it now keeps the eventual swap to changing
-   * where the record comes from rather than also re-unit-ing its timestamps.
+   * The one-liner under the name in the picker, e.g. "3 items · USD · due 30
+   * days". Derived by `describeSnapshot`, not stored: the API has no such field,
+   * and a description a merchant has to invent is one they leave empty.
    */
+  description: string;
+  /** Epoch millis as a string, which is how the API sends it. */
   savedAt: string;
   /**
-   * Epoch millis as a string; null until the template has been applied.
+   * Epoch millis as a string; null until the template has been read once.
    *
-   * Replaces a local `usageCount`. The API records recency, not frequency, and
-   * bumps this itself as a side effect of reading one template, so a counter
-   * kept here would have nothing behind it and would double-count once the
-   * server takes over. Recency is also the better signal for a picker: what you
-   * used last week is a better guess than what you used most in March.
+   * Recency, not frequency: the API records this and bumps it itself when a
+   * template is read by id, which is the only reason `markUsed` issues a read.
+   * It is also the better signal for a picker — what you used last week is a
+   * better guess than what you used most in March.
    */
   lastUsedAt: string | null;
   snapshot: InvoiceTemplateSnapshot;
