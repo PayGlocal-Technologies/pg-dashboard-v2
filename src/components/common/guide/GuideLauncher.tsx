@@ -79,28 +79,31 @@ export function GuideLauncher({
         Guide
       </Button>
 
-      {/* First-visit highlight on the button itself. */}
+      {/* First-visit highlight on the button itself — a breathing halo (pulse)
+          around it so it doesn't get overlooked in the corner. */}
       {showIntro && !running && (
-        <Spotlight target="guide-launcher" side="top" align="end">
-          <div className="mb-2 flex items-start justify-between gap-2">
+        <Spotlight target="guide-launcher" side="top" align="end" pulse>
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <Icon name="sparkles" className="h-4 w-4" aria-hidden />
+            </span>
             <h3 className="text-[15px] font-semibold leading-snug text-foreground">
-              New here? Take a quick tour
+              Take a quick tour
             </h3>
+          </div>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            New to this dashboard? We&apos;ll point out the key things in a few seconds. You can
+            reopen it any time from this button.
+          </p>
+          <div className="mt-4 flex items-center justify-between">
             <Button
               variant="ghost"
               size="sm"
-              aria-label="Dismiss"
               onClick={dismissIntro}
-              className="-mr-1 -mt-1 h-6 w-6 shrink-0 p-0 text-muted-foreground hover:text-foreground"
+              className="h-auto min-h-0 px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:text-foreground"
             >
-              <Icon name="x" className="h-4 w-4" aria-hidden />
+              Skip
             </Button>
-          </div>
-          <p className="text-[13px] leading-relaxed text-muted-foreground">
-            We&apos;ll walk you through the key parts of this screen. You can start it any time from
-            this button.
-          </p>
-          <div className="mt-4 flex justify-end">
             <Button
               variant="primary"
               size="sm"
