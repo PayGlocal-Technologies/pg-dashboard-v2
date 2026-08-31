@@ -1,3 +1,4 @@
+import type { RelativeRangeValue } from "@/components/common/filters/FilterChips";
 import type { BaseResponse } from "@/types/common";
 
 /**
@@ -87,4 +88,23 @@ export interface InvoiceRef {
   totalAmount: string;
   clientName?: string;
   clientBusinessName?: string;
+}
+
+/**
+ * The Date filter, as one value.
+ *
+ * The chip's two modes and the epoch window they resolve to are kept together
+ * because they are one filter, not three: exactly one of `range` (absolute
+ * yyyy-mm-dd bounds) and `relative` ("last N weeks/days/…") is ever set, and
+ * `window` is whichever of them resolved to epoch millis at the moment it was
+ * applied. Holding them as one object is what lets the summary's range picker
+ * and the table's Date chip be two views of a single piece of state, so
+ * changing either one is visible in both.
+ */
+export interface InvoiceDateFilter {
+  range: { from: string; to: string };
+  relative: RelativeRangeValue;
+  /** Resolved bounds for a relative range, epoch millis. Null when the filter
+   *  is absolute (the range is converted at request time) or unset. */
+  window: { startTime: number; endTime: number } | null;
 }

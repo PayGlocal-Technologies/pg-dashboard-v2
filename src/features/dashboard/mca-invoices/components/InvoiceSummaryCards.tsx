@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Button,
   Select,
@@ -18,42 +17,11 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useGet } from "@/lib/api/hooks";
 import { invoiceSummaryApi } from "@/features/dashboard/mca-invoices/services";
+import {
+  CUSTOM_RANGE_VALUE,
+  SUMMARY_RANGE_OPTIONS,
+} from "@/features/dashboard/mca-invoices/constants";
 import type { McaInvoiceSummaryResponse } from "@/features/dashboard/mca-invoices/types";
-
-/**
- * Epoch SECONDS at the end of the local day containing `now`.
- *
- * The window is deliberately bucketed to day boundaries rather than to the
- * exact moment. It feeds both the request URL and the react-query key, so a
- * second-resolution "now" produced a different key on every single mount: the
- * cache could never hit, and the cards fell back to skeletons every time the
- * page was opened. Bucketing makes the key identical for the whole day, so a
- * revisit paints from cache and revalidates in the background.
- *
- * Day granularity is also what the ranges actually mean — "last 7 days", not
- * "the 604800 seconds ending at 14:23:07".
- */
-function endOfDaySeconds(now: Date): number {
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  return Math.floor(end.getTime() / 1000);
-}
-
-/** Epoch seconds at local midnight `daysBack` days before `now`. */
-function startOfDaySeconds(now: Date, daysBack: number): number {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - daysBack);
-  return Math.floor(start.getTime() / 1000);
-}
-
-/** Ranges from pg-dashboard's summary picker. Values are day counts. */
-const RANGE_OPTIONS = [
-  { value: "ALL_TIME", label: "All time" },
-  { value: "7", label: "Last 7 days" },
-  { value: "30", label: "Last 30 days" },
-  { value: "90", label: "Last 90 days" },
-] as const;
 
 interface SummaryCard {
   key: string;
@@ -73,30 +41,34 @@ interface SummaryCard {
  *  - the range picker moves the table's date filter as well as the summary's
  *    own window, so the counts and the rows below always describe the same
  *    period.
+ *
+ * Both the picker's value and the window it reads are owned by the page, not
+ * here: they are the same state the table's Date chip edits, which is what
+ * keeps the two controls from ever disagreeing. The window arrives as epoch
+ * seconds bucketed by the page, so it is stable across mounts and the query
+ * key below can actually hit the cache.
  */
 export function InvoiceSummaryCards({
   merchantId,
+  rangeValue,
+  onRangeChange,
+  windowSeconds,
   onStatusFilter,
-  onRangeDaysChange,
 }: {
   merchantId: string;
+  /** One of SUMMARY_RANGE_OPTIONS, or CUSTOM_RANGE_VALUE when the Date chip
+   *  holds a range the picker cannot express. */
+  rangeValue: string;
+  onRangeChange: (next: string) => void;
+  windowSeconds: { start: number; end: number };
   onStatusFilter: (statuses: string[]) => void;
-  onRangeDaysChange: (days: number | undefined) => void;
 }) {
-  const [range, setRange] = useState<string>("ALL_TIME");
-  // Resolved in a lazy initializer and in the change handler, never during
-  // render, and bucketed to the day so the value is stable across mounts.
-  const [window, setWindow] = useState<{ start: number; end: number }>(() => ({
-    start: 0,
-    end: endOfDaySeconds(new Date()),
-  }));
-
-  const url = invoiceSummaryApi(merchantId, window.start, window.end);
+  const url = invoiceSummaryApi(merchantId, windowSeconds.start, windowSeconds.end);
   // isPending, not isLoading: isPending is false the moment there is data to
   // show, cached or fresh, so a revisit renders the previous counts instead of
   // skeletons while the background revalidation runs.
   const { data, isPending } = useGet<McaInvoiceSummaryResponse>(
-    ["invoice-summary", merchantId, window.start, window.end],
+    ["invoice-summary", merchantId, windowSeconds.start, windowSeconds.end],
     url,
     undefined,
     { enabled: !!url }
@@ -132,22 +104,7 @@ export function InvoiceSummaryCards({
     },
   ];
 
-  const handleRangeChange = (next: string) => {
-    setRange(next);
-
-    const now = new Date();
-    const end = endOfDaySeconds(now);
-
-    if (next === "ALL_TIME") {
-      setWindow({ start: 0, end });
-      onRangeDaysChange(undefined);
-      return;
-    }
-
-    const days = Number(next);
-    setWindow({ start: startOfDaySeconds(now, days), end });
-    onRangeDaysChange(days);
-  };
+  const isCustomRange = rangeValue === CUSTOM_RANGE_VALUE;
 
   return (
     <div className="flex flex-col gap-3">
@@ -155,16 +112,25 @@ export function InvoiceSummaryCards({
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
           Summary
         </h2>
-        <Select value={range} onValueChange={handleRangeChange}>
+        <Select value={rangeValue} onValueChange={onRangeChange}>
           <SelectTrigger className="h-8 w-[9.5rem]" aria-label="Summary date range">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {RANGE_OPTIONS.map((option) => (
+            {SUMMARY_RANGE_OPTIONS.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}
               </SelectItem>
             ))}
+            {/* Only mounted while it is the current value, so the Select has
+                something to render for a Date chip range this picker has no
+                option for. Not a choice the user can make here: the chip is
+                where a custom range is set. */}
+            {isCustomRange && (
+              <SelectItem value={CUSTOM_RANGE_VALUE} disabled>
+                Custom range
+              </SelectItem>
+            )}
           </SelectContent>
         </Select>
       </div>
