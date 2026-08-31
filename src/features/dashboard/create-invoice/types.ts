@@ -84,6 +84,8 @@ export interface InvoiceData {
   lastSyncedTime?: number | null;
   /** Absent on drafts created before themes existed; treat as the default. */
   themeMetadata?: ThemeMetadata | null;
+  /** The template this invoice was built from, if any. */
+  templateId?: string | null;
 }
 
 export interface LinkedTxnDetails {
@@ -323,7 +325,6 @@ export interface InvoiceTemplateSnapshot {
   discountType: "percentage" | "fixed";
   taxName: string;
   taxValue: string;
-  accountNo: string;
   memo: string;
   notes: string;
   lut: string;
@@ -335,27 +336,102 @@ export interface InvoiceTemplateSnapshot {
   accent: string;
   isRecurring: boolean;
   recurringType: RecurringType | "";
+  /**
+   * Carried, never edited here.
+   *
+   * The API stores it on a template and the editor has no GST control at all —
+   * `generate-invoice` is hard-coded to false, exactly as pg-dashboard's create
+   * flow is. Holding it means an update round-trips whatever the template
+   * already had instead of overwriting it with a guess.
+   */
+  isGstInvoice: boolean;
 }
 
+/**
+ * A line item as the templates API carries it.
+ *
+ * Two departures from the invoice's own line items, both mandated by the
+ * endpoint: amounts are numbers rather than the strings production posts, and
+ * there is a `name` alongside `description`. The editor has one label per item,
+ * so both fields receive it — see `toTemplateWriteBody`.
+ */
+export interface TemplateLineItem {
+  name: string;
+  description: string;
+  type: string;
+  quantity: number;
+  unitPrice: number;
+  gstRate: number;
+  hsn: string;
+}
+
+/** The body POSTed to /templates, and PUT to /templates/{id} unchanged. */
+export interface TemplateWriteBody {
+  name: string;
+  currency: string;
+  lineItems: TemplateLineItem[];
+  isGstInvoice: boolean;
+  themeMetadata: ThemeMetadata;
+  discount: {
+    discountName?: string;
+    value?: string;
+    type?: string;
+    discountAmount?: string;
+  };
+  tax: {
+    taxName?: string;
+    value?: string;
+    taxAmount?: string;
+  };
+  memo: string;
+  notes: string;
+  lut: string;
+  /** Whole days from the issue date. Omitted when the template carries no term. */
+  dueTermDays?: number;
+  /** The invoice's own recurringType vocabulary. Omitted when not recurring. */
+  recurring?: RecurringType;
+  logoEnabled: boolean;
+  signatureEnabled: boolean;
+}
+
+/** A template as the API returns it: the body above plus server-managed fields. */
+export type ApiInvoiceTemplate = TemplateWriteBody & {
+  templateId: string;
+  /** Epoch millis as a string. */
+  savedAt: string;
+  /** Epoch millis as a string; null until the template has been read once. */
+  lastUsedAt: string | null;
+};
+
+export type TemplateListResponse = BaseResponse<{ templates: ApiInvoiceTemplate[] }>;
+
+export type TemplateResponse = BaseResponse<{ template: ApiInvoiceTemplate }>;
+
+export type TemplateWriteResponse = BaseResponse<{ templateId: string }>;
+
+/**
+ * A template as this feature consumes it: identity, plus the snapshot the editor
+ * applies. Mapped from ApiInvoiceTemplate by `fromApiTemplate`.
+ */
 export interface InvoiceTemplate {
+  /** The server's `templateId`. */
   id: string;
   name: string;
-  /** Free text, shown under the name in the picker. */
-  description: string;
   /**
-   * Epoch millis as a string, deliberately: it is the shape the templates API
-   * uses for `savedAt`, so adopting it now keeps the eventual swap to changing
-   * where the record comes from rather than also re-unit-ing its timestamps.
+   * The one-liner under the name in the picker, e.g. "3 items · USD · due 30
+   * days". Derived by `describeSnapshot`, not stored: the API has no such field,
+   * and a description a merchant has to invent is one they leave empty.
    */
+  description: string;
+  /** Epoch millis as a string, which is how the API sends it. */
   savedAt: string;
   /**
-   * Epoch millis as a string; null until the template has been applied.
+   * Epoch millis as a string; null until the template has been read once.
    *
-   * Replaces a local `usageCount`. The API records recency, not frequency, and
-   * bumps this itself as a side effect of reading one template, so a counter
-   * kept here would have nothing behind it and would double-count once the
-   * server takes over. Recency is also the better signal for a picker: what you
-   * used last week is a better guess than what you used most in March.
+   * Recency, not frequency: the API records this and bumps it itself when a
+   * template is read by id, which is the only reason `markUsed` issues a read.
+   * It is also the better signal for a picker — what you used last week is a
+   * better guess than what you used most in March.
    */
   lastUsedAt: string | null;
   snapshot: InvoiceTemplateSnapshot;

@@ -57,7 +57,7 @@ export function BrandingSection({
   onChange,
   onBrandingChange,
   onResetColors,
-  onOpenCropper,
+  onOpenUpload,
 }: {
   logoEnabled: boolean;
   signatureEnabled: boolean;
@@ -76,7 +76,7 @@ export function BrandingSection({
   onBrandingChange: (patch: Partial<ThemeMetadata>) => void;
   /** Puts the colour pair back to the server's own default. */
   onResetColors: () => void;
-  onOpenCropper: (type: "LOGO" | "SIGNATURE") => void;
+  onOpenUpload: (type: "LOGO" | "SIGNATURE") => void;
 }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -147,7 +147,7 @@ export function BrandingSection({
             enabled={logoEnabled}
             onEnabledChange={(next) => onChange({ logoEnabled: next })}
             asset={logo}
-            onOpen={() => onOpenCropper("LOGO")}
+            onOpen={() => onOpenUpload("LOGO")}
           />
           <AssetRow
             label="Signature"
@@ -155,7 +155,7 @@ export function BrandingSection({
             enabled={signatureEnabled}
             onEnabledChange={(next) => onChange({ signatureEnabled: next })}
             asset={signature}
-            onOpen={() => onOpenCropper("SIGNATURE")}
+            onOpen={() => onOpenUpload("SIGNATURE")}
           />
         </div>
       )}
@@ -209,7 +209,7 @@ function AssetRow({
                 variant="secondary"
                 size="sm"
                 disabled={asset.isUploading}
-                leftIcon={<Icon name="crop" className="h-3.5 w-3.5" />}
+                leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
                 onClick={onOpen}
               >
                 {asset.isUploading ? "Uploading…" : "Replace"}
