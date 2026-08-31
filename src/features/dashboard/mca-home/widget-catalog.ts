@@ -71,9 +71,10 @@ export const MCA_WIDGET_BY_ID: Record<McaWidgetId, McaWidgetCatalogEntry> = MCA_
 export const DEFAULT_MCA_DASHBOARD_LAYOUT: McaWidgetId[] = [
   "transactions",
   "total-invoiced",
-  "outstanding-amount",
+  // Hidden from the default view for now (kept in the catalog / code):
+  // "outstanding-amount",
   "saved-amount",
-  "invoice-trend",
+  // "invoice-trend",
   "currency-split",
 ];
 

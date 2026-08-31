@@ -738,7 +738,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-2.5 dark:bg-muted/15">
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold leading-snug text-foreground">
-                  Funds on hold
+                  Documents pending
                 </p>
                 <p className="mt-1 font-sans text-sm font-bold tabular-nums tracking-[-0.02em] text-amber-800 dark:text-amber-300 sm:text-base">
                   {formatInrCompact(attention.fundsOnHold.amount)}

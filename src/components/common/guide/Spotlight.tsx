@@ -30,6 +30,9 @@ interface SpotlightProps {
   align?: "start" | "center" | "end";
   /** Called (once) if the target never renders after the retry window. */
   onMissing?: () => void;
+  /** Adds a looping halo around the cutout to draw the eye (used by the
+   *  first-visit launcher highlight so it isn't missed). */
+  pulse?: boolean;
   /** Card content shown beside the spotlight. */
   children: ReactNode;
 }
@@ -42,7 +45,7 @@ const SPOTLIGHT_PAD = 8;
 const MAX_TARGET_ATTEMPTS = 40;
 const TARGET_RETRY_MS = 150;
 
-export function Spotlight({ target, side, align, onMissing, children }: SpotlightProps) {
+export function Spotlight({ target, side, align, onMissing, pulse, children }: SpotlightProps) {
   const [rect, setRect] = useState<Rect | null>(null);
 
   // Measure the target, keep it in view, and track scroll/resize. Re-runs when
@@ -125,15 +128,50 @@ export function Spotlight({ target, side, align, onMissing, children }: Spotligh
   };
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[120]" role="dialog" aria-modal="true">
-      {/* Dim + spotlight cutout via a single oversized box-shadow. */}
+    <motion.div
+      className="pointer-events-none fixed inset-0 z-[120]"
+      role="dialog"
+      aria-modal="true"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25, ease: "easeOut" }}
+    >
+      {/* Dim + spotlight cutout via a single oversized box-shadow. The dim's own
+          colour cross-fades (via boxShadow in `animate`) while the cutout glides
+          between targets, so advancing a step reads as one smooth move rather
+          than a jump. */}
       <motion.div
         initial={false}
         animate={{ top: spot.top, left: spot.left, width: spot.width, height: spot.height }}
-        transition={{ type: "spring", stiffness: 320, damping: 34 }}
+        transition={{ type: "tween", duration: 0.45, ease: [0.4, 0, 0.2, 1] }}
         className="absolute rounded-xl ring-2 ring-primary/70"
         style={{ boxShadow: "0 0 0 9999px rgba(15, 23, 42, 0.55)" }}
       />
+
+      {/* Attention halo — a soft ring that breathes around the cutout. */}
+      {pulse && (
+        <motion.div
+          initial={false}
+          animate={{
+            top: spot.top - 6,
+            left: spot.left - 6,
+            width: spot.width + 12,
+            height: spot.height + 12,
+            opacity: [0.55, 0, 0.55],
+            scale: [1, 1.08, 1],
+          }}
+          transition={{
+            top: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
+            left: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
+            width: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
+            height: { duration: 0.45, ease: [0.4, 0, 0.2, 1] },
+            opacity: { duration: 1.8, repeat: Infinity, ease: "easeInOut" },
+            scale: { duration: 1.8, repeat: Infinity, ease: "easeInOut" },
+          }}
+          className="absolute rounded-2xl ring-4 ring-primary/60"
+        />
+      )}
 
       {/* Card, positioned by Radix relative to an invisible anchor at the rect. */}
       <Popover open>
@@ -156,7 +194,7 @@ export function Spotlight({ target, side, align, onMissing, children }: Spotligh
           {children}
         </PopoverContent>
       </Popover>
-    </div>,
+    </motion.div>,
     document.body,
   );
 }

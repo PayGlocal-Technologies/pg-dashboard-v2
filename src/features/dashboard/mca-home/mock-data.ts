@@ -111,13 +111,9 @@ export const revenueByTimeframe: Record<RevenueTimeframe, RevenueSeries> = {
   },
 };
 
-export const upcomingSettlement = {
-  amount: 124890,
-  currency: "INR",
-  cycle: "T+1",
-  settlesAtLabel: "12:00AM IST",
-  bankAccountLabel: "Bank ****4521",
-};
+// upcomingSettlement mock removed — the Revenue card's Upcoming settlement now
+// uses the live settlement/upcoming endpoint (see McaRevenueCard +
+// useSettlementUpcoming).
 
 export interface NeedsAttentionRow {
   id: string;
@@ -169,7 +165,8 @@ export const mcaQuickAccessItems: QuickAccessItem[] = [
   { id: "platform-withdrawal", label: "Platform withdrawal", icon: "download" },
   { id: "client-management", label: "Client management", icon: "users" },
   { id: "forex-calculator", label: "Forex calculator", icon: "circle-dollar-sign" },
-  { id: "customise-dashboard", label: "Customise dashboard", icon: "sliders-horizontal" },
+  // Hidden for now — the dashboard-customise entry point (kept in code):
+  // { id: "customise-dashboard", label: "Customise dashboard", icon: "sliders-horizontal" },
 ];
 
 // Invoice-origins mock removed — the card is now backed by the live

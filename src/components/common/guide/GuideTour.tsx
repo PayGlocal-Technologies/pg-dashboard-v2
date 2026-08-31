@@ -10,6 +10,7 @@
  * positioning all come from <Spotlight/>.
  */
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { Spotlight } from "@/components/common/guide/Spotlight";
@@ -46,30 +47,24 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
   }
 
   /** Restart from the first step — offered on the final step's card. */
-  function replay() {
+  function restart() {
     setStepIndex(0);
   }
 
   if (!open || !step) return null;
 
   return (
-    <Spotlight
-      // Keyed by step so advancing re-mounts the shell and re-measures the new
-      // target from scratch (rect resets, no stale spotlight between steps).
-      key={stepIndex}
-      target={step.target}
-      side={step.side}
-      align={step.align}
-      onMissing={goNext}
-    >
-      {/* Progress dots + close */}
+    // No `key` on Spotlight — one instance persists across steps so the cutout
+    // glides to each new target instead of remounting and snapping.
+    <Spotlight target={step.target} side={step.side} align={step.align} onMissing={goNext}>
+      {/* Progress dots + Skip (dots persist across steps and animate width). */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
           {steps.map((s, i) => (
             <span
               key={s.target}
               className={
-                "h-1.5 rounded-full transition-all " +
+                "h-1.5 rounded-full transition-all duration-300 " +
                 (i === stepIndex ? "w-5 bg-primary" : "w-2 bg-border")
               }
             />
@@ -78,16 +73,30 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
         <Button
           variant="ghost"
           size="sm"
-          aria-label="Skip guide"
           onClick={onClose}
-          className="h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+          className="h-auto min-h-0 px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:text-foreground"
         >
-          <Icon name="x" className="h-4 w-4" aria-hidden />
+          Skip
         </Button>
       </div>
 
-      <h3 className="text-[15px] font-semibold leading-snug text-foreground">{step.title}</h3>
-      <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">{step.description}</p>
+      {/* Step copy cross-fades on advance so the text doesn't jump-cut. */}
+      <div className="relative min-h-[68px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={stepIndex}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: "easeOut" }}
+          >
+            <h3 className="text-[15px] font-semibold leading-snug text-foreground">{step.title}</h3>
+            <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+              {step.description}
+            </p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       <div className="mt-4 flex items-center justify-between">
         <span className="text-[11px] font-medium text-muted-foreground">
@@ -98,10 +107,10 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
             <Button
               variant="ghost"
               size="sm"
-              onClick={replay}
+              onClick={restart}
               leftIcon={<Icon name="rotate-ccw" className="h-3.5 w-3.5" aria-hidden />}
             >
-              Replay
+              Restart
             </Button>
           ) : (
             stepIndex > 0 && (
