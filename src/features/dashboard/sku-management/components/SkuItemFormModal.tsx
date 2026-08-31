@@ -434,15 +434,20 @@ function SkuItemFormBody({
           </form.Subscribe>
         </div>
 
-        {/* ── Media ────────────────────────────────────────────────────── */}
+        {/* ── Media ──────────────────────────────────────────────────────
+            One image, matching what the catalogue stores. `savedImageUrl` is
+            read off the values the form opened with, so discarding a
+            replacement restores the picture the item already has rather than
+            emptying the slot. */}
         <div className="flex flex-col gap-2">
           <SectionLabel>Media</SectionLabel>
-          <form.Field name="images">
+          <form.Field name="image">
             {(field) => (
               <SkuMediaUpload
                 id="sku-media"
                 value={field.state.value}
                 onChange={(next) => field.handleChange(next)}
+                savedImageUrl={initialValues?.image?.url}
               />
             )}
           </form.Field>

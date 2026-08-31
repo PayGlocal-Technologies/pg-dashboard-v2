@@ -7,15 +7,19 @@ export const SKU_GUIDE_KEY = "sku-management-v2";
 /**
  * First-visit coach-mark for SKU management. `target` matches the `data-guide`
  * on the first product row's thumbnail cell (columns.tsx) / card (SkuCardList).
- * Copy carried over verbatim from the design annotation, including the
- * "Edit product → Add Image" hint.
+ *
+ * Copy follows the design annotation, singular: the catalogue stores one image
+ * per SKU. The hint names the form's Media section rather than the "+ Add
+ * Image" tile the annotation described — that tile belonged to the six-image
+ * strip, and pointing a first-run coach-mark at a control that isn't there is
+ * worse than no coach-mark.
  */
 export const SKU_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-sku-image",
     title: "Add images to your SKU",
     description:
-      "Add images to your SKUs to easily identify your products and services. Edit product → + Add Image.",
+      "Add an image to your SKUs to easily identify your products and services. Edit product → Media.",
     side: "bottom",
     align: "start",
   },

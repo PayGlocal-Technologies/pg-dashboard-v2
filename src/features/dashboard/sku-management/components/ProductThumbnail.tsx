@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
 import { Avatar, AvatarFallback } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -30,28 +31,36 @@ export function ProductThumbnail({
   product: SkuProduct;
   className?: string;
 }) {
-  // images[0] is the primary image by definition (see SkuProduct.images);
-  // anything beyond it belongs to the item's gallery, not this cell.
-  const primaryImage = product.images?.[0];
+  // The catalogue row's presigned S3 URL, good for about ten minutes.
+  const imageUrl = product.imageUrl;
+
+  // Which is why this exists. A merchant who leaves the table open past the
+  // expiry would otherwise get the browser's broken-image glyph in every
+  // Product cell; falling back to the type icon is the same thing a SKU with
+  // no artwork shows, which is the honest reading of "we can't show it".
+  // Keyed off the url so a refetch with a fresh link tries again.
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImage = !!imageUrl && failedUrl !== imageUrl;
 
   return (
     <Avatar className={cn("h-[70px] w-[70px] rounded-lg", className)}>
-      {primaryImage ? (
+      {showImage ? (
         // object-cover: the photo fills the square edge to edge, cropping
         // whatever doesn't fit rather than letterboxing inside it. The white
         // ground is fixed rather than themed — it's photographic backdrop,
         // matching what's baked into the JPEGs and standing behind the
         // transparent PNGs, so the tile reads the same in either theme.
         <Image
-          src={primaryImage}
+          src={imageUrl}
           alt={product.name}
           width={THUMBNAIL_SIZE}
           height={THUMBNAIL_SIZE}
-          // Images added through the item form are object URLs, which the
-          // optimiser can't fetch — it resolves sources server-side and a
-          // blob: URL only exists in the tab that minted it. Catalogue images
-          // shipped under /assets still go through it.
-          unoptimized={primaryImage.startsWith("blob:")}
+          // Always unoptimised. The optimiser resolves sources server-side, and
+          // neither kind of source here survives that: an S3 host has no
+          // remotePattern configured and its signed URL expires anyway, and an
+          // object URL from the item form only exists in the tab that minted it.
+          unoptimized
+          onError={() => setFailedUrl(imageUrl)}
           className="h-full w-full bg-white object-cover"
         />
       ) : (
