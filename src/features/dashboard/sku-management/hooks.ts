@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
@@ -12,13 +13,14 @@ import {
   skuDeleteApi,
   skuDuplicateApi,
   skuExtractedRowsApi,
+  skuImageUploadApi,
   skuImportFileApi,
   skuSearchApi,
   skuTemplateApi,
   skuUpdateApi,
   skuUploadInitiateApi,
 } from "@/features/dashboard/sku-management/services";
-import { SKU_PAGE_LIMIT } from "@/features/dashboard/sku-management/constants";
+import { SKU_IMAGE_EXTENSION, SKU_PAGE_LIMIT } from "@/features/dashboard/sku-management/constants";
 import { isSkuItemFormValid } from "@/features/dashboard/sku-management/schemas";
 import type {
   ExtractedSkuRow,
@@ -26,7 +28,9 @@ import type {
   McaCurrencyListResponse,
   SkuApiItem,
   SkuApiType,
+  SkuCreateResponse,
   SkuExtractedRowsResponse,
+  SkuImageUploadResponse,
   SkuImportCountResponse,
   SkuItemFormValues,
   SkuMutationPayload,
@@ -69,9 +73,12 @@ function toPrice(value: string | null): number {
 }
 
 /**
- * One catalogue row, wire → render. `images` is absent by design: the API has no
- * media field (see the migration report), and ProductThumbnail already falls
- * back to a type glyph when a row has none.
+ * One catalogue row, wire → render.
+ *
+ * `imageFileName` is deliberately dropped: it is the object's name on S3, and
+ * nothing in the UI builds a path — `imageUrl` is already the presigned URL to
+ * render. `null` is normalised to undefined so consumers have one absent value
+ * to test rather than two.
  */
 export function toSkuProduct(item: SkuApiItem): SkuProduct {
   return {
@@ -84,6 +91,7 @@ export function toSkuProduct(item: SkuApiItem): SkuProduct {
     productCost: toPrice(item.costPrice),
     currency: item.currency ?? "",
     description: item.description ?? "",
+    imageUrl: item.imageUrl ?? undefined,
   };
 }
 
@@ -278,49 +286,207 @@ interface SkuMutation {
   isPending: boolean;
 }
 
-/** POST /sku/{mid}. `onDone` fires only on success, so the form can decide
- *  between closing and staying open for the next item. */
-export function useCreateSku(onDone?: () => void): {
-  createSku: (payload: SkuMutationPayload) => void;
-} & SkuMutation {
-  const { mid } = useSkuPathMid();
-
-  const { mutate, isPending } = usePost<unknown, SkuMutationPayload>(skuCreateApi(mid), {
-    invalidateQueries: [CATALOGUE_KEY],
-    onSuccess: () => {
-      toast.success("Item added to your catalog.");
-      onDone?.();
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to add item."),
-  });
-
-  return { createSku: (payload) => mutate(payload), isPending };
+/**
+ * The `extension` the upload endpoint is asked for, decided by the file's MIME
+ * type rather than its name — the extension becomes the object's name on S3,
+ * and a PNG the merchant happens to have called `photo.txt` should still be
+ * stored as one. Unrecognised types fall back to the name's own suffix, and
+ * then to png, so the call is always well-formed; the dropzone has already
+ * rejected anything outside SKU_IMAGE_ACCEPTED_MIME_TYPES before we get here.
+ */
+function imageExtension(file: File): string {
+  const fromMime = SKU_IMAGE_EXTENSION[file.type];
+  if (fromMime) return fromMime;
+  const fromName = file.name.split(".").pop()?.toLowerCase() ?? "";
+  return /^[a-z0-9]{2,5}$/.test(fromName) ? fromName : "png";
 }
 
 /**
- * PUT /sku/{mid}/{id}. Serves both the item form and the two inline price
- * cells, so it takes a whole payload: the endpoint replaces the row rather than
- * patching it, and sending only the edited price would blank every other field.
- * `rowMid` is the row's own MID, which matters for a multi-MID merchant.
+ * Both legs of putting one picture on one SKU: presign, then PUT the bytes.
+ *
+ * There is no third leg. The presign call is what records the file against the
+ * SKU row, so the moment S3 accepts the body the catalogue already points at
+ * it — which is also why the caller invalidates the list afterwards rather than
+ * calling a confirm endpoint.
+ *
+ * Resolves to a boolean instead of throwing. An image that fails to upload must
+ * not read as the *item* failing to save: by the time this runs the row is
+ * already created or updated, and the caller says so separately.
  */
-export function useUpdateSku(onDone?: () => void): {
-  updateSku: (args: { id: string; rowMid?: string; payload: SkuMutationPayload }) => void;
+function useSkuImageUpload() {
+  const { mid: pathMid } = useSkuPathMid();
+
+  const { mutateAsync: presign } = usePost<
+    SkuImageUploadResponse,
+    { dynamicUrl: string; extension: string }
+  >("", { invalidateQueries: false });
+
+  // Straight to S3, so no invalidation and no JSON content type — the
+  // presigned URL carries its own auth in the query string.
+  const { mutateAsync: putToS3 } = usePut<
+    void,
+    { dynamicUrl: string; customHeaders: Record<string, string>; reqBody: File }
+  >("", { invalidateQueries: false });
+
+  return async ({
+    id,
+    rowMid,
+    file,
+  }: {
+    id: string;
+    rowMid?: string;
+    file: File;
+  }): Promise<boolean> => {
+    const uploadMid = rowMid || pathMid;
+    const url = skuImageUploadApi(uploadMid, id);
+    if (!url) return false;
+
+    try {
+      const res = await presign({ dynamicUrl: url, extension: imageExtension(file) });
+      const uploadUrl = res?.data?.upload_url;
+      if (!uploadUrl) return false;
+
+      await putToS3({
+        dynamicUrl: uploadUrl,
+        customHeaders: {
+          "Content-Type": file.type || "application/octet-stream",
+          // Not optional. The presigned URL comes back with
+          // `X-Amz-SignedHeaders=host;x-amz-meta-merchantid`, which means S3
+          // computed the signature over this header and will reject the PUT
+          // with 403 SignatureDoesNotMatch if it is missing or holds a
+          // different value. The presign response does not echo the id back
+          // (the bulk-import one returns a `metaData` block; this one does
+          // not), so it is the merchant id we addressed the presign call with —
+          // the same one that appears in the returned object key.
+          //
+          // If this ever starts 403ing again, read `X-Amz-SignedHeaders` off
+          // the failing URL first: it is the authoritative list of what the PUT
+          // has to carry.
+          "x-amz-meta-merchantid": uploadMid,
+        },
+        reqBody: file,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+}
+
+/**
+ * POST /sku/{mid}, then the image if the merchant picked one. `onDone` fires
+ * only on success, so the form can decide between closing and staying open for
+ * the next item.
+ *
+ * The image is a second call and it is deliberately sequenced after the first:
+ * the upload is addressed by the new row's id, which only exists once the
+ * create has answered. A failed upload leaves a saved item without artwork and
+ * says so — it does not report the item as failed, because it did not.
+ */
+export function useCreateSku(onDone?: () => void): {
+  createSku: (payload: SkuMutationPayload, image?: File | null) => void;
 } & SkuMutation {
   const { mid } = useSkuPathMid();
+  const queryClient = useQueryClient();
+  const uploadImage = useSkuImageUpload();
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { mutate, isPending } = usePost<SkuCreateResponse, SkuMutationPayload>(skuCreateApi(mid), {
+    invalidateQueries: [CATALOGUE_KEY],
+    onError: (error: Error) => toast.error(error.message || "Failed to add item."),
+  });
+
+  const createSku = (payload: SkuMutationPayload, image?: File | null) => {
+    mutate(payload, {
+      onSuccess: async (res) => {
+        const id = res?.data?.id;
+
+        // The upload is addressed by the new row's id, so without one there is
+        // nowhere to put the file. Said out loud rather than dropped silently:
+        // the merchant chose a picture and would otherwise never learn it did
+        // not make it onto the item they just created.
+        if (image && !id) {
+          toast.error("Item added, but its image couldn't be attached. Edit the item to add it.");
+          onDone?.();
+          return;
+        }
+
+        if (image && id) {
+          setIsUploading(true);
+          const uploaded = await uploadImage({ id, file: image });
+          setIsUploading(false);
+          // A second invalidation, because the row the first one fetched was
+          // read before the object existed and so came back with no imageUrl.
+          void queryClient.invalidateQueries({ queryKey: CATALOGUE_KEY });
+          if (!uploaded) {
+            toast.error("Item added, but its image didn't upload. Edit the item to try again.");
+            onDone?.();
+            return;
+          }
+        }
+
+        toast.success("Item added to your catalog.");
+        onDone?.();
+      },
+    });
+  };
+
+  return { createSku, isPending: isPending || isUploading };
+}
+
+/**
+ * PUT /sku/{mid}/{id}, then the image if a new one was picked. Serves both the
+ * item form and the two inline price cells, so it takes a whole payload: the
+ * endpoint replaces the row rather than patching it, and sending only the
+ * edited price would blank every other field. `rowMid` is the row's own MID,
+ * which matters for a multi-MID merchant.
+ *
+ * `image` is only ever the *newly chosen* file. Reopening an item whose picture
+ * is already on S3 and saving it unchanged uploads nothing — see
+ * SkuImageValue, whose `file` is what separates the two cases.
+ */
+export function useUpdateSku(onDone?: () => void): {
+  updateSku: (args: {
+    id: string;
+    rowMid?: string;
+    payload: SkuMutationPayload;
+    image?: File | null;
+  }) => void;
+} & SkuMutation {
+  const { mid } = useSkuPathMid();
+  const queryClient = useQueryClient();
+  const uploadImage = useSkuImageUpload();
+  const [isUploading, setIsUploading] = useState(false);
 
   const { mutate, isPending } = usePut<unknown, SkuMutationPayload & { dynamicUrl: string }>("", {
     invalidateQueries: [CATALOGUE_KEY],
-    onSuccess: () => {
-      toast.success("Item updated successfully.");
-      onDone?.();
-    },
     onError: (error: Error) => toast.error(error.message || "Failed to update item."),
   });
 
   return {
-    updateSku: ({ id, rowMid, payload }) =>
-      mutate({ dynamicUrl: skuUpdateApi(rowMid || mid, id), ...payload }),
-    isPending,
+    updateSku: ({ id, rowMid, payload, image }) =>
+      mutate(
+        { dynamicUrl: skuUpdateApi(rowMid || mid, id), ...payload },
+        {
+          onSuccess: async () => {
+            if (image) {
+              setIsUploading(true);
+              const uploaded = await uploadImage({ id, rowMid, file: image });
+              setIsUploading(false);
+              void queryClient.invalidateQueries({ queryKey: CATALOGUE_KEY });
+              if (!uploaded) {
+                toast.error("Item updated, but its image didn't upload. Try again.");
+                onDone?.();
+                return;
+              }
+            }
+
+            toast.success("Item updated successfully.");
+            onDone?.();
+          },
+        }
+      ),
+    isPending: isPending || isUploading,
   };
 }
 

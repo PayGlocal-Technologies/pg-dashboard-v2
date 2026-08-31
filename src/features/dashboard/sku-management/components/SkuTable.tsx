@@ -60,14 +60,10 @@ function toFormValues(product: SkuProduct): SkuItemFormValues {
     sellingPrice: String(product.sellingPrice),
     productCost: String(product.productCost),
     description: product.description,
-    // The catalogue endpoint has no media field, so a fetched row never carries
-    // images. Kept mapping-shaped rather than hardcoded to [] so this starts
-    // working the day the API grows one.
-    images: (product.images ?? []).map((url, index) => ({
-      id: `${product.id}-image-${index}`,
-      url,
-      name: `${product.name} image ${index + 1}`,
-    })),
+    // No `file`, which is the whole point: this is the picture the server
+    // already holds, shown so the merchant can see what a replacement would
+    // replace. Saving without touching it uploads nothing (see useUpdateSku).
+    image: product.imageUrl ? { url: product.imageUrl, name: "Current image" } : null,
   };
 }
 
@@ -146,14 +142,18 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
     // check, so this is a guard rather than a path the UI can reach.
     if (!payload) return;
 
+    // Only a newly picked file travels on: an untouched slot still holds the
+    // item's saved image, which has no `file` and needs no upload.
+    const image = values.image?.file ?? null;
+
     if (editing) {
-      updateSku({ id: editing.id, rowMid: editing.mid, payload });
+      updateSku({ id: editing.id, rowMid: editing.mid, payload, image });
       setEditing(null);
       onAddItemOpenChange(false);
       return;
     }
 
-    createSku(payload);
+    createSku(payload, image);
     // A new item lands at the top of the unfiltered list, so a merchant sitting
     // on a type tab or a later page would otherwise watch the form close onto a
     // list the item isn't in.
