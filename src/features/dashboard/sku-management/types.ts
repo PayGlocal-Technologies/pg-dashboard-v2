@@ -25,16 +25,21 @@ export interface SkuProduct {
   mid?: string;
   name: string;
   /**
-   * The item's media, primary image first — the Product cell shows images[0]
-   * and ignores the rest. One ordered list rather than a separate
-   * primary/gallery pair, so "the first one is the primary" stays true by
-   * construction and reordering never needs two fields kept in step.
+   * The item's picture, as a **presigned S3 GET URL with roughly ten minutes of
+   * life left on it**. One image, not a gallery: the catalogue stores exactly
+   * one file per SKU (`sku_image.<ext>`), so there is no primary/secondary
+   * distinction to model.
    *
-   * Optional throughout: the catalogue lets a merchant create an item before
-   * uploading artwork for it, and the Product cell falls back to a type glyph
-   * (see ProductThumbnail) rather than an empty box.
+   * The expiry is why nothing caches this. Every consumer passes `unoptimized`
+   * to next/image — the optimiser would key its cache on a URL that stops
+   * working — and both ProductThumbnail and the preview fall back to the type
+   * glyph on a load error, so a page left open past the expiry degrades to the
+   * placeholder instead of showing a broken image.
+   *
+   * Optional: the catalogue lets a merchant create an item before uploading
+   * artwork for it, and the endpoint omits the field entirely for those.
    */
-  images?: string[];
+  imageUrl?: string;
   /**
    * Null is a real value on a fetched row, not a missing one: the catalogue
    * endpoint returns `type: null` for items that predate the field or arrived
@@ -88,14 +93,25 @@ export interface SkuItemFormValues {
   sellingPrice: string;
   productCost: string;
   description: string;
-  images: SkuMediaItem[];
+  image: SkuImageValue | null;
 }
 
-/** One uploaded image: a local preview URL plus the file it came from. */
-export interface SkuMediaItem {
-  id: string;
+/**
+ * The item form's single image slot, in either of the two states it can hold.
+ *
+ * `file` is what tells them apart, and it is the whole contract: present means
+ * "the merchant picked this off their disk and it still has to be uploaded",
+ * absent means "this is the picture the server already has, shown so they can
+ * see what they are replacing". Save only uploads when `file` is set, so
+ * reopening an item and saving it unchanged does not re-upload its artwork.
+ *
+ * `url` is an object URL in the first case and the row's presigned GET URL in
+ * the second — both go straight into an `unoptimized` next/image.
+ */
+export interface SkuImageValue {
   url: string;
   name: string;
+  file?: File;
 }
 
 // ── Catalogue API ───────────────────────────────────────────────────────────
@@ -128,6 +144,12 @@ export interface SkuApiItem {
    *  matches what actually arrives. */
   creationTime: number;
   formattedCreationDate: string;
+  /** The stored object's name, e.g. "sku_image.jpg". Bookkeeping only — the
+   *  frontend renders `imageUrl` and never has to build a path itself. */
+  imageFileName?: string | null;
+  /** Presigned S3 GET URL, ~10 minutes. Absent or null on a SKU with no
+   *  image. See SkuProduct.imageUrl for what that expiry costs us. */
+  imageUrl?: string | null;
 }
 
 /** `{ status, message, data: { totalCount, data } }` — the same double-nested
@@ -157,6 +179,35 @@ export interface SkuMutationPayload {
   costPrice?: string;
   currency: string;
   description?: string;
+}
+
+/** POST /sku/{mid} answers with the new row's id, which is what the image
+ *  upload that may follow it is addressed by. */
+export interface SkuCreateResponse {
+  status: string;
+  message: string;
+  data: { id: string };
+}
+
+/**
+ * POST /sku/{mid}/{id}/image — asks for somewhere to put one SKU's picture.
+ *
+ * The body is `{ extension }` and nothing else; the backend decides the object
+ * name from it. Two things about this endpoint are easy to get wrong:
+ *
+ * 1. It is the *presign* call that writes `imageFileName` onto the SKU record,
+ *    not the upload. There is no confirm leg to call afterwards — once the S3
+ *    PUT succeeds the row already points at the object.
+ * 2. `upload_url` is snake_case while everything around it is camel, exactly
+ *    as with the bulk-import presign above. Typed as it arrives.
+ */
+export interface SkuImageUploadResponse {
+  status: string;
+  message: string;
+  data: {
+    upload_url: string;
+    fileName: string;
+  };
 }
 
 // ── Bulk import API ─────────────────────────────────────────────────────────

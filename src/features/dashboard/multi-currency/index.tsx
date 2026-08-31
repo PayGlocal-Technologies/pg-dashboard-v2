@@ -256,74 +256,75 @@ function MultiCurrencyContent() {
           child *inside* the Account Details column below, not a third track
           here, so it never resizes these two things. */}
       <div className="grid gap-x-5 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
-        <div className="lg:col-start-1 lg:row-start-1">
+        {/* Title and region list are one sticky unit, not two independently
+            placed grid items: the heading names the control directly below it,
+            so pinning the list while the heading scrolls away would leave an
+            unlabelled column of flags. Spanning both rows with `self-start`
+            keeps the wrapper content-height (so it has room to travel inside
+            its two-row area) and keeps its top edge on row 1 — level with the
+            right column's own title, the alignment this grid exists for.
+            space-y-3 reproduces the grid's own 12px title → container step
+            now that the two are no longer separated by gap-y-3. */}
+        <div className="space-y-3 lg:col-start-1 lg:row-start-1 lg:row-end-3 lg:sticky lg:top-6 lg:self-start">
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
-        </div>
 
-        {isLoading ? (
-          // The region list is this page's only navigation, so its loading
-          // state has to hold the column's footprint — otherwise the right
-          // column snaps sideways when the accounts land. Six rows is the
-          // typical account count; the Card and its p-3 are the same ones the
-          // loaded list sits in, so nothing moves but the row contents.
-          <Card
-            size="sm"
-            aria-busy
-            className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex lg:sticky lg:top-6 lg:self-start"
-          >
-            <div className="space-y-1">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-5 py-2.5">
-                  <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
-                  <Shimmer className="h-3.5 w-28" />
-                </div>
-              ))}
-            </div>
-          </Card>
-        ) : (
-          <>
-            {/* Below `lg` the two columns collapse into one stack, where a full
-                vertical list of regions would push the account details most of
-                a screen down. The tiles scroll horizontally instead, so the
-                details stay near the fold. Each tile is its own surface, so
-                this variant needs no Card around it — unlike the list below.
-
-                Two renderings toggled by `hidden`, not one set of rows bent
-                into both shapes with responsive classes: the layouts differ in
-                direction, in what the selected state looks like, and in whether
-                there's a chevron at all. `display: none` also keeps whichever
-                one is inactive out of the tab order and the accessibility tree,
-                so there is never a second, invisible copy of these controls to
-                land on. */}
-            <div data-guide="mca-region-selector" className="-mx-1 lg:hidden">
-              <RegionSelector
-                accounts={accounts}
-                selectedAccountId={selectedAccount?.id ?? ""}
-                onSelect={selectAccount}
-                label="Select client region"
-                variant="cards"
-              />
-            </div>
-
-            {/* p-3 rather than Card's own 28px inset: the rows carry their own
-                px-5, so the card's padding only has to keep them clear of its
-                edge — anything more and the region names sit adrift of the
-                title above the card. */}
-            <Card
-              size="sm"
-              className="hidden gap-0 p-3 lg:col-start-1 lg:row-start-2 lg:flex lg:sticky lg:top-6 lg:self-start"
-              data-guide="mca-region-selector"
-            >
-              <RegionSelector
-                accounts={accounts}
-                selectedAccountId={selectedAccount?.id ?? ""}
-                onSelect={selectAccount}
-                label="Select client region"
-                size="md"
-              />
+          {isLoading ? (
+            // The region list is this page's only navigation, so its loading
+            // state has to hold the column's footprint — otherwise the right
+            // column snaps sideways when the accounts land. Six rows is the
+            // typical account count; the Card and its p-3 are the same ones the
+            // loaded list sits in, so nothing moves but the row contents.
+            <Card size="sm" aria-busy className="hidden gap-0 p-3 lg:flex">
+              <div className="space-y-1">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-2.5">
+                    <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
+                    <Shimmer className="h-3.5 w-28" />
+                  </div>
+                ))}
+              </div>
             </Card>
-          </>
-        )}
+          ) : (
+            <>
+              {/* Below `lg` the two columns collapse into one stack, where a full
+                  vertical list of regions would push the account details most of
+                  a screen down. The tiles scroll horizontally instead, so the
+                  details stay near the fold. Each tile is its own surface, so
+                  this variant needs no Card around it — unlike the list below.
+
+                  Two renderings toggled by `hidden`, not one set of rows bent
+                  into both shapes with responsive classes: the layouts differ in
+                  direction, in what the selected state looks like, and in whether
+                  there's a chevron at all. `display: none` also keeps whichever
+                  one is inactive out of the tab order and the accessibility tree,
+                  so there is never a second, invisible copy of these controls to
+                  land on. */}
+              <div data-guide="mca-region-selector" className="-mx-1 lg:hidden">
+                <RegionSelector
+                  accounts={accounts}
+                  selectedAccountId={selectedAccount?.id ?? ""}
+                  onSelect={selectAccount}
+                  label="Select client region"
+                  variant="cards"
+                />
+              </div>
+
+              {/* p-3 rather than Card's own 28px inset: the rows carry their own
+                  px-5, so the card's padding only has to keep them clear of its
+                  edge — anything more and the region names sit adrift of the
+                  title above the card. */}
+              <Card size="sm" className="hidden gap-0 p-3 lg:flex" data-guide="mca-region-selector">
+                <RegionSelector
+                  accounts={accounts}
+                  selectedAccountId={selectedAccount?.id ?? ""}
+                  onSelect={selectAccount}
+                  label="Select client region"
+                  size="md"
+                />
+              </Card>
+            </>
+          )}
+        </div>
 
         {/* Right column's row-1 title, mirroring the left's: same grid row,
             so the two headings share a top edge no matter how each one wraps.
@@ -645,7 +646,10 @@ function MultiCurrencyContent() {
       </div>
 
       {/* Guide launcher for International Accounts. */}
-      <GuideLauncher steps={MCA_INTL_ACCOUNTS_GUIDE_STEPS} storageKey={MCA_INTL_ACCOUNTS_GUIDE_KEY} />
+      <GuideLauncher
+        steps={MCA_INTL_ACCOUNTS_GUIDE_STEPS}
+        storageKey={MCA_INTL_ACCOUNTS_GUIDE_KEY}
+      />
     </div>
   );
 }

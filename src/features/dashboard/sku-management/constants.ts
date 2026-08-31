@@ -86,16 +86,35 @@ export const SKU_CURRENCY_OPTIONS: { value: SkuCurrency; country: string }[] = [
   { value: "SGD", country: "Singapore" },
 ];
 
-/** Images allowed per item — enough for a small gallery, few enough that the
- *  preview strip never becomes the tallest thing in the modal. */
-export const SKU_MAX_IMAGES = 6;
-
+/**
+ * One image per item, because that is what the catalogue stores.
+ *
+ * The upload endpoint writes a single object per SKU (`sku_image.<extension>`)
+ * and the search row carries a single `imageUrl`, so a second upload replaces
+ * the first rather than joining it. The form used to accept six and keep them
+ * in the browser; there was nowhere for the other five to go.
+ */
 export const SKU_IMAGE_ACCEPTED_MIME_TYPES = [
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/avif",
 ] as const;
+
+/**
+ * MIME type → the `extension` the upload endpoint is asked for.
+ *
+ * Driven by the type the browser reports rather than by whatever the file
+ * happens to be named: the extension decides the object's name on S3, and a
+ * file called `photo.txt` that is really a PNG should still be stored as one.
+ * `image/jpeg` maps to `jpg`, not `jpeg`, matching what the backend returns.
+ */
+export const SKU_IMAGE_EXTENSION: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/avif": "avif",
+};
 
 export const SKU_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
