@@ -69,13 +69,15 @@ export function VideoMiniPlayer({
         aria-label={title}
         className="fixed bottom-6 right-6 z-40 w-[min(320px,calc(100vw-3rem))] overflow-hidden rounded-2xl border border-border bg-card shadow-2xl"
       >
-        <div className="flex items-center justify-between p-2">
+        <div className="relative">
+          <VideoFrame videoUrl={videoUrl} title={title} />
           <IconButton
             aria-label="Expand video"
             variant="outline"
             size="sm"
             rounded="full"
             onClick={() => setSpotlightOpen(true)}
+            className="absolute left-2 top-2"
           >
             <Icon name="expand" className="h-3.5 w-3.5 text-muted-foreground" />
           </IconButton>
@@ -85,23 +87,43 @@ export function VideoMiniPlayer({
             size="sm"
             rounded="full"
             onClick={onClose}
+            className="absolute right-2 top-2"
           >
             <Icon name="x" className="h-3.5 w-3.5 text-muted-foreground" />
           </IconButton>
         </div>
-        <VideoFrame videoUrl={videoUrl} title={title} />
       </div>
 
-      {/* Expand opens this in place of enlarging the mini-player itself, the
-          same "spotlight" pattern TutorialVideoTile.tsx uses for the Help
-          drawer's Tutorials tile — Dialog supplies its own close button plus
-          Escape/click-outside dismissal for free. */}
+      {/* Expand opens this in place of enlarging the mini-player itself. Just
+          the video over the dimmed backdrop — no card chrome around it — so
+          `showClose={false}` drops DialogContent's own close button and the
+          default card padding/border/background/shadow/rounding are each
+          overridden to nothing, leaving a single control overlaid on the
+          video, top-right: shrink, back to the docked mini-player (this
+          dialog has no separate "fully dismiss" affordance — that only lives
+          on the mini-player itself). Escape and click-outside-the-video still
+          dismiss it via Radix's own handling. */}
       <Dialog open={spotlightOpen} onOpenChange={setSpotlightOpen}>
-        <DialogContent className="max-w-[min(100%,56rem)] p-3 [&>button:last-child]:top-3">
+        <DialogContent
+          showClose={false}
+          className="w-[min(92vw,64rem)] max-w-none rounded-none border-0 bg-transparent p-0 shadow-none"
+        >
           <DialogTitle asChild>
             <VisuallyHidden>{title}</VisuallyHidden>
           </DialogTitle>
-          <VideoFrame videoUrl={videoUrl} title={title} className="rounded-lg bg-black" />
+          <div className="relative">
+            <VideoFrame videoUrl={videoUrl} title={title} className="rounded-lg bg-black" />
+            <IconButton
+              aria-label="Back to mini player"
+              variant="outline"
+              size="sm"
+              rounded="full"
+              onClick={() => setSpotlightOpen(false)}
+              className="absolute right-2 top-2"
+            >
+              <Icon name="shrink" className="h-3.5 w-3.5 text-muted-foreground" />
+            </IconButton>
+          </div>
         </DialogContent>
       </Dialog>
     </>
