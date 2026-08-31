@@ -11,6 +11,24 @@ export interface BusinessDataResponse {
   data?: BusinessData | null;
 }
 
+/** The onboarding business profile block of GET /merchants/{merchantId}/profile.
+ *  Backs the read-only extra fields on Business details. */
+export interface OnboardingBusinessProfile {
+  gst?: string | null;
+  businessRegisteredAddress?: string | null;
+  websiteUrl?: string | null;
+  natureOfBusiness?: string | null;
+  emailId?: string | null;
+  phoneNumber?: string | null;
+}
+
+export interface MerchantProfileData {
+  onboardingBusinessProfile?: OnboardingBusinessProfile | null;
+}
+
+/** Envelope-tolerant: read `data` if the response wraps, else the flat body. */
+export type MerchantProfileResponse = { data?: MerchantProfileData | null } & Partial<MerchantProfileData>;
+
 /** The PUT body pg-dashboard sends — note the plural key `purposeCodes`, which
  *  differs from the singular `purposeCode` the GET returns. */
 export interface BusinessUpdatePayload {

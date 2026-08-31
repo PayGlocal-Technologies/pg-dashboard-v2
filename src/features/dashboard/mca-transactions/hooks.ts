@@ -9,6 +9,8 @@ import {
   mcaInvoiceOriginsApi,
   mcaOverviewByMidApi,
   mcaOverviewByUcicApi,
+  mcaSavedAmountApi,
+  mcaSettledByAccountApi,
   mcaTxnDocumentPresignApi,
   merchantProfileApi,
   merchantPurposeCodesApi,
@@ -30,6 +32,10 @@ import type {
   McaOverviewResponse,
   MerchantProfileResponse,
   PresignedUrlResponse,
+  SavedAmountData,
+  SavedAmountResponse,
+  SettledByAccountData,
+  SettledByAccountResponse,
   SuggestedPurposeCodesResponse,
 } from "@/features/dashboard/mca-transactions/types";
 
@@ -209,6 +215,52 @@ export function useMcaOverview(): {
     isLoading: isPending,
     isError,
   };
+}
+
+/**
+ * Per-account settled amount + count for a timeframe, scoped like useMcaOverview.
+ * Backs SettlementAnalyticsCard's KPI + per-account bars.
+ */
+export function useSettledByAccount(timeframe: string): {
+  settled: SettledByAccountData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<SettledByAccountResponse>(
+    ["mca-settled-by-account", merchantId, timeframe],
+    mcaSettledByAccountApi(merchantId, timeframe),
+    { enabled: isReady && !!merchantId }
+  );
+
+  return { settled: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+}
+
+/**
+ * Saved amount vs banks — overall + per-timeframe breakdown. Scoped like
+ * useMcaOverview. Backs SavedAmountCard.
+ */
+export function useSavedAmount(): {
+  saved: SavedAmountData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<SavedAmountResponse>(
+    ["mca-saved-amount", merchantId],
+    mcaSavedAmountApi(merchantId),
+    { enabled: isReady && !!merchantId }
+  );
+
+  return { saved: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
 }
 
 /**

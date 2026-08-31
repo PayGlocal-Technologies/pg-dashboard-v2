@@ -400,3 +400,45 @@ export interface CurrencySplitData {
 /** Envelope-tolerant: the sampled response was flat, but every other analytics
  *  endpoint wraps in `data`, so the hook reads whichever is present. */
 export type CurrencySplitResponse = { data?: CurrencySplitData | null } & Partial<CurrencySplitData>;
+
+// ── Settled by account ───────────────────────────────────────────────────────
+
+export interface SettledAccountRow {
+  currency: string;
+  amount: number;
+  count: number;
+}
+
+export interface SettledByAccountData {
+  timeframe: string;
+  totalAmount: number;
+  totalCount: number;
+  accounts: SettledAccountRow[];
+}
+
+export interface SettledByAccountResponse {
+  data: SettledByAccountData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Saved amount ─────────────────────────────────────────────────────────────
+
+export interface SavedAmountTimeframeRow {
+  timeframe: string;
+  amount: number;
+  count: number;
+}
+
+export interface SavedAmountData {
+  currency: string;
+  overallAmount: number;
+  overallCount: number;
+  timeframes: SavedAmountTimeframeRow[];
+}
+
+export interface SavedAmountResponse {
+  data: SavedAmountData;
+  message?: string;
+  errors?: unknown;
+}

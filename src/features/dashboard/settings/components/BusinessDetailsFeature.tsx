@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Badge, Button, Card, Input, PageHeader, Shimmer, Textarea } from "@/components/ui";
+import { Button, Card, Input, PageHeader, Shimmer, Textarea } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
 import {
   useBusinessDetails,
+  useMerchantBusinessProfile,
   useUpdateBusinessDetails,
 } from "@/features/dashboard/settings/hooks";
 
@@ -14,23 +15,13 @@ interface BusinessField {
   description: string;
   value: string;
   multiline?: boolean;
-  /** True for fields with no backing endpoint yet — kept as illustrative mock
-   *  data and flagged, per the "keep UI, mark BACKEND GAP" decision. */
-  gap?: boolean;
 }
 
-function BusinessFieldRow({ label, description, value, multiline, gap }: BusinessField) {
+function BusinessFieldRow({ label, description, value, multiline }: BusinessField) {
   return (
     <div className="flex items-start justify-between gap-6 py-4">
       <div className="max-w-xs">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-bold text-foreground">{label}</p>
-          {gap && (
-            <Badge variant="secondary" size="sm">
-              Not available yet
-            </Badge>
-          )}
-        </div>
+        <p className="text-sm font-bold text-foreground">{label}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
       </div>
       <div className="w-full max-w-md">
@@ -53,6 +44,9 @@ export function BusinessDetailsFeature() {
   const profile = useApp((s) => s.profile);
   const { business, isLoading } = useBusinessDetails();
   const { updateBusiness, isSaving } = useUpdateBusinessDetails();
+  // GST / address / website / nature-of-business / support contact now come from
+  // the merchant profile's onboardingBusinessProfile block.
+  const { businessProfile } = useMerchantBusinessProfile();
 
   // Purpose codes are the one editable field, mirroring pg-dashboard's
   // BusinessDetails (trade name stays read-only, codes edit + save via PUT).
@@ -85,9 +79,9 @@ export function BusinessDetailsFeature() {
     );
   };
 
-  // Only registeredName/mid come from the session profile; tradeName and
-  // purposeCode now come from the real /business endpoint. Everything below the
-  // divider has no endpoint yet — kept as illustrative mock and flagged `gap`.
+  // registeredName/mid from the session profile; tradeName/purposeCode from the
+  // /business endpoint; the rest from the merchant profile's
+  // onboardingBusinessProfile block.
   const readOnlyFields: BusinessField[] = [
     {
       label: "Legal business name",
@@ -104,43 +98,36 @@ export function BusinessDetailsFeature() {
       description: "Your unique PayGlocal merchant identifier.",
       value: profile?.mid ?? "Not available",
     },
-    // BACKEND GAP — no endpoint returns these; illustrative-only mock values.
     {
       label: "GSTIN",
       description: "15-character GST identification number.",
-      value: "29ABCDE1234F1Z5",
-      gap: true,
+      value: businessProfile?.gst ?? "",
     },
     {
       label: "Registered address",
       description: "Principal place of business in India.",
-      value: "221B, MG Road, Bengaluru, Karnataka 560001, India",
+      value: businessProfile?.businessRegisteredAddress ?? "",
       multiline: true,
-      gap: true,
     },
     {
       label: "Business category",
       description: "Helps us tune risk and reporting templates.",
-      value: "E-commerce - General merchandise",
-      gap: true,
+      value: businessProfile?.natureOfBusiness ?? "",
     },
     {
       label: "Website",
       description: "Your public-facing business website.",
-      value: "https://www.swigbeverages.com",
-      gap: true,
+      value: businessProfile?.websiteUrl ?? "",
     },
     {
       label: "Support email",
       description: "Where customer queries are directed.",
-      value: "support@swigbeverages.com",
-      gap: true,
+      value: businessProfile?.emailId ?? "",
     },
     {
       label: "Support phone",
       description: "Shown on receipts and payment pages where applicable.",
-      value: "+91 80 4567 8900",
-      gap: true,
+      value: businessProfile?.phoneNumber ?? "",
     },
   ];
 

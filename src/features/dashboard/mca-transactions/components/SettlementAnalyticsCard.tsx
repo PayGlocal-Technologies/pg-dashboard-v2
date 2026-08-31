@@ -15,9 +15,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatNextSettlementDate } from "@/lib/utils/format";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
-import { MOCK_VIRTUAL_ACCOUNTS } from "@/features/dashboard/multi-currency/mock-data";
-import { SETTLEMENT_ANALYTICS_BY_ACCOUNT } from "@/features/dashboard/mca-transactions/mock-data";
-import { toMetricNumber, useMcaOverview } from "@/features/dashboard/mca-transactions/hooks";
+import { useMcaOverview, useSettledByAccount } from "@/features/dashboard/mca-transactions/hooks";
 
 type AnalyticsMode = "amount" | "count";
 
@@ -36,23 +34,37 @@ export const TIME_RANGE_OPTIONS: { value: TimeRange; label: string }[] = [
   { value: "year", label: "Year to date" },
 ];
 
-// SETTLEMENT_ANALYTICS_BY_ACCOUNT is a full year's placeholder figures; every
-// other range scales it down by how much of a year it covers, rather than a
-// second hand-authored dataset per range. This only affects the per-account
-// bars below, which are already placeholder data pending a real endpoint (see
-// mock-data.ts's own TODO). The KPI above comes from the live
-// business-overview endpoint, which has no period parameter today, so the
-// time range can't drive it without a real API change; moving the control
-// out to the whole section (see TransactionsAnalyticsCarousel) doesn't change
-// that, it's still just these placeholder bars (and, by the same
-// approximation, SavedAmountCard's real lifetime figure) that actually
-// redraw.
-export const TIME_RANGE_MULTIPLIERS: Record<TimeRange, number> = {
-  year: 1,
-  month: 1 / 12,
-  week: 1 / 52,
-  today: 1 / 365,
+/** The section's TimeRange → the settled-by-account API's timeframe param. */
+const TIMEFRAME_BY_RANGE: Record<TimeRange, string> = {
+  today: "today",
+  week: "week",
+  month: "month",
+  year: "ytd",
 };
+
+/** Account currency → display label + flag ISO2. REST_OF_WORLD has no flag. */
+const ACCOUNT_META: Record<string, { label: string; iso2: string }> = {
+  USD: { label: "USD Account", iso2: "US" },
+  GBP: { label: "GBP Account", iso2: "GB" },
+  EUR: { label: "EUR Account", iso2: "EU" },
+  CAD: { label: "CAD Account", iso2: "CA" },
+  AED: { label: "AED Account", iso2: "AE" },
+  SGD: { label: "SGD Account", iso2: "SG" },
+  AUD: { label: "AUD Account", iso2: "AU" },
+  REST_OF_WORLD: { label: "Rest of world", iso2: "" },
+};
+
+function accountMeta(currency: string): { label: string; iso2: string } {
+  return ACCOUNT_META[currency] ?? { label: `${currency} Account`, iso2: "" };
+}
+
+/** Compact ₹ for the narrow bar-value column (amounts share one reporting
+ *  currency — they sum to totalAmount). */
+function formatBarAmount(amount: number): string {
+  if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(1)}L`;
+  if (amount >= 1_000) return `₹${(amount / 1_000).toFixed(1)}K`;
+  return `₹${Math.round(amount)}`;
+}
 
 /**
  * Settlement analytics for the Transactions page: a headline KPI beside the
@@ -120,32 +132,25 @@ export function SettlementAnalyticsCard({
   const [mode, setMode] = useState<AnalyticsMode>("amount");
   const [expanded, setExpanded] = useState(false);
   const isAmountMode = mode === "amount";
-  const { overview, isLoading } = useMcaOverview();
+  // nextSettlement date still comes from the overview; the KPI + bars are the
+  // settled-by-account endpoint, per the selected timeframe.
+  const { overview } = useMcaOverview();
+  const { settled, isLoading } = useSettledByAccount(TIMEFRAME_BY_RANGE[timeRange]);
 
-  const rangeMultiplier = TIME_RANGE_MULTIPLIERS[timeRange];
-
-  const accountRows = SETTLEMENT_ANALYTICS_BY_ACCOUNT.map((entry) => {
-    const account = MOCK_VIRTUAL_ACCOUNTS.find((a) => a.id === entry.accountId);
-    const value = Math.round(
-      (isAmountMode ? entry.settledUsd : entry.transactionCount) * rangeMultiplier
-    );
-    return {
-      accountId: entry.accountId,
-      label: account?.accountName ?? entry.accountId,
-      iso2: account?.iso2 ?? "",
-      value,
-      // MOCK: per-account settlement figures have no live endpoint yet (see
-      // mock-data.ts TODO). Real label computation preserved below for when the
-      // backend lands; until then the figure is surfaced as "MOCK" so nobody
-      // reads placeholder numbers as real.
-      // valueLabel: isAmountMode
-      //   ? value >= 1000
-      //     ? `$${(value / 1000).toFixed(1)}K`
-      //     : `$${value}`
-      //   : value.toLocaleString("en-US"),
-      valueLabel: "MOCK",
-    };
-  }).sort((a, b) => b.value - a.value);
+  const accountRows = (settled?.accounts ?? [])
+    .map((account) => {
+      const meta = accountMeta(account.currency);
+      return {
+        accountId: account.currency,
+        label: meta.label,
+        iso2: meta.iso2,
+        value: isAmountMode ? account.amount : account.count,
+        valueLabel: isAmountMode
+          ? formatBarAmount(account.amount)
+          : account.count.toLocaleString("en-IN"),
+      };
+    })
+    .sort((a, b) => b.value - a.value);
 
   const maxValue = accountRows[0]?.value ?? 0;
   // Capped at five on every breakpoint, not just the mobile carousel: the
@@ -157,8 +162,8 @@ export function SettlementAnalyticsCard({
   const restRows = accountRows.slice(VISIBLE_COUNT);
   const canExpand = restRows.length > 0;
 
-  const settledValue = toMetricNumber(overview?.successfulPayments?.value);
-  const settledCount = toMetricNumber(overview?.successfulPayments?.count);
+  const settledValue = settled?.totalAmount ?? 0;
+  const settledCount = settled?.totalCount ?? 0;
 
   // Last settled used to sit beside this as its own row; removed at the
   // design's request rather than replaced, so this is the only date shown
