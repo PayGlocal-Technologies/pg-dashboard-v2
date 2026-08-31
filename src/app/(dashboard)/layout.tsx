@@ -8,6 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { ContentAreaProvider } from "@/components/layout/ContentAreaContext";
 import { Icon } from "@/components/icon";
 import { FeedbackSheet } from "@/features/dashboard/feedback/FeedbackSheet";
+import { VideoMiniPlayerTrigger } from "@/components/layout/VideoMiniPlayerTrigger";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { isError } = useFetchCommonData();
@@ -39,6 +40,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           whole. Whether it actually appears is the server's call — see the
           eligibility check inside. */}
       <FeedbackSheet />
+      <VideoMiniPlayerTrigger />
     </div>
   );
 }

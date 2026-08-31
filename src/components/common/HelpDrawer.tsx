@@ -20,6 +20,7 @@ import {
   TutorialTile,
   type TutorialVideo,
 } from "@/features/dashboard/multi-currency/components/TutorialVideoTile";
+import { useHelpDrawerStore } from "@/stores/useHelpDrawer";
 
 export interface HelpGuideItem {
   question: string;
@@ -117,13 +118,18 @@ export function HelpDrawer({
     if (isAnimatingRef.current) return;
     isAnimatingRef.current = true;
     setOpen(false);
+    useHelpDrawerStore.getState().setOpen(false);
   };
 
   const toggle = () => {
     if (isAnimatingRef.current) return;
     isAnimatingRef.current = true;
     setEverOpened(true);
-    setOpen((prev) => !prev);
+    setOpen((prev) => {
+      const next = !prev;
+      useHelpDrawerStore.getState().setOpen(next);
+      return next;
+    });
   };
 
   // Escape and click-outside both only listen while open, and both check the
