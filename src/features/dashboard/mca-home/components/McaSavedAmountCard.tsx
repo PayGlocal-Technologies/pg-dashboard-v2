@@ -38,8 +38,8 @@ export function McaSavedAmountCard() {
   const [duration, setDuration] = useState<SavedAmountDuration>("overall");
   const savedInr =
     duration === "overall"
-      ? saved?.overallAmount ?? 0
-      : saved?.timeframes.find((t) => t.timeframe === duration)?.amount ?? 0;
+      ? (saved?.overallAmount ?? 0)
+      : (saved?.timeframes.find((t) => t.timeframe === duration)?.amount ?? 0);
   const currency = saved?.currency ?? "INR";
 
   return (
@@ -48,7 +48,11 @@ export function McaSavedAmountCard() {
           uses for its icon and pending chip, rather than a second row. */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10">
-          <Icon name="piggy-bank" className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden />
+          <Icon
+            name="piggy-bank"
+            className="h-5 w-5 text-emerald-600 dark:text-emerald-400"
+            aria-hidden
+          />
         </div>
         {/* Same segmented-toggle treatment as McaCurrencySplitCard's Volume /
             Count switch, one step tighter because this card is a third the

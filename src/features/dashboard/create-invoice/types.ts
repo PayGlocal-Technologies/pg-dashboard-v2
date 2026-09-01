@@ -277,12 +277,7 @@ export interface InvoiceFormState {
 
 /** Which document layout a branding style renders through. */
 export type InvoiceLayoutId =
-  | "classic"
-  | "minimal-mono"
-  | "bold-sidebar"
-  | "playful-border"
-  | "y2k-bold"
-  | "geometric-modern";
+  "classic" | "minimal-mono" | "bold-sidebar" | "playful-border" | "y2k-bold" | "geometric-modern";
 
 /**
  * What this app knows about one of the server's themes.

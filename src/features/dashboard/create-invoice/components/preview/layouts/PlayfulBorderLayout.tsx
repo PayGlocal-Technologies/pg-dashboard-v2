@@ -139,10 +139,7 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
           />
 
           <div className="w-full max-w-[200px] shrink-0 overflow-hidden rounded-xl">
-            <div
-              className="px-3 py-2"
-              style={{ backgroundColor: withAlpha(accent, 0.28) }}
-            >
+            <div className="px-3 py-2" style={{ backgroundColor: withAlpha(accent, 0.28) }}>
               <TotalsRows
                 labels={labels}
                 subtotal={totals.subtotal}

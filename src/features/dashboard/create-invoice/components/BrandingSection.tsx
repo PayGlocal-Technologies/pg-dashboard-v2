@@ -25,9 +25,7 @@ import type {
  * on the document and what is highlighted the same thing.
  */
 function withSelected<T extends { name: string }>(options: T[], selected: T): T[] {
-  return options.some((option) => option.name === selected.name)
-    ? options
-    : [...options, selected];
+  return options.some((option) => option.name === selected.name) ? options : [...options, selected];
 }
 
 /**
@@ -104,13 +102,36 @@ export function BrandingSection({
             Advanced branding options
           </span>
           <span className="block text-[11px] font-normal text-muted-foreground">
-            Invoice theme, colours, logo and signature
+            Logo, signature, theme and colours
           </span>
         </span>
       </Button>
 
       {expanded && (
         <div className="border-t border-border">
+          {/* Logo and signature first. They are what a merchant opens this
+              panel for, and the only two they come back to change — a theme and
+              a colour pair are set once and then left alone, so putting the
+              grids above the uploads buried the frequent job under the rare
+              one. Each asset keeps its own bottom border so the four blocks
+              still read as one list. */}
+          <AssetRow
+            label="Logo"
+            hint="Shown at the top of the invoice"
+            enabled={logoEnabled}
+            onEnabledChange={(next) => onChange({ logoEnabled: next })}
+            asset={logo}
+            onOpen={() => onOpenUpload("LOGO")}
+          />
+          <AssetRow
+            label="Signature"
+            hint="Authorised signatory image"
+            enabled={signatureEnabled}
+            onEnabledChange={(next) => onChange({ signatureEnabled: next })}
+            asset={signature}
+            onOpen={() => onOpenUpload("SIGNATURE")}
+          />
+
           <div className="border-b border-border p-4">
             <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice theme</p>
             <InvoiceThemePicker
@@ -122,7 +143,7 @@ export function BrandingSection({
             />
           </div>
 
-          <div className="border-b border-border p-4">
+          <div className="p-4">
             <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice colours</p>
             <InvoiceColorPicker
               color={branding.color}
@@ -140,23 +161,6 @@ export function BrandingSection({
               onReset={onResetColors}
             />
           </div>
-
-          <AssetRow
-            label="Logo"
-            hint="Shown at the top of the invoice"
-            enabled={logoEnabled}
-            onEnabledChange={(next) => onChange({ logoEnabled: next })}
-            asset={logo}
-            onOpen={() => onOpenUpload("LOGO")}
-          />
-          <AssetRow
-            label="Signature"
-            hint="Authorised signatory image"
-            enabled={signatureEnabled}
-            onEnabledChange={(next) => onChange({ signatureEnabled: next })}
-            asset={signature}
-            onOpen={() => onOpenUpload("SIGNATURE")}
-          />
         </div>
       )}
     </div>

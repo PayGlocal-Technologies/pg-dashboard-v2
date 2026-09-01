@@ -30,6 +30,7 @@ import {
 import {
   buildInvoiceRequestBody,
   dateFilterToEpochMs,
+  EMPTY_INVOICE_DATE_FILTER,
 } from "@/features/dashboard/mca-invoices/helpers";
 import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
 import {
@@ -117,10 +118,6 @@ interface McaInvoiceTableProps {
    *  what pg-dashboard's summary does. */
   statusFilters: string[];
   onStatusFiltersChange: (next: string[]) => void;
-  /** The Date chip's value, owned by the page so the summary's range picker is
-   *  a view of the same filter. */
-  dateFilter: InvoiceDateFilter;
-  onDateFilterChange: (next: InvoiceDateFilter) => void;
 }
 
 /**
@@ -135,8 +132,6 @@ export function McaInvoiceTable({
   summarySection,
   statusFilters,
   onStatusFiltersChange,
-  dateFilter,
-  onDateFilterChange,
 }: McaInvoiceTableProps) {
   const router = useRouter();
 
@@ -144,6 +139,17 @@ export function McaInvoiceTable({
   const paCbMids = useApp((s) => s.paCbMids);
 
   const [search, setSearch] = useState("");
+  /**
+   * The Date chip's own value, and nobody else's.
+   *
+   * This used to be lifted to the page so the summary's range picker could be a
+   * second view of it. That made each control silently move the other, so the
+   * chip could read "Date · last 7 days" because someone had scoped the counts
+   * above. The summary keeps its own period now, and this lives here — where the
+   * only control that edits it lives — so the two cannot be re-coupled by
+   * threading one prop.
+   */
+  const [dateFilter, setDateFilter] = useState<InvoiceDateFilter>(EMPTY_INVOICE_DATE_FILTER);
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
@@ -186,6 +192,16 @@ export function McaInvoiceTable({
   const rows = data?.data?.data ?? [];
   const totalRows = data?.data?.totalCount ?? 0;
 
+  /**
+   * Whether anything is narrowing the list, which decides what an empty result
+   * MEANS and therefore what the empty state is allowed to say.
+   *
+   * The tab is deliberately excluded. "Drafts" with nothing in it is not a
+   * filtered-out result to the merchant, it is a true statement that they have
+   * no drafts — so it gets the plain reading, not "try adjusting".
+   */
+  const hasNarrowingFilters = !!search.trim() || !!dateFilter.window || !!dateFilter.range.from;
+
   // Derived from the filters rather than stored, so the tab stays correct when
   // something else moves them: a summary card, or the Status flyout. Matching
   // over STATUS_PINNED_TABS means adding a tab needs no change here.
@@ -193,6 +209,32 @@ export function McaInvoiceTable({
     ? "recurring"
     : (STATUS_PINNED_TABS.find((tab) => sameSet(statusFilters, TAB_STATUS_FILTERS[tab.value]))
         ?.value ?? "all");
+
+  /**
+   * What an empty list says.
+   *
+   * It used to say "No invoices found · Try adjusting your filters or search
+   * query" whatever the reason, which a DQA pass flagged for reading like an
+   * error: a merchant with no invoices yet was being told to adjust filters they
+   * had never set. So the two cases are now told apart — a narrowed search that
+   * matched nothing, versus a view that genuinely holds nothing — and the second
+   * names the view rather than implying something went wrong.
+   */
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No invoices match your search",
+        description: "Clear the search or widen the date range to see more.",
+      }
+    : {
+        title:
+          activeTab === "all"
+            ? "No invoices yet"
+            : `No ${INVOICE_VIEW_TABS.find((tab) => tab.value === activeTab)?.label.toLowerCase() ?? ""} invoices`,
+        description:
+          activeTab === "all"
+            ? "Invoices you create will appear here."
+            : "Nothing in this view yet. Other views may still have invoices.",
+      };
 
   // Blank URLs: every call overrides them per row via `dynamicUrl`, because
   // the MID differs by row on a multi-MID merchant's list.
@@ -308,12 +350,12 @@ export function McaInvoiceTable({
       onDateRangeChange={(next) => {
         // The chip's two modes are exclusive, so applying an absolute range
         // drops the relative one and the window it had resolved to.
-        onDateFilterChange({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
+        setDateFilter({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
         setPage(1);
       }}
       relativeRange={dateFilter.relative}
       onRelativeRangeChange={(next) => {
-        onDateFilterChange({
+        setDateFilter({
           range: { from: "", to: "" },
           relative: next,
           // Clock reads belong in the handler, never in render.
@@ -377,6 +419,7 @@ export function McaInvoiceTable({
               hiddenKeys={hiddenColumns}
               onHiddenKeysChange={setHiddenColumns}
               fixedKeys={FIXED_COLUMN_KEYS}
+              fixedReason="Always shown. An invoice row is unreadable without its number, amount and status."
             />
             <Button
               type="button"
@@ -454,8 +497,8 @@ export function McaInvoiceTable({
               data={rows}
               isLoading={isPending}
               skeletonRows={8}
-              emptyTitle="No invoices found"
-              emptyDescription="Try adjusting your filters or search query"
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
               rowKey={(row) => row.id}
               pageSize={INVOICES_PAGE_LIMIT}
               totalRows={totalRows}
@@ -474,8 +517,8 @@ export function McaInvoiceTable({
               onPageChange={setPage}
               totalRows={totalRows}
               pageSize={INVOICES_PAGE_LIMIT}
-              emptyTitle="No invoices found"
-              emptyDescription="Try adjusting your filters or search query"
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
             />
           </>
         )}

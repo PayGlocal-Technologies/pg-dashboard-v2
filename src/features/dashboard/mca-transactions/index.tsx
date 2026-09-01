@@ -65,7 +65,10 @@ export function McaTransactionsFeature() {
 
       {/* Guide launcher (analytics + row Upload Invoice). */}
       {isMCAEnabled && (
-        <GuideLauncher steps={MCA_TRANSACTIONS_GUIDE_STEPS} storageKey={MCA_TRANSACTIONS_GUIDE_KEY} />
+        <GuideLauncher
+          steps={MCA_TRANSACTIONS_GUIDE_STEPS}
+          storageKey={MCA_TRANSACTIONS_GUIDE_KEY}
+        />
       )}
     </div>
   );

@@ -9,10 +9,7 @@ import {
   type DateRangeValue,
   type DurationPickMode,
 } from "@/components/common/DateRangeCalendarPicker";
-import {
-  formatDateKey,
-  formatShortDate,
-} from "@/features/dashboard/settlement-reports/calendarUtils";
+import { formatDateKey, formatShortDate, parseDateKey } from "@/lib/utils/format";
 
 export interface SettlementDurationValue {
   mode: DurationPickMode;
@@ -25,10 +22,6 @@ export interface SettlementDurationValue {
 interface SettlementDurationFilterProps {
   value: SettlementDurationValue | undefined;
   onChange: (value: SettlementDurationValue | undefined) => void;
-}
-
-function parseDateKey(dateKey: string): Date {
-  return new Date(`${dateKey}T00:00:00`);
 }
 
 function durationLabel(value: SettlementDurationValue): string {

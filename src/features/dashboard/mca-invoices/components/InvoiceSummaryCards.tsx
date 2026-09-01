@@ -2,11 +2,6 @@
 
 import {
   Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Shimmer,
   Tooltip,
   TooltipContent,
@@ -16,10 +11,11 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useGet } from "@/lib/api/hooks";
+import { TimeRangeTabs } from "@/components/common/TimeRangeTabs";
 import { invoiceSummaryApi } from "@/features/dashboard/mca-invoices/services";
 import {
-  CUSTOM_RANGE_VALUE,
   SUMMARY_RANGE_OPTIONS,
+  type SummaryRange,
 } from "@/features/dashboard/mca-invoices/constants";
 import type { McaInvoiceSummaryResponse } from "@/features/dashboard/mca-invoices/types";
 
@@ -35,31 +31,28 @@ interface SummaryCard {
 /**
  * Invoice counts, from get-invoice-summary.
  *
- * Two behaviours are pg-dashboard's, not inventions:
- *  - a card is a shortcut, not just a readout: clicking one pins the table to
- *    that status set;
- *  - the range picker moves the table's date filter as well as the summary's
- *    own window, so the counts and the rows below always describe the same
- *    period.
+ * A card is a shortcut, not just a readout: clicking one pins the table to that
+ * status set, which is pg-dashboard's behaviour and not an invention.
  *
- * Both the picker's value and the window it reads are owned by the page, not
- * here: they are the same state the table's Date chip edits, which is what
- * keeps the two controls from ever disagreeing. The window arrives as epoch
- * seconds bucketed by the page, so it is stable across mounts and the query
- * key below can actually hit the cache.
+ * The period, though, is this block's alone. It used to be two views of the
+ * table's Date filter, so picking a range here refiltered the list and setting
+ * the chip below moved these counts. Both directions are gone: the range now
+ * scopes the three figures beside it and nothing else, which is the only reading
+ * a merchant can take from a control that sits inside the summary.
+ *
+ * The window still arrives from the page as epoch seconds, bucketed there so it
+ * is stable across renders and the query key below can hit the cache.
  */
 export function InvoiceSummaryCards({
   merchantId,
-  rangeValue,
+  range,
   onRangeChange,
   windowSeconds,
   onStatusFilter,
 }: {
   merchantId: string;
-  /** One of SUMMARY_RANGE_OPTIONS, or CUSTOM_RANGE_VALUE when the Date chip
-   *  holds a range the picker cannot express. */
-  rangeValue: string;
-  onRangeChange: (next: string) => void;
+  range: SummaryRange;
+  onRangeChange: (next: SummaryRange) => void;
   windowSeconds: { start: number; end: number };
   onStatusFilter: (statuses: string[]) => void;
 }) {
@@ -104,35 +97,21 @@ export function InvoiceSummaryCards({
     },
   ];
 
-  const isCustomRange = rangeValue === CUSTOM_RANGE_VALUE;
-
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
           Summary
         </h2>
-        <Select value={rangeValue} onValueChange={onRangeChange}>
-          <SelectTrigger className="h-8 w-[9.5rem]" aria-label="Summary date range">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SUMMARY_RANGE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-            {/* Only mounted while it is the current value, so the Select has
-                something to render for a Date chip range this picker has no
-                option for. Not a choice the user can make here: the chip is
-                where a custom range is set. */}
-            {isCustomRange && (
-              <SelectItem value={CUSTOM_RANGE_VALUE} disabled>
-                Custom range
-              </SelectItem>
-            )}
-          </SelectContent>
-        </Select>
+        {/* The same control Transactions puts beside its own title, rather than
+            the dropdown that used to sit here: a DQA pass called out having one
+            page segment time with tabs and another with a select. */}
+        <TimeRangeTabs
+          options={SUMMARY_RANGE_OPTIONS}
+          value={range}
+          onValueChange={onRangeChange}
+          label="Summary period"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

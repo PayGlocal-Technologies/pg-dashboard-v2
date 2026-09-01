@@ -17,24 +17,20 @@ import { useAccountSetup } from "@/stores/useAccountSetup";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
-import { ALL_TIME_RANGE_VALUE } from "@/features/dashboard/mca-invoices/constants";
 import {
-  EMPTY_INVOICE_DATE_FILTER,
-  endOfDayMs,
-  relativeDaysDateFilter,
-  summaryRangeValue,
-  summaryWindowSeconds,
-} from "@/features/dashboard/mca-invoices/helpers";
-import type { InvoiceDateFilter } from "@/features/dashboard/mca-invoices/types";
+  ALL_TIME_RANGE_VALUE,
+  type SummaryRange,
+} from "@/features/dashboard/mca-invoices/constants";
+import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoices/helpers";
 
 /**
  * Invoice management, at /mca-invoices.
  *
- * Composition root only. Filter state that both the summary cards and the
- * table need lives here, because pg-dashboard's summary cards are shortcuts
- * into the table's own filters rather than a separate read-only panel:
- * clicking "Outstanding invoices" filters the list, and changing the summary's
- * date range moves the list's window too.
+ * Composition root only. The one piece of state shared between the summary and
+ * the table is the status filter, because a summary card is a shortcut into the
+ * list: clicking "Outstanding invoices" filters it, exactly as pg-dashboard
+ * does. The summary's period and the table's Date chip are NOT shared — see
+ * SUMMARY_RANGE_OPTIONS for why they stopped being.
  */
 export function McaInvoicesFeature() {
   return (
@@ -113,11 +109,8 @@ function McaInvoicesContent() {
 
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
 
-  // One Date filter for the whole page, because the summary's range picker and
-  // the table's Date chip are two views of it rather than two filters: picking
-  // "Last 7 days" above has to leave the chip reading "Date · last 7 days",
-  // and setting a range in the chip has to move the counts above with it.
-  const [dateFilter, setDateFilter] = useState<InvoiceDateFilter>(EMPTY_INVOICE_DATE_FILTER);
+  /** The summary's own period. The table's Date chip is its own, inside it. */
+  const [summaryRange, setSummaryRange] = useState<SummaryRange>(ALL_TIME_RANGE_VALUE);
 
   // Read once, and bucketed to the end of the local day: this is the open end
   // of the summary's window, and therefore part of its react-query key, so a
@@ -128,16 +121,9 @@ function McaInvoicesContent() {
   const summary = (
     <InvoiceSummaryCards
       merchantId={summaryMid}
-      rangeValue={summaryRangeValue(dateFilter)}
-      onRangeChange={(next) =>
-        // Clock read, so it happens here and never during render.
-        setDateFilter(
-          next === ALL_TIME_RANGE_VALUE
-            ? EMPTY_INVOICE_DATE_FILTER
-            : relativeDaysDateFilter(Number(next))
-        )
-      }
-      windowSeconds={summaryWindowSeconds(dateFilter, defaultEndMs)}
+      range={summaryRange}
+      onRangeChange={setSummaryRange}
+      windowSeconds={summaryWindowSeconds(summaryRange, defaultEndMs)}
       onStatusFilter={setStatusFilters}
     />
   );
@@ -147,8 +133,6 @@ function McaInvoicesContent() {
       summarySection={summary}
       statusFilters={statusFilters}
       onStatusFiltersChange={setStatusFilters}
-      dateFilter={dateFilter}
-      onDateFilterChange={setDateFilter}
     />
   );
 }

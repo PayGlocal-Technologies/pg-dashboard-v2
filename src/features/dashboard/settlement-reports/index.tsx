@@ -13,12 +13,8 @@ import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import { TransactionColumnsMenu } from "@/features/dashboard/settlement-reports/components/TransactionColumnsMenu";
 import type { TableReqBody } from "@/types/transactions";
-import {
-  formatDayMonth,
-  formatWeekdayDate,
-  formatWeekdayName,
-  type SettlementSchedule,
-} from "@/features/dashboard/settlement-reports/calendarUtils";
+import { formatDayMonth, formatWeekdayDate, formatWeekdayName } from "@/lib/utils/format";
+import type { SettlementSchedule } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { SettlementCalendarButton } from "@/features/dashboard/settlement-reports/components/SettlementCalendarButton";
 import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementCycleInfoPanel";
 // MOCK (hidden): SettlementDetailsDialog shows the mock cycle/bank account —
@@ -338,34 +334,34 @@ export function SettlementReportsFeature() {
           <div className="min-w-0 flex-1 space-y-4">
             {/* BACKEND GAP: mock summary — see the banner note above. */}
             <div data-guide="mca-settlement-analytics">
-            <SettlementStatCards
-              totalSettledLabel={totalSettledLabel}
-              totalSettledTrendPct={totalSettledTrendPct}
-              totalSettledComparisonLabel={overview?.comparisonLabel}
-              totalSettledTimeframe={settlementTimeframe}
-              onTotalSettledTimeframeChange={setSettlementTimeframe}
-              totalSettledChartData={totalSettledChartData}
-              previousSettledLabel={previousSettledLabel}
-              previousSettledDateLabel={previousSettledDateLabel}
-              previousSettledTransactionCount={previousSettledTransactionCount}
-              onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
-              // BACKEND GAP: the "previous settled" summary card is mock data
-              // (no summary endpoint), so there is no real settlement date to
-              // download here. Row-level downloads in the table below are wired.
-              onDownloadPreviousSettled={() => {}}
-              // MOCK — hidden for now (no endpoint): the previous-settlement time,
-              // UTR and gross/tax/fee breakup. Re-enable by un-commenting these
-              // and the matching blocks in SettlementStatCards.
-              // previousSettledTimeLabel={summary.previousSettled.timeLabel}
-              // previousSettledUtrNumber={summary.previousSettled.utrNumber}
-              // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
-              // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
-              // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
-              upcomingSettlementLabel={upcomingSettlementLabel}
-              upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
-              pendingInvoiceCount={upcomingPendingInvoiceCount}
-              onUploadInvoice={() => {}}
-            />
+              <SettlementStatCards
+                totalSettledLabel={totalSettledLabel}
+                totalSettledTrendPct={totalSettledTrendPct}
+                totalSettledComparisonLabel={overview?.comparisonLabel}
+                totalSettledTimeframe={settlementTimeframe}
+                onTotalSettledTimeframeChange={setSettlementTimeframe}
+                totalSettledChartData={totalSettledChartData}
+                previousSettledLabel={previousSettledLabel}
+                previousSettledDateLabel={previousSettledDateLabel}
+                previousSettledTransactionCount={previousSettledTransactionCount}
+                onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
+                // BACKEND GAP: the "previous settled" summary card is mock data
+                // (no summary endpoint), so there is no real settlement date to
+                // download here. Row-level downloads in the table below are wired.
+                onDownloadPreviousSettled={() => {}}
+                // MOCK — hidden for now (no endpoint): the previous-settlement time,
+                // UTR and gross/tax/fee breakup. Re-enable by un-commenting these
+                // and the matching blocks in SettlementStatCards.
+                // previousSettledTimeLabel={summary.previousSettled.timeLabel}
+                // previousSettledUtrNumber={summary.previousSettled.utrNumber}
+                // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
+                // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
+                // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
+                upcomingSettlementLabel={upcomingSettlementLabel}
+                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
+                pendingInvoiceCount={upcomingPendingInvoiceCount}
+                onUploadInvoice={() => router.push("/mca-transactions")}
+              />
             </div>
 
             <Card className="gap-0 overflow-hidden p-0">

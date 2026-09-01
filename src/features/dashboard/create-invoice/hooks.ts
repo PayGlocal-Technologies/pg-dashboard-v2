@@ -323,12 +323,14 @@ export function useClientGeo(enabled: boolean): ClientGeo {
       if (!stateCodes) return [];
       if (country !== "India") return [{ label: "Not Applicable", value: "OTHER COUNTRY" }];
 
-      return Object.keys(stateCodes)
-        .filter((name) => name !== "OTHER COUNTRY")
-        .map((name) => ({ label: titleCase(name), value: name }))
-        // The API returns its map unordered. Sorted on the *label*, which is
-        // what the user reads and what Select's type-ahead matches against.
-        .sort((a, b) => a.label.localeCompare(b.label));
+      return (
+        Object.keys(stateCodes)
+          .filter((name) => name !== "OTHER COUNTRY")
+          .map((name) => ({ label: titleCase(name), value: name }))
+          // The API returns its map unordered. Sorted on the *label*, which is
+          // what the user reads and what Select's type-ahead matches against.
+          .sort((a, b) => a.label.localeCompare(b.label))
+      );
     },
     [stateData]
   );

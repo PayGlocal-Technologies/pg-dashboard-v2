@@ -4,11 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { cn, formatCurrency } from "@/lib/utils";
+import { formatMonthYearLabel, formatShortDate } from "@/lib/utils/format";
 import {
   buildMonthGrid,
   diffInDays,
-  formatMonthLabel,
-  formatShortDate,
   type CalendarCell,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { useBankHolidays } from "@/features/dashboard/settlement-reports/hooks";
@@ -180,10 +179,7 @@ export function SettlementCalendarButton({
   // amber badge above needs no fetch of its own: hasUpcomingHoliday arrives as a
   // prop from the page's own calendar read.
   const { from: monthFrom, to: monthTo } = monthWindow(viewYear, viewMonth);
-  const { holidays: monthHolidays } = useBankHolidays(
-    open ? monthFrom : "",
-    open ? monthTo : ""
-  );
+  const { holidays: monthHolidays } = useBankHolidays(open ? monthFrom : "", open ? monthTo : "");
   const holidayMap = useMemo(
     () => new Map(monthHolidays.map((h) => [h.date, h.name])),
     [monthHolidays]
@@ -290,7 +286,7 @@ export function SettlementCalendarButton({
                 <Icon name="chevron-left" size={14} />
               </Button>
               <p className="text-sm font-semibold text-foreground">
-                {formatMonthLabel(viewYear, viewMonth)}
+                {formatMonthYearLabel(viewYear, viewMonth)}
               </p>
               <Button
                 type="button"

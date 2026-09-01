@@ -210,11 +210,7 @@ function LineItemBody({
           non-modal popover out there has its wheel events cancelled. Without
           this the list rendered but would not scroll, which with the old
           six-item cap is most of why this looked broken. */}
-      <Popover
-        modal
-        open={suggestionsOpen && matches.length > 0}
-        onOpenChange={setSuggestionsOpen}
-      >
+      <Popover modal open={suggestionsOpen && matches.length > 0} onOpenChange={setSuggestionsOpen}>
         <PopoverAnchor asChild>
           <Field>
             <FieldLabel htmlFor="line-item-name">Item name</FieldLabel>

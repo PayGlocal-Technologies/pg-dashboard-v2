@@ -52,8 +52,7 @@ export function BankingFeature() {
             setEditing(false);
             setMasked(true); // refetch the masked read the invalidation just cleared
           },
-          onError: (err: Error) =>
-            toast.error(err.message || "Failed to update bank account."),
+          onError: (err: Error) => toast.error(err.message || "Failed to update bank account."),
         }
       );
     },

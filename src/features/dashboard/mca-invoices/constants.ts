@@ -103,14 +103,18 @@ export const STATUS_PINNED_TABS = INVOICE_VIEW_TABS.filter(
 export const FIXED_COLUMN_KEYS = ["invoiceNumber", "totalAmount", "status"];
 
 /**
- * The summary's range picker, from pg-dashboard's own options. Values are day
- * counts, so each one maps straight onto the Date chip's "Last N days" mode.
+ * The period the summary cards describe, from pg-dashboard's own options.
+ *
+ * Scopes the three counts and nothing else. It used to also drive the table's
+ * Date chip, in both directions, which meant picking "Last 7 days" above
+ * silently refiltered the list below and setting a range on the chip moved the
+ * counts — so neither control could be trusted to mean only what it said. The
+ * two are now independent, which is also why there is no longer a "Custom
+ * range" entry here: nothing outside these options can set this value.
+ *
+ * Values other than ALL_TIME are day counts, read as "the last N days".
  */
 export const ALL_TIME_RANGE_VALUE = "ALL_TIME";
-/** Not selectable: it only labels the picker when the Date chip holds a range
- *  the picker's own options cannot express (an absolute range, or a "Last …"
- *  value that is not one of the day counts below). */
-export const CUSTOM_RANGE_VALUE = "CUSTOM";
 
 export const SUMMARY_RANGE_OPTIONS = [
   { value: ALL_TIME_RANGE_VALUE, label: "All time" },
@@ -119,7 +123,4 @@ export const SUMMARY_RANGE_OPTIONS = [
   { value: "90", label: "Last 90 days" },
 ] as const;
 
-/** Day counts the picker can display, i.e. every option bar "All time". */
-export const SUMMARY_RANGE_DAYS = SUMMARY_RANGE_OPTIONS.map((o) => Number(o.value)).filter(
-  (n) => !Number.isNaN(n)
-);
+export type SummaryRange = (typeof SUMMARY_RANGE_OPTIONS)[number]["value"];

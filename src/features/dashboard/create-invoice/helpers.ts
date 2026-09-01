@@ -337,7 +337,6 @@ export const toFormState = (
   logoEnabled: invoice.logoEnabled ?? false,
   signatureEnabled: invoice.signatureEnabled ?? false,
 
-
   isRecurring: invoice.type === "RECURRING",
   recurringType: invoice.recurringType || "",
   recurringStartDate: invoice.recurringStartDate || "",
@@ -521,7 +520,7 @@ const dueTermDaysFor = (dueTermId: string | null): number | undefined =>
 
 /** The chip a stored day count came from, or null when no chip matches it. */
 const dueTermIdForDays = (days: number | undefined): string | null =>
-  days == null ? null : DUE_TERM_OPTIONS.find((option) => option.days === days)?.id ?? null;
+  days == null ? null : (DUE_TERM_OPTIONS.find((option) => option.days === days)?.id ?? null);
 
 /** The editor's shape → the body POSTed to /templates and PUT to /templates/{id}. */
 export const toTemplateWriteBody = (
@@ -690,9 +689,7 @@ export const themeFor = (name: string): InvoiceTheme =>
  * these three. Both cases mean "the server's default", which is what this
  * returns rather than letting `undefined` reach the wire.
  */
-export const brandingFrom = (
-  source: Partial<ThemeMetadata> | null | undefined
-): ThemeMetadata => ({
+export const brandingFrom = (source: Partial<ThemeMetadata> | null | undefined): ThemeMetadata => ({
   theme: source?.theme || DEFAULT_THEME_METADATA.theme,
   color: source?.color || DEFAULT_THEME_METADATA.color,
   accent: source?.accent || DEFAULT_THEME_METADATA.accent,

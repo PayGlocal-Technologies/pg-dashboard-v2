@@ -216,7 +216,9 @@ function EditBillerBody({
           <SearchableSelect
             id="biller-country"
             value={values.country ?? ""}
-            onValueChange={(next) => patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })}
+            onValueChange={(next) =>
+              patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })
+            }
             options={countryOptions}
             placeholder="Select country"
             searchPlaceholder="Search country…"

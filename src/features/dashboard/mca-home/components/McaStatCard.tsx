@@ -33,7 +33,9 @@ export function McaStatCard({ data }: McaStatCardProps) {
               : "text-muted-foreground"
           )}
         >
-          {hasTrend && <Icon name={positive ? "trending-up" : "trending-down"} size={12} aria-hidden />}
+          {hasTrend && (
+            <Icon name={positive ? "trending-up" : "trending-down"} size={12} aria-hidden />
+          )}
           <span>
             {hasTrend ? (
               <>

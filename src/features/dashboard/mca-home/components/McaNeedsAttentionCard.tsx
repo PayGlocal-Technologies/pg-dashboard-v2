@@ -37,7 +37,10 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
 
       <div className="flex flex-col gap-3">
         {needsAttention.map((row) => (
-          <Card key={row.id} className="flex-row items-center justify-between gap-3 p-3.5 shadow-none">
+          <Card
+            key={row.id}
+            className="flex-row items-center justify-between gap-3 p-3.5 shadow-none"
+          >
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 text-[13px] font-semibold text-foreground">
                 <span aria-hidden>{countryFlag(row.countryCode)}</span>
@@ -46,7 +49,9 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
               <p
                 className={cn(
                   "mt-1 text-base font-bold tabular-nums",
-                  row.statusTone === "danger" ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
+                  row.statusTone === "danger"
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-amber-600 dark:text-amber-400"
                 )}
               >
                 {formatCurrencyCode(row.amount, row.currency)}

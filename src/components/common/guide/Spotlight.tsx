@@ -70,7 +70,7 @@ export function Spotlight({ target, side, align, onMissing, pulse, children }: S
     };
     const findVisible = () =>
       Array.from(document.querySelectorAll<HTMLElement>(`[data-guide="${target}"]`)).find(
-        isVisible,
+        isVisible
       ) ?? null;
 
     const attach = () => {
@@ -204,6 +204,6 @@ export function Spotlight({ target, side, align, onMissing, pulse, children }: S
         </PopoverContent>
       </Popover>
     </motion.div>,
-    document.body,
+    document.body
   );
 }

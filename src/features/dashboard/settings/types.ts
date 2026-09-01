@@ -27,7 +27,9 @@ export interface MerchantProfileData {
 }
 
 /** Envelope-tolerant: read `data` if the response wraps, else the flat body. */
-export type MerchantProfileResponse = { data?: MerchantProfileData | null } & Partial<MerchantProfileData>;
+export type MerchantProfileResponse = {
+  data?: MerchantProfileData | null;
+} & Partial<MerchantProfileData>;
 
 /** The PUT body pg-dashboard sends — note the plural key `purposeCodes`, which
  *  differs from the singular `purposeCode` the GET returns. */
