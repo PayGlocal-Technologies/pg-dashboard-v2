@@ -54,9 +54,17 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
   if (!open || !step) return null;
 
   return (
-    // No `key` on Spotlight — one instance persists across steps so the cutout
-    // glides to each new target instead of remounting and snapping.
-    <Spotlight target={step.target} side={step.side} align={step.align} onMissing={goNext}>
+    // Keyed by step inside AnimatePresence(mode="wait"): advancing does NOT glide
+    // the cutout across the screen — the current step's spotlight fades out, then
+    // the next step's fades in at its own position. No travel between targets.
+    <AnimatePresence mode="wait">
+      <Spotlight
+        key={stepIndex}
+        target={step.target}
+        side={step.side}
+        align={step.align}
+        onMissing={goNext}
+      >
       {/* Progress dots + Skip (dots persist across steps and animate width). */}
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-1.5">
@@ -140,6 +148,7 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
           </Button>
         </div>
       </div>
-    </Spotlight>
+      </Spotlight>
+    </AnimatePresence>
   );
 }

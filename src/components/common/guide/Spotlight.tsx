@@ -93,9 +93,23 @@ export function Spotlight({ target, side, align, onMissing, pulse, children }: S
         setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
       };
 
-      el.scrollIntoView({ block: "center", inline: "nearest", behavior: "smooth" });
+      // Scroll BEFORE the first measure so the spotlight renders at the target's
+      // final position — never at a pre-scroll spot it then chases. Skip the
+      // scroll entirely when the target is already in view (most guide targets
+      // are), and when a scroll is needed do it instantly (`auto`), not smooth:
+      // a smooth scroll animates the page under the already-shown cutout, which
+      // is exactly the "moves around before it finds it" the tour had.
+      const r0 = el.getBoundingClientRect();
+      const inView =
+        r0.top >= 0 &&
+        r0.left >= 0 &&
+        r0.bottom <= window.innerHeight &&
+        r0.right <= window.innerWidth;
+      if (!inView) {
+        el.scrollIntoView({ block: "center", inline: "nearest", behavior: "auto" });
+      }
       raf = requestAnimationFrame(measure);
-      settle = setTimeout(measure, 340); // remeasure after smooth scroll settles
+      settle = setTimeout(measure, 200); // one late remeasure in case layout settles
       window.addEventListener("resize", measure);
       window.addEventListener("scroll", measure, true);
     };
