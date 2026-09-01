@@ -133,7 +133,11 @@ export function LineItemsSection({
         {/* Currencies come from the merchant's own FFMS configuration, not a
             hard-coded list, so an unsupported one cannot be chosen. */}
         <Select value={currency} onValueChange={onCurrencyChange}>
-          <SelectTrigger className="w-[7.5rem]" aria-label="Invoice currency">
+          {/* flux's Select defaults to h-11 / 15px, which is a full-size form
+              control. This one sits in a card header beside a 13px title and a
+              13px table, so it was reading a size too large — the DQA's
+              "dropdown text UI font size needs to be checked". */}
+          <SelectTrigger className="h-9 w-[7.5rem] px-3 text-[13px]" aria-label="Invoice currency">
             <SelectValue placeholder="Currency" />
           </SelectTrigger>
           <SelectContent>
@@ -334,7 +338,7 @@ export function LineItemsSection({
                       onTotalsFieldChange({ discountType: next as "percentage" | "fixed" })
                     }
                   >
-                    <SelectTrigger className="h-7 w-[4.5rem]" aria-label="Discount type">
+                    <SelectTrigger className="h-7 w-[4.5rem] px-2 text-[13px]" aria-label="Discount type">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

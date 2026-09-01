@@ -189,7 +189,14 @@ export function BillToSection({
               ? "No client selected yet. Pick who this invoice bills."
               : "Preparing the draft…"}
           </p>
-          <div className="flex items-center gap-2">
+          {/* Two ways to answer the same question, so they are the same
+              control twice: same variant, same size, same icon treatment. They
+              used to be a filled button beside a ghost one, which read as a
+              primary action and an afterthought and left merchants unsure the
+              second one did anything — a DQA pass called them "completely
+              different UIs". Choosing between an existing client and a new one
+              is not a hierarchy. */}
+          <div className="flex flex-wrap items-center justify-center gap-2">
             <Button
               type="button"
               variant="secondary"
@@ -202,13 +209,13 @@ export function BillToSection({
             </Button>
             <Button
               type="button"
-              variant="ghost"
+              variant="secondary"
               size="sm"
               disabled={!invoiceId}
               leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
               onClick={() => setAddClientOpen(true)}
             >
-              Add new
+              Add new client
             </Button>
           </div>
         </div>

@@ -62,6 +62,11 @@ import { BrandingSection } from "@/features/dashboard/create-invoice/components/
 import { LinkedTransactionChip } from "@/features/dashboard/create-invoice/components/LinkedTransactionChip";
 import { InvoicePreviewSidebar } from "@/features/dashboard/create-invoice/components/preview/InvoicePreviewSidebar";
 import { CreateInvoiceSuccess } from "@/features/dashboard/create-invoice/components/success";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
+import {
+  CREATE_INVOICE_GUIDE_KEY,
+  CREATE_INVOICE_GUIDE_STEPS,
+} from "@/features/dashboard/create-invoice/guide";
 import type {
   BillerDetails,
   BillerDetailsResponse,
@@ -109,7 +114,6 @@ function emptyForm(today: string, currency: string): InvoiceFormState {
     lut: "",
     logoEnabled: false,
     signatureEnabled: false,
-
 
     isRecurring: false,
     recurringType: "",
@@ -707,7 +711,7 @@ function InvoiceEditor({
    * still offers "Update template" without anything being remembered locally.
    */
   const [templateLink, setTemplateLink] = useState<string | null | undefined>(undefined);
-  const activeTemplateId = templateLink !== undefined ? templateLink : invoice.templateId ?? null;
+  const activeTemplateId = templateLink !== undefined ? templateLink : (invoice.templateId ?? null);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   /** Which asset the upload dialog is open for, or null when it is closed. */
@@ -825,9 +829,10 @@ function InvoiceEditor({
 
     // Ordered by how much it blocks the merchant: a missing start date stops
     // Generate outright, so that is worth saying over the reassurance.
-    const followUp = next.isRecurring && !form.recurringStartDate
-      ? "Set the recurring start date: a schedule cannot be reused from a template."
-      : "Client, invoice number, dates and receiving account are unchanged.";
+    const followUp =
+      next.isRecurring && !form.recurringStartDate
+        ? "Set the recurring start date: a schedule cannot be reused from a template."
+        : "Client, invoice number, dates and receiving account are unchanged.";
 
     toast.success(`Applied "${template.name}"`, { description: followUp });
   };
@@ -1086,7 +1091,7 @@ function InvoiceEditor({
             <StatusBadge variant="muted" label="Draft" size="sm" />
             <span className="flex items-center gap-1 text-[13px] text-muted-foreground">
               <Icon name="refresh" className={isSaving ? "h-3 w-3 animate-spin" : "h-3 w-3"} />
-              {isSaving ? "Saving…" : "Auto-saved as you type"}
+              {isSaving ? "Saving…" : "Auto-saved"}
             </span>
             {linkedGid && <LinkedTransactionChip gid={linkedGid} record={linkedTxn} />}
           </div>
@@ -1097,6 +1102,7 @@ function InvoiceEditor({
             came from one, because offering both invites the merchant to guess
             which of the two they want. */}
         <SplitButton
+          data-guide="invoice-generate"
           label={isGenerating ? "Generating…" : "Generate invoice"}
           variant="primary"
           size="sm"
@@ -1145,17 +1151,37 @@ function InvoiceEditor({
               </SplitButtonItem>
             </>
           ) : (
+            /**
+             * Still disabled with nothing worth saving, but no longer silent
+             * about it.
+             *
+             * A disabled control that does not say why leaves the merchant to
+             * decide whether the app is broken — the DQA's point about disabled
+             * states needing an explanation. A menu item receives no pointer
+             * events once disabled, so a tooltip on it would never fire; the
+             * reason therefore renders inside the item, under the label.
+             */
             <SplitButtonItem
               className="whitespace-nowrap"
               disabled={!hasTemplatableContent}
               onClick={() => setSaveTemplateOpen(true)}
             >
-              Save as template
+              <span className="flex flex-col items-start">
+                Save as template
+                {!hasTemplatableContent && (
+                  <span className="text-[11px] font-normal text-muted-foreground">
+                    Add a line item or note first
+                  </span>
+                )}
+              </span>
             </SplitButtonItem>
           )}
+          {/* Deliberately never disabled. With no templates yet this opens a
+              dialog that explains how to make one, which answers the merchant's
+              question instead of refusing the click and leaving them to guess
+              what the item would have done. */}
           <SplitButtonItem
             className="whitespace-nowrap"
-            disabled={templateStore.templates.length === 0}
             onClick={() => setManageTemplatesOpen(true)}
           >
             Manage templates
@@ -1190,16 +1216,18 @@ function InvoiceEditor({
               />
             </div>
 
-            <InvoiceTemplatePicker
-              templates={templateStore.templates}
-              isReady={templateStore.isReady}
-              activeTemplateId={activeTemplateId}
-              hasContent={hasTemplatableContent}
-              onApply={handleApplyTemplate}
-              onDetach={handleDetachTemplate}
-              onManage={() => setManageTemplatesOpen(true)}
-              onSaveCurrent={() => setSaveTemplateOpen(true)}
-            />
+            <div data-guide="invoice-template">
+              <InvoiceTemplatePicker
+                templates={templateStore.templates}
+                isReady={templateStore.isReady}
+                activeTemplateId={activeTemplateId}
+                hasContent={hasTemplatableContent}
+                onApply={handleApplyTemplate}
+                onDetach={handleDetachTemplate}
+                onManage={() => setManageTemplatesOpen(true)}
+                onSaveCurrent={() => setSaveTemplateOpen(true)}
+              />
+            </div>
 
             <BillerSection
               billerDetails={billerDetails}
@@ -1207,36 +1235,42 @@ function InvoiceEditor({
               onChange={setBillerDetails}
             />
 
-            <BillToSection
-              invoiceId={invoiceId}
-              clientId={form.clientId}
-              onClientIdChange={(clientId) => patch({ clientId })}
-              remitterName={linkedTxn?.partnerCustomerFullName}
-            />
+            <div data-guide="invoice-client">
+              <BillToSection
+                invoiceId={invoiceId}
+                clientId={form.clientId}
+                onClientIdChange={(clientId) => patch({ clientId })}
+                remitterName={linkedTxn?.partnerCustomerFullName}
+              />
+            </div>
 
-            <LineItemsSection
-              lineItems={form.lineItems}
-              onLineItemsChange={(lineItems) => patch({ lineItems })}
-              currency={form.currency}
-              currencies={currencies}
-              symbolFor={symbolFor}
-              onCurrencyChange={(currency) => patch({ currency })}
-              discountName={form.discountName}
-              discountValue={form.discountValue}
-              discountType={form.discountType}
-              taxName={form.taxName}
-              taxValue={form.taxValue}
-              onTotalsFieldChange={patch}
-              linkedExpectedTotal={linkedTotalMismatch ? linkedExpectedTotal : null}
-              linkedCurrency={linkedTxn?.currency ?? form.currency}
-            />
+            <div data-guide="invoice-items">
+              <LineItemsSection
+                lineItems={form.lineItems}
+                onLineItemsChange={(lineItems) => patch({ lineItems })}
+                currency={form.currency}
+                currencies={currencies}
+                symbolFor={symbolFor}
+                onCurrencyChange={(currency) => patch({ currency })}
+                discountName={form.discountName}
+                discountValue={form.discountValue}
+                discountType={form.discountType}
+                taxName={form.taxName}
+                taxValue={form.taxValue}
+                onTotalsFieldChange={patch}
+                linkedExpectedTotal={linkedTotalMismatch ? linkedExpectedTotal : null}
+                linkedCurrency={linkedTxn?.currency ?? form.currency}
+              />
+            </div>
 
-            <PaymentDetailsSection
-              invoiceId={invoiceId}
-              currency={persistedCurrency}
-              accountNo={form.accountNo}
-              onAccountNoChange={(accountNo) => patch({ accountNo })}
-            />
+            <div data-guide="invoice-payment">
+              <PaymentDetailsSection
+                invoiceId={invoiceId}
+                currency={persistedCurrency}
+                accountNo={form.accountNo}
+                onAccountNoChange={(accountNo) => patch({ accountNo })}
+              />
+            </div>
 
             <NotesAndTermsSection
               memo={form.memo}
@@ -1262,7 +1296,7 @@ function InvoiceEditor({
         </div>
 
         <div className="min-h-0 overflow-y-auto bg-muted">
-          <div className="space-y-4 p-4 md:p-6">
+          <div className="space-y-4 p-4 md:p-6" data-guide="invoice-preview">
             <InvoicePreviewSidebar
               source={previewSource}
               onLogoClick={() => setUploadingAsset("LOGO")}
@@ -1304,6 +1338,11 @@ function InvoiceEditor({
         onRename={templateStore.rename}
         onDelete={handleDeleteTemplate}
       />
+
+      {/* Persistent launcher, bottom-right, replayable. Not auto-started: this
+          editor is often reopened on a draft, and a tour that runs itself every
+          time would be in the way. */}
+      <GuideLauncher steps={CREATE_INVOICE_GUIDE_STEPS} storageKey={CREATE_INVOICE_GUIDE_KEY} />
 
       <AssetUploadDialog
         open={!!uploadingAsset}

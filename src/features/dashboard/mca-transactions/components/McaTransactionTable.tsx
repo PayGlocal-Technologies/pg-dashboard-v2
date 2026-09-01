@@ -516,6 +516,7 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
               hiddenKeys={hiddenColumns}
               onHiddenKeysChange={setHiddenColumns}
               fixedKeys={FIXED_COLUMN_KEYS}
+              fixedReason="Always shown. A transaction row is unreadable without these columns."
             />
             <Button
               type="button"
