@@ -44,7 +44,9 @@ export function McaTotalInvoicedCard() {
     ? formatCompact(totals.totalInvoiced, origins?.reportingCurrency ?? "INR")
     : "—";
   const trendPct = totals?.totalInvoicedTrendPct;
-  const hasTrend = trendPct !== undefined;
+  // No trend beside a zero (or absent) figure — a percentage change against
+  // nothing invoiced reads as broken.
+  const hasTrend = trendPct !== undefined && (totals?.totalInvoiced ?? 0) > 0;
   const positive = hasTrend && trendPct >= 0;
   const sparkData = base.spark.map((v, i) => ({ i, v }));
   const gradId = "mca-total-invoiced-fill";

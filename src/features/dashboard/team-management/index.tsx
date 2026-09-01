@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
@@ -252,6 +253,13 @@ export function TeamManagementFeature() {
               Retry
             </Button>
           </div>
+        ) : !isPending && filteredRows.length === 0 ? (
+          <PlaceholderState
+            variant="no-data"
+            title="No team members found"
+            description="Try adjusting your filters or search query"
+            className="border-t border-border py-16"
+          />
         ) : (
           <DataTable
             columns={teamMemberColumns}

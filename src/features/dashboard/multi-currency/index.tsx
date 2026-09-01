@@ -1,21 +1,13 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { currencySymbol, formatCurrency } from "@/lib/utils/format";
+import { formatCurrency } from "@/lib/utils/format";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
+import { useSettledByAccount } from "@/features/dashboard/mca-transactions/hooks";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
@@ -29,10 +21,6 @@ import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/compo
 // Side-panel variant, kept for reference — superseded below by the modal.
 // import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
 import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
-import {
-  DEFAULT_SETTLED_CURRENCY,
-  SETTLED_AMOUNT_BY_CURRENCY,
-} from "@/features/dashboard/multi-currency/mock-data";
 import {
   useAccountDocumentDownload,
   useNeedsMidSelection,
@@ -105,28 +93,21 @@ function MultiCurrencyContent() {
 
   const selectAccount = (account: VirtualAccount) => setSelectedAccountId(account.id);
 
-  // The settled-amount card follows the selected region: its title names that
-  // region's currency and its figures are in that currency, so picking a region
-  // is the only thing that changes this card.
-  const settledCurrency = selectedAccount?.currency ?? DEFAULT_SETTLED_CURRENCY;
-  // Falls back rather than rendering an empty card if an account ever carries a
-  // currency the summary data has no entry for.
-  const settled =
-    SETTLED_AMOUNT_BY_CURRENCY[settledCurrency] ??
-    SETTLED_AMOUNT_BY_CURRENCY[DEFAULT_SETTLED_CURRENCY];
-
-  // Every region names its currency in the title except Rest of the World,
-  // which keeps the bare label: its `currency` is "GLOBAL" (see
-  // mapAccounts.ts), the accounts endpoint's SWIFT-catch-all bucket key
-  // renamed for display, and "Settled amount in GLOBAL" doesn't read as a
-  // sentence the way "Settled amount in USD" does. The symbol on the figure
-  // below still says which unit the amount is in either way.
-  const settledTitle =
-    selectedAccount?.iso2 === "ROW" ? "Settled amount" : `Settled amount in ${settledCurrency}`;
-
-  // Unique per mount so the settled-amount chart's fill gradient doesn't
-  // collide with another <linearGradient> id elsewhere on the page.
-  const settledGradientId = useId().replace(/:/g, "");
+  // Settled amount for the selected region, from the same settled-by-account
+  // endpoint the Transactions page's analytics use (useSettledByAccount). The
+  // figure is the merchant's real settled total for that account, reported in
+  // INR — there is no per-currency native figure or monthly trend behind it, so
+  // this card shows the amount + transaction count only, not a chart. Year to
+  // date, this page having no time-range control of its own.
+  //
+  // Rest of the World maps to the endpoint's REST_OF_WORLD catch-all bucket;
+  // every other region matches on its own currency code.
+  const settledApiCurrency =
+    selectedAccount?.iso2 === "ROW" ? "REST_OF_WORLD" : (selectedAccount?.currency ?? "");
+  const { settled: settledByAccount, isLoading: isSettledLoading } = useSettledByAccount("ytd");
+  const settledRow = settledByAccount?.accounts.find((a) => a.currency === settledApiCurrency);
+  const settledAmountInr = settledRow?.amount ?? 0;
+  const settledTxnCount = settledRow?.count ?? 0;
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [fxModalOpen, setFxModalOpen] = useState(false);
@@ -255,7 +236,7 @@ function MultiCurrencyContent() {
           shape whether or not How it works is open — that panel is a flex
           child *inside* the Account Details column below, not a third track
           here, so it never resizes these two things. */}
-      <div className="grid gap-x-5 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
+      <div className="grid gap-x-5 gap-y-6 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
         {/* Title and region list are one sticky unit, not two independently
             placed grid items: the heading names the control directly below it,
             so pinning the list while the heading scrolls away would leave an
@@ -268,16 +249,14 @@ function MultiCurrencyContent() {
         {/* min-w-0 is load-bearing below `lg`, where this stack holds the
             horizontally scrolling region tiles (RegionSelector's `cards`
             variant). A grid item's default `min-width: auto` floors the track at
-            the item's min-content width, and a nowrap flex row of six 144px
-            tiles makes that ~930px — so the single implicit column grew past the
-            viewport and the whole *page* scrolled sideways instead of the tile
-            row scrolling inside its own box. The lg layout already spelled this
-            out for the right column (`minmax(0,1fr)`); the stacked one needs the
-            same floor removed here. */}
-        <div className="min-w-0 space-y-3 lg:col-start-1 lg:row-start-1 lg:row-end-3 lg:sticky lg:top-6 lg:self-start">
-          <h2 className={MODULE_TITLE}>Select Client Region</h2>
+            the item's min-content width, and a nowrap flex row of tiles would
+            otherwise grow the implicit column past the viewport, scrolling the
+            whole page sideways instead of the tile row inside its own box. */}
+        <div className="min-w-0 space-y-6">
+          <div className="space-y-3">
+            <h2 className={MODULE_TITLE}>Select client region</h2>
 
-          {isLoading ? (
+            {isLoading ? (
             // The region list is this page's only navigation, so its loading
             // state has to hold the column's footprint — otherwise the right
             // column snaps sideways when the accounts land. Six rows is the
@@ -333,39 +312,74 @@ function MultiCurrencyContent() {
               </Card>
             </>
           )}
+          </div>
+
+          {/* Currency caveat for the selected region — a pre-payment briefing
+              (e.g. "don't convert to GBP"), so it sits directly under the
+              region choice it belongs to rather than beside the account card.
+              Renders nothing for a currency that carries no caveat. */}
+          {selectedAccount && <AccountCurrencyNotice currency={selectedAccount.currency} />}
+
+          {/* Documents for the selected region, under the region + warning. */}
+          {selectedAccount && (
+            <section>
+              <h2 className={cn(MODULE_TITLE, "mb-3")}>Documents you might need</h2>
+
+              {/* Stacked (flex-col) rather than the wide row it used to be — this
+                  now lives in the narrow 288px left column, so the label and its
+                  download action sit one above the other. */}
+              <Card size="sm" className="flex-col items-start gap-4 py-6">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-[14px] font-medium text-foreground">
+                    Need proof of account ownership?
+                  </p>
+                  <p className={MODULE_SUBTITLE}>
+                    An official document confirming this receiving account belongs to you — for
+                    clients or banks that ask.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full shrink-0"
+                  disabled={isDownloadingProof}
+                  leftIcon={<Icon name="download" className="h-4 w-4" />}
+                  onClick={() => void handleDownloadProof()}
+                >
+                  Download document
+                </Button>
+              </Card>
+            </section>
+          )}
         </div>
 
-        {/* Right column's row-1 title, mirroring the left's: same grid row,
-            so the two headings share a top edge no matter how each one wraps.
-            Guarded on selectedAccount since the heading names its region. */}
-        {selectedAccount && (
-          <div className="flex min-w-0 flex-wrap items-start justify-between gap-2 lg:col-start-2 lg:row-start-1">
-            <h2 className={MODULE_TITLE}>Receive payments from {selectedAccount.countryName}</h2>
-            {/* Tertiary action: the link variant carries no fill or border,
-                so it reads as one step below the module title it sits
-                beside. -mr-2 cancels the variant's own horizontal padding so
-                the label's right edge lines up with the card edge below it,
-                and -mt-1 pulls it back onto the title's own line after
-                items-start has top-aligned the row. Opens the per-currency
-                guide, which is why it sits with the selection rather than in
-                the page header. */}
-            <Button
-              variant="link"
-              className="-mr-2 -mt-1 text-[13px] underline"
-              onClick={() => setHowItWorksOpen(true)}
-            >
-              How it works?
-            </Button>
-          </div>
-        )}
+        {/* Right column: heading, then account details + metrics — one grid
+            item so `items-start` aligns its top edge with the left column's,
+            rather than relying on explicit row placement. space-y-3 is the 12px
+            title → content step; the content block below keeps its own 32px
+            section spacing. min-w-0 lets the account-details/metrics content
+            shrink instead of forcing the column past the viewport. */}
+        <div className="min-w-0 space-y-3">
+          {selectedAccount && (
+            // h2 as a plain block (not a flex item), so its top edge renders
+            // identically to the left column's plain-block heading and the two
+            // line up. "How it works?" is positioned absolutely to the top-right
+            // rather than sharing a flex line, which was nudging the heading
+            // down; pr-28 keeps a long region name clear of it.
+            <div className="relative pr-28">
+              <h2 className={MODULE_TITLE}>Receive payments from {selectedAccount.countryName}</h2>
+              <Button
+                variant="link"
+                className="absolute right-0 top-0 -mr-2 text-[13px] underline"
+                onClick={() => setHowItWorksOpen(true)}
+              >
+                How it works?
+              </Button>
+            </div>
+          )}
 
-        {/* space-y-8 is the 32px section → section step, the loosest on the
-            page. mt-5 restores that separation below `lg`, where this column
-            stacks under its own title above (row 1 has already dropped out) and
-            would otherwise inherit the grid's own 12px title → container gap;
-            on `lg` and up it must be zero, or this row-2 content would no
-            longer start level with the region Card. */}
-        <div className="mt-5 min-w-0 space-y-8 lg:col-start-2 lg:row-start-2 lg:mt-0">
+          {/* space-y-8 is the 32px section → section step, the loosest on the
+              page. */}
+          <div className="space-y-8">
           {selectedAccount && (
             // Account details come before the Metrics section below: a
             // merchant opens this page to find the numbers to hand a client,
@@ -392,16 +406,13 @@ function MultiCurrencyContent() {
                     no carousel here naming the account any more — and the width
                     override drops the card's default shrink-wrapping so it fills
                     this column. */}
-                <div className="space-y-3">
-                  <AccountCurrencyNotice currency={selectedAccount.currency} />
-                  <VirtualAccountDetails
-                    account={selectedAccount}
-                    onCopy={handleCopyFullAccount}
-                    onShare={() => setShareModalOpen(true)}
-                    headerPlacement="inside"
-                    className="w-full max-w-none"
-                  />
-                </div>
+                <VirtualAccountDetails
+                  account={selectedAccount}
+                  onCopy={handleCopyFullAccount}
+                  onShare={() => setShareModalOpen(true)}
+                  headerPlacement="inside"
+                  className="w-full max-w-none"
+                />
               </section>
 
               {/* Side-panel variant, kept for reference — superseded below
@@ -444,154 +455,33 @@ function MultiCurrencyContent() {
                 same height on a shared line, and therefore a shared top and
                 bottom edge. */}
             <div className="flex flex-wrap gap-4">
-              {/* Not MetricSparklineCard: that renders its sparkline as a tiny
-                borderless corner overlay with no axes, which can't carry this
-                card's monthly X axis and settled-amount Y axis. Built on the
-                same flux-ui Card as OutstandingAmountCard beside it — same
-                size="sm" inset, border, radius and elevation — with the
-                recharts primitives and styling flux-ui itself uses in
-                DashboardAreaChartTemplate, so the two read as a deliberate
-                pair without introducing a chart abstraction of its own. Every
-                figure is keyed off the selected region's currency rather than
-                fixed to USD.
+              {/* Settled amount for the selected region, from the real
+                  settled-by-account endpoint (useSettledByAccount, the same one
+                  the Transactions analytics read). The endpoint reports a single
+                  INR total per account with no native-currency figure or monthly
+                  series behind it, so this is the amount + its transaction count
+                  rather than the chart the mock used to fake. Built on the same
+                  flux-ui Card as OutstandingAmountCard beside it so the two read
+                  as a pair. */}
+              <Card size="sm" className="min-w-[min(300px,100%)] flex-1">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Settled amount</p>
 
-                min() rather than a bare min-w-[470px]: 470px is the floor
-                wherever there is room for it, but a min-width that large would
-                otherwise push the card past the viewport on a narrow screen,
-                and min-width beats max-width in the cascade so `max-w-full`
-                could not rein it back in. 100% is measured against the flex
-                line, so the card fills the row instead of overflowing it.
-
-                flex-[1.6] against Outstanding's flex-1: while both share a
-                line, the extra width goes to the card that has a chart to put
-                it in. Once they wrap, each is alone on its line and grows to
-                the full width regardless. */}
-              <Card size="sm" className="min-w-[min(470px,100%)] flex-[1.6] gap-0">
-                {/* KPI stack left, chart right, so the card spends the width it
-                  has rather than stacking into extra height. flex-1 makes this
-                  row fill the Card, which the grid above has already stretched
-                  to the taller of the pair; items-stretch then hands that full
-                  height down to the chart. Below `sm` the two stack, which is
-                  the only width where there isn't room for both. */}
-                <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
-                  {/* No min-w-0 here, unlike the chart beside it: the default
-                    `min-width: auto` floors this column at its own min-content
-                    width, which the nowrap amount below now sets. That is what
-                    makes the guarantee hold under pressure — when the card is
-                    squeezed, the chart gives up width and the figure keeps
-                    every pixel it needs. */}
-                  <div className="flex-1 sm:basis-2/5">
-                    {/* Names the region's currency everywhere but Rest of the
-                      World — see settledTitle for why that one stays bare. */}
-                    <p className="text-sm font-semibold text-foreground">{settledTitle}</p>
-
-                    {/* Same size and weight as OutstandingAmountCard's own
-                      figure — the two headline numbers have to carry equal
-                      visual weight for the cards to read as a pair.
-                      whitespace-nowrap keeps a grouped figure from ever
-                      breaking mid-number. */}
-                    <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                      {`${currencySymbol(settledCurrency)}${settled.amount.toLocaleString("en-US")}`}
-                    </p>
-
-                    {/* Secondary to the figure above it: smaller size, muted
-                      colour, same left edge — supporting context, not a second
-                      headline. mt-1 (tight) because it restates that same
-                      figure, so it belongs to the amount rather than reading
-                      as the next item down. nowrap costs nothing here: at
-                      text-sm this line is narrower than the text-3xl amount,
-                      so the amount still sets the column's floor. */}
-                    <p className="mt-1 whitespace-nowrap text-sm tabular-nums text-muted-foreground">
-                      {formatCurrency(settled.amountInr, "INR", "en-IN")}
-                    </p>
-
-                    {/* Supporting metric, the lowest step in this stack. Left
-                      aligned with everything above it. */}
-                    <p className="mt-4 flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400">
-                      <Icon name="trending-up" className="h-3.5 w-3.5 shrink-0" />
-                      <span>{settled.trendLabel}</span>
-                    </p>
-                  </div>
-
-                  {/* No fixed height: items-stretch on the row above sizes this
-                    to the Card's full content height, so the chart runs from
-                    the top of the title beside it to the bottom of the trend
-                    line. min-h-36 is only a floor for the stacked layout below
-                    `sm`, where there is no row height to stretch to and
-                    ResponsiveContainer would otherwise collapse to nothing.
-                    Because the height is inherited rather than set here, the
-                    chart can never be what makes this card taller than
-                    OutstandingAmountCard beside it.
-
-                    3/5 against the KPI stack's 2/5, rather than the even split
-                    the two flex-1s alone would give: the plot area loses a
-                    fixed 64px to the Y axis, so the widest track is worth more
-                    to the chart than to a stack of left-aligned text. */}
-                  <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart
-                        data={settled.trend}
-                        margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
-                      >
-                        <defs>
-                          <linearGradient id={settledGradientId} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
-                            <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0.02} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="color-mix(in srgb, var(--border) 65%, transparent)"
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="x"
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                          interval="preserveStartEnd"
-                        />
-                        {/* Axis and tooltip both read in the selected currency,
-                          so the chart never contradicts the headline figure
-                          above it. width=64 leaves room for the widest label
-                          this can produce: every region's symbol is a glyph or
-                          two ("$140K", "A$140K"), but the width is sized past
-                          that so a currency whose symbol falls back to its own
-                          code still can't clip. */}
-                        <YAxis
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                          tickFormatter={(v: number) =>
-                            v >= 1000
-                              ? `${currencySymbol(settledCurrency)}${(v / 1000).toFixed(0)}K`
-                              : `${currencySymbol(settledCurrency)}${v}`
-                          }
-                          width={64}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            borderRadius: 10,
-                            border: "1px solid var(--border)",
-                            fontSize: 12,
-                            background: "var(--popover)",
-                            color: "var(--popover-foreground)",
-                          }}
-                          formatter={(v) => [
-                            formatCurrency(Number(v), settledCurrency, "en-US"),
-                            "Settled",
-                          ]}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="y"
-                          stroke="var(--chart-4)"
-                          strokeWidth={2}
-                          fill={`url(#${settledGradientId})`}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {isSettledLoading ? (
+                    <Shimmer className="mt-4 h-9 w-40" />
+                  ) : (
+                    <>
+                      {/* Same size/weight as OutstandingAmountCard's figure so
+                          the pair carries equal visual weight. */}
+                      <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                        {formatCurrency(settledAmountInr, "INR", "en-IN")}
+                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {settledTxnCount.toLocaleString("en-IN")} settled transaction
+                        {settledTxnCount === 1 ? "" : "s"} · Year to date
+                      </p>
+                    </>
+                  )}
                 </div>
               </Card>
 
@@ -611,39 +501,7 @@ function MultiCurrencyContent() {
               <OutstandingAmountCard className="min-w-[min(300px,100%)] flex-1" />
             </div>
           </section>
-
-          {selectedAccount && (
-            <section>
-              <h2 className={cn(MODULE_TITLE, "mb-3")}>Documents you might need</h2>
-
-              {/* Secondary module: same surface and padding as the account card
-                  above it, but its copy sits at supporting weight rather than
-                  the section-title weight, so it reads as the lesser of the
-                  two. */}
-              <Card
-                size="sm"
-                className="flex-row flex-wrap items-center justify-between gap-4 py-6"
-              >
-                <div className="min-w-0 space-y-1">
-                  <p className="text-[13px] font-medium text-foreground">
-                    Need proof of account ownership?
-                  </p>
-                  <p className={MODULE_SUBTITLE}>
-                    Download an official document confirming ownership of this receiving account.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="shrink-0"
-                  disabled={isDownloadingProof}
-                  rightIcon={<Icon name="download" className="h-4 w-4" />}
-                  onClick={() => void handleDownloadProof()}
-                >
-                  Download proof of account ownership
-                </Button>
-              </Card>
-            </section>
-          )}
+          </div>
         </div>
       </div>
 

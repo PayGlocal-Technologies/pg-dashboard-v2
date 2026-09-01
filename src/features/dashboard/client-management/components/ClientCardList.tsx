@@ -1,7 +1,8 @@
 "use client";
 
-import { Button, EmptyState, Shimmer } from "@/components/ui";
+import { Button, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
 import {
@@ -160,7 +161,12 @@ export function ClientCardList({
       {isLoading ? (
         Array.from({ length: skeletonCount }).map((_, i) => <ClientCardSkeleton key={i} />)
       ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
+        <PlaceholderState
+          variant="no-data"
+          size="sm"
+          title={emptyTitle}
+          description={emptyDescription}
+        />
       ) : (
         rows.map((row) => <ClientCard key={row.id} row={row} onOpenDetails={onOpenDetails} />)
       )}

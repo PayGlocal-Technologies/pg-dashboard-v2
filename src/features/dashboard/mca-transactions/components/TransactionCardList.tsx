@@ -1,7 +1,8 @@
 "use client";
 
-import { Button, EmptyState, IconButton, Shimmer, StatusBadge } from "@/components/ui";
+import { Button, IconButton, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
 import {
@@ -183,7 +184,12 @@ export function TransactionCardList({
       {isLoading ? (
         Array.from({ length: skeletonCount }).map((_, i) => <TransactionCardSkeleton key={i} />)
       ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
+        <PlaceholderState
+          variant="no-transactions"
+          size="sm"
+          title={emptyTitle}
+          description={emptyDescription}
+        />
       ) : (
         rows.map((row) => <TransactionCard key={row.gid} row={row} onOpenDetails={onOpenDetails} />)
       )}

@@ -13,6 +13,7 @@ import { Button, Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
   totalSettledTimeframes,
   type TotalSettledTimeframe,
@@ -78,6 +79,9 @@ export function TotalSettledCard({
   const trendPositive = totalSettledTrendPct >= 0;
   const data = chartData;
   const { domain, ticks } = computeYAxisTicks(data);
+  // Nothing settled in the window → no series to plot, so an illustration
+  // stands in for the empty chart rather than an axis-only grid.
+  const hasData = data.length > 0 && data.some((point) => point.y > 0);
 
   return (
     <Card className={cn("gap-4 p-5", className)}>
@@ -88,20 +92,25 @@ export function TotalSettledCard({
             value={totalSettledLabel}
             className="mt-2 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
-          <div
-            className={cn(
-              "mt-2 flex items-center gap-1 text-xs font-medium",
-              trendPositive
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-red-600 dark:text-red-400"
-            )}
-          >
-            <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
-            <RollingNumber
-              value={`${trendPositive ? "+" : ""}${totalSettledTrendPct}% ${comparisonLabel ?? "vs last"}`}
-              className="tabular-nums"
-            />
-          </div>
+          {/* No trend beside a zero total — "+0%/-100% vs last week" against
+              nothing settled reads as broken, so it's hidden until there's a
+              real figure to compare. */}
+          {hasData && (
+            <div
+              className={cn(
+                "mt-2 flex items-center gap-1 text-xs font-medium",
+                trendPositive
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-red-600 dark:text-red-400"
+              )}
+            >
+              <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
+              <RollingNumber
+                value={`${trendPositive ? "+" : ""}${totalSettledTrendPct}% ${comparisonLabel ?? "vs last"}`}
+                className="tabular-nums"
+              />
+            </div>
+          )}
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-1 rounded-lg border border-border bg-muted/50 p-1">
@@ -125,6 +134,14 @@ export function TotalSettledCard({
       </div>
 
       <div className="h-76 w-full">
+        {!hasData ? (
+          <PlaceholderState
+            variant="no-settlements"
+            title="No settlements yet"
+            description="Nothing has settled in this period yet."
+            className="h-full"
+          />
+        ) : (
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
             <defs>
@@ -163,6 +180,7 @@ export function TotalSettledCard({
             />
           </AreaChart>
         </ResponsiveContainer>
+        )}
       </div>
     </Card>
   );

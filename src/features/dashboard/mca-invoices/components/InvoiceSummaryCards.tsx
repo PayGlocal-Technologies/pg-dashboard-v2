@@ -99,11 +99,14 @@ export function InvoiceSummaryCards({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      {/* Subheading, then the time tabs directly beneath it (left-aligned)
+          rather than across the row from it, so the window reads as scoping the
+          Summary below. */}
+      <div className="flex flex-col gap-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
           Summary
         </h2>
-        {/* The same control Transactions puts beside its own title, rather than
+        {/* The same control Transactions puts under its own title, rather than
             the dropdown that used to sit here: a DQA pass called out having one
             page segment time with tabs and another with a select. */}
         <TimeRangeTabs

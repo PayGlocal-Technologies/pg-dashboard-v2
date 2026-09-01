@@ -588,16 +588,15 @@ function PlatformsContent() {
               carrying full-width art, which is what gives it the weight the two
               compact sections above it deliberately don't have. */}
           <section>
-            <h2 className={MODULE_TITLE}>Steps</h2>
-
             {/* Step number → instruction → screenshot, in that order, every step
-                the same shape so the sequence scans as one column.
+                the same shape so the sequence scans as one column. No "Steps"
+                heading — the numbered sequence reads as steps on its own.
 
                 space-y-8 between steps against the 4px and 12px inside one: a
                 step's own parts sit far closer to each other than any step does
                 to the next, which is what gives the sequence its rhythm rather
                 than reading as six evenly spaced blocks. */}
-            <ol className="mt-4 space-y-8">
+            <ol className="space-y-8">
               {selectedPlatform.steps.map((step, index) => (
                 <li key={step.instruction}>
                   {/* The number is a marker, not a title: smallest size, muted,

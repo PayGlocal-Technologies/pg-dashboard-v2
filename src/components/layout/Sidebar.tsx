@@ -428,7 +428,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               alt="PayGlocal"
               width={160}
               height={28}
-              className="h-7 w-auto"
+              className="h-6 w-auto"
             />
           </div>
           <Button
@@ -490,7 +490,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               alt="PayGlocal"
               width={160}
               height={28}
-              className="h-7 w-auto"
+              className="h-6 w-auto"
             />
             <Button
               variant="ghost"

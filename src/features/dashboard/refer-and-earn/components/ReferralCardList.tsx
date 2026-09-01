@@ -1,7 +1,8 @@
 "use client";
 
-import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
+import { Button, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatEpochDate } from "@/lib/utils/format";
 import {
@@ -127,7 +128,12 @@ function CardListShell({
       {isLoading ? (
         Array.from({ length: skeletonCount }).map((_, i) => <ReferralCardSkeleton key={i} />)
       ) : count === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
+        <PlaceholderState
+          variant="no-data"
+          size="sm"
+          title={emptyTitle}
+          description={emptyDescription}
+        />
       ) : (
         children
       )}

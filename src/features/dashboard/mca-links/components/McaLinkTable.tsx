@@ -6,6 +6,7 @@ import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
   AmountFilterChip,
   CurrencyFilterChip,
@@ -277,21 +278,30 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
         </div>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={tableRows}
-        isLoading={isPending}
-        skeletonRows={8}
-        emptyTitle="No payment links found"
-        emptyDescription="Try adjusting your filters or search query"
-        rowKey={(row) => row.gid}
-        pageSize={MCA_LINKS_PAGE_LIMIT}
-        totalRows={totalCount}
-        page={page}
-        onPageChange={setPage}
-        tableLayout="content"
-        density="compact"
-      />
+      {!isPending && tableRows.length === 0 ? (
+        <PlaceholderState
+          variant="no-payment-links"
+          title="No payment links found"
+          description="Try adjusting your filters or search query"
+          className="py-16"
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          data={tableRows}
+          isLoading={isPending}
+          skeletonRows={8}
+          emptyTitle="No payment links found"
+          emptyDescription="Try adjusting your filters or search query"
+          rowKey={(row) => row.gid}
+          pageSize={MCA_LINKS_PAGE_LIMIT}
+          totalRows={totalCount}
+          page={page}
+          onPageChange={setPage}
+          tableLayout="content"
+          density="compact"
+        />
+      )}
 
       {/* Rendered alongside the table (not in place of it) so closing it
           leaves the table exactly as it was. */}

@@ -5,6 +5,7 @@ import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import {
   CountryFilterChip,
@@ -400,20 +401,28 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
       </div>
 
       {/* Desktop (lg+): the full table, columns and all. */}
-      <DataTable
-        className="hidden rounded-none border-0 lg:block"
-        columns={columns}
-        data={pageRows}
-        emptyTitle={emptyTitle}
-        emptyDescription={emptyDescription}
-        rowKey={(row) => row.id}
-        pageSize={CLIENT_PAGE_LIMIT}
-        totalRows={totalCount}
-        page={page}
-        onPageChange={setPage}
-        tableLayout="content"
-        density="compact"
-        isLoading={isLoading}
+      {!isLoading && pageRows.length === 0 ? (
+        <PlaceholderState
+          variant="no-data"
+          title={emptyTitle}
+          description={emptyDescription}
+          className="hidden py-16 lg:flex"
+        />
+      ) : (
+        <DataTable
+          className="hidden rounded-none border-0 lg:block"
+          columns={columns}
+          data={pageRows}
+          emptyTitle={emptyTitle}
+          emptyDescription={emptyDescription}
+          rowKey={(row) => row.id}
+          pageSize={CLIENT_PAGE_LIMIT}
+          totalRows={totalCount}
+          page={page}
+          onPageChange={setPage}
+          tableLayout="content"
+          density="compact"
+          isLoading={isLoading}
         // Edit rides the rowAction slot rather than a column of its own — the
         // same arrangement, and the same button treatment, as the Upload Invoice
         // action on the client's transactions table. Revealed on row hover and on
@@ -435,8 +444,9 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           >
             Edit
           </Button>
-        )}
-      />
+          )}
+        />
+      )}
 
       {/* Tablet + mobile (below lg): the same page's rows as cards. */}
       <ClientCardList

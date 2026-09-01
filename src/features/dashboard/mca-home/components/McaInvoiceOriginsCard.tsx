@@ -6,6 +6,7 @@ import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
 
@@ -196,9 +197,21 @@ export function McaInvoiceOriginsCard() {
                 ))}
               </div>
             ) : isError ? (
-              <p className="text-sm text-muted-foreground">Couldn&apos;t load invoice origins.</p>
+              <PlaceholderState
+                variant="error"
+                size="sm"
+                title="Couldn't load"
+                description="Invoice origins didn't load."
+                className="h-full py-2"
+              />
             ) : rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No invoiced volume in this period.</p>
+              <PlaceholderState
+                variant="no-analytics"
+                size="sm"
+                title="No invoiced volume"
+                description="No invoiced volume in this period."
+                className="h-full py-2"
+              />
             ) : (
               <div className="flex flex-col gap-3">
                 {rows.map((origin, i) => (
@@ -239,20 +252,29 @@ export function McaInvoiceOriginsCard() {
               ))
             ) : (
               <>
+                {/* Trend passed as null (hidden) whenever the figure it sits
+                    beside is zero — a percentage change against nothing reads as
+                    broken. */}
                 <StatCell
                   label="Total invoiced"
                   valueLabel={formatCompact(totalInvoiced, currency)}
-                  trendPct={totals?.totalInvoicedTrendPct ?? null}
+                  trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
                 <StatCell
                   label="Avg per country"
                   valueLabel={formatCompact(totals?.avgPerCountry ?? 0, currency)}
-                  trendPct={totals?.avgPerCountryTrendPct ?? null}
+                  trendPct={
+                    (totals?.avgPerCountry ?? 0) > 0 ? (totals?.avgPerCountryTrendPct ?? null) : null
+                  }
                 />
                 <StatCell
                   label={topShareLabel}
                   valueLabel={totals?.topCountry ? `${totals.topCountry.sharePct}%` : "—"}
-                  trendPct={totals?.topCountry?.shareTrendPct ?? null}
+                  trendPct={
+                    totals?.topCountry && totals.topCountry.sharePct > 0
+                      ? (totals.topCountry.shareTrendPct ?? null)
+                      : null
+                  }
                 />
                 <div>
                   <p className="text-xs text-muted-foreground">Active markets</p>

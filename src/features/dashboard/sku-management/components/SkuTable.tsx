@@ -9,6 +9,7 @@ import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { SkuCardList } from "@/features/dashboard/sku-management/components/SkuCardList";
 import { ProductPreviewModal } from "@/features/dashboard/sku-management/components/ProductPreviewModal";
 import { SkuRowActions } from "@/features/dashboard/sku-management/components/SkuRowActions";
@@ -304,25 +305,34 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
         />
       ) : (
         <>
-          <DataTable
-            className={cn(
-              "hidden rounded-none border-0 lg:block",
-              "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
-            )}
-            columns={columns}
-            data={products}
-            isLoading={isLoading}
-            emptyTitle={emptyTitle}
-            emptyDescription={emptyDescription}
-            rowKey={(row) => row.id}
-            rowAction={renderRowActions}
-            pageSize={SKU_PAGE_LIMIT}
-            totalRows={totalCount}
-            page={page}
-            onPageChange={setPage}
-            tableLayout="content"
-            density="compact"
-          />
+          {!isLoading && products.length === 0 ? (
+            <PlaceholderState
+              variant="no-data"
+              title={emptyTitle}
+              description={emptyDescription}
+              className="hidden py-16 lg:flex"
+            />
+          ) : (
+            <DataTable
+              className={cn(
+                "hidden rounded-none border-0 lg:block",
+                "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+              )}
+              columns={columns}
+              data={products}
+              isLoading={isLoading}
+              emptyTitle={emptyTitle}
+              emptyDescription={emptyDescription}
+              rowKey={(row) => row.id}
+              rowAction={renderRowActions}
+              pageSize={SKU_PAGE_LIMIT}
+              totalRows={totalCount}
+              page={page}
+              onPageChange={setPage}
+              tableLayout="content"
+              density="compact"
+            />
+          )}
 
           {/* Tablet + mobile (below lg): the same page's rows as cards. */}
           <SkuCardList

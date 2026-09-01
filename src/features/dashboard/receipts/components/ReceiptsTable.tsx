@@ -6,6 +6,7 @@ import { DataTable } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { type AmountRangeValue } from "@/components/common/filters/FilterChips";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -245,26 +246,35 @@ export function ReceiptsTable() {
         </div>
       </div>
 
-      <DataTable
-        className={cn(
-          "hidden rounded-none border-0 lg:block",
-          "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
-        )}
-        columns={columns}
-        data={pageRows}
-        isLoading={isLoading}
-        skeletonRows={8}
-        emptyTitle={emptyTitle}
-        emptyDescription={emptyDescription}
-        rowKey={(row) => row.gid}
-        pageSize={RECEIPTS_PAGE_LIMIT}
-        totalRows={totalCount}
-        page={page}
-        onPageChange={setPage}
-        rowAction={(row) => <ReceiptDownloadAction row={row} onDownload={onDownloadReceipt} />}
-        tableLayout="content"
-        density="compact"
-      />
+      {!isLoading && pageRows.length === 0 ? (
+        <PlaceholderState
+          variant="no-data"
+          title={emptyTitle}
+          description={emptyDescription}
+          className="hidden py-16 lg:flex"
+        />
+      ) : (
+        <DataTable
+          className={cn(
+            "hidden rounded-none border-0 lg:block",
+            "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+          )}
+          columns={columns}
+          data={pageRows}
+          isLoading={isLoading}
+          skeletonRows={8}
+          emptyTitle={emptyTitle}
+          emptyDescription={emptyDescription}
+          rowKey={(row) => row.gid}
+          pageSize={RECEIPTS_PAGE_LIMIT}
+          totalRows={totalCount}
+          page={page}
+          onPageChange={setPage}
+          rowAction={(row) => <ReceiptDownloadAction row={row} onDownload={onDownloadReceipt} />}
+          tableLayout="content"
+          density="compact"
+        />
+      )}
 
       <ReceiptCardList
         className="lg:hidden"

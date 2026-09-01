@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
@@ -508,22 +509,31 @@ export function McaInvoiceTable({
           </div>
         ) : (
           <>
-            <DataTable
-              className="hidden rounded-none border-0 lg:block"
-              columns={columns}
-              data={rows}
-              isLoading={isPending}
-              skeletonRows={8}
-              emptyTitle={emptyCopy.title}
-              emptyDescription={emptyCopy.description}
-              rowKey={(row) => row.id}
-              pageSize={INVOICES_PAGE_LIMIT}
-              totalRows={totalRows}
-              page={page}
-              onPageChange={setPage}
-              tableLayout="content"
-              density="compact"
-            />
+            {!isPending && rows.length === 0 ? (
+              <PlaceholderState
+                variant="no-invoices"
+                title={emptyCopy.title}
+                description={emptyCopy.description}
+                className="hidden py-16 lg:flex"
+              />
+            ) : (
+              <DataTable
+                className="hidden rounded-none border-0 lg:block"
+                columns={columns}
+                data={rows}
+                isLoading={isPending}
+                skeletonRows={8}
+                emptyTitle={emptyCopy.title}
+                emptyDescription={emptyCopy.description}
+                rowKey={(row) => row.id}
+                pageSize={INVOICES_PAGE_LIMIT}
+                totalRows={totalRows}
+                page={page}
+                onPageChange={setPage}
+                tableLayout="content"
+                density="compact"
+              />
+            )}
 
             <InvoiceCardList
               className="lg:hidden"

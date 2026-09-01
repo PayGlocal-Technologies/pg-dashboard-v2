@@ -6,12 +6,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  EmptyState,
   IconButton,
   Shimmer,
   StatusBadge,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { getInvoiceStatusMeta } from "@/features/dashboard/mca-invoices/constants";
@@ -174,7 +174,12 @@ export function InvoiceCardList({
       {isLoading ? (
         Array.from({ length: skeletonCount }).map((_, i) => <InvoiceCardSkeleton key={i} />)
       ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
+        <PlaceholderState
+          variant="no-invoices"
+          size="sm"
+          title={emptyTitle}
+          description={emptyDescription}
+        />
       ) : (
         rows.map((row) => <InvoiceCard key={row.id} row={row} handlers={handlers} />)
       )}

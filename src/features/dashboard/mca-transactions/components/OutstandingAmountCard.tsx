@@ -37,10 +37,9 @@ export function OutstandingAmountCard({ className }: { className?: string }) {
           className this component receives from TransactionsAnalyticsCarousel)
           leaves the extra space below the KPI rather than centering it. */}
       <CardContent className="flex flex-1 flex-col">
-        {/* Top row: icon left, pending-count chip right, vertically centered
-            against the icon (the KPI stack is its own row below, so there's no
-            taller sibling to align against here). */}
-        <div className="flex items-center justify-between gap-2">
+        {/* Top row: just the icon now. The pending-count chip moved down to
+            sit beside the title (see below). */}
+        <div className="flex items-center gap-2">
           {/* h-12 w-12/rounded-full/amber-500 at 10% opacity: same subtle
               tinted-circle treatment as the error state's icon elsewhere in
               this feature (see McaTransactionTable), just amber for
@@ -50,19 +49,21 @@ export function OutstandingAmountCard({ className }: { className?: string }) {
           <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
             <Icon name="clock" size={22} />
           </span>
-          {!isLoading && pendingCount > 0 && (
-            <Badge variant="secondary" size="sm" className="shrink-0">
-              {pendingCount.toLocaleString("en-IN")} pending transaction
-              {pendingCount === 1 ? "" : "s"}
-            </Badge>
-          )}
         </div>
 
-        {/* KPI stack: title then amount, mt-4 as the step down from the top
-            row, mt-1 within the stack itself for the tight title-to-amount
-            pairing. */}
+        {/* KPI stack: title (with the pending-count chip beside it) then
+            amount, mt-4 as the step down from the top row, mt-1 within the
+            stack itself for the tight title-to-amount pairing. */}
         <div className="mt-4">
-          <p className="text-sm font-semibold text-foreground">Documents pending</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm font-semibold text-foreground">Documents pending</p>
+            {!isLoading && pendingCount > 0 && (
+              <Badge variant="secondary" size="sm" className="shrink-0">
+                {pendingCount.toLocaleString("en-IN")} pending transaction
+                {pendingCount === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
           {isLoading ? (
             <Shimmer className="mt-1 h-9 w-32" />
           ) : (
