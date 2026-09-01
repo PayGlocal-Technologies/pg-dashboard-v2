@@ -53,7 +53,10 @@ export function SavedAmountCard({
             above, mt-1 within the stack itself for the tight title-to-amount
             pairing, same rhythm as Outstanding Amount's own KPI stack. */}
         <div className="mt-4">
-          <p className="text-sm font-semibold text-foreground">Saved amount vs banks</p>
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">Saved amount</span> <span className="text-muted-foreground">vs banks</span>
+          </p>
+     
           {isLoading ? (
             <Shimmer className="mt-1 h-9 w-32" />
           ) : (

@@ -74,7 +74,7 @@ export function McaCurrencySplitCard() {
       <div className="flex flex-nowrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">
-            Currency split <span className="font-normal text-muted-foreground">· Last 30 days</span>
+            Currency split <span className="text-xs font-normal text-muted-foreground">· Last 30 days</span>
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {metric === "volume"

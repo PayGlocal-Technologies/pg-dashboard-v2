@@ -58,14 +58,20 @@ export function TransactionDetailsDrawer({
   // Contextual coach-mark: runs once, the first time a merchant opens the drawer
   // on desktop (the expand action it points at doesn't exist on the bottom
   // sheet). No launcher button here — the drawer is transient, so the tour is
-  // tied to the open event instead. setState lives in the rAF callback.
+  // tied to the open event instead.
+  //
+  // Held back until the drawer has finished sliding in (~550ms) rather than
+  // firing on the same frame: opening the tour while the panel is still
+  // animating in made the spotlight pop up abruptly over a moving surface.
+  // Waiting lets the drawer settle, then the dim/card fade in on their own.
+  // setState lives in the timeout callback, per the purity lint rules.
   const [tourOpen, setTourOpen] = useState(false);
   useEffect(() => {
     if (!open || isBottomSheet) return;
-    const raf = requestAnimationFrame(() => {
+    const id = setTimeout(() => {
       if (!isGuideCompleted(TXN_DETAIL_GUIDE_KEY)) setTourOpen(true);
-    });
-    return () => cancelAnimationFrame(raf);
+    }, 550);
+    return () => clearTimeout(id);
   }, [open, isBottomSheet]);
 
   function closeTour() {
