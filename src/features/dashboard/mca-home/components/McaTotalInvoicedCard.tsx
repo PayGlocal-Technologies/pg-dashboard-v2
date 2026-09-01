@@ -52,7 +52,7 @@ export function McaTotalInvoicedCard() {
   return (
     <Card className="h-full gap-2 p-5">
       <h2 className="text-sm font-semibold text-foreground">
-        Total invoiced <span className="font-normal text-muted-foreground">· Last 30 days</span>
+        Total invoiced <span className="text-xs font-normal text-muted-foreground">· Last 30 days</span>
       </h2>
 
       <div>
