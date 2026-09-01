@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
   EMPTY_RELATIVE_RANGE,
   FilterChipsRow,
@@ -598,22 +599,31 @@ export function McaTransactionTable({
         ) : (
           <>
             {/* Desktop (lg+): the full table, columns and all. */}
-            <DataTable
-              className="hidden rounded-none border-0 lg:block"
-              columns={columns}
-              data={tableRows}
-              isLoading={isPending}
-              skeletonRows={8}
-              emptyTitle="No transactions found"
-              emptyDescription="Try adjusting your filters or search query"
-              rowKey={(row) => row.gid}
-              pageSize={TRANSACTIONS_PAGE_LIMIT}
-              totalRows={totalCount}
-              page={page}
-              onPageChange={setPage}
-              tableLayout="content"
-              density="compact"
-            />
+            {!isPending && tableRows.length === 0 ? (
+              <PlaceholderState
+                variant="no-transactions"
+                title="No transactions found"
+                description="Try adjusting your filters or search query"
+                className="hidden py-16 lg:flex"
+              />
+            ) : (
+              <DataTable
+                className="hidden rounded-none border-0 lg:block"
+                columns={columns}
+                data={tableRows}
+                isLoading={isPending}
+                skeletonRows={8}
+                emptyTitle="No transactions found"
+                emptyDescription="Try adjusting your filters or search query"
+                rowKey={(row) => row.gid}
+                pageSize={TRANSACTIONS_PAGE_LIMIT}
+                totalRows={totalCount}
+                page={page}
+                onPageChange={setPage}
+                tableLayout="content"
+                density="compact"
+              />
+            )}
 
             {/* Tablet + mobile (below lg): a vertical list of transaction
                 cards instead of table columns/header. `tableRows` is

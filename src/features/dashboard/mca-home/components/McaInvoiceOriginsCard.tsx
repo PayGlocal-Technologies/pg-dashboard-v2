@@ -6,6 +6,7 @@ import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
 
@@ -196,9 +197,21 @@ export function McaInvoiceOriginsCard() {
                 ))}
               </div>
             ) : isError ? (
-              <p className="text-sm text-muted-foreground">Couldn&apos;t load invoice origins.</p>
+              <PlaceholderState
+                variant="error"
+                size="sm"
+                title="Couldn't load"
+                description="Invoice origins didn't load."
+                className="h-full py-2"
+              />
             ) : rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No invoiced volume in this period.</p>
+              <PlaceholderState
+                variant="no-analytics"
+                size="sm"
+                title="No invoiced volume"
+                description="No invoiced volume in this period."
+                className="h-full py-2"
+              />
             ) : (
               <div className="flex flex-col gap-3">
                 {rows.map((origin, i) => (

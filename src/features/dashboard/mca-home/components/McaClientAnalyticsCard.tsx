@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import useNewPermissions from "@/hooks/useNewPermissions";
 import { useTopClients } from "@/features/dashboard/mca-home/hooks";
 
@@ -77,9 +78,21 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
             </div>
           ))
         ) : isError ? (
-          <p className="py-4 text-sm text-muted-foreground">Couldn&apos;t load client analytics.</p>
+          <PlaceholderState
+            variant="error"
+            size="sm"
+            title="Couldn't load"
+            description="Client analytics didn't load."
+            className="py-4"
+          />
         ) : !hasData ? (
-          <p className="py-4 text-sm text-muted-foreground">No client activity in this period.</p>
+          <PlaceholderState
+            variant="no-analytics"
+            size="sm"
+            title="No client activity"
+            description="No client activity in this period."
+            className="py-4"
+          />
         ) : (
           clients.map((client) => (
             <div key={client.client} className="flex flex-col gap-1.5">

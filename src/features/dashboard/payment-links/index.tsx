@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/utils";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { paymentLinkColumns, withRowClick } from "@/features/dashboard/payment-links/columns";
 import { PaymentLinksStatCards } from "@/features/dashboard/payment-links/components/PaymentLinksStatCards";
 import { PaymentLinkDetailsModal } from "@/features/dashboard/payment-links/components/PaymentLinkDetailsModal";
@@ -218,17 +219,25 @@ export function PaymentLinksFeature() {
           </div>
         </div>
 
-        <DataTable
-          columns={columns}
-          data={filteredRows}
-          emptyTitle="No payment links found"
-          emptyDescription="Try adjusting your filters or search query"
-          rowKey={(row) => row.id}
-          pageSize={PAYMENT_LINKS_PAGE_LIMIT}
-          density="compact"
-          tableLayout="content"
-          className="rounded-none border-0 border-t border-border"
-          rowAction={(row) => (
+        {filteredRows.length === 0 ? (
+          <PlaceholderState
+            variant="no-payment-links"
+            title="No payment links found"
+            description="Try adjusting your filters or search query"
+            className="border-t border-border py-16"
+          />
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredRows}
+            emptyTitle="No payment links found"
+            emptyDescription="Try adjusting your filters or search query"
+            rowKey={(row) => row.id}
+            pageSize={PAYMENT_LINKS_PAGE_LIMIT}
+            density="compact"
+            tableLayout="content"
+            className="rounded-none border-0 border-t border-border"
+            rowAction={(row) => (
             <Button
               variant="outline"
               size="sm"
@@ -238,8 +247,9 @@ export function PaymentLinksFeature() {
             >
               View details
             </Button>
-          )}
-        />
+            )}
+          />
+        )}
       </Card>
 
       <PaymentLinkDetailsModal row={detailsRow} open={detailsOpen} onOpenChange={setDetailsOpen} />

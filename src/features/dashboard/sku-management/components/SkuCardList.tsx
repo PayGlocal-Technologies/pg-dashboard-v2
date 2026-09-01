@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
+import { Button, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { SKU_PRICE_LOCALE, SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
@@ -139,7 +140,12 @@ export function SkuCardList({
       {isLoading ? (
         Array.from({ length: skeletonCount }).map((_, i) => <SkuCardSkeleton key={i} />)
       ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
+        <PlaceholderState
+          variant="no-data"
+          size="sm"
+          title={emptyTitle}
+          description={emptyDescription}
+        />
       ) : (
         rows.map((row) => (
           <SkuCard key={row.id} row={row} actions={rowAction?.(row)} onPreview={onPreview} />

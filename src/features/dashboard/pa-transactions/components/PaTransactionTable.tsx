@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { cn } from "@/lib/utils";
 import { usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
@@ -162,6 +163,13 @@ export function PaTransactionTable() {
             Retry
           </Button>
         </div>
+      ) : !isPending && rows.length === 0 ? (
+        <PlaceholderState
+          variant="no-transactions"
+          title="No transactions found"
+          description="Try adjusting your filters or search query"
+          className="py-16"
+        />
       ) : (
         <DataTable
           columns={columns}

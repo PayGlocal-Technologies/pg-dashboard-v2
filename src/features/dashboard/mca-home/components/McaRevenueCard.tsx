@@ -15,6 +15,7 @@ import { Button, Card, Separator, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
   revenueTimeframes,
   type RevenuePoint,
@@ -178,13 +179,19 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         {isLoading ? (
           <Shimmer className="h-full min-h-48 w-full" />
         ) : isError ? (
-          <p className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
-            Couldn&apos;t load revenue.
-          </p>
+          <PlaceholderState
+            variant="error"
+            title="Couldn't load"
+            description="Revenue didn't load."
+            className="h-full min-h-48"
+          />
         ) : !hasData ? (
-          <p className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
-            No revenue in this period.
-          </p>
+          <PlaceholderState
+            variant="no-analytics"
+            title="No revenue"
+            description="No revenue in this period."
+            className="h-full min-h-48"
+          />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>

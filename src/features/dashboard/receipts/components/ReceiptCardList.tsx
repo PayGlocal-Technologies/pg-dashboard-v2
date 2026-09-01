@@ -1,7 +1,8 @@
 "use client";
 
-import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
+import { Button, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { cn } from "@/lib/utils";
 import { ReceiptDownloadAction } from "@/features/dashboard/receipts/columns";
 import { formatReceiptAmount } from "@/features/dashboard/receipts/utils";
@@ -119,7 +120,12 @@ export function ReceiptCardList({
       {isLoading ? (
         Array.from({ length: skeletonCount }).map((_, i) => <ReceiptCardSkeleton key={i} />)
       ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
+        <PlaceholderState
+          variant="no-data"
+          size="sm"
+          title={emptyTitle}
+          description={emptyDescription}
+        />
       ) : (
         rows.map((row) => <ReceiptCard key={row.gid} row={row} onDownload={onDownload} />)
       )}

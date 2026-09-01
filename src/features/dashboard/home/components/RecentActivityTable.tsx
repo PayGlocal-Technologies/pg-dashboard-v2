@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useRouter } from "next/navigation";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import {
@@ -280,29 +281,47 @@ export function RecentActivityTable({
         </div>
 
         <TabsContent value="transactions" className="mt-3">
-          <DataTable<RecentTransaction>
-            columns={transactionColumns}
-            data={transactions.slice(0, 7)}
-            rowKey={(row) => row.id}
-            isLoading={isLoading}
-            skeletonRows={7}
-            className="rounded-none border-0 border-t border-border"
-            emptyTitle="No recent transactions"
-            rowAction={rowActionButton("View details")}
-          />
+          {!isLoading && transactions.length === 0 ? (
+            <PlaceholderState
+              variant="no-transactions"
+              size="sm"
+              title="No recent transactions"
+              className="border-t border-border py-12"
+            />
+          ) : (
+            <DataTable<RecentTransaction>
+              columns={transactionColumns}
+              data={transactions.slice(0, 7)}
+              rowKey={(row) => row.id}
+              isLoading={isLoading}
+              skeletonRows={7}
+              className="rounded-none border-0 border-t border-border"
+              emptyTitle="No recent transactions"
+              rowAction={rowActionButton("View details")}
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="settlements" className="mt-3">
-          <DataTable<RecentSettlement>
-            columns={settlementColumns}
-            data={settlements}
-            rowKey={(row) => row.id}
-            isLoading={isLoading}
-            skeletonRows={4}
-            className="rounded-none border-0 border-t border-border"
-            emptyTitle="No recent settlements"
-            rowAction={rowActionButton("View report")}
-          />
+          {!isLoading && settlements.length === 0 ? (
+            <PlaceholderState
+              variant="no-settlements"
+              size="sm"
+              title="No recent settlements"
+              className="border-t border-border py-12"
+            />
+          ) : (
+            <DataTable<RecentSettlement>
+              columns={settlementColumns}
+              data={settlements}
+              rowKey={(row) => row.id}
+              isLoading={isLoading}
+              skeletonRows={4}
+              className="rounded-none border-0 border-t border-border"
+              emptyTitle="No recent settlements"
+              rowAction={rowActionButton("View report")}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </Card>

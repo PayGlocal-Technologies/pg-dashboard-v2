@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useCurrencySplit } from "@/features/dashboard/mca-transactions/hooks";
 
 type CurrencySplitMetric = "volume" | "count";
@@ -114,13 +115,21 @@ export function McaCurrencySplitCard() {
           </div>
         </div>
       ) : isError ? (
-        <p className="flex flex-1 items-center text-sm text-muted-foreground">
-          Couldn&apos;t load currency split.
-        </p>
+        <PlaceholderState
+          variant="error"
+          size="sm"
+          title="Couldn't load"
+          description="Currency split didn't load."
+          className="flex-1 py-4"
+        />
       ) : !hasData ? (
-        <p className="flex flex-1 items-center text-sm text-muted-foreground">
-          No transactions in this period.
-        </p>
+        <PlaceholderState
+          variant="no-analytics"
+          size="sm"
+          title="No transactions"
+          description="No transactions in this period."
+          className="flex-1 py-4"
+        />
       ) : (
         <div className="flex flex-1 flex-wrap items-center gap-6">
           <div className="h-36 w-36 shrink-0">

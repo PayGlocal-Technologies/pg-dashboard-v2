@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/icon/Icon";
+import { AppImage } from "@/components/common/AppImage";
 import { Button } from "@/components/ui";
 import { useErrorReporting } from "@/hooks/useErrorReporting";
 
@@ -19,10 +19,16 @@ export default function Error({
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm">
         <div className="rounded-2xl border border-border bg-card p-8 shadow-sm text-center page-enter">
-          {/* Icon */}
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-full border border-amber-100 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-950/40">
-            <Icon name="alert-triangle" size={24} className="text-amber-500" />
-          </div>
+          {/* Illustration */}
+          <AppImage
+            src="/assets/something-went-wrong.svg"
+            alt=""
+            width={140}
+            height={140}
+            unoptimized
+            style={{ width: 140, height: 140 }}
+            className="mx-auto mb-4"
+          />
 
           {/* Heading */}
           <h1 className="text-xl font-semibold text-foreground">Something went wrong</h1>

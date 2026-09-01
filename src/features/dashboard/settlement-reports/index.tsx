@@ -8,6 +8,7 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
 import { useApp } from "@/stores/useApp";
 import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { MidGuard } from "@/components/common/MidGuard";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { Button, Card, DataTable, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
@@ -409,22 +410,24 @@ export function SettlementReportsFeature() {
               </div>
 
               {isError ? (
-                <div className="flex flex-col items-center gap-3 border-t border-border p-10 text-center">
-                  <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
-                    <Icon name="alert-circle" size={22} />
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                      Couldn&apos;t load settlements
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Something went wrong while fetching data.
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm" onClick={() => void refetch()}>
-                    Retry
-                  </Button>
-                </div>
+                <PlaceholderState
+                  variant="error"
+                  title="Couldn't load settlements"
+                  description="Something went wrong while fetching data."
+                  className="border-t border-border py-14"
+                  action={
+                    <Button variant="outline" size="sm" onClick={() => void refetch()}>
+                      Retry
+                    </Button>
+                  }
+                />
+              ) : !isPending && filteredSettlementRows.length === 0 ? (
+                <PlaceholderState
+                  variant="no-settlements"
+                  title="No settlements yet"
+                  description="Settlement reports will appear here once transactions are processed."
+                  className="border-t border-border py-14"
+                />
               ) : (
                 <DataTable
                   columns={buildSettlementColumns({ columnOrder, hiddenColumns })}

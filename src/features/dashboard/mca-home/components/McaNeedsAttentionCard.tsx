@@ -1,6 +1,7 @@
 import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useNeedsAttention } from "@/features/dashboard/mca-home/hooks";
 import type { NeedsAttentionInvoice } from "@/features/dashboard/mca-home/types";
 
@@ -77,14 +78,21 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
           ))}
         </div>
       ) : isError ? (
-        <p className="py-6 text-center text-[13px] text-muted-foreground">
-          Couldn&apos;t load invoices needing attention.
-        </p>
+        <PlaceholderState
+          variant="error"
+          size="sm"
+          title="Couldn't load"
+          description="Invoices needing attention didn't load."
+          className="py-4"
+        />
       ) : invoices.length === 0 ? (
-        <div className="flex flex-col items-center gap-1.5 py-6 text-center">
-          <Icon name="check-circle" className="h-6 w-6 text-emerald-500" aria-hidden />
-          <p className="text-[13px] text-muted-foreground">You&apos;re all caught up.</p>
-        </div>
+        <PlaceholderState
+          variant="no-overdue-invoices"
+          size="sm"
+          title="You're all caught up"
+          description="No invoices need your attention right now."
+          className="py-4"
+        />
       ) : (
         <div className="flex flex-col gap-3">
           {invoices.map((invoice) => {
