@@ -532,36 +532,6 @@ export function useDuplicateSku(): {
   };
 }
 
-// ── MID scope ───────────────────────────────────────────────────────────────
-
-interface SkuMidScope {
-  /** True when the merchant holds more than one PACB MID and has selected
-   *  none — the state in which "which account is this row on?" is a real
-   *  question, so the table shows a MID column and the page's actions ask which
-   *  MID they apply to. Mirrors pg-dashboard's `isMultiPacbMid && !selectedMid`. */
-  needsMidChoice: boolean;
-  /** Every PACB MID available to pick from, for those action pickers. */
-  midOptions: string[];
-  /** Commits a pick, so "Add item" opens the form already scoped to that MID —
-   *  the same store the header's merchant selector writes. */
-  selectMid: (mid: string) => void;
-}
-
-export function useSkuMidScope(): SkuMidScope {
-  const paCbMids = useApp((s) => s.paCbMids);
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
-  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
-
-  return {
-    needsMidChoice: paCbMids.length > 1 && !selectedMid,
-    midOptions: paCbMids,
-    // Colour is what the header's merchant chip is tinted with; pg-dashboard
-    // sets one here too when the SKU page selects a MID on the merchant's
-    // behalf, so the chip doesn't appear blank afterwards.
-    selectMid: (mid: string) => setSelectedMidDetails({ mid, color: "#E5B5FF" }),
-  };
-}
-
 // ── Merchant currencies ─────────────────────────────────────────────────────
 
 /**
