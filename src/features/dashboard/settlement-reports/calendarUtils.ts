@@ -1,3 +1,13 @@
+// Settlement-calendar domain logic only: the T+1 working-day math, the holiday
+// rules, and the month grid.
+//
+// Date formatting is not here. The date-key primitives (parseDateKey /
+// formatDateKey) and every "YYYY-MM-DD" display helper live in
+// @/lib/utils/format alongside the app's other date formatting, because they are
+// not calendar-specific — the payment-links duration filter needs them too, and
+// used to import them from this file to get them.
+import { formatDateKey, parseDateKey } from "@/lib/utils/format";
+
 export interface HolidayInfo {
   /** YYYY-MM-DD */
   date: string;
@@ -40,45 +50,9 @@ export interface SettlementSchedule {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-const WEEKDAY_NAMES = [
-  "Sunday",
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-];
-const MONTH_ABBR = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
-function parseDateKey(dateKey: string): Date {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(year!, month! - 1, day);
-}
-
 function isWeekend(date: Date): boolean {
   const day = date.getDay();
   return day === 0 || day === 6;
-}
-
-export function formatDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }
 
 export function addDays(dateKey: string, days: number): string {
@@ -180,36 +154,6 @@ export function isHolidayWithinDays(
     const diff = diffInDays(todayKey, h.date);
     return diff >= 0 && diff <= withinDays;
   });
-}
-
-export function formatMonthLabel(year: number, monthIndex: number): string {
-  return new Date(year, monthIndex, 1).toLocaleDateString("en-US", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
-export function formatShortDate(dateKey: string): string {
-  return parseDateKey(dateKey).toLocaleDateString("en-US", { day: "numeric", month: "short" });
-}
-
-/** "2026-08-09" -> "9 Aug", day-first to match the rest of the dashboard
- * (formatShortDate above is month-first, kept as-is for the calendar widget
- * it already powers). */
-export function formatDayMonth(dateKey: string): string {
-  const date = parseDateKey(dateKey);
-  return `${date.getDate()} ${MONTH_ABBR[date.getMonth()]}`;
-}
-
-/** "2026-08-09" -> "Saturday, 9 Aug". */
-export function formatWeekdayDate(dateKey: string): string {
-  const date = parseDateKey(dateKey);
-  return `${WEEKDAY_NAMES[date.getDay()]}, ${formatDayMonth(dateKey)}`;
-}
-
-/** "2026-08-09" -> "Saturday". */
-export function formatWeekdayName(dateKey: string): string {
-  return WEEKDAY_NAMES[parseDateKey(dateKey).getDay()]!;
 }
 
 /** Always returns 42 cells (6 full weeks) so the grid height stays constant across months. */

@@ -90,8 +90,7 @@ export function BusinessDetailsFeature() {
           toast.success("Business details updated successfully.");
           setEditing(false);
         },
-        onError: (err: Error) =>
-          toast.error(err.message || "Failed to update business details."),
+        onError: (err: Error) => toast.error(err.message || "Failed to update business details."),
       }
     );
   };
@@ -108,7 +107,7 @@ export function BusinessDetailsFeature() {
     {
       label: "Trade name",
       description: "The name customers see, if different from your legal name.",
-      value: isLoading ? "" : business?.tradeName ?? "Not available",
+      value: isLoading ? "" : (business?.tradeName ?? "Not available"),
     },
     {
       label: "Merchant ID",
@@ -186,7 +185,9 @@ export function BusinessDetailsFeature() {
                     placeholder="e.g. P0104, P0802"
                     className="text-[13px] font-medium text-foreground"
                   />
-                  <p className="text-[11px] text-muted-foreground">Separate multiple codes with commas.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    Separate multiple codes with commas.
+                  </p>
                   <div className="flex gap-2">
                     <Button type="button" size="sm" onClick={saveCodes} isLoading={isSaving}>
                       Save changes

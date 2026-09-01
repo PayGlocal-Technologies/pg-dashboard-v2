@@ -1,14 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  EmptyState,
-  Input,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogTitle, EmptyState, Input } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
 import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/create-invoice/constants";

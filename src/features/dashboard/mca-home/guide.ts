@@ -29,8 +29,7 @@ export const MCA_DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-quick-access",
     title: "Quick access",
-    description:
-      "Quickly find the tools and information you need to manage your virtual accounts.",
+    description: "Quickly find the tools and information you need to manage your virtual accounts.",
     side: "top",
     align: "start",
   },

@@ -1,10 +1,13 @@
 "use client";
 
-import { Button, type Column, StatusBadge, VisuallyHidden } from "@/components/ui";
+import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeTrailIcon, BadgeVariant } from "@payglocal_ui/flux-ui";
-import { Icon } from "@/components/icon";
-import { formatCurrency } from "@/lib/utils/format";
-import type { Referral, ReferralStatus } from "@/features/dashboard/refer-and-earn/types";
+import { formatCurrency, formatEpochDate } from "@/lib/utils/format";
+import type {
+  Referral,
+  ReferralRedemption,
+  ReferralStatus,
+} from "@/features/dashboard/refer-and-earn/types";
 
 // ── Status mapping: raw value → display meta ─────────────────────────────────
 // Same shape as MCA Links' MCA_LINK_STATUS_META, so every table in the
@@ -35,66 +38,22 @@ export function getReferralStatusMeta(raw: string): StatusMeta {
 }
 
 /**
- * The reward, or a dash while it is still unearned — a zero amount would read
- * as "this referral earned nothing" rather than "not yet".
+ * The reward this referral accrued. Always a figure, never a dash: the credit
+ * carries its full amount from the moment it is minted, and `isRewardReleased`
+ * below is what distinguishes money already available from money still held.
  */
 export function formatReferralReward(row: Referral): string {
-  if (row.rewardAmount == null) return "—";
   return formatCurrency(parseFloat(row.rewardAmount), row.rewardCurrency, "en-US");
 }
 
-// ── Remind action ────────────────────────────────────────────────────────────
-
 /**
- * Whether a row can still be nudged. Only a referral still in progress has
- * anything left to complete — one that already earned its reward or had it
- * waived is done, and reminding it would have nothing to point at.
+ * Whether the reward has actually been released to the wallet, which is what
+ * decides whether the figure is set solid or greyed back. A held reward is real
+ * money the merchant has accrued, so it is shown — just not as emphatically as
+ * one they can already spend.
  */
-export function canRemind(row: Referral): boolean {
-  return row.status === "PENDING" || row.status === "ACTIVATED";
-}
-
-export interface ReferralRemindActions {
-  /** Sends the nudge for one row. */
-  onRemind: (row: Referral) => void;
-  /**
-   * Rows already reminded in this session. Held by the caller rather than by
-   * each button so the state survives paging between the table and the card
-   * list, which render the same rows from the same set.
-   */
-  remindedIds: ReadonlySet<string>;
-}
-
-/**
- * The row action, shared by the desktop table and the mobile cards so there is
- * one button treatment and one sent-state rule across both.
- *
- * `h-8` rather than the size's own 36px: the table's comfortable density gives
- * a 56px row, and 32px is what fits inside it once the cell's padding is
- * trimmed (see the column's `cellClassName`) without the action becoming what
- * sets the row height.
- */
-export function ReferralRemindButton({
-  row,
-  onRemind,
-  remindedIds,
-}: { row: Referral } & ReferralRemindActions) {
-  const sent = remindedIds.has(row.id);
-
-  return (
-    <Button
-      type="button"
-      variant="secondary"
-      size="sm"
-      disabled={sent}
-      onClick={() => onRemind(row)}
-      leftIcon={<Icon name={sent ? "check" : "bell"} size={13} />}
-      aria-label={sent ? `Reminder already sent to ${row.fullName}` : `Remind ${row.fullName}`}
-      className="h-8 min-h-8"
-    >
-      {sent ? "Sent" : "Remind"}
-    </Button>
-  );
+export function isRewardReleased(row: Referral): boolean {
+  return row.status === "REWARD_EARNED" || row.status === "WAIVED";
 }
 
 // ── Column definitions ───────────────────────────────────────────────────────
@@ -105,7 +64,7 @@ export function ReferralRemindButton({
 // max-width on their block-level cell content, which is what actually bounds a
 // column under the automatic table algorithm: a long name or address truncates
 // rather than stretching the whole table.
-export function buildReferralColumns(actions: ReferralRemindActions): Column<Referral>[] {
+export function buildReferralColumns(): Column<Referral>[] {
   return [
     {
       key: "fullName",
@@ -131,9 +90,9 @@ export function buildReferralColumns(actions: ReferralRemindActions): Column<Ref
       render: (row) => (
         <span
           className={
-            row.rewardAmount == null
-              ? "text-[13px] tabular-nums text-muted-foreground"
-              : "text-[13px] font-semibold tabular-nums text-foreground"
+            isRewardReleased(row)
+              ? "text-[13px] font-semibold tabular-nums text-foreground"
+              : "text-[13px] tabular-nums text-muted-foreground"
           }
         >
           {formatReferralReward(row)}
@@ -150,22 +109,57 @@ export function buildReferralColumns(actions: ReferralRemindActions): Column<Ref
       ),
     },
     {
-      key: "remind",
-      // No visible header — the buttons label themselves. The name is still in
-      // the accessibility tree so the column is announced like the other four.
-      header: <VisuallyHidden>Reminder</VisuallyHidden>,
-      // Trims the comfortable density's `py-4` to `py-2` for this cell alone:
-      // 32px of button inside 8px of padding is 48px, under the row's own 56px
-      // minimum, so the action costs the row no height. `cellClassName` is
-      // merged last by DataTable, which is what lets it win over the density
-      // padding rather than sitting alongside it.
-      cellClassName: "py-2",
-      // No button at all for a completed or waived row, rather than a disabled
-      // one — there is nothing left for it to do. The cell is simply empty:
-      // it is still the same `<td>` in the same column, so the column itself
-      // stays aligned across every row without a placeholder standing in for
-      // the button.
-      render: (row) => (canRemind(row) ? <ReferralRemindButton row={row} {...actions} /> : null),
+      key: "createdAt",
+      header: "Referred on",
+      render: (row) => (
+        <span className="whitespace-nowrap text-[13px] tabular-nums text-muted-foreground">
+          {formatEpochDate(row.createdAt)}
+        </span>
+      ),
+    },
+  ];
+}
+
+// ── Redeemed tab ─────────────────────────────────────────────────────────────
+
+/**
+ * The redeemed table's columns — reference, amount, date, the same three
+ * pg-dashboard shows for its "Redeemed Referrals" tab.
+ *
+ * There is no name or email column here and there cannot be one: a redemption is
+ * a drawdown of the wallet as a whole, with no referral behind it to name (see
+ * ReferralRedemption). The amount is signed and coloured as a deduction, since
+ * this is money leaving the reward wallet to come off an invoice.
+ */
+export function buildRedemptionColumns(): Column<ReferralRedemption>[] {
+  return [
+    {
+      key: "id",
+      header: "Reference number",
+      render: (row) => (
+        <span className="block max-w-[20rem] truncate font-mono text-[12px] text-muted-foreground">
+          {row.id}
+        </span>
+      ),
+    },
+    {
+      key: "amount",
+      header: "Redeemed amount",
+      align: "right",
+      render: (row) => (
+        <span className="whitespace-nowrap text-[13px] font-semibold tabular-nums text-foreground">
+          −{formatCurrency(parseFloat(row.amount), row.currency, "en-US")}
+        </span>
+      ),
+    },
+    {
+      key: "createdAt",
+      header: "Redeemed on",
+      render: (row) => (
+        <span className="whitespace-nowrap text-[13px] tabular-nums text-muted-foreground">
+          {formatEpochDate(row.createdAt)}
+        </span>
+      ),
     },
   ];
 }

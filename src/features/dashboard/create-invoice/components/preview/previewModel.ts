@@ -1,9 +1,5 @@
 import { formatDate } from "@/lib/utils/format";
-import {
-  getAmount,
-  getInvoiceTotals,
-  themeFor,
-} from "@/features/dashboard/create-invoice/helpers";
+import { getAmount, getInvoiceTotals, themeFor } from "@/features/dashboard/create-invoice/helpers";
 import { INVOICE_LABELS, type InvoiceLabels } from "@/features/dashboard/create-invoice/labels";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";
 import type {

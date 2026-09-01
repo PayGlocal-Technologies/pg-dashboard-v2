@@ -1,4 +1,17 @@
-const MONTHS_SHORT = [
+// The app's month and day names, spelled out rather than read from Intl.
+//
+// Every date this app renders is built from these four tables, and none of them
+// go through toLocaleDateString. That is deliberate: Intl output varies with the
+// reader's locale and timezone, so a server-rendered date and the client's
+// rehydration of it can disagree and trigger a hydration mismatch. Fixed English
+// strings render identically in both places.
+//
+// Exported because features kept declaring their own copies (the settlement
+// calendar had a second month table and a second weekday table of its own) and
+// then drifting — abbreviate one list differently and two screens disagree about
+// what August is called.
+
+export const MONTHS_SHORT = [
   "Jan",
   "Feb",
   "Mar",
@@ -13,7 +26,7 @@ const MONTHS_SHORT = [
   "Dec",
 ] as const;
 
-const MONTHS_LONG = [
+export const MONTHS_LONG = [
   "January",
   "February",
   "March",
@@ -28,7 +41,17 @@ const MONTHS_LONG = [
   "December",
 ] as const;
 
-const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+export const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+export const DAYS_LONG = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
 
 /** 1st/2nd/3rd/4th..., with the 11th-13th exception. */
 function ordinalSuffix(day: number): string {
@@ -181,48 +204,81 @@ export function formatNumber(num: number): string {
   return num.toString();
 }
 
-// Spelled out rather than read from Intl: a billing period is a calendar month,
-// not a moment, so the label must not vary with the reader's locale or timezone
-// the way toLocaleString would. "2026-08" reads "August 2026" for everyone, and
-// the same reasoning that keeps formatDate on fixed English strings (below)
-// keeps these here.
-export const MONTH_LABELS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
+// Kept as names for the billing-period callers that already read them. They were
+// a second, character-for-character copy of the two tables at the top of this
+// file until they were pointed at them — one set of month names per app.
+export const MONTH_LABELS = MONTHS_LONG;
 
 /** The same twelve, abbreviated — for anything laying months out in a grid. */
-export const MONTH_SHORT_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
+export const MONTH_SHORT_LABELS = MONTHS_SHORT;
+
+/** (2026, 7) → "August 2026". `monthIndex` is 0-based, as Date reports it. */
+export function formatMonthYearLabel(year: number, monthIndex: number): string {
+  return `${MONTHS_LONG[monthIndex]} ${year}`;
+}
 
 /** "2026-08" → "August 2026". Returns the raw value if it isn't a "YYYY-MM" pair. */
 export function formatMonthLabel(periodMonth: string): string {
   const [year, month] = periodMonth.split("-");
-  const name = MONTH_LABELS[Number(month) - 1];
+  const name = MONTHS_LONG[Number(month) - 1];
   if (!year || !name) return periodMonth;
-  return `${name} ${year}`;
+  return formatMonthYearLabel(Number(year), Number(month) - 1);
+}
+
+// ── Date keys ────────────────────────────────────────────────────────────────
+//
+// A "date key" is a calendar day written "YYYY-MM-DD" — the form the settlement
+// calendar, the duration filters and the settlement APIs all pass days around
+// in. A day, not a moment: no time, no timezone.
+//
+// These live here rather than beside the settlement calendar because three
+// separate files had grown their own private copy of parseDateKey, and the two
+// duration filters were reaching into the calendar's own module for the rest.
+
+/**
+ * "2026-08-09" → a Date at local midnight on that day.
+ *
+ * Built from the parts rather than handed to the Date constructor: `new
+ * Date("2026-08-09")` parses as UTC midnight, which is the *previous* day for
+ * anyone behind UTC, so a date key would render as the day before its own value.
+ */
+export function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year!, month! - 1, day);
+}
+
+/** The inverse: a Date → "2026-08-09", read in local time. */
+export function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/** "2026-08-09" → "Aug 9", month-first, for the settlement calendar widget. */
+export function formatShortDate(dateKey: string): string {
+  const date = parseDateKey(dateKey);
+  return `${MONTHS_SHORT[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
+ * "2026-08-09" → "9 Aug", day-first to match the rest of the dashboard.
+ * formatShortDate above is month-first, kept that way for the calendar widget it
+ * already powers.
+ */
+export function formatDayMonth(dateKey: string): string {
+  const date = parseDateKey(dateKey);
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
+}
+
+/** "2026-08-09" → "Saturday, 9 Aug". */
+export function formatWeekdayDate(dateKey: string): string {
+  return `${DAYS_LONG[parseDateKey(dateKey).getDay()]}, ${formatDayMonth(dateKey)}`;
+}
+
+/** "2026-08-09" → "Saturday". */
+export function formatWeekdayName(dateKey: string): string {
+  return DAYS_LONG[parseDateKey(dateKey).getDay()]!;
 }
 
 /**
@@ -363,6 +419,46 @@ export function formatTransactionDateOnly(raw: string | null | undefined): strin
   if (!raw) return "—";
   const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
   return parsed ? formatTransactionDate(parsed) : raw;
+}
+
+/**
+ * Parses epoch milliseconds, which several APIs send as a string rather than a
+ * number ("1771329858260").
+ *
+ * The string form is why this exists as its own step: `new Date("1771329858260")`
+ * is an Invalid Date, since the Date constructor reads a string as a date
+ * *format*, not as a count of milliseconds. It has to go through Number first,
+ * and every caller that forgot got a silently broken date.
+ */
+export function parseEpochMillis(value: string | number | null | undefined): Date | null {
+  if (value === null || value === undefined || value === "") return null;
+  const millis = Number(value);
+  if (!Number.isFinite(millis)) return null;
+  const date = new Date(millis);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Epoch millis → the app-wide transaction timestamp form, "24 Jul '26, 03:32 PM".
+ *
+ * `fallback` is what an absent or unparseable value renders as. It defaults to
+ * the em dash every other formatter here falls back to; the settlement timeline
+ * passes "" instead, because a step whose timestamp is not meaningful yet omits
+ * the line rather than showing a placeholder inside a sentence.
+ */
+export function formatEpochDateTime(
+  value: string | number | null | undefined,
+  fallback = "—"
+): string {
+  const date = parseEpochMillis(value);
+  return date ? formatTransactionDateTime(date) : fallback;
+}
+
+/** Epoch millis → date only, "31 Aug 2026". */
+export function formatEpochDate(value: string | number | null | undefined, fallback = "—"): string {
+  const date = parseEpochMillis(value);
+  if (!date) return fallback;
+  return formatDate(date, { day: "2-digit", month: "short", year: "numeric" });
 }
 
 /**

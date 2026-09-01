@@ -74,7 +74,8 @@ export function McaCurrencySplitCard() {
       <div className="flex flex-nowrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-sm font-semibold text-foreground">
-            Currency split <span className="text-xs font-normal text-muted-foreground">· Last 30 days</span>
+            Currency split{" "}
+            <span className="text-xs font-normal text-muted-foreground">· Last 30 days</span>
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {metric === "volume"
@@ -147,7 +148,10 @@ export function McaCurrencySplitCard() {
             {slices.map((slice) => (
               <li key={slice.key} className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-2 text-muted-foreground">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: slice.color }} />
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                    style={{ background: slice.color }}
+                  />
                   {slice.label}
                 </span>
                 <span className="font-semibold tabular-nums text-foreground">

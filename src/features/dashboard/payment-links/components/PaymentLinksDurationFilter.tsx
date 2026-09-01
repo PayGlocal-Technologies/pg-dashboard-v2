@@ -9,10 +9,7 @@ import {
   type DateRangeValue,
   type DurationPickMode,
 } from "@/components/common/DateRangeCalendarPicker";
-import {
-  formatDateKey,
-  formatShortDate,
-} from "@/features/dashboard/settlement-reports/calendarUtils";
+import { formatDateKey, formatShortDate, parseDateKey } from "@/lib/utils/format";
 
 export type DurationPreset = "today" | "last7" | "last30" | "last3months" | "custom";
 
@@ -35,10 +32,6 @@ const PRESETS: { value: Exclude<DurationPreset, "custom">; label: string }[] = [
   { value: "last30", label: "Last 30 days" },
   { value: "last3months", label: "Last 3 months" },
 ];
-
-function parseDateKey(dateKey: string): Date {
-  return new Date(`${dateKey}T00:00:00`);
-}
 
 function durationLabel(value: PaymentLinksDurationValue): string {
   const preset = PRESETS.find((p) => p.value === value.preset);

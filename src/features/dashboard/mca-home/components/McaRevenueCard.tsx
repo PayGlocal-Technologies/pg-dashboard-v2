@@ -1,7 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button, Card, Separator, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -28,7 +37,11 @@ function buildRevenueRanges(): Record<RevenueTimeframe, { startDate: string; end
     start.setDate(start.getDate() - days);
     return { startDate: iso(start), endDate: iso(end) };
   };
-  return { "1W": back(TIMEFRAME_DAYS["1W"]), "1M": back(TIMEFRAME_DAYS["1M"]), "3M": back(TIMEFRAME_DAYS["3M"]) };
+  return {
+    "1W": back(TIMEFRAME_DAYS["1W"]),
+    "1M": back(TIMEFRAME_DAYS["1M"]),
+    "3M": back(TIMEFRAME_DAYS["3M"]),
+  };
 }
 
 /**
@@ -68,7 +81,9 @@ function RevenueTooltip({
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
       <p className="font-medium text-muted-foreground">{point.x}</p>
-      <p className="font-semibold tabular-nums text-foreground">{point.current.toLocaleString("en-IN")}</p>
+      <p className="font-semibold tabular-nums text-foreground">
+        {point.current.toLocaleString("en-IN")}
+      </p>
     </div>
   );
 }

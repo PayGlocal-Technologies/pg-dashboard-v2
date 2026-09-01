@@ -1,27 +1,22 @@
 import type {
   LeaderboardEntry,
   Referral,
+  ReferralRedemption,
   ReferralStandings,
   ReferralStatus,
   ReferralTransaction,
+  ReferralWallet,
 } from "@/features/dashboard/refer-and-earn/types";
 
 /**
- * Whether a referral is through its qualifying transaction. A waived referral
- * earned its reward before any of it could come off an invoice, so it counts as
- * completed too — the completed figure is "made it to the end", not "has an
- * untouched reward sitting there".
+ * Every figure the analytics surfaces show. All of it comes from the wallet —
+ * see summarizeWallet.
  */
-function isCompleted(status: ReferralStatus): boolean {
-  return status === "REWARD_EARNED" || status === "WAIVED";
-}
-
 export interface ReferralSummary {
-  /** Sum of every reward already credited to the referrer. */
+  /** Total earned from referrals that converted. */
   totalEarned: number;
-  /** Currency the rewards are paid in — see the note in summarizeReferrals. */
   earnedCurrency: string;
-  /** Everyone invited through the referral link, at any stage. */
+  /** Everyone onboarded through the referral link, at any stage. */
   totalInvited: number;
   /** Invited but not yet through their first qualifying transaction. */
   inProgress: number;
@@ -31,53 +26,57 @@ export interface ReferralSummary {
   totalWaived: number;
   /**
    * The pool the waiver draws from — the earned total. Kept as its own field so
-   * the "waived of eligible" pair reads from one place and the two figures can
-   * never be computed from different row sets.
+   * the "waived of eligible" pair reads from one place.
    */
   waivedEligible: number;
 }
 
+/** What the analytics show before the wallet has loaded, or if it has none. */
+const EMPTY_SUMMARY: ReferralSummary = {
+  totalEarned: 0,
+  earnedCurrency: "USD",
+  totalInvited: 0,
+  inProgress: 0,
+  completed: 0,
+  totalWaived: 0,
+  waivedEligible: 0,
+};
+
+/** Wallet fields arrive as strings for money and numbers for counts. */
+function toNumber(value: string | number | null | undefined): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 /**
- * Derives the analytics row from the same rows the earnings table renders, so
- * the two can never disagree — there is no separate totals source to drift from.
+ * The analytics row, the Total earned card and the waived card, all from the
+ * wallet and nothing else.
  *
- * The referral program pays one reward in one currency, so the earned total is a
- * single figure and `earnedCurrency` is taken from the first credited reward. If
- * the eventual API ever returns rewards in mixed currencies this needs to become
- * a per-currency breakdown rather than one sum.
+ * The transactions feed is deliberately not an input here. It is the table's
+ * data source and only that: it holds one row per reward already minted, so
+ * anything derived from it undercounts the funnel — a referral who signed up and
+ * has not transacted has no row at all, and a merchant whose history is longer
+ * than one page would have their totals silently truncated. The wallet states
+ * all six figures outright, so there is nothing left to infer or reconcile.
  */
-export function summarizeReferrals(referrals: Referral[]): ReferralSummary {
-  let totalEarned = 0;
-  let totalWaived = 0;
-  let earnedCurrency: string | null = null;
-  let completed = 0;
+export function summarizeWallet(wallet: ReferralWallet | null): ReferralSummary {
+  if (!wallet) return EMPTY_SUMMARY;
 
-  for (const referral of referrals) {
-    if (isCompleted(referral.status)) completed += 1;
-
-    const waived = referral.waivedAmount == null ? NaN : parseFloat(referral.waivedAmount);
-    if (!Number.isNaN(waived)) totalWaived += waived;
-
-    if (referral.rewardAmount == null) continue;
-
-    const amount = parseFloat(referral.rewardAmount);
-    if (Number.isNaN(amount)) continue;
-
-    totalEarned += amount;
-    earnedCurrency ??= referral.rewardCurrency;
-  }
+  const totalEarned = toNumber(wallet.totalEarnedAmount);
+  const totalInvited = toNumber(wallet.referredCount);
+  const completed = toNumber(wallet.convertedReferralCount);
 
   return {
     totalEarned,
-    earnedCurrency: earnedCurrency ?? "USD",
-    totalInvited: referrals.length,
-    // Everyone who isn't through their qualifying transaction yet — Pending and
-    // Activated both count as in progress.
-    inProgress: referrals.length - completed,
+    earnedCurrency: wallet.currency || EMPTY_SUMMARY.earnedCurrency,
+    totalInvited,
+    // Signed up but not yet transacted. Clamped rather than trusted, so a wallet
+    // whose two counts briefly disagree cannot draw a negative bar.
+    inProgress: Math.max(0, totalInvited - completed),
     completed,
-    totalWaived,
-    // The earned total is what is eligible to be waived — a reward has to be
-    // credited before any of it can come off a fee.
+    totalWaived: toNumber(wallet.totalWithdrawn),
+    // Everything earned is eligible to come off the MDR, so the waived card
+    // reads totalWithdrawn against this.
     waivedEligible: totalEarned,
   };
 }
@@ -152,24 +151,59 @@ export function buildLeaderboardView(
 // ── Wire-up: influencer transactions → the Referral rows the UI consumes ─────
 
 /**
- * Maps the influencer service's CREDIT transactions onto the `Referral` rows the
- * earnings table and analytics already read. Each CREDIT is one referred
- * merchant's reward; DEBITs are wallet withdrawals (not per-referral) and are
- * reconciled separately from the wallet totals, so they are dropped here.
+ * Newest first. The feed arrives ordered by the backend's `statusReferenceNumber`
+ * sort key, which sorts COMPLETED ahead of PENDING and leaves the rows in no
+ * chronological order at all — so both tables sort here rather than paging
+ * straight off the array they were handed.
+ */
+function byNewestFirst<T extends { createdAt: string }>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+}
+
+/**
+ * Maps the influencer service's referral CREDITs onto the `Referral` rows the
+ * earnings table and analytics read.
  *
- * `waivedAmount` stays null: the transactions feed has no per-referral waived
- * slice, so the table shows a dash and the waived total comes from the wallet.
+ * The amount is carried through for pending rows as well as completed ones: a
+ * CREDIT is minted with the full reward on it, and its status says whether that
+ * money has been released (available) or is still held. Blanking the pending
+ * amounts made the page's earned total disagree with `wallet.totalEarnings`,
+ * which counts them.
+ *
+ * DEBITs are dropped here and mapped separately — see mapTransactionsToRedemptions.
  */
 export function mapTransactionsToReferrals(transactions: ReferralTransaction[]): Referral[] {
-  return transactions
-    .filter((txn) => txn.transactionType === "CREDIT")
-    .map((txn) => ({
-      id: txn.referenceNumber,
-      fullName: txn.meta?.name || "—",
-      emailId: txn.meta?.email ?? "",
-      status: txn.status === "COMPLETED" ? "REWARD_EARNED" : "PENDING",
-      rewardAmount: txn.status === "COMPLETED" ? txn.amount : null,
-      waivedAmount: null,
-      rewardCurrency: txn.currency,
-    }));
+  return byNewestFirst(
+    transactions
+      .filter((txn) => txn.transactionType === "CREDIT" && txn.reason === "REFERRAL_REWARD")
+      .map((txn) => ({
+        id: txn.referenceNumber,
+        referralMid: txn.referralMid,
+        fullName: txn.meta?.name || "—",
+        emailId: txn.meta?.email ?? "",
+        status: (txn.status === "COMPLETED" ? "REWARD_EARNED" : "PENDING") as ReferralStatus,
+        rewardAmount: txn.amount,
+        rewardCurrency: txn.currency,
+        createdAt: txn.creationTime,
+      }))
+  );
+}
+
+/**
+ * Maps the DEBIT side of the same feed — each one a slice of the reward wallet
+ * already applied against the merchant's fees.
+ */
+export function mapTransactionsToRedemptions(
+  transactions: ReferralTransaction[]
+): ReferralRedemption[] {
+  return byNewestFirst(
+    transactions
+      .filter((txn) => txn.transactionType === "DEBIT")
+      .map((txn) => ({
+        id: txn.referenceNumber,
+        amount: txn.amount,
+        currency: txn.currency,
+        createdAt: txn.creationTime,
+      }))
+  );
 }

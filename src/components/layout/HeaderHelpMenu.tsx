@@ -24,15 +24,7 @@ const HELP_AVAILABILITY = "Available Monday to Friday, 9:30am to 6:30pm IST";
  * `tel:` off to, and a merchant reading this is far more likely to be pasting
  * the address into whatever they are already writing in.
  */
-function HelpContactRow({
-  icon,
-  label,
-  value,
-}: {
-  icon: IconName;
-  label: string;
-  value: string;
-}) {
+function HelpContactRow({ icon, label, value }: { icon: IconName; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 px-2 py-2">
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">

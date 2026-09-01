@@ -82,21 +82,21 @@ export function QuickAccess({
         Quick access
       </h2>
 
-    <div className="w-fit max-w-full">
-      <div className="flex flex-wrap gap-2.5">
-        {quickActions.map((item) => (
-          <Button
-            key={item.id}
-            variant="ghost"
-            onClick={() => handleAction(item.id)}
-            className={quickAccessCardClass}
-          >
-            <Icon name={item.icon} className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-            <span className="text-left text-[11px] font-medium leading-snug text-foreground sm:text-xs">
-              {item.label}
-            </span>
-          </Button>
-        ))}
+      <div className="w-fit max-w-full">
+        <div className="flex flex-wrap gap-2.5">
+          {quickActions.map((item) => (
+            <Button
+              key={item.id}
+              variant="ghost"
+              onClick={() => handleAction(item.id)}
+              className={quickAccessCardClass}
+            >
+              <Icon name={item.icon} className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+              <span className="text-left text-[11px] font-medium leading-snug text-foreground sm:text-xs">
+                {item.label}
+              </span>
+            </Button>
+          ))}
 
           {handleEditDashboard != null && !editMode && (
             <Button

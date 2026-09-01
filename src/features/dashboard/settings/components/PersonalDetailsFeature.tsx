@@ -76,10 +76,12 @@ export function PersonalDetailsFeature() {
     const body = new FormData();
     body.append("merchantLogo", file);
     uploadLogo(body, {
-      onSuccess: (res) => {
+      onSuccess: () => {
         URL.revokeObjectURL(previewUrl);
-        const url = res?.data?.merchantLogoPublicUrl;
-        if (url) setPhotoUrl(url);
+        // Drop the local preview so the display falls back to the cache-busted
+        // URL the hook just wrote into the shared profile cache (see
+        // useUpdateMerchantLogo) — same source the sidebar avatar reads.
+        setPhotoUrl(null);
         toast.success("Logo updated.");
       },
       onError: () => {

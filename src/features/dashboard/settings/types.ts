@@ -32,7 +32,9 @@ export interface MerchantProfileData {
 }
 
 /** Envelope-tolerant: read `data` if the response wraps, else the flat body. */
-export type MerchantProfileResponse = { data?: MerchantProfileData | null } & Partial<MerchantProfileData>;
+export type MerchantProfileResponse = {
+  data?: MerchantProfileData | null;
+} & Partial<MerchantProfileData>;
 
 /** Response to the logo upload — carries the stored public URL to display. */
 export interface MerchantLogoUploadData {

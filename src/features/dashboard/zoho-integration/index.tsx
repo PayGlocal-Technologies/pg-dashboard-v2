@@ -3,7 +3,7 @@
 import { Badge, Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatEpochMillis } from "@/features/dashboard/mca-transactions/timeline/format";
+import { formatEpochDateTime } from "@/lib/utils/format";
 import { useZohoIntegration } from "@/features/dashboard/zoho-integration/hooks";
 import { ZohoConnectDialog } from "@/features/dashboard/zoho-integration/components/ZohoConnectDialog";
 import { ZohoDisconnectDialog } from "@/features/dashboard/zoho-integration/components/ZohoDisconnectDialog";
@@ -107,7 +107,7 @@ export function ZohoIntegrationCard() {
               <p className="text-[13px] text-muted-foreground">
                 {isFirstSync
                   ? "Ready to sync"
-                  : `Last synced ${lastSyncedTime ? formatEpochMillis(lastSyncedTime) : "unknown"}`}
+                  : `Last synced ${lastSyncedTime ? formatEpochDateTime(lastSyncedTime, "") : "unknown"}`}
               </p>
               {syncNowButton}
             </div>

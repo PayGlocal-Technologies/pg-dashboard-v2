@@ -159,13 +159,7 @@ function SaveBody({
       </div>
 
       <div className="mt-5 flex justify-end gap-2">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={isSaving}
-          onClick={onCancel}
-        >
+        <Button type="button" variant="secondary" size="sm" disabled={isSaving} onClick={onCancel}>
           Cancel
         </Button>
         <Button

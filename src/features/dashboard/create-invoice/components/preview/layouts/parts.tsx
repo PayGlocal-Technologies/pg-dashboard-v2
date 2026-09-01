@@ -110,11 +110,7 @@ export function PartyBlock({
       {lines.map((line, index) => (
         <p
           key={`${line}-${index}`}
-          className={cn(
-            "text-[12px] leading-snug text-muted-foreground/80",
-            WRAPS,
-            bodyClassName
-          )}
+          className={cn("text-[12px] leading-snug text-muted-foreground/80", WRAPS, bodyClassName)}
         >
           {line}
         </p>
@@ -139,9 +135,7 @@ export function ItemMeta({ item, className }: { item: PreviewItem; className?: s
   if (!item.codeLabel && !item.gstLabel) return null;
 
   return (
-    <span
-      className={cn("block truncate text-[10.5px] text-muted-foreground", className)}
-    >
+    <span className={cn("block truncate text-[10.5px] text-muted-foreground", className)}>
       {[item.codeLabel, item.gstLabel && `GST ${item.gstLabel}`].filter(Boolean).join(" · ")}
     </span>
   );
@@ -253,9 +247,7 @@ export function AccountBlock({
 export function MemoLine({ memo, className }: { memo: string; className?: string }) {
   if (!memo) return null;
   return (
-    <p
-      className={cn("whitespace-pre-line text-[12px] text-muted-foreground/80", WRAPS, className)}
-    >
+    <p className={cn("whitespace-pre-line text-[12px] text-muted-foreground/80", WRAPS, className)}>
       {memo}
     </p>
   );
@@ -326,13 +318,7 @@ export function SignatureBlock({
   if (!url) return null;
 
   return (
-    <div
-      className={cn(
-        "flex flex-col",
-        align === "left" ? "items-start" : "items-end",
-        className
-      )}
-    >
+    <div className={cn("flex flex-col", align === "left" ? "items-start" : "items-end", className)}>
       <Image
         src={url}
         alt="Authorised signature"

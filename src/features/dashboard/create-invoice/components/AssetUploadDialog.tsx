@@ -143,9 +143,7 @@ function UploadBody({
           </div>
 
           <div className="flex items-center justify-between gap-2">
-            <span className="min-w-0 truncate text-[12px] text-muted-foreground">
-              {file?.name}
-            </span>
+            <span className="min-w-0 truncate text-[12px] text-muted-foreground">{file?.name}</span>
             <Button
               type="button"
               variant="link"
@@ -161,7 +159,13 @@ function UploadBody({
       )}
 
       <div className="mt-5 flex justify-end gap-2">
-        <Button type="button" variant="secondary" size="sm" disabled={isUploading} onClick={onCancel}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          disabled={isUploading}
+          onClick={onCancel}
+        >
           Cancel
         </Button>
         <Button

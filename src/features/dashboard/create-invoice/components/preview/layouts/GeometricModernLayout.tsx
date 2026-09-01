@@ -174,10 +174,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
           before put its labels and its values on opposite reading edges, and
           `shrink-0` on a block holding an IBAN is what let a long account number
           set the page width and push the signature off the paper. */}
-      <div
-        className="mt-8 border-t pt-4"
-        style={{ borderColor: withAlpha(primary, 0.2) }}
-      >
+      <div className="mt-8 border-t pt-4" style={{ borderColor: withAlpha(primary, 0.2) }}>
         <AccountBlock
           labels={labels}
           account={model.account}

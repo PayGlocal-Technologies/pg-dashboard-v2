@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
+import { DAYS_LONG, MONTHS_LONG } from "@/lib/utils/format";
 import {
   readDashboardLayout,
   writeDashboardLayout,
@@ -34,11 +35,10 @@ function useContextLine() {
     const now = new Date();
     const day = now.getDay(); // 0=Sun
     const h = now.getHours();
-    const date = now.toLocaleDateString("en-IN", {
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-    });
+    // Built from the shared name tables rather than toLocaleDateString, so the
+    // greeting names a month the same way every other date on the dashboard
+    // does. "Monday, 31 August".
+    const date = `${DAYS_LONG[now.getDay()]}, ${now.getDate()} ${MONTHS_LONG[now.getMonth()]}`;
 
     if (day === 1 && h < 11) return `Here's everything lined up for the week ahead 🗓️`;
     if (day === 5 && h >= 15) return `Great work this week, here's your final summary 🎉`;
