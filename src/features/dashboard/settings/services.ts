@@ -26,8 +26,14 @@ export const updateAccountDetailsApi = (merchantId: string): string =>
 export const contactDetailsApi = (onbId: string): string =>
   `${BASE_URL_V3}/merchants/profile/${onbId}/contact`;
 
-/** Merchant profile — carries the onboardingBusinessProfile block (GST, address,
- *  website, nature of business, support email/phone) shown on Business details.
+/** Merchant profile — carries the merchantBusinessSummary block (GST, address,
+ *  website, line of business, support contact) shown on Business details.
  *  Keyed by the merchant id (profile.mid), not the onboarding id. */
 export const merchantProfileApi = (merchantId: string): string =>
   merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/profile` : "";
+
+/** Upload the merchant's checkout logo — PUT multipart/form-data with a single
+ *  `merchantLogo` file (JPG/PNG). Returns the stored public URL. Keyed by the
+ *  merchant id (profile.mid), like merchantProfileApi above. */
+export const merchantLogoUploadApi = (merchantId: string): string =>
+  merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/profile/logo` : "";

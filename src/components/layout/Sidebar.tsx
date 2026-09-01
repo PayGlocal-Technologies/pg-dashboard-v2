@@ -22,6 +22,7 @@ import {
 import { useApp } from "@/stores/useApp";
 import { useProductContext, toProductType } from "@/stores/useProductContext";
 import { useLogout } from "@/lib/hooks/useLogout";
+import { useMerchantBusinessProfile } from "@/features/dashboard/settings/hooks";
 import useNewPermissions from "@/hooks/useNewPermissions";
 
 function profileInitials(name: string) {
@@ -150,6 +151,11 @@ function SidebarBody({
 }) {
   const profile = useApp((s) => s.profile);
   const { logout, isLoading } = useLogout();
+  // Fetched here so the merchant's checkout logo is loaded as soon as the shell
+  // mounts and shown in this footer avatar. Shares the query key the Settings
+  // page uses, so it is fetched once and served from cache to both.
+  const { businessProfile } = useMerchantBusinessProfile();
+  const logoUrl = businessProfile?.merchantLogoPublicUrl ?? null;
 
   const displayName =
     [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || profile?.username || "";
@@ -235,9 +241,19 @@ function SidebarBody({
             collapsed ? "flex-col items-center justify-center gap-1" : "items-center"
           )}
         >
-          {/* Avatar */}
+          {/* Avatar — the merchant's checkout logo once uploaded, else the
+              name initials, else a generic glyph. */}
           <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full ring-2 ring-transparent">
-            {displayName ? (
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt="Merchant logo"
+                width={32}
+                height={32}
+                unoptimized
+                className="h-full w-full object-cover"
+              />
+            ) : displayName ? (
               <span className="flex h-full w-full items-center justify-center bg-muted-foreground text-[11px] font-bold text-background">
                 {profileInitials(displayName)}
               </span>

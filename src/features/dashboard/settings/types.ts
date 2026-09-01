@@ -13,23 +13,39 @@ export interface BusinessDataResponse {
 
 /** The onboarding business profile block of GET /merchants/{merchantId}/profile.
  *  Backs the read-only extra fields on Business details. */
-export interface OnboardingBusinessProfile {
+export interface MerchantBusinessSummary {
   gst?: string | null;
-  businessRegisteredAddress?: string | null;
+  registeredAddress?: string | null;
   websiteUrl?: string | null;
-  natureOfBusiness?: string | null;
-  emailId?: string | null;
-  phoneNumber?: string | null;
+  /** A code, e.g. "GOODS_EXPORT" — not a human label. */
+  lineOfBusiness?: string | null;
+  supportContactName?: string | null;
+  supportEmail?: string | null;
+  supportPhone?: string | null;
+  /** Public S3 URL of the uploaded checkout logo (see merchantLogoUploadApi).
+   *  Absent until a logo has been uploaded. */
+  merchantLogoPublicUrl?: string | null;
 }
 
 export interface MerchantProfileData {
-  onboardingBusinessProfile?: OnboardingBusinessProfile | null;
+  merchantBusinessSummary?: MerchantBusinessSummary | null;
 }
 
 /** Envelope-tolerant: read `data` if the response wraps, else the flat body. */
 export type MerchantProfileResponse = {
   data?: MerchantProfileData | null;
 } & Partial<MerchantProfileData>;
+
+/** Response to the logo upload — carries the stored public URL to display. */
+export interface MerchantLogoUploadData {
+  merchantLogoPublicUrl: string;
+}
+
+export interface MerchantLogoUploadResponse {
+  message?: string;
+  reasonCode?: string;
+  data: MerchantLogoUploadData;
+}
 
 /** The PUT body pg-dashboard sends — note the plural key `purposeCodes`, which
  *  differs from the singular `purposeCode` the GET returns. */

@@ -66,3 +66,14 @@ export const mcaTopClientsByUcicApi = (
     ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/mca/top-clients` +
       `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&limit=${limit}`
     : "";
+
+/**
+ * Invoices needing the merchant's attention — overdue, or due soon — for the
+ * dashboard's Needs attention panel. Merchant-scoped in the path (unlike the
+ * analytics endpoints above, which are session-scoped maps). `limit` caps how
+ * many the panel shows.
+ */
+export const mcaNeedsAttentionApi = (merchantId: string, limit: number): string =>
+  merchantId
+    ? `${BASE_URL_V3}/mca-invoice/${encodeURIComponent(merchantId)}/needs-attention?limit=${limit}`
+    : "";
