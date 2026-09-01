@@ -17,6 +17,23 @@ interface BusinessField {
   multiline?: boolean;
 }
 
+/** Known line-of-business codes → human labels. Anything unmapped falls back to
+ *  prettifying the code itself ("GOODS_EXPORT" → "Goods export"), so a new code
+ *  the backend adds still reads sensibly instead of showing raw. */
+const LINE_OF_BUSINESS_LABELS: Record<string, string> = {
+  GOODS_EXPORT: "Goods export",
+  GOODS_IMPORT: "Goods import",
+  SERVICES_EXPORT: "Services export",
+  SERVICES_IMPORT: "Services import",
+};
+
+function formatLineOfBusiness(code: string | null | undefined): string {
+  if (!code) return "";
+  if (LINE_OF_BUSINESS_LABELS[code]) return LINE_OF_BUSINESS_LABELS[code];
+  const words = code.toLowerCase().replace(/_/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
+}
+
 function BusinessFieldRow({ label, description, value, multiline }: BusinessField) {
   return (
     <div className="flex items-start justify-between gap-6 py-4">
@@ -44,8 +61,8 @@ export function BusinessDetailsFeature() {
   const profile = useApp((s) => s.profile);
   const { business, isLoading } = useBusinessDetails();
   const { updateBusiness, isSaving } = useUpdateBusinessDetails();
-  // GST / address / website / nature-of-business / support contact now come from
-  // the merchant profile's onboardingBusinessProfile block.
+  // GST / address / website / line-of-business / support contact now come from
+  // the merchant profile's merchantBusinessSummary block.
   const { businessProfile } = useMerchantBusinessProfile();
 
   // Purpose codes are the one editable field, mirroring pg-dashboard's
@@ -81,7 +98,7 @@ export function BusinessDetailsFeature() {
 
   // registeredName/mid from the session profile; tradeName/purposeCode from the
   // /business endpoint; the rest from the merchant profile's
-  // onboardingBusinessProfile block.
+  // merchantBusinessSummary block.
   const readOnlyFields: BusinessField[] = [
     {
       label: "Legal business name",
@@ -106,13 +123,13 @@ export function BusinessDetailsFeature() {
     {
       label: "Registered address",
       description: "Principal place of business in India.",
-      value: businessProfile?.businessRegisteredAddress ?? "",
+      value: businessProfile?.registeredAddress ?? "",
       multiline: true,
     },
     {
       label: "Business category",
       description: "Helps us tune risk and reporting templates.",
-      value: businessProfile?.natureOfBusiness ?? "",
+      value: formatLineOfBusiness(businessProfile?.lineOfBusiness),
     },
     {
       label: "Website",
@@ -120,14 +137,19 @@ export function BusinessDetailsFeature() {
       value: businessProfile?.websiteUrl ?? "",
     },
     {
+      label: "Support contact name",
+      description: "Person customer queries are addressed to.",
+      value: businessProfile?.supportContactName ?? "",
+    },
+    {
       label: "Support email",
       description: "Where customer queries are directed.",
-      value: businessProfile?.emailId ?? "",
+      value: businessProfile?.supportEmail ?? "",
     },
     {
       label: "Support phone",
       description: "Shown on receipts and payment pages where applicable.",
-      value: businessProfile?.phoneNumber ?? "",
+      value: businessProfile?.supportPhone ?? "",
     },
   ];
 

@@ -11,7 +11,11 @@ import {
   type ContactType,
 } from "@/features/dashboard/settings/components/EditContactDialog";
 import { ChangePasswordDialog } from "@/features/dashboard/settings/components/ChangePasswordDialog";
-import { useContactDetails } from "@/features/dashboard/settings/hooks";
+import {
+  useContactDetails,
+  useMerchantBusinessProfile,
+  useUpdateMerchantLogo,
+} from "@/features/dashboard/settings/hooks";
 
 const PHOTO_MAX_MB = 5;
 const PHOTO_ACCEPTED = ["image/jpeg", "image/png"];
@@ -32,11 +36,17 @@ export function PersonalDetailsFeature() {
     profile?.username ||
     "Not available";
 
-  // BACKEND GAP: no profile-photo upload endpoint yet, so the chosen image is a
-  // local, session-only preview (revoked when replaced). Wire to the real upload
-  // when it lands.
+  // The checkout logo. Displayed value is either a remote S3 URL (once uploaded)
+  // or, mid-upload, a local object-URL preview shown optimistically. Only object
+  // URLs (blob:) are revoked; the remote URL is left alone.
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { uploadLogo, isUploading, canUpload } = useUpdateMerchantLogo();
+
+  // The already-stored logo from the merchant profile, so the current image
+  // shows on load. A fresh upload (photoUrl) takes precedence over it.
+  const { businessProfile } = useMerchantBusinessProfile();
+  const displayPhoto = photoUrl ?? businessProfile?.merchantLogoPublicUrl ?? null;
 
   const onPhotoChange = (event: React.ChangeEvent<HTMLInputElement>): void => {
     const file = event.target.files?.[0];
@@ -50,9 +60,33 @@ export function PersonalDetailsFeature() {
       toast.error(`Image must be under ${PHOTO_MAX_MB} MB.`);
       return;
     }
+    if (!canUpload) {
+      toast.error("Still loading your account. Try again in a moment.");
+      return;
+    }
+
+    // Show the picked image immediately, then send it. The optimistic preview is
+    // swapped for the server's stored URL on success, or rolled back on failure.
+    const previewUrl = URL.createObjectURL(file);
     setPhotoUrl((prev) => {
-      if (prev) URL.revokeObjectURL(prev);
-      return URL.createObjectURL(file);
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return previewUrl;
+    });
+
+    const body = new FormData();
+    body.append("merchantLogo", file);
+    uploadLogo(body, {
+      onSuccess: (res) => {
+        URL.revokeObjectURL(previewUrl);
+        const url = res?.data?.merchantLogoPublicUrl;
+        if (url) setPhotoUrl(url);
+        toast.success("Logo updated.");
+      },
+      onError: () => {
+        URL.revokeObjectURL(previewUrl);
+        setPhotoUrl((cur) => (cur === previewUrl ? null : cur));
+        toast.error("Couldn't upload the image. Please try again.");
+      },
     });
   };
 
@@ -79,9 +113,9 @@ export function PersonalDetailsFeature() {
           <div className="py-5">
             <div className="flex items-center gap-4">
               <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted text-lg font-bold text-muted-foreground">
-                {photoUrl ? (
+                {displayPhoto ? (
                   <AppImage
-                    src={photoUrl}
+                    src={displayPhoto}
                     alt="Profile photo"
                     width={64}
                     height={64}
@@ -97,8 +131,10 @@ export function PersonalDetailsFeature() {
                   variant="outline"
                   size="sm"
                   onClick={() => fileInputRef.current?.click()}
+                  isLoading={isUploading}
+                  disabled={isUploading || !canUpload}
                 >
-                  Change photo
+                  {isUploading ? "Uploading…" : "Change photo"}
                 </Button>
                 <p className="mt-1.5 text-xs text-muted-foreground">JPG or PNG, up to 5 MB.</p>
               </div>

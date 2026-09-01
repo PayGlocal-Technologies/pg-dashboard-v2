@@ -6,6 +6,7 @@ import { useApp } from "@/stores/useApp";
 import {
   businessDetailsApi,
   contactDetailsApi,
+  merchantLogoUploadApi,
   merchantProfileApi,
   secureSettlementDetailsApi,
   settlementDetailsApi,
@@ -18,8 +19,9 @@ import type {
   BusinessUpdatePayload,
   ContactData,
   ContactDataResponse,
+  MerchantBusinessSummary,
+  MerchantLogoUploadResponse,
   MerchantProfileResponse,
-  OnboardingBusinessProfile,
   SettlementData,
   SettlementDataResponse,
 } from "@/features/dashboard/settings/types";
@@ -46,11 +48,11 @@ export function useBusinessDetails(): {
   return { business: data?.data ?? null, isLoading: !!onbId && isPending, isError };
 }
 
-/** The onboarding business profile (GST, address, website, nature of business,
- *  support email/phone) from GET /merchants/{merchantId}/profile. Keyed by
+/** The merchant business summary (GST, address, website, line of business,
+ *  support contact) from GET /merchants/{merchantId}/profile. Keyed by
  *  profile.mid. Envelope-tolerant — reads `data` or the flat body. */
 export function useMerchantBusinessProfile(): {
-  businessProfile: OnboardingBusinessProfile | undefined;
+  businessProfile: MerchantBusinessSummary | undefined;
   isLoading: boolean;
   isError: boolean;
 } {
@@ -62,7 +64,7 @@ export function useMerchantBusinessProfile(): {
   );
   const body = data?.data ?? data;
   return {
-    businessProfile: body?.onboardingBusinessProfile ?? undefined,
+    businessProfile: body?.merchantBusinessSummary ?? undefined,
     isLoading: !!merchantId && isPending,
     isError,
   };
@@ -122,6 +124,25 @@ export function useUpdateAccountDetails(): {
     { invalidateQueries: [["settings-settlement", onbId]] }
   );
   return { updateAccount: mutate, isSaving: isPending, canEdit: !!merchantId };
+}
+
+/** Upload the merchant's checkout logo via
+ *  PUT /gcc/v1/merchants/{merchantId}/profile/logo (multipart/form-data, single
+ *  `merchantLogo` file). The mutation body IS a FormData — the shared mutation
+ *  hook detects that and sets the multipart Content-Type itself. Returns the
+ *  stored public URL in the response for the caller to display. `canUpload` is
+ *  false until the merchant id resolves. */
+export function useUpdateMerchantLogo(): {
+  uploadLogo: UseMutateFunction<MerchantLogoUploadResponse, Error, FormData>;
+  isUploading: boolean;
+  canUpload: boolean;
+} {
+  const merchantId = useMerchantId();
+  const { mutate, isPending } = usePut<MerchantLogoUploadResponse, FormData>(
+    merchantLogoUploadApi(merchantId),
+    { invalidateQueries: false }
+  );
+  return { uploadLogo: mutate, isUploading: isPending, canUpload: !!merchantId };
 }
 
 /** Contact phone + email (read-only, as in pg-dashboard). */
