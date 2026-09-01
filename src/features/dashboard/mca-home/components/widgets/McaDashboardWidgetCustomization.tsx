@@ -12,7 +12,12 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
@@ -20,14 +25,20 @@ import { Icon } from "@/components/icon";
 import { McaDashboardWidgetRenderer } from "@/features/dashboard/mca-home/components/widgets/McaDashboardWidgetRenderer";
 import { SortableMcaDashboardWidget } from "@/features/dashboard/mca-home/components/widgets/SortableMcaDashboardWidget";
 import { McaWidgetLibraryModal } from "@/features/dashboard/mca-home/components/widgets/McaWidgetLibraryModal";
-import { MIN_MCA_DASHBOARD_WIDGETS, type McaWidgetId } from "@/features/dashboard/mca-home/widget-catalog";
+import {
+  MIN_MCA_DASHBOARD_WIDGETS,
+  type McaWidgetId,
+} from "@/features/dashboard/mca-home/widget-catalog";
 import { cn } from "@/lib/utils";
 
 export const MCA_DASHBOARD_DROP_ZONE_ID = "mca-dashboard-drop-zone";
 const REMOVE_ANIMATION_MS = 200;
 
 function DropGridShell({ editMode, children }: { editMode: boolean; children: React.ReactNode }) {
-  const { setNodeRef, isOver } = useDroppable({ id: MCA_DASHBOARD_DROP_ZONE_ID, disabled: !editMode });
+  const { setNodeRef, isOver } = useDroppable({
+    id: MCA_DASHBOARD_DROP_ZONE_ID,
+    disabled: !editMode,
+  });
 
   return (
     <div
@@ -185,7 +196,10 @@ export function McaDashboardWidgetCustomization({
         onApplyLayout={handleApplyLibrary}
       />
 
-      <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }} style={{ zIndex: 200 }}>
+      <DragOverlay
+        dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }}
+        style={{ zIndex: 200 }}
+      >
         {activeSort && (
           <div className="widget-dnd-overlay w-[min(100vw-2rem,300px)] cursor-grabbing rounded-xl border border-border bg-card p-2 shadow-2xl">
             <McaDashboardWidgetRenderer widgetId={activeSort} />

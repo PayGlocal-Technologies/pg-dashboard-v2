@@ -60,13 +60,14 @@ export const MCA_WIDGET_CATALOG: McaWidgetCatalogEntry[] = [
   { id: "currency-split", name: "Currency Split", category: "Charts", lgColSpan: 4 },
 ];
 
-export const MCA_WIDGET_BY_ID: Record<McaWidgetId, McaWidgetCatalogEntry> = MCA_WIDGET_CATALOG.reduce(
-  (acc, e) => {
-    acc[e.id] = e;
-    return acc;
-  },
-  {} as Record<McaWidgetId, McaWidgetCatalogEntry>
-);
+export const MCA_WIDGET_BY_ID: Record<McaWidgetId, McaWidgetCatalogEntry> =
+  MCA_WIDGET_CATALOG.reduce(
+    (acc, e) => {
+      acc[e.id] = e;
+      return acc;
+    },
+    {} as Record<McaWidgetId, McaWidgetCatalogEntry>
+  );
 
 export const DEFAULT_MCA_DASHBOARD_LAYOUT: McaWidgetId[] = [
   "transactions",

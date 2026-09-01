@@ -83,8 +83,12 @@ function InvoiceCard({ row, handlers }: { row: McaInvoiceRow; handlers: InvoiceR
             <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
           </span>
           <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-            {row.invoiceDate ? formatDate(row.invoiceDate) : "—"}
-            {row.dueDate ? ` · due ${formatDate(row.dueDate)}` : ""}
+            {row.invoiceDate
+              ? formatDate(row.invoiceDate, { day: "2-digit", month: "short", year: "2-digit" })
+              : "—"}
+            {row.dueDate
+              ? ` · due ${formatDate(row.dueDate, { day: "2-digit", month: "short", year: "2-digit" })}`
+              : ""}
           </p>
         </div>
 

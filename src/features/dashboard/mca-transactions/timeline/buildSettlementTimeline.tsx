@@ -13,10 +13,9 @@ import { mcaTxnFilePath } from "@/features/dashboard/mca-transactions/services";
 import {
   fileNameFrom,
   formatAmount,
-  formatEpochMillis,
   formatEventTime,
 } from "@/features/dashboard/mca-transactions/timeline/format";
-import { currencySymbol } from "@/lib/utils/format";
+import { currencySymbol, formatEpochDateTime } from "@/lib/utils/format";
 import { accountNumberOf } from "@/features/dashboard/multi-currency/utils";
 import type {
   SettlementStepStatus,
@@ -308,12 +307,12 @@ export function buildSettlementTimeline({
     virtualAccounts?.find((account) => account.currency === txnCurrency) ??
     virtualAccounts?.find((account) => account.isGlobal);
   const resolvedAccountNumber =
-    accountDetails?.accountNumber || (fallbackVirtualAccount && accountNumberOf(fallbackVirtualAccount)) || "";
+    accountDetails?.accountNumber ||
+    (fallbackVirtualAccount && accountNumberOf(fallbackVirtualAccount)) ||
+    "";
   // Last 4 digits only, bullet-masked, same convention RecentActivityTable
   // already uses for card numbers elsewhere in the product.
-  const maskedAccountSuffix = resolvedAccountNumber
-    ? `••••${resolvedAccountNumber.slice(-4)}`
-    : "";
+  const maskedAccountSuffix = resolvedAccountNumber ? `••••${resolvedAccountNumber.slice(-4)}` : "";
   // See getMockUtrNumber's own TODO (mock-data.ts): no per-transaction UTR
   // field exists in the API yet, so this is a placeholder rather than the
   // real thing. Kept truthy-checked below regardless, so the "don't show if
@@ -334,7 +333,7 @@ export function buildSettlementTimeline({
         <AlertDescription className="text-[12px]">
           We have received notification of your payment. The funds are currently being processed
           through the banking network and are expected to be credited on{" "}
-          {formatEpochMillis(row.valueDateTime)}.
+          {formatEpochDateTime(row.valueDateTime, "")}.
         </AlertDescription>
       </Alert>
     ) : null;

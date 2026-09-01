@@ -399,7 +399,9 @@ export interface CurrencySplitData {
 
 /** Envelope-tolerant: the sampled response was flat, but every other analytics
  *  endpoint wraps in `data`, so the hook reads whichever is present. */
-export type CurrencySplitResponse = { data?: CurrencySplitData | null } & Partial<CurrencySplitData>;
+export type CurrencySplitResponse = {
+  data?: CurrencySplitData | null;
+} & Partial<CurrencySplitData>;
 
 // ── Settled by account ───────────────────────────────────────────────────────
 

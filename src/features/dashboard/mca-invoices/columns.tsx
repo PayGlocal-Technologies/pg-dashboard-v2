@@ -261,7 +261,9 @@ export function buildInvoiceColumns(
       render: (row) => (
         <RowClick onClick={() => open(row)}>
           <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {row.invoiceDate ? formatDate(row.invoiceDate) : "—"}
+            {row.invoiceDate
+              ? formatDate(row.invoiceDate, { day: "2-digit", month: "short", year: "2-digit" })
+              : "—"}
           </span>
         </RowClick>
       ),
@@ -273,7 +275,9 @@ export function buildInvoiceColumns(
       render: (row) => (
         <RowClick onClick={() => open(row)}>
           <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {row.dueDate ? formatDate(row.dueDate) : "—"}
+            {row.dueDate
+              ? formatDate(row.dueDate, { day: "2-digit", month: "short", year: "2-digit" })
+              : "—"}
           </span>
         </RowClick>
       ),

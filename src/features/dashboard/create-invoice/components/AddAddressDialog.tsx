@@ -200,15 +200,17 @@ function AddressBody({
               here — it is hardwired to its internal COUNTRIES array, while these
               options come from the API and carry the country *names* the address
               is stored under. */}
-          <SearchableSelect
-            id="client-address-country"
-            value={address.country}
-            onValueChange={(next) => patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })}
-            options={countryOptions}
-            placeholder="Select country"
-            searchPlaceholder="Search country…"
-            emptyMessage="No country matches that search."
-          />
+            <SearchableSelect
+              id="client-address-country"
+              value={address.country}
+              onValueChange={(next) =>
+                patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })
+              }
+              options={countryOptions}
+              placeholder="Select country"
+              searchPlaceholder="Search country…"
+              emptyMessage="No country matches that search."
+            />
           </Field>
 
           <Field>

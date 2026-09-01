@@ -74,10 +74,7 @@ function ThemeThumbnail({
     return (
       <span className="flex h-full w-full flex-col justify-center gap-1 p-1.5">
         <span className="flex items-center gap-1">
-          <span
-            className="block h-2 w-2 rounded-full"
-            style={{ backgroundColor: faintAccent }}
-          />
+          <span className="block h-2 w-2 rounded-full" style={{ backgroundColor: faintAccent }} />
           {bar("2.5rem", primary, "h-1.5")}
         </span>
         {bar("70%", faint)}
@@ -183,7 +180,9 @@ export function InvoiceThemePicker({
                     New
                   </span>
                 )}
-                {selected && <Icon name="check" className="ml-auto h-3 w-3 shrink-0 text-primary" />}
+                {selected && (
+                  <Icon name="check" className="ml-auto h-3 w-3 shrink-0 text-primary" />
+                )}
               </span>
             </span>
           </Button>

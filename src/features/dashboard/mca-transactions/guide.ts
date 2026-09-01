@@ -21,7 +21,8 @@ export const MCA_TRANSACTIONS_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-txn-upload-invoice",
     title: "Upload invoice to settle",
-    description: "Upload an invoice directly from the table to move the transaction toward settlement.",
+    description:
+      "Upload an invoice directly from the table to move the transaction toward settlement.",
     side: "top",
     align: "start",
   },

@@ -25,9 +25,7 @@ import type {
  * on the document and what is highlighted the same thing.
  */
 function withSelected<T extends { name: string }>(options: T[], selected: T): T[] {
-  return options.some((option) => option.name === selected.name)
-    ? options
-    : [...options, selected];
+  return options.some((option) => option.name === selected.name) ? options : [...options, selected];
 }
 
 /**

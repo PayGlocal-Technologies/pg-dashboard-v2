@@ -103,37 +103,37 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
           {stepIndex + 1} of {steps.length}
         </span>
         <div className="flex items-center gap-2">
-          {isLast ? (
-            // Restart only makes sense for a multi-step tour — a single-step
-            // guide (e.g. the transaction drawer) has nothing to restart.
-            steps.length > 1 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={restart}
-                leftIcon={<Icon name="rotate-ccw" className="h-3.5 w-3.5" aria-hidden />}
-              >
-                Restart
-              </Button>
-            )
-          ) : (
-            stepIndex > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={goBack}
-                leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" aria-hidden />}
-              >
-                Back
-              </Button>
-            )
-          )}
+          {isLast
+            ? // Restart only makes sense for a multi-step tour — a single-step
+              // guide (e.g. the transaction drawer) has nothing to restart.
+              steps.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={restart}
+                  leftIcon={<Icon name="rotate-ccw" className="h-3.5 w-3.5" aria-hidden />}
+                >
+                  Restart
+                </Button>
+              )
+            : stepIndex > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goBack}
+                  leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" aria-hidden />}
+                >
+                  Back
+                </Button>
+              )}
           <Button
             variant="primary"
             size="sm"
             onClick={goNext}
             rightIcon={
-              !isLast ? <Icon name="chevron-right" className="h-3.5 w-3.5" aria-hidden /> : undefined
+              !isLast ? (
+                <Icon name="chevron-right" className="h-3.5 w-3.5" aria-hidden />
+              ) : undefined
             }
           >
             {isLast ? "Done" : "Next"}

@@ -17,10 +17,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import {
-  useInvoiceClients,
-  useInvoiceMerchantId,
-} from "@/features/dashboard/create-invoice/hooks";
+import { useInvoiceClients, useInvoiceMerchantId } from "@/features/dashboard/create-invoice/hooks";
 import { validateSelectedClient } from "@/features/dashboard/create-invoice/helpers";
 import { ClientFormModal } from "@/features/dashboard/client-management/components/ClientFormModal";
 import {

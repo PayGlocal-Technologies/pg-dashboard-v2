@@ -93,11 +93,7 @@ export function PersonalDetailsFeature() {
                 )}
               </span>
               <div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                >
+                <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
                   Change photo
                 </Button>
                 <p className="mt-1.5 text-xs text-muted-foreground">JPG or PNG, up to 5 MB.</p>

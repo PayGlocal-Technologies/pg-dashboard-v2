@@ -1,4 +1,4 @@
-import { formatWeekdayDate } from "@/features/dashboard/settlement-reports/calendarUtils";
+import { formatWeekdayDate } from "@/lib/utils/format";
 import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
 
 // Single source of truth for settlement-state copy, the table's UTR

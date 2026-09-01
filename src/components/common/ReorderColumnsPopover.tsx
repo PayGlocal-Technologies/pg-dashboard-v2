@@ -230,9 +230,7 @@ export function ReorderColumnsPopover({
                           // A fixed column keeps a box rather than having none,
                           // so the list reads as one set of columns with some
                           // locked, not two lists.
-                          lockedReason: fixedKeys.includes(col.key)
-                            ? fixedReason
-                            : undefined,
+                          lockedReason: fixedKeys.includes(col.key) ? fixedReason : undefined,
                           onToggle: () => toggleVisibility(col.key),
                         }
                       : undefined

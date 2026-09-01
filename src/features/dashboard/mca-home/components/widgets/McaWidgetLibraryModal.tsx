@@ -2,7 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Button, Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, Input } from "@/components/ui";
+import {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Input,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import {
   MCA_CATEGORY_ORDER,
@@ -53,7 +61,10 @@ export function McaWidgetLibraryModal({
   const prevOpen = useRef(false);
 
   const grouped = useMemo(() => filterCatalogByQuery(searchQuery), [searchQuery]);
-  const hasResults = useMemo(() => MCA_CATEGORY_ORDER.some((cat) => grouped[cat].length > 0), [grouped]);
+  const hasResults = useMemo(
+    () => MCA_CATEGORY_ORDER.some((cat) => grouped[cat].length > 0),
+    [grouped]
+  );
 
   useEffect(() => {
     if (open && !prevOpen.current) {
@@ -84,7 +95,9 @@ export function McaWidgetLibraryModal({
 
   const handleApply = () => {
     if (staged.length < MIN_MCA_DASHBOARD_WIDGETS) {
-      toast.error("Not enough widgets", { description: `Select at least ${MIN_MCA_DASHBOARD_WIDGETS} widgets.` });
+      toast.error("Not enough widgets", {
+        description: `Select at least ${MIN_MCA_DASHBOARD_WIDGETS} widgets.`,
+      });
       return;
     }
     onApplyLayout(staged);
@@ -151,11 +164,15 @@ export function McaWidgetLibraryModal({
               >
                 <Icon name="search" className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
               </div>
-              <h3 className="text-[15px] font-semibold tracking-tight text-foreground">No widgets found</h3>
+              <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+                No widgets found
+              </h3>
               <p className="mt-1.5 max-w-sm text-[13px] leading-relaxed text-muted-foreground">
                 Nothing matches{" "}
-                <span className="font-medium text-foreground">&ldquo;{searchQuery.trim()}&rdquo;</span>. Try another
-                keyword or browse by category.
+                <span className="font-medium text-foreground">
+                  &ldquo;{searchQuery.trim()}&rdquo;
+                </span>
+                . Try another keyword or browse by category.
               </p>
               <Button
                 type="button"

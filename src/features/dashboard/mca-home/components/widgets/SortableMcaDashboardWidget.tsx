@@ -5,7 +5,11 @@ import { CSS } from "@dnd-kit/utilities";
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { McaDashboardWidgetRenderer } from "@/features/dashboard/mca-home/components/widgets/McaDashboardWidgetRenderer";
-import { MCA_WIDGET_BY_ID, MIN_MCA_DASHBOARD_WIDGETS, type McaWidgetId } from "@/features/dashboard/mca-home/widget-catalog";
+import {
+  MCA_WIDGET_BY_ID,
+  MIN_MCA_DASHBOARD_WIDGETS,
+  type McaWidgetId,
+} from "@/features/dashboard/mca-home/widget-catalog";
 import { cn } from "@/lib/utils";
 
 export function SortableMcaDashboardWidget({

@@ -45,7 +45,14 @@ function formatCompact(amount: number, currency: string): string {
   }).format(amount);
 }
 
-const BAR_COLORS = ["var(--chart-1)", "var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-3)", "var(--chart-4)"];
+const BAR_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+];
 
 interface StatCellProps {
   label: string;
@@ -146,7 +153,9 @@ export function McaInvoiceOriginsCard() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="text-sm font-semibold text-foreground">Transactions</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">Total transaction volume by country</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Total transaction volume by country
+              </p>
             </div>
             <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
               {TIMEFRAMES.map((opt) => (
@@ -198,7 +207,9 @@ export function McaInvoiceOriginsCard() {
                       <span className="text-sm leading-none" aria-hidden>
                         {countryFlag(origin.countryCode)}
                       </span>
-                      <span className="truncate text-[13px] font-medium text-foreground">{origin.countryName}</span>
+                      <span className="truncate text-[13px] font-medium text-foreground">
+                        {origin.countryName}
+                      </span>
                     </div>
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
                       <div

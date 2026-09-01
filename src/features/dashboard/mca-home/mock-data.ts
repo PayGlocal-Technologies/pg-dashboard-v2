@@ -156,7 +156,8 @@ export const needsAttention: NeedsAttentionRow[] = [
 export interface QuickAccessItem {
   id: string;
   label: string;
-  icon: "file-text" | "globe-2" | "download" | "users" | "circle-dollar-sign" | "sliders-horizontal";
+  icon:
+    "file-text" | "globe-2" | "download" | "users" | "circle-dollar-sign" | "sliders-horizontal";
 }
 
 export const mcaQuickAccessItems: QuickAccessItem[] = [

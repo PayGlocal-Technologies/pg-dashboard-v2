@@ -338,7 +338,10 @@ export function LineItemsSection({
                       onTotalsFieldChange({ discountType: next as "percentage" | "fixed" })
                     }
                   >
-                    <SelectTrigger className="h-7 w-[4.5rem] px-2 text-[13px]" aria-label="Discount type">
+                    <SelectTrigger
+                      className="h-7 w-[4.5rem] px-2 text-[13px]"
+                      aria-label="Discount type"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>

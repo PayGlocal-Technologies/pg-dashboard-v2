@@ -22,7 +22,10 @@ interface AnalyticsTimeRangeControlProps {
  * Invoice management's summary uses too — this file is what supplies the
  * transactions-specific options, so the call site is unchanged.
  */
-export function AnalyticsTimeRangeControl({ value, onValueChange }: AnalyticsTimeRangeControlProps) {
+export function AnalyticsTimeRangeControl({
+  value,
+  onValueChange,
+}: AnalyticsTimeRangeControlProps) {
   return (
     <TimeRangeTabs
       options={TIME_RANGE_OPTIONS}

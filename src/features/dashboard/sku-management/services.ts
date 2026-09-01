@@ -35,7 +35,6 @@ export const skuDeleteApi = (mid: string, id: string) =>
 export const skuDuplicateApi = (mid: string, id: string) =>
   mid && id ? `${SKU_BASE}/${mid}/${id}/duplicate` : "";
 
-
 export const skuImageUploadApi = (mid: string, id: string) =>
   mid && id ? `${SKU_BASE}/${mid}/${id}/image` : "";
 

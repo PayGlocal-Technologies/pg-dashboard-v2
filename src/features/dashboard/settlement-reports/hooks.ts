@@ -8,10 +8,10 @@ import {
   settlementOverviewApi,
   settlementUpcomingApi,
 } from "@/features/dashboard/settlement-reports/services";
+import { formatDateKey } from "@/lib/utils/format";
 import {
   computeNextSettlement,
   computeSettlementSchedule,
-  formatDateKey,
   isHolidayWithinDays,
   type HolidayInfo,
   type NextSettlementInfo,
