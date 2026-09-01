@@ -153,7 +153,11 @@ export function ReadinessChecklist({
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent align="end" collisionPadding={8} className="w-[21rem] p-2">
+      {/* A standard-scale width, deliberately. twMerge drops flux's own `w-72`
+          the moment this carries any `w-*` of its own, so an arbitrary value
+          Tailwind has not generated leaves the panel with no width rule at all —
+          it then shrink-wraps to max-content and runs the width of the screen. */}
+      <PopoverContent align="end" collisionPadding={8} className="w-80 p-2">
         <div className="px-2.5 pb-1 pt-1.5">
           <p className="text-[12.5px] font-semibold text-foreground">
             {isReady ? "Ready to generate" : "Before you can generate"}
@@ -170,7 +174,7 @@ export function ReadinessChecklist({
         {/* Outstanding first, in the order the page is filled in, then what is
             already done — so the list opens on the work rather than on a wall of
             ticks the merchant has to read past. */}
-        <div className="max-h-[22rem] space-y-0.5 overflow-y-auto">
+        <div className="max-h-80 space-y-0.5 overflow-y-auto">
           {[...outstanding, ...requirements.filter((r) => r.done)].map((requirement) => (
             <RequirementRow
               key={requirement.id}
