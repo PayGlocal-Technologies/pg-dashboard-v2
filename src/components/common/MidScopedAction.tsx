@@ -138,7 +138,9 @@ export function MidChoiceMenu({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>{children}</PopoverTrigger>
-      <PopoverContent align={align} collisionPadding={8} className="w-[17rem] p-2">
+      {/* Standard scale, not an arbitrary value — see the note on the readiness
+          checklist's own PopoverContent for why that matters here. */}
+      <PopoverContent align={align} collisionPadding={8} className="w-72 p-2">
         <div className="px-2 pb-1.5 pt-1">
           <p className="text-[12.5px] font-semibold text-foreground">Which account?</p>
           <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
