@@ -15,7 +15,7 @@ import {
   Shimmer,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { useApp } from "@/stores/useApp";
+import { cn } from "@/lib/utils";
 import { useSettlementDetails, useUpdateAccountDetails } from "@/features/dashboard/settings/hooks";
 
 // Indian IFSC: 4 letters, a 0, then 6 alphanumerics. The API also does its own
@@ -23,10 +23,16 @@ import { useSettlementDetails, useUpdateAccountDetails } from "@/features/dashbo
 const IFSC_RE = /^[A-Z]{4}0[A-Z0-9]{6}$/;
 const ACCOUNT_RE = /^\d{9,18}$/;
 
-export function BankingFeature() {
-  const profile = useApp((s) => s.profile);
-  const bankName = profile?.bankName ?? "Not available";
+// This card is compact: max-w-sm, size="sm" buttons (h-9, text-xs) and text-xs
+// values. Flux's Input defaults to h-11/text-[15px] and FieldLabel to text-sm,
+// which made the card jump a type scale and ~150px in height the moment Edit
+// was clicked. These scale the edit form to the card's own density instead.
+const COMPACT_FIELD = "gap-1.5";
+const COMPACT_LABEL = "text-xs font-medium text-muted-foreground";
+const COMPACT_INPUT = "h-9 min-h-9 px-3 text-xs placeholder:font-sans";
+const COMPACT_ERROR = "text-xs";
 
+export function BankingFeature() {
   // Eye toggle, exactly as pg-dashboard's SettlementDetails: masked reads the
   // /settlement endpoint, unmasked swaps to /settlement-details. Starts masked.
   const [masked, setMasked] = useState(true);
@@ -85,11 +91,14 @@ export function BankingFeature() {
         </div>
 
         <div>
-          <p className="text-sm font-bold text-foreground">{bankName}</p>
+          {/* No bank name here: the settlement endpoints return only the
+              account number and IFSC (same as pg-dashboard's Settlement
+              Details), so there is nothing to render it from. */}
+          <p className="text-sm font-bold text-foreground">Settlement account</p>
 
           {editing ? (
             <form
-              className="mt-3 space-y-3"
+              className="mt-2 space-y-2.5"
               onSubmit={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -106,8 +115,10 @@ export function BankingFeature() {
                 }}
               >
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="account-number">Account number</FieldLabel>
+                  <Field className={COMPACT_FIELD}>
+                    <FieldLabel htmlFor="account-number" className={COMPACT_LABEL}>
+                      Account number
+                    </FieldLabel>
                     <Input
                       id="account-number"
                       inputMode="numeric"
@@ -116,9 +127,9 @@ export function BankingFeature() {
                       aria-invalid={field.state.meta.errors.length > 0}
                       onChange={(e) => field.handleChange(e.target.value.replace(/\D/g, ""))}
                       onBlur={field.handleBlur}
-                      className="font-mono tabular-nums"
+                      className={cn(COMPACT_INPUT, "font-mono tabular-nums")}
                     />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                    <FieldError className={COMPACT_ERROR}>{field.state.meta.errors[0]}</FieldError>
                   </Field>
                 )}
               </form.Field>
@@ -133,8 +144,10 @@ export function BankingFeature() {
                 }}
               >
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="ifsc-code">IFSC code</FieldLabel>
+                  <Field className={COMPACT_FIELD}>
+                    <FieldLabel htmlFor="ifsc-code" className={COMPACT_LABEL}>
+                      IFSC code
+                    </FieldLabel>
                     <Input
                       id="ifsc-code"
                       placeholder="e.g. HDFC0000123"
@@ -142,9 +155,9 @@ export function BankingFeature() {
                       aria-invalid={field.state.meta.errors.length > 0}
                       onChange={(e) => field.handleChange(e.target.value.toUpperCase())}
                       onBlur={field.handleBlur}
-                      className="font-mono"
+                      className={cn(COMPACT_INPUT, "font-mono")}
                     />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
+                    <FieldError className={COMPACT_ERROR}>{field.state.meta.errors[0]}</FieldError>
                   </Field>
                 )}
               </form.Field>

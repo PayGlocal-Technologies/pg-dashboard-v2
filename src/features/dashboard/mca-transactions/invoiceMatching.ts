@@ -70,3 +70,21 @@ export function hasRemitterNameMismatch(payload: InvoiceMatchingPayload | null):
   const remitter = payload?.validationStatus?.remitterName;
   return !!remitter && remitter.isMatch !== MATCHED;
 }
+
+/**
+ * Whether extraction flagged the *transaction's* remitter name as unusable —
+ * the bank sent a correspondent-bank name (CBA) down the wire instead of the
+ * actual sender's.
+ *
+ * This is not an invoice problem: nothing on a correct invoice will ever match
+ * a correspondent bank's name, so the field-by-field mismatch panel is
+ * meaningless here and gets replaced by a re-upload prompt.
+ *
+ * DIVERGES FROM pg-dashboard, deliberately. There, this is a hard stop with no
+ * "Submit anyway". Here the re-upload is only the recommended path — a merchant
+ * with nothing better to upload can still submit and let manual review handle
+ * it, rather than being stuck on the transaction.
+ */
+export function isCbaNameFlagged(payload: InvoiceMatchingPayload | null): boolean {
+  return payload?.isCbaName === true;
+}
