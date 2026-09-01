@@ -37,10 +37,10 @@ export function OutstandingAmountCard({ className }: { className?: string }) {
           className this component receives from TransactionsAnalyticsCarousel)
           leaves the extra space below the KPI rather than centering it. */}
       <CardContent className="flex flex-1 flex-col">
-        {/* Top row: icon left, pending-count chip right. items-start (not
-            center) keeps the chip pinned to the top of the card rather than
-            centering against the taller KPI stack below it. */}
-        <div className="flex items-start justify-between gap-2">
+        {/* Top row: icon left, pending-count chip right, vertically centered
+            against the icon (the KPI stack is its own row below, so there's no
+            taller sibling to align against here). */}
+        <div className="flex items-center justify-between gap-2">
           {/* h-12 w-12/rounded-full/amber-500 at 10% opacity: same subtle
               tinted-circle treatment as the error state's icon elsewhere in
               this feature (see McaTransactionTable), just amber for

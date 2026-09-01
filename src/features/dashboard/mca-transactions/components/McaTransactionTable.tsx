@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import { Button, DataTable } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/icon";
@@ -96,9 +97,17 @@ interface McaTransactionTableProps {
    *  search/filter controls and table/card list, so the two stay in this
    *  fixed order at every width. */
   analyticsSection?: ReactNode;
+  /** Fired as the full-page details view opens (true) and closes (false).
+   *  The page header uses it to hide the analytics time-range tabs while a
+   *  single transaction is being viewed — those tabs scope the list/analytics,
+   *  not the details page, so they're meaningless there. */
+  onDetailsOpenChange?: (open: boolean) => void;
 }
 
-export function McaTransactionTable({ analyticsSection }: McaTransactionTableProps) {
+export function McaTransactionTable({
+  analyticsSection,
+  onDetailsOpenChange,
+}: McaTransactionTableProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
   const contentEl = useContentAreaElement();
@@ -230,11 +239,13 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
     setDetailsRowId(row.gid);
     setDrawerOpen(false);
     setDetailsOpen(true);
+    onDetailsOpenChange?.(true);
   };
 
   const closeDetails = () => {
     setDetailsOpen(false);
     setDetailsOverrideRow(null);
+    onDetailsOpenChange?.(false);
   };
 
   // Collapse reverses Expand: closes the full page and reopens the same
@@ -246,6 +257,7 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   const collapseToDrawer = () => {
     setDetailsOpen(false);
     setDrawerOpen(true);
+    onDetailsOpenChange?.(false);
   };
 
   // Passed through as onOpenTransaction to TransactionDetailsPage/Drawer:
@@ -425,16 +437,28 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   // The details page replaces the table in place (same component instance,
   // same closed-over search/filter/page state) rather than overlaying it —
   // this is what makes Back restore the table's previous state for free.
+  //
+  // Expand swaps the drawer for this full page in the same frame, which read
+  // as an abrupt jump. A short fade + rise on mount lets the page ease in as
+  // the drawer slides away over it, so the two motions blend into one
+  // handoff rather than a hard cut. Delayed a touch so it starts after the
+  // drawer has begun sliding out, not on the same frame.
   if (detailsOpen && detailsRow) {
     return (
-      <TransactionDetailsPage
-        row={detailsRow}
-        onBack={closeDetails}
-        onCollapse={collapseToDrawer}
-        onUploaded={handleInvoiceSubmitted}
-        onOpenTransaction={openLinkedTransaction}
-        isPartnerUser={isPartnerUser}
-      />
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.08 }}
+      >
+        <TransactionDetailsPage
+          row={detailsRow}
+          onBack={closeDetails}
+          onCollapse={collapseToDrawer}
+          onUploaded={handleInvoiceSubmitted}
+          onOpenTransaction={openLinkedTransaction}
+          isPartnerUser={isPartnerUser}
+        />
+      </motion.div>
     );
   }
 
@@ -505,18 +529,6 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
           <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
 
           <div className="ml-auto flex items-center gap-2">
-            <ReorderColumnsPopover
-              columns={reorderableColumns}
-              order={currentColumnOrder}
-              onOrderChange={setColumnOrder}
-              onReset={() => {
-                setColumnOrder(null);
-                setHiddenColumns([]);
-              }}
-              hiddenKeys={hiddenColumns}
-              onHiddenKeysChange={setHiddenColumns}
-              fixedKeys={FIXED_COLUMN_KEYS}
-            />
             <Button
               type="button"
               variant="outline"
@@ -530,6 +542,18 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
             >
               Refresh
             </Button>
+            <ReorderColumnsPopover
+              columns={reorderableColumns}
+              order={currentColumnOrder}
+              onOrderChange={setColumnOrder}
+              onReset={() => {
+                setColumnOrder(null);
+                setHiddenColumns([]);
+              }}
+              hiddenKeys={hiddenColumns}
+              onHiddenKeysChange={setHiddenColumns}
+              fixedKeys={FIXED_COLUMN_KEYS}
+            />
             <Button
               type="button"
               variant="outline"
