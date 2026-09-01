@@ -265,7 +265,16 @@ function MultiCurrencyContent() {
             right column's own title, the alignment this grid exists for.
             space-y-3 reproduces the grid's own 12px title → container step
             now that the two are no longer separated by gap-y-3. */}
-        <div className="space-y-3 lg:col-start-1 lg:row-start-1 lg:row-end-3 lg:sticky lg:top-6 lg:self-start">
+        {/* min-w-0 is load-bearing below `lg`, where this stack holds the
+            horizontally scrolling region tiles (RegionSelector's `cards`
+            variant). A grid item's default `min-width: auto` floors the track at
+            the item's min-content width, and a nowrap flex row of six 144px
+            tiles makes that ~930px — so the single implicit column grew past the
+            viewport and the whole *page* scrolled sideways instead of the tile
+            row scrolling inside its own box. The lg layout already spelled this
+            out for the right column (`minmax(0,1fr)`); the stacked one needs the
+            same floor removed here. */}
+        <div className="min-w-0 space-y-3 lg:col-start-1 lg:row-start-1 lg:row-end-3 lg:sticky lg:top-6 lg:self-start">
           <h2 className={MODULE_TITLE}>Select Client Region</h2>
 
           {isLoading ? (
@@ -330,7 +339,7 @@ function MultiCurrencyContent() {
             so the two headings share a top edge no matter how each one wraps.
             Guarded on selectedAccount since the heading names its region. */}
         {selectedAccount && (
-          <div className="flex flex-wrap items-start justify-between gap-2 lg:col-start-2 lg:row-start-1">
+          <div className="flex min-w-0 flex-wrap items-start justify-between gap-2 lg:col-start-2 lg:row-start-1">
             <h2 className={MODULE_TITLE}>Receive payments from {selectedAccount.countryName}</h2>
             {/* Tertiary action: the link variant carries no fill or border,
                 so it reads as one step below the module title it sits
@@ -356,7 +365,7 @@ function MultiCurrencyContent() {
             would otherwise inherit the grid's own 12px title → container gap;
             on `lg` and up it must be zero, or this row-2 content would no
             longer start level with the region Card. */}
-        <div className="mt-5 space-y-8 lg:col-start-2 lg:row-start-2 lg:mt-0">
+        <div className="mt-5 min-w-0 space-y-8 lg:col-start-2 lg:row-start-2 lg:mt-0">
           {selectedAccount && (
             // Account details come before the Metrics section below: a
             // merchant opens this page to find the numbers to hand a client,
