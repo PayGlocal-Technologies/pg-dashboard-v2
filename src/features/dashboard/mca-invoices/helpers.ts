@@ -1,4 +1,14 @@
+import {
+  EMPTY_RELATIVE_RANGE,
+  toEndOfDayMs,
+  toStartOfDayMs,
+} from "@/components/common/filters/FilterChips";
+import {
+  ALL_TIME_RANGE_VALUE,
+  type SummaryRange,
+} from "@/features/dashboard/mca-invoices/constants";
 import type {
+  InvoiceDateFilter,
   InvoiceFilterValues,
   InvoiceSearchBody,
 } from "@/features/dashboard/mca-invoices/types";
@@ -58,4 +68,59 @@ export function buildInvoiceRequestBody(
     ...(hasFilters && { fieldSearch }),
     ...(hasTimeRange && { startTime, endTime }),
   };
+}
+
+// ─── The table's Date filter ──────────────────────────────────────────────────
+// Owned by the table alone. The summary's range is its own state and its own
+// arithmetic, further down.
+
+export const EMPTY_INVOICE_DATE_FILTER: InvoiceDateFilter = {
+  range: { from: "", to: "" },
+  relative: EMPTY_RELATIVE_RANGE,
+  window: null,
+};
+
+/** Epoch millis at the end of the local day containing `now`. */
+export function endOfDayMs(now: Date): number {
+  const end = new Date(now);
+  end.setHours(23, 59, 59, 999);
+  return end.getTime();
+}
+
+/** The filter's bounds as the invoice search body wants them: epoch millis,
+ *  or undefined when that end is open. */
+export function dateFilterToEpochMs(filter: InvoiceDateFilter): {
+  startTime?: number;
+  endTime?: number;
+} {
+  return {
+    startTime:
+      filter.window?.startTime ??
+      (filter.range.from ? toStartOfDayMs(filter.range.from) : undefined),
+    endTime:
+      filter.window?.endTime ?? (filter.range.to ? toEndOfDayMs(filter.range.to) : undefined),
+  };
+}
+
+/** Milliseconds in a day, for the summary's day-count ranges. */
+const MS_PER_DAY = 86_400_000;
+
+/**
+ * The summary's window, in the epoch SECONDS its endpoint wants.
+ *
+ * "All time" is a start of 0. Everything else counts `range` days back from the
+ * end of today. `endMs` is passed in rather than read here so it stays stable
+ * across renders: it is part of the summary's react-query key, and a
+ * second-resolution "now" would mint a fresh key on every render and never hit
+ * the cache.
+ */
+export function summaryWindowSeconds(
+  range: SummaryRange,
+  endMs: number
+): { start: number; end: number } {
+  const end = Math.floor(endMs / 1000);
+  if (range === ALL_TIME_RANGE_VALUE) return { start: 0, end };
+
+  const days = Number(range);
+  return { start: Math.floor((endMs - days * MS_PER_DAY) / 1000), end };
 }

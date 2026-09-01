@@ -34,6 +34,34 @@ export const downloadInvoiceApi = (mid: string, invoiceId: string): string =>
 export const sendInvoiceEmailApi = (mid: string, invoiceId: string): string =>
   mid && invoiceId ? `${BASE_URL_V3}/mca-invoice/${mid}/${invoiceId}/send-email` : "";
 
+// ── Themes ──────────────────────────────────────────────────────────────────
+
+/**
+ * The palette the renderer draws with: the theme names it can lay out, plus the
+ * named colours and accents it recognises, each with the hex it uses for them.
+ *
+ * Not scoped by merchant, hence a bare constant rather than a builder. The
+ * vocabulary belongs to the renderer, so it is the same for everyone and changes
+ * only on a backend release, which is why callers cache it indefinitely.
+ */
+export const invoiceThemesApi = `${BASE_URL_V3}/mca-invoice/themes`;
+
+// ── Templates ───────────────────────────────────────────────────────────────
+
+/** GET lists this merchant's templates; POST creates one. */
+export const invoiceTemplatesApi = (mid: string): string =>
+  mid ? `${BASE_URL_V3}/mca-invoice/${mid}/templates` : "";
+
+/**
+ * One template: GET reads it, PUT replaces it wholesale, DELETE removes it.
+ *
+ * Note the read has a side effect the other endpoints do not: it bumps the
+ * template's `lastUsedAt`, which is how the API records that a template was
+ * used. See `markUsed` in hooks.ts.
+ */
+export const invoiceTemplateApi = (mid: string, templateId: string): string =>
+  mid && templateId ? `${invoiceTemplatesApi(mid)}/${templateId}` : "";
+
 // ── Biller ──────────────────────────────────────────────────────────────────
 
 export const billerDetailsApi = (mid: string): string =>

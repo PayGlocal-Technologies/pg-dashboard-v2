@@ -259,17 +259,17 @@ export function buildMcaColumns(
       key: "amount",
       header: "Amount",
       minWidth: 135,
-      align: "right",
+      align: "left",
       render: (row) => {
         const amount = parseFloat(row.amount ?? "0");
         const currency = row.currency ?? "USD";
         return (
-          <RowClick onClick={() => onOpenDetails(row)} align="right">
+          <RowClick onClick={() => onOpenDetails(row)} align="left">
             {/* The offer badge leads the amount (items-center against the
                 amount block's own baseline alignment) so a discounted
                 transaction is identifiable while scanning the column, the
                 same placement pg-dashboard uses. */}
-            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+            <div className="flex items-center gap-1.5 whitespace-nowrap">
               <MdrOfferBadge totalMdrDiscount={row.totalMdrDiscount} />
               <FrmPendingBadge frmStatus={row.frmStatus} />
               <span className="flex items-baseline gap-1.5">
@@ -355,18 +355,20 @@ export function buildMcaColumns(
                   to take, and burying it behind "…" would cost a click on the
                   transactions that most need one. */}
               {isPendingInvoice ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="upload" className="w-3 h-3" />}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlers.onOpenDetails(row);
-                  }}
-                  className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-                >
-                  Upload Invoice
-                </Button>
+                <span data-guide="mca-txn-upload-invoice" className="inline-flex">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    leftIcon={<Icon name="upload" className="w-3 h-3" />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlers.onOpenDetails(row);
+                    }}
+                    className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+                  >
+                    Upload Invoice
+                  </Button>
+                </span>
               ) : (
                 /* Hidden until the row is hovered/focused, opacity-only (no
                    display/width change) so revealing it never shifts the

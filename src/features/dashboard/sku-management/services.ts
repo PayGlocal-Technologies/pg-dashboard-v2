@@ -35,6 +35,9 @@ export const skuDeleteApi = (mid: string, id: string) =>
 export const skuDuplicateApi = (mid: string, id: string) =>
   mid && id ? `${SKU_BASE}/${mid}/${id}/duplicate` : "";
 
+export const skuImageUploadApi = (mid: string, id: string) =>
+  mid && id ? `${SKU_BASE}/${mid}/${id}/image` : "";
+
 // ── Bulk import from a file ─────────────────────────────────────────────────
 // Four legs, in the order the modal walks them: fetch the template so the
 // merchant has the right columns, ask for somewhere to put their file, read back

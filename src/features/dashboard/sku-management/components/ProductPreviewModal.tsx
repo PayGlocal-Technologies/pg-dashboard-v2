@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
 import {
   Avatar,
@@ -11,8 +11,6 @@ import {
   Drawer,
   DrawerContent,
   DrawerTitle,
-  IconButton,
-  ProgressIndicator,
   Shimmer,
   useBreakpoint,
 } from "@/components/ui";
@@ -22,39 +20,22 @@ import { formatCurrency } from "@/lib/utils/format";
 import { SKU_PRICE_LOCALE, SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
-/** Horizontal distance a touch has to travel before it counts as a swipe
- *  rather than a tap that drifted. */
-const SWIPE_THRESHOLD_PX = 40;
-
 /** Intrinsic size handed to next/image. The frame's real size comes from
  *  aspect-square plus the modal width; this only tells the optimiser which
  *  resize to serve. */
 const PREVIEW_IMAGE_SIZE = 560;
 
 /**
- * The product's images as a square carousel — the modal's dominant element.
- * Always 1:1, never distorted, and static when there's only one image.
+ * The product's picture as a square, the modal's dominant element. Always 1:1
+ * and never distorted.
+ *
+ * One image, not a carousel: the catalogue stores a single object per SKU, so
+ * there is nothing to page through. The arrows, the swipe handling and the dot
+ * indicator that used to live here were paging a gallery the API cannot hold.
  */
 function PreviewMedia({ product }: { product: SkuProduct }) {
-  const images = product.images ?? [];
-  const count = images.length;
-  const [index, setIndex] = useState(0);
-  // Per-image, so paging to a new one shows its own skeleton rather than
-  // inheriting the previous image's resolved state.
+  const imageUrl = product.imageUrl;
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const touchStartXRef = useRef<number | null>(null);
-
-  // Clamped rather than trusted: guards against an index left over from a
-  // longer gallery if this instance is ever reused for another item.
-  const safeIndex = count > 0 ? Math.min(index, count - 1) : 0;
-  const active = images[safeIndex];
-
-  const goTo = (next: number) => {
-    // Wraps both ways, so the last image steps forward to the first and the
-    // first steps back to the last.
-    setIndex(((next % count) + count) % count);
-    setStatus("loading");
-  };
 
   return (
     /*
@@ -64,25 +45,10 @@ function PreviewMedia({ product }: { product: SkuProduct }) {
       layout shift — the box is sized before any image loads, and the skeleton,
       the photo, and the fallback all fill this same frame.
 
-      `group` drives the arrow reveal below. rounded-xl is the frame radius used
-      across this page.
+      rounded-xl is the frame radius used across this page.
     */
-    <div
-      className="group relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-white"
-      onTouchStart={(e) => {
-        touchStartXRef.current = e.touches[0]?.clientX ?? null;
-      }}
-      onTouchEnd={(e) => {
-        const startX = touchStartXRef.current;
-        touchStartXRef.current = null;
-        if (startX === null || count < 2) return;
-        const deltaX = (e.changedTouches[0]?.clientX ?? startX) - startX;
-        if (Math.abs(deltaX) < SWIPE_THRESHOLD_PX) return;
-        // Dragging left moves forward, the direction the content travels.
-        goTo(safeIndex + (deltaX < 0 ? 1 : -1));
-      }}
-    >
-      {active && status !== "error" ? (
+    <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border bg-white">
+      {imageUrl && status !== "error" ? (
         <>
           {/* Sits under the image at the same size, so the frame is never empty
               while the file is in flight and nothing moves when it arrives. */}
@@ -90,17 +56,18 @@ function PreviewMedia({ product }: { product: SkuProduct }) {
             <Shimmer className="absolute inset-0 h-full w-full" rounded="lg" />
           )}
           <Image
-            // Keyed by src so switching images remounts and fires onLoad again
-            // — without it a cached second image can leave the skeleton up.
-            key={active}
-            src={active}
-            alt={`${product.name} image ${safeIndex + 1} of ${count}`}
+            // Keyed by src so a refreshed presigned URL remounts and fires
+            // onLoad again — without it a cached response can leave the
+            // skeleton up, or a stale error state can outlive the new link.
+            key={imageUrl}
+            src={imageUrl}
+            alt={product.name}
             width={PREVIEW_IMAGE_SIZE}
             height={PREVIEW_IMAGE_SIZE}
-            // Images added through the item form are object URLs, which the
-            // optimiser can't fetch — it resolves sources server-side and a
-            // blob: URL only exists in the tab that minted it.
-            unoptimized={active.startsWith("blob:")}
+            // Always unoptimised: this is a presigned S3 URL on a host with no
+            // remotePattern configured, and it expires in about ten minutes, so
+            // there is nothing worth caching against it.
+            unoptimized
             onLoad={() => setStatus("ready")}
             onError={() => setStatus("error")}
             // cover + center: portrait, landscape, and square sources all fill
@@ -112,57 +79,15 @@ function PreviewMedia({ product }: { product: SkuProduct }) {
           />
         </>
       ) : (
-        // Covers both "no artwork" and "the file failed to load" — the frame
-        // keeps its size and shows the item's type glyph either way, rather
-        // than collapsing. Same Avatar placeholder the Product column uses.
+        // Covers both "no artwork" and "the link stopped working" — a presigned
+        // URL that has aged out lands here rather than on a broken-image glyph.
+        // The frame keeps its size either way. Same Avatar placeholder the
+        // Product column uses.
         <Avatar className="h-full w-full rounded-none border-0">
           <AvatarFallback className="rounded-none bg-muted text-muted-foreground">
             <Icon name={product.type === "SERVICES" ? "wrench" : "package"} className="h-10 w-10" />
           </AvatarFallback>
         </Avatar>
-      )}
-
-      {/* Neither control renders for a single image, which needs no
-          navigation. Arrows are the desktop affordance, hover-revealed; touch
-          is served by swipe and by the indicator below. */}
-      {count > 1 && (
-        <>
-          <IconButton
-            type="button"
-            aria-label="Previous image"
-            variant="secondary"
-            size="sm"
-            onClick={() => goTo(safeIndex - 1)}
-            className="absolute top-1/2 left-2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-          >
-            <Icon name="chevron-left" className="h-4 w-4" />
-          </IconButton>
-          <IconButton
-            type="button"
-            aria-label="Next image"
-            variant="secondary"
-            size="sm"
-            onClick={() => goTo(safeIndex + 1)}
-            className="absolute top-1/2 right-2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-          >
-            <Icon name="chevron-right" className="h-4 w-4" />
-          </IconButton>
-
-          {/* Overlaid on the frame's bottom edge rather than placed beneath it,
-              so the indicator costs the 1:1 box no height. The translucent pill
-              keeps it legible over a photo of any colour. */}
-          <div className="absolute inset-x-0 bottom-3 flex justify-center">
-            <div className="rounded-full bg-background/80 px-2 py-1 shadow-sm backdrop-blur-sm">
-              <ProgressIndicator
-                aria-label={`${product.name} images`}
-                size="sm"
-                values={images.map((_, i) => `Image ${i + 1}`)}
-                selectedIndex={safeIndex}
-                onChange={goTo}
-              />
-            </div>
-          </div>
-        </>
       )}
     </div>
   );

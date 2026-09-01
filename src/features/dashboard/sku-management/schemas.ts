@@ -89,6 +89,6 @@ export function emptySkuItemForm(): SkuItemFormValues {
     sellingPrice: "",
     productCost: "",
     description: "",
-    images: [],
+    image: null,
   };
 }

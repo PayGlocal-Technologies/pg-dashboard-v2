@@ -1,75 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  PageHeader,
-} from "@/components/ui";
-import { Icon } from "@/components/icon";
-import type { IconName } from "@/components/icon/registry";
+import { PageHeader } from "@/components/ui";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { SkuTable } from "@/features/dashboard/sku-management/components/SkuTable";
 import { ImportSkuFileModal } from "@/features/dashboard/sku-management/components/ImportSkuFileModal";
-import { useSkuMidScope, useSkuPathMid } from "@/features/dashboard/sku-management/hooks";
-
-/**
- * One header action, in whichever form the merchant's account shape calls for.
- *
- * With a single PACB MID (or one already selected) it is a plain button that
- * acts. With several and none selected, the same action first has to be told
- * which account it applies to, so it becomes a dropdown of MIDs and the pick is
- * what runs it. pg-dashboard does this with its ChooseMidSelect; the branch is
- * here rather than at each call site so the two forms can't drift apart.
- */
-function MidScopedAction({
-  label,
-  icon,
-  variant,
-  needsMidChoice,
-  midOptions,
-  onRun,
-}: {
-  label: string;
-  icon: IconName;
-  variant: "primary" | "ghost";
-  needsMidChoice: boolean;
-  midOptions: string[];
-  /** Called with the chosen MID, or "" when there was nothing to choose. */
-  onRun: (mid: string) => void;
-}) {
-  const glyph = <Icon name={icon} className="h-3.5 w-3.5" />;
-
-  if (!needsMidChoice) {
-    return (
-      <Button type="button" variant={variant} size="sm" leftIcon={glyph} onClick={() => onRun("")}>
-        {label}
-      </Button>
-    );
-  }
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" variant={variant} size="sm" leftIcon={glyph}>
-          {label}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Which merchant ID?</DropdownMenuLabel>
-        {midOptions.map((mid) => (
-          <DropdownMenuItem key={mid} onSelect={() => onRun(mid)} className="tabular-nums">
-            {mid}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
+import { SKU_GUIDE_KEY, SKU_GUIDE_STEPS } from "@/features/dashboard/sku-management/guide";
+import { useSkuPathMid } from "@/features/dashboard/sku-management/hooks";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 
 export function SkuManagementFeature() {
   // The buttons live here but every row they create lives in SkuTable, so this
@@ -86,7 +26,7 @@ export function SkuManagementFeature() {
   // applies here (`isPaMidSelected` → SelectMidView), expressed through
   // useResolvedMids' guardState.
   const { guardState } = useSkuPathMid();
-  const { needsMidChoice, midOptions, selectMid } = useSkuMidScope();
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
 
   const openImport = (mid: string) => {
     setImportMid(mid);
@@ -145,6 +85,9 @@ export function SkuManagementFeature() {
       />
 
       <ImportSkuFileModal open={importOpen} onOpenChange={setImportOpen} mid={importMid} />
+
+      {/* First-visit onboarding coach-mark — add images to SKUs. */}
+      <GuideLauncher steps={SKU_GUIDE_STEPS} storageKey={SKU_GUIDE_KEY} />
     </div>
   );
 }

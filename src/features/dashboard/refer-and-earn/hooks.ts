@@ -1,8 +1,18 @@
 "use client";
 
-import { usePostQuery } from "@/lib/api/hooks";
+import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
-import { referralLinkApi } from "@/features/dashboard/refer-and-earn/services";
+import {
+  referralLinkApi,
+  referralTransactionsApi,
+  referralWalletApi,
+} from "@/features/dashboard/refer-and-earn/services";
+import type {
+  ReferralTransaction,
+  ReferralTransactionsResponse,
+  ReferralWallet,
+  ReferralWalletResponse,
+} from "@/features/dashboard/refer-and-earn/types";
 
 /**
  * Which programme the link is for. "mca" verbatim from pg-dashboard's
@@ -51,4 +61,53 @@ export function useReferralLink(): { link: string; isLoading: boolean; isError: 
     isLoading: !!profile && !isGuestUser && isPending,
     isError,
   };
+}
+
+/**
+ * The merchant's reward wallet (available / held / earned / withdrawn totals).
+ *
+ * The influencer service scopes the wallet by the merchant's `mid` — pg-dashboard
+ * passes `profile.mid` into the path segment it names "ucicId". They are the same
+ * value for most merchants but not all, so passing `profile.ucicId` here 403s for
+ * merchants where the two differ. Match pg-dashboard exactly: use `profile.mid`.
+ */
+export function useReferralWallet(): {
+  wallet: ReferralWallet | null;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const mid = useApp((s) => s.profile?.mid);
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const enabled = !!mid && !isGuestUser;
+
+  const { data, isLoading, isError } = useGet<ReferralWalletResponse>(
+    ["referral-wallet", mid],
+    referralWalletApi(mid ?? ""),
+    { enabled }
+  );
+
+  return { wallet: data?.data.wallet ?? null, isLoading, isError };
+}
+
+/**
+ * The merchant's referral credit/debit history. CREDITs become the earnings
+ * rows the table renders; DEBITs are wallet withdrawals reconciled from
+ * useReferralWallet.
+ */
+export function useReferralTransactions(): {
+  transactions: ReferralTransaction[];
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const mid = useApp((s) => s.profile?.mid);
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const enabled = !!mid && !isGuestUser;
+
+  const { data, isLoading, isError } = useGet<ReferralTransactionsResponse>(
+    ["referral-transactions", mid],
+    referralTransactionsApi(mid ?? ""),
+    { enabled }
+  );
+
+  return { transactions: data?.data.transactions ?? [], isLoading, isError };
 }

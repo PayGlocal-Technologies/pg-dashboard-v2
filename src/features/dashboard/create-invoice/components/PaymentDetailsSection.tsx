@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, Callout, CalloutText, Shimmer } from "@/components/ui";
+import { Button, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useDelete } from "@/lib/api/hooks";
@@ -84,11 +84,12 @@ export function PaymentDetailsSection({
           <Shimmer className="h-20 w-full rounded-lg" />
         </div>
       ) : rows.length === 0 ? (
-        <Callout variant="info">
-          <CalloutText>
-            No receiving accounts are available yet. Add one to put bank details on the invoice.
-          </CalloutText>
-        </Callout>
+        /* Plain empty-state copy, not an info callout. Nothing has gone wrong
+           and there is nothing to be advised about: the section simply has no
+           accounts yet, and a tinted panel with an icon overstated that. */
+        <p className="rounded-lg border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
+          No receiving accounts yet. Add one to put bank details on the invoice.
+        </p>
       ) : (
         <div className="space-y-2" role="radiogroup" aria-label="Receiving account">
           {rows.map((row) => {
@@ -162,15 +163,20 @@ export function PaymentDetailsSection({
         </div>
       )}
 
+      {/* The same secondary button every other "add one of these" action in
+          this editor uses. It used to be a blue link at link font size, sitting
+          inside a form whose other actions are all buttons — the DQA's
+          "placement, font size, color and design of it is changing. It's
+          inconsistent within 1 form." */}
       <Button
         type="button"
-        variant="link"
+        variant="secondary"
         size="sm"
-        className="mt-3 h-auto p-0"
+        className="mt-3"
         leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
         onClick={() => setAddOpen(true)}
       >
-        Add new bank details
+        Add bank details
       </Button>
 
       <AddBankAccountDialog open={addOpen} onOpenChange={setAddOpen} onAdded={refetchAdded} />

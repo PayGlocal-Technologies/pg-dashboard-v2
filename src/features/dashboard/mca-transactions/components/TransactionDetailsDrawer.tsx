@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -15,6 +16,12 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { truncateMiddle } from "@/lib/utils/format";
 import { TransactionDetailsContent } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
+import { GuideTour } from "@/components/common/guide/GuideTour";
+import { isGuideCompleted, markGuideCompleted } from "@/components/common/guide/storage";
+import {
+  TXN_DETAIL_GUIDE_KEY,
+  TXN_DETAIL_GUIDE_STEPS,
+} from "@/features/dashboard/mca-transactions/guide";
 
 interface TransactionDetailsDrawerProps {
   row: McaTransaction | null;
@@ -47,6 +54,30 @@ export function TransactionDetailsDrawer({
   // the DOM until a row is clicked, which is client-only by definition.
   const { isBelow } = useBreakpoint();
   const isBottomSheet = isBelow("md");
+
+  // Contextual coach-mark: runs once, the first time a merchant opens the drawer
+  // on desktop (the expand action it points at doesn't exist on the bottom
+  // sheet). No launcher button here — the drawer is transient, so the tour is
+  // tied to the open event instead.
+  //
+  // Held back until the drawer has finished sliding in (~550ms) rather than
+  // firing on the same frame: opening the tour while the panel is still
+  // animating in made the spotlight pop up abruptly over a moving surface.
+  // Waiting lets the drawer settle, then the dim/card fade in on their own.
+  // setState lives in the timeout callback, per the purity lint rules.
+  const [tourOpen, setTourOpen] = useState(false);
+  useEffect(() => {
+    if (!open || isBottomSheet) return;
+    const id = setTimeout(() => {
+      if (!isGuideCompleted(TXN_DETAIL_GUIDE_KEY)) setTourOpen(true);
+    }, 550);
+    return () => clearTimeout(id);
+  }, [open, isBottomSheet]);
+
+  function closeTour() {
+    markGuideCompleted(TXN_DETAIL_GUIDE_KEY);
+    setTourOpen(false);
+  }
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} side={isBottomSheet ? "bottom" : "right"}>
@@ -115,16 +146,18 @@ export function TransactionDetailsDrawer({
                 at there. Close stays the only way out, same interaction as
                 everywhere else. */}
             {!isBottomSheet && (
-              <IconButton
-                aria-label="Expand to full page"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (row) onExpand(row);
-                }}
-              >
-                <Icon name="expand" className="h-4 w-4" />
-              </IconButton>
+              <span data-guide="mca-txn-detail-expand" className="inline-flex">
+                <IconButton
+                  aria-label="Expand to full page"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (row) onExpand(row);
+                  }}
+                >
+                  <Icon name="expand" className="h-4 w-4" />
+                </IconButton>
+              </span>
             )}
           </div>
           {row && (
@@ -150,6 +183,9 @@ export function TransactionDetailsDrawer({
             />
           )}
         </div>
+
+        {/* First-open coach-mark pointing at the expand-to-full-page action. */}
+        <GuideTour steps={TXN_DETAIL_GUIDE_STEPS} open={tourOpen} onClose={closeTour} />
       </DrawerContent>
     </Drawer>
   );

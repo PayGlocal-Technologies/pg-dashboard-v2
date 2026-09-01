@@ -194,7 +194,7 @@ export function ShareAccountDetailsModal({
           close button (its last rendered child, see flux-ui's dialog.tsx)
           down from its default top-3 to top-6, matching the content's own
           24px inset instead of the content moving up to match the button. */}
-      <DialogContent className="max-w-[min(100%,64rem)] max-h-[min(90vh,760px)] p-6 [&>button:last-child]:top-6">
+      <DialogContent className="max-w-[min(100%,64rem)] max-h-[min(90vh,760px)] scrollbar-none p-6 [&>button:last-child]:top-6">
         <DialogTitle asChild>
           <VisuallyHidden>Share account details</VisuallyHidden>
         </DialogTitle>

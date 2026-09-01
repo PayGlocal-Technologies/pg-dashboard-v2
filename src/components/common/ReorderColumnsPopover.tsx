@@ -24,6 +24,10 @@ import {
   PopoverContent,
   PopoverTrigger,
   Separator,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -42,9 +46,18 @@ interface ReorderColumnsPopoverProps {
   hiddenKeys?: string[];
   onHiddenKeysChange?: (hidden: string[]) => void;
   /** Columns that must always be shown — the ones the table is meaningless
-   *  without. Rendered with a disabled checkbox, matching pg-dashboard's
+   *  without. Rendered with a locked checkbox, matching pg-dashboard's
    *  "Fixed Columns" group. */
   fixedKeys?: string[];
+  /**
+   * Why a fixed column cannot be hidden, shown on hover and focus.
+   *
+   * Required in spirit rather than in the type: a control that is disabled and
+   * silent about it is the thing a DQA pass called out, so every caller should
+   * say something. The default is deliberately generic so a missing one is
+   * still an answer rather than an empty tooltip.
+   */
+  fixedReason?: string;
   /** Discards any saved order so the table falls back to the column order
    *  buildMcaColumns declares. Separate from onOrderChange rather than
    *  passing the default order through it, since "no saved order" is its own
@@ -58,7 +71,8 @@ interface ReorderColumnsPopoverProps {
 // action (no remove).
 interface ColumnVisibility {
   checked: boolean;
-  disabled: boolean;
+  /** Locked on, with a reason. Renders grey rather than as an active choice. */
+  lockedReason?: string;
   onToggle: () => void;
 }
 
@@ -99,15 +113,45 @@ function SortableColumnRow({
         <Icon name="grip-vertical" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="truncate">{label}</span>
       </span>
-      {visibility && (
-        <Checkbox
-          checked={visibility.checked}
-          disabled={visibility.disabled}
-          onCheckedChange={visibility.onToggle}
-          aria-label={`Show ${label} column`}
-          className="shrink-0"
-        />
-      )}
+      {visibility &&
+        (visibility.lockedReason ? (
+          /**
+           * A locked column, and two DQA points in one control.
+           *
+           * It renders grey, not the primary blue a live ticked box uses: blue
+           * says "you chose this", and nobody chose this. And it explains
+           * itself, because a disabled control that stays silent leaves the
+           * merchant to guess whether they are doing something wrong.
+           *
+           * The tooltip hangs off a wrapping span rather than the Checkbox: a
+           * disabled control receives no pointer events, so a trigger on the
+           * box itself would never fire. The span also carries the
+           * not-allowed cursor and is focusable, so the reason is reachable by
+           * keyboard as well as hover.
+           */
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span tabIndex={0} className="shrink-0 cursor-not-allowed rounded-sm">
+                  <Checkbox
+                    checked
+                    disabled
+                    aria-label={`${label} column is always shown`}
+                    className="pointer-events-none border-border opacity-100 data-[state=checked]:border-border data-[state=checked]:bg-muted-foreground/40 data-[state=checked]:text-foreground/70"
+                  />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-[15rem]">{visibility.lockedReason}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        ) : (
+          <Checkbox
+            checked={visibility.checked}
+            onCheckedChange={visibility.onToggle}
+            aria-label={`Show ${label} column`}
+            className="shrink-0"
+          />
+        ))}
     </div>
   );
 }
@@ -120,6 +164,7 @@ export function ReorderColumnsPopover({
   hiddenKeys,
   onHiddenKeysChange,
   fixedKeys = [],
+  fixedReason = "Always shown. The table needs this column to make sense.",
 }: ReorderColumnsPopoverProps) {
   const canToggleVisibility = !!hiddenKeys && !!onHiddenKeysChange;
   const hidden = hiddenKeys ?? [];
@@ -182,10 +227,10 @@ export function ReorderColumnsPopover({
                     canToggleVisibility
                       ? {
                           checked: !hidden.includes(col.key),
-                          // A fixed column shows a ticked, disabled box rather
-                          // than no box at all, so the list reads as one set
-                          // of columns with some pinned, not two lists.
-                          disabled: fixedKeys.includes(col.key),
+                          // A fixed column keeps a box rather than having none,
+                          // so the list reads as one set of columns with some
+                          // locked, not two lists.
+                          lockedReason: fixedKeys.includes(col.key) ? fixedReason : undefined,
                           onToggle: () => toggleVisibility(col.key),
                         }
                       : undefined
@@ -197,21 +242,27 @@ export function ReorderColumnsPopover({
         </DndContext>
 
         {/* Secondary action, below the list and divided off from it so it
-            reads as an escape hatch rather than another draggable row.
-            Disabled while the order already is the default, so the button
-            never suggests there's something to undo when there isn't. */}
+            reads as an escape hatch rather than another draggable row. */}
         <Separator className="my-2" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="refresh" className="h-3 w-3" />}
-          onClick={onReset}
-          disabled={!isCustomOrder}
-          className="w-full justify-start text-muted-foreground hover:text-foreground"
-        >
-          Reset to defaults
-        </Button>
+        {isCustomOrder ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="refresh" className="h-3 w-3" />}
+            onClick={onReset}
+            className="w-full justify-start text-muted-foreground hover:text-foreground"
+          >
+            Reset to defaults
+          </Button>
+        ) : (
+          /* Nothing to undo. This used to render as a disabled button, which
+             offers an action and then refuses it; saying the columns already
+             are the default answers the question the button was raising. */
+          <p className="px-2 py-1.5 text-[12px] text-muted-foreground">
+            Columns are in their default order.
+          </p>
+        )}
       </PopoverContent>
     </Popover>
   );

@@ -1,144 +1,126 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Field, FieldLabel, Input } from "@/components/ui";
+import { Button, Field, FieldLabel } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { normalizeHexColor } from "@/features/dashboard/create-invoice/helpers";
-import { BRAND_COLOR_SWATCHES } from "@/features/dashboard/create-invoice/constants";
+import { DEFAULT_THEME_METADATA } from "@/features/dashboard/create-invoice/constants";
+import type { ThemePaletteOption } from "@/features/dashboard/create-invoice/types";
+
+/** Turns "BOLD_RED" into "Bold red", which is what a swatch's tooltip should say. */
+const labelFor = (name: string): string => {
+  const words = name.toLowerCase().split("_").join(" ");
+  return words ? words[0]!.toUpperCase() + words.slice(1) : name;
+};
 
 /**
- * One colour: ten swatches and a hex field.
+ * One row of named swatches.
  *
- * Nova pairs a native `<input type="color">` with the hex box. flux has no
- * colour-input component and CLAUDE.md's UI rule rules out the bare element, so
- * this is swatches plus hex instead — which covers a brand palette better
- * anyway, since a brand colour is a known value to be entered, not a hue to be
- * hunted for on a wheel. Logged as a flux gap: a `<ColorInput>` would replace
- * both halves of this component.
+ * This used to be a hex field plus ten arbitrary colours, because nothing on the
+ * wire held a colour and the preview was the only consumer. It no longer is: the
+ * invoice stores an enum NAME and the renderer decides what that name is worth,
+ * so an arbitrary hex has nowhere to go. The swatches are therefore exactly the
+ * server's vocabulary, and the hex under each one is only what this build draws
+ * it as on screen.
  *
- * The hex field commits on blur, not per keystroke, so typing "1" into an empty
- * box does not repaint the whole preview a colour nobody asked for. Invalid
- * input reverts and says so inline rather than through a toast, because the
- * field that is wrong is the thing that should carry the message.
+ * Losing the hex field loses nothing real. A merchant could type `#BADA55` into
+ * it before and the generated PDF ignored them; now the control cannot promise
+ * something the document will not honour.
  */
-function ColorField({
+function SwatchRow({
   label,
+  options,
   value,
   onChange,
 }: {
   label: string;
+  options: ThemePaletteOption[];
+  /** The stored enum name, e.g. "SLATE". */
   value: string;
-  onChange: (hex: string) => void;
+  onChange: (name: string) => void;
 }) {
-  const [draft, setDraft] = useState(value.toUpperCase());
-  const [error, setError] = useState<string | null>(null);
-
-  const commit = () => {
-    const normalized = normalizeHexColor(draft);
-    if (!normalized) {
-      setDraft(value.toUpperCase());
-      setError("Not a hex colour");
-      return;
-    }
-    setError(null);
-    setDraft(normalized);
-    onChange(normalized);
-  };
-
-  const pick = (hex: string) => {
-    setError(null);
-    setDraft(hex);
-    onChange(hex);
-  };
-
-  const fieldId = `brand-color-${label.toLowerCase()}`;
+  const selected = options.find((option) => option.name === value);
 
   return (
     <Field>
-      <FieldLabel htmlFor={fieldId}>{label}</FieldLabel>
+      <FieldLabel>
+        {label}
+        <span className="ml-1.5 font-normal text-muted-foreground">
+          {labelFor(selected?.name ?? value)}
+        </span>
+      </FieldLabel>
 
-      <div className="flex items-center gap-2">
-        <span
-          className="h-8 w-8 shrink-0 rounded-md border border-border"
-          style={{ backgroundColor: value }}
-          aria-hidden
-        />
-        <Input
-          id={fieldId}
-          value={draft}
-          spellCheck={false}
-          aria-invalid={!!error}
-          aria-describedby={error ? `${fieldId}-error` : undefined}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commit();
-          }}
-          className="h-8 max-w-[7.5rem] font-mono text-[12px] uppercase"
-        />
-        {error && (
-          <span id={`${fieldId}-error`} className="text-[11px] text-destructive">
-            {error}
-          </span>
-        )}
-      </div>
+      <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label={label}>
+        {options.map((option) => {
+          const isSelected = option.name === value;
 
-      <div className="mt-1.5 flex flex-wrap gap-1.5">
-        {BRAND_COLOR_SWATCHES.map((hex) => (
-          <Button
-            key={hex}
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label={`${label} ${hex}`}
-            aria-pressed={hex === value.toUpperCase()}
-            onClick={() => pick(hex)}
-            className={cn(
-              "h-6 w-6 rounded-full p-0 ring-offset-2 ring-offset-card",
-              hex === value.toUpperCase() && "ring-2 ring-primary"
-            )}
-            style={{ backgroundColor: hex }}
-          >
-            {hex === value.toUpperCase() && (
-              <Icon name="check" className="h-3 w-3 text-white" aria-hidden />
-            )}
-          </Button>
-        ))}
+          return (
+            <Button
+              key={option.name}
+              type="button"
+              variant="ghost"
+              size="sm"
+              role="radio"
+              aria-checked={isSelected}
+              aria-label={`${label} ${labelFor(option.name)}`}
+              title={labelFor(option.name)}
+              onClick={() => onChange(option.name)}
+              className={cn(
+                "h-7 w-7 rounded-full p-0 ring-offset-2 ring-offset-card",
+                isSelected && "ring-2 ring-primary"
+              )}
+              style={{ backgroundColor: option.hex }}
+            >
+              {isSelected && <Icon name="check" className="h-3 w-3 text-white" aria-hidden />}
+            </Button>
+          );
+        })}
       </div>
     </Field>
   );
 }
 
 export function InvoiceColorPicker({
-  primaryColor,
-  accentColor,
-  onPrimaryColorChange,
-  onAccentColorChange,
+  color,
+  accent,
+  colors,
+  accents,
+  onColorChange,
+  onAccentChange,
   onReset,
 }: {
-  primaryColor: string;
-  accentColor: string;
-  onPrimaryColorChange: (hex: string) => void;
-  onAccentColorChange: (hex: string) => void;
-  /** Puts both colours back to the current theme's defaults. */
+  /** Stored colour enum name. */
+  color: string;
+  /** Stored accent enum name. */
+  accent: string;
+  colors: ThemePaletteOption[];
+  accents: ThemePaletteOption[];
+  onColorChange: (name: string) => void;
+  onAccentChange: (name: string) => void;
+  /** Puts both back to the pair the server itself defaults to. */
   onReset: () => void;
 }) {
+  const isDefault =
+    color === DEFAULT_THEME_METADATA.color && accent === DEFAULT_THEME_METADATA.accent;
+
   return (
     <div className="space-y-3">
-      <ColorField label="Primary" value={primaryColor} onChange={onPrimaryColorChange} />
-      <ColorField label="Accent" value={accentColor} onChange={onAccentColorChange} />
+      <SwatchRow label="Colour" options={colors} value={color} onChange={onColorChange} />
+      <SwatchRow label="Accent" options={accents} value={accent} onChange={onAccentChange} />
 
-      <Button
-        type="button"
-        variant="link"
-        size="sm"
-        className="h-auto p-0"
-        leftIcon={<Icon name="rotate-ccw" className="h-3 w-3" />}
-        onClick={onReset}
-      >
-        Reset to theme defaults
-      </Button>
+      {/* Hidden rather than disabled when there is nothing to undo: a permanently
+          greyed link on a fresh invoice reads as something being broken. */}
+      {!isDefault && (
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto p-0"
+          leftIcon={<Icon name="rotate-ccw" className="h-3 w-3" />}
+          onClick={onReset}
+        >
+          Reset to default colours
+        </Button>
+      )}
     </div>
   );
 }

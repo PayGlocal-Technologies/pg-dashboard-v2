@@ -110,7 +110,10 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
       </div>
       <div className="divide-y divide-border">
         {items.map((item) => (
-          <div key={item.key} className="grid grid-cols-[minmax(0,1fr)_72px_48px_80px] gap-2 py-3 text-[13px]">
+          <div
+            key={item.key}
+            className="grid grid-cols-[minmax(0,1fr)_72px_48px_80px] gap-2 py-3 text-[13px]"
+          >
             <span className="min-w-0">
               <span className="block truncate text-foreground">{item.name}</span>
               <ItemMeta item={item} />

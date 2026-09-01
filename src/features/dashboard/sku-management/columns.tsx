@@ -75,7 +75,7 @@ export function buildSkuColumns(
         <RowClick onClick={() => onPreview(row)}>
           {/* min-w-max: the cell never shrinks below thumbnail + full name, so
               the column widens to fit rather than truncating or wrapping. */}
-          <div className="flex min-w-max items-center gap-3">
+          <div className="flex min-w-max items-center gap-3" data-guide="mca-sku-image">
             <ProductThumbnail product={row} className="shrink-0" />
             <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
               {row.name}

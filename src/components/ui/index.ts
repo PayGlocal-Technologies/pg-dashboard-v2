@@ -66,6 +66,8 @@ export {
   InputGroupInput,
   InputGroupText,
   Label,
+  MetricText,
+  type MetricTextProps,
   OtpInput,
   PageHeader,
   PasswordInput,
@@ -90,6 +92,7 @@ export {
   Separator,
   Shimmer,
   StatCardSkeleton,
+  Switch,
   TableRowSkeleton,
   ChartSkeleton,
   StatusBadge,
@@ -129,7 +132,6 @@ export {
   type CalloutVariant,
   CurrencyAmountInput,
   InputGroupButton,
-  Switch,
   TimePicker,
   // Added for the invoice editor: Slider drives the logo crop's zoom, and
   // SplitButton is the "Generate invoice ▾" control that hosts the template

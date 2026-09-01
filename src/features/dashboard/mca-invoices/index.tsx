@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Button,
   DropdownMenu,
@@ -17,15 +17,20 @@ import { useAccountSetup } from "@/stores/useAccountSetup";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
+import {
+  ALL_TIME_RANGE_VALUE,
+  type SummaryRange,
+} from "@/features/dashboard/mca-invoices/constants";
+import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoices/helpers";
 
 /**
  * Invoice management, at /mca-invoices.
  *
- * Composition root only. Filter state that both the summary cards and the
- * table need lives here, because pg-dashboard's summary cards are shortcuts
- * into the table's own filters rather than a separate read-only panel:
- * clicking "Outstanding invoices" filters the list, and changing the summary's
- * date range moves the list's window too.
+ * Composition root only. The one piece of state shared between the summary and
+ * the table is the status filter, because a summary card is a shortcut into the
+ * list: clicking "Outstanding invoices" filters it, exactly as pg-dashboard
+ * does. The summary's period and the table's Date chip are NOT shared — see
+ * SUMMARY_RANGE_OPTIONS for why they stopped being.
  */
 export function McaInvoicesFeature() {
   return (
@@ -103,29 +108,24 @@ function McaInvoicesContent() {
   const summaryMid = selectedMid || (paCbMids[0] ?? "");
 
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
-  const [relativeWindow, setRelativeWindow] = useState<{
-    startTime: number;
-    endTime: number;
-  } | null>(null);
 
-  const summary = useMemo(
-    () => (
-      <InvoiceSummaryCards
-        merchantId={summaryMid}
-        onStatusFilter={setStatusFilters}
-        onRangeDaysChange={(days) => {
-          if (days === undefined) {
-            setRelativeWindow(null);
-            return;
-          }
-          // Millis here, unlike the summary endpoint's own seconds: the search
-          // body's startTime/endTime are epoch millis.
-          const endTime = Date.now();
-          setRelativeWindow({ startTime: endTime - days * 24 * 60 * 60 * 1000, endTime });
-        }}
-      />
-    ),
-    [summaryMid]
+  /** The summary's own period. The table's Date chip is its own, inside it. */
+  const [summaryRange, setSummaryRange] = useState<SummaryRange>(ALL_TIME_RANGE_VALUE);
+
+  // Read once, and bucketed to the end of the local day: this is the open end
+  // of the summary's window, and therefore part of its react-query key, so a
+  // second-resolution "now" would produce a fresh key on every mount and the
+  // cards could never paint from cache.
+  const [defaultEndMs] = useState(() => endOfDayMs(new Date()));
+
+  const summary = (
+    <InvoiceSummaryCards
+      merchantId={summaryMid}
+      range={summaryRange}
+      onRangeChange={setSummaryRange}
+      windowSeconds={summaryWindowSeconds(summaryRange, defaultEndMs)}
+      onStatusFilter={setStatusFilters}
+    />
   );
 
   return (
@@ -133,8 +133,6 @@ function McaInvoicesContent() {
       summarySection={summary}
       statusFilters={statusFilters}
       onStatusFiltersChange={setStatusFilters}
-      relativeWindow={relativeWindow}
-      onRelativeWindowChange={setRelativeWindow}
     />
   );
 }

@@ -1,47 +1,53 @@
 "use client";
 
-import { Button, Dialog, DialogContent, DialogTitle, Separator } from "@/components/ui";
+import { Dialog, DialogContent, DialogTitle, Separator } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { ACCOUNT_HELPER_TEXT } from "@/features/dashboard/multi-currency/accountGuides";
 
 /**
- * "How it works?" — how a client actually pays into the selected account, and
- * how long the money takes to arrive.
- *
- * Ported from pg-dashboard's HowItWorksModal. The copy is per-currency because
- * the rail is: a US client uses ACH/Fedwire over 2-3 days, a UK client uses FPS
- * over 1-2. Renders nothing for a currency with no entry rather than showing a
- * generic paragraph that would be wrong for some rail.
+ * "How it works?" as a modal — the same per-currency copy `HowItWorksPanel`
+ * renders inline, behind an overlay instead of reflowing the page beside it.
+ * Renders nothing for a currency with no entry, same as the panel.
  */
 export function HowItWorksDialog({
-  currency,
   open,
   onOpenChange,
+  currency,
 }: {
-  currency: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  currency: string;
 }) {
   const helper = ACCOUNT_HELPER_TEXT[currency];
   if (!helper) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[min(100%,36rem)] p-6 [&>button:last-child]:top-6">
-        <DialogTitle className="text-base font-semibold text-foreground">
-          {helper.title}
-        </DialogTitle>
+      <DialogContent className="max-w-[min(100%,26rem)] p-6 [&>button:last-child]:top-6">
+        <DialogTitle className="text-base font-semibold text-foreground">How it works</DialogTitle>
 
-        <Separator className="my-4 border-dashed" />
+        <Separator className="my-4" />
 
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{helper.description}</p>
+        {/* Icon + heading + paragraph, twice, separated by a divider — the
+            same shape HowItWorksPanel uses for this copy. */}
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Icon name="file-text" size={16} />
+            </span>
+            <p className="text-sm font-semibold text-foreground">{helper.title}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{helper.description}</p>
+          </div>
 
-        <p className="mt-6 text-sm font-semibold text-foreground">{helper.timelineTitle}</p>
-        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{helper.timeline}</p>
+          <Separator />
 
-        <div className="mt-6 flex justify-end">
-          <Button variant="primary" onClick={() => onOpenChange(false)}>
-            Got it!
-          </Button>
+          <div className="flex flex-col gap-2">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <Icon name="clock" size={16} />
+            </span>
+            <p className="text-sm font-semibold text-foreground">{helper.timelineTitle}</p>
+            <p className="text-xs leading-relaxed text-muted-foreground">{helper.timeline}</p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

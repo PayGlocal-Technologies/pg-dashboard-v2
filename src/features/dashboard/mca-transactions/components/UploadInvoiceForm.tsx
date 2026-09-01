@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm, useStore } from "@tanstack/react-form";
 import {
   Alert,
@@ -27,6 +26,7 @@ import { useInvoiceUpload } from "@/features/dashboard/mca-transactions/useInvoi
 import {
   hasInvoiceIssues,
   hasRemitterNameMismatch,
+  isCbaNameFlagged,
   toInvoiceComparison,
 } from "@/features/dashboard/mca-transactions/invoiceMatching";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
@@ -55,7 +55,6 @@ export function UploadInvoiceForm({
   const [saveError, setSaveError] = useState<string | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const purposeCodeRef = useRef<PurposeCodeComboboxHandle>(null);
-  const router = useRouter();
   const dropzoneRef = useRef<HTMLDivElement>(null);
 
   // Which codes this merchant may choose from, and which one they last used,
@@ -85,10 +84,31 @@ export function UploadInvoiceForm({
   // review, exactly as one with flagged discrepancies does. The only state
   // that blocks submission is having no file, or a scan still running.
   const verificationFailed = upload.phase === "error" && !!upload.file;
+  // The transaction's remitter name is a correspondent bank's, not the sender's.
+  // A re-upload is the better fix and the dropzone panel leads with it, but this
+  // no longer blocks submission: the merchant can send the invoice through to
+  // manual review instead of being stuck when they have nothing better to
+  // upload.
+  const hasCbaRemitterName = upload.phase === "ready" && isCbaNameFlagged(upload.matching);
   const isInvoiceReady = upload.phase === "ready" || verificationFailed;
   // Nothing to opt into when the comparison never produced a name to compare.
-  const showRemitterNameOptIn = hasRemitterNameMismatch(upload.matching);
-  const isSubmitUnverified = hasIssues || verificationFailed;
+  // Still suppressed while the transaction's own name is the unusable one:
+  // whether a CBA-named transaction may take the invoice's name onto its FIRC
+  // is a compliance call, not one to make by leaving the checkbox on screen.
+  const showRemitterNameOptIn = !hasCbaRemitterName && hasRemitterNameMismatch(upload.matching);
+  const isSubmitUnverified = hasCbaRemitterName || hasIssues || verificationFailed;
+
+  // Why this submission goes to manual review. The CBA name outranks the field
+  // comparison, the same precedence the dropzone panel gives it.
+  let unverifiedNotice =
+    "Invoice will be flagged for manual review and might cause delay in settlement.";
+  if (hasCbaRemitterName) {
+    unverifiedNotice =
+      "The remitter name on this transaction doesn't look like the sender's. Submitting will send this invoice to manual review, which might delay settlement.";
+  } else if (verificationFailed) {
+    unverifiedNotice =
+      "We couldn't check this invoice against the transaction. It will go to manual review, which might delay settlement.";
+  }
 
   const form = useForm({
     defaultValues: {
@@ -140,6 +160,8 @@ export function UploadInvoiceForm({
     if (!isInvoiceReady) {
       // The invoice is no longer a form field (the upload hook owns it), so
       // its "required" check lives here rather than in a field validator.
+      // Only a missing file or an in-flight scan gets here now — a flagged
+      // result, CBA name included, is submittable.
       setInvoiceError("Upload an invoice to continue.");
       dropzoneRef.current?.focus();
       return;
@@ -231,14 +253,8 @@ export function UploadInvoiceForm({
             invalid={!!invoiceError}
             errorId="invoice-error"
             onCreateInvoice={() => {
-              // The create flow exists now, so this hands off to it. Only the
-              // gid is passed: the editor creates its own draft and writes the
-              // resulting invoiceId into the URL itself, and a draft raised this
-              // way stays attached to the transaction — which is what makes the
-              // remitter-match and exact-amount gates apply.
-              //
-              // router.push, not window.location, so Next adds the base path.
-              router.push(`/create-invoice?gid=${row.gid}`);
+              // TODO: hand off to the /invoices/create flow and populate this
+              // field with the created invoice once that flow exists here.
             }}
           />
           <FieldError id="invoice-error">{invoiceError}</FieldError>
@@ -292,9 +308,7 @@ export function UploadInvoiceForm({
               </div>
               {isSubmitUnverified && (
                 <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                  {verificationFailed
-                    ? "We couldn't check this invoice against the transaction. It will go to manual review, which might delay settlement."
-                    : "Invoice will be flagged for manual review and might cause delay in settlement."}
+                  {unverifiedNotice}
                 </p>
               )}
             </>

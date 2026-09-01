@@ -1,10 +1,8 @@
 import { type Metadata } from "next";
-import { SettingsFeature } from "@/features/dashboard/settings";
+import { SettingsOverviewFeature } from "@/features/dashboard/settings/components/SettingsOverviewFeature";
 
-export const metadata: Metadata = {
-  title: "Settings",
-};
+export const metadata: Metadata = { title: "Settings" };
 
 export default function SettingsPage() {
-  return <SettingsFeature />;
+  return <SettingsOverviewFeature />;
 }

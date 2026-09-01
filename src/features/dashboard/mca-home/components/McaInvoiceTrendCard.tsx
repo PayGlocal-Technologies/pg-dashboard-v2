@@ -33,12 +33,19 @@ export function McaInvoiceTrendCard() {
     <Card className="h-full gap-4 p-5">
       <div>
         <h2 className="text-sm font-semibold text-foreground">Invoice trend</h2>
-        <p className="mt-0.5 text-xs text-muted-foreground">Paid vs outstanding invoices by month</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Paid vs outstanding invoices by month
+        </p>
       </div>
 
       <div className="min-h-56 w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={invoiceTrend} barCategoryGap="28%" barGap={2} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          <BarChart
+            data={invoiceTrend}
+            barCategoryGap="28%"
+            barGap={2}
+            margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
+          >
             <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
             <XAxis
               dataKey="month"
@@ -46,10 +53,24 @@ export function McaInvoiceTrendCard() {
               tickLine={false}
               tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
             />
-            <YAxis axisLine={false} tickLine={false} width={30} tick={{ fontSize: 11, fill: "var(--chart-tick)" }} />
-            <Tooltip content={<InvoiceTrendTooltip />} cursor={{ fill: "var(--chart-cursor)", radius: 4 }} />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              width={30}
+              tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
+            />
+            <Tooltip
+              content={<InvoiceTrendTooltip />}
+              cursor={{ fill: "var(--chart-cursor)", radius: 4 }}
+            />
             <Bar dataKey="paid" name="Paid" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="outstanding" name="Outstanding" fill="var(--chart-1)" fillOpacity={0.3} radius={[4, 4, 0, 0]} />
+            <Bar
+              dataKey="outstanding"
+              name="Outstanding"
+              fill="var(--chart-1)"
+              fillOpacity={0.3}
+              radius={[4, 4, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

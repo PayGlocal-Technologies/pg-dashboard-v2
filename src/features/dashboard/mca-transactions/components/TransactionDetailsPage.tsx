@@ -1,15 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import {
-  Alert,
-  AlertDescription,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  StatusBadge,
-} from "@/components/ui";
+import { Alert, AlertDescription, Button, Card, CardContent, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
@@ -170,28 +162,18 @@ function PaymentDetailsSection({
             label="Receiving Account"
             value={account?.accountHolderName ?? account?.bankName ?? `${accountCurrency} Account`}
           />
-          {/* Flag + code chip rather than bare text, so the currency is
-              recognisable at a glance. Flux's Badge is the chip primitive
-              here, with the flag in its leftIcon slot. CountryFlag is the
-              same small-flag component every other country chip in the
-              product uses (the Transactions table's Country column, the
-              Currency filter's own options below), so this one can't drift
-              from them in asset, size, or border. The flag is decorative
-              beside the code it labels, hence the empty alt; if this
-              currency has no matching MOCK_VIRTUAL_ACCOUNTS entry the chip
-              shows the code alone instead of a guessed flag. */}
+          {/* Flag + code as plain inline text (no chip). CountryFlag is the
+              same small-flag component every other country reference in the
+              product uses, so this can't drift from them in asset or size;
+              the flag is decorative beside the code it labels, and is simply
+              omitted when the account carries no country. */}
           <DetailRow
             label="Currency"
             value={
-              <Badge
-                variant="secondary"
-                size="md"
-                leftIcon={
-                  account?.bankCountry ? <CountryFlag iso2={account.bankCountry} /> : undefined
-                }
-              >
+              <span className="flex items-center gap-1.5">
+                {account?.bankCountry ? <CountryFlag iso2={account.bankCountry} /> : null}
                 {accountCurrency}
-              </Badge>
+              </span>
             }
           />
           {/* Elided from the middle for the same reason the account number
@@ -272,7 +254,7 @@ export function TransactionDetailsPage({
           size="sm"
           leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
           onClick={onBack}
-          className="text-muted-foreground hover:text-foreground"
+          className="pl-0 text-muted-foreground hover:text-foreground"
         >
           {backLabel}
         </Button>
@@ -384,7 +366,7 @@ export function TransactionDetailsContent({
           <CountryCell iso2={row.partnerCustomerCountry} />
           <div className="mt-1.5 flex flex-col items-start gap-1.5">
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-[26px] font-semibold tabular-nums text-foreground">
+              <span className="text-[34px] font-semibold tabular-nums text-foreground">
                 {formatCurrency(amount, currency, "en-US")}
               </span>
               <MdrOfferBadge totalMdrDiscount={row.totalMdrDiscount} />
@@ -395,7 +377,7 @@ export function TransactionDetailsContent({
                 readable, with the remitter name itself kept at foreground
                 weight so it doesn't disappear entirely. */}
             <p className="text-[13px] text-muted-foreground">
-              Charged by <span className="font-medium text-foreground">{counterpartyName}</span>
+              Charged to <span className="font-medium text-foreground">{counterpartyName}</span>
             </p>
             {/* Settlement date sits with the amount rather than in Payment
                 Details, so it is present in the drawer too — that layout

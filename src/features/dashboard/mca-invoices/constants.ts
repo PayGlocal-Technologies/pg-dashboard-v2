@@ -101,3 +101,26 @@ export const STATUS_PINNED_TABS = INVOICE_VIEW_TABS.filter(
 
 /** Columns the table is meaningless without, so they cannot be hidden. */
 export const FIXED_COLUMN_KEYS = ["invoiceNumber", "totalAmount", "status"];
+
+/**
+ * The period the summary cards describe, from pg-dashboard's own options.
+ *
+ * Scopes the three counts and nothing else. It used to also drive the table's
+ * Date chip, in both directions, which meant picking "Last 7 days" above
+ * silently refiltered the list below and setting a range on the chip moved the
+ * counts — so neither control could be trusted to mean only what it said. The
+ * two are now independent, which is also why there is no longer a "Custom
+ * range" entry here: nothing outside these options can set this value.
+ *
+ * Values other than ALL_TIME are day counts, read as "the last N days".
+ */
+export const ALL_TIME_RANGE_VALUE = "ALL_TIME";
+
+export const SUMMARY_RANGE_OPTIONS = [
+  { value: ALL_TIME_RANGE_VALUE, label: "All time" },
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+] as const;
+
+export type SummaryRange = (typeof SUMMARY_RANGE_OPTIONS)[number]["value"];

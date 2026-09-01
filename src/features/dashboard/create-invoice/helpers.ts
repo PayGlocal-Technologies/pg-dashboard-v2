@@ -1,17 +1,23 @@
 import { formatDate } from "@/lib/utils/format";
 import {
+  DEFAULT_THEME_METADATA,
   DUE_TERM_OPTIONS,
   INVOICE_STEPS,
+  INVOICE_THEMES,
   REQUIRED_ADDRESS_KEYS,
 } from "@/features/dashboard/create-invoice/constants";
 import type {
+  ApiInvoiceTemplate,
   ClientData,
   InvoiceCreatePayload,
   InvoiceData,
   InvoiceFormState,
   InvoiceTemplate,
   InvoiceTemplateSnapshot,
+  InvoiceTheme,
   LineItemDraft,
+  TemplateWriteBody,
+  ThemeMetadata,
 } from "@/features/dashboard/create-invoice/types";
 
 // ─── Totals ───────────────────────────────────────────────────────────────────
@@ -142,6 +148,10 @@ export const deriveCurrentStep = (form: InvoiceFormState): string => {
 
 export interface BuildPayloadArgs {
   form: InvoiceFormState;
+  /** The effective theme trio: the merchant's override, or the invoice's own. */
+  branding: ThemeMetadata;
+  /** The template this invoice descends from. `null` detaches it. */
+  templateId: string | null;
   /** Last document the server sent back; unspecified fields are preserved. */
   invoiceDetails: Partial<InvoiceData> | undefined;
   invoiceId: string;
@@ -161,6 +171,8 @@ export interface BuildPayloadArgs {
  */
 export const toInvoicePayload = ({
   form,
+  branding,
+  templateId,
   invoiceDetails,
   invoiceId,
   gid,
@@ -230,6 +242,15 @@ export const toInvoicePayload = ({
     lut: form.lut,
     logoEnabled: form.logoEnabled,
     signatureEnabled: form.signatureEnabled,
+    // Three enum names, never the hexes beside them on screen: the renderer
+    // owns what each name is worth. Always sent rather than omitted-when-default
+    // so that switching *back* to Classic is a change the server records, not a
+    // field it stops seeing.
+    themeMetadata: branding,
+    // Explicitly null rather than omitted when there is no link: `...carried`
+    // above spreads the previous response, so leaving it out would re-assert a
+    // template the merchant has just detached from.
+    templateId,
 
     // DATE
     invoiceNumber: form.invoiceNumber,
@@ -387,10 +408,21 @@ export const validateSelectedClient = (
  * a template that carried them would let a merchant bill last month's customer
  * by accident. See InvoiceTemplateSnapshot for the field-by-field reasoning.
  *
+ * The receiving account is not captured either, and that one is the API's call
+ * rather than this editor's: `/templates` has no field for it yet. It used to be
+ * stored locally, so a template saved before this switch quietly stops carrying
+ * an account — the payment card reads as unselected and Generate blocks on it,
+ * which is the right way round for a field the server cannot remember.
+ *
  * Line-item keys are dropped here and reassigned on apply, so two invoices built
  * from the same template never share a key.
  */
-export const toTemplateSnapshot = (form: InvoiceFormState): InvoiceTemplateSnapshot => ({
+export const toTemplateSnapshot = (
+  form: InvoiceFormState,
+  branding: ThemeMetadata,
+  /** The template being overwritten, when there is one, for fields it owns. */
+  previous?: InvoiceTemplateSnapshot
+): InvoiceTemplateSnapshot => ({
   currency: form.currency,
   lineItems: form.lineItems.map((item) => ({ ...item })),
   discountName: form.discountName,
@@ -398,7 +430,6 @@ export const toTemplateSnapshot = (form: InvoiceFormState): InvoiceTemplateSnaps
   discountType: form.discountType,
   taxName: form.taxName,
   taxValue: form.taxValue,
-  accountNo: form.accountNo,
   memo: form.memo,
   notes: form.notes,
   lut: form.lut,
@@ -406,12 +437,13 @@ export const toTemplateSnapshot = (form: InvoiceFormState): InvoiceTemplateSnaps
   dueTermId: form.dueTermId,
   logoEnabled: form.logoEnabled,
   signatureEnabled: form.signatureEnabled,
-  brandingStyleId: form.brandingStyleId,
-  primaryColor: form.primaryColor,
-  accentColor: form.accentColor,
-  language: form.language,
+  theme: branding.theme,
+  color: branding.color,
+  accent: branding.accent,
   isRecurring: form.isRecurring,
   recurringType: form.recurringType,
+  // Nothing in this editor can change it; a template that has it keeps it.
+  isGstInvoice: previous?.isGstInvoice ?? false,
 });
 
 /**
@@ -448,19 +480,145 @@ export const applyTemplateSnapshot = (
     discountType: snapshot.discountType,
     taxName: snapshot.taxName,
     taxValue: snapshot.taxValue,
-    accountNo: snapshot.accountNo,
     memo: snapshot.memo,
     notes: snapshot.notes,
     lut: snapshot.lut,
     dueTermId: snapshot.dueTermId,
     logoEnabled: snapshot.logoEnabled,
     signatureEnabled: snapshot.signatureEnabled,
-    brandingStyleId: snapshot.brandingStyleId,
-    primaryColor: snapshot.primaryColor,
-    accentColor: snapshot.accentColor,
-    language: snapshot.language,
     isRecurring: snapshot.isRecurring,
     recurringType: snapshot.recurringType,
+  };
+};
+
+// ─── Templates: snapshot ⇄ wire ───────────────────────────────────────────────
+//
+// FIVE MAPPING DECISIONS LIVE IN THIS BLOCK, all of them open questions on the
+// API contract that were answered with a documented default rather than a guess
+// buried in the code. Each is one line to change if the answer differs:
+//
+//  1. `name` vs `description` on a line item. The editor has ONE label per item
+//     (`LineItemDraft.description`, which the preview prints as the headline and
+//     production posts as `description`). The template body wants both, so both
+//     receive that label, and a read prefers `name` and falls back.
+//  2. Numbers vs strings. The template body shows numbers; the editor holds
+//     strings so a half-typed "12." survives, and the invoice endpoint takes
+//     strings. Coerced on the way out, stringified on the way back.
+//  3. `discount.type`. Sent as the editor's own "percentage" / "fixed", the
+//     values the invoice endpoint round-trips today. The spec's examples show
+//     "PERCENT"; if `/templates` validates a different enum, map it here.
+//  4. `discountAmount` / `taxAmount`. Derived, not authoritative: computed from
+//     the template's own line items on write and recomputed from the invoice's on
+//     apply, because a template's amounts change the moment a quantity does.
+//  5. Two kinds of "none". `dueTermDays` and `recurring` are OMITTED when absent
+//     rather than sent as null, and `0` is never used to mean "no term" because
+//     it is a real term (the "Today" chip).
+
+/** Whole days for a due-term chip, or undefined when the term is not reusable. */
+const dueTermDaysFor = (dueTermId: string | null): number | undefined =>
+  DUE_TERM_OPTIONS.find((option) => option.id === dueTermId)?.days;
+
+/** The chip a stored day count came from, or null when no chip matches it. */
+const dueTermIdForDays = (days: number | undefined): string | null =>
+  days == null ? null : (DUE_TERM_OPTIONS.find((option) => option.days === days)?.id ?? null);
+
+/** The editor's shape → the body POSTed to /templates and PUT to /templates/{id}. */
+export const toTemplateWriteBody = (
+  name: string,
+  snapshot: InvoiceTemplateSnapshot
+): TemplateWriteBody => {
+  const dueTermDays = dueTermDaysFor(snapshot.dueTermId);
+  const recurring = snapshot.isRecurring ? snapshot.recurringType || undefined : undefined;
+
+  return {
+    name,
+    currency: snapshot.currency,
+    lineItems: snapshot.lineItems.map((item) => ({
+      name: item.description,
+      description: item.description,
+      type: item.type,
+      quantity: Number(item.quantity) || 0,
+      unitPrice: Number(item.unitPrice) || 0,
+      gstRate: Number(item.gstRate) || 0,
+      hsn: item.hsn,
+    })),
+    isGstInvoice: snapshot.isGstInvoice,
+    themeMetadata: { theme: snapshot.theme, color: snapshot.color, accent: snapshot.accent },
+    discount: {
+      discountName: snapshot.discountName || undefined,
+      value: snapshot.discountValue || undefined,
+      type: snapshot.discountType,
+      discountAmount: getDiscountAmount(
+        snapshot.discountValue,
+        snapshot.discountType,
+        snapshot.lineItems
+      ),
+    },
+    tax: {
+      taxName: snapshot.taxName || undefined,
+      value: snapshot.taxValue || undefined,
+      taxAmount: getTaxAmount(
+        snapshot.taxValue,
+        snapshot.discountValue,
+        snapshot.discountType,
+        snapshot.lineItems
+      ),
+    },
+    memo: snapshot.memo,
+    notes: snapshot.notes,
+    lut: snapshot.lut,
+    ...(dueTermDays != null && { dueTermDays }),
+    ...(recurring && { recurring }),
+    logoEnabled: snapshot.logoEnabled,
+    signatureEnabled: snapshot.signatureEnabled,
+  };
+};
+
+/** A template as the API returns it → the shape this feature consumes. */
+export const fromApiTemplate = (template: ApiInvoiceTemplate): InvoiceTemplate => {
+  const branding = brandingFrom(template.themeMetadata);
+
+  const snapshot: InvoiceTemplateSnapshot = {
+    currency: template.currency ?? "",
+    lineItems: (template.lineItems ?? []).map((item, index) => ({
+      // Keyed by the template so two invoices from one template never collide.
+      key: `tpl_${template.templateId}_${index}`,
+      description: item.name || item.description || "",
+      type: item.type ?? "",
+      hsn: item.hsn ?? "",
+      // Back to strings, and an absent or zero rate reads as "no GST" rather
+      // than as an explicit 0, matching GST_RATE_OPTIONS' empty value.
+      gstRate: item.gstRate ? String(item.gstRate) : "",
+      unitPrice: item.unitPrice != null ? String(item.unitPrice) : "",
+      quantity: item.quantity != null ? String(item.quantity) : "",
+      saveAsSku: false,
+    })),
+    discountName: template.discount?.discountName ?? "",
+    discountValue: template.discount?.value ?? "",
+    discountType: template.discount?.type === "fixed" ? "fixed" : "percentage",
+    taxName: template.tax?.taxName ?? "",
+    taxValue: template.tax?.value ?? "",
+    memo: template.memo ?? "",
+    notes: template.notes ?? "",
+    lut: template.lut ?? "",
+    dueTermId: dueTermIdForDays(template.dueTermDays),
+    logoEnabled: !!template.logoEnabled,
+    signatureEnabled: !!template.signatureEnabled,
+    theme: branding.theme,
+    color: branding.color,
+    accent: branding.accent,
+    isRecurring: !!template.recurring,
+    recurringType: template.recurring ?? "",
+    isGstInvoice: !!template.isGstInvoice,
+  };
+
+  return {
+    id: template.templateId,
+    name: template.name ?? "",
+    description: describeSnapshot(snapshot),
+    savedAt: template.savedAt ?? "",
+    lastUsedAt: template.lastUsedAt ?? null,
+    snapshot,
   };
 };
 
@@ -500,15 +658,53 @@ export const formatEpochDay = (millis: string | null | undefined): string => {
   return formatDate(new Date(value), { day: "2-digit", month: "short", year: "numeric" });
 };
 
+// ─── Themes ───────────────────────────────────────────────────────────────────
+
+/**
+ * What to draw for a theme name.
+ *
+ * The server owns the vocabulary, so a name this build has never heard of is a
+ * normal outcome rather than an error: it renders through the Classic layout
+ * under a title-cased version of its own name, which is legible enough to pick
+ * from a grid. That is what lets the backend ship a seventh theme ahead of the
+ * frontend that describes it.
+ */
+export const themeFor = (name: string): InvoiceTheme =>
+  INVOICE_THEMES[name] ?? {
+    name,
+    label: name
+      .toLowerCase()
+      .split("_")
+      .map((word) => (word ? word[0]!.toUpperCase() + word.slice(1) : word))
+      .join(" "),
+    layout: "classic",
+  };
+
+/**
+ * A complete theme trio out of a partial or missing one.
+ *
+ * Used for both sources the editor resolves branding from: the invoice's own
+ * `themeMetadata`, absent on drafts that predate the feature, and a template
+ * snapshot saved before it, which holds the old hex-based fields and none of
+ * these three. Both cases mean "the server's default", which is what this
+ * returns rather than letting `undefined` reach the wire.
+ */
+export const brandingFrom = (source: Partial<ThemeMetadata> | null | undefined): ThemeMetadata => ({
+  theme: source?.theme || DEFAULT_THEME_METADATA.theme,
+  color: source?.color || DEFAULT_THEME_METADATA.color,
+  accent: source?.accent || DEFAULT_THEME_METADATA.accent,
+});
+
 // ─── Brand colours ────────────────────────────────────────────────────────────
 
 /**
- * Normalises typed hex to `#RRGGBB`, or null when it is not a colour.
+ * Normalises a hex string to `#RRGGBB`, or null when it is not a colour.
  *
- * Accepts a leading hash or not, and the three-digit shorthand, because those
- * are what people paste out of a brand guideline.
+ * Module-private since the colour picker stopped taking typed hex: the palette
+ * is now the server's named vocabulary, so the only caller left is `withAlpha`,
+ * which needs a known-shaped value before it can append an alpha byte.
  */
-export const normalizeHexColor = (value: string): string | null => {
+const normalizeHexColor = (value: string): string | null => {
   const raw = value.trim().replace(/^#/, "");
 
   if (/^[0-9a-fA-F]{3}$/.test(raw)) {

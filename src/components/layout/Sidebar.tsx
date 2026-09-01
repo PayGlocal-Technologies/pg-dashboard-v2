@@ -22,6 +22,7 @@ import {
 import { useApp } from "@/stores/useApp";
 import { useProductContext, toProductType } from "@/stores/useProductContext";
 import { useLogout } from "@/lib/hooks/useLogout";
+import { useMerchantBusinessProfile } from "@/features/dashboard/settings/hooks";
 import useNewPermissions from "@/hooks/useNewPermissions";
 
 function profileInitials(name: string) {
@@ -150,6 +151,11 @@ function SidebarBody({
 }) {
   const profile = useApp((s) => s.profile);
   const { logout, isLoading } = useLogout();
+  // Fetched here so the merchant's checkout logo is loaded as soon as the shell
+  // mounts and shown in this footer avatar. Shares the query key the Settings
+  // page uses, so it is fetched once and served from cache to both.
+  const { businessProfile } = useMerchantBusinessProfile();
+  const logoUrl = businessProfile?.merchantLogoPublicUrl ?? null;
 
   const displayName =
     [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || profile?.username || "";
@@ -228,16 +234,26 @@ function SidebarBody({
       </nav>
 
       {/* ── Bottom profile section ── */}
-      <div className="px-2.5 py-2.5 flex-shrink-0 border-t border-sidebar-border">
+      <div className="px-2.5 py-2.5 flex-shrink-0 border-t border-sidebar-border space-y-2">
         <div
           className={cn(
             "flex gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/5",
             collapsed ? "flex-col items-center justify-center gap-1" : "items-center"
           )}
         >
-          {/* Avatar */}
+          {/* Avatar — the merchant's checkout logo once uploaded, else the
+              name initials, else a generic glyph. */}
           <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full ring-2 ring-transparent">
-            {displayName ? (
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt="Merchant logo"
+                width={32}
+                height={32}
+                unoptimized
+                className="h-full w-full object-cover"
+              />
+            ) : displayName ? (
               <span className="flex h-full w-full items-center justify-center bg-muted-foreground text-[11px] font-bold text-background">
                 {profileInitials(displayName)}
               </span>
@@ -256,34 +272,15 @@ function SidebarBody({
                   {formatRole(profile?.role)}
                 </p>
               </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                <Link
-                  href="/settings"
-                  onClick={onNavClick}
-                  className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  aria-label="Settings"
-                  title="Settings"
-                >
-                  <Icon name="settings" size={16} />
-                </Link>
-                <Button
-                  variant="ghost"
-                  disabled={isLoading}
-                  className="h-7 w-7 min-h-0 rounded-md text-muted-foreground hover:text-foreground"
-                  aria-label="Log out"
-                  title="Log out"
-                  onClick={() => {
-                    onNavClick?.();
-                    void logout();
-                  }}
-                >
-                  <Icon
-                    name={isLoading ? "loader" : "log-out"}
-                    size={16}
-                    className={isLoading ? "animate-spin" : ""}
-                  />
-                </Button>
-              </div>
+              <Link
+                href="/settings"
+                onClick={onNavClick}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
+                aria-label="Settings"
+                title="Settings"
+              >
+                <Icon name="settings" size={16} />
+              </Link>
             </>
           ) : (
             <>
@@ -316,6 +313,28 @@ function SidebarBody({
             </>
           )}
         </div>
+
+        {!collapsed && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isLoading}
+            leftIcon={
+              <Icon
+                name={isLoading ? "loader" : "log-out"}
+                size={16}
+                className={cn("text-red-600 dark:text-red-400", isLoading && "animate-spin")}
+              />
+            }
+            className="w-full justify-start gap-2 text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
+            onClick={() => {
+              onNavClick?.();
+              void logout();
+            }}
+          >
+            Log out
+          </Button>
+        )}
       </div>
     </>
   );

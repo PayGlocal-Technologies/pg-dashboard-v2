@@ -31,7 +31,9 @@ export function McaWidgetPickerTile({
       className={cn(
         "group relative w-full cursor-pointer rounded-xl border border-border bg-card p-3 text-left shadow-sm transition-[border-color,box-shadow,opacity] outline-none",
         "focus-visible:ring-2 focus-visible:ring-ring/35 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
-        selected ? "border-primary ring-1 ring-primary/25" : "hover:border-muted-foreground/30 hover:shadow-md"
+        selected
+          ? "border-primary ring-1 ring-primary/25"
+          : "hover:border-muted-foreground/30 hover:shadow-md"
       )}
       aria-pressed={selected}
       aria-label={
@@ -43,7 +45,9 @@ export function McaWidgetPickerTile({
       <div className="mb-2 flex items-start justify-between gap-2 pr-1">
         <div className="min-w-0">
           <h4 className="text-sm font-semibold leading-snug text-foreground">{entry.name}</h4>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">Tap to {selected ? "remove" : "add"}</p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground">
+            Tap to {selected ? "remove" : "add"}
+          </p>
         </div>
         <span
           className={cn(

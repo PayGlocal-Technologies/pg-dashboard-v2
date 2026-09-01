@@ -1,13 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import {
   Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Shimmer,
   Tooltip,
   TooltipContent,
@@ -17,43 +11,13 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useGet } from "@/lib/api/hooks";
+import { TimeRangeTabs } from "@/components/common/TimeRangeTabs";
 import { invoiceSummaryApi } from "@/features/dashboard/mca-invoices/services";
+import {
+  SUMMARY_RANGE_OPTIONS,
+  type SummaryRange,
+} from "@/features/dashboard/mca-invoices/constants";
 import type { McaInvoiceSummaryResponse } from "@/features/dashboard/mca-invoices/types";
-
-/**
- * Epoch SECONDS at the end of the local day containing `now`.
- *
- * The window is deliberately bucketed to day boundaries rather than to the
- * exact moment. It feeds both the request URL and the react-query key, so a
- * second-resolution "now" produced a different key on every single mount: the
- * cache could never hit, and the cards fell back to skeletons every time the
- * page was opened. Bucketing makes the key identical for the whole day, so a
- * revisit paints from cache and revalidates in the background.
- *
- * Day granularity is also what the ranges actually mean — "last 7 days", not
- * "the 604800 seconds ending at 14:23:07".
- */
-function endOfDaySeconds(now: Date): number {
-  const end = new Date(now);
-  end.setHours(23, 59, 59, 999);
-  return Math.floor(end.getTime() / 1000);
-}
-
-/** Epoch seconds at local midnight `daysBack` days before `now`. */
-function startOfDaySeconds(now: Date, daysBack: number): number {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - daysBack);
-  return Math.floor(start.getTime() / 1000);
-}
-
-/** Ranges from pg-dashboard's summary picker. Values are day counts. */
-const RANGE_OPTIONS = [
-  { value: "ALL_TIME", label: "All time" },
-  { value: "7", label: "Last 7 days" },
-  { value: "30", label: "Last 30 days" },
-  { value: "90", label: "Last 90 days" },
-] as const;
 
 interface SummaryCard {
   key: string;
@@ -67,36 +31,37 @@ interface SummaryCard {
 /**
  * Invoice counts, from get-invoice-summary.
  *
- * Two behaviours are pg-dashboard's, not inventions:
- *  - a card is a shortcut, not just a readout: clicking one pins the table to
- *    that status set;
- *  - the range picker moves the table's date filter as well as the summary's
- *    own window, so the counts and the rows below always describe the same
- *    period.
+ * A card is a shortcut, not just a readout: clicking one pins the table to that
+ * status set, which is pg-dashboard's behaviour and not an invention.
+ *
+ * The period, though, is this block's alone. It used to be two views of the
+ * table's Date filter, so picking a range here refiltered the list and setting
+ * the chip below moved these counts. Both directions are gone: the range now
+ * scopes the three figures beside it and nothing else, which is the only reading
+ * a merchant can take from a control that sits inside the summary.
+ *
+ * The window still arrives from the page as epoch seconds, bucketed there so it
+ * is stable across renders and the query key below can hit the cache.
  */
 export function InvoiceSummaryCards({
   merchantId,
+  range,
+  onRangeChange,
+  windowSeconds,
   onStatusFilter,
-  onRangeDaysChange,
 }: {
   merchantId: string;
+  range: SummaryRange;
+  onRangeChange: (next: SummaryRange) => void;
+  windowSeconds: { start: number; end: number };
   onStatusFilter: (statuses: string[]) => void;
-  onRangeDaysChange: (days: number | undefined) => void;
 }) {
-  const [range, setRange] = useState<string>("ALL_TIME");
-  // Resolved in a lazy initializer and in the change handler, never during
-  // render, and bucketed to the day so the value is stable across mounts.
-  const [window, setWindow] = useState<{ start: number; end: number }>(() => ({
-    start: 0,
-    end: endOfDaySeconds(new Date()),
-  }));
-
-  const url = invoiceSummaryApi(merchantId, window.start, window.end);
+  const url = invoiceSummaryApi(merchantId, windowSeconds.start, windowSeconds.end);
   // isPending, not isLoading: isPending is false the moment there is data to
   // show, cached or fresh, so a revisit renders the previous counts instead of
   // skeletons while the background revalidation runs.
   const { data, isPending } = useGet<McaInvoiceSummaryResponse>(
-    ["invoice-summary", merchantId, window.start, window.end],
+    ["invoice-summary", merchantId, windowSeconds.start, windowSeconds.end],
     url,
     undefined,
     { enabled: !!url }
@@ -132,41 +97,21 @@ export function InvoiceSummaryCards({
     },
   ];
 
-  const handleRangeChange = (next: string) => {
-    setRange(next);
-
-    const now = new Date();
-    const end = endOfDaySeconds(now);
-
-    if (next === "ALL_TIME") {
-      setWindow({ start: 0, end });
-      onRangeDaysChange(undefined);
-      return;
-    }
-
-    const days = Number(next);
-    setWindow({ start: startOfDaySeconds(now, days), end });
-    onRangeDaysChange(days);
-  };
-
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
           Summary
         </h2>
-        <Select value={range} onValueChange={handleRangeChange}>
-          <SelectTrigger className="h-8 w-[9.5rem]" aria-label="Summary date range">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {RANGE_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* The same control Transactions puts beside its own title, rather than
+            the dropdown that used to sit here: a DQA pass called out having one
+            page segment time with tabs and another with a select. */}
+        <TimeRangeTabs
+          options={SUMMARY_RANGE_OPTIONS}
+          value={range}
+          onValueChange={onRangeChange}
+          label="Summary period"
+        />
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

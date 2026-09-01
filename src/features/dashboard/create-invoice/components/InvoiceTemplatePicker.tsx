@@ -82,13 +82,7 @@ export function InvoiceTemplatePicker({
         </div>
 
         {templates.length > 0 && (
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="h-auto p-0"
-            onClick={onManage}
-          >
+          <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={onManage}>
             Manage templates
           </Button>
         )}

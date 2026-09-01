@@ -25,7 +25,8 @@ import type { LayoutProps } from "@/features/dashboard/create-invoice/components
 export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
   const { labels, totals, money, items, primary, accent } = model;
 
-  const headLabel = "border-b-2 pb-1 mb-2 text-[11px] font-extrabold uppercase tracking-wide text-foreground";
+  const headLabel =
+    "border-b-2 pb-1 mb-2 text-[11px] font-extrabold uppercase tracking-wide text-foreground";
   const headStyle = { borderColor: accent };
 
   return (

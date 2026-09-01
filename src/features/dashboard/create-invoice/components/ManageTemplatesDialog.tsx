@@ -1,14 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  EmptyState,
-  Input,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogTitle, EmptyState, Input } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
 import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/create-invoice/constants";
@@ -25,12 +18,21 @@ export function ManageTemplatesDialog({
   open,
   onOpenChange,
   templates,
+  isMutating,
   onRename,
   onDelete,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   templates: InvoiceTemplate[];
+  /**
+   * True while a rename or delete is in flight.
+   *
+   * Both are requests now, and a rename is a full replace of the template, so a
+   * second one issued over the first would race it. The row actions are held
+   * rather than the whole dialog, so the list stays readable while it settles.
+   */
+  isMutating: boolean;
   onRename: (templateId: string, name: string) => void;
   onDelete: (templateId: string) => void;
 }) {
@@ -121,10 +123,10 @@ export function ManageTemplatesDialog({
                           type="button"
                           variant="primary"
                           size="sm"
-                          disabled={!renameValue.trim() || !!renameError}
+                          disabled={!renameValue.trim() || !!renameError || isMutating}
                           onClick={commitRename}
                         >
-                          Save
+                          {isMutating ? "Saving…" : "Save"}
                         </Button>
                         <Button type="button" variant="ghost" size="sm" onClick={reset}>
                           Cancel
@@ -162,6 +164,7 @@ export function ManageTemplatesDialog({
                             type="button"
                             variant="danger"
                             size="sm"
+                            disabled={isMutating}
                             onClick={() => {
                               onDelete(template.id);
                               setPendingDeleteId(null);
@@ -186,6 +189,7 @@ export function ManageTemplatesDialog({
                             size="sm"
                             aria-label={`Rename ${template.name}`}
                             className="h-7 w-7 p-0"
+                            disabled={isMutating}
                             onClick={() => startRename(template)}
                           >
                             <Icon name="pencil" className="h-3.5 w-3.5" />
@@ -196,6 +200,7 @@ export function ManageTemplatesDialog({
                             size="sm"
                             aria-label={`Delete ${template.name}`}
                             className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                            disabled={isMutating}
                             onClick={() => setPendingDeleteId(template.id)}
                           >
                             <Icon name="trash-2" className="h-3.5 w-3.5" />

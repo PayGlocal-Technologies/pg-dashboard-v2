@@ -9,14 +9,22 @@ import { formatFileSize } from "@/lib/utils/format";
 import {
   SKU_IMAGE_ACCEPTED_MIME_TYPES,
   SKU_IMAGE_MAX_SIZE_BYTES,
-  SKU_MAX_IMAGES,
 } from "@/features/dashboard/sku-management/constants";
-import type { SkuMediaItem } from "@/features/dashboard/sku-management/types";
+import type { SkuImageValue } from "@/features/dashboard/sku-management/types";
 
 interface SkuMediaUploadProps {
   id: string;
-  value: SkuMediaItem[];
-  onChange: (next: SkuMediaItem[]) => void;
+  value: SkuImageValue | null;
+  onChange: (next: SkuImageValue | null) => void;
+  /**
+   * The image already on the item when the form opened, if any.
+   *
+   * Discarding a *newly picked* file has to put the merchant back where they
+   * started, and where they started was looking at this. Without it, clicking
+   * the X after choosing a replacement would empty the slot and read as "the
+   * saved image is gone", which is not something this form can do — see below.
+   */
+  savedImageUrl?: string;
 }
 
 /** Preview tile size — the same 70px the Product column uses, so what the
@@ -24,71 +32,74 @@ interface SkuMediaUploadProps {
 const TILE = 70;
 
 /**
- * Product images for the item form. Follows InvoiceDropzone's arrangement (a
- * visually-hidden file input driven by a click/drag surface, with validation
- * messages rendered beneath) rather than introducing a second upload idiom,
- * but holds a list instead of a single file: the first image is the item's
- * primary one and the rest are its gallery.
+ * The item's picture. One image, because that is what the catalogue stores:
+ * the upload endpoint writes a single object per SKU and the row carries a
+ * single `imageUrl`, so a second upload replaces the first. This used to accept
+ * six and hold them as object URLs, five of which had nowhere to go.
  *
- * Previews are local object URLs. There is no media endpoint yet, so nothing
- * is uploaded anywhere — the URLs are handed to the catalogue row as-is and
- * survive as long as the page does. Swapping in a real upload means replacing
- * `addFiles` below with the call that returns hosted URLs; nothing else here
- * or downstream changes.
+ * Follows InvoiceDropzone's arrangement — a visually-hidden file input driven
+ * by a click/drag surface, with validation messages beneath — rather than
+ * introducing a second upload idiom.
+ *
+ * **There is no remove.** The API has an upload endpoint and no delete, so a
+ * saved image can be replaced but not taken away, and offering an X that
+ * silently did nothing on save would be a lie. The X appears only over a file
+ * the merchant has just picked and not yet saved, where it means "discard this
+ * choice" and restores whatever was there before.
  */
-export function SkuMediaUpload({ id, value, onChange }: SkuMediaUploadProps) {
+export function SkuMediaUpload({ id, value, onChange, savedImageUrl }: SkuMediaUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  // Object URLs are minted in event handlers, never during render, so ids can
-  // come from a counter rather than Math.random/Date.now — both of which are
-  // barred during render and pointless to reach for here anyway.
-  const nextIdRef = useRef(0);
 
-  const atCapacity = value.length >= SKU_MAX_IMAGES;
+  // Only a freshly picked file carries one; a saved image is just a URL.
+  const isPending = !!value?.file;
 
   const openFileDialog = () => inputRef.current?.click();
 
-  const addFiles = (files: File[]) => {
-    if (!files.length) return;
+  const selectFile = (files: File[]) => {
+    const file = files[0];
+    if (!file) return;
 
-    const room = SKU_MAX_IMAGES - value.length;
-    const accepted: SkuMediaItem[] = [];
-    let rejection: string | null = null;
-
-    for (const file of files) {
-      if (accepted.length >= room) {
-        rejection = `You can add up to ${SKU_MAX_IMAGES} images.`;
-        break;
-      }
-      const typeOk = (SKU_IMAGE_ACCEPTED_MIME_TYPES as readonly string[]).includes(file.type);
-      if (!typeOk) {
-        rejection = "Images must be PNG, JPG, WEBP, or AVIF.";
-        continue;
-      }
-      if (file.size > SKU_IMAGE_MAX_SIZE_BYTES) {
-        rejection = `Each image must be under ${formatFileSize(SKU_IMAGE_MAX_SIZE_BYTES)}.`;
-        continue;
-      }
-      accepted.push({
-        id: `sku-media-${nextIdRef.current++}`,
-        url: URL.createObjectURL(file),
-        name: file.name,
-      });
+    const typeOk = (SKU_IMAGE_ACCEPTED_MIME_TYPES as readonly string[]).includes(file.type);
+    if (!typeOk) {
+      setError("Images must be PNG, JPG, WEBP, or AVIF.");
+      return;
+    }
+    if (file.size > SKU_IMAGE_MAX_SIZE_BYTES) {
+      setError(`The image must be under ${formatFileSize(SKU_IMAGE_MAX_SIZE_BYTES)}.`);
+      return;
     }
 
-    setError(rejection);
-    if (accepted.length) onChange([...value, ...accepted]);
+    // The previous object URL is released here rather than on unmount: this is
+    // the only place one stops being displayed, and a merchant cycling through
+    // half a dozen candidates would otherwise leave all of them alive. Only the
+    // ones this component minted are revoked — a saved image's URL is S3's.
+    if (value?.file) URL.revokeObjectURL(value.url);
+
+    setError(null);
+    onChange({ url: URL.createObjectURL(file), name: file.name, file });
   };
 
-  const handleRemove = (item: SkuMediaItem) => {
-    // Released as soon as the tile goes, so a long editing session doesn't
-    // accumulate object URLs for images the merchant already discarded. Only
-    // safe because a removed image is gone from `value` in the same tick, so
-    // nothing can still be pointing at it.
-    URL.revokeObjectURL(item.url);
+  const discardPick = () => {
+    if (value?.file) URL.revokeObjectURL(value.url);
     setError(null);
-    onChange(value.filter((image) => image.id !== item.id));
+    // Back to the saved image if there was one, rather than to an empty slot:
+    // discarding a replacement is not the same as deleting what it replaced.
+    onChange(savedImageUrl ? { url: savedImageUrl, name: "Current image" } : null);
+  };
+
+  const dropHandlers = {
+    onDragOver: (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(true);
+    },
+    onDragLeave: () => setIsDragOver(false),
+    onDrop: (e: React.DragEvent) => {
+      e.preventDefault();
+      setIsDragOver(false);
+      selectFile(Array.from(e.dataTransfer.files ?? []));
+    },
   };
 
   return (
@@ -97,20 +108,19 @@ export function SkuMediaUpload({ id, value, onChange }: SkuMediaUploadProps) {
         ref={inputRef}
         id={id}
         type="file"
-        multiple
         accept={SKU_IMAGE_ACCEPTED_MIME_TYPES.join(",")}
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           // Cleared so re-picking the same file still fires a change event.
           e.target.value = "";
-          addFiles(files);
+          selectFile(files);
         }}
         className="sr-only"
         aria-hidden
         tabIndex={-1}
       />
 
-      {value.length === 0 ? (
+      {!value ? (
         // Empty state: the whole area is the drop target, matching
         // InvoiceDropzone's idle treatment.
         <div
@@ -123,16 +133,7 @@ export function SkuMediaUpload({ id, value, onChange }: SkuMediaUploadProps) {
               openFileDialog();
             }
           }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragOver(false);
-            addFiles(Array.from(e.dataTransfer.files ?? []));
-          }}
+          {...dropHandlers}
           className={cn(
             "flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed px-4 py-6 text-center transition-colors",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
@@ -143,63 +144,46 @@ export function SkuMediaUpload({ id, value, onChange }: SkuMediaUploadProps) {
         >
           <Icon name="image" className="h-5 w-5 text-muted-foreground" />
           <p className="text-[13px] font-medium text-foreground">
-            Drag and drop product images, or{" "}
+            Drag and drop a product image, or{" "}
             <span className="text-primary underline underline-offset-2">click to browse</span>
           </p>
           <p className="text-[11px] text-muted-foreground">
-            PNG, JPG, WEBP or AVIF, up to {formatFileSize(SKU_IMAGE_MAX_SIZE_BYTES)} each
+            PNG, JPG, WEBP or AVIF, up to {formatFileSize(SKU_IMAGE_MAX_SIZE_BYTES)}
           </p>
         </div>
       ) : (
-        // Populated state: a strip of square previews with the add tile
-        // trailing them, so adding more never moves the images already there.
+        // Populated state: the tile, with the one action that applies to it.
         <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragOver(true);
-          }}
-          onDragLeave={() => setIsDragOver(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragOver(false);
-            addFiles(Array.from(e.dataTransfer.files ?? []));
-          }}
+          {...dropHandlers}
           className={cn(
-            "flex flex-wrap gap-2 rounded-lg border-2 border-dashed p-2.5 transition-colors",
+            "flex items-center gap-3 rounded-lg border-2 border-dashed p-2.5 transition-colors",
             isDragOver ? "border-primary bg-primary/5" : "border-border"
           )}
         >
-          {value.map((image, index) => (
-            <div
-              key={image.id}
-              className="group relative overflow-hidden rounded-lg border border-border bg-white"
-              style={{ width: TILE, height: TILE }}
-            >
-              <Image
-                src={image.url}
-                alt={image.name}
-                width={TILE}
-                height={TILE}
-                // Object URLs can't go through the image optimiser — it fetches
-                // by URL server-side and a blob: URL only exists in this tab.
-                unoptimized
-                className="h-full w-full object-cover"
-              />
+          <div
+            className="group relative shrink-0 overflow-hidden rounded-lg border border-border bg-white"
+            style={{ width: TILE, height: TILE }}
+          >
+            <Image
+              src={value.url}
+              alt={value.name}
+              width={TILE}
+              height={TILE}
+              // Never optimised, whichever state this is in. An object URL only
+              // exists in this tab, so the optimiser cannot fetch it; a saved
+              // image is a presigned S3 URL on a host next/image has no
+              // remotePattern for, and one that expires in ten minutes besides.
+              unoptimized
+              className="h-full w-full object-cover"
+            />
 
-              {/* The primary marker earns its place only on the first tile,
-                  which is the whole rule: images[0] is what the table shows. */}
-              {index === 0 && (
-                <span className="absolute inset-x-0 bottom-0 bg-foreground/70 py-0.5 text-center text-[9px] font-semibold tracking-wide text-background">
-                  PRIMARY
-                </span>
-              )}
-
+            {isPending && (
               <IconButton
                 type="button"
-                aria-label={`Remove ${image.name}`}
+                aria-label="Discard this image"
                 variant="ghost"
                 size="xs"
-                onClick={() => handleRemove(image)}
+                onClick={discardPick}
                 className={cn(
                   "absolute right-0.5 top-0.5 h-5 w-5 rounded-md bg-background/85 text-foreground",
                   "opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
@@ -207,31 +191,29 @@ export function SkuMediaUpload({ id, value, onChange }: SkuMediaUploadProps) {
               >
                 <Icon name="x" className="h-3 w-3" />
               </IconButton>
-            </div>
-          ))}
+            )}
+          </div>
 
-          {!atCapacity && (
-            <Button
-              type="button"
-              variant="outline"
-              onClick={openFileDialog}
-              aria-label="Add another image"
-              className="h-auto min-h-0 flex-col gap-0 border-dashed p-0 text-muted-foreground hover:text-foreground"
-              style={{ width: TILE, height: TILE }}
-            >
-              <Icon name="plus" className="h-4 w-4" />
-            </Button>
-          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[13px] font-medium text-foreground">{value.name}</p>
+            <p className="mt-0.5 text-[11px] text-muted-foreground">
+              {isPending ? "Uploads when you save." : "Currently on this item."}
+            </p>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="shrink-0"
+            onClick={openFileDialog}
+          >
+            Replace
+          </Button>
         </div>
       )}
 
-      {error ? (
-        <p className="text-[12px] text-destructive">{error}</p>
-      ) : value.length > 0 ? (
-        <p className="text-[11px] text-muted-foreground">
-          First image is used as the product image. {value.length} of {SKU_MAX_IMAGES} added.
-        </p>
-      ) : null}
+      {error && <p className="text-[12px] text-destructive">{error}</p>}
     </div>
   );
 }

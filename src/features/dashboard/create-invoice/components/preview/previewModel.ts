@@ -1,17 +1,13 @@
 import { formatDate } from "@/lib/utils/format";
-import {
-  DEFAULT_BRANDING_STYLE,
-  INVOICE_BRANDING_STYLES,
-} from "@/features/dashboard/create-invoice/constants";
-import { getAmount, getInvoiceTotals } from "@/features/dashboard/create-invoice/helpers";
-import { invoiceLabelsFor, type InvoiceLabels } from "@/features/dashboard/create-invoice/i18n";
+import { getAmount, getInvoiceTotals, themeFor } from "@/features/dashboard/create-invoice/helpers";
+import { INVOICE_LABELS, type InvoiceLabels } from "@/features/dashboard/create-invoice/labels";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";
 import type {
   Address,
   BillerDetails,
   ClientData,
-  InvoiceBrandingStyle,
   InvoiceFormState,
+  InvoiceTheme,
 } from "@/features/dashboard/create-invoice/types";
 import type { InvoiceTotals } from "@/features/dashboard/create-invoice/helpers";
 
@@ -32,6 +28,18 @@ export interface PreviewSource {
   logoUrl: string | undefined;
   signatureUrl: string | undefined;
   symbol: string;
+  /**
+   * The effective theme name, and the hexes for its colour pair.
+   *
+   * Branding does not live in `form`: the invoice carries it and the editor
+   * derives it, so it arrives here as its own field. The hexes are resolved by
+   * the caller rather than looked up here because the mapping lives behind a
+   * query (GET /themes) and this is a pure function. Names go on the wire; these
+   * hexes are for drawing only.
+   */
+  theme: string;
+  primaryHex: string;
+  accentHex: string;
 }
 
 export interface PreviewItem {
@@ -50,7 +58,7 @@ export interface PreviewItem {
 
 export interface PreviewModel {
   labels: InvoiceLabels;
-  style: InvoiceBrandingStyle;
+  theme: InvoiceTheme;
   primary: string;
   accent: string;
 
@@ -104,9 +112,7 @@ const addressLines = (address: Address | BillerDetails | undefined): string[] =>
 export function buildPreviewModel(source: PreviewSource): PreviewModel {
   const { form, biller, client, account, logoUrl, signatureUrl, symbol } = source;
 
-  const style =
-    INVOICE_BRANDING_STYLES.find((candidate) => candidate.id === form.brandingStyleId) ??
-    DEFAULT_BRANDING_STYLE;
+  const theme = themeFor(source.theme);
 
   const money = (amount: string | number): string => {
     const value = typeof amount === "string" ? Number(amount) : amount;
@@ -116,21 +122,19 @@ export function buildPreviewModel(source: PreviewSource): PreviewModel {
     })}`;
   };
 
-  const labels = invoiceLabelsFor(form.language);
-
   return {
-    labels,
-    style,
-    primary: form.primaryColor,
-    accent: form.accentColor,
+    labels: INVOICE_LABELS,
+    theme,
+    primary: source.primaryHex,
+    accent: source.accentHex,
 
     currency: form.currency,
     money,
     totals: getInvoiceTotals(form),
-    // A merchant-typed name wins; otherwise the translated generic, so a
-    // Japanese invoice does not print an English "Discount" beside 税.
-    discountLabel: form.discountName || labels.discount,
-    taxLabel: form.taxName || labels.tax,
+    // A merchant-typed name wins; otherwise the generic one, so an invoice with
+    // an unnamed discount still labels the row.
+    discountLabel: form.discountName || INVOICE_LABELS.discount,
+    taxLabel: form.taxName || INVOICE_LABELS.tax,
 
     invoiceNumber: form.invoiceNumber || "-",
     issueDate: longDate(form.invoiceDate) || "-",

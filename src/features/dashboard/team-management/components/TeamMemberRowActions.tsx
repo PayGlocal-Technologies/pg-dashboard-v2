@@ -15,7 +15,9 @@ interface TeamMemberRowActionsProps {
   onDeactivate: (row: TeamMemberRow) => void;
   onReactivate: (row: TeamMemberRow) => void;
   onResend: (row: TeamMemberRow) => void;
-  onSetLimitedTime: (row: TeamMemberRow) => void;
+  // OUT OF SCOPE — limited-time access not required for now. Drawer + wiring
+  // kept in the codebase; restore this prop and the menu item below to re-enable.
+  // onSetLimitedTime: (row: TeamMemberRow) => void;
 }
 
 // Menu items switch on the member's status, mirroring pg-dashboard's
@@ -30,7 +32,6 @@ export function TeamMemberRowActions({
   onDeactivate,
   onReactivate,
   onResend,
-  onSetLimitedTime,
 }: TeamMemberRowActionsProps) {
   const isActive = row.status === "ACTIVE" || row.status === "LOCKED";
   const isDeactivated = row.status === "DEACTIVATED";
@@ -52,10 +53,13 @@ export function TeamMemberRowActions({
       <DropdownMenuContent align="end">
         {isActive && (
           <>
+            {/* OUT OF SCOPE — "Set/Edit limited time" not required for now.
+                Restore alongside the onSetLimitedTime prop above to re-enable.
             <DropdownMenuItem onClick={() => onSetLimitedTime(row)}>
               <Icon name="clock" className="h-3.5 w-3.5" />
               {row.limitedTimeAccessUser ? "Edit limited time" : "Set limited time"}
             </DropdownMenuItem>
+            */}
             <DropdownMenuItem onClick={() => onDeactivate(row)}>
               <Icon name="ban" className="h-3.5 w-3.5" />
               Deactivate user

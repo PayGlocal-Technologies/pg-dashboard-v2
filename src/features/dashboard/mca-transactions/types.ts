@@ -345,3 +345,102 @@ export interface McaOverviewResponse {
   errors?: unknown;
   data: McaOverviewData;
 }
+
+// ── Invoice origins (per-country analytics) ──────────────────────────────────
+// Shape of /analytics/{merchantId}/merchant/mca/invoice-origins.
+
+export interface InvoiceOriginRowApi {
+  countryCode: string;
+  amount: number;
+  invoiceCount: number;
+  sharePct: number;
+}
+
+export interface InvoiceOriginTotals {
+  totalInvoiced: number;
+  totalInvoicedTrendPct: number;
+  avgPerCountry: number;
+  avgPerCountryTrendPct: number;
+  topCountry: { countryCode: string; sharePct: number; shareTrendPct: number };
+  activeMarkets: number;
+  activeMarketsTrendPct: number;
+}
+
+export interface InvoiceOriginsData {
+  startDate: string;
+  endDate: string;
+  reportingCurrency: string;
+  totals: InvoiceOriginTotals;
+  rows: InvoiceOriginRowApi[];
+}
+
+export interface InvoiceOriginsResponse {
+  message?: string;
+  errors?: unknown;
+  data: InvoiceOriginsData;
+}
+
+// ── Currency split ───────────────────────────────────────────────────────────
+
+export interface CurrencySplitSliceApi {
+  currency: string;
+  amount: number;
+  amountPct: number;
+  count: number;
+  countPct: number;
+}
+
+export interface CurrencySplitData {
+  reportingCurrency: string;
+  totalAmount: number;
+  totalCount: number;
+  slices: CurrencySplitSliceApi[];
+}
+
+/** Envelope-tolerant: the sampled response was flat, but every other analytics
+ *  endpoint wraps in `data`, so the hook reads whichever is present. */
+export type CurrencySplitResponse = {
+  data?: CurrencySplitData | null;
+} & Partial<CurrencySplitData>;
+
+// ── Settled by account ───────────────────────────────────────────────────────
+
+export interface SettledAccountRow {
+  currency: string;
+  amount: number;
+  count: number;
+}
+
+export interface SettledByAccountData {
+  timeframe: string;
+  totalAmount: number;
+  totalCount: number;
+  accounts: SettledAccountRow[];
+}
+
+export interface SettledByAccountResponse {
+  data: SettledByAccountData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Saved amount ─────────────────────────────────────────────────────────────
+
+export interface SavedAmountTimeframeRow {
+  timeframe: string;
+  amount: number;
+  count: number;
+}
+
+export interface SavedAmountData {
+  currency: string;
+  overallAmount: number;
+  overallCount: number;
+  timeframes: SavedAmountTimeframeRow[];
+}
+
+export interface SavedAmountResponse {
+  data: SavedAmountData;
+  message?: string;
+  errors?: unknown;
+}

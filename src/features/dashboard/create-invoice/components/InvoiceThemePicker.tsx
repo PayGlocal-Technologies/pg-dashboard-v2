@@ -4,11 +4,7 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { withAlpha } from "@/features/dashboard/create-invoice/helpers";
-import {
-  INVOICE_BRANDING_STYLES,
-  RENDERER_LAYOUT_ID,
-} from "@/features/dashboard/create-invoice/constants";
-import type { InvoiceLayoutId } from "@/features/dashboard/create-invoice/types";
+import type { InvoiceLayoutId, InvoiceTheme } from "@/features/dashboard/create-invoice/types";
 
 /**
  * A schematic of each layout, drawn in the merchant's own colours.
@@ -18,7 +14,7 @@ import type { InvoiceLayoutId } from "@/features/dashboard/create-invoice/types"
  * a left rail, a centred stack, a bordered card. Bars carry that; 6pt text
  * would not. Real content is one click away in the preview beside it.
  */
-function StyleThumbnail({
+function ThemeThumbnail({
   layout,
   primary,
   accent,
@@ -78,10 +74,7 @@ function StyleThumbnail({
     return (
       <span className="flex h-full w-full flex-col justify-center gap-1 p-1.5">
         <span className="flex items-center gap-1">
-          <span
-            className="block h-2 w-2 rounded-full"
-            style={{ backgroundColor: faintAccent }}
-          />
+          <span className="block h-2 w-2 rounded-full" style={{ backgroundColor: faintAccent }} />
           {bar("2.5rem", primary, "h-1.5")}
         </span>
         {bar("70%", faint)}
@@ -126,21 +119,27 @@ function StyleThumbnail({
 /**
  * Invoice theme.
  *
- * `classic` carries a badge saying it is the layout the server renders, because
- * for now it is the only one that reaches the PDF. That badge is driven by
- * RENDERER_LAYOUT_ID — delete the constant and this block when the renderer
- * learns the rest.
+ * The list is the server's: `GET /themes` says which layouts the renderer can
+ * produce, and the invoice stores the chosen name. Every card therefore draws in
+ * the merchant's current colour pair rather than in per-theme defaults, because
+ * that pair is what the renderer will apply to whichever theme they land on.
+ *
+ * A theme the server offers that this build has no thumbnail for still appears,
+ * drawn through the Classic schematic — see `themeFor`.
  */
-export function InvoiceBrandingStylePicker({
-  brandingStyleId,
-  primaryColor,
-  accentColor,
+export function InvoiceThemePicker({
+  themes,
+  theme,
+  primaryHex,
+  accentHex,
   onChange,
 }: {
-  brandingStyleId: string;
-  primaryColor: string;
-  accentColor: string;
-  onChange: (brandingStyleId: string) => void;
+  themes: InvoiceTheme[];
+  /** The selected theme's enum name. */
+  theme: string;
+  primaryHex: string;
+  accentHex: string;
+  onChange: (theme: string) => void;
 }) {
   return (
     <div
@@ -148,18 +147,17 @@ export function InvoiceBrandingStylePicker({
       role="radiogroup"
       aria-label="Invoice theme"
     >
-      {INVOICE_BRANDING_STYLES.map((style) => {
-        const selected = style.id === brandingStyleId;
-        const isRendered = style.layout === RENDERER_LAYOUT_ID;
+      {themes.map((option) => {
+        const selected = option.name === theme;
 
         return (
           <Button
-            key={style.id}
+            key={option.name}
             type="button"
             variant="outline"
             role="radio"
             aria-checked={selected}
-            onClick={() => onChange(style.id)}
+            onClick={() => onChange(option.name)}
             className={cn(
               "h-auto p-2 text-left [&>span]:w-full",
               selected ? "border-primary bg-primary/5" : "border-border"
@@ -167,33 +165,24 @@ export function InvoiceBrandingStylePicker({
           >
             {/* One child, carrying the column. flux wraps every child of a
                 Button in a single plain <span>, so `flex-col gap-2` set on the
-                button itself would never reach these three. */}
+                button itself would never reach these two. */}
             <span className="flex flex-col gap-2">
               <span className="block aspect-[4/3] overflow-hidden rounded-md border border-border bg-card">
-                <StyleThumbnail
-                  layout={style.layout}
-                  // The selected style previews in the merchant's live colours;
-                  // the others in their own defaults, so the grid reads as six
-                  // distinct options rather than six tints of one.
-                  primary={selected ? primaryColor : style.defaultPrimaryColor}
-                  accent={selected ? accentColor : style.defaultAccentColor}
-                />
+                <ThemeThumbnail layout={option.layout} primary={primaryHex} accent={accentHex} />
               </span>
 
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className="truncate text-[12px] font-medium text-foreground">
-                  {style.name}
+                  {option.label}
                 </span>
-                {style.isNew && (
+                {option.isNew && (
                   <span className="shrink-0 rounded bg-primary/10 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-primary">
                     New
                   </span>
                 )}
-                {selected && <Icon name="check" className="ml-auto h-3 w-3 shrink-0 text-primary" />}
-              </span>
-
-              <span className="block text-[10px] font-normal leading-tight text-muted-foreground">
-                {isRendered ? "Matches the generated document" : "Preview only for now"}
+                {selected && (
+                  <Icon name="check" className="ml-auto h-3 w-3 shrink-0 text-primary" />
+                )}
               </span>
             </span>
           </Button>

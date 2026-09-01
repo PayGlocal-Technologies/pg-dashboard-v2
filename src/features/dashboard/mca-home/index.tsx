@@ -6,6 +6,13 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import {
+  MCA_DASHBOARD_GUIDE_KEY,
+  MCA_DASHBOARD_GUIDE_STEPS,
+} from "@/features/dashboard/mca-home/guide";
 import { McaRevenueCard } from "@/features/dashboard/mca-home/components/McaRevenueCard";
 import { McaClientAnalyticsCard } from "@/features/dashboard/mca-home/components/McaClientAnalyticsCard";
 import { McaNeedsAttentionCard } from "@/features/dashboard/mca-home/components/McaNeedsAttentionCard";
@@ -55,11 +62,20 @@ export function McaDashboardFeature() {
     [firstName, lastName].filter(Boolean).join(" ") || profile?.username || "there";
 
   const router = useRouter();
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
   const [editMode, setEditMode] = useState(false);
   const [layout, setLayout] = useState<McaWidgetId[]>(() => readMcaDashboardLayout());
   const layoutSnapshot = useRef<McaWidgetId[]>(layout);
 
-  function handleInvoice() {
+  /**
+   * A new invoice is raised against exactly one MID, and the editor puts that
+   * MID in every request path — so with several PACB MIDs and none selected,
+   * the merchant is asked which before the editor opens rather than having the
+   * first one chosen for them. Same question pg-dashboard's own Quick Access
+   * asks (ChooseMidSelect), and `MidScopedAction` below is what asks it.
+   */
+  function handleInvoice(mid: string) {
+    if (mid) selectMid(mid);
     router.push("/create-invoice");
   }
 
@@ -125,14 +141,16 @@ export function McaDashboardFeature() {
             <span>Amount received at mid-market rate</span>
           </div>
           <div className="hidden h-3.5 w-px bg-border sm:block" />
-          <Button
-            variant="primary"
-            size="sm"
-            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" aria-hidden />}
-            onClick={handleInvoice}
-          >
-            Invoice
-          </Button>
+          <div data-guide="mca-create-invoice">
+            <MidScopedAction
+              label="Invoice"
+              icon="plus"
+              variant="primary"
+              needsMidChoice={needsMidChoice}
+              midOptions={midOptions}
+              onRun={handleInvoice}
+            />
+          </div>
         </div>
       </div>
 
@@ -143,14 +161,18 @@ export function McaDashboardFeature() {
         </div>
         <div className="flex flex-col gap-4 lg:col-span-4">
           <McaClientAnalyticsCard onViewAll={handleViewClients} />
-          <McaNeedsAttentionCard
-            onViewAll={() => handleViewAll("Needs attention")}
-            onAction={handleNeedsAttentionAction}
-          />
+          <div data-guide="mca-needs-attention">
+            <McaNeedsAttentionCard
+              onViewAll={() => handleViewAll("Needs attention")}
+              onAction={handleNeedsAttentionAction}
+            />
+          </div>
         </div>
       </div>
 
-      <McaQuickAccess editMode={editMode} onEditDashboard={handleCustomise} />
+      <div data-guide="mca-quick-access">
+        <McaQuickAccess editMode={editMode} onEditDashboard={handleCustomise} />
+      </div>
 
       {/* ── Configurable widgets (Transactions/globe, stat cards, charts) ── */}
       <McaDashboardWidgetCustomization
@@ -159,6 +181,14 @@ export function McaDashboardFeature() {
         editMode={editMode}
         onDiscardEdit={handleDiscardCustomise}
         onDoneEdit={handleDoneCustomise}
+      />
+
+      {/* Guide launcher — highlighted once here (the main dashboard), a plain
+          button on every other screen. */}
+      <GuideLauncher
+        steps={MCA_DASHBOARD_GUIDE_STEPS}
+        storageKey={MCA_DASHBOARD_GUIDE_KEY}
+        highlightOnFirstVisit
       />
     </div>
   );

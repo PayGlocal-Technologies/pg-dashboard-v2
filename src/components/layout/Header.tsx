@@ -7,6 +7,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -33,6 +34,9 @@ const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
   { label: "Multi-Currency Accounts", href: "/mca-dashboard", context: "PACB" },
   { label: "Partners", href: "/refer-and-earn" },
 ] as const;
+
+// OUT OF SCOPE — Create button hidden for now. Flip back to true to restore.
+const SHOW_CREATE_BUTTON = false;
 
 const CREATE_ITEMS = [
   {
@@ -167,8 +171,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Notification bell */}
-          <Button
+          {/* OUT OF SCOPE — Notification bell hidden for now (no notifications
+              backend yet). Restore by un-commenting this block. */}
+          {/* <Button
             type="button"
             variant="ghost"
             className="relative w-9 h-9 rounded-lg bg-muted border border-border hover:bg-accent flex items-center justify-center transition-colors"
@@ -176,21 +181,15 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           >
             <Icon name="bell" size={17} className="text-muted-foreground" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-header" />
-          </Button>
+          </Button> */}
 
           <ThemeToggle />
 
-          {/* Help */}
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-9 h-9 rounded-lg bg-muted border border-border hover:bg-accent flex items-center justify-center transition-colors"
-            aria-label="Help"
-          >
-            <Icon name="help-circle" size={17} className="text-muted-foreground" />
-          </Button>
+          {/* Help — support contacts and hours, see HeaderHelpMenu. */}
+          <HeaderHelpMenu />
 
           {/* Create button */}
+          {SHOW_CREATE_BUTTON && (
           <div ref={createRef} className="relative">
             <AnimatePresence>
               {createHover && !createOpen && (
@@ -273,22 +272,28 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               )}
             </AnimatePresence>
           </div>
+          )}
         </div>
       </header>
 
-      {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode */}
+      {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode.
+          Flux's primary-light tint rather than the per-merchant
+          `selectedMidDetails.color` this used to carry — that colour still
+          lives in the store and still marks the row in MerchantSelector's own
+          list, but this ribbon reads as a system-level notice, so it takes the
+          app's one fixed primary treatment instead of a colour that changes
+          with which merchant is selected. primary-light (not the solid
+          primary blue) plus primary-text keeps this a quiet strip rather than
+          a loud banner, while staying on the same primary token family. */}
       {showRibbon && (
-        <div
-          className="flex items-center justify-between px-4 py-1.5 text-[13px]"
-          style={{ backgroundColor: selectedMidDetails.color || "#f3f4f6" }}
-        >
-          <span className="text-gray-800">
+        <div className="flex items-center justify-between bg-primary-light px-4 py-1.5 text-[13px] text-[var(--primary-text)]">
+          <span>
             Viewing as <strong>{tradeName}</strong>
           </span>
           <Button
             type="button"
             variant="ghost"
-            className="h-auto min-h-0 p-0 font-medium text-gray-800 underline transition-opacity hover:opacity-70 hover:bg-transparent"
+            className="h-auto min-h-0 p-0 font-medium text-[var(--primary-text)] underline transition-opacity hover:opacity-70 hover:bg-transparent"
             onClick={() => setSelectedMidDetails({ mid: "", status: "", color: "" })}
           >
             Switch to main view

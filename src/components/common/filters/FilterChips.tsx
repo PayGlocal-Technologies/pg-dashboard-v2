@@ -44,17 +44,21 @@ export interface FilterChipOption {
 // click from also opening the popover needs no stopPropagation gymnastics:
 // they're just two separate click targets.
 
-// The dashed-outline pill itself. Purely structural, no click handler, no
-// interactive semantics of its own, so it's a plain div rather than a
-// flux-ui component; the actual clicking happens in the two children it
-// wraps. Only its border colour reacts to `active`, matching the "colour
-// change, not a shape change" active state the chips already had.
+// The pill itself. Purely structural, no click handler, no interactive
+// semantics of its own, so it's a plain div rather than a flux-ui component;
+// the actual clicking happens in the two children it wraps.
+//
+// Inactive it's a dashed outline in the muted border colour, reading as an
+// "add a filter" affordance. Active it flips to a solid primary ring with a
+// primary-tinted fill (not just a faint border tint) so an applied filter is
+// unmistakable at a glance rather than a subtle recolour of the same dashed
+// outline — the label text and state dot inside shift to primary alongside it.
 export function FilterChipShell({ active, children }: { active: boolean; children: ReactNode }) {
   return (
     <div
       className={cn(
         "inline-flex h-auto shrink-0 items-center rounded-full border border-dashed border-border bg-card shadow-sm",
-        active && "border-primary/50"
+        active && "border-solid border-primary bg-primary/10 shadow-none ring-1 ring-primary/30"
       )}
     >
       {children}
@@ -75,7 +79,7 @@ export function FilterChipClearButton({ label, onClick }: { label: string; onCli
       size="sm"
       aria-label={`Clear ${label} filter`}
       onClick={onClick}
-      className="h-auto min-h-0 shrink-0 rounded-full border border-transparent px-2 py-1 text-muted-foreground hover:text-foreground"
+      className="h-auto min-h-0 shrink-0 rounded-full border border-transparent px-2 py-1 text-primary/70 hover:text-primary"
     >
       <Icon name="x" className="h-3 w-3" />
     </Button>
@@ -122,8 +126,10 @@ export const FilterChipLabelTrigger = forwardRef<
         ) : undefined
       }
       className={cn(
-        "h-auto min-h-0 shrink-0 rounded-full border border-transparent py-1 text-muted-foreground hover:text-foreground",
-        active ? "pl-1.5 pr-2.5" : "pl-2.5 pr-2.5",
+        "h-auto min-h-0 shrink-0 rounded-full border border-transparent py-1",
+        active
+          ? "pl-1.5 pr-2.5 font-semibold text-primary hover:text-primary"
+          : "pl-2.5 pr-2.5 text-muted-foreground hover:text-foreground",
         className
       )}
       {...props}

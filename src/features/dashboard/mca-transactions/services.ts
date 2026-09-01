@@ -115,6 +115,38 @@ export const mcaOverviewByMidApi = (mid: string) =>
 export const mcaOverviewByUcicApi = (ucicId: string) =>
   ucicId ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/getPacbOverview` : "";
 
+/** Invoice origins: per-country invoiced totals + trend headline figures, over
+ *  a date range (YYYY-MM-DD). Empty dates let the backend default the window
+ *  (~last 30 days). Backs McaInvoiceOriginsCard. */
+export const mcaInvoiceOriginsApi = (merchantId: string, startDate: string, endDate: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/mca/invoice-origins` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
+/** Currency split: per-currency amount + count shares over a date range. Drives
+ *  the currency-split donut's Volume (amountPct) and Count (countPct) toggle. */
+export const mcaCurrencySplitApi = (merchantId: string, startDate: string, endDate: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/mca/currency-split` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
+/** Settled by account: per-account settled amount + count for a timeframe
+ *  (today | week | month | ytd). Backs SettlementAnalyticsCard's per-account bars. */
+export const mcaSettledByAccountApi = (merchantId: string, timeframe: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settled-by-account` +
+      `?timeframe=${encodeURIComponent(timeframe)}`
+    : "";
+
+/** Saved amount vs banks: an overall figure plus a per-timeframe breakdown
+ *  (today | week | month | ytd). Backs SavedAmountCard. No query params. */
+export const mcaSavedAmountApi = (merchantId: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/saved-amount`
+    : "";
+
 /** Transactions export. POST the same OpenSearch body the table uses; the
  *  response is an xlsx blob, not JSON. */
 export const mcaTxnReportDownloadApi = (mid: string) =>

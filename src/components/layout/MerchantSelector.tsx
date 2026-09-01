@@ -1,13 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import {
-  Button,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui";
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -16,16 +10,10 @@ import { merchantProductsApi } from "@/api";
 import { toast } from "sonner";
 import type { MerchantEnabledProducts } from "@/stores/useApp";
 import type { BaseResponse } from "@/types/common";
+import { MidAvatar, MID_STATUS_DOT } from "@/components/common/MidAvatar";
 import { cn } from "@/lib/utils";
 
 const COLOR_SET = ["#E5B5FF", "#D4FFB5", "#A9FFCB"];
-
-const AVATAR_PALETTES: [string, string][] = [
-  ["#e0f2fe", "#0369a1"],
-  ["#fce7f3", "#9d174d"],
-  ["#d1fae5", "#065f46"],
-  ["#ede9fe", "#5b21b6"],
-];
 
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: "Active",
@@ -33,33 +21,11 @@ const STATUS_LABEL: Record<string, string> = {
   DISABLED: "Disabled",
 };
 
-const STATUS_DOT_COLOR: Record<string, string> = {
-  ACTIVE: "#22c55e",
-  INACTIVE: "#f59e0b",
-  DISABLED: "#9ca3af",
-};
-
 const STATUS_BADGE_STYLE: Record<string, React.CSSProperties> = {
   ACTIVE: { background: "#f0fdf4", color: "#16a34a" },
   INACTIVE: { background: "#fef3c7", color: "#d97706" },
   DISABLED: { background: "#f9fafb", color: "#9ca3af" },
 };
-
-function MidAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md" }) {
-  const initials = name.slice(0, 2).toUpperCase();
-  const [bg, color] = AVATAR_PALETTES[name.charCodeAt(0) % AVATAR_PALETTES.length];
-  return (
-    <div
-      className={cn(
-        "flex flex-shrink-0 items-center justify-center font-bold",
-        size === "md" ? "h-8 w-8 rounded-lg text-[13px]" : "h-6 w-6 rounded-md text-[10px]"
-      )}
-      style={{ background: bg, color }}
-    >
-      {initials}
-    </div>
-  );
-}
 
 type TagUpdateVars = { dynamicUrl: string };
 
@@ -446,7 +412,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
                         <div
                           className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
                           style={{
-                            background: STATUS_DOT_COLOR[status] ?? "#9ca3af",
+                            background: MID_STATUS_DOT[status] ?? "#9ca3af",
                           }}
                         />
                         <div className="min-w-0 flex-1">

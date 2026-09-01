@@ -3,7 +3,10 @@
 import { useRef, useState, type UIEvent } from "react";
 import { ProgressIndicator } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { SettlementAnalyticsCard } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
+import {
+  SettlementAnalyticsCard,
+  type TimeRange,
+} from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { SavedAmountCard } from "@/features/dashboard/mca-transactions/components/SavedAmountCard";
 
@@ -62,8 +65,19 @@ function scrollToPage(el: HTMLDivElement, index: number): void {
  *   Outstanding + Saved stack as a secondary column, both filling the same
  *   overall height. No carousel and no indicator there, so desktop layout is
  *   unchanged beyond that column split and height match.
+ *
+ * The time-range control itself lives in the page header now (see
+ * McaTransactionsFeature/AnalyticsTimeRangeControl), in line with the
+ * "Transactions" title rather than inside this section; timeRange just
+ * arrives here as a prop to pass down to Settlement Analytics and Saved
+ * Amount. Neither's live endpoint actually has a period parameter (see
+ * SettlementAnalyticsCard's own TIME_RANGE_MULTIPLIERS comment), so both
+ * scale a real lifetime figure by the same approximation multiplier rather
+ * than showing a genuine per-period total. Outstanding Amount isn't wired to
+ * it at all: its own KPI (settlementsDue) is a live balance, not something a
+ * historical time window applies to.
  */
-export function TransactionsAnalyticsCarousel() {
+export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRange }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activePage, setActivePage] = useState(0);
 
@@ -97,7 +111,7 @@ export function TransactionsAnalyticsCarousel() {
             page instead (see PAGE_CLASSES), where the card's own height is
             left alone, unchanged from before. */}
         <div className={PAGE_CLASSES}>
-          <SettlementAnalyticsCard className="lg:h-full" />
+          <SettlementAnalyticsCard className="lg:h-full" timeRange={timeRange} />
         </div>
 
         {/* grow (not flex-1, whose 0 basis would force both cards to the same
@@ -111,7 +125,7 @@ export function TransactionsAnalyticsCarousel() {
             stretches by the same default), from lg up via the grid. */}
         <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
           <OutstandingAmountCard className="grow" />
-          <SavedAmountCard className="grow" />
+          <SavedAmountCard className="grow" timeRange={timeRange} />
         </div>
       </div>
 

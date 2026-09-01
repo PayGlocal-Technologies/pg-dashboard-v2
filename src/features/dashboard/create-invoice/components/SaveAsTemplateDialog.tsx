@@ -30,6 +30,7 @@ export function SaveAsTemplateDialog({
   onOpenChange,
   snapshot,
   existingNames,
+  isSaving,
   onSave,
 }: {
   open: boolean;
@@ -38,6 +39,8 @@ export function SaveAsTemplateDialog({
   snapshot: InvoiceTemplateSnapshot | null;
   /** Rejected as duplicates, case-insensitively. */
   existingNames: string[];
+  /** True while the POST is in flight. */
+  isSaving: boolean;
   onSave: (name: string) => void;
 }) {
   return (
@@ -49,11 +52,13 @@ export function SaveAsTemplateDialog({
           key={open ? "open" : "closed"}
           snapshot={snapshot}
           existingNames={existingNames}
+          isSaving={isSaving}
           onCancel={() => onOpenChange(false)}
-          onSave={(name) => {
-            onSave(name);
-            onOpenChange(false);
-          }}
+          // Deliberately does not close: saving is a request now, and the caller
+          // closes this on success. Closing here would report a template saved
+          // before the server had accepted it, and a failure would then have
+          // nowhere to land but a toast over an empty screen.
+          onSave={onSave}
         />
       </DialogContent>
     </Dialog>
@@ -63,11 +68,13 @@ export function SaveAsTemplateDialog({
 function SaveBody({
   snapshot,
   existingNames,
+  isSaving,
   onCancel,
   onSave,
 }: {
   snapshot: InvoiceTemplateSnapshot | null;
   existingNames: string[];
+  isSaving: boolean;
   onCancel: () => void;
   onSave: (name: string) => void;
 }) {
@@ -91,7 +98,7 @@ function SaveBody({
         "Discount and tax",
         "Receiving account",
         "Memo, notes and LUT",
-        "Branding: theme, colours, language",
+        "Branding: theme and colours",
         snapshot.isRecurring ? "Recurring schedule" : "Due-date term",
       ]
     : [];
@@ -152,18 +159,18 @@ function SaveBody({
       </div>
 
       <div className="mt-5 flex justify-end gap-2">
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+        <Button type="button" variant="secondary" size="sm" disabled={isSaving} onClick={onCancel}>
           Cancel
         </Button>
         <Button
           type="button"
           variant="primary"
           size="sm"
-          disabled={!!error || !snapshot}
+          disabled={!!error || !snapshot || isSaving}
           leftIcon={<Icon name="bookmark" className="h-3.5 w-3.5" />}
           onClick={() => onSave(trimmed)}
         >
-          Save template
+          {isSaving ? "Saving…" : "Save template"}
         </Button>
       </div>
     </div>

@@ -9,14 +9,14 @@ import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import {
   DateFilterChip,
   EMPTY_RELATIVE_RANGE,
   StatusFilterChip,
   hasRelativeRange,
   relativeRangeToEpochMs,
-  toEndOfDayMs,
-  toStartOfDayMs,
   type RelativeRangeValue,
 } from "@/components/common/filters/FilterChips";
 import { useDelete, usePost, usePostQuery } from "@/lib/api/hooks";
@@ -29,7 +29,11 @@ import {
   duplicateInvoiceApi,
   viewInvoiceApi,
 } from "@/features/dashboard/mca-invoices/services";
-import { buildInvoiceRequestBody } from "@/features/dashboard/mca-invoices/helpers";
+import {
+  buildInvoiceRequestBody,
+  dateFilterToEpochMs,
+  EMPTY_INVOICE_DATE_FILTER,
+} from "@/features/dashboard/mca-invoices/helpers";
 import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
 import {
   FIXED_COLUMN_KEYS,
@@ -47,6 +51,7 @@ import { ConfirmActionDialog } from "@/features/dashboard/mca-invoices/component
 import { LinkTransactionModal } from "@/features/dashboard/mca-invoices/components/LinkTransactionModal";
 import { toDateKey } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
 import type {
+  InvoiceDateFilter,
   InvoiceSearchBody,
   McaInvoiceRow,
   McaInvoicesResponse,
@@ -115,8 +120,6 @@ interface McaInvoiceTableProps {
    *  what pg-dashboard's summary does. */
   statusFilters: string[];
   onStatusFiltersChange: (next: string[]) => void;
-  relativeWindow: { startTime: number; endTime: number } | null;
-  onRelativeWindowChange: (next: { startTime: number; endTime: number } | null) => void;
 }
 
 /**
@@ -131,8 +134,6 @@ export function McaInvoiceTable({
   summarySection,
   statusFilters,
   onStatusFiltersChange,
-  relativeWindow,
-  onRelativeWindowChange,
 }: McaInvoiceTableProps) {
   const router = useRouter();
 
@@ -140,9 +141,18 @@ export function McaInvoiceTable({
   const paCbMids = useApp((s) => s.paCbMids);
 
   const [search, setSearch] = useState("");
+  /**
+   * The Date chip's own value, and nobody else's.
+   *
+   * This used to be lifted to the page so the summary's range picker could be a
+   * second view of it. That made each control silently move the other, so the
+   * chip could read "Date · last 7 days" because someone had scoped the counts
+   * above. The summary keeps its own period now, and this lives here — where the
+   * only control that edits it lives — so the two cannot be re-coupled by
+   * threading one prop.
+   */
+  const [dateFilter, setDateFilter] = useState<InvoiceDateFilter>(EMPTY_INVOICE_DATE_FILTER);
   const [typeFilter, setTypeFilter] = useState<string[]>([]);
-  const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
-  const [relativeRange, setRelativeRange] = useState<RelativeRangeValue>(EMPTY_RELATIVE_RANGE);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [page, setPage] = useState(1);
@@ -159,13 +169,23 @@ export function McaInvoiceTable({
   const mids = useMemo(() => (selectedMid ? [selectedMid] : paCbMids), [selectedMid, paCbMids]);
   const showMid = !selectedMid && paCbMids.length > 1;
 
+  // This list spans every PACB MID when none is selected, but the editor it
+  // opens does not — it puts one MID in every request path. So in exactly the
+  // state where the MID column above is showing, Create invoice has to ask
+  // which account the new invoice belongs to before it navigates, rather than
+  // letting the editor fall back to the merchant's first MID.
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+
+  const openInvoiceEditor = (mid: string) => {
+    if (mid) selectMid(mid);
+    router.push("/create-invoice");
+  };
+
   const body = buildInvoiceRequestBody(
     {
       status: statusFilters.length ? statusFilters : undefined,
       type: typeFilter.length ? typeFilter : undefined,
-      startTime:
-        relativeWindow?.startTime ?? (dateRange.from ? toStartOfDayMs(dateRange.from) : undefined),
-      endTime: relativeWindow?.endTime ?? (dateRange.to ? toEndOfDayMs(dateRange.to) : undefined),
+      ...dateFilterToEpochMs(dateFilter),
     },
     {
       mids,
@@ -186,6 +206,16 @@ export function McaInvoiceTable({
   const rows = data?.data?.data ?? [];
   const totalRows = data?.data?.totalCount ?? 0;
 
+  /**
+   * Whether anything is narrowing the list, which decides what an empty result
+   * MEANS and therefore what the empty state is allowed to say.
+   *
+   * The tab is deliberately excluded. "Drafts" with nothing in it is not a
+   * filtered-out result to the merchant, it is a true statement that they have
+   * no drafts — so it gets the plain reading, not "try adjusting".
+   */
+  const hasNarrowingFilters = !!search.trim() || !!dateFilter.window || !!dateFilter.range.from;
+
   // Derived from the filters rather than stored, so the tab stays correct when
   // something else moves them: a summary card, or the Status flyout. Matching
   // over STATUS_PINNED_TABS means adding a tab needs no change here.
@@ -193,6 +223,32 @@ export function McaInvoiceTable({
     ? "recurring"
     : (STATUS_PINNED_TABS.find((tab) => sameSet(statusFilters, TAB_STATUS_FILTERS[tab.value]))
         ?.value ?? "all");
+
+  /**
+   * What an empty list says.
+   *
+   * It used to say "No invoices found · Try adjusting your filters or search
+   * query" whatever the reason, which a DQA pass flagged for reading like an
+   * error: a merchant with no invoices yet was being told to adjust filters they
+   * had never set. So the two cases are now told apart — a narrowed search that
+   * matched nothing, versus a view that genuinely holds nothing — and the second
+   * names the view rather than implying something went wrong.
+   */
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No invoices match your search",
+        description: "Clear the search or widen the date range to see more.",
+      }
+    : {
+        title:
+          activeTab === "all"
+            ? "No invoices yet"
+            : `No ${INVOICE_VIEW_TABS.find((tab) => tab.value === activeTab)?.label.toLowerCase() ?? ""} invoices`,
+        description:
+          activeTab === "all"
+            ? "Invoices you create will appear here."
+            : "Nothing in this view yet. Other views may still have invoices.",
+      };
 
   // Blank URLs: every call overrides them per row via `dynamicUrl`, because
   // the MID differs by row on a multi-MID merchant's list.
@@ -235,6 +291,11 @@ export function McaInvoiceTable({
     // own menu, and is no longer what a plain row click does.
     onOpenRow: (row: McaInvoiceRow) => {
       if (row.status === "DRAFT") {
+        // Scoped to the draft's own MID first. This list spans every PACB MID
+        // when none is selected, but the editor reads the draft from one MID's
+        // path — without this it would look for another merchant's invoice id
+        // under the merchant's first MID and find nothing.
+        if (row.mid) selectMid(row.mid);
         router.push(`/create-invoice?invoiceId=${row.id}`);
         return;
       }
@@ -304,18 +365,21 @@ export function McaInvoiceTable({
   // keeps the hidden row's chips from opening alongside the visible ones.
   const renderFilterChips = () => (
     <InvoiceFilterChips
-      dateRange={dateRange}
+      dateRange={dateFilter.range}
       onDateRangeChange={(next) => {
-        setDateRange(next);
-        setRelativeRange(EMPTY_RELATIVE_RANGE);
-        onRelativeWindowChange(null);
+        // The chip's two modes are exclusive, so applying an absolute range
+        // drops the relative one and the window it had resolved to.
+        setDateFilter({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
         setPage(1);
       }}
-      relativeRange={relativeRange}
+      relativeRange={dateFilter.relative}
       onRelativeRangeChange={(next) => {
-        setRelativeRange(next);
-        // Clock reads belong in the handler, never in render.
-        onRelativeWindowChange(hasRelativeRange(next) ? relativeRangeToEpochMs(next) : null);
+        setDateFilter({
+          range: { from: "", to: "" },
+          relative: next,
+          // Clock reads belong in the handler, never in render.
+          window: hasRelativeRange(next) ? relativeRangeToEpochMs(next) : null,
+        });
         setPage(1);
       }}
       statusFilters={statusFilters}
@@ -374,6 +438,7 @@ export function McaInvoiceTable({
               hiddenKeys={hiddenColumns}
               onHiddenKeysChange={setHiddenColumns}
               fixedKeys={FIXED_COLUMN_KEYS}
+              fixedReason="Always shown. An invoice row is unreadable without its number, amount and status."
             />
             <Button
               type="button"
@@ -388,16 +453,15 @@ export function McaInvoiceTable({
             >
               Refresh
             </Button>
-            <Button
-              type="button"
+            <MidScopedAction
+              label="Create invoice"
+              icon="plus"
               variant="primary"
-              size="sm"
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => router.push("/create-invoice")}
               className="h-auto min-h-0 shrink-0 py-1"
-            >
-              Create invoice
-            </Button>
+              needsMidChoice={needsMidChoice}
+              midOptions={midOptions}
+              onRun={openInvoiceEditor}
+            />
           </div>
         </div>
 
@@ -411,16 +475,15 @@ export function McaInvoiceTable({
               ariaLabel="Search invoices"
               className="min-w-0 flex-1"
             />
-            <Button
-              type="button"
+            <MidScopedAction
+              label="Create"
+              icon="plus"
               variant="primary"
-              size="sm"
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => router.push("/create-invoice")}
               className="h-auto min-h-0 shrink-0 py-1"
-            >
-              Create
-            </Button>
+              needsMidChoice={needsMidChoice}
+              midOptions={midOptions}
+              onRun={openInvoiceEditor}
+            />
           </div>
 
           <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
@@ -451,8 +514,8 @@ export function McaInvoiceTable({
               data={rows}
               isLoading={isPending}
               skeletonRows={8}
-              emptyTitle="No invoices found"
-              emptyDescription="Try adjusting your filters or search query"
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
               rowKey={(row) => row.id}
               pageSize={INVOICES_PAGE_LIMIT}
               totalRows={totalRows}
@@ -471,8 +534,8 @@ export function McaInvoiceTable({
               onPageChange={setPage}
               totalRows={totalRows}
               pageSize={INVOICES_PAGE_LIMIT}
-              emptyTitle="No invoices found"
-              emptyDescription="Try adjusting your filters or search query"
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
             />
           </>
         )}

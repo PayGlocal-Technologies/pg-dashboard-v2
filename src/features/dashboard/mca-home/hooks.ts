@@ -4,10 +4,23 @@ import { useMemo } from "react";
 import { useGet } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
-import { clientAnalyticsApi } from "@/features/dashboard/mca-home/services";
+import {
+  clientAnalyticsApi,
+  mcaNeedsAttentionApi,
+  mcaRevenueTrendByMidApi,
+  mcaRevenueTrendByUcicApi,
+  mcaTopClientsByMidApi,
+  mcaTopClientsByUcicApi,
+} from "@/features/dashboard/mca-home/services";
 import type {
   ClientAnalyticsRecord,
   ClientAnalyticsResponse,
+  NeedsAttentionInvoice,
+  NeedsAttentionResponse,
+  RevenueTrendData,
+  RevenueTrendResponse,
+  TopClientRow,
+  TopClientsResponse,
 } from "@/features/dashboard/mca-home/types";
 
 /**
@@ -103,6 +116,102 @@ export function useMcaClientAnalytics(): {
     rows,
     days: CLIENT_ANALYTICS_DAYS,
     isLoading: isReady && mids.length > 0 && isPending,
+    isError,
+  };
+}
+
+/**
+ * Revenue trend behind McaRevenueCard. Scoped like useMcaOverview: a selected
+ * MID uses the per-merchant endpoint, otherwise the UCIC roll-up.
+ *
+ * NOT consumed by the card yet — the card still renders mock. This is the wiring
+ * kept ready so switching to live data is a one-line source swap once the mock
+ * has been eyeballed. Empty dates default the window on the backend.
+ */
+export function useRevenueTrend(
+  startDate: string,
+  endDate: string
+): { trend: RevenueTrendData | undefined; isLoading: boolean; isError: boolean } {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const scopeId = urlMid || ucicId;
+  const url = urlMid
+    ? mcaRevenueTrendByMidApi(urlMid, startDate, endDate)
+    : mcaRevenueTrendByUcicApi(ucicId, startDate, endDate);
+
+  const { data, isPending, isError } = useGet<RevenueTrendResponse>(
+    ["mca-revenue-trend", scopeId, startDate, endDate],
+    url,
+    { enabled: isReady && !!scopeId }
+  );
+
+  return { trend: data?.data, isLoading: isReady && !!scopeId && isPending, isError };
+}
+
+/**
+ * Top clients by amount over a date range, scoped like useMcaOverview. Backs the
+ * Client analytics list. Rows carry their own `barPct`, so the card renders the
+ * bar directly instead of deriving it.
+ */
+export function useTopClients(
+  startDate: string,
+  endDate: string,
+  limit = 5
+): {
+  clients: TopClientRow[];
+  reportingCurrency: string | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const scopeId = urlMid || ucicId;
+  const url = urlMid
+    ? mcaTopClientsByMidApi(urlMid, startDate, endDate, limit)
+    : mcaTopClientsByUcicApi(ucicId, startDate, endDate, limit);
+
+  const { data, isPending, isError } = useGet<TopClientsResponse>(
+    ["mca-top-clients", scopeId, startDate, endDate, limit],
+    url,
+    { enabled: isReady && !!scopeId }
+  );
+
+  return {
+    clients: data?.data?.rows ?? [],
+    reportingCurrency: data?.data?.reportingCurrency,
+    isLoading: isReady && !!scopeId && isPending,
+    isError,
+  };
+}
+
+/**
+ * Invoices needing attention (overdue / due soon) for the dashboard's Needs
+ * attention panel. Merchant-scoped in the path — a selected MID, else the UCIC
+ * roll-up — mirroring useRevenueTrend/useTopClients above.
+ */
+export function useNeedsAttention(limit = 5): {
+  invoices: NeedsAttentionInvoice[];
+  totalCount: number;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const scopeId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<NeedsAttentionResponse>(
+    ["mca-needs-attention", scopeId, limit],
+    mcaNeedsAttentionApi(scopeId, limit),
+    { enabled: isReady && !!scopeId }
+  );
+
+  return {
+    invoices: data?.data?.data ?? [],
+    totalCount: data?.data?.totalCount ?? 0,
+    isLoading: isReady && !!scopeId && isPending,
     isError,
   };
 }

@@ -39,6 +39,7 @@ function SkuCard({
       tabIndex={0}
       aria-label={`Preview ${row.name}`}
       aria-haspopup="dialog"
+      data-guide="mca-sku-image"
       onClick={() => onPreview(row)}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {

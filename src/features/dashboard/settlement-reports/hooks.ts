@@ -3,17 +3,27 @@
 import { useMemo, useState } from "react";
 import { useGet } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
-import { bankHolidayCalendarApi } from "@/features/dashboard/settlement-reports/services";
+import {
+  bankHolidayCalendarApi,
+  settlementOverviewApi,
+  settlementUpcomingApi,
+} from "@/features/dashboard/settlement-reports/services";
+import { formatDateKey } from "@/lib/utils/format";
 import {
   computeNextSettlement,
   computeSettlementSchedule,
-  formatDateKey,
   isHolidayWithinDays,
   type HolidayInfo,
   type NextSettlementInfo,
   type SettlementSchedule,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
-import type { HolidayCalendarResponse } from "@/features/dashboard/settlement-reports/types";
+import type {
+  HolidayCalendarResponse,
+  SettlementOverviewData,
+  SettlementOverviewResponse,
+  SettlementUpcomingData,
+  SettlementUpcomingResponse,
+} from "@/features/dashboard/settlement-reports/types";
 
 /**
  * The settlement rail these screens are about. Production's BankHolidayCalendar
@@ -132,4 +142,40 @@ export function useSettlementCalendar(): SettlementCalendarState {
     }),
     [today, holidays, isLoading]
   );
+}
+
+/**
+ * Settlement overview for the Total settled card, for the given merchant + one
+ * timeframe (week | month | ytd). Refetches when the timeframe toggle changes.
+ * `enabled` gates on a resolved merchant id, so callers can pass "" safely.
+ */
+export function useSettlementOverview(
+  merchantId: string,
+  timeframe: string
+): { overview: SettlementOverviewData | undefined; isLoading: boolean; isError: boolean } {
+  const { data, isPending, isError } = useGet<SettlementOverviewResponse>(
+    ["settlement-overview", merchantId, timeframe],
+    settlementOverviewApi(merchantId, timeframe),
+    { enabled: !!merchantId }
+  );
+
+  return { overview: data?.data, isLoading: !!merchantId && isPending, isError };
+}
+
+/**
+ * Upcoming settlement headline (amount, transaction count, pending invoices).
+ * No date range — always current. `enabled` gates on a resolved merchant id.
+ */
+export function useSettlementUpcoming(merchantId: string): {
+  upcoming: SettlementUpcomingData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { data, isPending, isError } = useGet<SettlementUpcomingResponse>(
+    ["settlement-upcoming", merchantId],
+    settlementUpcomingApi(merchantId),
+    { enabled: !!merchantId }
+  );
+
+  return { upcoming: data?.data, isLoading: !!merchantId && isPending, isError };
 }

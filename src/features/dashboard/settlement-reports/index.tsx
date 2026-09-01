@@ -13,16 +13,19 @@ import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import { TransactionColumnsMenu } from "@/features/dashboard/settlement-reports/components/TransactionColumnsMenu";
 import type { TableReqBody } from "@/types/transactions";
-import {
-  formatDayMonth,
-  formatWeekdayDate,
-  formatWeekdayName,
-  type SettlementSchedule,
-} from "@/features/dashboard/settlement-reports/calendarUtils";
+import { formatDayMonth, formatWeekdayDate, formatWeekdayName } from "@/lib/utils/format";
+import type { SettlementSchedule } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { SettlementCalendarButton } from "@/features/dashboard/settlement-reports/components/SettlementCalendarButton";
 import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementCycleInfoPanel";
-import { SettlementDetailsDialog } from "@/features/dashboard/settlement-reports/components/SettlementDetailsDialog";
+// MOCK (hidden): SettlementDetailsDialog shows the mock cycle/bank account —
+// re-enable with its usage in the header actions below.
+// import { SettlementDetailsDialog } from "@/features/dashboard/settlement-reports/components/SettlementDetailsDialog";
 import { SettlementStatCards } from "@/features/dashboard/settlement-reports/components/SettlementStatCards";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
+import {
+  MCA_SETTLEMENT_GUIDE_KEY,
+  MCA_SETTLEMENT_GUIDE_STEPS,
+} from "@/features/dashboard/settlement-reports/guide";
 import {
   SettlementDurationFilter,
   type SettlementDurationValue,
@@ -34,11 +37,16 @@ import {
 } from "@/features/dashboard/settlement-reports/columns";
 import {
   mcaSettlementSummary,
-  mcaTotalSettledChartsByTimeframe,
+  // MOCK (unused — chart has no fallback now): mcaTotalSettledChartsByTimeframe,
   settlementSummary,
-  totalSettledChartsByTimeframe,
+  // MOCK (unused — chart has no fallback now): totalSettledChartsByTimeframe,
+  type TotalSettledTimeframe,
 } from "@/features/dashboard/settlement-reports/mock-data";
-import { useSettlementCalendar } from "@/features/dashboard/settlement-reports/hooks";
+import {
+  useSettlementCalendar,
+  useSettlementOverview,
+  useSettlementUpcoming,
+} from "@/features/dashboard/settlement-reports/hooks";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import {
   ffmsSettlementDownloadApi,
@@ -182,9 +190,41 @@ export function SettlementReportsFeature() {
 
   // Mock-only summary/calendar/detail data — see BACKEND GAP below.
   const summary = isMca ? mcaSettlementSummary : settlementSummary;
-  const chartsByTimeframe = isMca
-    ? mcaTotalSettledChartsByTimeframe
-    : totalSettledChartsByTimeframe;
+  // MOCK (unused now the chart has no fallback — kept for later):
+  // const chartsByTimeframe = isMca
+  //   ? mcaTotalSettledChartsByTimeframe
+  //   : totalSettledChartsByTimeframe;
+
+  // Total settled card is now live: the selected timeframe drives the overview
+  // fetch, so total / trend / chart all move together. Falls back to the mock
+  // summary while loading or if the endpoint is unavailable (e.g. the PA path).
+  const [settlementTimeframe, setSettlementTimeframe] = useState<TotalSettledTimeframe>("ytd");
+  const { overview } = useSettlementOverview(mid, settlementTimeframe);
+
+  // No mock fallback: an unloaded/unsupported overview shows 0 / empty, never a
+  // fake figure.
+  const totalSettledLabel = formatLakh(overview?.totalSettled ?? 0);
+  const totalSettledTrendPct = overview?.totalSettledTrendPct ?? 0;
+  const totalSettledChartData = overview
+    ? overview.series.map((point) => ({ x: point.label, y: point.value }))
+    : [];
+
+  // Previous settled: amount / date / count from the overview, else zeros. The
+  // UTR and gross/tax/fee breakup have no endpoint and stay hidden (see below).
+  const prevSettlement = overview?.previousSettlement;
+  const previousSettledLabel = formatCurrency(prevSettlement?.amount ?? 0, "INR");
+  const previousSettledDateLabel = prevSettlement
+    ? formatDayMonth(prevSettlement.settlementDate)
+    : "—";
+  const previousSettledTransactionCount = prevSettlement?.transactionCount ?? 0;
+
+  // Upcoming settlement — live, current-state (no date range). No mock fallback:
+  // we don't show a placeholder amount while it loads.
+  const { upcoming: upcomingSettlementData } = useSettlementUpcoming(mid);
+  const upcomingSettlementLabel = upcomingSettlementData
+    ? formatCurrency(upcomingSettlementData.amount, "INR")
+    : "—";
+  const upcomingPendingInvoiceCount = upcomingSettlementData?.pendingInvoiceCount;
 
   const onSearch = (v: string) => setSearch(v);
   const onDuration = (v: SettlementDurationValue | undefined) => setDuration(v);
@@ -260,20 +300,25 @@ export function SettlementReportsFeature() {
           subtitle="Daily settlement activity and bank transfers"
           actions={
             <>
-              <SettlementDetailsDialog
+              {/* MOCK (hidden for now — no settlement-summary endpoint for the
+                  cycle / bank account). Re-enable by un-commenting this and its
+                  import. */}
+              {/* <SettlementDetailsDialog
                 cycleValue={summary.cycle.value}
                 cycleFrequency={summary.cycle.frequency}
                 bankAccount={summary.bankAccount}
                 bankAccountStatus={summary.bankAccountStatus}
-              />
-              <SettlementCalendarButton
-                rows={apiRows}
-                todayKey={calendar.today}
-                nextSettlementDate={calendar.nextSettlement.date}
-                nextSettlementReason={calendar.nextSettlement.reason}
-                nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
-                hasUpcomingHoliday={calendar.hasUpcomingHoliday}
-              />
+              /> */}
+              <span data-guide="mca-settlement-calendar" className="inline-flex">
+                <SettlementCalendarButton
+                  rows={apiRows}
+                  todayKey={calendar.today}
+                  nextSettlementDate={calendar.nextSettlement.date}
+                  nextSettlementReason={calendar.nextSettlement.reason}
+                  nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
+                  hasUpcomingHoliday={calendar.hasUpcomingHoliday}
+                />
+              </span>
               <Button
                 variant="outline"
                 size="sm"
@@ -288,28 +333,36 @@ export function SettlementReportsFeature() {
         <div className="flex items-start gap-4">
           <div className="min-w-0 flex-1 space-y-4">
             {/* BACKEND GAP: mock summary — see the banner note above. */}
-            <SettlementStatCards
-              totalSettledLabel={formatLakh(summary.totalSettled)}
-              totalSettledTrendPct={summary.totalSettledTrendPct}
-              totalSettledChartsByTimeframe={chartsByTimeframe}
-              previousSettledLabel={formatCurrency(summary.previousSettled.amount, "INR")}
-              previousSettledDateLabel={summary.previousSettled.dateLabel}
-              previousSettledTimeLabel={summary.previousSettled.timeLabel}
-              previousSettledTransactionCount={summary.previousSettled.transactionCount}
-              previousSettledUtrNumber={summary.previousSettled.utrNumber}
-              previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
-              previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
-              previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
-              onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
-              // BACKEND GAP: the "previous settled" summary card is mock data
-              // (no summary endpoint), so there is no real settlement date to
-              // download here. Row-level downloads in the table below are wired.
-              onDownloadPreviousSettled={() => {}}
-              upcomingSettlementLabel={formatCurrency(summary.upcomingSettlement.amount, "INR")}
-              upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
-              pendingInvoiceCount={isMca ? mcaSettlementSummary.pendingInvoiceCount : undefined}
-              onUploadInvoice={() => {}}
-            />
+            <div data-guide="mca-settlement-analytics">
+              <SettlementStatCards
+                totalSettledLabel={totalSettledLabel}
+                totalSettledTrendPct={totalSettledTrendPct}
+                totalSettledComparisonLabel={overview?.comparisonLabel}
+                totalSettledTimeframe={settlementTimeframe}
+                onTotalSettledTimeframeChange={setSettlementTimeframe}
+                totalSettledChartData={totalSettledChartData}
+                previousSettledLabel={previousSettledLabel}
+                previousSettledDateLabel={previousSettledDateLabel}
+                previousSettledTransactionCount={previousSettledTransactionCount}
+                onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
+                // BACKEND GAP: the "previous settled" summary card is mock data
+                // (no summary endpoint), so there is no real settlement date to
+                // download here. Row-level downloads in the table below are wired.
+                onDownloadPreviousSettled={() => {}}
+                // MOCK — hidden for now (no endpoint): the previous-settlement time,
+                // UTR and gross/tax/fee breakup. Re-enable by un-commenting these
+                // and the matching blocks in SettlementStatCards.
+                // previousSettledTimeLabel={summary.previousSettled.timeLabel}
+                // previousSettledUtrNumber={summary.previousSettled.utrNumber}
+                // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
+                // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
+                // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
+                upcomingSettlementLabel={upcomingSettlementLabel}
+                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
+                pendingInvoiceCount={upcomingPendingInvoiceCount}
+                onUploadInvoice={() => router.push("/mca-transactions")}
+              />
+            </div>
 
             <Card className="gap-0 overflow-hidden p-0">
               <div className="pl-5 pr-3 pb-3 pt-5">
@@ -433,6 +486,11 @@ export function SettlementReportsFeature() {
             </aside>
           )}
         </div>
+
+        {/* Guide launcher — MCA settlement view only. */}
+        {isMca && (
+          <GuideLauncher steps={MCA_SETTLEMENT_GUIDE_STEPS} storageKey={MCA_SETTLEMENT_GUIDE_KEY} />
+        )}
       </div>
     </MidGuard>
   );
