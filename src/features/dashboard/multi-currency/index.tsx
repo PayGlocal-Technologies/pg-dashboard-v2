@@ -246,7 +246,13 @@ function MultiCurrencyContent() {
             right column's own title, the alignment this grid exists for.
             space-y-3 reproduces the grid's own 12px title → container step
             now that the two are no longer separated by gap-y-3. */}
-        <div className="space-y-6">
+        {/* min-w-0 is load-bearing below `lg`, where this stack holds the
+            horizontally scrolling region tiles (RegionSelector's `cards`
+            variant). A grid item's default `min-width: auto` floors the track at
+            the item's min-content width, and a nowrap flex row of tiles would
+            otherwise grow the implicit column past the viewport, scrolling the
+            whole page sideways instead of the tile row inside its own box. */}
+        <div className="min-w-0 space-y-6">
           <div className="space-y-3">
             <h2 className={MODULE_TITLE}>Select client region</h2>
 
@@ -350,8 +356,9 @@ function MultiCurrencyContent() {
             item so `items-start` aligns its top edge with the left column's,
             rather than relying on explicit row placement. space-y-3 is the 12px
             title → content step; the content block below keeps its own 32px
-            section spacing. */}
-        <div className="space-y-3">
+            section spacing. min-w-0 lets the account-details/metrics content
+            shrink instead of forcing the column past the viewport. */}
+        <div className="min-w-0 space-y-3">
           {selectedAccount && (
             // h2 as a plain block (not a flex item), so its top edge renders
             // identically to the left column's plain-block heading and the two

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button, DataTable, EmptyState } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -29,7 +30,6 @@ import {
   useDeleteSku,
   useDuplicateSku,
   useSkuCatalogue,
-  useSkuMidScope,
   useUpdateSku,
 } from "@/features/dashboard/sku-management/hooks";
 import type {
@@ -100,8 +100,8 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   });
 
   // Only true when several PACB MIDs are in play and none is selected — see
-  // useSkuMidScope. That is the one state where a row's own MID matters.
-  const { needsMidChoice } = useSkuMidScope();
+  // usePacbMidScope. That is the one state where a row's own MID matters.
+  const { needsMidChoice } = usePacbMidScope();
 
   const closeItemForm = (open: boolean) => {
     if (!open) setEditing(null);

@@ -98,7 +98,18 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.22, ease: "easeOut" }}
           >
-            <h3 className="text-[15px] font-semibold leading-snug text-foreground">{step.title}</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-[15px] font-semibold leading-snug text-foreground">
+                {step.title}
+              </h3>
+              {/* Amber, not red: nothing is wrong, this is simply a block the
+                  merchant will be stopped at if they skip it. */}
+              {step.required && (
+                <span className="rounded-full bg-amber-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-500">
+                  Required
+                </span>
+              )}
+            </div>
             <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
               {step.description}
             </p>

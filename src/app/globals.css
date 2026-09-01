@@ -41,6 +41,11 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  /* `text-success` was already being used (ZohoSyncLine, SaveAsTemplateDialog,
+     the invoice readiness checklist) with no token behind it, so those ticks
+     silently inherited their parent's colour. Same green as --chart-4, which is
+     what the palette already uses for a positive figure. */
+  --color-success: var(--success);
   /* Slightly tighter than Tailwind defaults for large radii (cards, dialogs, previews) */
   --radius-xl: 0.625rem;
   --radius-2xl: 0.875rem;
@@ -55,6 +60,7 @@
   --radius: 0.375rem;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
+  --success: #059669;
   --background: #f6f8fa;
   --foreground: #111827;
   --card: #ffffff;
@@ -94,6 +100,7 @@
   color-scheme: dark;
   --destructive: #f87171;
   --destructive-foreground: #450a0a;
+  --success: #34d399;
   --background: #0b0f14;
   --foreground: #f3f4f6;
   --card: #141a22;
@@ -349,4 +356,35 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
   outline: none;
+}
+
+/* ─── Field flash ─────────────────────────────────────────────────────────
+   Marks the field a control just scrolled to — the invoice editor's readiness
+   checklist uses it (see revealInvoiceField). A ring rather than a background
+   change so it reads on any surface the section happens to draw, and it fades
+   on its own because it answers "here it is", not "something is wrong". */
+@keyframes field-flash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 45%, transparent);
+  }
+  20%,
+  55% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 45%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
+
+.field-flash {
+  border-radius: 0.75rem;
+  animation: field-flash 1.8s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The scroll is already instant under this setting; a pulsing ring on top of
+     that is the part to drop, so the ring simply holds and fades once. */
+  .field-flash {
+    animation: field-flash 1.8s step-end;
+  }
 }

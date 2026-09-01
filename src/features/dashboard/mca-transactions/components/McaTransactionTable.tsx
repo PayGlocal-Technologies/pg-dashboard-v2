@@ -6,6 +6,7 @@ import { Button, DataTable } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
@@ -164,6 +165,7 @@ export function McaTransactionTable({
   const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
 
   const router = useRouter();
+  const { selectMid } = usePacbMidScope();
   const checkPermissions = useNewPermissions();
   const canManageInvoices = checkPermissions(["getAllMerchantInvoice"]);
   const { downloadFirc } = useFircDownload();
@@ -338,7 +340,15 @@ export function McaTransactionTable({
   const baseColumns = buildMcaColumns(isPartnerUser, {
     onOpenDetails: openDetails,
     onDownloadFirc: (row) => downloadFirc(row.merchantId, row.gid),
-    onCreateInvoice: (row) => router.push(`/create-invoice?gid=${row.gid}`),
+    // The row already answers "which MID?", so this never asks — it scopes the
+    // editor to the transaction's own merchant before opening it. Without that,
+    // a merchant with several PACB MIDs and none selected would raise the
+    // invoice under their first MID while linking it to a transaction on
+    // another. See usePacbMidScope for the entry points that do have to ask.
+    onCreateInvoice: (row) => {
+      if (row.merchantId) selectMid(row.merchantId);
+      router.push(`/create-invoice?gid=${row.gid}`);
+    },
     onLinkInvoice: (row) => router.push(`/mca-invoices?linkTo=${row.gid}`),
     canManageInvoices,
   });
