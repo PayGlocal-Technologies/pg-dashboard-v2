@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import {
-  Badge,
   Button,
   DataTable,
   Popover,
@@ -13,6 +12,7 @@ import {
   type Column,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { StatusFilterChip } from "@/components/common/filters/FilterChips";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatTransactionDateOnly } from "@/lib/utils/format";
 import { clientAmountLocale } from "@/features/dashboard/client-management/constants";
@@ -178,10 +178,10 @@ export function ClientInvoicesSection({
   });
   const { duplicateInvoice, deleteInvoice, downloadInvoice } = useInvoiceRowActions();
 
-  const toggleStatus = (value: string) => {
-    onStatusesChange(
-      statuses.includes(value) ? statuses.filter((s) => s !== value) : [...statuses, value]
-    );
+  // The chip stages its own draft and hands back the whole selection on Apply,
+  // so this replaces the set outright rather than toggling one value at a time.
+  const applyStatuses = (next: string[]) => {
+    onStatusesChange(next);
     setPage(1);
   };
 
@@ -219,7 +219,11 @@ export function ClientInvoicesSection({
       key: "totalAmount",
       header: "Amount",
       minWidth: 130,
-      align: "right",
+      // Left, matching the Transactions table's own Amount column. In a
+      // content-width table a right-aligned column pushes its figures away from
+      // the header above them, and that was this table's most visible departure
+      // from every other one in the app.
+      align: "left",
       render: (row) => {
         const amount = Number(row.totalAmount);
         return (
@@ -263,75 +267,26 @@ export function ClientInvoicesSection({
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         {/* Status filter and refresh, the two controls production's own ledger
-            toolbar carries. */}
-        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-          <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                leftIcon={<Icon name="filter" className="h-3.5 w-3.5" />}
-              >
-                Status
-                {activeCount > 0 ? (
-                  <Badge variant="secondary" size="sm" className="ml-1.5">
-                    {activeCount}
-                  </Badge>
-                ) : null}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="start" className="w-52 p-1">
-              {INVOICE_STATUS_OPTIONS.map((option) => (
-                <Button
-                  key={option.value}
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => toggleStatus(option.value)}
-                  // A check marks the chosen ones rather than a checkbox column, so
-                  // the row stays one line at this width — and it rides the leftIcon
-                  // slot rather than being a child beside the label, which is what
-                  // keeps it on that line. Button puts its children in a plain
-                  // non-flex <span>, where preflight's display:block <svg> breaks to
-                  // a line of its own; leftIcon is a direct flex child instead.
-                  //
-                  // Transparent rather than absent when unselected, so every row's
-                  // label starts at the same x whatever is ticked.
-                  leftIcon={
-                    <Icon
-                      name="check"
-                      className={cn(
-                        "h-3.5 w-3.5 shrink-0",
-                        statuses.includes(option.value) ? "text-primary" : "text-transparent"
-                      )}
-                    />
-                  }
-                  className="h-auto min-h-0 w-full justify-start gap-2 rounded-md px-2 py-1.5 text-[13px] font-normal"
-                >
-                  {option.label}
-                </Button>
-              ))}
-              {activeCount > 0 ? (
-                <>
-                  <Separator className="my-1" />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      onStatusesChange([]);
-                      setPage(1);
-                    }}
-                    className="h-auto min-h-0 w-full justify-start rounded-md px-2 py-1.5 text-[13px] font-normal text-muted-foreground"
-                  >
-                    Clear
-                  </Button>
-                </>
-              ) : null}
-            </PopoverContent>
-          </Popover>
+            toolbar carries — in the row treatment every other table in the app
+            uses: the shared dashed filter chip on the left, then a borderless
+            ghost Refresh pushed right. The chip is the same StatusFilterChip
+            the Transactions and MCA Links toolbars render, rather than a
+            bordered pill built here, so this ledger's controls are literally
+            the same component as theirs and cannot drift from them. */}
+        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <StatusFilterChip
+              options={INVOICE_STATUS_OPTIONS}
+              selected={statuses}
+              onChange={applyStatuses}
+              open={filterOpen}
+              onOpenChange={setFilterOpen}
+            />
+          </div>
 
+          {/* Every mutation already invalidates this ledger, so this is for
+              changes made elsewhere. Spinning on isFetching (not isLoading) is
+              what makes a press over existing rows visibly do something. */}
           <Button
             type="button"
             variant="ghost"
@@ -353,6 +308,9 @@ export function ClientInvoicesSection({
           columns={columns}
           data={invoices}
           isLoading={isLoading}
+          // Matched to pageSize, so the loading block is exactly the height of
+          // the rows that replace it and the section doesn't jump on settle.
+          skeletonRows={5}
           emptyTitle="No invoices yet"
           emptyDescription={
             activeCount > 0

@@ -29,9 +29,9 @@ interface ClientDetailsPageProps {
  * the invoice ledger, which needs the status filter state the KPI cards drive.
  */
 export function ClientDetailsPage({ client, onBack, onCollapse }: ClientDetailsPageProps) {
-  // Which invoice statuses the ledger is narrowed to. Held here rather than in
-  // the ledger because the KPI cards above it are what set it, and they live in a
-  // different subtree.
+  // Which invoice statuses the ledger is narrowed to. Held here rather than
+  // inside the ledger so the page keeps the merchant's choice across a re-render
+  // of the section, and so both detail views own it the same way.
   const [invoiceStatuses, setInvoiceStatuses] = useState<string[]>([]);
   const { viewContract } = useClientContractView();
 
@@ -66,10 +66,6 @@ export function ClientDetailsPage({ client, onBack, onCollapse }: ClientDetailsP
       <ClientDetailsContent
         client={client}
         layout="page"
-        // Pressing a KPI card narrows the ledger to the statuses that card
-        // counts, which is the whole reason the cards are clickable — the figure
-        // and the rows behind it end up on screen together.
-        onFilterByStatus={setInvoiceStatuses}
         onViewContract={
           client.contract?.fileId
             ? () => viewContract({ clientId: client.id, rowMid: client.mid })

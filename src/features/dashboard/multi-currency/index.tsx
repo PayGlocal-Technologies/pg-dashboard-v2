@@ -373,22 +373,18 @@ function MultiCurrencyContent() {
                     caveat. space-y-3 keeps it bound to the card rather than
                     reading as the section below it.
 
-                    Rest of the World's FX notice goes *before* the account
-                    details — a client reading it needs the "don't convert to
-                    GBP" instruction before, not after, the account number they're
-                    about to send a payment to. Every other notice (currently just
-                    AUD's) keeps its original placement after the details, since
-                    only Rest of the World's is a pre-payment instruction the
-                    client-facing hierarchy calls out specifically.
+                    The notice goes *before* the account details — every one of
+                    them is a pre-payment briefing (don't convert to GBP, expect
+                    your bank's verification prompt), so the client has to read it
+                    before, not after, the account number they're about to send a
+                    payment to.
 
                     `inside` moves the flag/name/subtitle into the card — there's
                     no carousel here naming the account any more — and the width
                     override drops the card's default shrink-wrapping so it fills
                     this column. */}
                 <div className="space-y-3">
-                  {selectedAccount.isGlobal && (
-                    <AccountCurrencyNotice currency={selectedAccount.currency} />
-                  )}
+                  <AccountCurrencyNotice currency={selectedAccount.currency} />
                   <VirtualAccountDetails
                     account={selectedAccount}
                     onCopy={handleCopyFullAccount}
@@ -396,9 +392,6 @@ function MultiCurrencyContent() {
                     headerPlacement="inside"
                     className="w-full max-w-none"
                   />
-                  {!selectedAccount.isGlobal && (
-                    <AccountCurrencyNotice currency={selectedAccount.currency} />
-                  )}
                 </div>
               </section>
 

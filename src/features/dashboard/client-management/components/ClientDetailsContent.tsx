@@ -190,13 +190,17 @@ export function ClientIdentitySummary({
  * h-full is what keeps all three cards exactly equal in height — the grid
  * stretches every one to the tallest, which is whichever label wraps first or
  * whichever card carries the most currencies.
+ *
+ * The tile is a plain readout, not a control. It used to press to filter the
+ * ledger below to the statuses it counts, but a card-shaped surface that shows a
+ * pointer cursor reads as navigation, and the ledger already carries its own
+ * Status filter — the same narrowing, where a merchant looks for it.
  */
 function ClientMetricCard({
   label,
   value,
   amounts,
   hint,
-  onClick,
 }: {
   label: string;
   value: number;
@@ -208,34 +212,12 @@ function ClientMetricCard({
    *  easy to read as the same number three ways, and the tooltip is what says
    *  which invoices each one includes. */
   hint?: string;
-  /** Filters the invoice ledger below to the statuses this card describes.
-   *  Absent when there is no ledger to filter. */
-  onClick?: () => void;
 }) {
   // min-w-0 so the three cards can narrow with the column that holds them,
   // rather than the row's min-content width becoming a floor that overflows it.
   // Their labels wrap instead.
   return (
-    <Card
-      size="sm"
-      className={cn(
-        "h-full w-full min-w-0 px-4 py-3.5",
-        onClick && "cursor-pointer transition-colors hover:bg-muted/40"
-      )}
-      {...(onClick
-        ? {
-            role: "button",
-            tabIndex: 0,
-            onClick,
-            onKeyDown: (e: React.KeyboardEvent) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onClick();
-              }
-            },
-          }
-        : {})}
-    >
+    <Card size="sm" className="h-full w-full min-w-0 px-4 py-3.5">
       <CardContent className="flex h-full flex-1 flex-col">
         <div className="flex items-center gap-1">
           <p className="text-[12px] text-muted-foreground">{label}</p>
@@ -253,8 +235,6 @@ function ClientMetricCard({
                     type="button"
                     aria-label={`About ${label.toLowerCase()}`}
                     className="shrink-0 text-muted-foreground/70 hover:text-muted-foreground"
-                    // The card itself may be clickable; the hint is not that.
-                    onClick={(e) => e.stopPropagation()}
                   >
                     <Icon name="info" className="h-3 w-3" />
                   </button>
@@ -277,29 +257,27 @@ function ClientMetricCard({
           <p className="text-2xl font-semibold tabular-nums tracking-tight text-foreground">
             {value}
           </p>
-          {amounts.length === 0 ? (
-            // An em-dash, not a formatted zero: "there are no invoices here"
-            // and "these invoices are worth nothing" are different facts, and
-            // only the first one is ever true. Rendered rather than omitted so
-            // a card with nothing to value keeps its neighbours' bottom line.
-            <p className="mt-0.5 text-[11px] text-muted-foreground">—</p>
-          ) : (
-            // One line per currency, amount then ISO code, the same pairing the
-            // table's Total received column uses. A client billed in a single
-            // currency — every client today — gets exactly one line, so this
-            // never makes the card taller in practice; a mixed-currency client
-            // adds a line rather than silently summing across rates.
-            amounts.map((total) => (
-              <p
-                key={total.currency}
-                className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground"
-                title={`${formatCurrency(total.amount, total.currency, clientAmountLocale(total.currency))} ${total.currency}`}
-              >
-                {formatCurrency(total.amount, total.currency, clientAmountLocale(total.currency))}{" "}
-                <span className="font-medium">{total.currency}</span>
-              </p>
-            ))
-          )}
+          {/* One line per currency, amount then ISO code, the same pairing the
+              table's Total received column uses. A client billed in a single
+              currency — every client today — gets exactly one line, so this
+              never makes the card taller in practice; a mixed-currency client
+              adds a line rather than silently summing across rates.
+
+              A card with nothing to value renders no line at all. It used to
+              draw an em-dash there to keep the three cards' bottom edges level,
+              but a lone dash under a zero reads as a missing value rather than
+              as "nothing to show", and the grid's own stretch already keeps the
+              cards equal in height. */}
+          {amounts.map((total) => (
+            <p
+              key={total.currency}
+              className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground"
+              title={`${formatCurrency(total.amount, total.currency, clientAmountLocale(total.currency))} ${total.currency}`}
+            >
+              {formatCurrency(total.amount, total.currency, clientAmountLocale(total.currency))}{" "}
+              <span className="font-medium">{total.currency}</span>
+            </p>
+          ))}
         </div>
       </CardContent>
     </Card>
@@ -315,25 +293,7 @@ function ClientMetricCard({
  * production reports rather than an approximation computed from the transactions
  * listed underneath it. See useClientInvoiceSummary and clientInvoiceAmounts.
  */
-/**
- * Which invoice statuses each KPI card narrows the ledger to. Copied from
- * pg-dashboard's ClientSummary: "completed" spans everything that was actually
- * raised, "paid" both settled states, and outstanding just the one.
- */
-const METRIC_STATUS_FILTERS = {
-  total: ["ACTIVE", "PAID", "PAID_OUTSIDE", "OUTSTANDING"],
-  paid: ["PAID", "PAID_OUTSIDE"],
-  outstanding: ["OUTSTANDING"],
-} as const;
-
-export function ClientInvoiceMetrics({
-  client,
-  onFilterByStatus,
-}: {
-  client: Client;
-  /** Narrows the invoice ledger below to these statuses. */
-  onFilterByStatus?: (statuses: string[]) => void;
-}) {
+export function ClientInvoiceMetrics({ client }: { client: Client }) {
   // Counts and amounts come from two different places, because the API splits
   // them that way: get-invoice-summary returns the three counts and no money,
   // while the client record carries the money and no counts. Both describe the
@@ -362,29 +322,18 @@ export function ClientInvoiceMetrics({
           value={metrics.total}
           amounts={amounts.total}
           hint="The total number of successfully generated invoices."
-          onClick={
-            onFilterByStatus ? () => onFilterByStatus([...METRIC_STATUS_FILTERS.total]) : undefined
-          }
         />
         <ClientMetricCard
           label="Paid invoices"
           value={metrics.paid}
           amounts={amounts.paid}
           hint="The total number of invoices for which payments have been linked."
-          onClick={
-            onFilterByStatus ? () => onFilterByStatus([...METRIC_STATUS_FILTERS.paid]) : undefined
-          }
         />
         <ClientMetricCard
           label="Outstanding invoices"
           value={metrics.outstanding}
           amounts={amounts.outstanding}
           hint="The total number of unpaid invoices past due date."
-          onClick={
-            onFilterByStatus
-              ? () => onFilterByStatus([...METRIC_STATUS_FILTERS.outstanding])
-              : undefined
-          }
         />
       </div>
     </section>
@@ -586,8 +535,6 @@ interface ClientDetailsContentProps {
    * nothing else, so that is what these views show.
    */
   ledgerSlot?: ReactNode;
-  /** Narrows the ledger to the statuses a KPI card describes. */
-  onFilterByStatus?: (statuses: string[]) => void;
   /** Opens the stored contract. */
   onViewContract?: () => void;
 }
@@ -613,7 +560,6 @@ export function ClientDetailsContent({
   client,
   layout = "page",
   ledgerSlot,
-  onFilterByStatus,
   onViewContract,
 }: ClientDetailsContentProps) {
   return (
@@ -625,7 +571,7 @@ export function ClientDetailsContent({
     // min-width:auto — their content's intrinsic width.
     <div className="space-y-6">
       <ClientIdentitySummary client={client} />
-      <ClientInvoiceMetrics client={client} onFilterByStatus={onFilterByStatus} />
+      <ClientInvoiceMetrics client={client} />
       <ClientContactSection client={client} layout={layout} onViewContract={onViewContract} />
       {ledgerSlot}
     </div>
