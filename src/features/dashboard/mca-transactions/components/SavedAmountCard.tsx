@@ -55,7 +55,6 @@ export function SavedAmountCard({
         <div className="mt-4">
           <p className="text-sm text-foreground">
             <span className="font-semibold">Saved amount</span>{" "}
-            <span className="text-muted-foreground">vs banks</span>
           </p>
 
           {isLoading ? (
