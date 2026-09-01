@@ -19,7 +19,6 @@ import type {
   ContactData,
   ContactDataResponse,
   MerchantProfileResponse,
-  OnboardingBusinessProfile,
   SettlementData,
   SettlementDataResponse,
 } from "@/features/dashboard/settings/types";
@@ -46,11 +45,12 @@ export function useBusinessDetails(): {
   return { business: data?.data ?? null, isLoading: !!onbId && isPending, isError };
 }
 
-/** The onboarding business profile (GST, address, website, nature of business,
- *  support email/phone) from GET /merchants/{merchantId}/profile. Keyed by
- *  profile.mid. Envelope-tolerant — reads `data` or the flat body. */
-export function useMerchantBusinessProfile(): {
-  businessProfile: OnboardingBusinessProfile | undefined;
+/** The merchant profile (registered name, GST, address, website, nature of
+ *  business, support email/phone) from GET /merchants/{merchantId}/profile.
+ *  Keyed by profile.mid. The body is flat — no `data` envelope — so it is read
+ *  straight off `data`. */
+export function useMerchantProfile(): {
+  merchantProfile: MerchantProfileResponse | undefined;
   isLoading: boolean;
   isError: boolean;
 } {
@@ -60,9 +60,8 @@ export function useMerchantBusinessProfile(): {
     merchantProfileApi(merchantId),
     { enabled: !!merchantId }
   );
-  const body = data?.data ?? data;
   return {
-    businessProfile: body?.onboardingBusinessProfile ?? undefined,
+    merchantProfile: data,
     isLoading: !!merchantId && isPending,
     isError,
   };

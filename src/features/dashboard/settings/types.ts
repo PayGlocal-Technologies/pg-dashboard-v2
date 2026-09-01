@@ -11,25 +11,57 @@ export interface BusinessDataResponse {
   data?: BusinessData | null;
 }
 
-/** The onboarding business profile block of GET /merchants/{merchantId}/profile.
- *  Backs the read-only extra fields on Business details. */
-export interface OnboardingBusinessProfile {
-  gst?: string | null;
-  businessRegisteredAddress?: string | null;
-  websiteUrl?: string | null;
-  natureOfBusiness?: string | null;
+/** Address block of the merchant profile. `concatAddress` is the pre-joined
+ *  single-line form the API builds; the individual parts are what it joins, and
+ *  are the fallback when it comes back null. */
+export interface MerchantProfileAddress {
+  streetAddress1?: string | null;
+  streetAddress2?: string | null;
+  city?: string | null;
+  state?: string | null;
+  stateCode?: string | null;
+  zipcode?: string | null;
+  concatAddress?: string | null;
+}
+
+/** A contact block of the merchant profile (business / technical / operations).
+ *  Only the fields Business details falls back to are declared. */
+export interface MerchantProfileContact {
   emailId?: string | null;
-  phoneNumber?: string | null;
+  cellPhoneNumber?: string | null;
+  cellPhoneISDNumber?: string | null;
+  fullName?: string | null;
 }
 
-export interface MerchantProfileData {
-  onboardingBusinessProfile?: OnboardingBusinessProfile | null;
+/** GET /gcc/v1/merchants/{merchantId}/profile.
+ *
+ *  The body is FLAT — there is no `data` envelope. This matches pg-dashboard,
+ *  which types the same endpoint flat in platform-withdrawals/types.ts
+ *  (`ProfileData`) and reads `profileData?.merchantRegisteredName` /
+ *  `profileData?.merchantAddress?.concatAddress` directly.
+ *
+ *  Only the fields Business details reads are declared; the endpoint returns
+ *  considerably more (PAN, IE code, bank/settlement blocks) which is
+ *  deliberately left out rather than surfaced. */
+export interface MerchantProfileResponse {
+  merchantRegisteredName?: string | null;
+  /** Trade / DBA name. `displayTag` carries the same value in most records. */
+  merchantShortName?: string | null;
+  displayTag?: string | null;
+  merchantGST?: string | null;
+  merchantUrl?: string | null;
+  merchantEntityType?: string | null;
+  /** Nature of business. Frequently null on older records. */
+  lineOfBusiness?: string | null;
+  merchantEmail?: string | null;
+  merchantPhone?: string | null;
+  merchantCountry?: string | null;
+  merchantAddress?: MerchantProfileAddress | null;
+  legalAddress?: MerchantProfileAddress | null;
+  businessContact?: MerchantProfileContact | null;
+  /** Singular string here, unlike the v3 /business endpoint's string[]. */
+  purposeCode?: string | null;
 }
-
-/** Envelope-tolerant: read `data` if the response wraps, else the flat body. */
-export type MerchantProfileResponse = {
-  data?: MerchantProfileData | null;
-} & Partial<MerchantProfileData>;
 
 /** The PUT body pg-dashboard sends — note the plural key `purposeCodes`, which
  *  differs from the singular `purposeCode` the GET returns. */
