@@ -5,10 +5,14 @@ import { Heading } from "@/components/ui";
 import { ReferralHero } from "@/features/dashboard/refer-and-earn/components/ReferralHero";
 // TEMPORARILY HIDDEN — Referral leaderboard.
 //
-// The component, its helpers (buildLeaderboardView), its types
-// (LeaderboardEntry / ReferralStandings), and MOCK_LEADERBOARD all stay in the
-// codebase untouched; only this page stops rendering it. To restore it, put
-// these two imports back and un-comment the block in the grid below.
+// The component, its helper (buildLeaderboardView) and its types
+// (LeaderboardEntry / ReferralStandings) all stay in the codebase; only this
+// page stops rendering it. To restore it, put the import below back and
+// un-comment the block in the grid further down.
+//
+// It also needs a source of standings. There is no leaderboard endpoint, and
+// the placeholder standings it used to read are gone with mock-data.ts, so
+// restoring it means wiring a real one — not just un-commenting.
 //
 // import { ReferralLeaderboard } from "@/features/dashboard/refer-and-earn/components/ReferralLeaderboard";
 import { ReferralTotalsCard } from "@/features/dashboard/refer-and-earn/components/ReferralTotalsCard";
@@ -16,20 +20,31 @@ import { ReferralJourneyCard } from "@/features/dashboard/refer-and-earn/compone
 import { ReferralEarnings } from "@/features/dashboard/refer-and-earn/components/ReferralEarnings";
 import { buildReferralUrl } from "@/features/dashboard/refer-and-earn/constants";
 import {
+  mapTransactionsToRedemptions,
   mapTransactionsToReferrals,
-  summarizeReferrals,
+  summarizeWallet,
 } from "@/features/dashboard/refer-and-earn/helpers";
 import {
   useReferralLink,
   useReferralTransactions,
   useReferralWallet,
 } from "@/features/dashboard/refer-and-earn/hooks";
-// import { MOCK_LEADERBOARD } from "@/features/dashboard/refer-and-earn/mock-data";
 
-// Wired to pg-dashboard's influencer service: the referral link, the reward
-// wallet and the referral history all come from the real endpoints (see
-// hooks.ts / services.ts). The leaderboard has no backend contract yet and
-// stays hidden below.
+// Wired to pg-dashboard's influencer service (see hooks.ts / services.ts). Two
+// endpoints, with one job each and no overlap between them:
+//
+//   get-wallet    → every figure on the page. The Total earned card, the three
+//                   funnel bars, the waived card.
+//   transactions  → the rows of the table below, and nothing else.
+//
+// The split is deliberate. The feed holds one row per reward already minted, so
+// it cannot answer what the analytics ask: a referral who signed up and has not
+// transacted has no row in it at all, and a merchant with more history than one
+// page would have their totals quietly truncated. The wallet states all of it
+// outright, so nothing is derived from the rows and there is nothing to
+// reconcile between the two.
+//
+// The leaderboard has no backend contract and stays hidden below.
 export function ReferAndEarnFeature() {
   const { link } = useReferralLink();
   const { transactions, isLoading: transactionsLoading } = useReferralTransactions();
@@ -39,16 +54,17 @@ export function ReferAndEarnFeature() {
   // loaded, so the hero never renders an empty field.
   const referralUrl = link || buildReferralUrl();
 
+  // The one transactions feed carries both halves of the programme: the referral
+  // credits, one per referred merchant, and the debits where reward money has
+  // already come off the merchant's fees. They are different shapes and get
+  // their own tab, so they are mapped apart here rather than filtered later.
   const referrals = useMemo(() => mapTransactionsToReferrals(transactions), [transactions]);
+  const redemptions = useMemo(() => mapTransactionsToRedemptions(transactions), [transactions]);
 
-  // The analytics row and the totals card are both derived from this one pure
-  // summary, so the two can never disagree, and ReferralEarnings keeps
-  // computing its own over the same rows. The waived total is the one figure the
-  // per-row feed can't carry, so it's taken from the wallet's withdrawn total.
-  const summary = useMemo(() => {
-    const base = summarizeReferrals(referrals);
-    return wallet ? { ...base, totalWaived: Number(wallet.totalWithdrawn) || base.totalWaived } : base;
-  }, [referrals, wallet]);
+  // One summary for the whole page, straight off the wallet: the totals card
+  // beside the hero and the analytics row above the table both read this object,
+  // so the two cannot disagree.
+  const summary = useMemo(() => summarizeWallet(wallet), [wallet]);
 
   return (
     <div className="page-enter mx-auto max-w-[1400px] space-y-6 overflow-x-hidden lg:space-y-8">
@@ -94,8 +110,10 @@ export function ReferAndEarnFeature() {
             the same arrangement that worked before the leaderboard was
             hidden.
 
+            `standings` needs a real source — see the note beside the import.
+
             <ReferralLeaderboard
-              standings={MOCK_LEADERBOARD}
+              standings={standings}
               currentEarned={summary.totalEarned}
               // Completed referrals are the ones that qualified, so they are
               // what the leaderboard's gap-to-#1 is measured in.
@@ -105,7 +123,12 @@ export function ReferAndEarnFeature() {
         */}
       </div>
 
-      <ReferralEarnings referrals={referrals} isLoading={transactionsLoading} />
+      <ReferralEarnings
+        referrals={referrals}
+        redemptions={redemptions}
+        summary={summary}
+        isLoading={transactionsLoading}
+      />
     </div>
   );
 }
