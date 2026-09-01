@@ -191,7 +191,16 @@ export function Spotlight({ target, side, align, onMissing, pulse, children }: S
           onInteractOutside={(e) => e.preventDefault()}
           className="pointer-events-auto z-[121] w-[320px] rounded-2xl border border-border bg-background p-4 shadow-2xl"
         >
-          {children}
+          {/* Ease the card in rather than letting it pop — matters most for the
+              transaction drawer, where the tour appears over a just-settled
+              panel. Runs once on mount; per-step copy has its own transition. */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97, y: 4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
+            {children}
+          </motion.div>
         </PopoverContent>
       </Popover>
     </motion.div>,

@@ -104,14 +104,18 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
         </span>
         <div className="flex items-center gap-2">
           {isLast ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={restart}
-              leftIcon={<Icon name="rotate-ccw" className="h-3.5 w-3.5" aria-hidden />}
-            >
-              Restart
-            </Button>
+            // Restart only makes sense for a multi-step tour — a single-step
+            // guide (e.g. the transaction drawer) has nothing to restart.
+            steps.length > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={restart}
+                leftIcon={<Icon name="rotate-ccw" className="h-3.5 w-3.5" aria-hidden />}
+              >
+                Restart
+              </Button>
+            )
           ) : (
             stepIndex > 0 && (
               <Button

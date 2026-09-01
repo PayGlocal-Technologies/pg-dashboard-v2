@@ -261,7 +261,7 @@ export function RecentActivityTable({
           onClick={() =>
             router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-report")
           }
-          rightIcon={<Icon name="arrow-right" className="h-3 w-3" aria-hidden />}
+          // rightIcon={<Icon name="arrow-right" className="h-3 w-3" aria-hidden />}
         >
           View all
         </Button>

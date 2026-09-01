@@ -216,7 +216,7 @@ export function SettlementAnalyticsCard({
               fact, the same order OutstandingAmountCard and SavedAmountCard
               both use for their own KPI blocks. */}
           <p className="text-sm font-semibold text-foreground">
-            {isAmountMode ? "Total settled amount" : "Total transactions"}
+            {isAmountMode ? "Total amount collected" : "Total transactions"}
           </p>
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
             {isLoading ? (

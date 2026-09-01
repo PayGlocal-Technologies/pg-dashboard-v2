@@ -26,13 +26,17 @@ export function McaTransactionsFeature() {
   // the page header's action (in line with the "Transactions" title) while
   // still reaching down into TransactionsAnalyticsCarousel.
   const [timeRange, setTimeRange] = useState<TimeRange>("year");
+  // True while the full-page single-transaction details view is open (see
+  // McaTransactionTable). The time-range tabs scope the list and its
+  // analytics, so they're hidden on the details page where they mean nothing.
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
       <PageHeader
         title="Transactions"
         actions={
-          isMCAEnabled ? (
+          isMCAEnabled && !detailsOpen ? (
             <AnalyticsTimeRangeControl value={timeRange} onValueChange={setTimeRange} />
           ) : undefined
         }
@@ -48,6 +52,7 @@ export function McaTransactionsFeature() {
               directly. */}
           <McaTransactionTable
             analyticsSection={<TransactionsAnalyticsCarousel timeRange={timeRange} />}
+            onDetailsOpenChange={setDetailsOpen}
           />
         </MidGuard>
       ) : (

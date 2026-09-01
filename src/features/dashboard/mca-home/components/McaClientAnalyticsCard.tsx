@@ -55,7 +55,7 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
             type="button"
             variant="link"
             onClick={onViewAll}
-            rightIcon={<Icon name="arrow-up-right" className="h-3 w-3" />}
+            // rightIcon={<Icon name="arrow-up-right" className="h-3 w-3" />}
             className="h-auto w-fit min-h-0 justify-start p-0 text-xs font-semibold"
           >
             View all
