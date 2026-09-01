@@ -73,3 +73,34 @@ export interface TopClientsResponse {
   errors?: unknown;
   data: TopClientsData;
 }
+
+// ── Needs attention ──────────────────────────────────────────────────────────
+// Backs McaNeedsAttentionCard. One row per invoice that is overdue or due soon.
+// `attentionStatus` drives the row's tone/label; `daysRemaining` is negative
+// once overdue (e.g. -6 = six days past due), positive while still due soon.
+
+export type InvoiceAttentionStatus = "OVERDUE" | "DUE_SOON";
+
+export interface NeedsAttentionInvoice {
+  id: string;
+  invoiceId: string;
+  clientName: string;
+  clientBusinessName: string;
+  currency: string;
+  totalAmount: number;
+  invoiceNumber: string;
+  dueDate: string;
+  attentionStatus: InvoiceAttentionStatus;
+  daysRemaining: number;
+}
+
+export interface NeedsAttentionData {
+  totalCount: number;
+  data: NeedsAttentionInvoice[];
+}
+
+export interface NeedsAttentionResponse {
+  message?: string;
+  errors?: unknown;
+  data: NeedsAttentionData;
+}

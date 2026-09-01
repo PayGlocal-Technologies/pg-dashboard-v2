@@ -7,53 +7,44 @@ import { useApp } from "@/stores/useApp";
 import { SettingsDetailRow } from "@/features/dashboard/settings/components/SettingsDetailRow";
 import {
   useBusinessDetails,
-  useMerchantProfile,
+  useMerchantBusinessProfile,
   useUpdateBusinessDetails,
 } from "@/features/dashboard/settings/hooks";
-import type { MerchantProfileAddress } from "@/features/dashboard/settings/types";
 
 interface BusinessField {
   label: string;
   description: string;
-  /** Null/empty renders as "Not available". */
-  value?: string | null;
+  /** Empty renders as "Not available". Long values wrap; no multiline variant is
+   *  needed now that values are plain text rather than boxed fields. */
+  value: string;
+  /** Show a shimmer instead of "Not available" while the value is still loading. */
   isLoading?: boolean;
 }
 
-/** The API's own single-line form when it has one, else the parts joined in the
- *  same order — mirroring pg-dashboard's concatAddress-then-rebuild fallback. */
-function formatAddress(address: MerchantProfileAddress | null | undefined): string {
-  if (!address) return "";
-  const concatenated = address.concatAddress?.trim();
-  if (concatenated) return concatenated;
-  return [
-    address.streetAddress1,
-    address.streetAddress2,
-    address.city,
-    address.state,
-    address.zipcode,
-  ]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(", ");
-}
+/** Known line-of-business codes → human labels. Anything unmapped falls back to
+ *  prettifying the code itself ("GOODS_EXPORT" → "Goods export"), so a new code
+ *  the backend adds still reads sensibly instead of showing raw. */
+const LINE_OF_BUSINESS_LABELS: Record<string, string> = {
+  GOODS_EXPORT: "Goods export",
+  GOODS_IMPORT: "Goods import",
+  SERVICES_EXPORT: "Services export",
+  SERVICES_IMPORT: "Services import",
+};
 
-/** "+91 7973430962" when the ISD code is separate, else the number alone. */
-function formatPhone(number: string | null | undefined, isd: string | null | undefined): string {
-  const digits = number?.trim();
-  if (!digits) return "";
-  const code = isd?.trim();
-  return code && !digits.startsWith(code) ? `${code} ${digits}` : digits;
+function formatLineOfBusiness(code: string | null | undefined): string {
+  if (!code) return "";
+  if (LINE_OF_BUSINESS_LABELS[code]) return LINE_OF_BUSINESS_LABELS[code];
+  const words = code.toLowerCase().replace(/_/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
 }
 
 export function BusinessDetailsFeature() {
   const profile = useApp((s) => s.profile);
   const { business, isLoading } = useBusinessDetails();
   const { updateBusiness, isSaving } = useUpdateBusinessDetails();
-  // Everything except trade name and purpose codes comes from the merchant
-  // profile — a FLAT body, so fields are read straight off it (merchantGST,
-  // merchantUrl, merchantAddress.concatAddress, ...).
-  const { merchantProfile, isLoading: isProfileLoading } = useMerchantProfile();
+  // GST / address / website / line-of-business / support contact now come from
+  // the merchant profile's merchantBusinessSummary block.
+  const { businessProfile, isLoading: isProfileLoading } = useMerchantBusinessProfile();
 
   // Purpose codes are the one editable field, mirroring pg-dashboard's
   // BusinessDetails (trade name stays read-only, codes edit + save via PUT).
@@ -85,67 +76,67 @@ export function BusinessDetailsFeature() {
     );
   };
 
-  const businessContact = merchantProfile?.businessContact;
-
+  // registeredName/mid from the session profile (already resolved, so no loading
+  // state); tradeName/purposeCode from the /business endpoint; the rest from the
+  // merchant profile's merchantBusinessSummary block. An empty value renders as
+  // "Not available" in the row below, so none of these need their own fallback.
   const readOnlyFields: BusinessField[] = [
     {
       label: "Legal business name",
       description: "As on your incorporation / GST records.",
-      // The profile is authoritative; the session's registeredName is the
-      // fallback so this row is never blank while the profile loads.
-      value: merchantProfile?.merchantRegisteredName ?? profile?.registeredName,
-      isLoading: isProfileLoading && !profile?.registeredName,
+      value: profile?.registeredName ?? "",
     },
     {
       label: "Trade name",
       description: "The name customers see, if different from your legal name.",
-      value:
-        business?.tradeName ?? merchantProfile?.merchantShortName ?? merchantProfile?.displayTag,
-      isLoading: isLoading || isProfileLoading,
+      value: business?.tradeName ?? "",
+      isLoading,
     },
     {
       label: "Merchant ID",
       description: "Your unique PayGlocal merchant identifier.",
-      value: profile?.mid,
+      value: profile?.mid ?? "",
     },
     {
       label: "GSTIN",
       description: "15-character GST identification number.",
-      value: merchantProfile?.merchantGST,
+      value: businessProfile?.gst ?? "",
       isLoading: isProfileLoading,
     },
     {
       label: "Registered address",
       description: "Principal place of business in India.",
-      value: formatAddress(merchantProfile?.merchantAddress ?? merchantProfile?.legalAddress),
+      value: businessProfile?.registeredAddress ?? "",
       isLoading: isProfileLoading,
     },
     {
       label: "Business category",
       description: "Helps us tune risk and reporting templates.",
-      value: merchantProfile?.lineOfBusiness,
+      value: formatLineOfBusiness(businessProfile?.lineOfBusiness),
       isLoading: isProfileLoading,
     },
     {
       label: "Website",
       description: "Your public-facing business website.",
-      value: merchantProfile?.merchantUrl,
+      value: businessProfile?.websiteUrl ?? "",
+      isLoading: isProfileLoading,
+    },
+    {
+      label: "Support contact name",
+      description: "Person customer queries are addressed to.",
+      value: businessProfile?.supportContactName ?? "",
       isLoading: isProfileLoading,
     },
     {
       label: "Support email",
       description: "Where customer queries are directed.",
-      // merchantEmail is often null on older records; the authorised
-      // signatory's contact block is the fallback pg-dashboard also falls to.
-      value: merchantProfile?.merchantEmail ?? businessContact?.emailId,
+      value: businessProfile?.supportEmail ?? "",
       isLoading: isProfileLoading,
     },
     {
       label: "Support phone",
       description: "Shown on receipts and payment pages where applicable.",
-      value:
-        merchantProfile?.merchantPhone ??
-        formatPhone(businessContact?.cellPhoneNumber, businessContact?.cellPhoneISDNumber),
+      value: businessProfile?.supportPhone ?? "",
       isLoading: isProfileLoading,
     },
   ];
@@ -159,14 +150,17 @@ export function BusinessDetailsFeature() {
 
       <Card className="gap-0 p-0">
         <div className="border-b border-border p-5">
-          <h2 className="text-base font-bold text-foreground">Legal &amp; public profile</h2>
+          <h2 className="text-base font-bold text-foreground">Legal & public profile</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
             Details shown where required for compliance and customer support.
           </p>
         </div>
 
         <div className="divide-y divide-border px-5">
-          {/* Real, editable purpose codes row. */}
+          {/* Real, editable purpose codes row — the one field on this page that
+              takes input, so it is the only one that shows a boxed control, and
+              only while actually editing. Label styling matches
+              SettingsDetailRow so it reads as part of the same list. */}
           <div className="flex items-start justify-between gap-6 py-3">
             <div className="max-w-xs">
               <p className="text-sm text-muted-foreground">Purpose code(s)</p>
@@ -225,7 +219,7 @@ export function BusinessDetailsFeature() {
                 field.isLoading && !field.value ? (
                   <Shimmer className="h-4 w-40" />
                 ) : (
-                  field.value?.trim() || "Not available"
+                  field.value.trim() || "Not available"
                 )
               }
             />

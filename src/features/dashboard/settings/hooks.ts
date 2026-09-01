@@ -1,11 +1,13 @@
 "use client";
 
 import type { UseMutateFunction } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGet, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import {
   businessDetailsApi,
   contactDetailsApi,
+  merchantLogoUploadApi,
   merchantProfileApi,
   secureSettlementDetailsApi,
   settlementDetailsApi,
@@ -18,6 +20,8 @@ import type {
   BusinessUpdatePayload,
   ContactData,
   ContactDataResponse,
+  MerchantBusinessSummary,
+  MerchantLogoUploadResponse,
   MerchantProfileResponse,
   SettlementData,
   SettlementDataResponse,
@@ -45,12 +49,11 @@ export function useBusinessDetails(): {
   return { business: data?.data ?? null, isLoading: !!onbId && isPending, isError };
 }
 
-/** The merchant profile (registered name, GST, address, website, nature of
- *  business, support email/phone) from GET /merchants/{merchantId}/profile.
- *  Keyed by profile.mid. The body is flat — no `data` envelope — so it is read
- *  straight off `data`. */
-export function useMerchantProfile(): {
-  merchantProfile: MerchantProfileResponse | undefined;
+/** The merchant business summary (GST, address, website, line of business,
+ *  support contact) from GET /merchants/{merchantId}/profile. Keyed by
+ *  profile.mid. Envelope-tolerant — reads `data` or the flat body. */
+export function useMerchantBusinessProfile(): {
+  businessProfile: MerchantBusinessSummary | undefined;
   isLoading: boolean;
   isError: boolean;
 } {
@@ -60,8 +63,9 @@ export function useMerchantProfile(): {
     merchantProfileApi(merchantId),
     { enabled: !!merchantId }
   );
+  const body = data?.data ?? data;
   return {
-    merchantProfile: data,
+    businessProfile: body?.merchantBusinessSummary ?? undefined,
     isLoading: !!merchantId && isPending,
     isError,
   };
@@ -121,6 +125,57 @@ export function useUpdateAccountDetails(): {
     { invalidateQueries: [["settings-settlement", onbId]] }
   );
   return { updateAccount: mutate, isSaving: isPending, canEdit: !!merchantId };
+}
+
+/** Upload the merchant's checkout logo via
+ *  PUT /gcc/v1/merchants/{merchantId}/profile/logo (multipart/form-data, single
+ *  `merchantLogo` file). The mutation body IS a FormData — the shared mutation
+ *  hook detects that and sets the multipart Content-Type itself. Returns the
+ *  stored public URL in the response for the caller to display. `canUpload` is
+ *  false until the merchant id resolves.
+ *
+ *  On success it writes a cache-busted logo URL straight into the merchant
+ *  profile query cache. The S3 public URL is deterministic (same path every
+ *  upload), so without a changing `?v=` the browser would keep serving the old
+ *  cached image; pushing the busted URL into the shared cache updates every
+ *  consumer at once (this page's avatar and the sidebar footer). */
+export function useUpdateMerchantLogo(): {
+  uploadLogo: UseMutateFunction<MerchantLogoUploadResponse, Error, FormData>;
+  isUploading: boolean;
+  canUpload: boolean;
+} {
+  const merchantId = useMerchantId();
+  const queryClient = useQueryClient();
+  const { mutate, isPending } = usePut<MerchantLogoUploadResponse, FormData>(
+    merchantLogoUploadApi(merchantId),
+    {
+      invalidateQueries: false,
+      onSuccess: (res) => {
+        const url = res?.data?.merchantLogoPublicUrl;
+        if (!url) return;
+        // Date.now() lives in this async success callback, not in render.
+        const busted = `${url}${url.includes("?") ? "&" : "?"}v=${Date.now()}`;
+        // setQueriesData (prefix match), NOT setQueryData: useGet stores under
+        // an extended key — [...queryKey, finalUrl, headers] — so the exact key
+        // here would miss the real cache entry and write a dead one. A prefix
+        // filter matches whatever full key the reader actually registered.
+        queryClient.setQueriesData<MerchantProfileResponse>(
+          { queryKey: ["settings-merchant-profile", merchantId] },
+          (old) => {
+            if (!old) return old;
+            // Envelope-tolerant, matching useMerchantBusinessProfile's read: the
+            // summary may sit under `data` or on the flat body.
+            const existing = old.data?.merchantBusinessSummary ?? old.merchantBusinessSummary;
+            const nextSummary = { ...(existing ?? {}), merchantLogoPublicUrl: busted };
+            return old.data
+              ? { ...old, data: { ...old.data, merchantBusinessSummary: nextSummary } }
+              : { ...old, merchantBusinessSummary: nextSummary };
+          }
+        );
+      },
+    }
+  );
+  return { uploadLogo: mutate, isUploading: isPending, canUpload: !!merchantId };
 }
 
 /** Contact phone + email (read-only, as in pg-dashboard). */

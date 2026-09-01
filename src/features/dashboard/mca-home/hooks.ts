@@ -6,6 +6,7 @@ import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import {
   clientAnalyticsApi,
+  mcaNeedsAttentionApi,
   mcaRevenueTrendByMidApi,
   mcaRevenueTrendByUcicApi,
   mcaTopClientsByMidApi,
@@ -14,6 +15,8 @@ import {
 import type {
   ClientAnalyticsRecord,
   ClientAnalyticsResponse,
+  NeedsAttentionInvoice,
+  NeedsAttentionResponse,
   RevenueTrendData,
   RevenueTrendResponse,
   TopClientRow,
@@ -178,6 +181,36 @@ export function useTopClients(
   return {
     clients: data?.data?.rows ?? [],
     reportingCurrency: data?.data?.reportingCurrency,
+    isLoading: isReady && !!scopeId && isPending,
+    isError,
+  };
+}
+
+/**
+ * Invoices needing attention (overdue / due soon) for the dashboard's Needs
+ * attention panel. Merchant-scoped in the path — a selected MID, else the UCIC
+ * roll-up — mirroring useRevenueTrend/useTopClients above.
+ */
+export function useNeedsAttention(limit = 5): {
+  invoices: NeedsAttentionInvoice[];
+  totalCount: number;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const scopeId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<NeedsAttentionResponse>(
+    ["mca-needs-attention", scopeId, limit],
+    mcaNeedsAttentionApi(scopeId, limit),
+    { enabled: isReady && !!scopeId }
+  );
+
+  return {
+    invoices: data?.data?.data ?? [],
+    totalCount: data?.data?.totalCount ?? 0,
     isLoading: isReady && !!scopeId && isPending,
     isError,
   };
