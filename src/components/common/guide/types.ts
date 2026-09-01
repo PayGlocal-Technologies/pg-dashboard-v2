@@ -11,4 +11,10 @@ export interface GuideStep {
   /** Which side of the target the card sits on. Radix flips it on collision. */
   side?: "top" | "right" | "bottom" | "left";
   align?: "start" | "center" | "end";
+  /**
+   * The step covers something the merchant cannot submit without. Draws a
+   * "Required" mark on the card, so a tour of a long form separates the blocks
+   * that gate the submit from the ones that only improve the result.
+   */
+  required?: boolean;
 }

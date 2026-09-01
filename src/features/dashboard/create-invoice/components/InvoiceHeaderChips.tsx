@@ -41,6 +41,47 @@ export function dueDateForTerm(issueDate: string, termId: string | null): string
   return term ? addDaysToDateKey(issueDate, term.days) : "";
 }
 
+/**
+ * One chip, captioned.
+ *
+ * The three chips used to sit in a bare row with nothing naming them, which is
+ * how a merchant could read past the due date entirely: an unfilled one is just
+ * a small control among two filled ones, and none of the three said what it was
+ * for. A caption above each turns the row into three labelled fields, and the
+ * required mark is what says the due date is not optional.
+ *
+ * items-end on the row (see the editor) keeps the chips on one baseline whatever
+ * their captions do.
+ */
+export function ChipField({
+  label,
+  required = false,
+  fieldId,
+  children,
+}: {
+  label: string;
+  /** Draws the asterisk and, more importantly, is what the checklist points at. */
+  required?: boolean;
+  /** `data-field` anchor, so the readiness checklist can scroll here. */
+  fieldId: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1" data-field={fieldId}>
+      <span className="text-[11px] font-medium text-muted-foreground">
+        {label}
+        {required && (
+          <span className="text-destructive" aria-hidden>
+            {" "}
+            *
+          </span>
+        )}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 function Chip({
   label,
   children,
@@ -160,6 +201,7 @@ export function IssueDateChip({
       <PopoverTrigger asChild>
         <button
           type="button"
+          aria-label={`Issue date${value ? `: ${label}` : ""}`}
           className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/80"
         >
           {label}
@@ -225,15 +267,22 @@ export function DueDateChip({
         {label ? (
           <button
             type="button"
+            aria-label={`Due date: ${label}`}
             className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/80"
           >
             {label}
             <Icon name="pencil" className="h-3 w-3 text-muted-foreground" />
           </button>
         ) : (
+          /* Same pill geometry as the two chips beside it, so an unset due date
+             reads as the third field of the row rather than as a footnote after
+             it. Dashed and primary-tinted rather than the siblings' solid muted
+             fill — the app's own "add a filter" chip affordance (see
+             FilterChipShell) — which is what marks it as still to do. */
           <button
             type="button"
-            className="flex items-center gap-1 text-[13px] font-medium text-primary hover:underline"
+            aria-label="Set the due date"
+            className="flex items-center gap-1.5 rounded-full border border-dashed border-primary/50 bg-primary/5 px-3 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/10"
           >
             <Icon name="plus" className="h-3.5 w-3.5" />
             Add due date

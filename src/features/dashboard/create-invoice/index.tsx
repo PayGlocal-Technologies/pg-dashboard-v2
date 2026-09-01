@@ -44,6 +44,7 @@ import {
   DueDateChip,
   InvoiceNumberChip,
   IssueDateChip,
+  ChipField,
   dueDateForTerm,
   toDateKey,
 } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
@@ -63,6 +64,12 @@ import { LinkedTransactionChip } from "@/features/dashboard/create-invoice/compo
 import { InvoicePreviewSidebar } from "@/features/dashboard/create-invoice/components/preview/InvoicePreviewSidebar";
 import { CreateInvoiceSuccess } from "@/features/dashboard/create-invoice/components/success";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
+import { SelectMidView } from "@/components/common/SelectMidView";
+import {
+  ReadinessChecklist,
+  type InvoiceRequirement,
+} from "@/features/dashboard/create-invoice/components/ReadinessChecklist";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import {
   CREATE_INVOICE_GUIDE_KEY,
   CREATE_INVOICE_GUIDE_STEPS,
@@ -222,6 +229,61 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
  * effect instead would cascade renders on every load.
  */
 export function CreateInvoiceFeature() {
+  const router = useRouter();
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+
+  /**
+   * The editor cannot open without knowing which merchant the invoice is for:
+   * every endpoint below puts a MID in its path, and `useInvoiceMerchantId`
+   * falls back to the merchant's first PACB MID when none is selected — which
+   * would raise the invoice under an account the merchant never chose.
+   *
+   * Every in-app entry point now answers that before navigating: the dashboard
+   * button and quick-access tile ask (MidScopedAction), and the rows that
+   * already know — a transaction, a saved draft — set it from the record. So
+   * this only ever catches a pasted link or a bookmark, where nothing has said
+   * which account is meant. Nothing has been created at this point, so leaving
+   * costs the merchant nothing.
+   *
+   * The picker is rendered *in* the card rather than the usual "use the selector
+   * in the sidebar": this route is the full-screen editor shell, which draws no
+   * sidebar at all, so that instruction would point at nothing.
+   */
+  if (needsMidChoice) {
+    return (
+      <>
+        <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Close"
+            className="h-9 w-9 shrink-0 p-0"
+            onClick={() => router.push("/mca-invoices")}
+          >
+            <Icon name="x" className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            Create a new invoice
+          </h1>
+        </header>
+        <div className="mx-auto w-full max-w-2xl px-6 py-16">
+          <SelectMidView midType="PACB" midOptions={midOptions} onSelectMid={selectMid} />
+        </div>
+      </>
+    );
+  }
+
+  return <CreateInvoiceBootstrap />;
+}
+
+/**
+ * Everything the editor needs before it can mount: the draft, the biller
+ * profile, the currency list and the theme palette. Split out of
+ * CreateInvoiceFeature above so the MID gate can return before any of these
+ * fire — a draft must not be created against a MID the merchant has not picked.
+ */
+function CreateInvoiceBootstrap() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const merchantId = useInvoiceMerchantId();
@@ -713,6 +775,9 @@ function InvoiceEditor({
   const [templateLink, setTemplateLink] = useState<string | null | undefined>(undefined);
   const activeTemplateId = templateLink !== undefined ? templateLink : (invoice.templateId ?? null);
   const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  /** The readiness popover. Opened by the merchant, and by a Generate press that
+   *  cannot go through — see handleGenerate. */
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   /** Which asset the upload dialog is open for, or null when it is closed. */
   const [uploadingAsset, setUploadingAsset] = useState<"LOGO" | "SIGNATURE" | null>(null);
@@ -969,37 +1034,128 @@ function InvoiceEditor({
 
   // ── Generate ───────────────────────────────────────────────────────────────
 
-  /** Returns an error message when the invoice is not ready to be finalised. */
-  const blockingIssue = (): string | null => {
-    if (clientIssue.kind === "not-selected") return "Select the client this invoice bills.";
-    if (clientIssue.kind === "incomplete-address")
-      return "Complete the client's billing address first.";
-    if (clientIssue.kind === "remitter-mismatch")
-      return "The selected client does not match the remitter on the linked transaction.";
-    if (!hasCompleteLineItems(form.lineItems))
-      return "Every line item needs a name, type, rate and quantity.";
-    // A linked invoice must settle its transaction exactly. Unlike the previous
-    // `if (gid && linkedTxn?.amount)` form, an unresolved lookup no longer skips
-    // the check silently — production always has a figure to compare against, so
-    // having none here is a reason to wait, not to proceed.
-    if (linkedGid && !linkedExpectedTotal)
-      return "Still loading the linked transaction. Try again in a moment.";
-    if (linkedTotalMismatch)
-      return `The invoice totals ${totals.total}, but the linked transaction is for ${linkedExpectedTotal}. Adjust the items to match.`;
-    if (!form.accountNo) return "Choose the account this invoice should be paid into.";
-    if (!form.invoiceNumber.trim()) return "The invoice needs a number.";
-    if (!form.invoiceDate) return "Set the issue date.";
-    if (!form.dueDate) return "Set the due date.";
-    if (form.isRecurring && (!form.recurringType || !form.recurringStartDate))
-      return "A recurring invoice needs a frequency and a start date.";
-    if (!form.userCreateConsent) return "Accept the declaration before generating.";
-    return null;
-  };
+  /**
+   * Everything this invoice needs, met or not, in the order the page is filled
+   * in — the same conditions the old `blockingIssue()` checked, but all of them
+   * reported at once rather than the first one as a toast. See ReadinessChecklist
+   * for why. `problem` non-null is what marks a requirement outstanding, so each
+   * entry states its own rule exactly once.
+   */
+  const requirement = (
+    id: string,
+    label: string,
+    fieldId: string | null,
+    problem: string | null,
+    doneDetail: string
+  ): InvoiceRequirement => ({
+    id,
+    label,
+    fieldId,
+    done: problem === null,
+    detail: problem ?? doneDetail,
+  });
+
+  const requirements: InvoiceRequirement[] = [
+    requirement(
+      "client",
+      "Client",
+      "client",
+      clientIssue.kind === "not-selected"
+        ? "Pick who this invoice bills."
+        : clientIssue.kind === "incomplete-address"
+          ? "Complete their billing address — it prints on the invoice."
+          : clientIssue.kind === "remitter-mismatch"
+            ? "This client is not the remitter on the linked transaction."
+            : null,
+      selectedClient?.businessName ?? "Selected."
+    ),
+    requirement(
+      "line-items",
+      "Line items",
+      "line-items",
+      hasCompleteLineItems(form.lineItems)
+        ? null
+        : form.lineItems.length === 0
+          ? "Add at least one thing you are billing for."
+          : "Every line needs a name, type, rate and quantity.",
+      `${form.lineItems.length} item${form.lineItems.length === 1 ? "" : "s"}, totalling ${totals.total}.`
+    ),
+    // A linked invoice must settle its transaction exactly. An unresolved lookup
+    // blocks rather than waving the invoice through — production always has a
+    // figure to compare against, so having none is a reason to wait.
+    ...(linkedGid
+      ? [
+          requirement(
+            "linked-total",
+            "Linked transaction",
+            "line-items",
+            !linkedExpectedTotal
+              ? "Still loading the transaction this settles. Try again in a moment."
+              : linkedTotalMismatch
+                ? `The items total ${totals.total}, but the transaction is for ${linkedExpectedTotal}.`
+                : null,
+            `Matches the transaction's ${linkedExpectedTotal}.`
+          ),
+        ]
+      : []),
+    requirement(
+      "payment-account",
+      "Receiving account",
+      "payment-account",
+      form.accountNo ? null : "Choose the account this invoice is paid into.",
+      selectedAccount?.accountNumber ?? "Chosen."
+    ),
+    requirement(
+      "invoice-number",
+      "Invoice number",
+      "invoice-number",
+      form.invoiceNumber.trim() ? null : "The invoice needs a number.",
+      form.invoiceNumber
+    ),
+    requirement(
+      "issue-date",
+      "Issue date",
+      "issue-date",
+      form.invoiceDate ? null : "Set the date this invoice is issued.",
+      form.invoiceDate
+    ),
+    requirement(
+      "due-date",
+      "Due date",
+      "due-date",
+      form.dueDate ? null : "Set when payment is due.",
+      form.dueDate
+    ),
+    ...(form.isRecurring
+      ? [
+          requirement(
+            "recurring",
+            "Recurring schedule",
+            "recurring",
+            form.recurringType && form.recurringStartDate
+              ? null
+              : "A recurring invoice needs a frequency and a start date.",
+            `${form.recurringType} from ${form.recurringStartDate}.`
+          ),
+        ]
+      : []),
+    requirement(
+      "consent",
+      "Declaration",
+      "consent",
+      form.userCreateConsent ? null : "Accept the declaration before generating.",
+      "Accepted."
+    ),
+  ];
+
+  const outstanding = requirements.filter((r) => !r.done);
 
   const handleGenerate = () => {
-    const issue = blockingIssue();
-    if (issue) {
-      toast.error("Not ready to generate", { description: issue });
+    // The checklist beside the button is the message now: it names every
+    // outstanding item at once and each one is a control that scrolls to its own
+    // field, which a toast could be neither of.
+    if (outstanding.length > 0) {
+      setChecklistOpen(true);
       return;
     }
 
@@ -1097,6 +1253,14 @@ function InvoiceEditor({
           </div>
         </div>
 
+        {/* Sits immediately left of Generate, because it is the answer to the
+            question that button raises. */}
+        <ReadinessChecklist
+          requirements={requirements}
+          open={checklistOpen}
+          onOpenChange={setChecklistOpen}
+        />
+
         {/* Nova's split button, restored. The menu offers exactly one of "Save
             as template" or "Update template" depending on whether this invoice
             came from one, because offering both invites the merchant to guess
@@ -1192,28 +1356,42 @@ function InvoiceEditor({
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]">
         <div className="min-h-0 overflow-y-auto">
           <div className="mx-auto max-w-[860px] space-y-5 px-6 py-6 lg:px-10">
-            <div className="flex flex-wrap items-center gap-2">
-              <InvoiceNumberChip
-                value={form.invoiceNumber}
-                serverValue={invoice.invoiceNumber ?? ""}
-                onChange={(invoiceNumber) => patch({ invoiceNumber })}
-              />
-              <IssueDateChip
-                value={form.invoiceDate}
-                maxDate={today}
-                onChange={(invoiceDate) =>
-                  patch({ invoiceDate, dueDate: dueDateForTerm(invoiceDate, form.dueTermId) })
-                }
-              />
-              <DueDateChip
-                termId={form.dueTermId}
-                dueDate={form.dueDate}
-                minDate={form.invoiceDate}
-                onTermChange={(dueTermId) =>
-                  patch({ dueTermId, dueDate: dueDateForTerm(form.invoiceDate, dueTermId) })
-                }
-                onCustomDateChange={(dueDate) => patch({ dueDate })}
-              />
+            {/* Three captioned fields, not a loose row of pills: the due date is
+                required and was the hardest thing on this page to find, because
+                nothing named any of the three and an unset one drew as a bare
+                link. items-end keeps the chips on one baseline under captions of
+                differing length. */}
+            <div
+              className="flex flex-wrap items-end gap-x-4 gap-y-3"
+              data-guide="invoice-dates"
+            >
+              <ChipField label="Invoice number" fieldId="invoice-number">
+                <InvoiceNumberChip
+                  value={form.invoiceNumber}
+                  serverValue={invoice.invoiceNumber ?? ""}
+                  onChange={(invoiceNumber) => patch({ invoiceNumber })}
+                />
+              </ChipField>
+              <ChipField label="Issue date" fieldId="issue-date">
+                <IssueDateChip
+                  value={form.invoiceDate}
+                  maxDate={today}
+                  onChange={(invoiceDate) =>
+                    patch({ invoiceDate, dueDate: dueDateForTerm(invoiceDate, form.dueTermId) })
+                  }
+                />
+              </ChipField>
+              <ChipField label="Due date" required fieldId="due-date">
+                <DueDateChip
+                  termId={form.dueTermId}
+                  dueDate={form.dueDate}
+                  minDate={form.invoiceDate}
+                  onTermChange={(dueTermId) =>
+                    patch({ dueTermId, dueDate: dueDateForTerm(form.invoiceDate, dueTermId) })
+                  }
+                  onCustomDateChange={(dueDate) => patch({ dueDate })}
+                />
+              </ChipField>
             </div>
 
             <div data-guide="invoice-template">
@@ -1235,7 +1413,7 @@ function InvoiceEditor({
               onChange={setBillerDetails}
             />
 
-            <div data-guide="invoice-client">
+            <div data-guide="invoice-client" data-field="client">
               <BillToSection
                 invoiceId={invoiceId}
                 clientId={form.clientId}
@@ -1244,7 +1422,7 @@ function InvoiceEditor({
               />
             </div>
 
-            <div data-guide="invoice-items">
+            <div data-guide="invoice-items" data-field="line-items">
               <LineItemsSection
                 lineItems={form.lineItems}
                 onLineItemsChange={(lineItems) => patch({ lineItems })}
@@ -1263,7 +1441,7 @@ function InvoiceEditor({
               />
             </div>
 
-            <div data-guide="invoice-payment">
+            <div data-guide="invoice-payment" data-field="payment-account">
               <PaymentDetailsSection
                 invoiceId={invoiceId}
                 currency={persistedCurrency}
@@ -1279,19 +1457,23 @@ function InvoiceEditor({
               onChange={patch}
             />
 
-            <RecurringSection
-              isRecurring={form.isRecurring}
-              recurringType={form.recurringType}
-              recurringStartDate={form.recurringStartDate}
-              minStartDate={today}
-              onChange={patch}
-            />
+            <div data-field="recurring">
+              <RecurringSection
+                isRecurring={form.isRecurring}
+                recurringType={form.recurringType}
+                recurringStartDate={form.recurringStartDate}
+                minStartDate={today}
+                onChange={patch}
+              />
+            </div>
 
-            <ConsentSection
-              checked={form.userCreateConsent}
-              isLinkedToTransaction={!!linkedGid}
-              onChange={(userCreateConsent) => patch({ userCreateConsent })}
-            />
+            <div data-guide="invoice-consent" data-field="consent">
+              <ConsentSection
+                checked={form.userCreateConsent}
+                isLinkedToTransaction={!!linkedGid}
+                onChange={(userCreateConsent) => patch({ userCreateConsent })}
+              />
+            </div>
           </div>
         </div>
 

@@ -9,6 +9,8 @@ import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import {
   DateFilterChip,
   EMPTY_RELATIVE_RANGE,
@@ -167,6 +169,18 @@ export function McaInvoiceTable({
   const mids = useMemo(() => (selectedMid ? [selectedMid] : paCbMids), [selectedMid, paCbMids]);
   const showMid = !selectedMid && paCbMids.length > 1;
 
+  // This list spans every PACB MID when none is selected, but the editor it
+  // opens does not — it puts one MID in every request path. So in exactly the
+  // state where the MID column above is showing, Create invoice has to ask
+  // which account the new invoice belongs to before it navigates, rather than
+  // letting the editor fall back to the merchant's first MID.
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+
+  const openInvoiceEditor = (mid: string) => {
+    if (mid) selectMid(mid);
+    router.push("/create-invoice");
+  };
+
   const body = buildInvoiceRequestBody(
     {
       status: statusFilters.length ? statusFilters : undefined,
@@ -277,6 +291,11 @@ export function McaInvoiceTable({
     // own menu, and is no longer what a plain row click does.
     onOpenRow: (row: McaInvoiceRow) => {
       if (row.status === "DRAFT") {
+        // Scoped to the draft's own MID first. This list spans every PACB MID
+        // when none is selected, but the editor reads the draft from one MID's
+        // path — without this it would look for another merchant's invoice id
+        // under the merchant's first MID and find nothing.
+        if (row.mid) selectMid(row.mid);
         router.push(`/create-invoice?invoiceId=${row.id}`);
         return;
       }
@@ -434,16 +453,15 @@ export function McaInvoiceTable({
             >
               Refresh
             </Button>
-            <Button
-              type="button"
+            <MidScopedAction
+              label="Create invoice"
+              icon="plus"
               variant="primary"
-              size="sm"
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => router.push("/create-invoice")}
               className="h-auto min-h-0 shrink-0 py-1"
-            >
-              Create invoice
-            </Button>
+              needsMidChoice={needsMidChoice}
+              midOptions={midOptions}
+              onRun={openInvoiceEditor}
+            />
           </div>
         </div>
 
@@ -457,16 +475,15 @@ export function McaInvoiceTable({
               ariaLabel="Search invoices"
               className="min-w-0 flex-1"
             />
-            <Button
-              type="button"
+            <MidScopedAction
+              label="Create"
+              icon="plus"
               variant="primary"
-              size="sm"
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => router.push("/create-invoice")}
               className="h-auto min-h-0 shrink-0 py-1"
-            >
-              Create
-            </Button>
+              needsMidChoice={needsMidChoice}
+              midOptions={midOptions}
+              onRun={openInvoiceEditor}
+            />
           </div>
 
           <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">

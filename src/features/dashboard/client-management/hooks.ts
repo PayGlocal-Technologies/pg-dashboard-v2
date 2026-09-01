@@ -423,30 +423,6 @@ export function useClientPathMid() {
   return { mid, midFilter, isReady: isReady && !!mid, guardState };
 }
 
-/**
- * Whether several PACB MIDs are in play with none selected — the state where an
- * action has to be told which account it applies to. Mirrors pg-dashboard's
- * `pacbMids.length > 1 && !selectedMid`, which is what turns its header buttons
- * into MID pickers.
- */
-export function useClientMidScope(): {
-  needsMidChoice: boolean;
-  midOptions: string[];
-  selectMid: (mid: string) => void;
-} {
-  const paCbMids = useApp((s) => s.paCbMids);
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
-  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
-
-  return {
-    needsMidChoice: paCbMids.length > 1 && !selectedMid,
-    midOptions: paCbMids,
-    // Colour tints the header's merchant chip; pg-dashboard sets one here too
-    // when a page selects a MID on the merchant's behalf, so the chip doesn't
-    // appear blank afterwards.
-    selectMid: (mid: string) => setSelectedMidDetails({ mid, color: "#E5B5FF" }),
-  };
-}
 
 // ── Reference data ──────────────────────────────────────────────────────────
 
