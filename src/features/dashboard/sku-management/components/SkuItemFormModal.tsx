@@ -73,11 +73,11 @@ function useCurrencyOptions(): { value: string; country: string }[] {
   }, [currencies]);
 }
 
-/** Red asterisk before a required field's label — the same marker the Create
- *  MCA Link form uses, so required-ness reads identically across the product. */
+/** Red asterisk after a required field's label — required-ness reads
+ *  identically across the product. */
 function RequiredMark() {
   return (
-    <span aria-hidden className="text-destructive">
+    <span aria-hidden className="-ml-1.5 text-destructive">
       *
     </span>
   );
@@ -234,7 +234,7 @@ function SkuItemFormBody({
                 <FieldLabel htmlFor="sku-name">
                   {/* Names the field for both kinds of catalogue item; the
                       table still shows it under the Product column. */}
-                  <RequiredMark /> Product/Service Name
+                  Product/Service Name<RequiredMark />
                 </FieldLabel>
                 <Input
                   id="sku-name"
@@ -262,7 +262,7 @@ function SkuItemFormBody({
               {(field) => (
                 <Field>
                   <FieldLabel htmlFor="sku-type">
-                    <RequiredMark /> Type
+                    Type<RequiredMark />
                   </FieldLabel>
                   <Select
                     value={field.state.value}
@@ -313,7 +313,7 @@ function SkuItemFormBody({
                         <FieldLabel htmlFor="sku-hsn-sac">
                           {/* Named for the scheme that actually applies once a
                               type is chosen; the table column stays HSN/SAC. */}
-                          <RequiredMark /> {scheme.label}
+                          {scheme.label}<RequiredMark />
                         </FieldLabel>
                         <Input
                           id="sku-hsn-sac"
@@ -355,7 +355,7 @@ function SkuItemFormBody({
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="sku-currency">
-                          <RequiredMark /> Currency
+                          Currency<RequiredMark />
                         </FieldLabel>
                         <Select
                           value={field.state.value}
@@ -405,7 +405,7 @@ function SkuItemFormBody({
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="sku-selling-price">
-                          <RequiredMark /> Selling price
+                          Selling price<RequiredMark />
                         </FieldLabel>
                         <PriceInput id="sku-selling-price" symbol={symbol} field={field} />
                         <FieldError>{field.state.meta.errors[0]}</FieldError>

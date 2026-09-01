@@ -252,20 +252,29 @@ export function McaInvoiceOriginsCard() {
               ))
             ) : (
               <>
+                {/* Trend passed as null (hidden) whenever the figure it sits
+                    beside is zero — a percentage change against nothing reads as
+                    broken. */}
                 <StatCell
                   label="Total invoiced"
                   valueLabel={formatCompact(totalInvoiced, currency)}
-                  trendPct={totals?.totalInvoicedTrendPct ?? null}
+                  trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
                 <StatCell
                   label="Avg per country"
                   valueLabel={formatCompact(totals?.avgPerCountry ?? 0, currency)}
-                  trendPct={totals?.avgPerCountryTrendPct ?? null}
+                  trendPct={
+                    (totals?.avgPerCountry ?? 0) > 0 ? (totals?.avgPerCountryTrendPct ?? null) : null
+                  }
                 />
                 <StatCell
                   label={topShareLabel}
                   valueLabel={totals?.topCountry ? `${totals.topCountry.sharePct}%` : "—"}
-                  trendPct={totals?.topCountry?.shareTrendPct ?? null}
+                  trendPct={
+                    totals?.topCountry && totals.topCountry.sharePct > 0
+                      ? (totals.topCountry.shareTrendPct ?? null)
+                      : null
+                  }
                 />
                 <div>
                   <p className="text-xs text-muted-foreground">Active markets</p>

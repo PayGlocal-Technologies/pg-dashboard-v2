@@ -156,9 +156,12 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         )}
       </div>
 
+      {/* Trend is only meaningful against a non-zero figure — a "-100% vs
+          previous period" beside ₹0 reads as broken, so it's hidden when there's
+          nothing settled in the window. */}
       {isLoading ? (
         <Shimmer className="mt-1 h-4 w-40" />
-      ) : trend ? (
+      ) : trend && trend.total > 0 ? (
         <div
           className={cn(
             "mt-1 flex items-center gap-1 text-xs font-medium",
