@@ -12,6 +12,7 @@ import {
 } from "@/features/dashboard/mca-transactions/constants";
 import {
   hasInvoiceIssues,
+  isCbaNameFlagged,
   toInvoiceComparison,
   type InvoiceComparisonRow,
 } from "@/features/dashboard/mca-transactions/invoiceMatching";
@@ -125,6 +126,68 @@ function MismatchPanel({
   );
 }
 
+/**
+ * Shown when extraction reports the transaction's own remitter name is a
+ * correspondent bank's rather than the sender's. No field table here: the
+ * comparison it would print is meaningless, since the value on the left is
+ * known to be wrong. The only way forward is a different invoice, so this is
+ * the one ready-state panel with no path to submit.
+ */
+function CbaNamePanel({
+  name,
+  size,
+  onReupload,
+  dropzoneRef,
+}: {
+  name: string;
+  size: number;
+  onReupload: () => void;
+  dropzoneRef: React.Ref<HTMLDivElement>;
+}) {
+  return (
+    <div ref={dropzoneRef} tabIndex={-1} className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Icon name="file-text" className="h-4 w-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-[13px] font-medium text-foreground">{name}</p>
+          <p className="text-[11px] text-muted-foreground">{formatFileSize(size)}</p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-xl border border-amber-500/50 bg-amber-500/5 p-4">
+        <div className="flex items-start gap-2">
+          <Icon
+            name="alert-triangle"
+            className="mt-px h-4 w-4 shrink-0 text-amber-600 dark:text-amber-500"
+          />
+          <div className="flex flex-col gap-1">
+            <p className="text-[13px] font-semibold text-amber-700 dark:text-amber-500">
+              The remitter name doesn&apos;t look right
+            </p>
+            <p className="text-[12px] text-muted-foreground">
+              Sometimes the remitter name doesn&apos;t come through correctly on a transaction. An
+              invoice with the correct remitter name is the fastest way through. You can still
+              submit this one, and it will go to manual review.
+            </p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full"
+          leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+          onClick={onReupload}
+        >
+          Re-upload invoice
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
   (
     { id, phase, file, matching, error, onSelectFile, onReset, invalid, errorId, onCreateInvoice },
@@ -139,8 +202,14 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
     const openFileDialog = () => inputRef.current?.click();
 
     const comparison = matching ? toInvoiceComparison(matching) : null;
-    const showsIssues = phase === "ready" && !!comparison && hasInvoiceIssues(comparison);
-    const showsAccepted = phase === "ready" && !showsIssues;
+    // A flagged correspondent-bank name outranks the field comparison: it
+    // makes every remitter-name row meaningless, so it replaces the mismatch
+    // panel entirely rather than sitting alongside it (same precedence
+    // pg-dashboard's showMismatchPanel gives it).
+    const showsCbaName = phase === "ready" && isCbaNameFlagged(matching);
+    const showsIssues =
+      phase === "ready" && !showsCbaName && !!comparison && hasInvoiceIssues(comparison);
+    const showsAccepted = phase === "ready" && !showsCbaName && !showsIssues;
 
     const handleFile = (candidate: File) => {
       const extension = `.${candidate.name.split(".").pop()?.toLowerCase() ?? ""}`;
@@ -206,7 +275,14 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
           tabIndex={-1}
         />
 
-        {showsAccepted && file ? (
+        {showsCbaName && file ? (
+          <CbaNamePanel
+            dropzoneRef={ref}
+            name={file.name}
+            size={file.size}
+            onReupload={handleReupload}
+          />
+        ) : showsAccepted && file ? (
           <div
             ref={ref}
             className="flex items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-2.5"
