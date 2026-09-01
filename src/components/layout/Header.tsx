@@ -35,6 +35,9 @@ const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
   { label: "Partners", href: "/refer-and-earn" },
 ] as const;
 
+// OUT OF SCOPE — Create button hidden for now. Flip back to true to restore.
+const SHOW_CREATE_BUTTON = false;
+
 const CREATE_ITEMS = [
   {
     label: "Invoice link",
@@ -186,6 +189,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           <HeaderHelpMenu />
 
           {/* Create button */}
+          {SHOW_CREATE_BUTTON && (
           <div ref={createRef} className="relative">
             <AnimatePresence>
               {createHover && !createOpen && (
@@ -268,6 +272,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               )}
             </AnimatePresence>
           </div>
+          )}
         </div>
       </header>
 

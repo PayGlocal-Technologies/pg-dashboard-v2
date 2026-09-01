@@ -48,8 +48,8 @@ export function ClientDetailsDrawer({
   const { viewContract } = useClientContractView();
 
   // Which invoice statuses the ledger below is narrowed to. Held here rather
-  // than in the ledger because the KPI cards above it are what set it, and they
-  // live in a different subtree.
+  // than inside the ledger so the drawer keeps the merchant's choice across a
+  // re-render of the section, and so both detail views own it the same way.
   const [invoiceStatuses, setInvoiceStatuses] = useState<string[]>([]);
 
   return (
@@ -123,9 +123,6 @@ export function ClientDetailsDrawer({
             <ClientDetailsContent
               client={client}
               layout="drawer"
-              // Pressing a KPI card narrows the ledger below it to the statuses
-              // that card counts, exactly as it does on the expanded page.
-              onFilterByStatus={setInvoiceStatuses}
               onViewContract={
                 client.contract?.fileId
                   ? () => viewContract({ clientId: client.id, rowMid: client.mid })

@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, Card, Input, PageHeader, Shimmer, Textarea } from "@/components/ui";
+import { Button, Card, Input, PageHeader, Shimmer } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
+import { SettingsDetailRow } from "@/features/dashboard/settings/components/SettingsDetailRow";
 import {
   useBusinessDetails,
   useMerchantBusinessProfile,
@@ -13,8 +14,11 @@ import {
 interface BusinessField {
   label: string;
   description: string;
+  /** Empty renders as "Not available". Long values wrap; no multiline variant is
+   *  needed now that values are plain text rather than boxed fields. */
   value: string;
-  multiline?: boolean;
+  /** Show a shimmer instead of "Not available" while the value is still loading. */
+  isLoading?: boolean;
 }
 
 /** Known line-of-business codes → human labels. Anything unmapped falls back to
@@ -34,36 +38,13 @@ function formatLineOfBusiness(code: string | null | undefined): string {
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
 }
 
-function BusinessFieldRow({ label, description, value, multiline }: BusinessField) {
-  return (
-    <div className="flex items-start justify-between gap-6 py-4">
-      <div className="max-w-xs">
-        <p className="text-sm font-bold text-foreground">{label}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
-      </div>
-      <div className="w-full max-w-md">
-        {multiline ? (
-          <Textarea
-            value={value}
-            readOnly
-            rows={2}
-            className="resize-none text-[13px] font-medium text-foreground"
-          />
-        ) : (
-          <Input value={value} readOnly className="text-[13px] font-medium text-foreground" />
-        )}
-      </div>
-    </div>
-  );
-}
-
 export function BusinessDetailsFeature() {
   const profile = useApp((s) => s.profile);
   const { business, isLoading } = useBusinessDetails();
   const { updateBusiness, isSaving } = useUpdateBusinessDetails();
   // GST / address / website / line-of-business / support contact now come from
   // the merchant profile's merchantBusinessSummary block.
-  const { businessProfile } = useMerchantBusinessProfile();
+  const { businessProfile, isLoading: isProfileLoading } = useMerchantBusinessProfile();
 
   // Purpose codes are the one editable field, mirroring pg-dashboard's
   // BusinessDetails (trade name stays read-only, codes edit + save via PUT).
@@ -95,60 +76,68 @@ export function BusinessDetailsFeature() {
     );
   };
 
-  // registeredName/mid from the session profile; tradeName/purposeCode from the
-  // /business endpoint; the rest from the merchant profile's
-  // merchantBusinessSummary block.
+  // registeredName/mid from the session profile (already resolved, so no loading
+  // state); tradeName/purposeCode from the /business endpoint; the rest from the
+  // merchant profile's merchantBusinessSummary block. An empty value renders as
+  // "Not available" in the row below, so none of these need their own fallback.
   const readOnlyFields: BusinessField[] = [
     {
       label: "Legal business name",
       description: "As on your incorporation / GST records.",
-      value: profile?.registeredName ?? "Not available",
+      value: profile?.registeredName ?? "",
     },
     {
       label: "Trade name",
       description: "The name customers see, if different from your legal name.",
-      value: isLoading ? "" : (business?.tradeName ?? "Not available"),
+      value: business?.tradeName ?? "",
+      isLoading,
     },
     {
       label: "Merchant ID",
       description: "Your unique PayGlocal merchant identifier.",
-      value: profile?.mid ?? "Not available",
+      value: profile?.mid ?? "",
     },
     {
       label: "GSTIN",
       description: "15-character GST identification number.",
       value: businessProfile?.gst ?? "",
+      isLoading: isProfileLoading,
     },
     {
       label: "Registered address",
       description: "Principal place of business in India.",
       value: businessProfile?.registeredAddress ?? "",
-      multiline: true,
+      isLoading: isProfileLoading,
     },
     {
       label: "Business category",
       description: "Helps us tune risk and reporting templates.",
       value: formatLineOfBusiness(businessProfile?.lineOfBusiness),
+      isLoading: isProfileLoading,
     },
     {
       label: "Website",
       description: "Your public-facing business website.",
       value: businessProfile?.websiteUrl ?? "",
+      isLoading: isProfileLoading,
     },
     {
       label: "Support contact name",
       description: "Person customer queries are addressed to.",
       value: businessProfile?.supportContactName ?? "",
+      isLoading: isProfileLoading,
     },
     {
       label: "Support email",
       description: "Where customer queries are directed.",
       value: businessProfile?.supportEmail ?? "",
+      isLoading: isProfileLoading,
     },
     {
       label: "Support phone",
       description: "Shown on receipts and payment pages where applicable.",
       value: businessProfile?.supportPhone ?? "",
+      isLoading: isProfileLoading,
     },
   ];
 
@@ -168,60 +157,72 @@ export function BusinessDetailsFeature() {
         </div>
 
         <div className="divide-y divide-border px-5">
-          {/* Real, editable purpose codes row. */}
-          <div className="flex items-start justify-between gap-6 py-4">
+          {/* Real, editable purpose codes row — the one field on this page that
+              takes input, so it is the only one that shows a boxed control, and
+              only while actually editing. Label styling matches
+              SettingsDetailRow so it reads as part of the same list. */}
+          <div className="flex items-start justify-between gap-6 py-3">
             <div className="max-w-xs">
-              <p className="text-sm font-bold text-foreground">Purpose code(s)</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="text-sm text-muted-foreground">Purpose code(s)</p>
+              <p className="mt-0.5 text-xs text-muted-foreground/70">
                 RBI purpose codes used for cross-border transactions.
               </p>
             </div>
-            <div className="w-full max-w-md">
-              {editing ? (
-                <div className="space-y-2">
-                  <Input
-                    value={codesInput}
-                    onChange={(e) => setCodesInput(e.target.value)}
-                    placeholder="e.g. P0104, P0802"
-                    className="text-[13px] font-medium text-foreground"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Separate multiple codes with commas.
-                  </p>
-                  <div className="flex gap-2">
-                    <Button type="button" size="sm" onClick={saveCodes} isLoading={isSaving}>
-                      Save changes
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setEditing(false)}
-                      disabled={isSaving}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between gap-3">
-                  {isLoading ? (
-                    <Shimmer className="h-5 w-40" />
-                  ) : (
-                    <span className="text-[13px] font-medium text-foreground">
-                      {purposeCodes.length ? purposeCodes.join(", ") : "Not set"}
-                    </span>
-                  )}
-                  <Button type="button" variant="outline" size="sm" onClick={startEditing}>
-                    Edit
+            {editing ? (
+              <div className="w-full max-w-md space-y-2">
+                <Input
+                  value={codesInput}
+                  onChange={(e) => setCodesInput(e.target.value)}
+                  placeholder="e.g. P0104, P0802"
+                  className="text-[13px] font-medium text-foreground"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Separate multiple codes with commas.
+                </p>
+                <div className="flex gap-2">
+                  <Button type="button" size="sm" onClick={saveCodes} isLoading={isSaving}>
+                    Save changes
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditing(false)}
+                    disabled={isSaving}
+                  >
+                    Cancel
                   </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                {isLoading ? (
+                  <Shimmer className="h-4 w-40" />
+                ) : (
+                  <span className="text-sm font-semibold text-foreground">
+                    {purposeCodes.length ? purposeCodes.join(", ") : "Not set"}
+                  </span>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={startEditing}>
+                  Edit
+                </Button>
+              </div>
+            )}
           </div>
 
           {readOnlyFields.map((field) => (
-            <BusinessFieldRow key={field.label} {...field} />
+            <SettingsDetailRow
+              key={field.label}
+              label={field.label}
+              description={field.description}
+              value={
+                field.isLoading && !field.value ? (
+                  <Shimmer className="h-4 w-40" />
+                ) : (
+                  field.value.trim() || "Not available"
+                )
+              }
+            />
           ))}
         </div>
       </Card>

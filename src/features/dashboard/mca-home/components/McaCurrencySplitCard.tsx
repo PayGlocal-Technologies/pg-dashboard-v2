@@ -14,13 +14,34 @@ const METRICS: { value: CurrencySplitMetric; label: string }[] = [
   { value: "count", label: "Count" },
 ];
 
+/**
+ * The hue order the currency slices take, most-significant first.
+ *
+ * Hue-separated on purpose. This used to run chart-1 → chart-3 → chart-2, and
+ * chart-1 (#0061e3) and chart-2 (#2563eb) are the same blue two steps apart — so
+ * a merchant with three currencies saw the largest slice and the catch-all
+ * painted what read as one colour. chart-2 is dropped from the categorical order
+ * entirely for that reason: it is a shade of chart-1, not a sibling of it.
+ *
+ * Blue → amber → violet → green clears the adjacent-pair colour-vision check on
+ * both the normal and the deficient-vision floors, so no two slices that sit
+ * next to each other in the ring collapse into each other.
+ */
 const SLICE_COLORS = [
   "var(--chart-1)",
+  "var(--chart-5)",
   "var(--chart-3)",
-  "var(--chart-2)",
   "var(--chart-4)",
-  "var(--muted-foreground)",
 ];
+
+/**
+ * The API's catch-all bucket. It is not a currency, so it does not take a
+ * currency's hue — it is painted neutral, and it is skipped when the hues above
+ * are handed out. Otherwise it would consume a slot and shift every currency
+ * listed after it onto the wrong colour.
+ */
+const OTHER_SLICE = "OTHER";
+const OTHER_COLOR = "var(--muted-foreground)";
 
 /** Last 30 days, computed once on mount (no `new Date()` in render — see the
  *  React Compiler rule in CLAUDE.md). This card has no timeframe control, so it
@@ -60,13 +81,21 @@ export function McaCurrencySplitCard() {
   const { split, isLoading, isError } = useCurrencySplit(range.startDate, range.endDate);
 
   // Volume → amountPct, Count → countPct, straight from the API's slices.
-  const slices = (split?.slices ?? []).map((s, i) => ({
-    key: s.currency,
-    label: s.currency,
-    color: SLICE_COLORS[i % SLICE_COLORS.length]!,
-    volumePct: s.amountPct,
-    countPct: s.countPct,
-  }));
+  // The hue cursor advances only on real currencies, so "Other" keeps its
+  // neutral without spending one. Past the end of the order a further currency
+  // takes the neutral too, rather than cycling back onto a colour already in the
+  // ring — a repeated hue is worse than an unnamed one.
+  let hue = 0;
+  const slices = (split?.slices ?? []).map((s) => {
+    const color = s.currency === OTHER_SLICE ? OTHER_COLOR : (SLICE_COLORS[hue++] ?? OTHER_COLOR);
+    return {
+      key: s.currency,
+      label: s.currency,
+      color,
+      volumePct: s.amountPct,
+      countPct: s.countPct,
+    };
+  });
   const dataKey = metric === "volume" ? "volumePct" : "countPct";
   const hasData = !isLoading && !isError && slices.length > 0;
 
