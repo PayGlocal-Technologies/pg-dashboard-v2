@@ -608,7 +608,16 @@ function MultiCurrencyContent() {
                 amount beside its pending-count chip — needs before it starts
                 looking cramped, so the row breaks rather than letting it get
                 there. */}
-              <OutstandingAmountCard className="min-w-[min(300px,100%)] flex-1" />
+              <OutstandingAmountCard
+                className="min-w-[min(300px,100%)] flex-1"
+                currency={
+                  selectedAccount
+                    ? selectedAccount.iso2 === "ROW"
+                      ? "REST_OF_WORLD"
+                      : selectedAccount.currency
+                    : undefined
+                }
+              />
             </div>
           </section>
           </div>
