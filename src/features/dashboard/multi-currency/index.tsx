@@ -1,13 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
+import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
-import { useSettledByAccount } from "@/features/dashboard/mca-transactions/hooks";
+import { useSettlementOverview } from "@/features/dashboard/settlement-reports/hooks";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
@@ -40,6 +50,21 @@ const MODULE_TITLE = "text-base font-semibold text-foreground";
 
 /** Supporting copy under a module title, and secondary text inside a module. */
 const MODULE_SUBTITLE = "text-[13px] text-muted-foreground";
+
+/** The last `count` months (including the current one) as month-key + short
+ *  label — the fixed axis the settled chart plots against, so it always shows a
+ *  run of months even when the API only returns the ones that had settlements.
+ *  Computed once on mount (no `new Date()` in render — React Compiler rule). */
+function buildRecentMonths(count: number): { key: string; label: string }[] {
+  const now = new Date();
+  const months: { key: string; label: string }[] = [];
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    months.push({ key, label: d.toLocaleString("en-US", { month: "short" }) });
+  }
+  return months;
+}
 
 export function MultiCurrencyFeature() {
   // A multi-MID merchant has to say which account they mean before anything is
@@ -93,21 +118,39 @@ function MultiCurrencyContent() {
 
   const selectAccount = (account: VirtualAccount) => setSelectedAccountId(account.id);
 
-  // Settled amount for the selected region, from the same settled-by-account
-  // endpoint the Transactions page's analytics use (useSettledByAccount). The
-  // figure is the merchant's real settled total for that account, reported in
-  // INR — there is no per-currency native figure or monthly trend behind it, so
-  // this card shows the amount + transaction count only, not a chart. Year to
-  // date, this page having no time-range control of its own.
-  //
-  // Rest of the World maps to the endpoint's REST_OF_WORLD catch-all bucket;
-  // every other region matches on its own currency code.
-  const settledApiCurrency =
-    selectedAccount?.iso2 === "ROW" ? "REST_OF_WORLD" : (selectedAccount?.currency ?? "");
-  const { settled: settledByAccount, isLoading: isSettledLoading } = useSettledByAccount("ytd");
-  const settledRow = settledByAccount?.accounts.find((a) => a.currency === settledApiCurrency);
-  const settledAmountInr = settledRow?.amount ?? 0;
-  const settledTxnCount = settledRow?.count ?? 0;
+  // Settled amount + its monthly trend, from the settlement-overview endpoint
+  // (the same one the Settlement Reports page's Total settled card charts). Year
+  // to date, so the series is a month-by-month breakdown. This is the merchant's
+  // overall settled figure, spanning every account rather than the selected
+  // region — matching OutstandingAmountCard beside it, which is aggregate too;
+  // there's no per-currency monthly series to plot, so both metrics read across
+  // all accounts.
+  const { urlMid, midFilter } = useResolvedMids("PACB");
+  const settlementMid = urlMid || midFilter?.value?.[0] || "";
+  const { overview: settlementOverview, isLoading: isSettledLoading } = useSettlementOverview(
+    settlementMid,
+    "ytd"
+  );
+  const settledAmount = settlementOverview?.totalSettled ?? 0;
+  const settledTxnCount = settlementOverview?.transactionCount ?? 0;
+  // A fixed six-month axis (five prior + current), computed once on mount. The
+  // API only returns months that had settlements, so its points are bucketed by
+  // month onto this axis and every other month renders as zero — the chart then
+  // always shows a run of months rather than collapsing to the single one with
+  // data.
+  const [recentMonths] = useState(() => buildRecentMonths(6));
+  const settledByMonth = new Map<string, number>();
+  for (const point of settlementOverview?.series ?? []) {
+    const monthKey = (point.periodStart ?? "").slice(0, 7);
+    if (monthKey) settledByMonth.set(monthKey, (settledByMonth.get(monthKey) ?? 0) + point.value);
+  }
+  const settledSeries = recentMonths.map((month) => ({
+    x: month.label,
+    y: settledByMonth.get(month.key) ?? 0,
+  }));
+  // Unique per mount so the chart's fill gradient id can't collide with another
+  // <linearGradient> elsewhere on the page.
+  const settledGradientId = useId().replace(/:/g, "");
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [fxModalOpen, setFxModalOpen] = useState(false);
@@ -455,33 +498,100 @@ function MultiCurrencyContent() {
                 same height on a shared line, and therefore a shared top and
                 bottom edge. */}
             <div className="flex flex-wrap gap-4">
-              {/* Settled amount for the selected region, from the real
-                  settled-by-account endpoint (useSettledByAccount, the same one
-                  the Transactions analytics read). The endpoint reports a single
-                  INR total per account with no native-currency figure or monthly
-                  series behind it, so this is the amount + its transaction count
-                  rather than the chart the mock used to fake. Built on the same
-                  flux-ui Card as OutstandingAmountCard beside it so the two read
-                  as a pair. */}
-              <Card size="sm" className="min-w-[min(300px,100%)] flex-1">
-                <div>
-                  <p className="text-sm font-semibold text-foreground">Settled amount</p>
+              {/* Settled amount: the KPI on the left, a month-by-month area
+                  chart on the right — the same shape and recharts styling as the
+                  Settlement Reports "Total settled" card and the dashboard's
+                  revenue chart, so the graphs across the product read as a set.
+                  Figure + series both come from the settlement-overview endpoint
+                  (year to date). flex-[1.6] gives the card with the chart the
+                  extra width; Outstanding beside it stays flex-1. */}
+              <Card size="sm" className="min-w-[min(470px,100%)] flex-[1.6] gap-0">
+                <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
+                  <div className="flex-1 sm:basis-2/5">
+                    <p className="text-sm font-semibold text-foreground">Settled amount</p>
 
-                  {isSettledLoading ? (
-                    <Shimmer className="mt-4 h-9 w-40" />
-                  ) : (
-                    <>
-                      {/* Same size/weight as OutstandingAmountCard's figure so
-                          the pair carries equal visual weight. */}
-                      <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                        {formatCurrency(settledAmountInr, "INR", "en-IN")}
-                      </p>
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {settledTxnCount.toLocaleString("en-IN")} settled transaction
-                        {settledTxnCount === 1 ? "" : "s"} · Year to date
-                      </p>
-                    </>
-                  )}
+                    {isSettledLoading ? (
+                      <Shimmer className="mt-4 h-9 w-40" />
+                    ) : (
+                      <>
+                        {/* Same size/weight as OutstandingAmountCard's figure so
+                            the pair carries equal visual weight. */}
+                        <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                          {formatCurrency(settledAmount, "INR", "en-IN")}
+                        </p>
+                        <p className="mt-2 text-sm text-muted-foreground">
+                          {settledTxnCount.toLocaleString("en-IN")} settled transaction
+                          {settledTxnCount === 1 ? "" : "s"} · Year to date
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
+                    {isSettledLoading ? (
+                      <Shimmer className="h-full min-h-36 w-full" />
+                    ) : settledSeries.every((point) => point.y === 0) ? (
+                      <div className="flex h-full min-h-36 items-center justify-center text-sm text-muted-foreground">
+                        No settlements yet
+                      </div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={settledSeries}
+                          margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                        >
+                          <defs>
+                            <linearGradient id={settledGradientId} x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
+                              <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0.02} />
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid
+                            strokeDasharray="3 3"
+                            stroke="color-mix(in srgb, var(--border) 65%, transparent)"
+                            vertical={false}
+                          />
+                          <XAxis
+                            dataKey="x"
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                            interval="preserveStartEnd"
+                          />
+                          <YAxis
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                            tickFormatter={(v: number) =>
+                              v >= 100_000
+                                ? `₹${(v / 100_000).toFixed(0)}L`
+                                : v >= 1_000
+                                  ? `₹${(v / 1_000).toFixed(0)}K`
+                                  : `₹${v}`
+                            }
+                            width={48}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 10,
+                              border: "1px solid var(--border)",
+                              fontSize: 12,
+                              background: "var(--popover)",
+                              color: "var(--popover-foreground)",
+                            }}
+                            formatter={(v) => [formatCurrency(Number(v), "INR", "en-IN"), "Settled"]}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="y"
+                            stroke="var(--chart-4)"
+                            strokeWidth={2}
+                            fill={`url(#${settledGradientId})`}
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
                 </div>
               </Card>
 
