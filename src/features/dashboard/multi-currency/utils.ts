@@ -1,4 +1,8 @@
-import type { AccountDetail, VirtualAccount } from "@/features/dashboard/multi-currency/types";
+import type {
+  AccountDetail,
+  MerchantRegisteredProfile,
+  VirtualAccount,
+} from "@/features/dashboard/multi-currency/types";
 
 /** Same CDN the MCA transactions table uses for country flags. */
 export function flagSrc(iso2: string) {
@@ -168,4 +172,31 @@ export async function accountDocumentId(accountNumber: string): Promise<string> 
  *  because the view model keeps identifiers in `details`. */
 export function accountNumberOf(account: VirtualAccount): string {
   return account.details.find((detail) => detail.label === "Account Number")?.value ?? "";
+}
+
+/**
+ * The merchant's registered address as one line, for prefilling the statement
+ * drawers.
+ *
+ * The profile returns it either pre-joined or split into parts, so this falls
+ * back from `concatAddress` to joining the parts — exactly what
+ * pg-dashboard's `createFinalConcatAddress` does in its DownloadReport drawer.
+ * Returns "" when the profile carries neither, leaving the field empty for the
+ * merchant to fill rather than showing a string of stray spaces.
+ */
+export function merchantRegisteredAddressOf(profile?: MerchantRegisteredProfile): string {
+  const address = profile?.merchantAddress;
+  if (!address) return "";
+  if (address.concatAddress) return address.concatAddress;
+
+  return [
+    address.streetAddress1,
+    address.streetAddress2,
+    address.city,
+    address.state,
+    address.zipcode,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
 }

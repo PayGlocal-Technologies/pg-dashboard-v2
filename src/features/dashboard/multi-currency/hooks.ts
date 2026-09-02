@@ -12,6 +12,7 @@ import {
   mcaBankStatementApi,
   mcaExchangeRatesApi,
   mcaGeneratedFileApi,
+  mcaMerchantProfileApi,
   mcaSendAccountEmailApi,
   mcaShareLinkApi,
   mcaSharedVirtualAccountsApi,
@@ -26,9 +27,11 @@ import type {
   ExchangeRatesResponse,
   GeneratedDocumentPayload,
   GeneratedDocumentUrlResponse,
+  MerchantRegisteredProfile,
   SendAccountEmailRequest,
   ShareLinkRequest,
   ShareLinkResponse,
+  TransactionReportRequest,
   VirtualAccount,
 } from "@/features/dashboard/multi-currency/types";
 
@@ -179,21 +182,18 @@ export function useSendAccountEmail(): {
 }
 
 // ── Generated document downloads ────────────────────────────────────────────
-// Proof of account ownership and the bank settlement statement are the same
-// two-leg flow, differing only in the leg-1 URL:
+// Proof of account ownership and the transaction report are the same two-leg
+// flow, differing only in leg 1:
 //
-//   leg 1  GET  account-confirmation|bank-statement/{accountId}
+//   leg 1  account-confirmation/{accountId} (GET) or bank-statement/{accountId}
+//          (POST, carrying the drawer's three fields)
 //               -> { fileName, processor, isAmazon, documentType }
 //   leg 2  POST account-generated-file with that descriptor, repeatedly, until
 //               the response carries a `url`. Generation is asynchronous.
 //
-// Both legs are modelled as pg-dashboard models them: leg 1 a disabled query
-// driven by refetch() (the request is an imperative command, not page state),
-// leg 2 a mutation called in a loop.
-
-/** Which document to generate. Also the descriptor's own `documentType`, but
- *  that value comes back from leg 1 rather than being sent. */
-export type AccountDocumentKind = "proof-of-ownership" | "bank-statement";
+// Both are modelled as pg-dashboard models them: a GET leg 1 as a disabled
+// query driven by refetch() (the request is an imperative command, not page
+// state), a POST leg 1 and leg 2 as mutations, leg 2 called in a loop.
 
 /** One queued document request. `nonce` makes a repeat request for the same
  *  account a distinct query key, so it refetches instead of replaying a cached
@@ -213,14 +213,17 @@ const MAX_POLL_ATTEMPTS = 15;
 const POLL_INTERVAL_MS = 2000;
 
 /**
- * Downloads one of the generated account documents.
+ * Downloads the proof-of-account-ownership document.
  *
- * `accountId` is the SHA-256 hash of the account number, which is how both
- * endpoints identify an account — see `accountDocumentId` in this feature's
+ * `accountId` is the SHA-256 hash of the account number, which is how the
+ * endpoint identifies an account — see `accountDocumentId` in this feature's
  * utils. The hash is computed by the caller and never logged: the account
  * number itself must not appear in a URL, a query key, or an error message.
+ *
+ * The transaction report shares leg 2 with this but not leg 1, which now takes
+ * a form body — see useTransactionReportDownload below.
  */
-export function useAccountDocumentDownload(kind: AccountDocumentKind): {
+export function useAccountDocumentDownload(): {
   download: (accountId: string) => void;
   isDownloading: boolean;
 } {
@@ -228,14 +231,9 @@ export function useAccountDocumentDownload(kind: AccountDocumentKind): {
   const [job, setJob] = useState<DocumentJob | null>(null);
   const jobCounter = useRef(0);
 
-  const initiateUrl =
-    kind === "proof-of-ownership"
-      ? mcaAccountConfirmationApi(merchantId, job?.accountId ?? "")
-      : mcaBankStatementApi(merchantId, job?.accountId ?? "");
-
   const { refetch: initiate } = useGet<{ data?: GeneratedDocumentPayload }>(
-    ["mca-account-document", kind, merchantId, job?.accountId, job?.nonce],
-    initiateUrl,
+    ["mca-account-document", "proof-of-ownership", merchantId, job?.accountId, job?.nonce],
+    mcaAccountConfirmationApi(merchantId, job?.accountId ?? ""),
     { enabled: false }
   );
 
@@ -245,9 +243,9 @@ export function useAccountDocumentDownload(kind: AccountDocumentKind): {
   >(mcaGeneratedFileApi(merchantId), { invalidateQueries: false });
 
   // The work runs in an effect rather than inside `download`, and that ordering
-  // is load-bearing: `initiateUrl` is built from `job`, so refetching in the
-  // same tick as the setState would fetch the URL from the *previous* render —
-  // an empty one on the first click. The effect runs after the render that
+  // is load-bearing: leg 1's URL is built from `job`, so refetching in the same
+  // tick as the setState would fetch the URL from the *previous* render — an
+  // empty one on the first click. The effect runs after the render that
   // committed the job, so refetch() sees the right URL.
   useEffect(() => {
     if (!job) return;
@@ -310,6 +308,101 @@ export function useAccountDocumentDownload(kind: AccountDocumentKind): {
 }
 
 /**
+ * The transaction report: the last three months of activity on one receiving
+ * account, as a statement the merchant's own bank or auditor will accept.
+ *
+ * Mirrors pg-dashboard's useTransactionReportDownload. Leg 1 POSTs the three
+ * fields the drawer collects to bank-statement/{accountId} and returns the
+ * descriptor; leg 2 is the same account-generated-file poll every generated
+ * document uses — 15 attempts, 2s apart, ~30s in total.
+ *
+ * Unlike the GET-driven download above, both legs are mutations, so the whole
+ * flow runs inside the submit handler rather than an effect: there is no
+ * refetch URL that has to be committed to state first. Errors are thrown rather
+ * than toasted here, so the drawer can decide whether to stay open.
+ */
+export function useTransactionReportDownload(): {
+  downloadReport: (request: TransactionReportRequest, accountId: string) => Promise<void>;
+  isDownloading: boolean;
+} {
+  const merchantId = useMcaMerchantId();
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // The URL is per-account, so it can only be built at call time — hence the
+  // empty accountId here and the `dynamicUrl` override below, the same override
+  // pg-dashboard uses for this endpoint.
+  const { mutateAsync: triggerReportGeneration } = usePost<
+    { data?: GeneratedDocumentPayload },
+    { dynamicUrl: string; reqBody: TransactionReportRequest }
+  >(mcaBankStatementApi(merchantId, ""), { invalidateQueries: false });
+
+  const { mutateAsync: pollGeneratedFile } = usePost<
+    { data?: GeneratedDocumentUrlResponse },
+    GeneratedDocumentPayload
+  >(mcaGeneratedFileApi(merchantId), { invalidateQueries: false });
+
+  const downloadReport = useCallback(
+    async (request: TransactionReportRequest, accountId: string): Promise<void> => {
+      if (!merchantId || !accountId) return;
+
+      setIsDownloading(true);
+      try {
+        const triggered = await triggerReportGeneration({
+          dynamicUrl: mcaBankStatementApi(merchantId, accountId),
+          reqBody: request,
+        });
+        const descriptor = triggered?.data;
+
+        if (!descriptor?.fileName) {
+          throw new Error("Couldn't start generating this report.");
+        }
+
+        for (let attempt = 0; attempt < MAX_POLL_ATTEMPTS; attempt += 1) {
+          const polled = await pollGeneratedFile(descriptor);
+          const url = polled?.data?.url;
+
+          if (url) {
+            window.open(url, "_blank", "noopener,noreferrer");
+            return;
+          }
+
+          if (attempt < MAX_POLL_ATTEMPTS - 1) {
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+          }
+        }
+
+        throw new Error("This report is taking longer than expected. Please try again in a bit.");
+      } finally {
+        setIsDownloading(false);
+      }
+    },
+    [merchantId, triggerReportGeneration, pollGeneratedFile]
+  );
+
+  return { downloadReport, isDownloading };
+}
+
+/**
+ * The merchant's registered name and address, for prefilling the transaction
+ * report drawer. Same read pg-dashboard's drawer does before it renders its
+ * form; envelope-tolerant, since this endpoint is returned both wrapped and
+ * flat elsewhere in the app.
+ */
+export function useMerchantRegisteredProfile(): {
+  profile: MerchantRegisteredProfile | undefined;
+  isLoading: boolean;
+} {
+  const merchantId = useMcaMerchantId();
+  const { data, isPending } = useGet<
+    { data?: MerchantRegisteredProfile } & Partial<MerchantRegisteredProfile>
+  >(["mca-merchant-profile", merchantId], mcaMerchantProfileApi(merchantId), {
+    enabled: !!merchantId,
+  });
+
+  return { profile: data?.data ?? data, isLoading: !!merchantId && isPending };
+}
+
+/**
  * The Amazon account-detail statement: a PDF ops generates from the account
  * details the merchant confirms in the drawer.
  *
@@ -318,13 +411,21 @@ export function useAccountDocumentDownload(kind: AccountDocumentKind): {
  * pg-dashboard polls this every 2s and gives up after 30s; MAX_POLL_ATTEMPTS x
  * POLL_INTERVAL_MS is the same 30s here.
  */
-export function useAmzAccountStatement(): {
+export function useAmzAccountStatement(options?: { onDownloaded?: () => void }): {
   requestStatement: (payload: AmzAccountStatementRequest) => Promise<void>;
   isWorking: boolean;
 } {
   const merchantId = useMcaMerchantId();
   const [job, setJob] = useState<StatementJob | null>(null);
   const jobCounter = useRef(0);
+
+  // Held in a ref so a caller can pass an inline arrow without restarting the
+  // poll below on every render. Assigned in an effect rather than during
+  // render, which would be a side effect in the render pass.
+  const onDownloadedRef = useRef(options?.onDownloaded);
+  useEffect(() => {
+    onDownloadedRef.current = options?.onDownloaded;
+  }, [options?.onDownloaded]);
 
   const { mutateAsync: triggerStatement, isPending: isTriggering } = usePost<
     AmzAccountStatementTriggerResponse,
@@ -350,6 +451,10 @@ export function useAmzAccountStatement(): {
 
           if (url) {
             window.open(url, "_blank", "noopener,noreferrer");
+            // The statement has been handed over, so the form that requested it
+            // has nothing left to do — pg-dashboard's DownloadReport closes its
+            // drawer at exactly this point.
+            onDownloadedRef.current?.();
             return;
           }
 

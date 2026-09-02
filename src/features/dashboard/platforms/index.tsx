@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
-import { toast } from "sonner";
 import {
   Accordion,
   AccordionContent,
@@ -23,18 +22,16 @@ import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
-  accountDocumentId,
-  accountNumberOf,
   buildFullAccountDetails,
   canadianRoutingParts,
 } from "@/features/dashboard/multi-currency/utils";
 import {
-  useAccountDocumentDownload,
   useNeedsMidSelection,
   useVirtualAccounts,
 } from "@/features/dashboard/multi-currency/hooks";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms/components/SettlementStatementDrawer";
+import { TransactionReportDrawer } from "@/features/dashboard/platforms/components/TransactionReportDrawer";
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
 import { SUPPORTED_PLATFORMS, accountsForPlatform } from "@/features/dashboard/platforms/constants";
@@ -160,33 +157,24 @@ function PlatformsContent() {
     : [];
 
   const [settlementDrawerOpen, setSettlementDrawerOpen] = useState(false);
+  const [transactionReportOpen, setTransactionReportOpen] = useState(false);
   const [requestPlatformOpen, setRequestPlatformOpen] = useState(false);
 
-  const { download: downloadBankStatement, isDownloading: isDownloadingStatement } =
-    useAccountDocumentDownload("bank-statement");
-
   /**
-   * What a document card does when it's activated — from the card, from its icon
-   * button, or from the keyboard. Which cards open the settlement form is data
-   * (`opensSettlementForm`), not a title match; every other card is the bank
-   * settlement statement download.
+   * What a document card does when it's activated — from the card, from its
+   * icon button, or from the keyboard. Which drawer it opens is data
+   * (`opens`), not a title match.
    *
-   * The endpoint keys the account by the SHA-256 of its number, never the
-   * number itself. Neither value is logged.
+   * Neither document downloads straight from the card any more: both are
+   * generated from details the merchant has to confirm first, which is the
+   * flow pg-dashboard's two PwDrawers implement.
    */
-  const handleDocumentAction = async (doc: PlatformDocument) => {
-    if (doc.opensSettlementForm) {
-      setSettlementDrawerOpen(true);
+  const handleDocumentAction = (doc: PlatformDocument) => {
+    if (doc.opens === "transaction-report") {
+      setTransactionReportOpen(true);
       return;
     }
-
-    if (!selectedAccount) return;
-    const accountId = await accountDocumentId(accountNumberOf(selectedAccount));
-    if (!accountId) {
-      toast.error("This account has no account number to generate a statement for.");
-      return;
-    }
-    await downloadBankStatement(accountId);
+    setSettlementDrawerOpen(true);
   };
 
   if (!selectedPlatform) return null;
@@ -219,20 +207,29 @@ function PlatformsContent() {
 
       <RequestPlatformDialog open={requestPlatformOpen} onOpenChange={setRequestPlatformOpen} />
 
-      {/* Opened by the Generate Settlement Statement document card. The key
-          remounts it whenever the platform or the currency changes, so the form
-          always opens on the account the page is showing rather than on
-          whatever it was last left holding. Closing it leaves the page exactly
-          as it was — nothing out here reads back out of the drawer. */}
+      {/* Opened by the two document cards. The key remounts each whenever the
+          platform or the currency changes, so a form always opens on the
+          account the page is showing rather than on whatever it was last left
+          holding. Closing one leaves the page exactly as it was — nothing out
+          here reads back out of a drawer. */}
       {selectedAccount && (
-        <SettlementStatementDrawer
-          key={`${selectedPlatform.id}-${selectedAccount.id}`}
-          platformName={selectedPlatform.name}
-          accounts={accounts}
-          defaultAccountId={selectedAccount.id}
-          open={settlementDrawerOpen}
-          onOpenChange={setSettlementDrawerOpen}
-        />
+        <>
+          <SettlementStatementDrawer
+            key={`settlement-${selectedPlatform.id}-${selectedAccount.id}`}
+            platformName={selectedPlatform.name}
+            accounts={accounts}
+            defaultAccountId={selectedAccount.id}
+            open={settlementDrawerOpen}
+            onOpenChange={setSettlementDrawerOpen}
+          />
+          <TransactionReportDrawer
+            key={`transaction-report-${selectedPlatform.id}-${selectedAccount.id}`}
+            accounts={accounts}
+            defaultAccountId={selectedAccount.id}
+            open={transactionReportOpen}
+            onOpenChange={setTransactionReportOpen}
+          />
+        </>
       )}
 
       {/* Fixed 288px navigation column, matching Virtual Accounts', with the
@@ -543,11 +540,11 @@ function PlatformsContent() {
                     size="sm"
                     role="button"
                     tabIndex={0}
-                    onClick={() => void handleDocumentAction(doc)}
+                    onClick={() => handleDocumentAction(doc)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault();
-                        void handleDocumentAction(doc);
+                        handleDocumentAction(doc);
                       }
                     }}
                     className="min-w-0 cursor-pointer flex-row items-center justify-between gap-3 p-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md"
@@ -569,10 +566,9 @@ function PlatformsContent() {
                       variant="ghost"
                       size="sm"
                       className="shrink-0"
-                      disabled={!doc.opensSettlementForm && isDownloadingStatement}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void handleDocumentAction(doc);
+                        handleDocumentAction(doc);
                       }}
                     >
                       <Icon name={doc.actionIcon} className="h-4 w-4" />
