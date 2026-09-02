@@ -27,12 +27,7 @@ const METRICS: { value: CurrencySplitMetric; label: string }[] = [
  * both the normal and the deficient-vision floors, so no two slices that sit
  * next to each other in the ring collapse into each other.
  */
-const SLICE_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-5)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-];
+const SLICE_COLORS = ["var(--chart-1)", "var(--chart-5)", "var(--chart-3)", "var(--chart-4)"];
 
 /**
  * The API's catch-all bucket. It is not a currency, so it does not take a

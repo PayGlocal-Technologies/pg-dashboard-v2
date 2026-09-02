@@ -283,7 +283,9 @@ export function McaInvoiceOriginsCard() {
                   label="Avg per country"
                   valueLabel={formatCompact(totals?.avgPerCountry ?? 0, currency)}
                   trendPct={
-                    (totals?.avgPerCountry ?? 0) > 0 ? (totals?.avgPerCountryTrendPct ?? null) : null
+                    (totals?.avgPerCountry ?? 0) > 0
+                      ? (totals?.avgPerCountryTrendPct ?? null)
+                      : null
                   }
                 />
                 <StatCell

@@ -190,8 +190,17 @@ export function useTopClients(
  * Invoices needing attention (overdue / due soon) for the dashboard's Needs
  * attention panel. Merchant-scoped in the path — a selected MID, else the UCIC
  * roll-up — mirroring useRevenueTrend/useTopClients above.
+ *
+ * Asked for without a `limit`, deliberately: the card previews the first couple
+ * of rows but names the total, and a limited response cannot be trusted to
+ * report a total beyond what it returned. One unlimited query serves both the
+ * card and its "View all" drawer — same key, so they share a single request and
+ * the drawer opens against data already in hand rather than fetching again.
+ *
+ * Rows are returned in the order the endpoint gave them (overdue first, then
+ * due soon, each by due date). Nothing here re-sorts or regroups them.
  */
-export function useNeedsAttention(limit = 5): {
+export function useNeedsAttention(): {
   invoices: NeedsAttentionInvoice[];
   totalCount: number;
   isLoading: boolean;
@@ -201,17 +210,18 @@ export function useNeedsAttention(limit = 5): {
   const profile = useApp((s) => s.profile);
   const ucicId = profile?.ucicId ?? "";
   const scopeId = urlMid || ucicId;
+  const enabled = isReady && !!scopeId;
 
   const { data, isPending, isError } = useGet<NeedsAttentionResponse>(
-    ["mca-needs-attention", scopeId, limit],
-    mcaNeedsAttentionApi(scopeId, limit),
-    { enabled: isReady && !!scopeId }
+    ["mca-needs-attention", scopeId],
+    mcaNeedsAttentionApi(scopeId),
+    { enabled }
   );
 
   return {
     invoices: data?.data?.data ?? [],
     totalCount: data?.data?.totalCount ?? 0,
-    isLoading: isReady && !!scopeId && isPending,
+    isLoading: enabled && isPending,
     isError,
   };
 }
