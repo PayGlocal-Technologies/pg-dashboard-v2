@@ -12,8 +12,9 @@ import { CopyableCell } from "@/components/common/CopyableCell";
 import {
   customerName,
   formatDisplayDateTime,
-  getStatusMeta,
+  getDisputeStatusMeta,
 } from "@/features/dashboard/transactions/paColumns";
+import { DISPUTE_PHASE_META } from "@/features/dashboard/transactions/status/disputeStatus";
 import {
   deriveTransactionDetail,
   type DisputeDetail,
@@ -133,10 +134,9 @@ export function DisputeDetailFeature({
   const amount = dispute.amount;
   const currency = dispute.currency || transaction.txnCurrency || "INR";
   // This dispute's own status badge, not the parent's aggregate (see
-  // getDisplayStatus on the parent page), reuses the exact existing
-  // DISPUTED/NEEDS_ACTION/UNDER_REVIEW/INSUFFICIENT_DOCUMENTS/WON/LOST
-  // labels.
-  const statusMeta = getStatusMeta(dispute.status);
+  // getDisplayStatus on the parent page), reuses the dispute-status
+  // vocabulary directly (status/disputeStatus.ts), never the transaction's.
+  const statusMeta = getDisputeStatusMeta(dispute.status);
   const isUnderBankReview = dispute.reviewPhase === "BANK_REVIEW";
   const name = customerName(transaction) || "Unknown customer";
   const formattedDateTime = formatDisplayDateTime(dispute.raisedOn) ?? "Not available";
@@ -155,14 +155,14 @@ export function DisputeDetailFeature({
     respondBy: dispute.respondBy ?? dispute.raisedOn,
   };
 
-  // "Action required" covers both raw statuses that mean the same thing to
-  // the merchant (see PA_STATUS_META): a freshly raised dispute awaiting
-  // accept/contest, or one where documents still need to be uploaded.
-  // INSUFFICIENT_DOCUMENTS also needs the merchant to act, but is its own
-  // distinct notice (re-upload, not a first-time accept/contest choice), so
-  // it's excluded here and handled in its own branch below.
+  // "Needs response" covers a freshly raised dispute awaiting accept/contest,
+  // and REOPENED (a cleared dispute the bank came back on, the merchant must
+  // respond again the same way). MORE_EVIDENCE_NEEDED also needs the
+  // merchant to act, but is its own distinct notice (re-upload, not a
+  // first-time accept/contest choice), so it's excluded here and handled in
+  // its own branch below.
   const disputeAwaitingDecision =
-    dispute.status === "DISPUTED" || dispute.status === "NEEDS_ACTION";
+    dispute.status === "NEEDS_RESPONSE" || dispute.status === "REOPENED";
 
   const underReviewSteps: DisputeFormStep[] | undefined =
     dispute.status === "UNDER_REVIEW"
@@ -210,11 +210,11 @@ export function DisputeDetailFeature({
   }
 
   function handleConfirmAcceptFull() {
-    resolveDispute(transaction!.gid ?? "", "LOST");
+    resolveDispute(transaction!.gid ?? "", "ACCEPTED");
     setStoredTransaction(
-      withDisputeStatus(transaction!, disputeId, "LOST", undefined, formatNow(new Date()))
+      withDisputeStatus(transaction!, disputeId, "ACCEPTED", undefined, formatNow(new Date()))
     );
-    toast.success("Dispute marked as lost", {
+    toast.success("Dispute accepted", {
       description: `${formatCurrency(amount, currency)} ${currency} has been refunded to the cardholder.`,
     });
     router.push(LIST_PATH);
@@ -306,6 +306,14 @@ export function DisputeDetailFeature({
               tooltip={statusMeta.tooltip}
               size="sm"
             />
+            {dispute.disputePhase && (
+              <StatusBadgeWithTooltip
+                variant="muted"
+                label={DISPUTE_PHASE_META[dispute.disputePhase].label}
+                tooltip={DISPUTE_PHASE_META[dispute.disputePhase].description}
+                size="sm"
+              />
+            )}
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground">
@@ -334,25 +342,39 @@ export function DisputeDetailFeature({
                   onAccept={handleAcceptDispute}
                   onContest={handleContestDispute}
                 />
-              ) : dispute.status === "WON" ? (
+              ) : dispute.status === "CLEARED" ? (
                 <DisputeStatusNoticeCard
                   icon="check-circle"
                   iconClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  title="Dispute won"
+                  title="Dispute cleared"
                   description="You successfully contested this dispute, the disputed amount stays with you. This dispute is now closed."
                 />
-              ) : dispute.status === "LOST" ? (
+              ) : dispute.status === "ACCEPTED" ? (
                 <DisputeStatusNoticeCard
                   icon="check-circle"
                   iconClassName="bg-muted text-muted-foreground"
                   title="Dispute closed"
                   description="You accepted this dispute and a refund was initiated to the cardholder. This dispute is now closed."
                 />
-              ) : dispute.status === "INSUFFICIENT_DOCUMENTS" ? (
+              ) : dispute.status === "CHARGED_BACK" ? (
                 <DisputeStatusNoticeCard
                   icon="alert-triangle"
                   iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-                  title="Insufficient documents"
+                  title="Dispute charged back"
+                  description="The bank ruled in the cardholder's favour. This dispute is now closed and the disputed amount was charged back."
+                />
+              ) : dispute.status === "EXPIRED" ? (
+                <DisputeStatusNoticeCard
+                  icon="alert-triangle"
+                  iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
+                  title="Dispute expired"
+                  description="The response deadline passed without a reply. This dispute is now closed and treated as a chargeback."
+                />
+              ) : dispute.status === "MORE_EVIDENCE_NEEDED" ? (
+                <DisputeStatusNoticeCard
+                  icon="alert-triangle"
+                  iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
+                  title="More evidence needed"
                   description="We need more information to investigate this dispute. Please upload additional documents to submit more supporting evidence."
                   documents={dispute.documents}
                   action={{ label: "Upload documents", onClick: handleContestDispute }}

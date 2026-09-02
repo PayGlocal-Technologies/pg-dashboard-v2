@@ -1,12 +1,16 @@
 import { sumAmounts } from "@/features/dashboard/transactions/financial/money";
 import type { DisputeRawStatus, DisputeRow } from "@/features/dashboard/dispute-management/types";
 
-/** Same 4-bucket grouping already used for the Dispute Overview donut/stat
- * cards (see the old SLICE_ORDER in DisputeOverviewCard and
- * needsActionCount/inReviewCount/wonCount/lostCount in
- * DisputeManagementFeature), centralized here instead of re-derived in each
- * caller. DISPUTED and NEEDS_ACTION both fold into "needsAction". */
-export type DisputeOverviewBucketKey = "needsAction" | "inReview" | "won" | "lost";
+/** 5-bucket grouping for the Dispute Overview donut/stat cards, centralized
+ * here instead of re-derived in each caller. NEEDS_RESPONSE/
+ * MORE_EVIDENCE_NEEDED/REOPENED all fold into "needsAction" (all three mean
+ * the merchant must act). ACCEPTED is its own bucket, deliberately never
+ * folded into "lost"/CHARGED_BACK, the status-vocabulary spec's own note:
+ * "Accepted is reported separately from Charged back so win-rate stays
+ * honest. A merchant who accepted forty disputes has not lost forty
+ * arguments." EXPIRED folds into "lost" since the spec treats it as a
+ * charged-back money outcome. */
+export type DisputeOverviewBucketKey = "needsAction" | "inReview" | "won" | "lost" | "accepted";
 
 export const DISPUTE_OVERVIEW_BUCKETS: {
   key: DisputeOverviewBucketKey;
@@ -15,28 +19,26 @@ export const DISPUTE_OVERVIEW_BUCKETS: {
 }[] = [
   { key: "needsAction", label: "Action required", color: "#f59e0b" },
   { key: "inReview", label: "In review", color: "#3b82f6" },
-  { key: "won", label: "Won", color: "#10b981" },
-  { key: "lost", label: "Lost", color: "#ef4444" },
+  { key: "won", label: "Cleared", color: "#10b981" },
+  { key: "lost", label: "Charged back", color: "#ef4444" },
+  { key: "accepted", label: "Accepted", color: "#a855f7" },
 ];
 
 function bucketForStatus(status: DisputeRawStatus): DisputeOverviewBucketKey {
   switch (status) {
-    case "DISPUTED":
-    case "NEEDS_ACTION":
+    case "NEEDS_RESPONSE":
+    case "MORE_EVIDENCE_NEEDED":
+    case "REOPENED":
       return "needsAction";
     case "UNDER_REVIEW":
       return "inReview";
-    // The review itself is already done, the ball is back in the
-    // merchant's court to upload more evidence, so this counts as a
-    // needs-action state for the overview chart even though its own status
-    // badge reads "Insufficient documents" rather than "Action required"
-    // (see PA_STATUS_META).
-    case "INSUFFICIENT_DOCUMENTS":
-      return "needsAction";
-    case "WON":
+    case "CLEARED":
       return "won";
-    case "LOST":
+    case "CHARGED_BACK":
+    case "EXPIRED":
       return "lost";
+    case "ACCEPTED":
+      return "accepted";
     default:
       return "needsAction";
   }
@@ -47,13 +49,20 @@ export interface DisputeOverviewCounts {
   inReview: number;
   won: number;
   lost: number;
+  accepted: number;
 }
 
 /** Number of disputes per status bucket. Rows with a missing/unrecognized
  * status are skipped rather than thrown on, see Section 13's "missing
  * status" edge case, an undefined/null `disputes` list is treated as empty. */
 export function getDisputeCounts(disputes: DisputeRow[] | undefined | null): DisputeOverviewCounts {
-  const counts: DisputeOverviewCounts = { needsAction: 0, inReview: 0, won: 0, lost: 0 };
+  const counts: DisputeOverviewCounts = {
+    needsAction: 0,
+    inReview: 0,
+    won: 0,
+    lost: 0,
+    accepted: 0,
+  };
   for (const row of disputes ?? []) {
     if (!row?.status) continue;
     counts[bucketForStatus(row.status)] += 1;
@@ -63,7 +72,7 @@ export function getDisputeCounts(disputes: DisputeRow[] | undefined | null): Dis
 
 export function getTotalDisputeCount(disputes: DisputeRow[] | undefined | null): number {
   const counts = getDisputeCounts(disputes);
-  return counts.needsAction + counts.inReview + counts.won + counts.lost;
+  return counts.needsAction + counts.inReview + counts.won + counts.lost + counts.accepted;
 }
 
 /** The currency held by the most disputes in the given list (ties broken by
@@ -97,6 +106,7 @@ export interface DisputeOverviewAmounts {
   inReview: number;
   won: number;
   lost: number;
+  accepted: number;
   /** The single currency every amount above is expressed in, see
    * getDominantCurrency. Falls back to "INR" (formatCurrency's own default)
    * when the list is empty or no row has a currency. */
@@ -120,6 +130,7 @@ export function getDisputeAmounts(
     inReview: [],
     won: [],
     lost: [],
+    accepted: [],
   };
   let excludedCount = 0;
 
@@ -138,6 +149,7 @@ export function getDisputeAmounts(
     inReview: sumAmounts(totals.inReview),
     won: sumAmounts(totals.won),
     lost: sumAmounts(totals.lost),
+    accepted: sumAmounts(totals.accepted),
     currency,
     excludedCount,
   };
@@ -145,5 +157,11 @@ export function getDisputeAmounts(
 
 export function getTotalDisputeAmount(disputes: DisputeRow[] | undefined | null): number {
   const amounts = getDisputeAmounts(disputes);
-  return sumAmounts([amounts.needsAction, amounts.inReview, amounts.won, amounts.lost]);
+  return sumAmounts([
+    amounts.needsAction,
+    amounts.inReview,
+    amounts.won,
+    amounts.lost,
+    amounts.accepted,
+  ]);
 }

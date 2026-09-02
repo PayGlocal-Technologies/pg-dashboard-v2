@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   getDisplayStatus,
   getDisplayStatusBucket,
-  getStatusMeta,
+  getDisputeStatusMeta,
+  getRefundStatusMeta,
 } from "@/features/dashboard/transactions/paColumns";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
 
@@ -23,7 +24,7 @@ describe("getDisplayStatus", () => {
     });
   });
 
-  it("shows Partially refunded for a partial refund", () => {
+  it("shows Refunded for a partial refund (the vocabulary no longer distinguishes partial from full)", () => {
     const txn: PaTransaction = {
       ...BASE,
       refunds: [
@@ -32,12 +33,12 @@ describe("getDisplayStatus", () => {
           transactionId: "gl_o-test1",
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "02/08/2026, 09:00:00",
         },
       ],
     };
-    expect(getDisplayStatus(txn)).toEqual({ label: "Partially refunded", variant: "refund" });
+    expect(getDisplayStatus(txn)).toEqual({ label: "Refunded", variant: "muted" });
   });
 
   it("shows Refunded for a full refund reached via multiple partials", () => {
@@ -49,7 +50,7 @@ describe("getDisplayStatus", () => {
           transactionId: "gl_o-test1",
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "02/08/2026, 09:00:00",
         },
         {
@@ -57,15 +58,15 @@ describe("getDisplayStatus", () => {
           transactionId: "gl_o-test1",
           amount: 7500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
     };
-    expect(getDisplayStatus(txn)).toEqual({ label: "Refunded", variant: "refund" });
+    expect(getDisplayStatus(txn)).toEqual({ label: "Refunded", variant: "muted" });
   });
 
-  it("shows the dispute label for a full active dispute with no refund", () => {
+  it("shows the generic Disputed chip for a full active dispute with no refund", () => {
     const txn: PaTransaction = {
       ...BASE,
       disputes: [
@@ -77,20 +78,19 @@ describe("getDisplayStatus", () => {
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "02/08/2026, 09:00:00",
         },
       ],
     };
     expect(getDisplayStatus(txn)).toEqual({
-      label: "Action required",
+      label: "Disputed",
       variant: "warning",
-      trailIcon: undefined,
-      tooltip: "Respond within 6 days",
+      tooltip: "Respond before the deadline",
     });
   });
 
-  it("combines a partial refund with an active dispute, dropping neither", () => {
+  it("combines a partial refund with an active dispute into Refunded and disputed", () => {
     const txn: PaTransaction = {
       ...BASE,
       refunds: [
@@ -99,7 +99,7 @@ describe("getDisplayStatus", () => {
           transactionId: "gl_o-test1",
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "02/08/2026, 09:00:00",
         },
       ],
@@ -112,17 +112,17 @@ describe("getDisplayStatus", () => {
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "03/08/2026, 09:00:00",
         },
       ],
     };
-    expect(getDisplayStatus(txn).label).toBe("Partially refunded · Action required");
+    expect(getDisplayStatus(txn).label).toBe("Refunded and disputed");
     expect(getDisplayStatus(txn).variant).toBe("warning");
-    expect(getDisplayStatus(txn).tooltip).toBe("Respond within 6 days");
+    expect(getDisplayStatus(txn).tooltip).toBeUndefined();
   });
 
-  it("does not auto-reduce a full dispute after a partial refund and still combines the label", () => {
+  it("does not auto-reduce a full dispute after a partial refund and still combines into Refunded and disputed", () => {
     const txn: PaTransaction = {
       ...BASE,
       totalAmount: "10000.00",
@@ -132,7 +132,7 @@ describe("getDisplayStatus", () => {
           transactionId: "gl_o-test1",
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "02/08/2026, 09:00:00",
         },
       ],
@@ -145,15 +145,15 @@ describe("getDisplayStatus", () => {
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "NEEDS_ACTION",
+          status: "NEEDS_RESPONSE",
           raisedOn: "03/08/2026, 09:00:00",
         },
       ],
     };
-    expect(getDisplayStatus(txn).label).toBe("Partially refunded · Action required");
+    expect(getDisplayStatus(txn).label).toBe("Refunded and disputed");
   });
 
-  it("keeps a resolved WON dispute's own label, unaffected by an independent refund", () => {
+  it("keeps a resolved CLEARED dispute's own outcome, unaffected by an independent refund", () => {
     const txn: PaTransaction = {
       ...BASE,
       disputes: [
@@ -165,16 +165,20 @@ describe("getDisplayStatus", () => {
           reason: "Duplicate processing",
           reasonCode: "12.6",
           description: "desc",
-          status: "WON",
+          status: "CLEARED",
           raisedOn: "02/08/2026, 09:00:00",
           resolvedOn: "05/08/2026, 09:00:00",
         },
       ],
     };
-    expect(getDisplayStatus(txn)).toEqual({ label: "Won", variant: "success", trailIcon: "check" });
+    expect(getDisplayStatus(txn)).toEqual({
+      label: "Dispute cleared",
+      variant: "success",
+      trailIcon: "check",
+    });
   });
 
-  it("keeps a resolved LOST dispute's own label", () => {
+  it("keeps a resolved CHARGED_BACK dispute's own outcome", () => {
     const txn: PaTransaction = {
       ...BASE,
       disputes: [
@@ -186,45 +190,76 @@ describe("getDisplayStatus", () => {
           reason: "Credit not processed",
           reasonCode: "13.6",
           description: "desc",
-          status: "LOST",
+          status: "CHARGED_BACK",
           raisedOn: "02/08/2026, 09:00:00",
           resolvedOn: "05/08/2026, 09:00:00",
         },
       ],
     };
-    expect(getDisplayStatus(txn)).toEqual({ label: "Lost", variant: "danger", trailIcon: "x" });
+    expect(getDisplayStatus(txn)).toEqual({
+      label: "Charged back",
+      variant: "danger",
+      trailIcon: "x",
+    });
   });
 
   it("never overlays refund/dispute state on a failed payment", () => {
     const txn: PaTransaction = { ...BASE, externalStatus: "ISSUER_DECLINE" };
-    expect(getDisplayStatus(txn).label).toBe("Issuer decline");
+    expect(getDisplayStatus(txn).label).toBe("Failed");
   });
 
   it("never overlays refund/dispute state on a still-pending payment", () => {
     const txn: PaTransaction = { ...BASE, externalStatus: "INPROGRESS" };
-    expect(getDisplayStatus(txn).label).toBe("In progress");
+    expect(getDisplayStatus(txn).label).toBe("-");
   });
 
-  it("falls back to the raw status for real API data with no structured refunds/disputes", () => {
-    const txn: PaTransaction = { ...BASE, externalStatus: "DISPUTED" };
-    expect(getDisplayStatus(txn).label).toBe("Action required");
-    expect(getDisplayStatus(txn).tooltip).toBe("Respond within 6 days");
+  it("routes a dispute pseudo-row's externalStatus through the dispute vocabulary, not the transaction one", () => {
+    const txn: PaTransaction = {
+      ...BASE,
+      linkedRecordType: "dispute",
+      externalStatus: "NEEDS_RESPONSE",
+    };
+    expect(getDisplayStatus(txn)).toEqual(getDisputeStatusMeta("NEEDS_RESPONSE"));
+    expect(getDisplayStatus(txn).label).toBe("Needs response");
+  });
+
+  it("routes a refund pseudo-row's externalStatus through the refund vocabulary, not the transaction one", () => {
+    const txn: PaTransaction = {
+      ...BASE,
+      linkedRecordType: "refund",
+      externalStatus: "COMPLETED",
+    };
+    expect(getDisplayStatus(txn)).toEqual(getRefundStatusMeta("COMPLETED"));
+    expect(getDisplayStatus(txn).label).toBe("Completed");
   });
 });
 
-describe("getStatusMeta: Action required / Insufficient documents vocabulary", () => {
-  it("DISPUTED and NEEDS_ACTION both display identically as Action required", () => {
-    expect(getStatusMeta("DISPUTED").label).toBe("Action required");
-    expect(getStatusMeta("NEEDS_ACTION").label).toBe("Action required");
+describe("getDisputeStatusMeta / getRefundStatusMeta: own-vocabulary lookups", () => {
+  it("NEEDS_RESPONSE covers what used to be split across DISPUTED and NEEDS_ACTION", () => {
+    expect(getDisputeStatusMeta("NEEDS_RESPONSE").label).toBe("Needs response");
   });
 
-  it("INSUFFICIENT_DOCUMENTS is its own distinct label, never folded into Action required", () => {
-    const meta = getStatusMeta("INSUFFICIENT_DOCUMENTS");
-    expect(meta.label).toBe("Insufficient documents");
-    expect(meta.label).not.toBe("Action required");
+  it("MORE_EVIDENCE_NEEDED is its own distinct label, never folded into Needs response", () => {
+    const meta = getDisputeStatusMeta("MORE_EVIDENCE_NEEDED");
+    expect(meta.label).toBe("More evidence needed");
+    expect(meta.label).not.toBe("Needs response");
   });
 
-  it("a dispute stuck needing more evidence still buckets as disputed, not a plain failure", () => {
+  it("exposes the 3-state refund vocabulary (renamed from PENDING/SUCCEEDED)", () => {
+    expect(getRefundStatusMeta("PROCESSING")).toEqual({ label: "Processing", variant: "info" });
+    expect(getRefundStatusMeta("COMPLETED")).toEqual({
+      label: "Completed",
+      variant: "success",
+      trailIcon: "check",
+    });
+    expect(getRefundStatusMeta("FAILED")).toEqual({
+      label: "Failed",
+      variant: "danger",
+      trailIcon: "x",
+    });
+  });
+
+  it("a dispute stuck needing more evidence still buckets as disputed, shown as the generic Disputed chip", () => {
     const txn: PaTransaction = {
       ...BASE,
       disputes: [
@@ -236,13 +271,13 @@ describe("getStatusMeta: Action required / Insufficient documents vocabulary", (
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "INSUFFICIENT_DOCUMENTS",
+          status: "MORE_EVIDENCE_NEEDED",
           raisedOn: "03/08/2026, 09:00:00",
         },
       ],
     };
     expect(getDisplayStatusBucket(txn)).toBe("disputed");
-    expect(getDisplayStatus(txn).label).toBe("Insufficient documents");
+    expect(getDisplayStatus(txn).label).toBe("Disputed");
   });
 });
 
@@ -260,7 +295,7 @@ describe("getDisplayStatusBucket", () => {
           transactionId: "gl_o-test1",
           amount: 100,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "02/08/2026, 09:00:00",
         },
       ],
@@ -277,7 +312,7 @@ describe("getDisplayStatusBucket", () => {
           transactionId: "gl_o-test1",
           amount: 100,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "02/08/2026, 09:00:00",
         },
       ],
@@ -290,7 +325,7 @@ describe("getDisplayStatusBucket", () => {
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "03/08/2026, 09:00:00",
         },
       ],

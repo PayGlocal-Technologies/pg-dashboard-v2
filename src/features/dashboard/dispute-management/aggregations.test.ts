@@ -12,7 +12,7 @@ function row(overrides: Partial<DisputeRow>): DisputeRow {
   return {
     disputeId: "du_1",
     txnGid: "gl_o-1",
-    status: "DISPUTED",
+    status: "NEEDS_RESPONSE",
     amount: 100,
     currency: "INR",
     reason: "Fraudulent",
@@ -25,22 +25,22 @@ function row(overrides: Partial<DisputeRow>): DisputeRow {
 
 // Section 22's own worked example: 6 Needs action, 2 In review, 1 Won, 1 Lost.
 const SAMPLE: DisputeRow[] = [
-  row({ disputeId: "d1", status: "DISPUTED", amount: 20000 }),
-  row({ disputeId: "d2", status: "DISPUTED", amount: 20000 }),
-  row({ disputeId: "d3", status: "NEEDS_ACTION", amount: 14500 }),
-  row({ disputeId: "d4", status: "NEEDS_ACTION", amount: 10000 }),
-  row({ disputeId: "d5", status: "NEEDS_ACTION", amount: 10000 }),
-  row({ disputeId: "d6", status: "NEEDS_ACTION", amount: 10000 }),
+  row({ disputeId: "d1", status: "NEEDS_RESPONSE", amount: 20000 }),
+  row({ disputeId: "d2", status: "NEEDS_RESPONSE", amount: 20000 }),
+  row({ disputeId: "d3", status: "NEEDS_RESPONSE", amount: 14500 }),
+  row({ disputeId: "d4", status: "NEEDS_RESPONSE", amount: 10000 }),
+  row({ disputeId: "d5", status: "NEEDS_RESPONSE", amount: 10000 }),
+  row({ disputeId: "d6", status: "NEEDS_RESPONSE", amount: 10000 }),
   row({ disputeId: "d7", status: "UNDER_REVIEW", amount: 12200 }),
   row({ disputeId: "d8", status: "UNDER_REVIEW", amount: 12000 }),
-  row({ disputeId: "d9", status: "WON", amount: 8500 }),
-  row({ disputeId: "d10", status: "LOST", amount: 5200 }),
+  row({ disputeId: "d9", status: "CLEARED", amount: 8500 }),
+  row({ disputeId: "d10", status: "CHARGED_BACK", amount: 5200 }),
 ];
 
 describe("getDisputeCounts / getTotalDisputeCount", () => {
-  it("buckets DISPUTED and NEEDS_ACTION together as needsAction", () => {
+  it("buckets NEEDS_RESPONSE rows together as needsAction", () => {
     const counts = getDisputeCounts(SAMPLE);
-    expect(counts).toEqual({ needsAction: 6, inReview: 2, won: 1, lost: 1 });
+    expect(counts).toEqual({ needsAction: 6, inReview: 2, won: 1, lost: 1, accepted: 0 });
   });
 
   it("totals to the sum of every bucket", () => {
@@ -48,8 +48,20 @@ describe("getDisputeCounts / getTotalDisputeCount", () => {
   });
 
   it("treats undefined/null/empty input as zero counts", () => {
-    expect(getDisputeCounts(undefined)).toEqual({ needsAction: 0, inReview: 0, won: 0, lost: 0 });
-    expect(getDisputeCounts(null)).toEqual({ needsAction: 0, inReview: 0, won: 0, lost: 0 });
+    expect(getDisputeCounts(undefined)).toEqual({
+      needsAction: 0,
+      inReview: 0,
+      won: 0,
+      lost: 0,
+      accepted: 0,
+    });
+    expect(getDisputeCounts(null)).toEqual({
+      needsAction: 0,
+      inReview: 0,
+      won: 0,
+      lost: 0,
+      accepted: 0,
+    });
     expect(getTotalDisputeCount([])).toBe(0);
   });
 
@@ -59,14 +71,18 @@ describe("getDisputeCounts / getTotalDisputeCount", () => {
     expect(getTotalDisputeCount(withMissing)).toBe(10);
   });
 
-  it("buckets INSUFFICIENT_DOCUMENTS as needsAction, the merchant still has to act", () => {
-    const withInsufficient = [
-      ...SAMPLE,
-      row({ disputeId: "dY", status: "INSUFFICIENT_DOCUMENTS" }),
-    ];
+  it("buckets MORE_EVIDENCE_NEEDED as needsAction, the merchant still has to act", () => {
+    const withInsufficient = [...SAMPLE, row({ disputeId: "dY", status: "MORE_EVIDENCE_NEEDED" })];
     const counts = getDisputeCounts(withInsufficient);
     expect(counts.needsAction).toBe(7);
     expect(getTotalDisputeCount(withInsufficient)).toBe(11);
+  });
+
+  it("keeps ACCEPTED separate from lost/CHARGED_BACK so win-rate stays honest", () => {
+    const withAccepted = [...SAMPLE, row({ disputeId: "dZ", status: "ACCEPTED" })];
+    const counts = getDisputeCounts(withAccepted);
+    expect(counts.accepted).toBe(1);
+    expect(counts.lost).toBe(1);
   });
 });
 
@@ -91,6 +107,7 @@ describe("getDisputeAmounts / getTotalDisputeAmount", () => {
       inReview: 0,
       won: 0,
       lost: 0,
+      accepted: 0,
       currency: "INR",
       excludedCount: 0,
     });
@@ -99,8 +116,8 @@ describe("getDisputeAmounts / getTotalDisputeAmount", () => {
 
   it("treats a missing or non-numeric amount as zero instead of producing NaN", () => {
     const rows = [
-      row({ disputeId: "d1", status: "WON", amount: undefined as unknown as number }),
-      row({ disputeId: "d2", status: "WON", amount: Number.NaN }),
+      row({ disputeId: "d1", status: "CLEARED", amount: undefined as unknown as number }),
+      row({ disputeId: "d2", status: "CLEARED", amount: Number.NaN }),
     ];
     const amounts = getDisputeAmounts(rows);
     expect(amounts.won).toBe(0);
@@ -109,9 +126,9 @@ describe("getDisputeAmounts / getTotalDisputeAmount", () => {
 
   it("never mixes currencies: only the dominant currency's disputes are summed", () => {
     const rows = [
-      row({ disputeId: "d1", status: "WON", amount: 100, currency: "INR" }),
-      row({ disputeId: "d2", status: "WON", amount: 200, currency: "INR" }),
-      row({ disputeId: "d3", status: "WON", amount: 9999, currency: "USD" }),
+      row({ disputeId: "d1", status: "CLEARED", amount: 100, currency: "INR" }),
+      row({ disputeId: "d2", status: "CLEARED", amount: 200, currency: "INR" }),
+      row({ disputeId: "d3", status: "CLEARED", amount: 9999, currency: "USD" }),
     ];
     const amounts = getDisputeAmounts(rows);
     expect(amounts.currency).toBe("INR");

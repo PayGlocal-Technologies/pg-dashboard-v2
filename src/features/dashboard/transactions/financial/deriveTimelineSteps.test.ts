@@ -55,13 +55,15 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 15:00:00",
         },
       ],
     };
     expect(labelsFor(txn)).toEqual(["Payment captured", "Settled", "Partially refunded"]);
-    expect(getDisplayStatus(txn).label).toBe("Partially refunded");
+    // The header status no longer distinguishes partial from full refund
+    // (status-vocabulary spec), only the timeline step label above does.
+    expect(getDisplayStatus(txn).label).toBe("Refunded");
   });
 
   it("full refund: the final timeline event communicates the transaction is now fully refunded", () => {
@@ -76,7 +78,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
         {
@@ -84,7 +86,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 7500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "05/08/2026, 09:00:00",
         },
       ],
@@ -98,7 +100,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
     expect(getDisplayStatus(txn).label).toBe("Refunded");
   });
 
-  it("dispute: Payment captured -> Settled -> Dispute raised -> Awaiting response", () => {
+  it("dispute: Payment captured -> Settled -> Dispute raised -> Needs response", () => {
     const txn: PaTransaction = {
       ...BASE,
       settlements: [
@@ -113,7 +115,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "04/08/2026, 09:00:00",
           respondBy: "20/08/2026, 09:00:00",
         },
@@ -123,9 +125,9 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
       "Payment captured",
       "Settled",
       "Dispute raised",
-      "Awaiting your response",
+      "Needs response",
     ]);
-    expect(getDisplayStatus(txn).label).toBe("Action required");
+    expect(getDisplayStatus(txn).label).toBe("Disputed");
   });
 
   it("refund then dispute: both appear, chronologically, header combines both", () => {
@@ -140,7 +142,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
@@ -153,7 +155,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "05/08/2026, 09:00:00",
         },
       ],
@@ -163,9 +165,9 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
       "Settled",
       "Partially refunded",
       "Dispute raised",
-      "Awaiting your response",
+      "Needs response",
     ]);
-    expect(getDisplayStatus(txn).label).toBe("Partially refunded · Action required");
+    expect(getDisplayStatus(txn).label).toBe("Refunded and disputed");
   });
 
   it("dispute then refund: chronological order follows real timestamps, not push order", () => {
@@ -185,7 +187,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "03/08/2026, 09:00:00",
         },
       ],
@@ -195,7 +197,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "05/08/2026, 09:00:00",
         },
       ],
@@ -216,7 +218,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
         {
@@ -224,7 +226,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "05/08/2026, 09:00:00",
         },
       ],
@@ -234,8 +236,9 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
     expect(refundSteps).toHaveLength(2);
     expect(refundSteps[0]!.isAdditionalRefund).toBe(false);
     expect(refundSteps[1]!.isAdditionalRefund).toBe(true);
-    // ₹5,000 of ₹10,000 refunded overall, still partial, matching the header.
-    expect(getDisplayStatus(txn).label).toBe("Partially refunded");
+    // ₹5,000 of ₹10,000 refunded overall, still partial at the timeline-step
+    // level, but the header status no longer distinguishes partial from full.
+    expect(getDisplayStatus(txn).label).toBe("Refunded");
   });
 
   it("multiple disputes: each keeps its own timeline entry, never overwriting the other", () => {
@@ -250,7 +253,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "WON",
+          status: "CLEARED",
           raisedOn: "02/08/2026, 09:00:00",
           resolvedOn: "10/08/2026, 09:00:00",
         },
@@ -262,7 +265,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           reason: "Duplicate processing",
           reasonCode: "12.6",
           description: "desc2",
-          status: "LOST",
+          status: "CHARGED_BACK",
           raisedOn: "12/08/2026, 09:00:00",
           resolvedOn: "20/08/2026, 09:00:00",
         },
@@ -271,8 +274,8 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
     const steps = deriveTimelineSteps(deriveTransactionDetail(txn).financials);
     const raisedSteps = steps.filter((s) => s.label === "Dispute raised");
     expect(raisedSteps).toHaveLength(2);
-    expect(steps.map((s) => s.label)).toContain("Dispute won");
-    expect(steps.map((s) => s.label)).toContain("Dispute lost");
+    expect(steps.map((s) => s.label)).toContain("Dispute cleared");
+    expect(steps.map((s) => s.label)).toContain("Dispute charged back");
   });
 
   it("settlement + refund + dispute: settlement stays historically accurate, refund is never overwritten by the later dispute", () => {
@@ -294,7 +297,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           transactionId: BASE.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
@@ -307,7 +310,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "05/08/2026, 09:00:00",
         },
       ],
@@ -319,12 +322,12 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
       "Settled",
       "Partially refunded",
       "Dispute raised",
-      "Awaiting your response",
+      "Needs response",
     ]);
     // Settlement amount stays exactly what was settled, unmodified by the
     // later refund/dispute.
     expect(detail.financials.settledAmount).toBe(10000);
-    expect(getDisplayStatus(txn).label).toBe("Partially refunded · Action required");
+    expect(getDisplayStatus(txn).label).toBe("Refunded and disputed");
   });
 
   it("payment failed: does not show Settled for a transaction that never reached settlement", () => {
@@ -361,7 +364,7 @@ describe("deriveTimelineSteps: header and timeline stay in sync (the reported bu
           reason: "Duplicate processing",
           reasonCode: "12.6",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "09/08/2026, 09:00:00",
         },
       ],

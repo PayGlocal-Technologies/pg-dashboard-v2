@@ -1,4 +1,5 @@
 import { isDisputeActive } from "@/features/dashboard/transactions/financial/deriveFinancials";
+import type { PaymentBucket } from "@/features/dashboard/transactions/status/paymentBucket";
 import type {
   DisputeEvent,
   RefundEvent,
@@ -26,7 +27,7 @@ export interface GenerateTimelineInput {
   originalAmount: number;
   /** The transaction's own formattedCreationDateTime. */
   paymentInitiatedAt: string;
-  paymentBucket: "success" | "failed" | "pending";
+  paymentBucket: PaymentBucket;
   refundEvents: RefundEvent[];
   disputeEvents: DisputeEvent[];
   settlementEvents: SettlementEvent[];
@@ -65,6 +66,13 @@ export function generateTimelineEvents({
       amount: originalAmount,
       currency,
     });
+  } else if (paymentBucket === "expired") {
+    events.push({
+      type: "PAYMENT_EXPIRED",
+      timestamp: paymentInitiatedAt,
+      amount: originalAmount,
+      currency,
+    });
   } else if (paymentBucket === "success") {
     events.push({
       type: "PAYMENT_CAPTURED",
@@ -94,9 +102,9 @@ export function generateTimelineEvents({
       currency: refund.currency,
       refundId: refund.id,
     });
-    if (refund.status === "SUCCEEDED") {
+    if (refund.status === "COMPLETED") {
       events.push({
-        type: "REFUND_SUCCEEDED",
+        type: "REFUND_COMPLETED",
         timestamp: refund.createdAt,
         amount: refund.amount,
         currency: refund.currency,
@@ -130,9 +138,13 @@ export function generateTimelineEvents({
       });
     }
 
-    if (dispute.status === "WON") {
+    // CLEARED keeps the money with the merchant (FUNDS_REINSTATED);
+    // CHARGED_BACK/ACCEPTED/EXPIRED all mean the money left (FUNDS_
+    // WITHDRAWN), for three different reasons the dispute's own status
+    // records, see status/disputeStatus.ts's didDisputeMoneyLeaveTheMerchant.
+    if (dispute.status === "CLEARED") {
       events.push({
-        type: "DISPUTE_WON",
+        type: "DISPUTE_CLEARED",
         timestamp: dispute.resolvedOn ?? dispute.raisedOn,
         amount: dispute.amount,
         currency: dispute.currency,
@@ -145,9 +157,19 @@ export function generateTimelineEvents({
         currency: dispute.currency,
         disputeId: dispute.id,
       });
-    } else if (dispute.status === "LOST") {
+    } else if (
+      dispute.status === "CHARGED_BACK" ||
+      dispute.status === "ACCEPTED" ||
+      dispute.status === "EXPIRED"
+    ) {
+      const type =
+        dispute.status === "CHARGED_BACK"
+          ? "DISPUTE_CHARGED_BACK"
+          : dispute.status === "ACCEPTED"
+            ? "DISPUTE_ACCEPTED"
+            : "DISPUTE_EXPIRED";
       events.push({
-        type: "DISPUTE_LOST",
+        type,
         timestamp: dispute.resolvedOn ?? dispute.raisedOn,
         amount: dispute.amount,
         currency: dispute.currency,
@@ -234,6 +256,14 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           timestamp: event.timestamp,
         });
         break;
+      case "PAYMENT_EXPIRED":
+        steps.push({
+          id: "payment-expired",
+          label: "Payment expired",
+          state: "danger",
+          timestamp: event.timestamp,
+        });
+        break;
       case "PAYMENT_SETTLED": {
         const settlement = event.settlementId ? settlementById.get(event.settlementId) : undefined;
         steps.push({
@@ -249,11 +279,11 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
         break;
       }
       case "REFUND_INITIATED": {
-        // A refund still PENDING gets its own step here, one that goes on
-        // to SUCCEED/FAIL is instead represented by that terminal event
+        // A refund still PROCESSING gets its own step here, one that goes
+        // on to COMPLETE/FAIL is instead represented by that terminal event
         // below (same moment, no need to show both).
         const refund = event.refundId ? refundById.get(event.refundId) : undefined;
-        if (refund?.status === "PENDING") {
+        if (refund?.status === "PROCESSING") {
           steps.push({
             id: `refund-initiated-${event.refundId}`,
             label: "Refund initiated",
@@ -265,7 +295,7 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
         }
         break;
       }
-      case "REFUND_SUCCEEDED": {
+      case "REFUND_COMPLETED": {
         refundedSoFar += event.amount ?? 0;
         const isFullyRefunded = refundedSoFar >= originalAmount;
         steps.push({
@@ -312,26 +342,43 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           timestamp: event.timestamp,
         });
         break;
-      case "DISPUTE_WON":
+      case "DISPUTE_CLEARED":
         steps.push({
-          id: `dispute-won-${event.disputeId}`,
-          label: "Dispute won",
+          id: `dispute-cleared-${event.disputeId}`,
+          label: "Dispute cleared",
           state: "complete",
           timestamp: event.timestamp,
         });
         break;
-      case "DISPUTE_LOST":
+      case "DISPUTE_CHARGED_BACK":
         steps.push({
-          id: `dispute-lost-${event.disputeId}`,
-          label: "Dispute lost",
+          id: `dispute-charged-back-${event.disputeId}`,
+          label: "Dispute charged back",
+          state: "danger",
+          timestamp: event.timestamp,
+        });
+        break;
+      case "DISPUTE_ACCEPTED":
+        steps.push({
+          id: `dispute-accepted-${event.disputeId}`,
+          label: "Dispute accepted",
+          state: "danger",
+          timestamp: event.timestamp,
+        });
+        break;
+      case "DISPUTE_EXPIRED":
+        steps.push({
+          id: `dispute-expired-${event.disputeId}`,
+          label: "Dispute expired",
           state: "danger",
           timestamp: event.timestamp,
         });
         break;
       case "FUNDS_WITHDRAWN":
       case "FUNDS_REINSTATED":
-        // Already communicated by Dispute won/lost immediately above (same
-        // moment), not its own step in this timeline.
+        // Already communicated by the Dispute cleared/charged back/
+        // accepted/expired step immediately above (same moment), not its
+        // own step in this timeline.
         break;
     }
   }
@@ -358,12 +405,15 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
         label: activeDispute.reviewPhase === "BANK_REVIEW" ? "Bank review" : "Under review",
         state: "current",
       });
-    } else if (activeDispute.status === "INSUFFICIENT_DOCUMENTS") {
-      steps.push({ id, label: "Insufficient documents", state: "current" });
+    } else if (activeDispute.status === "MORE_EVIDENCE_NEEDED") {
+      steps.push({ id, label: "More evidence needed", state: "current" });
+    } else if (activeDispute.status === "REOPENED") {
+      steps.push({ id, label: "Reopened", state: "current" });
     } else {
+      // NEEDS_RESPONSE: the clock is running, merchant must accept/contest.
       steps.push({
         id,
-        label: "Awaiting your response",
+        label: "Needs response",
         state: "current",
         respondBy: activeDispute.respondBy,
       });
@@ -386,8 +436,10 @@ export function deriveDisputeOnlyTimelineSteps(
     (step) =>
       step.id === `dispute-raised-${disputeId}` ||
       step.id === `evidence-submitted-${disputeId}` ||
-      step.id === `dispute-won-${disputeId}` ||
-      step.id === `dispute-lost-${disputeId}` ||
+      step.id === `dispute-cleared-${disputeId}` ||
+      step.id === `dispute-charged-back-${disputeId}` ||
+      step.id === `dispute-accepted-${disputeId}` ||
+      step.id === `dispute-expired-${disputeId}` ||
       step.id === `dispute-current-${disputeId}`
   );
 }

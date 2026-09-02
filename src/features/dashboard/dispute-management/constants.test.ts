@@ -5,15 +5,13 @@ import {
 } from "@/features/dashboard/dispute-management/constants";
 
 describe("DISPUTE_SEGMENT_RAW_STATUSES", () => {
-  it("the action-required segment includes both DISPUTED and NEEDS_ACTION, they display identically", () => {
-    expect(DISPUTE_SEGMENT_RAW_STATUSES["action-required"]).toEqual(["DISPUTED", "NEEDS_ACTION"]);
+  it("the action-required segment is NEEDS_RESPONSE only", () => {
+    expect(DISPUTE_SEGMENT_RAW_STATUSES["action-required"]).toEqual(["NEEDS_RESPONSE"]);
   });
 
-  it("has its own dedicated segment for INSUFFICIENT_DOCUMENTS, never folded into action-required", () => {
-    expect(DISPUTE_SEGMENT_RAW_STATUSES["insufficient-documents"]).toEqual([
-      "INSUFFICIENT_DOCUMENTS",
-    ]);
-    expect(DISPUTE_SEGMENT_RAW_STATUSES["action-required"]).not.toContain("INSUFFICIENT_DOCUMENTS");
+  it("has its own dedicated segment for MORE_EVIDENCE_NEEDED, never folded into action-required", () => {
+    expect(DISPUTE_SEGMENT_RAW_STATUSES["more-evidence-needed"]).toEqual(["MORE_EVIDENCE_NEEDED"]);
+    expect(DISPUTE_SEGMENT_RAW_STATUSES["action-required"]).not.toContain("MORE_EVIDENCE_NEEDED");
   });
 
   it("every non-all segment value has a matching raw-status entry", () => {

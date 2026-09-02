@@ -1,9 +1,9 @@
 import { create } from "zustand";
 
-export type DisputeResolutionOutcome = "WON" | "LOST" | "UNDER_REVIEW";
+export type DisputeResolutionOutcome = "CLEARED" | "ACCEPTED" | "UNDER_REVIEW";
 
 // TODO(integration): mock-only status override for disputes resolved during
-// this session (accepting in full moves a dispute to "LOST", submitting
+// this session (accepting in full moves a dispute to "ACCEPTED", submitting
 // evidence moves it to "UNDER_REVIEW"), there is no real resolve-dispute
 // endpoint yet. Keyed by transaction gid so the Transactions table, Dispute
 // Management table, and the shared detail page (see TransactionDetailFeature)

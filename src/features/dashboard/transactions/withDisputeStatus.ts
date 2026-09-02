@@ -21,14 +21,19 @@ export function withDisputeStatus(
     ...target,
     status,
     resolvedOn:
-      status === "WON" || status === "LOST" ? (resolvedOn ?? target.resolvedOn) : target.resolvedOn,
+      status === "CLEARED" ||
+      status === "CHARGED_BACK" ||
+      status === "ACCEPTED" ||
+      status === "EXPIRED"
+        ? (resolvedOn ?? target.resolvedOn)
+        : target.resolvedOn,
     documents: documents ?? target.documents,
     // The real moment evidence was submitted, so the timeline's own
     // "Evidence submitted" entry doesn't fall back to the dispute's
     // raisedOn date, see generateTimelineEvents.
     evidenceSubmittedOn: documents ? formatNow(new Date()) : target.evidenceSubmittedOn,
     // A fresh submission (first-time, or re-uploading after
-    // INSUFFICIENT_DOCUMENTS) always restarts PayGlocal's own review from
+    // MORE_EVIDENCE_NEEDED) always restarts PayGlocal's own review from
     // the beginning, never resumes at whatever phase the dispute was in
     // before, see DisputeEvent.reviewPhase.
     reviewPhase: status === "UNDER_REVIEW" ? undefined : target.reviewPhase,

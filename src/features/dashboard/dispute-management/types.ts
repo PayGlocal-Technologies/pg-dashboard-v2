@@ -1,7 +1,14 @@
-/** Same 6-status vocabulary already established for disputed PA transactions,
- * see PA_STATUS_META in @/features/dashboard/transactions/paColumns. */
+/** Same 8-status vocabulary already established for disputed PA transactions,
+ * see status/disputeStatus.ts's DISPUTE_STATUS_META. */
 export type DisputeRawStatus =
-  "DISPUTED" | "NEEDS_ACTION" | "UNDER_REVIEW" | "INSUFFICIENT_DOCUMENTS" | "WON" | "LOST";
+  | "NEEDS_RESPONSE"
+  | "UNDER_REVIEW"
+  | "MORE_EVIDENCE_NEEDED"
+  | "REOPENED"
+  | "CLEARED"
+  | "CHARGED_BACK"
+  | "ACCEPTED"
+  | "EXPIRED";
 
 export interface DisputeRow {
   disputeId: string;
@@ -20,8 +27,12 @@ export interface DisputeRow {
   paymentInstrument?: string;
   /** "DD/MM/YYYY, HH:MM:SS", same format as PaTransaction.formattedCreationDateTime. */
   disputedOn: string;
-  /** Only set for statuses that still need a merchant response (DISPUTED, NEEDS_ACTION). */
+  /** Only set for statuses that still need a merchant response (NEEDS_RESPONSE,
+   * MORE_EVIDENCE_NEEDED, REOPENED). */
   respondBy?: string;
+  /** The dispute's broader card-network stage, see status/disputeStatus.ts's
+   * DISPUTE_PHASE_META, shown as its own column, never merged into status. */
+  disputePhase?: "INQUIRY" | "CHARGEBACK" | "PRE_ARBITRATION" | "ARBITRATION";
 }
 
 // TODO(integration): this feature is mock-data only, see mockRows.ts. Wire up

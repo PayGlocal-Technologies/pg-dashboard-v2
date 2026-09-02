@@ -1,16 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  deriveTransactionStatus,
   getActiveDisputeAmount,
+  getChargedBackDisputeAmount,
+  getClearedDisputeAmount,
   getDisputedAmount,
   getFailedRefundAmount,
-  getLostDisputeAmount,
   getNetAmount,
-  getPendingRefundAmount,
+  getProcessingRefundAmount,
   getRefundedAmount,
   getRemainingAmount,
   getSettledAmount,
-  getWonDisputeAmount,
   hasDuplicateEventIds,
   validateChildEventReference,
   validateRefund,
@@ -20,6 +19,7 @@ import type {
   RefundEvent,
   SettlementEvent,
 } from "@/features/dashboard/transactions/financial/types";
+import { deriveTransactionStatusChip } from "@/features/dashboard/transactions/status/transactionStatus";
 
 const TXN_ID = "gl_o-test1";
 const CCY = "INR";
@@ -30,7 +30,7 @@ function refund(overrides: Partial<RefundEvent>): RefundEvent {
     transactionId: TXN_ID,
     amount: 100,
     currency: CCY,
-    status: "SUCCEEDED",
+    status: "COMPLETED",
     createdAt: "01/08/2026, 10:00:00",
     ...overrides,
   };
@@ -45,7 +45,7 @@ function dispute(overrides: Partial<DisputeEvent>): DisputeEvent {
     reason: "Fraudulent",
     reasonCode: "10.4",
     description: "The cardholder claims they did not authorise this purchase.",
-    status: "DISPUTED",
+    status: "NEEDS_RESPONSE",
     raisedOn: "02/08/2026, 10:00:00",
     ...overrides,
   };
@@ -63,10 +63,10 @@ function settlement(overrides: Partial<SettlementEvent>): SettlementEvent {
 }
 
 describe("getRefundedAmount", () => {
-  it("counts only SUCCEEDED refunds", () => {
+  it("counts only COMPLETED refunds", () => {
     const refunds = [
-      refund({ id: "rf-1", status: "SUCCEEDED", amount: 100 }),
-      refund({ id: "rf-2", status: "PENDING", amount: 50 }),
+      refund({ id: "rf-1", status: "COMPLETED", amount: 100 }),
+      refund({ id: "rf-2", status: "PROCESSING", amount: 50 }),
       refund({ id: "rf-3", status: "FAILED", amount: 25 }),
     ];
     expect(getRefundedAmount(refunds)).toBe(100);
@@ -82,14 +82,14 @@ describe("getRefundedAmount", () => {
   });
 });
 
-describe("getPendingRefundAmount / getFailedRefundAmount", () => {
-  it("bucket pending and failed refunds separately from succeeded", () => {
+describe("getProcessingRefundAmount / getFailedRefundAmount", () => {
+  it("bucket processing and failed refunds separately from completed", () => {
     const refunds = [
-      refund({ id: "rf-1", status: "SUCCEEDED", amount: 100 }),
-      refund({ id: "rf-2", status: "PENDING", amount: 50 }),
+      refund({ id: "rf-1", status: "COMPLETED", amount: 100 }),
+      refund({ id: "rf-2", status: "PROCESSING", amount: 50 }),
       refund({ id: "rf-3", status: "FAILED", amount: 25 }),
     ];
-    expect(getPendingRefundAmount(refunds)).toBe(50);
+    expect(getProcessingRefundAmount(refunds)).toBe(50);
     expect(getFailedRefundAmount(refunds)).toBe(25);
   });
 });
@@ -120,30 +120,44 @@ describe("getSettledAmount", () => {
   });
 });
 
-describe("getDisputedAmount / getActiveDisputeAmount / getWonDisputeAmount / getLostDisputeAmount", () => {
+describe("getDisputedAmount / getActiveDisputeAmount / getClearedDisputeAmount / getChargedBackDisputeAmount", () => {
   it("preserves the historical disputed amount regardless of outcome", () => {
-    const disputes = [dispute({ id: "du-1", amount: 780, status: "WON" })];
+    const disputes = [dispute({ id: "du-1", amount: 780, status: "CLEARED" })];
     expect(getDisputedAmount(disputes)).toBe(780);
-    expect(getWonDisputeAmount(disputes)).toBe(780);
+    expect(getClearedDisputeAmount(disputes)).toBe(780);
     expect(getActiveDisputeAmount(disputes)).toBe(0);
   });
 
   it("does not reduce a full dispute amount because of an earlier partial refund", () => {
-    const disputes = [dispute({ id: "du-1", amount: 10000, status: "DISPUTED" })];
+    const disputes = [dispute({ id: "du-1", amount: 10000, status: "NEEDS_RESPONSE" })];
     expect(getDisputedAmount(disputes)).toBe(10000);
     expect(getActiveDisputeAmount(disputes)).toBe(10000);
   });
 
-  it("splits won vs. lost vs. active across multiple disputes on one transaction", () => {
+  it("splits cleared vs. charged-back vs. active across multiple disputes on one transaction", () => {
     const disputes = [
-      dispute({ id: "du-1", amount: 100, status: "WON" }),
-      dispute({ id: "du-2", amount: 200, status: "LOST" }),
+      dispute({ id: "du-1", amount: 100, status: "CLEARED" }),
+      dispute({ id: "du-2", amount: 200, status: "CHARGED_BACK" }),
       dispute({ id: "du-3", amount: 300, status: "UNDER_REVIEW" }),
     ];
     expect(getDisputedAmount(disputes)).toBe(600);
-    expect(getWonDisputeAmount(disputes)).toBe(100);
-    expect(getLostDisputeAmount(disputes)).toBe(200);
+    expect(getClearedDisputeAmount(disputes)).toBe(100);
+    expect(getChargedBackDisputeAmount(disputes)).toBe(200);
     expect(getActiveDisputeAmount(disputes)).toBe(300);
+  });
+
+  it("counts ACCEPTED and EXPIRED disputes toward getChargedBackDisputeAmount, not just CHARGED_BACK", () => {
+    // getChargedBackDisputeAmount now sums every dispute where money
+    // ultimately left the merchant (didDisputeMoneyLeaveTheMerchant),
+    // which is CHARGED_BACK, ACCEPTED or EXPIRED, not just CHARGED_BACK.
+    const disputes = [
+      dispute({ id: "du-1", amount: 200, status: "CHARGED_BACK" }),
+      dispute({ id: "du-2", amount: 300, status: "ACCEPTED" }),
+      dispute({ id: "du-3", amount: 400, status: "EXPIRED" }),
+      dispute({ id: "du-4", amount: 500, status: "CLEARED" }),
+      dispute({ id: "du-5", amount: 600, status: "UNDER_REVIEW" }),
+    ];
+    expect(getChargedBackDisputeAmount(disputes)).toBe(900);
   });
 });
 
@@ -174,13 +188,13 @@ describe("validateRefund", () => {
   });
 
   it("rejects a refund that would exceed the refundable amount", () => {
-    const existing = [refund({ id: "rf-1", amount: 700, status: "SUCCEEDED" })];
+    const existing = [refund({ id: "rf-1", amount: 700, status: "COMPLETED" })];
     const result = validateRefund(1000, CCY, existing, { amount: 400, currency: CCY });
     expect(result.ok).toBe(false);
   });
 
-  it("counts pending refunds toward the refundable ceiling, not just succeeded ones", () => {
-    const existing = [refund({ id: "rf-1", amount: 900, status: "PENDING" })];
+  it("counts processing refunds toward the refundable ceiling, not just completed ones", () => {
+    const existing = [refund({ id: "rf-1", amount: 900, status: "PROCESSING" })];
     const result = validateRefund(1000, CCY, existing, { amount: 200, currency: CCY });
     expect(result.ok).toBe(false);
   });
@@ -192,7 +206,7 @@ describe("validateRefund", () => {
   });
 
   it("allows a final partial refund that exactly completes the original amount", () => {
-    const existing = [refund({ id: "rf-1", amount: 600, status: "SUCCEEDED" })];
+    const existing = [refund({ id: "rf-1", amount: 600, status: "COMPLETED" })];
     const result = validateRefund(1000, CCY, existing, { amount: 400, currency: CCY });
     expect(result.ok).toBe(true);
   });
@@ -219,85 +233,148 @@ describe("hasDuplicateEventIds", () => {
   });
 });
 
-describe("deriveTransactionStatus", () => {
-  const base = { originalAmount: 1000, refundedAmount: 0, activeDisputeAmount: 0 } as const;
+describe("deriveTransactionStatusChip", () => {
+  // Note: the old deriveTransactionStatus (removed from deriveFinancials.ts)
+  // took { paymentBucket, originalAmount, refundedAmount, activeDisputeAmount }
+  // and returned a distinct "PARTIALLY_*" key for a partial refund/dispute vs.
+  // a full one. deriveTransactionStatusChip takes
+  // { paymentBucket, originalAmount, refundedAmount, hasProcessingRefund,
+  // disputeEvents } and no longer distinguishes partial vs. full, only
+  // presence (refundedAmount > 0, a live/money-left dispute event) matters,
+  // per the status-vocabulary spec's 9-step precedence table. Every scenario
+  // below is translated from the old suite into this new shape/vocabulary;
+  // where the old suite had separate PARTIALLY_X and X cases they now
+  // collapse onto the same TransactionStatusKey.
+
+  const base = {
+    originalAmount: 1000,
+    refundedAmount: 0,
+    hasProcessingRefund: false,
+    disputeEvents: [] as DisputeEvent[],
+  };
 
   it("returns FAILED for a failed payment regardless of other amounts", () => {
-    expect(deriveTransactionStatus({ ...base, paymentBucket: "failed", refundedAmount: 500 })).toBe(
-      "FAILED"
-    );
-  });
-
-  it("returns PENDING for a pending payment", () => {
-    expect(deriveTransactionStatus({ ...base, paymentBucket: "pending" })).toBe("PENDING");
-  });
-
-  it("returns SUCCESSFUL when nothing has been refunded or disputed", () => {
-    expect(deriveTransactionStatus({ ...base, paymentBucket: "success" })).toBe("SUCCESSFUL");
-  });
-
-  it("returns PARTIALLY_REFUNDED for a partial refund", () => {
     expect(
-      deriveTransactionStatus({ ...base, paymentBucket: "success", refundedAmount: 400 })
-    ).toBe("PARTIALLY_REFUNDED");
+      deriveTransactionStatusChip({ ...base, paymentBucket: "failed", refundedAmount: 500 })
+    ).toBe("FAILED");
+  });
+
+  it("returns EXPIRED for an expired payment", () => {
+    expect(deriveTransactionStatusChip({ ...base, paymentBucket: "expired" })).toBe("EXPIRED");
+  });
+
+  it("returns IN_FLIGHT for a payment still on its way to the bank (was PENDING)", () => {
+    expect(deriveTransactionStatusChip({ ...base, paymentBucket: "in_flight" })).toBe("IN_FLIGHT");
+  });
+
+  it("returns SUCCESS when nothing has been refunded or disputed (was SUCCESSFUL)", () => {
+    expect(deriveTransactionStatusChip({ ...base, paymentBucket: "success" })).toBe("SUCCESS");
+  });
+
+  it("returns REFUNDED for a partial refund (was PARTIALLY_REFUNDED, now collapsed into REFUNDED)", () => {
+    expect(
+      deriveTransactionStatusChip({ ...base, paymentBucket: "success", refundedAmount: 400 })
+    ).toBe("REFUNDED");
   });
 
   it("returns REFUNDED when refunded amount reaches the original amount", () => {
     expect(
-      deriveTransactionStatus({ ...base, paymentBucket: "success", refundedAmount: 1000 })
+      deriveTransactionStatusChip({ ...base, paymentBucket: "success", refundedAmount: 1000 })
     ).toBe("REFUNDED");
   });
 
-  it("returns DISPUTED for a full active dispute with no refund", () => {
+  it("returns DISPUTED for a live dispute with no refund (was DISPUTED for a 'full' dispute)", () => {
     expect(
-      deriveTransactionStatus({ ...base, paymentBucket: "success", activeDisputeAmount: 1000 })
+      deriveTransactionStatusChip({
+        ...base,
+        paymentBucket: "success",
+        disputeEvents: [dispute({ amount: 1000, status: "NEEDS_RESPONSE" })],
+      })
     ).toBe("DISPUTED");
   });
 
-  it("returns PARTIALLY_DISPUTED for a partial active dispute with no refund", () => {
+  it("returns DISPUTED for a partial-amount live dispute too (was PARTIALLY_DISPUTED, now collapsed into DISPUTED)", () => {
     expect(
-      deriveTransactionStatus({ ...base, paymentBucket: "success", activeDisputeAmount: 300 })
-    ).toBe("PARTIALLY_DISPUTED");
+      deriveTransactionStatusChip({
+        ...base,
+        paymentBucket: "success",
+        disputeEvents: [dispute({ amount: 300, status: "UNDER_REVIEW" })],
+      })
+    ).toBe("DISPUTED");
   });
 
   it("returns REFUNDED_AND_DISPUTED when fully refunded and actively disputed", () => {
     expect(
-      deriveTransactionStatus({
+      deriveTransactionStatusChip({
         ...base,
         paymentBucket: "success",
         refundedAmount: 1000,
-        activeDisputeAmount: 1000,
+        disputeEvents: [dispute({ amount: 1000, status: "NEEDS_RESPONSE" })],
       })
     ).toBe("REFUNDED_AND_DISPUTED");
   });
 
-  it("returns PARTIALLY_REFUNDED_AND_DISPUTED for a partial refund plus an active dispute", () => {
+  it("returns REFUNDED_AND_DISPUTED for a partial refund plus a live dispute (was PARTIALLY_REFUNDED_AND_DISPUTED)", () => {
     expect(
-      deriveTransactionStatus({
+      deriveTransactionStatusChip({
         ...base,
         paymentBucket: "success",
         refundedAmount: 250,
-        activeDisputeAmount: 1000,
+        disputeEvents: [dispute({ amount: 1000, status: "NEEDS_RESPONSE" })],
       })
-    ).toBe("PARTIALLY_REFUNDED_AND_DISPUTED");
+    ).toBe("REFUNDED_AND_DISPUTED");
   });
 
-  it("does not auto-reduce a full dispute amount raised after a partial refund", () => {
+  it("still returns REFUNDED_AND_DISPUTED when a full dispute is raised after only a partial refund (was 'does not auto-reduce a full dispute amount')", () => {
     // 1000 original, 250 already refunded, a full 1000 dispute is then
-    // raised, activeDisputeAmount must stay 1000, not 750.
-    const status = deriveTransactionStatus({
+    // raised and reopened; the dispute's own amount no longer factors into
+    // this function at all (only whether it's live), the outcome is driven
+    // purely by precedence: refunded + live dispute still wins.
+    const status = deriveTransactionStatusChip({
       paymentBucket: "success",
       originalAmount: 1000,
       refundedAmount: 250,
-      activeDisputeAmount: 1000,
+      hasProcessingRefund: false,
+      disputeEvents: [dispute({ amount: 1000, status: "REOPENED" })],
     });
-    expect(status).toBe("PARTIALLY_REFUNDED_AND_DISPUTED");
+    expect(status).toBe("REFUNDED_AND_DISPUTED");
   });
 
-  it("a won dispute is no longer active and falls back to the refund-only status", () => {
+  it("returns DISPUTE_CLEARED for a cleared dispute alone (was 'a won dispute is no longer active and falls back to SUCCESSFUL', now its own resolved-status chip instead of falling back to SUCCESS)", () => {
     expect(
-      deriveTransactionStatus({ ...base, paymentBucket: "success", activeDisputeAmount: 0 })
-    ).toBe("SUCCESSFUL");
+      deriveTransactionStatusChip({
+        ...base,
+        paymentBucket: "success",
+        disputeEvents: [dispute({ amount: 100, status: "CLEARED" })],
+      })
+    ).toBe("DISPUTE_CLEARED");
+  });
+
+  it("returns CHARGED_BACK for a dispute that took money with no refund", () => {
+    expect(
+      deriveTransactionStatusChip({
+        ...base,
+        paymentBucket: "success",
+        disputeEvents: [dispute({ amount: 500, status: "CHARGED_BACK" })],
+      })
+    ).toBe("CHARGED_BACK");
+  });
+
+  it("returns REFUNDED_AND_CHARGED_BACK when refunded and the dispute took money (ACCEPTED counts too, not just CHARGED_BACK)", () => {
+    expect(
+      deriveTransactionStatusChip({
+        ...base,
+        paymentBucket: "success",
+        refundedAmount: 1000,
+        disputeEvents: [dispute({ amount: 1000, status: "ACCEPTED" })],
+      })
+    ).toBe("REFUNDED_AND_CHARGED_BACK");
+  });
+
+  it("returns REFUND_IN_PROGRESS when a refund is still processing and nothing else has resolved", () => {
+    expect(
+      deriveTransactionStatusChip({ ...base, paymentBucket: "success", hasProcessingRefund: true })
+    ).toBe("REFUND_IN_PROGRESS");
   });
 });
 

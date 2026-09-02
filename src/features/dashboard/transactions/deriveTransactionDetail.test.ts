@@ -39,7 +39,7 @@ describe("deriveTransactionDetail financials", () => {
         transactionId: "gl_o-test1",
         amount: 300,
         currency: "INR",
-        status: "SUCCEEDED",
+        status: "COMPLETED",
         createdAt: "05/08/2026, 09:00:00",
       },
       {
@@ -47,37 +47,41 @@ describe("deriveTransactionDetail financials", () => {
         transactionId: "gl_o-test1",
         amount: 200,
         currency: "INR",
-        status: "PENDING",
+        status: "PROCESSING",
         createdAt: "06/08/2026, 09:00:00",
       },
     ];
     const detail = deriveTransactionDetail(BASE_TXN, refundEvents);
     expect(detail.financials.refundedAmount).toBe(300);
-    expect(detail.financials.pendingRefundAmount).toBe(200);
+    expect(detail.financials.processingRefundAmount).toBe(200);
     expect(detail.financials.remainingAmount).toBe(700);
-    expect(detail.financials.derivedTransactionStatus).toBe("PARTIALLY_REFUNDED");
+    // A refund is still PROCESSING here (alongside the already-COMPLETED one),
+    // and the precedence table checks "still moving" before "completed", so
+    // this reads as REFUND_IN_PROGRESS, not REFUNDED.
+    expect(detail.financials.derivedTransactionStatus).toBe("REFUND_IN_PROGRESS");
   });
 
   it("derives DISPUTED status and a matching dispute event for a disputed transaction", () => {
-    const disputedTxn: PaTransaction = { ...BASE_TXN, externalStatus: "DISPUTED" };
+    const disputedTxn: PaTransaction = { ...BASE_TXN, externalStatus: "NEEDS_RESPONSE" };
     const detail = deriveTransactionDetail(disputedTxn);
     expect(detail.dispute).not.toBeNull();
     expect(detail.financials.disputeEvents).toHaveLength(1);
-    expect(detail.financials.disputeEvents[0]!.status).toBe("DISPUTED");
+    expect(detail.financials.disputeEvents[0]!.status).toBe("NEEDS_RESPONSE");
     expect(detail.financials.disputedAmount).toBe(1000);
     expect(detail.financials.derivedTransactionStatus).toBe("DISPUTED");
   });
 
-  it("keeps the historical disputed amount when a dispute resolves to WON", () => {
-    const wonTxn: PaTransaction = { ...BASE_TXN, externalStatus: "WON" };
-    const detail = deriveTransactionDetail(wonTxn);
-    expect(detail.financials.disputeEvents[0]!.status).toBe("WON");
+  it("keeps the historical disputed amount when a dispute resolves to CLEARED", () => {
+    const clearedTxn: PaTransaction = { ...BASE_TXN, externalStatus: "CLEARED" };
+    const detail = deriveTransactionDetail(clearedTxn);
+    expect(detail.financials.disputeEvents[0]!.status).toBe("CLEARED");
     expect(detail.financials.disputedAmount).toBe(1000);
-    expect(detail.financials.wonDisputeAmount).toBe(1000);
+    expect(detail.financials.clearedDisputeAmount).toBe(1000);
     expect(detail.financials.activeDisputeAmount).toBe(0);
-    // No longer actively disputed, so status falls back to the payment's
-    // own (successful, no refund) outcome.
-    expect(detail.financials.derivedTransactionStatus).toBe("SUCCESSFUL");
+    // No longer actively disputed, but a cleared dispute alone (nothing else
+    // touching the transaction) now gets its own dedicated status rather than
+    // falling all the way back to a plain successful payment.
+    expect(detail.financials.derivedTransactionStatus).toBe("DISPUTE_CLEARED");
   });
 
   it("produces chronologically sorted timeline events including the dispute", () => {
@@ -111,7 +115,7 @@ describe("deriveTransactionDetail with embedded child events (the corrected unif
           transactionId: "gl_o-test1",
           amount: 250,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "05/08/2026, 09:00:00",
         },
       ],
@@ -124,7 +128,7 @@ describe("deriveTransactionDetail with embedded child events (the corrected unif
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "06/08/2026, 09:00:00",
         },
       ],
@@ -138,7 +142,7 @@ describe("deriveTransactionDetail with embedded child events (the corrected unif
     expect(detail.financials.refundedAmount).toBe(250);
     expect(detail.financials.disputedAmount).toBe(200);
     expect(detail.financials.remainingAmount).toBe(750);
-    expect(detail.financials.derivedTransactionStatus).toBe("PARTIALLY_REFUNDED_AND_DISPUTED");
+    expect(detail.financials.derivedTransactionStatus).toBe("REFUNDED_AND_DISPUTED");
     expect(detail.settlement).toEqual({
       applicable: true,
       isSettled: true,
@@ -165,7 +169,7 @@ describe("deriveTransactionDetail with embedded child events (the corrected unif
           transactionId: "gl_o-test1",
           amount: 250,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "05/08/2026, 09:00:00",
         },
       ],
@@ -226,12 +230,16 @@ describe("mock data reflects the unified transaction model (no child event masqu
       MOCK_PA_TRANSACTIONS.map((t) => [t.gid, deriveTransactionDetail(t)])
     );
     const statuses = [...detailsByGid.values()].map((d) => d.financials.derivedTransactionStatus);
-    expect(statuses).toContain("SUCCESSFUL");
-    expect(statuses).toContain("PARTIALLY_REFUNDED");
+    // New vocabulary has no partial/full distinction at the transaction-status
+    // level (that's what remainingAmount is for), so the old PARTIALLY_REFUNDED/
+    // PARTIALLY_DISPUTED/PARTIALLY_REFUNDED_AND_DISPUTED variants collapse into
+    // their plain REFUNDED/DISPUTED/REFUNDED_AND_DISPUTED counterparts below.
+    expect(statuses).toContain("SUCCESS");
     expect(statuses).toContain("REFUNDED");
     expect(statuses).toContain("DISPUTED");
-    expect(statuses).toContain("PARTIALLY_DISPUTED");
-    expect(statuses).toContain("PARTIALLY_REFUNDED_AND_DISPUTED");
+    expect(statuses).toContain("REFUNDED_AND_DISPUTED");
+    expect(statuses).toContain("DISPUTE_CLEARED");
+    expect(statuses).toContain("CHARGED_BACK");
   });
 });
 
@@ -262,7 +270,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
@@ -284,7 +292,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 2000,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
         {
@@ -292,7 +300,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 1500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "05/08/2026, 09:00:00",
         },
       ],
@@ -311,7 +319,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 10000,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
@@ -330,14 +338,14 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 2500,
           currency: "INR",
-          status: "PENDING",
+          status: "PROCESSING",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
     };
     const detail = deriveTransactionDetail(txn);
     expect(detail.amountBreakdown!.refundedAmount).toBe(0);
-    expect(detail.financials.pendingRefundAmount).toBe(2500);
+    expect(detail.financials.processingRefundAmount).toBe(2500);
   });
 
   it("failed refund: not counted in the breakdown's refundedAmount", () => {
@@ -377,7 +385,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
@@ -408,7 +416,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "04/08/2026, 09:00:00",
         },
       ],
@@ -430,7 +438,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
@@ -443,7 +451,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "05/08/2026, 09:00:00",
         },
       ],
@@ -475,7 +483,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           transactionId: BASE_10K.gid!,
           amount: 2500,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
       ],
@@ -488,7 +496,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "05/08/2026, 09:00:00",
         },
       ],
@@ -498,7 +506,7 @@ describe("Payment Breakdown stays in sync with header status and timeline (Secti
     expect(detail.amountBreakdown!.refundedAmount).toBe(2500);
     expect(detail.amountBreakdown!.disputedAmount).toBe(2000);
     expect(detail.amountBreakdown!.refundedAmount).not.toBe(4500);
-    expect(detail.financials.derivedTransactionStatus).toBe("PARTIALLY_REFUNDED_AND_DISPUTED");
+    expect(detail.financials.derivedTransactionStatus).toBe("REFUNDED_AND_DISPUTED");
   });
 });
 
@@ -524,7 +532,7 @@ describe("dispute reason hierarchy: merchant-facing label is dynamically derived
           reasonCode: "12.6",
           description:
             "The customer claims they were charged more than once for the same purchase.",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "09/08/2026, 09:00:00",
         },
       ],
@@ -547,7 +555,7 @@ describe("dispute reason hierarchy: merchant-facing label is dynamically derived
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "09/08/2026, 09:00:00",
         },
       ],
@@ -556,7 +564,7 @@ describe("dispute reason hierarchy: merchant-facing label is dynamically derived
   });
 
   it("also derives a merchant label for the status-keyed fallback (real, not-yet-migrated API data)", () => {
-    const legacyTxn: PaTransaction = { ...BASE_DISPUTE_TXN, externalStatus: "WON" };
+    const legacyTxn: PaTransaction = { ...BASE_DISPUTE_TXN, externalStatus: "CLEARED" };
     const detail = deriveTransactionDetail(legacyTxn);
     expect(detail.dispute!.reason).toBe("Duplicate processing");
     expect(detail.dispute!.merchantLabel).toBe("Duplicate charge");
@@ -574,7 +582,7 @@ describe("dispute reason hierarchy: merchant-facing label is dynamically derived
           reason: "Duplicate processing",
           reasonCode: "12.6",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "09/08/2026, 09:00:00",
         },
       ],
@@ -608,7 +616,7 @@ describe("deriveTransactionDetail.linkedTransactions (parent-child transaction m
           transactionId: PARENT_20K.gid!,
           amount: 3000,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "03/08/2026, 09:00:00",
         },
         {
@@ -616,7 +624,7 @@ describe("deriveTransactionDetail.linkedTransactions (parent-child transaction m
           transactionId: PARENT_20K.gid!,
           amount: 2000,
           currency: "INR",
-          status: "SUCCEEDED",
+          status: "COMPLETED",
           createdAt: "04/08/2026, 09:00:00",
         },
       ],
@@ -629,7 +637,7 @@ describe("deriveTransactionDetail.linkedTransactions (parent-child transaction m
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "05/08/2026, 09:00:00",
         },
       ],
@@ -646,7 +654,7 @@ describe("deriveTransactionDetail.linkedTransactions (parent-child transaction m
       transactionId: PARENT_20K.gid!,
       amount: 1500,
       currency: "INR",
-      status: "SUCCEEDED" as const,
+      status: "COMPLETED" as const,
       createdAt: "06/08/2026, 09:00:00",
     };
     const linked = deriveTransactionDetail(PARENT_20K, [sessionRefund]).linkedTransactions;

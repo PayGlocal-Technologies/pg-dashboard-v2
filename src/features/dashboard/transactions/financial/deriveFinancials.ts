@@ -3,8 +3,11 @@ import {
   subtractAmounts,
   sumAmounts,
 } from "@/features/dashboard/transactions/financial/money";
+import {
+  didDisputeMoneyLeaveTheMerchant,
+  isDisputeStatusActive,
+} from "@/features/dashboard/transactions/status/disputeStatus";
 import type {
-  DerivedTransactionStatus,
   DisputeEvent,
   RefundEvent,
   SettlementEvent,
@@ -12,16 +15,16 @@ import type {
 } from "@/features/dashboard/transactions/financial/types";
 
 // ── Refund amounts ───────────────────────────────────────────────────────────
-// Only SUCCEEDED refunds count toward refundedAmount, a failed refund attempt
-// never moved money and a pending one hasn't moved it yet, see Section 7 of
-// the financial-logic spec.
+// Only COMPLETED refunds count toward refundedAmount, a failed refund attempt
+// never moved money and one still PROCESSING hasn't moved it yet, see
+// Section 7 of the financial-logic spec.
 
 export function getRefundedAmount(refunds: RefundEvent[]): number {
-  return sumAmounts(refunds.filter((r) => r.status === "SUCCEEDED").map((r) => r.amount));
+  return sumAmounts(refunds.filter((r) => r.status === "COMPLETED").map((r) => r.amount));
 }
 
-export function getPendingRefundAmount(refunds: RefundEvent[]): number {
-  return sumAmounts(refunds.filter((r) => r.status === "PENDING").map((r) => r.amount));
+export function getProcessingRefundAmount(refunds: RefundEvent[]): number {
+  return sumAmounts(refunds.filter((r) => r.status === "PROCESSING").map((r) => r.amount));
 }
 
 export function getFailedRefundAmount(refunds: RefundEvent[]): number {
@@ -51,21 +54,24 @@ export function getActiveDisputeAmount(disputes: DisputeEvent[]): number {
   return sumAmounts(disputes.filter(isDisputeActive).map((d) => d.amount));
 }
 
-export function getWonDisputeAmount(disputes: DisputeEvent[]): number {
-  return sumAmounts(disputes.filter((d) => d.status === "WON").map((d) => d.amount));
+export function getClearedDisputeAmount(disputes: DisputeEvent[]): number {
+  return sumAmounts(disputes.filter((d) => d.status === "CLEARED").map((d) => d.amount));
 }
 
-export function getLostDisputeAmount(disputes: DisputeEvent[]): number {
-  return sumAmounts(disputes.filter((d) => d.status === "LOST").map((d) => d.amount));
+export function getChargedBackDisputeAmount(disputes: DisputeEvent[]): number {
+  return sumAmounts(
+    disputes.filter((d) => didDisputeMoneyLeaveTheMerchant(d.status)).map((d) => d.amount)
+  );
 }
 
-/** A dispute still needs a decision/is being worked (DISPUTED, NEEDS_ACTION,
- * UNDER_REVIEW) vs. already resolved (WON, LOST). The single place this
- * WON/LOST check lives, callers (getDisplayStatus, getActiveDisputeAmount's
- * own filter above, TransactionDetailFeature) all use this instead of
- * re-deriving it. */
+/** A dispute still needs a decision/is being worked (NEEDS_RESPONSE,
+ * UNDER_REVIEW, MORE_EVIDENCE_NEEDED, REOPENED) vs. already resolved
+ * (CLEARED, CHARGED_BACK, ACCEPTED, EXPIRED). The single place this check
+ * lives, callers (getDisplayStatus, getActiveDisputeAmount's own filter
+ * above, TransactionDetailFeature) all use this instead of re-deriving it,
+ * delegates to status/disputeStatus.ts's own canonical isDisputeStatusActive. */
 export function isDisputeActive(dispute: DisputeEvent | undefined): boolean {
-  return !!dispute && dispute.status !== "WON" && dispute.status !== "LOST";
+  return !!dispute && isDisputeStatusActive(dispute.status);
 }
 
 // ── Remaining amount ─────────────────────────────────────────────────────────
@@ -104,10 +110,11 @@ export function assertSameCurrency(transactionCurrency: string, eventCurrency: s
 }
 
 // ── Refund validation ────────────────────────────────────────────────────────
-// Rejects any refund whose amount, combined with refunds already SUCCEEDED or
-// PENDING, would exceed the refundable amount (Section 6). PENDING is
-// included because it can still succeed, letting it through would allow two
-// concurrently-pending refunds to jointly over-refund once both complete.
+// Rejects any refund whose amount, combined with refunds already COMPLETED
+// or still PROCESSING, would exceed the refundable amount (Section 6).
+// PROCESSING is included because it can still complete, letting it through
+// would allow two concurrently-processing refunds to jointly over-refund
+// once both complete.
 
 export function validateRefund(
   originalAmount: number,
@@ -126,7 +133,7 @@ export function validateRefund(
   }
   const committedSoFar = sumAmounts(
     existingRefunds
-      .filter((r) => r.status === "SUCCEEDED" || r.status === "PENDING")
+      .filter((r) => r.status === "COMPLETED" || r.status === "PROCESSING")
       .map((r) => r.amount)
   );
   const remaining = getRemainingAmount(originalAmount, committedSoFar);
@@ -139,43 +146,11 @@ export function validateRefund(
   return { ok: true };
 }
 
-// ── Transaction status derivation ───────────────────────────────────────────
-// A single centralized function (Section 22) so no component derives this
-// independently. `paymentBucket` is the existing getStatusBucket() output for
-// the transaction's raw externalStatus (success/failed/pending), everything
-// else layers refund/dispute state on top of it. Disputed statuses already
-// bucket as "disputed" in getStatusBucket, callers pass the *payment* bucket
-// the transaction would have had absent any dispute (i.e. "success") so this
-// function can tell "disputed" apart from "disputed AND refunded".
-
-export interface DeriveTransactionStatusInput {
-  paymentBucket: "success" | "failed" | "pending";
-  originalAmount: number;
-  refundedAmount: number;
-  activeDisputeAmount: number;
-}
-
-export function deriveTransactionStatus({
-  paymentBucket,
-  originalAmount,
-  refundedAmount,
-  activeDisputeAmount,
-}: DeriveTransactionStatusInput): DerivedTransactionStatus {
-  if (paymentBucket === "failed") return "FAILED";
-  if (paymentBucket === "pending") return "PENDING";
-
-  const isFullyRefunded = refundedAmount > 0 && refundedAmount >= originalAmount;
-  const isPartiallyRefunded = refundedAmount > 0 && !isFullyRefunded;
-  const isDisputed = activeDisputeAmount > 0;
-  const isPartiallyDisputed = isDisputed && activeDisputeAmount < originalAmount;
-
-  if (isDisputed && isFullyRefunded) return "REFUNDED_AND_DISPUTED";
-  if (isDisputed && isPartiallyRefunded) return "PARTIALLY_REFUNDED_AND_DISPUTED";
-  if (isDisputed) return isPartiallyDisputed ? "PARTIALLY_DISPUTED" : "DISPUTED";
-  if (isFullyRefunded) return "REFUNDED";
-  if (isPartiallyRefunded) return "PARTIALLY_REFUNDED";
-  return "SUCCESSFUL";
-}
+// Transaction status derivation now lives in status/transactionStatus.ts's
+// deriveTransactionStatusChip, the single source of truth both the table
+// chip and TransactionFinancials.derivedTransactionStatus read (previously
+// this file had a second, parallel state machine here that could disagree
+// with paColumns.tsx's own combining logic for resolved disputes).
 
 // ── Child-event reference validation ────────────────────────────────────────
 // Every refund/dispute/settlement event must reference the transaction it

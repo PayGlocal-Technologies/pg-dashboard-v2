@@ -254,7 +254,7 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
       transactionId,
       amount: refundAmount,
       currency,
-      status: "SUCCEEDED",
+      status: "PROCESSING",
       reason: reasonLabel,
       details,
       createdAt: formatNow(new Date()),

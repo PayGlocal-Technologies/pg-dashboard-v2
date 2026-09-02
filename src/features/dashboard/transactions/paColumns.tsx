@@ -1,225 +1,142 @@
 "use client";
 
 import { type Column, StatusBadge } from "@/components/ui";
-import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
 import { TransactionCustomerCell } from "@/features/dashboard/transactions/components/TransactionCustomerCell";
 import { TransactionPaymentMethod } from "@/features/dashboard/transactions/components/TransactionPaymentMethod";
 import { TransactionAmount } from "@/features/dashboard/transactions/components/TransactionAmount";
 import { TransactionId } from "@/features/dashboard/transactions/components/TransactionId";
+import { getRefundedAmount } from "@/features/dashboard/transactions/financial/deriveFinancials";
+import { derivePaymentBucket } from "@/features/dashboard/transactions/status/paymentBucket";
 import {
-  getRefundedAmount,
-  isDisputeActive,
-} from "@/features/dashboard/transactions/financial/deriveFinancials";
+  deriveTransactionStatusChip,
+  TRANSACTION_STATUS_META,
+  type TransactionStatusKey,
+} from "@/features/dashboard/transactions/status/transactionStatus";
+import { REFUND_STATUS_META } from "@/features/dashboard/transactions/status/refundStatus";
+import { DISPUTE_STATUS_META } from "@/features/dashboard/transactions/status/disputeStatus";
+import type { StatusMeta } from "@/features/dashboard/transactions/status/types";
+import type {
+  DisputeEventStatus,
+  RefundEventStatus,
+} from "@/features/dashboard/transactions/financial/types";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
 
-// ── Status mapping: raw API value → display meta ──────────────────────────────
-type StatusMeta = {
-  label: string;
-  variant: BadgeVariant;
-  trailIcon?: BadgeTrailIcon;
-  /** Extra context shown on hover rather than inline in the badge itself,
-   * e.g. a dispute's response deadline, see StatusBadgeWithTooltip. */
-  tooltip?: string;
-};
+export type { StatusMeta };
 
-export const PA_STATUS_META: Record<string, StatusMeta> = {
-  SUCCESS: { label: "Success", variant: "success", trailIcon: "check" },
-  SENT_FOR_CAPTURE: { label: "Sent for capture", variant: "success", trailIcon: "check" },
-  AUTHORIZED: { label: "Authorized", variant: "warning" },
-  REVERSED: { label: "Reversed", variant: "success", trailIcon: "check" },
-  INPROGRESS: { label: "In progress", variant: "warning" },
-  IN_PROGRESS: { label: "In progress", variant: "warning" },
-  CAPTURE_STARTED: { label: "Capture started", variant: "warning" },
-  SENT_FOR_REFUND: { label: "Sent for refund", variant: "refund" },
-  REFUND_STARTED: { label: "Refund started", variant: "refund" },
-  // Used for a refund CHILD event's own status badge (see
-  // linkedChildRecords.ts), same label/variant getDisplayStatus already
-  // uses for a fully-refunded parent, kept consistent rather than a second
-  // "refunded" vocabulary.
-  REFUNDED: { label: "Refunded", variant: "refund" },
-  REFUND_FAILED: { label: "Refund failed", variant: "danger", trailIcon: "x" },
-  AUTH_REVERSAL_STARTED: { label: "Auth reversal", variant: "warning" },
-  ISSUER_DECLINE: { label: "Issuer decline", variant: "danger", trailIcon: "x" },
-  GENERAL_DECLINE: { label: "General decline", variant: "danger", trailIcon: "x" },
-  CUSTOMER_CANCELLED: { label: "Cancelled", variant: "danger", trailIcon: "x" },
-  AUTHENTICATION_TIMEOUT: { label: "Auth timeout", variant: "danger", trailIcon: "x" },
-  SYSTEM_ERROR: { label: "System error", variant: "danger", trailIcon: "x" },
-  REQUEST_ERROR: { label: "Request error", variant: "danger", trailIcon: "x" },
-  CONFIG_ERROR: { label: "Config error", variant: "danger", trailIcon: "x" },
-  SYSTEM_DECLINED: { label: "System declined", variant: "danger", trailIcon: "x" },
-  ABANDONED: { label: "Abandoned", variant: "danger", trailIcon: "x" },
-  AUTHENTICATION_FAILED: { label: "Auth failed", variant: "danger", trailIcon: "x" },
-  ALTPAY_DECLINE: { label: "Altpay decline", variant: "danger", trailIcon: "x" },
-  MARKED_AS_FRAUD: { label: "Marked as fraud", variant: "danger", trailIcon: "x" },
-  STEP_UP: { label: "Step up", variant: "warning" },
-  // variant: "warning"/"success"/"danger" here (not "orange") deliberately
-  // reuse the same three variants every other status in this table already
-  // uses, keeping the chip UI consistent instead of introducing a new color.
-  // DISPUTED and NEEDS_ACTION are two raw values for the same merchant-
-  // facing state ("needs the merchant to accept/contest or upload
-  // documents"), both display identically as "Action required" rather than
-  // two different-sounding labels for the same thing.
-  DISPUTED: { label: "Action required", variant: "warning", tooltip: "Respond within 6 days" },
-  NEEDS_ACTION: { label: "Action required", variant: "warning" },
-  UNDER_REVIEW: { label: "Under review", variant: "warning", trailIcon: "clock" },
-  // Only reached once PayGlocal has reviewed submitted evidence and found
-  // it inadequate, distinct from the initial "Action required" state.
-  INSUFFICIENT_DOCUMENTS: {
-    label: "Insufficient documents",
-    variant: "danger",
-    trailIcon: "alert",
-  },
-  WON: { label: "Won", variant: "success", trailIcon: "check" },
-  LOST: { label: "Lost", variant: "danger", trailIcon: "x" },
-};
-
-/** Every raw status that represents some stage of a dispute, these all
- * bucket under "disputed" (see getStatusBucket) rather than following their
- * badge variant's usual bucket, WON/LOST use "success"/"danger" variants for
- * their badge color but must still surface under the Disputes tab, not
- * alongside ordinary payment successes/failures. */
-const DISPUTE_STATUS_KEYS = [
-  "DISPUTED",
-  "UNDER_REVIEW",
-  "NEEDS_ACTION",
-  "INSUFFICIENT_DOCUMENTS",
-  "WON",
-  "LOST",
-];
-
-export function getStatusMeta(raw?: string): StatusMeta {
+/** Looks up a raw status string against one of the 3 status vocabularies
+ * (see status/transactionStatus.ts, refundStatus.ts, disputeStatus.ts),
+ * falling back to a generic muted chip for anything genuinely unrecognized
+ * rather than ever inventing a new chip term (status-vocabulary spec rule
+ * #7: "nothing outside these lists renders as a status"). */
+function lookupStatusMeta(raw: string | undefined, meta: Record<string, StatusMeta>): StatusMeta {
   if (!raw) return { label: "Unknown", variant: "muted" };
   const key = raw.toUpperCase().replace(/ /g, "_");
-  return PA_STATUS_META[key] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
+  return meta[key] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
 }
 
 // ── Coarse status buckets, drive both the segmented control filter and the
-// Amount column's sign/color, derived from PA_STATUS_META's own variants so
-// the two mappings can never drift apart. ──────────────────────────────────
+// Amount column's sign/color. ───────────────────────────────────────────────
 export type TransactionStatusBucket = "success" | "refunded" | "failed" | "pending" | "disputed";
 
-const BUCKET_BY_VARIANT: Partial<Record<BadgeVariant, TransactionStatusBucket>> = {
-  success: "success",
-  refund: "refunded",
-  danger: "failed",
-  warning: "pending",
+const BUCKET_BY_STATUS_KEY: Record<TransactionStatusKey, TransactionStatusBucket> = {
+  IN_FLIGHT: "pending",
+  FAILED: "failed",
+  EXPIRED: "failed",
+  SUCCESS: "success",
+  REFUND_IN_PROGRESS: "refunded",
+  REFUNDED: "refunded",
+  DISPUTED: "disputed",
+  DISPUTE_CLEARED: "disputed",
+  CHARGED_BACK: "disputed",
+  REFUNDED_AND_DISPUTED: "disputed",
+  REFUNDED_AND_CHARGED_BACK: "disputed",
 };
 
-export function getStatusBucket(raw?: string): TransactionStatusBucket {
-  const key = raw?.toUpperCase().replace(/ /g, "_");
-  if (key && DISPUTE_STATUS_KEYS.includes(key)) return "disputed";
-  const { variant } = getStatusMeta(raw);
-  return BUCKET_BY_VARIANT[variant] ?? "pending";
-}
-
-// ── Transaction-level display status ────────────────────────────────────────
-// getStatusMeta/getStatusBucket above answer "what does this one raw status
-// string mean". They're still correct and still used as-is for any
-// transaction with no refund/dispute history (including real, not-yet-
-// migrated API data, which has no refunds[]/disputes[] at all). The
-// functions below answer the actual question the transaction list/detail
-// page need answered: "what should this transaction's ONE status badge say,
-// given everything that has happened to it" (see the Unified Transaction ID
-// & Financial Event Logic model, refunds/disputes are child events on this
-// same PaTransaction, never separate rows). Every consumer of a
-// transaction's primary status (the table's status column, the drawer, the
-// full detail page) must go through getDisplayStatus, not getStatusMeta
-// directly, so there is one place this logic lives.
-
-/** The transaction's own bucket (see getStatusBucket) for a WON/LOST
- * dispute's raw status re-uses that same bucket mapping (WON's variant is
- * "success", LOST's is "danger" but both fall under "disputed" via
- * DISPUTE_STATUS_KEYS), kept in sync automatically since it's the same
- * function, not a second copy of the mapping. */
+/** The transaction's own bucket, driven by the exact same precedence as its
+ * chip (see getDisplayStatus below) so the two can never disagree, a
+ * transaction with a completed refund AND a dispute that later cleared
+ * shows "Refunded" (per the status-vocabulary spec's own worked example:
+ * "once the dispute is cleared, it is no longer affecting the money
+ * outcome"), so it now lives under the Refunded segment, not Disputes. */
 export function getDisplayStatusBucket(transaction: PaTransaction): TransactionStatusBucket {
-  const rawBucket = getStatusBucket(transaction.externalStatus);
-  if (rawBucket === "failed" || rawBucket === "pending") return rawBucket;
-
-  const dispute = transaction.disputes?.[0];
-  if (isDisputeActive(dispute)) return "disputed";
-  if (dispute) return getStatusBucket(dispute.status);
-
-  const refundedAmount = getRefundedAmount(transaction.refunds ?? []);
-  if (refundedAmount > 0) return "refunded";
-
-  return rawBucket;
+  return BUCKET_BY_STATUS_KEY[deriveStatusKey(transaction)];
 }
 
-/** The single badge {label, variant, trailIcon} shown for a transaction,
- * combining its refund state with its most recent dispute (if any). A
- * transaction with neither behaves exactly as getStatusMeta always did, this
- * is additive, not a replacement, for the common case. */
+function deriveStatusKey(transaction: PaTransaction): TransactionStatusKey {
+  return deriveTransactionStatusChip({
+    paymentBucket: derivePaymentBucket(transaction.externalStatus),
+    originalAmount: parseFloat(transaction.totalAmount ?? "0"),
+    refundedAmount: getRefundedAmount(transaction.refunds ?? []),
+    hasProcessingRefund: (transaction.refunds ?? []).some((r) => r.status === "PROCESSING"),
+    disputeEvents: transaction.disputes ?? [],
+  });
+}
+
+/** The single badge {label, variant, trailIcon} shown for a row in the
+ * Transactions table. A plain transaction is routed through the
+ * transaction-status precedence (status/transactionStatus.ts); a refund or
+ * dispute pseudo-row (see linkedChildRecords.ts's `linkedRecordType`) is
+ * routed through ITS OWN vocabulary instead, a term from one vocabulary
+ * never appears for another kind of row (status-vocabulary spec rule #1). */
 export function getDisplayStatus(transaction: PaTransaction): StatusMeta {
-  const rawBucket = getStatusBucket(transaction.externalStatus);
-  // Refund/dispute overlays only ever apply on top of an underlying
-  // successful payment, a failed or still-pending payment's own status is
-  // always the most important thing to show, unchanged.
-  if (rawBucket === "failed" || rawBucket === "pending") {
-    return getStatusMeta(transaction.externalStatus);
+  if (transaction.linkedRecordType === "refund") {
+    return lookupStatusMeta(transaction.externalStatus, REFUND_STATUS_META);
   }
-
-  const originalAmount = parseFloat(transaction.totalAmount ?? "0");
-  const refundedAmount = getRefundedAmount(transaction.refunds ?? []);
-  const isFullyRefunded = refundedAmount > 0 && refundedAmount >= originalAmount;
-  const isPartiallyRefunded = refundedAmount > 0 && !isFullyRefunded;
-  const refundPrefix = isFullyRefunded
-    ? "Refunded"
-    : isPartiallyRefunded
-      ? "Partially refunded"
-      : undefined;
-
-  const dispute = transaction.disputes?.[0];
-
-  if (isDisputeActive(dispute)) {
-    // getStatusMeta(dispute.status) reuses the exact existing labels for
-    // DISPUTED/NEEDS_ACTION/UNDER_REVIEW/INSUFFICIENT_DOCUMENTS ("Action
-    // required", "Under review", "Insufficient documents"), the dispute's
-    // own event status, not the transaction's externalStatus. Any extra
-    // context (e.g. DISPUTED's response deadline) travels via .tooltip,
-    // shown on hover rather than inline in the badge.
-    const disputeMeta = getStatusMeta(dispute!.status);
-    return {
-      label: refundPrefix ? `${refundPrefix} · ${disputeMeta.label}` : disputeMeta.label,
-      variant: "warning",
-      trailIcon: disputeMeta.trailIcon,
-      tooltip: disputeMeta.tooltip,
-    };
+  if (transaction.linkedRecordType === "dispute") {
+    return lookupStatusMeta(transaction.externalStatus, DISPUTE_STATUS_META);
   }
+  return TRANSACTION_STATUS_META[deriveStatusKey(transaction)];
+}
 
-  if (dispute) {
-    // Resolved (WON/LOST), keeps its own existing label/variant regardless
-    // of any independent refund state, see getDisplayStatus's own doc
-    // comment above for why this doesn't get combined with refund text.
-    return getStatusMeta(dispute.status);
-  }
+/** A dispute's own status badge (e.g. on the Dispute Management table/
+ * Dispute Detail page), never the combined transaction chip. */
+export function getDisputeStatusMeta(status: DisputeEventStatus): StatusMeta {
+  return DISPUTE_STATUS_META[status];
+}
 
-  if (refundPrefix) {
-    return { label: refundPrefix, variant: "refund" };
-  }
-
-  return getStatusMeta(transaction.externalStatus);
+/** A refund's own status badge (e.g. on the Refund Detail page). */
+export function getRefundStatusMeta(status: RefundEventStatus): StatusMeta {
+  return REFUND_STATUS_META[status];
 }
 
 /** Raw externalStatus codes belonging to each coarse bucket, used to build
  * the `externalStatus` array sent to the search API when a segmented-control
- * tab (other than "All") is selected. Dispute statuses are excluded from the
- * variant-derived success/failed lists (WON/LOST would otherwise double up
- * there) since they're already listed under "disputed" below. */
+ * tab (other than "All") is selected. "refunded"/"disputed" list the child
+ * event's OWN vocabulary (best-effort for a real API, the mock fallback path
+ * in PaTransactionTable filters by the actual derived bucket/flattened rows
+ * instead, see getDisplayStatusBucket/flattenRefundRows/flattenDisputeRows). */
 export const STATUS_BUCKET_RAW_VALUES: Record<
   Exclude<TransactionStatusBucket, "pending">,
   string[]
 > = {
-  success: Object.entries(PA_STATUS_META)
-    .filter(([key, meta]) => meta.variant === "success" && !DISPUTE_STATUS_KEYS.includes(key))
-    .map(([key]) => key),
-  refunded: Object.entries(PA_STATUS_META)
-    .filter(([, meta]) => meta.variant === "refund")
-    .map(([key]) => key),
-  failed: Object.entries(PA_STATUS_META)
-    .filter(([key, meta]) => meta.variant === "danger" && !DISPUTE_STATUS_KEYS.includes(key))
-    .map(([key]) => key),
-  disputed: DISPUTE_STATUS_KEYS,
+  success: ["SUCCESS", "REVERSED"],
+  refunded: ["PROCESSING", "COMPLETED", "FAILED"],
+  failed: [
+    "ISSUER_DECLINE",
+    "GENERAL_DECLINE",
+    "CUSTOMER_CANCELLED",
+    "AUTHENTICATION_TIMEOUT",
+    "AUTHENTICATION_FAILED",
+    "SYSTEM_ERROR",
+    "REQUEST_ERROR",
+    "CONFIG_ERROR",
+    "SYSTEM_DECLINED",
+    "ABANDONED",
+    "ALTPAY_DECLINE",
+    "MARKED_AS_FRAUD",
+    "EXPIRED",
+  ],
+  disputed: [
+    "NEEDS_RESPONSE",
+    "UNDER_REVIEW",
+    "MORE_EVIDENCE_NEEDED",
+    "REOPENED",
+    "CLEARED",
+    "CHARGED_BACK",
+    "ACCEPTED",
+    "EXPIRED",
+  ],
 };
 
 // ── Date & Time cell, reformats the API's "DD/MM/YYYY, HH:MM:SS" string into

@@ -1,20 +1,20 @@
-import { getStatusBucket, getStatusMeta } from "@/features/dashboard/transactions/paColumns";
 import { getDisputeReasonMeta } from "@/features/dashboard/transactions/disputeReasonMeta";
 import { buildLinkedChildRows } from "@/features/dashboard/transactions/linkedChildRecords";
 import { settlementRows } from "@/features/dashboard/settlement-reports/mock-data";
+import { derivePaymentBucket } from "@/features/dashboard/transactions/status/paymentBucket";
+import { deriveTransactionStatusChip } from "@/features/dashboard/transactions/status/transactionStatus";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
 import {
-  deriveTransactionStatus,
   getDisputedAmount,
   getActiveDisputeAmount,
+  getChargedBackDisputeAmount,
+  getClearedDisputeAmount,
   getFailedRefundAmount,
-  getLostDisputeAmount,
   getNetAmount,
-  getPendingRefundAmount,
+  getProcessingRefundAmount,
   getRefundedAmount,
   getRemainingAmount,
   getSettledAmount,
-  getWonDisputeAmount,
 } from "@/features/dashboard/transactions/financial/deriveFinancials";
 import { generateTimelineEvents } from "@/features/dashboard/transactions/financial/generateTimeline";
 import type {
@@ -59,9 +59,9 @@ const COMMENT_POOL = [
   "",
 ];
 
-/** Reference code shown in Status Notes for non-success statuses. Raw
- * externalStatus (normalized like getStatusMeta does) -> code. Statuses not
- * listed here fall back to a generic code per bucket in deriveErrorCode(). */
+/** Reference code shown in Status Notes for failed/expired payments. Raw
+ * externalStatus (normalized like derivePaymentBucket does) -> code.
+ * Statuses not listed here fall back to a generic code in deriveErrorCode(). */
 const ERROR_CODES: Record<string, string> = {
   ISSUER_DECLINE: "E1001",
   GENERAL_DECLINE: "E1002",
@@ -75,31 +75,39 @@ const ERROR_CODES: Record<string, string> = {
   SYSTEM_ERROR: "E5001",
   REQUEST_ERROR: "E4001",
   CONFIG_ERROR: "E4002",
-  SENT_FOR_REFUND: "R2001",
-  REFUND_STARTED: "R2002",
+  EXPIRED: "E1010",
 };
 
-/** Only failed/refunded transactions get an error code, gated on the same
- * status bucket that drives Status Notes' reason text and border color. */
-function deriveErrorCode(raw: string | undefined, bucket: string): string | undefined {
-  if (bucket !== "failed" && bucket !== "refunded") return undefined;
+/** Only a payment that never completed gets an error code, gated on the
+ * same payment bucket that drives Status Notes' reason text and border
+ * color. */
+function deriveErrorCode(
+  raw: string | undefined,
+  bucket: "in_flight" | "failed" | "expired" | "success"
+): string | undefined {
+  if (bucket !== "failed" && bucket !== "expired") return undefined;
   const key = raw?.toUpperCase().replace(/ /g, "_") ?? "";
-  return ERROR_CODES[key] ?? (bucket === "failed" ? "E1000" : "R2000");
+  return ERROR_CODES[key] ?? "E1000";
 }
 
-/** Per raw dispute status (DISPUTED/UNDER_REVIEW/NEEDS_ACTION/WON/LOST, see
- * DISPUTE_STATUS_KEYS in paColumns.tsx), the reason assumed for a dispute
- * with no structured data of its own (real, not-yet-migrated API data, see
- * the disputeEvents fallback below). Its reasonCode/description/merchant
- * label come from the shared getDisputeReasonMeta lookup, not duplicated
- * here, only the 5 dispute-bucket statuses ever reach this. */
+/** Every dispute status (see status/disputeStatus.ts), the reason assumed
+ * for a dispute with no structured data of its own (real, not-yet-migrated
+ * API data whose raw externalStatus happens to already BE one of these 8
+ * values, see the disputeEvents fallback below). Its reasonCode/
+ * description/merchant label come from the shared getDisputeReasonMeta
+ * lookup, not duplicated here. */
 const STATUS_DEFAULT_REASON: Record<string, string> = {
-  DISPUTED: "Fraudulent",
-  NEEDS_ACTION: "Fraudulent",
+  NEEDS_RESPONSE: "Fraudulent",
   UNDER_REVIEW: "Product not received",
-  WON: "Duplicate processing",
-  LOST: "Credit not processed",
+  MORE_EVIDENCE_NEEDED: "Fraudulent",
+  REOPENED: "Fraudulent",
+  CLEARED: "Duplicate processing",
+  CHARGED_BACK: "Credit not processed",
+  ACCEPTED: "Duplicate processing",
+  EXPIRED: "Fraudulent",
 };
+
+const DISPUTE_STATUS_VALUES = new Set(Object.keys(STATUS_DEFAULT_REASON));
 
 function seedFromString(value: string): number {
   let hash = 0;
@@ -224,22 +232,29 @@ export function deriveTransactionDetail(
   additionalRefundEvents: RefundEvent[] = []
 ): TransactionDetailView {
   const seed = seedFromString(row.gid ?? row.formattedCreationDateTime ?? "txn");
-  const bucket = getStatusBucket(row.externalStatus);
-  const statusLabel = getStatusMeta(row.externalStatus).label;
   const transactionId = row.gid ?? "";
   const currency = row.txnCurrency ?? "INR";
   const amountReceived = parseFloat(row.totalAmount ?? "0");
 
-  const statusReason =
-    bucket === "success"
-      ? `Payment ${statusLabel.toLowerCase()} successfully.`
-      : bucket === "failed"
-        ? `Payment declined${row.message ? `: ${row.message}` : "."}`
-        : bucket === "refunded"
-          ? (row.message ?? "Refund processed for this payment.")
-          : "Additional verification is in progress for this payment.";
+  // Real, not-yet-migrated API data with no structured disputes[] of its
+  // own can still have its raw externalStatus already BE one of the 8
+  // dispute-vocabulary values (see the disputeEvents fallback below); when
+  // that's the case, the underlying PAYMENT itself is treated as
+  // successful (a dispute can only exist on a payment that was collected),
+  // never as still in-flight/failed/expired.
+  const rawKey = row.externalStatus?.toUpperCase().replace(/ /g, "_") ?? "";
+  const isRawDisputeStatus = DISPUTE_STATUS_VALUES.has(rawKey);
+  const paymentBucket = isRawDisputeStatus ? "success" : derivePaymentBucket(row.externalStatus);
 
-  const errorCode = deriveErrorCode(row.externalStatus, bucket);
+  const statusReason = isRawDisputeStatus
+    ? "Additional verification is in progress for this payment."
+    : paymentBucket === "success"
+      ? "Payment completed successfully."
+      : paymentBucket === "failed" || paymentBucket === "expired"
+        ? `Payment declined${row.message ? `: ${row.message}` : "."}`
+        : "Payment is still being processed.";
+
+  const errorCode = deriveErrorCode(row.externalStatus, paymentBucket);
 
   const fee = Math.round(amountReceived * FEE_RATE * 100) / 100;
   // Fee-only net, used below for the settlement fallback's own synthesized
@@ -279,7 +294,7 @@ export function deriveTransactionDetail(
             isSettled: false,
             expectedOnDate: first.expectedOnDate ?? "Not available",
           };
-  } else if (bucket === "success") {
+  } else if (paymentBucket === "success") {
     const isSettled = seed % 3 !== 0;
     settlement = isSettled
       ? {
@@ -315,15 +330,15 @@ export function deriveTransactionDetail(
   }
 
   // Dispute: the transaction's own disputes[] is the real source of truth.
-  // A row with no structured disputes[] but a "disputed" raw status (real,
-  // not-yet-migrated API data) falls back to the same deterministic
-  // synthesis this function always used.
-  const rawDisputeKey = row.externalStatus?.toUpperCase().replace(/ /g, "_") ?? "";
+  // A row with no structured disputes[] but a raw status that already IS
+  // one of the 8 dispute-vocabulary values (real, not-yet-migrated API
+  // data) falls back to the same deterministic synthesis this function
+  // always used.
   let disputeEvents: DisputeEvent[];
   if (row.disputes && row.disputes.length > 0) {
     disputeEvents = row.disputes;
-  } else if (bucket === "disputed") {
-    const defaultReason = STATUS_DEFAULT_REASON[rawDisputeKey] ?? STATUS_DEFAULT_REASON.DISPUTED!;
+  } else if (isRawDisputeStatus) {
+    const defaultReason = STATUS_DEFAULT_REASON[rawKey] ?? STATUS_DEFAULT_REASON.NEEDS_RESPONSE!;
     const reasonMeta = getDisputeReasonMeta(defaultReason);
     // Disputes are typically filed some days after the original charge, not
     // the same instant, raisedOn is offset from the payment date so the
@@ -339,12 +354,16 @@ export function deriveTransactionDetail(
         reason: defaultReason,
         reasonCode: reasonMeta.reasonCode,
         description: reasonMeta.description,
-        status: (STATUS_DEFAULT_REASON[rawDisputeKey]
-          ? rawDisputeKey
-          : "DISPUTED") as DisputeEventStatus,
+        status: rawKey as DisputeEventStatus,
         raisedOn,
         respondBy,
-        resolvedOn: rawDisputeKey === "WON" || rawDisputeKey === "LOST" ? respondBy : undefined,
+        resolvedOn:
+          rawKey === "CLEARED" ||
+          rawKey === "CHARGED_BACK" ||
+          rawKey === "ACCEPTED" ||
+          rawKey === "EXPIRED"
+            ? respondBy
+            : undefined,
       },
     ];
   } else {
@@ -369,13 +388,8 @@ export function deriveTransactionDetail(
   // transaction for either.
   const refundEvents: RefundEvent[] = [...(row.refunds ?? []), ...additionalRefundEvents];
 
-  // Underlying payment bucket a disputed/refunded transaction would have had
-  // absent that later event, deriveTransactionStatus layers dispute/refund
-  // state back on top of this itself, see its own doc comment.
-  const paymentBucketForDerivation =
-    bucket === "failed" || bucket === "pending" ? bucket : "success";
-
   const refundedAmount = getRefundedAmount(refundEvents);
+  const hasProcessingRefund = refundEvents.some((r) => r.status === "PROCESSING");
   const activeDisputeAmount = getActiveDisputeAmount(disputeEvents);
   const disputedAmount = getDisputedAmount(disputeEvents);
   // Uses the fully-resolved refund/dispute arrays (mock-seeded + session-
@@ -383,11 +397,12 @@ export function deriveTransactionDetail(
   // row.refunds/row.disputes, so a refund issued this session shows up
   // immediately, see buildLinkedChildRows's own doc comment.
   linkedTransactions.push(...buildLinkedChildRows(row, refundEvents, disputeEvents));
-  const derivedTransactionStatus = deriveTransactionStatus({
-    paymentBucket: paymentBucketForDerivation,
+  const derivedTransactionStatus = deriveTransactionStatusChip({
+    paymentBucket,
     originalAmount: amountReceived,
     refundedAmount,
-    activeDisputeAmount,
+    hasProcessingRefund,
+    disputeEvents,
   });
 
   // Payment Breakdown: same refundedAmount/disputedAmount financials
@@ -395,7 +410,7 @@ export function deriveTransactionDetail(
   // (see getNetAmount's own doc comment on why disputedAmount is shown but
   // never subtracted).
   const amountBreakdown: TransactionDetailView["amountBreakdown"] =
-    bucket === "failed"
+    paymentBucket === "failed" || paymentBucket === "expired"
       ? null
       : {
           amountReceived,
@@ -413,20 +428,20 @@ export function deriveTransactionDetail(
     disputeEvents,
     settlementEvents,
     refundedAmount,
-    pendingRefundAmount: getPendingRefundAmount(refundEvents),
+    processingRefundAmount: getProcessingRefundAmount(refundEvents),
     failedRefundAmount: getFailedRefundAmount(refundEvents),
     settledAmount: getSettledAmount(settlementEvents),
     disputedAmount,
     activeDisputeAmount,
-    wonDisputeAmount: getWonDisputeAmount(disputeEvents),
-    lostDisputeAmount: getLostDisputeAmount(disputeEvents),
+    clearedDisputeAmount: getClearedDisputeAmount(disputeEvents),
+    chargedBackDisputeAmount: getChargedBackDisputeAmount(disputeEvents),
     remainingAmount: getRemainingAmount(amountReceived, refundedAmount),
     derivedTransactionStatus,
     timelineEvents: generateTimelineEvents({
       currency,
       originalAmount: amountReceived,
       paymentInitiatedAt: row.formattedCreationDateTime ?? "",
-      paymentBucket: paymentBucketForDerivation,
+      paymentBucket,
       refundEvents,
       disputeEvents,
       settlementEvents,

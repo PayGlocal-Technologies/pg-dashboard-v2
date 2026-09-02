@@ -19,7 +19,6 @@ import {
   buildPaColumns,
   customerName,
   getDisplayStatusBucket,
-  getStatusBucket,
 } from "@/features/dashboard/transactions/paColumns";
 import { applyDisputeResolutionOverride } from "@/features/dashboard/transactions/resolveDisputeOverride";
 import {
@@ -320,12 +319,12 @@ export function PaTransactionTable() {
     // A payment row: any transaction with a dispute (active or resolved)
     // skips the drawer entirely and opens straight into the full-page view,
     // which has more room for the Linked Transactions section pointing at
-    // the dispute's own detail page. Real, not-yet-migrated API data with no
-    // structured disputes[] yet falls back to its own raw externalStatus
-    // bucket, same check this used before.
-    const hasDispute =
-      (row.disputes && row.disputes.length > 0) ||
-      getStatusBucket(row.externalStatus) === "disputed";
+    // the dispute's own detail page. Disputed-ness now only ever comes from
+    // the row's own disputes[] (there's no longer a raw externalStatus
+    // bucket that means "disputed", dispute status is its own vocabulary,
+    // never a transaction externalStatus value, see the status-vocabulary
+    // spec's rule #1).
+    const hasDispute = !!row.disputes && row.disputes.length > 0;
     if (hasDispute) {
       setStoredTransaction(row);
       router.push(`/transactions/${encodeURIComponent(row.gid ?? "")}`);

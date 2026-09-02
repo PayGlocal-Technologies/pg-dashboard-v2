@@ -260,7 +260,19 @@ export function DisputeManagementFeature() {
   };
 
   const showRespondBy = RESPOND_BY_SEGMENTS.includes(statusSegment);
-  const columns = buildDisputeColumns({ columnOrder, hiddenColumns, showRespondBy });
+  const columns = buildDisputeColumns({ columnOrder, hiddenColumns, showRespondBy, nowMs });
+
+  // Soonest deadline first whenever "Respond by" is showing (status-
+  // vocabulary spec §27's "sorted ascending by default"), a row with no
+  // deadline sorts after every row that has one rather than to the top.
+  const sortedRows = useMemo(() => {
+    if (!showRespondBy) return filteredRows;
+    return [...filteredRows].sort((a, b) => {
+      const aTs = parseFormattedDate(a.respondBy) ?? Number.POSITIVE_INFINITY;
+      const bTs = parseFormattedDate(b.respondBy) ?? Number.POSITIVE_INFINITY;
+      return aTs - bTs;
+    });
+  }, [filteredRows, showRespondBy]);
 
   return (
     // Full-bleed background matching the cards below, rather than the app
@@ -357,7 +369,7 @@ export function DisputeManagementFeature() {
 
           <DataTable
             columns={columns}
-            data={filteredRows}
+            data={sortedRows}
             tableLayout="content"
             emptyTitle="No disputes yet"
             emptyDescription="Disputed payments will appear here as they come in."

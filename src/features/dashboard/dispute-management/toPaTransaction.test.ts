@@ -5,7 +5,7 @@ import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
 const ROW: DisputeRow = {
   disputeId: "du_test1",
   txnGid: "gl_o-test1",
-  status: "NEEDS_ACTION",
+  status: "NEEDS_RESPONSE",
   amount: 5400,
   currency: "INR",
   reason: "Subscription cancelled",

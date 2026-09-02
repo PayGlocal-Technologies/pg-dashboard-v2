@@ -14,27 +14,15 @@ import type { PaTransaction } from "@/features/dashboard/transactions/types";
 // PaTransactionTable's onViewDetails and TransactionDetailFeature's
 // goToDetail.
 
-/** Maps a refund's own event status to an existing PA_STATUS_META key, so
- * a refund's badge reuses the exact same label/variant/color the rest of
- * the app already uses for these concepts, rather than a second status
- * vocabulary just for refunds. */
-export function refundStatusToExternalStatus(status: RefundEvent["status"]): string {
-  switch (status) {
-    case "SUCCEEDED":
-      return "REFUNDED";
-    case "FAILED":
-      return "REFUND_FAILED";
-    case "PENDING":
-    default:
-      return "SENT_FOR_REFUND";
-  }
-}
-
 export function buildRefundLinkedRow(refund: RefundEvent, parent: PaTransaction): PaTransaction {
   return {
     ...parent,
     gid: parent.gid,
-    externalStatus: refundStatusToExternalStatus(refund.status),
+    // A refund pseudo-row's own status vocabulary IS RefundEventStatus
+    // (PROCESSING/COMPLETED/FAILED), see getDisplayStatus's
+    // linkedRecordType === "refund" branch in paColumns.tsx, no remapping
+    // needed now that refunds have their own dedicated chip vocabulary.
+    externalStatus: refund.status,
     totalAmount: String(refund.amount),
     txnCurrency: refund.currency,
     formattedCreationDateTime: refund.createdAt,

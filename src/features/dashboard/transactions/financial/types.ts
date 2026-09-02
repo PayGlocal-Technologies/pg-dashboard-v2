@@ -11,7 +11,13 @@
 // across components (see CLAUDE.md-adjacent project convention of a single
 // source of truth per concern).
 
-export type RefundEventStatus = "PENDING" | "SUCCEEDED" | "FAILED";
+import type { TransactionStatusKey } from "@/features/dashboard/transactions/status/transactionStatus";
+
+/** See status/refundStatus.ts for the display meta. PROCESSING/COMPLETED are
+ * the renamed PENDING/SUCCEEDED, matching the status-vocabulary spec's own
+ * refund chip vocabulary 1:1 (a real rename, not a relabeled-but-still-
+ * transient state: these 3 values ARE the spec's approved refund chips). */
+export type RefundEventStatus = "PROCESSING" | "COMPLETED" | "FAILED";
 
 export interface RefundEvent {
   id: string;
@@ -46,16 +52,23 @@ export interface SettlementEvent {
   expectedOnDate?: string;
 }
 
-/** Same 6-status vocabulary already established for disputed PA transactions
- * (see DISPUTE_STATUS_KEYS in paColumns.tsx and DisputeRawStatus in
+/** Same 8-status vocabulary already established for disputed PA transactions
+ * (see status/disputeStatus.ts and DisputeRawStatus in
  * dispute-management/types.ts), reused rather than introducing a second
- * dispute status enum. DISPUTED and NEEDS_ACTION are two raw values for the
- * same merchant-facing state (see PA_STATUS_META), both display as "Action
- * required". INSUFFICIENT_DOCUMENTS is reached only once PayGlocal has
- * reviewed submitted evidence and found it inadequate, distinct from the
- * initial "Action required" state. */
+ * dispute status enum. NEEDS_RESPONSE covers both "just raised" and
+ * "documents still needed" (the merged old DISPUTED/NEEDS_ACTION). CLEARED/
+ * CHARGED_BACK are the renamed WON/LOST. ACCEPTED (merchant chose not to
+ * contest) and REOPENED/EXPIRED are new, see status/disputeStatus.ts's own
+ * doc comments for why ACCEPTED is tracked separately from CHARGED_BACK. */
 export type DisputeEventStatus =
-  "DISPUTED" | "NEEDS_ACTION" | "UNDER_REVIEW" | "INSUFFICIENT_DOCUMENTS" | "WON" | "LOST";
+  | "NEEDS_RESPONSE"
+  | "UNDER_REVIEW"
+  | "MORE_EVIDENCE_NEEDED"
+  | "REOPENED"
+  | "CLEARED"
+  | "CHARGED_BACK"
+  | "ACCEPTED"
+  | "EXPIRED";
 
 export interface DisputeEvent {
   id: string;
@@ -71,7 +84,8 @@ export interface DisputeEvent {
   status: DisputeEventStatus;
   raisedOn: string;
   respondBy?: string;
-  /** Set once status moves to WON or LOST. */
+  /** Set once status moves to a resolved/terminal value (CLEARED,
+   * CHARGED_BACK, ACCEPTED, EXPIRED). */
   resolvedOn?: string;
   /** File names submitted as evidence, see DisputeRespondForm's onSubmit. */
   documents?: string[];
@@ -86,37 +100,28 @@ export interface DisputeEvent {
    * submission, before a representation is forwarded to the issuing bank.
    * Set by withDisputeStatus whenever a fresh submission restarts review. */
   reviewPhase?: "PAYGLOCAL_REVIEW" | "BANK_REVIEW";
+  /** The dispute's broader stage in the card-network process, separate from
+   * `reviewPhase` (a narrower PayGlocal-vs-bank detail only meaningful
+   * during UNDER_REVIEW). Shown as its own badge, never merged into the
+   * status, see status/disputeStatus.ts's DISPUTE_PHASE_META. */
+  disputePhase?: "INQUIRY" | "CHARGEBACK" | "PRE_ARBITRATION" | "ARBITRATION";
 }
-
-/** The 4 distinct concepts a single `externalStatus` string currently
- * conflates (see paColumns.tsx's getStatusBucket). This type only names the
- * "current overall state" one (transaction status), payment/financial/action
- * state are represented by amountBreakdown/derived amounts and UI logic
- * (disputeAwaitingDecision, canRefund) that already exist and are untouched. */
-export type DerivedTransactionStatus =
-  | "FAILED"
-  | "PENDING"
-  | "SUCCESSFUL"
-  | "PARTIALLY_REFUNDED"
-  | "REFUNDED"
-  | "DISPUTED"
-  | "PARTIALLY_DISPUTED"
-  | "REFUNDED_AND_DISPUTED"
-  | "PARTIALLY_REFUNDED_AND_DISPUTED";
 
 export type TimelineEventType =
   | "PAYMENT_INITIATED"
-  | "PAYMENT_AUTHORIZED"
   | "PAYMENT_CAPTURED"
   | "PAYMENT_FAILED"
+  | "PAYMENT_EXPIRED"
   | "PAYMENT_SETTLED"
   | "REFUND_INITIATED"
-  | "REFUND_SUCCEEDED"
+  | "REFUND_COMPLETED"
   | "REFUND_FAILED"
   | "DISPUTE_RAISED"
   | "EVIDENCE_SUBMITTED"
-  | "DISPUTE_WON"
-  | "DISPUTE_LOST"
+  | "DISPUTE_CLEARED"
+  | "DISPUTE_CHARGED_BACK"
+  | "DISPUTE_ACCEPTED"
+  | "DISPUTE_EXPIRED"
   | "FUNDS_WITHDRAWN"
   | "FUNDS_REINSTATED";
 
@@ -181,14 +186,18 @@ export interface TransactionFinancials {
   disputeEvents: DisputeEvent[];
   settlementEvents: SettlementEvent[];
   refundedAmount: number;
-  pendingRefundAmount: number;
+  /** Sum of refunds still PROCESSING (renamed from pendingRefundAmount). */
+  processingRefundAmount: number;
   failedRefundAmount: number;
   settledAmount: number;
   disputedAmount: number;
   activeDisputeAmount: number;
-  wonDisputeAmount: number;
-  lostDisputeAmount: number;
+  /** Sum of CLEARED disputes (renamed from wonDisputeAmount). */
+  clearedDisputeAmount: number;
+  /** Sum of disputes where money left the merchant: CHARGED_BACK, ACCEPTED
+   * or EXPIRED (renamed from lostDisputeAmount, now covers all 3 reasons). */
+  chargedBackDisputeAmount: number;
   remainingAmount: number;
-  derivedTransactionStatus: DerivedTransactionStatus;
+  derivedTransactionStatus: TransactionStatusKey;
   timelineEvents: TimelineEventRecord[];
 }

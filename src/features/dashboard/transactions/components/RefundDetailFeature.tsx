@@ -6,7 +6,10 @@ import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
 import { CopyableCell } from "@/components/common/CopyableCell";
-import { formatDisplayDateTime, getStatusMeta } from "@/features/dashboard/transactions/paColumns";
+import {
+  formatDisplayDateTime,
+  getRefundStatusMeta,
+} from "@/features/dashboard/transactions/paColumns";
 import {
   DetailRow,
   SectionLabel,
@@ -17,10 +20,7 @@ import {
   PaymentTimeline,
   type TimelineStep,
 } from "@/features/dashboard/transactions/components/PaymentTimeline";
-import {
-  getRefundDetailLinkedRows,
-  refundStatusToExternalStatus,
-} from "@/features/dashboard/transactions/linkedChildRecords";
+import { getRefundDetailLinkedRows } from "@/features/dashboard/transactions/linkedChildRecords";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { RefundEvent } from "@/features/dashboard/transactions/financial/types";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
@@ -37,12 +37,12 @@ function buildRefundOnlyTimelineSteps(refund: RefundEvent, currency: string): Ti
     id: "refund-initiated",
     label: "Refund initiated",
     description: `${amountLabel} · ${when}`,
-    state: refund.status === "PENDING" ? "current" : "complete",
+    state: refund.status === "PROCESSING" ? "current" : "complete",
   };
-  if (refund.status === "SUCCEEDED") {
+  if (refund.status === "COMPLETED") {
     return [
       initiated,
-      { id: "refund-processed", label: "Refund processed", description: when, state: "complete" },
+      { id: "refund-completed", label: "Refund completed", description: when, state: "complete" },
     ];
   }
   if (refund.status === "FAILED") {
@@ -102,7 +102,7 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
 
   const currency = refund.currency || transaction.txnCurrency || "INR";
   const originalAmount = parseFloat(transaction.totalAmount ?? "0");
-  const statusMeta = getStatusMeta(refundStatusToExternalStatus(refund.status));
+  const statusMeta = getRefundStatusMeta(refund.status);
   const formattedDateTime = formatDisplayDateTime(refund.createdAt) ?? "Not available";
 
   // Parent, always, plus any sibling dispute(s) belonging to THIS SAME

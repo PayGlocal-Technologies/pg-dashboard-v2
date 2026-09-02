@@ -49,7 +49,7 @@ describe("generateTimelineEvents", () => {
         transactionId: TXN_ID,
         amount: 100,
         currency: CCY,
-        status: "SUCCEEDED",
+        status: "COMPLETED",
         createdAt: "10/08/2026, 09:00:00",
       },
     ];
@@ -62,7 +62,7 @@ describe("generateTimelineEvents", () => {
         reason: "Fraudulent",
         reasonCode: "10.4",
         description: "desc",
-        status: "DISPUTED",
+        status: "NEEDS_RESPONSE",
         // Raised BEFORE the refund above, even though disputes are pushed
         // after refunds internally, must still sort earlier.
         raisedOn: "05/08/2026, 09:00:00",
@@ -84,7 +84,7 @@ describe("generateTimelineEvents", () => {
     expect(types.indexOf("DISPUTE_RAISED")).toBeLessThan(types.indexOf("REFUND_INITIATED"));
   });
 
-  it("keeps a historical dispute-raised event even after the dispute is won", () => {
+  it("keeps a historical dispute-raised event even after the dispute is cleared", () => {
     const disputes: DisputeEvent[] = [
       {
         id: "du-1",
@@ -94,7 +94,7 @@ describe("generateTimelineEvents", () => {
         reason: "Fraudulent",
         reasonCode: "10.4",
         description: "desc",
-        status: "WON",
+        status: "CLEARED",
         raisedOn: "05/08/2026, 09:00:00",
         resolvedOn: "12/08/2026, 09:00:00",
       },
@@ -112,12 +112,12 @@ describe("generateTimelineEvents", () => {
 
     const types = events.map((e) => e.type);
     expect(types).toContain("DISPUTE_RAISED");
-    expect(types).toContain("DISPUTE_WON");
+    expect(types).toContain("DISPUTE_CLEARED");
     expect(types).toContain("FUNDS_REINSTATED");
-    expect(types.indexOf("DISPUTE_RAISED")).toBeLessThan(types.indexOf("DISPUTE_WON"));
+    expect(types.indexOf("DISPUTE_RAISED")).toBeLessThan(types.indexOf("DISPUTE_CLEARED"));
   });
 
-  it("generates a funds-withdrawn event as a separate entry when a dispute is lost", () => {
+  it("generates a funds-withdrawn event as a separate entry when a dispute is charged back", () => {
     const disputes: DisputeEvent[] = [
       {
         id: "du-1",
@@ -127,7 +127,7 @@ describe("generateTimelineEvents", () => {
         reason: "Fraudulent",
         reasonCode: "10.4",
         description: "desc",
-        status: "LOST",
+        status: "CHARGED_BACK",
         raisedOn: "05/08/2026, 09:00:00",
         resolvedOn: "12/08/2026, 09:00:00",
       },
@@ -144,7 +144,69 @@ describe("generateTimelineEvents", () => {
     });
 
     const types = events.map((e) => e.type);
-    expect(types).toContain("DISPUTE_LOST");
+    expect(types).toContain("DISPUTE_CHARGED_BACK");
+    expect(types).toContain("FUNDS_WITHDRAWN");
+  });
+
+  it("generates a funds-withdrawn event when a dispute is accepted by the merchant", () => {
+    const disputes: DisputeEvent[] = [
+      {
+        id: "du-1",
+        transactionId: TXN_ID,
+        amount: 200,
+        currency: CCY,
+        reason: "Fraudulent",
+        reasonCode: "10.4",
+        description: "desc",
+        status: "ACCEPTED",
+        raisedOn: "05/08/2026, 09:00:00",
+        resolvedOn: "12/08/2026, 09:00:00",
+      },
+    ];
+
+    const events = generateTimelineEvents({
+      currency: CCY,
+      originalAmount: 1000,
+      paymentInitiatedAt: "01/08/2026, 09:00:00",
+      paymentBucket: "success",
+      refundEvents: [],
+      disputeEvents: disputes,
+      settlementEvents: [],
+    });
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("DISPUTE_ACCEPTED");
+    expect(types).toContain("FUNDS_WITHDRAWN");
+  });
+
+  it("generates a funds-withdrawn event when a dispute expires unresolved", () => {
+    const disputes: DisputeEvent[] = [
+      {
+        id: "du-1",
+        transactionId: TXN_ID,
+        amount: 200,
+        currency: CCY,
+        reason: "Fraudulent",
+        reasonCode: "10.4",
+        description: "desc",
+        status: "EXPIRED",
+        raisedOn: "05/08/2026, 09:00:00",
+        resolvedOn: "12/08/2026, 09:00:00",
+      },
+    ];
+
+    const events = generateTimelineEvents({
+      currency: CCY,
+      originalAmount: 1000,
+      paymentInitiatedAt: "01/08/2026, 09:00:00",
+      paymentBucket: "success",
+      refundEvents: [],
+      disputeEvents: disputes,
+      settlementEvents: [],
+    });
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("DISPUTE_EXPIRED");
     expect(types).toContain("FUNDS_WITHDRAWN");
   });
 
@@ -196,6 +258,38 @@ describe("generateTimelineEvents", () => {
     expect(types).toContain("PAYMENT_FAILED");
     expect(types).not.toContain("PAYMENT_CAPTURED");
   });
+
+  it("marks an expired payment with a PAYMENT_EXPIRED event, no captured/failed event", () => {
+    const events = generateTimelineEvents({
+      currency: CCY,
+      originalAmount: 1000,
+      paymentInitiatedAt: "01/08/2026, 09:00:00",
+      paymentBucket: "expired",
+      refundEvents: [],
+      disputeEvents: [],
+      settlementEvents: [],
+    });
+
+    const types = events.map((e) => e.type);
+    expect(types).toContain("PAYMENT_EXPIRED");
+    expect(types).not.toContain("PAYMENT_CAPTURED");
+    expect(types).not.toContain("PAYMENT_FAILED");
+  });
+
+  it("produces only PAYMENT_INITIATED for an in-flight payment (no captured/failed/expired event)", () => {
+    const events = generateTimelineEvents({
+      currency: CCY,
+      originalAmount: 1000,
+      paymentInitiatedAt: "01/08/2026, 09:00:00",
+      paymentBucket: "in_flight",
+      refundEvents: [],
+      disputeEvents: [],
+      settlementEvents: [],
+    });
+
+    const types = events.map((e) => e.type);
+    expect(types).toEqual(["PAYMENT_INITIATED"]);
+  });
 });
 
 const BASE_TXN: PaTransaction = {
@@ -219,7 +313,7 @@ describe("deriveDisputeOnlyTimelineSteps", () => {
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "WON",
+          status: "CLEARED",
           raisedOn: "02/08/2026, 09:00:00",
           resolvedOn: "10/08/2026, 09:00:00",
         },
@@ -231,7 +325,7 @@ describe("deriveDisputeOnlyTimelineSteps", () => {
           reason: "Duplicate processing",
           reasonCode: "12.6",
           description: "desc2",
-          status: "LOST",
+          status: "CHARGED_BACK",
           raisedOn: "12/08/2026, 09:00:00",
           resolvedOn: "20/08/2026, 09:00:00",
         },
@@ -240,10 +334,10 @@ describe("deriveDisputeOnlyTimelineSteps", () => {
     const financials = deriveTransactionDetail(txn).financials;
 
     const d1Steps = deriveDisputeOnlyTimelineSteps(financials, "d1");
-    expect(d1Steps.map((s) => s.label)).toEqual(["Dispute raised", "Dispute won"]);
+    expect(d1Steps.map((s) => s.label)).toEqual(["Dispute raised", "Dispute cleared"]);
 
     const d2Steps = deriveDisputeOnlyTimelineSteps(financials, "d2");
-    expect(d2Steps.map((s) => s.label)).toEqual(["Dispute raised", "Dispute lost"]);
+    expect(d2Steps.map((s) => s.label)).toEqual(["Dispute raised", "Dispute charged back"]);
   });
 
   it("includes the current in-progress step for an active dispute, scoped to its own id", () => {
@@ -258,14 +352,14 @@ describe("deriveDisputeOnlyTimelineSteps", () => {
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "02/08/2026, 09:00:00",
           respondBy: "20/08/2026, 09:00:00",
         },
       ],
     };
     const steps = deriveDisputeOnlyTimelineSteps(deriveTransactionDetail(txn).financials, "d1");
-    expect(steps.map((s) => s.label)).toEqual(["Dispute raised", "Awaiting your response"]);
+    expect(steps.map((s) => s.label)).toEqual(["Dispute raised", "Needs response"]);
   });
 
   it("returns an empty list for an unknown dispute id, never falling back to another dispute's steps", () => {
@@ -280,7 +374,7 @@ describe("deriveDisputeOnlyTimelineSteps", () => {
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "DISPUTED",
+          status: "NEEDS_RESPONSE",
           raisedOn: "02/08/2026, 09:00:00",
         },
       ],
@@ -293,7 +387,7 @@ describe("deriveDisputeOnlyTimelineSteps", () => {
   });
 });
 
-describe("deriveTimelineSteps: PayGlocal review -> bank review -> insufficient documents", () => {
+describe("deriveTimelineSteps: PayGlocal review -> bank review -> more evidence needed", () => {
   it("shows a plain Under review trailing step while PayGlocal's own review is in progress (no reviewPhase set)", () => {
     const txn: PaTransaction = {
       ...BASE_TXN,
@@ -341,7 +435,7 @@ describe("deriveTimelineSteps: PayGlocal review -> bank review -> insufficient d
     expect(steps.map((s) => s.label)).not.toContain("Under review");
   });
 
-  it("shows an Insufficient documents trailing step distinct from Awaiting your response", () => {
+  it("shows a More evidence needed trailing step distinct from Needs response", () => {
     const txn: PaTransaction = {
       ...BASE_TXN,
       disputes: [
@@ -353,14 +447,14 @@ describe("deriveTimelineSteps: PayGlocal review -> bank review -> insufficient d
           reason: "Fraudulent",
           reasonCode: "10.4",
           description: "desc",
-          status: "INSUFFICIENT_DOCUMENTS",
+          status: "MORE_EVIDENCE_NEEDED",
           raisedOn: "02/08/2026, 09:00:00",
           documents: ["evidence.pdf"],
         },
       ],
     };
     const steps = deriveTimelineSteps(deriveTransactionDetail(txn).financials);
-    expect(steps.map((s) => s.label)).toContain("Insufficient documents");
-    expect(steps.map((s) => s.label)).not.toContain("Awaiting your response");
+    expect(steps.map((s) => s.label)).toContain("More evidence needed");
+    expect(steps.map((s) => s.label)).not.toContain("Needs response");
   });
 });

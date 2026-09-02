@@ -3,33 +3,41 @@ import type { DisputeRawStatus } from "@/features/dashboard/dispute-management/t
 export const DISPUTE_STATUS_SEGMENTS = [
   { value: "action-required", label: "Action required" },
   { value: "under-review", label: "Under review" },
-  { value: "insufficient-documents", label: "Insufficient documents" },
+  { value: "more-evidence-needed", label: "More evidence needed" },
+  { value: "reopened", label: "Reopened" },
   { value: "all", label: "All disputes" },
-  { value: "won", label: "Won" },
-  { value: "lost", label: "Lost" },
+  { value: "cleared", label: "Cleared" },
+  { value: "charged-back", label: "Charged back" },
+  { value: "accepted", label: "Accepted" },
+  { value: "expired", label: "Expired" },
 ] as const;
 
 export type DisputeStatusSegment = (typeof DISPUTE_STATUS_SEGMENTS)[number]["value"];
 
 /** Raw statuses behind each segment (mirrors STATUS_BUCKET_RAW_VALUES's
- * pattern in paColumns.tsx). "all" has no entry, it means no filter.
- * DISPUTED and NEEDS_ACTION both fold into "action-required" since they
- * display identically (see PA_STATUS_META). */
+ * pattern in paColumns.tsx). "all" has no entry, it means no filter. */
 export const DISPUTE_SEGMENT_RAW_STATUSES: Record<
   Exclude<DisputeStatusSegment, "all">,
   DisputeRawStatus[]
 > = {
-  "action-required": ["DISPUTED", "NEEDS_ACTION"],
+  "action-required": ["NEEDS_RESPONSE"],
   "under-review": ["UNDER_REVIEW"],
-  "insufficient-documents": ["INSUFFICIENT_DOCUMENTS"],
-  won: ["WON"],
-  lost: ["LOST"],
+  "more-evidence-needed": ["MORE_EVIDENCE_NEEDED"],
+  reopened: ["REOPENED"],
+  cleared: ["CLEARED"],
+  "charged-back": ["CHARGED_BACK"],
+  accepted: ["ACCEPTED"],
+  expired: ["EXPIRED"],
 };
 
 /** Segments whose rows still need a merchant response, the only ones the
  * table's "Respond by" column applies to. Under review disputes already had
  * evidence submitted, so they have no response deadline left to show. */
-export const RESPOND_BY_SEGMENTS: DisputeStatusSegment[] = ["action-required"];
+export const RESPOND_BY_SEGMENTS: DisputeStatusSegment[] = [
+  "action-required",
+  "more-evidence-needed",
+  "reopened",
+];
 
 export const DISPUTE_REASONS = [
   "Fraudulent",

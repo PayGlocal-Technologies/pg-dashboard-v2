@@ -8,7 +8,6 @@ import {
   flattenRefundRows,
   getDisputeDetailLinkedRows,
   getRefundDetailLinkedRows,
-  refundStatusToExternalStatus,
 } from "@/features/dashboard/transactions/linkedChildRecords";
 import type { DisputeEvent, RefundEvent } from "@/features/dashboard/transactions/financial/types";
 import type { PaTransaction } from "@/features/dashboard/transactions/types";
@@ -31,7 +30,7 @@ const REFUND: RefundEvent = {
   transactionId: "gl_o-parent1",
   amount: 3000,
   currency: "INR",
-  status: "SUCCEEDED",
+  status: "COMPLETED",
   createdAt: "03/08/2026, 09:00:00",
 };
 
@@ -43,7 +42,7 @@ const DISPUTE: DisputeEvent = {
   reason: "Fraudulent",
   reasonCode: "10.4",
   description: "desc",
-  status: "DISPUTED",
+  status: "NEEDS_RESPONSE",
   raisedOn: "05/08/2026, 09:00:00",
 };
 
@@ -77,13 +76,10 @@ describe("buildRefundLinkedRow", () => {
     expect(row.firstName).toBe("Karan");
     expect(row.cardBrand).toBe("VISA");
   });
-});
 
-describe("refundStatusToExternalStatus", () => {
-  it("maps every refund status to a real, existing PA_STATUS_META key", () => {
-    expect(refundStatusToExternalStatus("SUCCEEDED")).toBe("REFUNDED");
-    expect(refundStatusToExternalStatus("PENDING")).toBe("SENT_FOR_REFUND");
-    expect(refundStatusToExternalStatus("FAILED")).toBe("REFUND_FAILED");
+  it("sets externalStatus to the refund's own status directly, no remapping (refunds have their own dedicated status vocabulary)", () => {
+    const row = buildRefundLinkedRow(REFUND, PARENT);
+    expect(row.externalStatus).toBe(REFUND.status);
   });
 });
 
@@ -92,7 +88,7 @@ describe("buildDisputeLinkedRow", () => {
     const row = buildDisputeLinkedRow(DISPUTE, PARENT);
     expect(row.gid).toBe(PARENT.gid);
     expect(row.totalAmount).toBe("4000");
-    expect(row.externalStatus).toBe("DISPUTED");
+    expect(row.externalStatus).toBe("NEEDS_RESPONSE");
     expect(row.linkedRecordType).toBe("dispute");
     expect(row.linkedRecordId).toBe(DISPUTE.id);
   });
@@ -185,7 +181,7 @@ describe("flattenRefundRows / flattenDisputeRows (Transactions table Refunded/Di
     transactionId: "gl_o-parent2",
     amount: 100,
     currency: "USD",
-    status: "SUCCEEDED",
+    status: "COMPLETED",
     createdAt: "04/08/2026, 09:00:00",
   };
 
