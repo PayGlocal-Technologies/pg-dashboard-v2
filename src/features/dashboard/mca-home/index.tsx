@@ -16,6 +16,7 @@ import {
 import { McaRevenueCard } from "@/features/dashboard/mca-home/components/McaRevenueCard";
 import { McaClientAnalyticsCard } from "@/features/dashboard/mca-home/components/McaClientAnalyticsCard";
 import { McaNeedsAttentionCard } from "@/features/dashboard/mca-home/components/McaNeedsAttentionCard";
+import { McaNeedsAttentionDrawer } from "@/features/dashboard/mca-home/components/McaNeedsAttentionDrawer";
 import { McaQuickAccess } from "@/features/dashboard/mca-home/components/McaQuickAccess";
 import { McaDashboardWidgetCustomization } from "@/features/dashboard/mca-home/components/widgets/McaDashboardWidgetCustomization";
 import {
@@ -64,6 +65,7 @@ export function McaDashboardFeature() {
   const router = useRouter();
   const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
   const [editMode, setEditMode] = useState(false);
+  const [needsAttentionOpen, setNeedsAttentionOpen] = useState(false);
   const [layout, setLayout] = useState<McaWidgetId[]>(() => readMcaDashboardLayout());
   const layoutSnapshot = useRef<McaWidgetId[]>(layout);
 
@@ -87,12 +89,21 @@ export function McaDashboardFeature() {
     router.push("/mca-settlement-report");
   }
 
-  function handleViewAll(section: string) {
-    toast.message(section, { description: "This action isn't wired up yet." });
-  }
-
-  function handleNeedsAttentionAction(id: string) {
-    toast.message("Action queued", { description: `Follow-up started for ${id}.` });
+  /**
+   * Both Needs attention actions — Remind on an overdue invoice, View on one
+   * still in its window — land on the invoice's details page. That page is
+   * where "Email / remind client" lives, so chasing an invoice is one hop from
+   * here rather than a separate action on the dashboard.
+   *
+   * The id is the invoice's own id, the same segment the invoice list pushes.
+   * Note the needs-attention payload carries no MID, so the details page
+   * resolves one itself (the selected MID, else the merchant's first PACB one).
+   * For a merchant with several PACB MIDs and none selected, this list spans
+   * them all and a row from another MID will not resolve — the payload needs a
+   * `mid` per row to fix properly.
+   */
+  function handleOpenInvoice(id: string) {
+    router.push(`/mca-invoices/${id}`);
   }
 
   function handleCustomise() {
@@ -163,8 +174,8 @@ export function McaDashboardFeature() {
           <McaClientAnalyticsCard onViewAll={handleViewClients} />
           <div data-guide="mca-needs-attention">
             <McaNeedsAttentionCard
-              onViewAll={() => handleViewAll("Needs attention")}
-              onAction={handleNeedsAttentionAction}
+              onViewAll={() => setNeedsAttentionOpen(true)}
+              onAction={handleOpenInvoice}
             />
           </div>
         </div>
@@ -181,6 +192,12 @@ export function McaDashboardFeature() {
         editMode={editMode}
         onDiscardEdit={handleDiscardCustomise}
         onDoneEdit={handleDoneCustomise}
+      />
+
+      <McaNeedsAttentionDrawer
+        open={needsAttentionOpen}
+        onOpenChange={setNeedsAttentionOpen}
+        onOpenInvoice={handleOpenInvoice}
       />
 
       {/* Guide launcher — highlighted once here (the main dashboard), a plain
