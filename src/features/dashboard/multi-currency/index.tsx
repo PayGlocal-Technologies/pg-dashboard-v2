@@ -157,7 +157,7 @@ function MultiCurrencyContent() {
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const { download: downloadProofOfOwnership, isDownloading: isDownloadingProof } =
-    useAccountDocumentDownload("proof-of-ownership");
+    useAccountDocumentDownload();
 
   const copyToClipboard = async (text: string, message: string) => {
     try {

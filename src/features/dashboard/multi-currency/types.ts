@@ -105,6 +105,47 @@ export interface GeneratedDocumentUrlResponse {
   fileName?: string;
 }
 
+/**
+ * Body of leg 1 of the transaction report (bank statement) download.
+ *
+ * Verbatim from pg-dashboard's TransactionReportRequest
+ * (multi-currency-accounts/types.ts) — the three fields its Transaction report
+ * drawer collects before the statement can be generated. Nothing else is sent:
+ * the account itself is identified by the SHA-256 in the URL.
+ */
+export interface TransactionReportRequest {
+  merchantRegisteredName: string;
+  contactEmail: string;
+  merchantRegisteredAddress: string;
+}
+
+/**
+ * The slice of GET /merchants/{mid}/profile the two statement drawers prefill
+ * from. Flat body, not enveloped — the same shape pg-dashboard's ProfileData
+ * reads (platform-withdrawals/types.ts). Envelope-tolerant on the read side,
+ * since other callers of this endpoint in the app see it wrapped.
+ *
+ * `merchantAddress` arrives either pre-joined as `concatAddress` or split into
+ * its parts, and pg-dashboard's DownloadReport falls back from the first to the
+ * second — see `merchantRegisteredAddressOf` in this feature's utils.
+ */
+export interface MerchantRegisteredProfile {
+  /** The registered legal name. Read-only wherever it is shown. */
+  merchantRegisteredName?: string;
+  /** The trading/DBA name — what the Amazon statement is issued to. */
+  merchantShortName?: string;
+  merchantAddress?: MerchantAddress;
+}
+
+export interface MerchantAddress {
+  concatAddress?: string;
+  streetAddress1?: string;
+  streetAddress2?: string;
+  city?: string;
+  state?: string;
+  zipcode?: string;
+}
+
 export interface ShareLinkRequest {
   currency: string;
 }
@@ -150,14 +191,19 @@ export interface ExchangeRatesResponse {
 /**
  * Leg 1's payload for the Amazon account-detail statement. Exactly the six
  * fields pg-dashboard sends (AmzAccountDetailReportRequest) — the drawer also
- * collects a DBA name and country, which this endpoint does not take.
+ * shows the registered legal name and the country, which this endpoint does
+ * not take.
  */
 export interface AmzAccountStatementRequest {
   currency: string;
   routingCode: string;
   accountNumber: string;
+  /** The seller's DBA (trading) name, not the registered legal name — the
+   *  statement is issued to this. */
   merchantName: string;
   merchantRegisteredAddress: string;
+  /** Optional on the wire, but the drawer always collects and sends it, as
+   *  pg-dashboard's DownloadReport does. */
   contactEmail?: string;
 }
 

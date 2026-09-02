@@ -2,28 +2,31 @@ import type { Platform, PlatformDocument } from "@/features/dashboard/platforms/
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
 /**
- * The two statements Amazon payouts involve: the platform-side settlement
- * statement the merchant has to generate, then their own bank statement. The
- * platform-side one leads because it is the document they must go and produce,
- * where the bank statement already exists.
+ * The two statements Amazon payouts involve, with pg-dashboard's own captions,
+ * titles and order (Platforms.tsx): the bank-side transaction report first,
+ * then the Amazon account statement. Wording is kept identical to production
+ * deliberately — merchants and support both refer to these documents by these
+ * names, so a second set of labels for the same two PDFs is a support problem,
+ * not a copy improvement.
  *
- * Amazon-only, matching pg-dashboard, which gates this whole column on the
- * selected platform being Amazon and labels its second card "Amazon / Account
- * Statement". No other platform here has documents, so none renders the column.
+ * Amazon-only, matching pg-dashboard, which gates this whole section on the
+ * selected platform being Amazon. No other platform here has documents, so
+ * none renders the section.
  */
 const AMAZON_DOCUMENTS: PlatformDocument[] = [
   {
-    caption: "Amazon",
-    title: "Generate Settlement Statement",
-    actionIcon: "file-text",
-    actionLabel: "Generate an Amazon settlement statement",
-    opensSettlementForm: true,
+    caption: "Last 3 months",
+    title: "Transaction Report",
+    actionIcon: "download",
+    actionLabel: "Request the last 3 months' transaction report",
+    opens: "transaction-report",
   },
   {
-    caption: "Last 3 months",
-    title: "Bank settlement statement",
-    actionIcon: "download",
-    actionLabel: "Download the last 3 months' bank settlement statement",
+    caption: "Amazon",
+    title: "Account Statement",
+    actionIcon: "file-text",
+    actionLabel: "Generate an Amazon account statement",
+    opens: "settlement-statement",
   },
 ];
 
