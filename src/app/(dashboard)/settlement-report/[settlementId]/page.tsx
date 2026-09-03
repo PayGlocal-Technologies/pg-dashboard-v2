@@ -11,5 +11,5 @@ interface SettlementDetailPageProps {
 
 export default async function SettlementDetailPage({ params }: SettlementDetailPageProps) {
   const { settlementId } = await params;
-  return <SettlementDetailFeature settlementId={settlementId} />;
+  return <SettlementDetailFeature settlementId={settlementId} product="PA" />;
 }

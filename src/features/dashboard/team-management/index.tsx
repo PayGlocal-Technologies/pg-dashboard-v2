@@ -10,7 +10,6 @@ import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useApp } from "@/stores/useApp";
-import { useAccountSetup } from "@/stores/useAccountSetup";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { teamMemberColumns } from "@/features/dashboard/team-management/columns";
 import { TeamMemberRowActions } from "@/features/dashboard/team-management/components/TeamMemberRowActions";
@@ -45,12 +44,12 @@ export function TeamManagementFeature() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGuestUser = useApp((s) => s.isGuestUser);
   const profile = useApp((s) => s.profile);
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
 
-  // Team management is scoped to a single MID (the caller's account or the
-  // explicitly-selected sub-MID), not a product filter — so it reads the MID
-  // directly rather than through useResolvedMids (see plan risk note).
-  const mid = selectedMid || profile?.mid || "";
+  // Team management is always scoped to the profile MID — the account the
+  // signed-in user belongs to — never to a selected sub-MID and never to the
+  // UCIC id. Team membership is a property of that account, so it does not
+  // follow the header's merchant selection the way the reporting pages do.
+  const mid = profile?.mid ?? "";
   const midType = profile?.midType ?? "";
 
   const [search, setSearch] = useState("");

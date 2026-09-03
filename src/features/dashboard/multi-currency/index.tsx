@@ -15,7 +15,6 @@ import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { useSettlementOverview } from "@/features/dashboard/settlement-reports/hooks";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
@@ -33,6 +32,7 @@ import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/compo
 import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
 import {
   useAccountDocumentDownload,
+  useMcaMerchantId,
   useNeedsMidSelection,
   useVirtualAccounts,
 } from "@/features/dashboard/multi-currency/hooks";
@@ -125,8 +125,8 @@ function MultiCurrencyContent() {
   // region — matching OutstandingAmountCard beside it, which is aggregate too;
   // there's no per-currency monthly series to plot, so both metrics read across
   // all accounts.
-  const { urlMid, midFilter } = useResolvedMids("PACB");
-  const settlementMid = urlMid || midFilter?.value?.[0] || "";
+  // Same endpoint, and now the same scope, as the settlement report page.
+  const settlementMid = useMcaMerchantId();
   const { overview: settlementOverview, isLoading: isSettledLoading } = useSettlementOverview(
     settlementMid,
     "ytd"

@@ -22,7 +22,7 @@ import {
   type RevenueTimeframe,
 } from "@/features/dashboard/mca-home/mock-data";
 import { useRevenueTrend } from "@/features/dashboard/mca-home/hooks";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { useSettlementUpcoming } from "@/features/dashboard/settlement-reports/hooks";
 
 /** Day window per timeframe. The revenue-trend endpoint is date-ranged, so each
@@ -102,9 +102,8 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
 
   // Upcoming settlement — the same live endpoint the settlement-report screen
   // uses (useSettlementUpcoming). Merchant-scoped, so resolve the PACB MID here.
-  const { urlMid, midFilter } = useResolvedMids("PACB");
-  const settlementMid = urlMid || midFilter?.value?.[0] || "";
-  const { upcoming } = useSettlementUpcoming(settlementMid);
+  const { scopeId: settlementScopeId } = useScopeId("PACB");
+  const { upcoming } = useSettlementUpcoming(settlementScopeId);
 
   // API points → the chart's shape (label → x). Empty until the call resolves.
   const chartData: RevenuePoint[] = (trend?.points ?? []).map((p) => ({

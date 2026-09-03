@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useGet, usePost, useDelete } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import useNewPermissions from "@/hooks/useNewPermissions";
 import {
   zohoStatusApi,
@@ -36,7 +37,10 @@ function getRedirectUri(): string {
 function useZohoIdentifier(): { identifier: string; pacbMids: string[]; selectedMid: string } {
   const pacbMids = useApp((s) => s.paCbMids);
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails?.mid) ?? "";
-  return { identifier: selectedMid || pacbMids[0] || "", pacbMids, selectedMid };
+  // pacbMids and selectedMid are still returned raw: callers use them to decide
+  // whether to show a MID picker, which is a different question from which id
+  // the endpoints take.
+  return { identifier: useScopeId("PACB").scopeId, pacbMids, selectedMid };
 }
 
 /**

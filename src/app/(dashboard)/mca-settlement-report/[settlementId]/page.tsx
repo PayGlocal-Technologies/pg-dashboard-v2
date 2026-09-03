@@ -13,5 +13,5 @@ interface McaSettlementDetailPageProps {
 // row from the MCA list keeps the merchant on the MCA path.
 export default async function McaSettlementDetailPage({ params }: McaSettlementDetailPageProps) {
   const { settlementId } = await params;
-  return <SettlementDetailFeature settlementId={settlementId} />;
+  return <SettlementDetailFeature settlementId={settlementId} product="PACB" />;
 }

@@ -46,6 +46,10 @@ export interface SettlementRow {
   nonWorkingDayDate?: string;
   /** Holiday name, only set when nonWorkingDayReason === "holiday". */
   nonWorkingDayName?: string;
+  /** Which merchant this settlement belongs to, used to scope its report
+   *  download. Optional because the summary endpoint does not return it yet —
+   *  see FfmsSettlementSummaryRow.merchantId. */
+  merchantId?: string;
 }
 
 export interface SparklinePoint {
@@ -164,6 +168,14 @@ export interface FfmsSettlementSummaryRow {
   totalSettlementAmount: string | null;
   numberOfTransactions: string | null;
   utrNumbers: string[];
+  /**
+   * BACKEND GAP: not returned today. The summary is called at UCIC scope for a
+   * multi-MID account with no MID selected, so its rows can span merchants and
+   * each row has to name its own before that row's report can be downloaded.
+   * Until it arrives the download falls back to the scope the summary was
+   * fetched at, which is correct only for a single-merchant response.
+   */
+  merchantId?: string | null;
 }
 
 export interface FfmsSettlementResponse {

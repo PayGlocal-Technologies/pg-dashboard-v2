@@ -12,8 +12,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
-import { useApp } from "@/stores/useApp";
-import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
@@ -99,13 +98,10 @@ function ZohoSyncAction() {
 }
 
 function McaInvoicesContent() {
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
-  const paCbMids = useApp((s) => s.paCbMids);
-
-  // The summary endpoint takes a single MID in its path, so it uses the
-  // selected one, falling back to the first PACB MID exactly as production's
-  // McaInvoiceSummary does.
-  const summaryMid = selectedMid || (paCbMids[0] ?? "");
+  // The summary endpoint takes a single id in its path: the product MID, the
+  // selected MID, or the UCIC id for a multi-MID account with nothing selected
+  // (see lib/hooks/useScopeId.ts).
+  const { scopeId: summaryMid } = useScopeId("PACB");
 
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
 
