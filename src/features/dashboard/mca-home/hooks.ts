@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useGet } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import {
   clientAnalyticsApi,
   mcaNeedsAttentionApi,
@@ -132,21 +133,19 @@ export function useRevenueTrend(
   startDate: string,
   endDate: string
 ): { trend: RevenueTrendData | undefined; isLoading: boolean; isError: boolean } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const scopeId = urlMid || ucicId;
-  const url = urlMid
-    ? mcaRevenueTrendByMidApi(urlMid, startDate, endDate)
-    : mcaRevenueTrendByUcicApi(ucicId, startDate, endDate);
+  const { scopeId, scope, isReady } = useScopeId("PACB");
+  const url =
+    scope === "mid"
+      ? mcaRevenueTrendByMidApi(scopeId, startDate, endDate)
+      : mcaRevenueTrendByUcicApi(scopeId, startDate, endDate);
 
   const { data, isPending, isError } = useGet<RevenueTrendResponse>(
     ["mca-revenue-trend", scopeId, startDate, endDate],
     url,
-    { enabled: isReady && !!scopeId }
+    { enabled: isReady }
   );
 
-  return { trend: data?.data, isLoading: isReady && !!scopeId && isPending, isError };
+  return { trend: data?.data, isLoading: isReady && isPending, isError };
 }
 
 /**
@@ -164,24 +163,22 @@ export function useTopClients(
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const scopeId = urlMid || ucicId;
-  const url = urlMid
-    ? mcaTopClientsByMidApi(urlMid, startDate, endDate, limit)
-    : mcaTopClientsByUcicApi(ucicId, startDate, endDate, limit);
+  const { scopeId, scope, isReady } = useScopeId("PACB");
+  const url =
+    scope === "mid"
+      ? mcaTopClientsByMidApi(scopeId, startDate, endDate, limit)
+      : mcaTopClientsByUcicApi(scopeId, startDate, endDate, limit);
 
   const { data, isPending, isError } = useGet<TopClientsResponse>(
     ["mca-top-clients", scopeId, startDate, endDate, limit],
     url,
-    { enabled: isReady && !!scopeId }
+    { enabled: isReady }
   );
 
   return {
     clients: data?.data?.rows ?? [],
     reportingCurrency: data?.data?.reportingCurrency,
-    isLoading: isReady && !!scopeId && isPending,
+    isLoading: isReady && isPending,
     isError,
   };
 }
@@ -206,11 +203,7 @@ export function useNeedsAttention(): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const scopeId = urlMid || ucicId;
-  const enabled = isReady && !!scopeId;
+  const { scopeId, isReady: enabled } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<NeedsAttentionResponse>(
     ["mca-needs-attention", scopeId],

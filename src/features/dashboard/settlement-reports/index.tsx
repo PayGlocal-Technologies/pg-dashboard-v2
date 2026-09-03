@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
-import { useProductContext, toProductType } from "@/stores/useProductContext";
+import { useScopeId } from "@/lib/hooks/useScopeId";
+import { toProductType, type NavContext } from "@/stores/useProductContext";
 import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
 import { useApp } from "@/stores/useApp";
 import { useGet, usePostQuery } from "@/lib/api/hooks";
@@ -83,15 +84,16 @@ function upcomingSettlementTimeLabel(schedule: SettlementSchedule): string {
   return `${formatWeekdayName(settlementDate)} · ${formatDayMonth(settlementDate)}`;
 }
 
-export function SettlementReportsFeature() {
+interface SettlementReportsFeatureProps {
+  /** Which product's settlements this screen shows. Comes from the route:
+   *  /settlement-report is PA, /mca-settlement-report is PACB. */
+  product: NavContext;
+}
+
+export function SettlementReportsFeature({ product }: SettlementReportsFeatureProps) {
   const router = useRouter();
 
-  // Which product (Payments / Multi-Currency Accounts) this shared screen is
-  // currently scoped to, set by the Header's top-level tabs, see
-  // useProductContext.ts. "Home" has no product of its own and falls back to
-  // PA. The real settlement endpoint differs per product: PA is a GET
-  // summary, FFMS (PACB) is a POST summary.
-  const activeContext = useProductContext((s) => s.activeContext);
+  const activeContext = product;
   const activeProduct = toProductType(activeContext);
   const isMca = activeProduct === "PACB";
   const listPath = settlementListPath(activeContext);
@@ -104,18 +106,36 @@ export function SettlementReportsFeature() {
 
   const { urlMid, midFilter } = useResolvedMids(activeProduct);
   const isGuestUser = useApp((s) => s.isGuestUser);
-  // Partner users carry the MID in the URL path; merchants resolve it from the
-  // product MID filter. Both settlement endpoints are keyed by a single MID.
-  const mid = urlMid || midFilter?.value?.[0] || "";
+  // The one id every path-scoped endpoint on this page takes: the product MID
+  // for a single-MID account, the selected MID, or the UCIC id for a multi-MID
+  // account with nothing selected. The FFMS settlement endpoints accept the
+  // UCIC id in that slot, so the table and the cards share this scope and
+  // always report over the same set of accounts.
+  const { scopeId } = useScopeId(activeProduct);
+  // The PA settlement endpoints are not confirmed to take a UCIC id, so they
+  // stay on a single MID. Remove this once PA is confirmed and the whole page
+  // can move to scopeId.
+  const paMid = urlMid || midFilter?.value?.[0] || "";
 
-  const [search, setSearch] = useState("");
+  // Seeded from ?q= so the header's global search can hand an identifier
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [duration, setDuration] = useState<SettlementDurationValue | undefined>(undefined);
   const [showCycleInfo, setShowCycleInfo] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>(SETTLEMENT_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   // Set when a row's download is requested; drives the lazy download queries
-  // below (mirrors pg-dashboard's reportDownloadDate + refetch pattern).
-  const [downloadDate, setDownloadDate] = useState<string | null>(null);
+  // below (mirrors pg-dashboard's reportDownloadDate + refetch pattern). Both
+  // the date and the merchant come off the clicked row, so a row from a
+  // UCIC-scoped summary downloads against its own merchant rather than the
+  // scope the list was fetched at.
+  const [downloadTarget, setDownloadTarget] = useState<{
+    date: string;
+    merchantId: string;
+  } | null>(null);
+  const downloadDate = downloadTarget?.date ?? null;
 
   const durationEnd = duration
     ? duration.mode === "range"
@@ -128,9 +148,9 @@ export function SettlementReportsFeature() {
   // ── PA (Payments) settlement summary — GET, date range in the URL path ──────
   const dateRange = duration ? `${duration.from}/${durationEnd ?? duration.from}` : undefined;
   const paQuery = useGet<PaSettlementResponse>(
-    ["settlement-pa", mid, dateRange ?? ""],
-    paSettlementReportsApi(mid, dateRange),
-    { enabled: !isMca && !!mid && !isGuestUser }
+    ["settlement-pa", paMid, dateRange ?? ""],
+    paSettlementReportsApi(paMid, dateRange),
+    { enabled: !isMca && !!paMid && !isGuestUser }
   );
 
   // ── FFMS (PACB) settlement summary — POST minimal TableReqBody ───────────────
@@ -140,22 +160,25 @@ export function SettlementReportsFeature() {
     ...(startTime && endTime ? { startTime, endTime } : {}),
   };
   const ffmsQuery = usePostQuery<FfmsSettlementResponse, TableReqBody>(
-    ["settlement-ffms", mid],
-    ffmsSettlementSummaryApi(mid),
+    ["settlement-ffms", scopeId],
+    ffmsSettlementSummaryApi(scopeId),
     ffmsBody,
     { staleTime: 0 },
-    isMca && !!mid && !isGuestUser
+    isMca && !!scopeId && !isGuestUser
   );
 
   // ── Lazy per-row download queries (fired via refetch on downloadDate) ────────
   const paDownloadQuery = useGet<PaSettlementDownloadResponse>(
-    ["settlement-pa-download", mid, downloadDate ?? ""],
-    paSettlementDownloadApi(mid, downloadDate ?? ""),
+    ["settlement-pa-download", paMid, downloadDate ?? ""],
+    paSettlementDownloadApi(paMid, downloadDate ?? ""),
     { enabled: false }
   );
+  // Scoped to the clicked row's own merchant, not to the scope the summary was
+  // fetched at: a UCIC-scoped summary can return rows from several merchants.
+  const ffmsDownloadMid = downloadTarget?.merchantId ?? "";
   const ffmsDownloadQuery = usePostQuery<FfmsSettlementDownloadResponse, Record<string, never>>(
-    ["settlement-ffms-download", mid, downloadDate ?? ""],
-    ffmsSettlementDownloadApi(mid, downloadDate ?? ""),
+    ["settlement-ffms-download", ffmsDownloadMid, downloadDate ?? ""],
+    ffmsSettlementDownloadApi(ffmsDownloadMid, downloadDate ?? ""),
     {},
     undefined,
     false
@@ -181,7 +204,7 @@ export function SettlementReportsFeature() {
       if (cancelled) return;
       if (link) triggerBrowserDownload(link);
       // Reset inside the async callback (not the effect body) per CLAUDE.md.
-      setDownloadDate(null);
+      setDownloadTarget(null);
     };
     void run();
     return () => {
@@ -200,7 +223,7 @@ export function SettlementReportsFeature() {
   // fetch, so total / trend / chart all move together. Falls back to the mock
   // summary while loading or if the endpoint is unavailable (e.g. the PA path).
   const [settlementTimeframe, setSettlementTimeframe] = useState<TotalSettledTimeframe>("ytd");
-  const { overview } = useSettlementOverview(mid, settlementTimeframe);
+  const { overview } = useSettlementOverview(scopeId, settlementTimeframe);
 
   // No mock fallback: an unloaded/unsupported overview shows 0 / empty, never a
   // fake figure.
@@ -221,7 +244,7 @@ export function SettlementReportsFeature() {
 
   // Upcoming settlement — live, current-state (no date range). No mock fallback:
   // we don't show a placeholder amount while it loads.
-  const { upcoming: upcomingSettlementData } = useSettlementUpcoming(mid);
+  const { upcoming: upcomingSettlementData } = useSettlementUpcoming(scopeId);
   const upcomingSettlementLabel = upcomingSettlementData
     ? formatCurrency(upcomingSettlementData.amount, "INR")
     : "—";
@@ -446,7 +469,15 @@ export function SettlementReportsFeature() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setDownloadDate(row.id)}
+                        onClick={() =>
+                          setDownloadTarget({
+                            date: row.id,
+                            // row.merchantId once the summary returns it; until
+                            // then the scope the list was fetched at, which is
+                            // right for a single-merchant response.
+                            merchantId: row.merchantId ?? scopeId,
+                          })
+                        }
                         leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
                         className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                       >

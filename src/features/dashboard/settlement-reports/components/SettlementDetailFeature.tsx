@@ -41,7 +41,7 @@ import type {
   SettlementPayment,
 } from "@/features/dashboard/settlement-reports/types";
 import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
-import { useProductContext } from "@/stores/useProductContext";
+import { type NavContext } from "@/stores/useProductContext";
 
 /** "UTR2603120001" → "UTR26....0001" */
 function truncateMiddle(value: string): string {
@@ -261,13 +261,14 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
 
 interface SettlementDetailFeatureProps {
   settlementId: string;
+  /** Which product's list to go back to. Comes from the route, as on the list
+   *  screen. */
+  product: NavContext;
 }
 
-export function SettlementDetailFeature({ settlementId }: SettlementDetailFeatureProps) {
+export function SettlementDetailFeature({ settlementId, product }: SettlementDetailFeatureProps) {
   const router = useRouter();
-  // Back-navigation targets the list route the merchant came from: MCA has its
-  // own, see settlement-reports/routes.ts.
-  const listPath = settlementListPath(useProductContext((s) => s.activeContext));
+  const listPath = settlementListPath(product);
   const [showReportInfo, setShowReportInfo] = useState(false);
   const [showReleasedInfo, setShowReleasedInfo] = useState(false);
   const detail = settlementDetailsById[settlementId];

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -23,6 +23,7 @@ import {
 import { useDelete, usePost, usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { reorderColumns } from "@/lib/utils/columns";
 import {
   allInvoicesApi,
@@ -140,8 +141,13 @@ export function McaInvoiceTable({
 
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
   const paCbMids = useApp((s) => s.paCbMids);
+  const { scopeId } = useScopeId("PACB");
 
-  const [search, setSearch] = useState("");
+  // Seeded from ?q= so the header's global search can hand an identifier
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   /**
    * The Date chip's own value, and nobody else's.
    *
@@ -197,7 +203,11 @@ export function McaInvoiceTable({
   );
 
   // Any MID can address the endpoint; fieldSearch.mid is what scopes results.
-  const searchUrl = allInvoicesApi(mids[0] ?? "");
+  // The search endpoint takes a single id in its path. `mids` above is the
+  // body-side filter list; the path id comes from the shared resolver, so a
+  // multi-MID account with nothing selected searches at UCIC scope instead of
+  // silently searching only its first MID.
+  const searchUrl = allInvoicesApi(scopeId);
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     McaInvoicesResponse,
