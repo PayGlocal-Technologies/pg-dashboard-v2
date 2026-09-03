@@ -10,6 +10,7 @@ import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import { SKU_GUIDE_KEY, SKU_GUIDE_STEPS } from "@/features/dashboard/sku-management/guide";
 import { useSkuPathMid } from "@/features/dashboard/sku-management/hooks";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { useUrlAction } from "@/lib/hooks/useUrlAction";
 
 export function SkuManagementFeature() {
   // The buttons live here but every row they create lives in SkuTable, so this
@@ -39,6 +40,16 @@ export function SkuManagementFeature() {
     if (mid) selectMid(mid);
     setAddItemOpen(true);
   };
+
+  // "Add item" and "Import items" picked from the header search land here as
+  // ?action=add-item / ?action=import. Both call the same openers with "" that
+  // the buttons call when there is no MID to choose (see MidScopedAction), so
+  // the two entry points are one code path. Held back until the MID list has
+  // loaded, and never fired while a choice is pending or the page is showing
+  // its own MID picker instead of the catalogue.
+  const canRunUrlAction = guardState !== "not-applicable" && midOptions.length > 0 && !needsMidChoice;
+  useUrlAction("add-item", () => openAddItem(""), canRunUrlAction);
+  useUrlAction("import", () => openImport(""), canRunUrlAction);
 
   if (guardState === "not-applicable") {
     return (

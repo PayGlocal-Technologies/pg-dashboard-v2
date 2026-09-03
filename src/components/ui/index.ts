@@ -28,6 +28,8 @@ export {
   CommandEmpty,
   CommandGroup,
   CommandItem,
+  CommandSeparator,
+  CommandShortcut,
   DataTable,
   type Column,
   DatePicker,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -64,7 +65,11 @@ export function ReceiptsTable() {
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
 
   const [product, setProduct] = useState<ReceiptProduct>(DEFAULT_RECEIPT_PRODUCT);
-  const [search, setSearch] = useState("");
+  // Seeded from ?q= so the header's global search can hand an identifier
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
   const [monthFilters, setMonthFilters] = useState<string[]>([]);
   const [page, setPage] = useState(1);

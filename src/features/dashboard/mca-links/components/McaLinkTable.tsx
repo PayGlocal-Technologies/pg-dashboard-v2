@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -57,7 +58,11 @@ function timestampMs(raw: string | null | undefined): number | null {
  * chips, tabs, and columns above and below it need no changes.
  */
 export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
-  const [search, setSearch] = useState("");
+  // Seeded from ?q= so the header's global search can hand an identifier
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });

@@ -26,6 +26,7 @@ import {
   MCA_INTL_ACCOUNTS_GUIDE_STEPS,
 } from "@/features/dashboard/multi-currency/guide";
 import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
+import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/components/AccountCurrencyNotice";
 // Side-panel variant, kept for reference — superseded below by the modal.
 // import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
@@ -154,6 +155,12 @@ function MultiCurrencyContent() {
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [fxModalOpen, setFxModalOpen] = useState(false);
+
+  // "Forex calculator" picked from the header search lands here as
+  // ?action=fx-calculator. Set inside MultiCurrencyContent rather than the
+  // exported feature above, so it only fires once the page has cleared its own
+  // MID guard and is actually showing the accounts view.
+  useUrlAction("fx-calculator", () => setFxModalOpen(true));
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const { download: downloadProofOfOwnership, isDownloading: isDownloadingProof } =

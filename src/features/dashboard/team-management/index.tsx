@@ -10,6 +10,7 @@ import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useApp } from "@/stores/useApp";
+import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { teamMemberColumns } from "@/features/dashboard/team-management/columns";
 import { TeamMemberRowActions } from "@/features/dashboard/team-management/components/TeamMemberRowActions";
@@ -57,7 +58,20 @@ export function TeamManagementFeature() {
   const [roleFilter, setRoleFilter] = useState<string[] | undefined>(undefined);
 
   const [addOpen, setAddOpen] = useState(false);
+
   const [deactivatingRow, setDeactivatingRow] = useState<TeamMemberRow | null>(null);
+
+  // "Add team member" picked from the header search lands here as
+  // ?action=add-member.
+  //
+  // Gated on isPartnerUser alone, and deliberately NOT on `mid` as well. Unlike
+  // the MCA pages there is no MID *choice* to protect here — team membership is
+  // always scoped to the profile MID (see above), never to a selected sub-MID —
+  // so waiting on `mid` would add a race for no safety: the gate starts false
+  // while the profile loads, and the modal only has to know the MID by the time
+  // the form is submitted, which the prop below supplies.
+  useUrlAction("add-member", () => setAddOpen(true), !isPartnerUser);
+
   // OUT OF SCOPE — limited-time access not required for now.
   // const [limitedTimeRow, setLimitedTimeRow] = useState<TeamMemberRow | null>(null);
 
