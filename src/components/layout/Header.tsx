@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -166,8 +167,11 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </nav>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* Global search — takes the space the spacer used to hold, pushed
+            right by its own ml-auto so the product tabs keep their position.
+            Resolves entirely in the browser from the sidebar's nav trees, see
+            GlobalSearch. */}
+        <GlobalSearch />
 
         {/* Actions */}
         <div className="flex items-center gap-2">

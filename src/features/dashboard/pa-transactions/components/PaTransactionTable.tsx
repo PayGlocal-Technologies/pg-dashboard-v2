@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -27,7 +28,11 @@ export function PaTransactionTable() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PA");
 
-  const [search, setSearch] = useState("");
+  // Seeded from ?q= so the header's global search can hand an identifier
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [status, setStatus] = useState("All");
   const [method, setMethod] = useState("All");
   const [page, setPage] = useState(1);

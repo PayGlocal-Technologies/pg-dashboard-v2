@@ -1,5 +1,7 @@
 import type { IconName } from "@/components/icon";
 import type { ProductType } from "@/lib/hooks/useResolvedMids";
+import type { UseNewPermissionsFn } from "@/hooks/useNewPermissions";
+import type { NavContext } from "@/stores/useProductContext";
 
 export type NavChild = {
   label: string;
@@ -435,3 +437,68 @@ export const globalNavigation: NavGroup[] = [
     ],
   },
 ];
+
+// ─── Tree selection and filtering ─────────────────────────────────────────────
+// Both live here rather than inside the Sidebar because the header's global
+// search runs the same two steps to build its index (see lib/search/registry.ts).
+// Keeping one implementation is what stops search from offering a page the
+// sidebar has hidden, or missing one it shows.
+
+/**
+ * Which of the five trees above applies. Partner and global-tenant accounts get
+ * their own regardless of product context; everyone else follows the Header's
+ * active tab — the short Home tree, the dedicated MCA tree, or the full
+ * Payments one.
+ */
+export function navigationForContext({
+  isPartnerUser,
+  isGlobalTenant,
+  activeContext,
+}: {
+  isPartnerUser: boolean;
+  isGlobalTenant: boolean;
+  activeContext: NavContext;
+}): NavGroup[] {
+  if (isPartnerUser) return partnerNavigation;
+  if (isGlobalTenant) return globalNavigation;
+  if (activeContext === "HOME") return homeNavigation;
+  if (activeContext === "PACB") return mcaNavigation;
+  return regularNavigation;
+}
+
+/**
+ * Drops everything the user cannot or should not see, mirroring pg-dashboard's
+ * formatMenuItems logic. An item or child tagged with `product` (e.g. the two
+ * "Dashboard" entries, "Payment Links" / "MCA Links") only survives while the
+ * Header's active product context matches; everything untagged is shared.
+ *
+ * Parents whose children all filter away are dropped too — an expandable item
+ * with nothing under it is a dead toggle.
+ */
+export function filterNavigation(
+  navigation: NavGroup[],
+  checkPermissions: UseNewPermissionsFn,
+  activeProduct: ProductType
+): NavGroup[] {
+  return navigation
+    .map((group) => {
+      const visibleItems = group.items
+        .filter(
+          (item) =>
+            (!item.permission?.length || checkPermissions(item.permission)) &&
+            (!item.product || item.product === activeProduct)
+        )
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter(
+            (c) =>
+              (!c.permission?.length || checkPermissions(c.permission)) &&
+              (!c.product || c.product === activeProduct)
+          ),
+        }))
+        .filter((item) => !item.children || item.children.length > 0);
+
+      return { ...group, items: visibleItems };
+    })
+    .filter((group) => group.items.length > 0);
+}

@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/ui";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { ClientTable } from "@/features/dashboard/client-management/components/ClientTable";
 import {
   useClientPathMid,
@@ -31,6 +32,17 @@ export function ClientManagementFeature() {
     if (mid) selectMid(mid);
     setAddClientOpen(true);
   };
+
+  // "Add client" picked from the header search lands here as ?action=add-client.
+  // It calls the same opener with "" that the button calls when there is no MID
+  // to choose (see MidScopedAction), so the two entry points are one code path.
+  // Held back until the MID list has loaded, and never fired while a choice is
+  // pending or the page is showing its own MID picker instead of the list.
+  useUrlAction(
+    "add-client",
+    () => openAddClient(""),
+    guardState !== "not-applicable" && midOptions.length > 0 && !needsMidChoice
+  );
 
   if (guardState === "not-applicable") {
     return (
