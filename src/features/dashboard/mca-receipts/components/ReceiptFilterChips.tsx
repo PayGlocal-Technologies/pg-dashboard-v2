@@ -7,7 +7,7 @@ import {
   type AmountRangeValue,
   type MonthRange,
 } from "@/components/common/filters/FilterChips";
-import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/receipts/constants";
+import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/mca-receipts/constants";
 
 /**
  * Amount and Month as one unit — the two filters the receipts table offers, and

@@ -35,7 +35,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/pa-transactions",
   "/payment-links",
   "/platforms",
-  "/receipts",
+  "/mca-receipts",
   "/refer-and-earn",
   "/settlement-report",
   "/sku-management",
@@ -65,7 +65,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/edpms": ["shipping bill", "regularise", "export data processing"],
   // The MCA tree labels this page "GST Invoices", so without "receipts" here a
   // merchant who types the word the route is named after finds nothing.
-  "/receipts": ["receipts", "GST invoice", "tax invoice", "invoice ID"],
+  "/mca-receipts": ["receipts", "GST invoice", "tax invoice", "invoice ID"],
   // Plurals earn their place: the matcher works forwards, so a trailing "s"
   // the singular label does not have makes the whole query fail. "invoices"
   // finds nothing against "Invoice Management" without this, and neither does
@@ -264,7 +264,7 @@ export interface LookupTarget {
  *   /mca-transactions, /pa-transactions  SEARCH_WORDS   -> "Transaction ID"
  *   /mca-invoices                        SEARCH_WORDS   -> "Invoice number"
  *   settlement reports                   inline words   -> "UTR", "Settlement ID"
- *   /receipts                            RECEIPT_SEARCH_HINTS -> "invoice ID"
+ *   /mca-receipts                        RECEIPT_SEARCH_HINTS -> "invoice ID"
  *   /mca-links                           inline words   -> "invoice number", "link"
  *
  * Deliberately excluded: /client-management (business name, contact name,
@@ -285,7 +285,7 @@ export function lookupTargets(context: NavContext): readonly LookupTarget[] {
     },
     { label: "Invoice Management", path: "/mca-invoices", icon: "receipt" },
     { label: "Settlements", path: settlementListPath(context), icon: "file-text" },
-    { label: "Receipts", path: "/receipts", icon: "receipt" },
+    { label: "Receipts", path: "/mca-receipts", icon: "receipt" },
     { label: "MCA Links", path: "/mca-links", icon: "link" },
   ];
 }

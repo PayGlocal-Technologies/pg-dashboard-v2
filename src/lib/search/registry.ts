@@ -47,7 +47,7 @@ export function buildSearchRegistry(
   { isPartnerUser = false }: { isPartnerUser?: boolean } = {}
 ): SearchEntry[] {
   const entries: SearchEntry[] = [];
-  // First occurrence of a path wins. /receipts appears three times across the
+  // First occurrence of a path wins. /mca-receipts appears three times across the
   // trees under three labels ("Receipts" twice, "GST Invoices" once) and
   // /team-management appears in several, so without this the dropdown would
   // offer the same destination repeatedly.

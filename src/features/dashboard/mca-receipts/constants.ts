@@ -1,12 +1,13 @@
-import type { ReceiptProduct } from "@/features/dashboard/receipts/types";
+import type { ReceiptProduct } from "@/features/dashboard/mca-receipts/types";
 
 /** Rows per page — matches SKU_PAGE_LIMIT so both tables page alike. */
 export const RECEIPTS_PAGE_LIMIT = 10;
 
 /**
- * What each product is called wherever it is named to the merchant: the tab that
- * selects it, and the Product type cell on every row it owns. Declared once so a
- * tab and the rows underneath it can never disagree about the product's name.
+ * What each product is called wherever it is named to the merchant. Only the MCA
+ * entry is reachable now the page is scoped to that product, but the map is kept
+ * whole: a response still carries a productType, and mapProductType still reads
+ * every value the backend can send.
  */
 export const RECEIPT_PRODUCT_LABEL: Record<ReceiptProduct, string> = {
   MCA: "Multi-currency accounts",
@@ -15,32 +16,25 @@ export const RECEIPT_PRODUCT_LABEL: Record<ReceiptProduct, string> = {
 };
 
 /**
- * The product tab bar: the three products receipts are issued under, and no
- * others. Unlike the SKU and Transactions tab bars — which are shortcuts onto a
- * type/status filter that the merchant could equally reach from the chips — this
- * one selects which product's receipts the table is showing at all. The columns
- * are the same in every tab (see RECEIPT_COLUMNS); only the rows change.
+ * The only product this page shows.
  *
- * Multi-currency accounts leads because it is the product most receipts are
- * raised under, and it is the page's default selection.
+ * Receipts used to be a three-tab table over MCA / PA / Fraud screening. The
+ * page now lives under Multi-Currency Accounts and is scoped to that product
+ * alone, so the tab bar is gone and this is the single value the list request
+ * asks for. The ReceiptProduct union and the mapping either way are kept whole —
+ * responses still carry a productType and it is still read back — so restoring
+ * another product means asking for it, not rebuilding the shape.
  */
-export const RECEIPT_PRODUCT_TABS = [
-  { value: "MCA", label: RECEIPT_PRODUCT_LABEL.MCA },
-  { value: "PA", label: RECEIPT_PRODUCT_LABEL.PA },
-  { value: "FRAUD", label: RECEIPT_PRODUCT_LABEL.FRAUD },
-] as const satisfies readonly { value: ReceiptProduct; label: string }[];
-
-/** The tab the page opens on. */
-export const DEFAULT_RECEIPT_PRODUCT: ReceiptProduct = "MCA";
+export const RECEIPT_PRODUCT: ReceiptProduct = "MCA";
 
 /**
- * The tab union → the value the list endpoint's `products` field takes.
+ * The ReceiptProduct union → the value the list endpoint's `products` field takes.
  *
  * Only Fraud screening differs: the backend calls it "FS" (see pg-dashboard's
  * productTypeDisplayMap and its merchantInvoiceFilters static data), while the
- * tab union spells it out. The inverse mapping lives in mapProductType, and the
- * two have to agree — send "FS" and read "FS" back — or the tab would request
- * one product and then filter the response for another.
+ * union spells it out. The inverse mapping lives in mapProductType, and the two
+ * have to agree — send "FS" and read "FS" back — or the page would request one
+ * product and then filter the response for another.
  */
 export const RECEIPT_PRODUCT_API_VALUE: Record<ReceiptProduct, string> = {
   MCA: "MCA",
@@ -95,9 +89,5 @@ export const RECEIPT_AMOUNT_HINT = "Matched against the receipt's total for the 
  */
 export const RECEIPT_SEARCH_HINTS = ["invoice number", "invoice ID", "amount"];
 
-/** Screen-reader label for the search box, per product. */
-export const RECEIPT_SEARCH_ARIA_LABEL: Record<ReceiptProduct, string> = {
-  MCA: "Search multi-currency account receipts",
-  PA: "Search payment aggregator receipts",
-  FRAUD: "Search fraud screening receipts",
-};
+/** Screen-reader label for the search box. */
+export const RECEIPT_SEARCH_ARIA_LABEL = "Search multi-currency account receipts";

@@ -3,14 +3,15 @@ import { formatCurrency } from "@/lib/utils/format";
 import {
   RECEIPT_DEFAULT_LOOKBACK_MONTHS,
   RECEIPT_MAX_LOOKBACK_MONTHS,
+  RECEIPT_PRODUCT,
   RECEIPT_PRODUCT_API_VALUE,
-} from "@/features/dashboard/receipts/constants";
+} from "@/features/dashboard/mca-receipts/constants";
 import type {
   InvoiceDownloadViewRecord,
   InvoiceViewRequestParams,
   Receipt,
   ReceiptProduct,
-} from "@/features/dashboard/receipts/types";
+} from "@/features/dashboard/mca-receipts/types";
 
 /**
  * INR receipts read 1,24,999.00 and everything else 124,999.00 — the lakh
@@ -98,7 +99,6 @@ export function receiptMonthsWithData(receipts: Receipt[]): Set<string> {
 }
 
 export interface ReceiptFilters {
-  product: ReceiptProduct;
   search: string;
   amountRange: AmountRangeValue;
 }
@@ -106,14 +106,14 @@ export interface ReceiptFilters {
 /**
  * The filters that stay on the client, applied in one pass.
  *
- * Product and period are NOT among them any more: both are in the request body
- * (see buildReceiptRequestBody), so the response already covers one product over
- * one window. Search and amount stay here because the endpoint takes neither.
+ * Product and period are NOT among them: both are in the request body (see
+ * buildReceiptRequestBody), so the response already covers one product over one
+ * window. Search and amount stay here because the endpoint takes neither.
  *
  * The product test below is kept even so, as a narrowing safety net rather than
- * the primary filter: if a backend ignored `products`, every tab would otherwise
- * show every product's receipts. It is a no-op whenever the server honours the
- * field.
+ * the primary filter: if a backend ignored `products`, this page would otherwise
+ * list PA and Fraud screening receipts alongside the MCA ones it asked for. It is
+ * a no-op whenever the server honours the field.
  */
 export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Receipt[] {
   const query = filters.search.trim().toLowerCase();
@@ -125,7 +125,7 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
   const hasMax = !Number.isNaN(max);
 
   return receipts.filter((receipt) => {
-    if (receipt.product !== filters.product) return false;
+    if (receipt.product !== RECEIPT_PRODUCT) return false;
 
     // The three fields the search hints name, all of them columns the table
     // renders in every tab. The amount is matched on its raw decimal string, so

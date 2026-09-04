@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { ReceiptsFeature } from "@/features/dashboard/receipts";
+import { McaReceiptsFeature } from "@/features/dashboard/mca-receipts";
 
 export default function ReceiptsPage() {
   // Suspense boundary: the table below reads the header search's ?q= handoff
@@ -7,7 +7,7 @@ export default function ReceiptsPage() {
   // be statically prerendered.
   return (
     <Suspense>
-      <ReceiptsFeature />
+      <McaReceiptsFeature />
     </Suspense>
   );
 }
