@@ -84,14 +84,7 @@ export function buildSearchRegistry(
         }
         continue;
       }
-      // "All settings" is the /settings landing page itself, so it reads as a
-      // top-level destination rather than one nested under Settings.
-      push({
-        path: item.href,
-        label: item.label,
-        parent: item.href === "/settings" ? undefined : "Settings",
-        icon: item.icon,
-      });
+      push({ path: item.href, label: item.label, parent: "Settings", icon: item.icon });
     }
   }
 

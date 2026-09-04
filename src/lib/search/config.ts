@@ -40,10 +40,10 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/settlement-report",
   "/sku-management",
   "/team-management",
-  // Settings and its live sub-pages. The rest of src/app/(dashboard)/settings
-  // (developer, notifications, payments) exists on disk but is commented out
-  // of SETTINGS_NAV_GROUPS, so it never reaches the registry to begin with.
-  "/settings",
+  // The live settings sub-pages. /settings itself only redirects, and the rest
+  // of src/app/(dashboard)/settings (developer, notifications, payments) exists
+  // on disk but is commented out of SETTINGS_NAV_GROUPS, so neither reaches the
+  // registry to begin with.
   "/settings/personal",
   "/settings/business",
   "/settings/banking",
@@ -105,7 +105,7 @@ export function popularPaths(context: NavContext): readonly string[] {
     context === "PACB" ? "/mca-transactions" : "/pa-transactions",
     settlementListPath(context),
     "/mca-invoices",
-    "/settings",
+    "/settings/personal",
   ];
 }
 
@@ -134,8 +134,9 @@ export interface StandalonePage {
  * such page. The other absences are all correct and must stay that way:
  * /settings/developer (+ api-keys, webhooks), /settings/notifications and
  * /settings/payments are commented out of SETTINGS_NAV_GROUPS as OUT OF SCOPE,
- * so search must not resurface what the product deliberately hid; "/" only
- * redirects; and /mca-links is an existing nav orphan (see ACTION_ENTRIES).
+ * so search must not resurface what the product deliberately hid; "/" and
+ * "/settings" only redirect; and /mca-links is an existing nav orphan (see
+ * ACTION_ENTRIES).
  */
 export const STANDALONE_PAGES: readonly StandalonePage[] = [
   {
