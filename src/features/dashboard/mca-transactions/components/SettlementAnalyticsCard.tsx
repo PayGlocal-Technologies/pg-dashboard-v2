@@ -14,7 +14,8 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { formatCurrency, formatNextSettlementDate } from "@/lib/utils/format";
+import { formatNextSettlementDate } from "@/lib/utils/format";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { useMcaOverview, useSettledByAccount } from "@/features/dashboard/mca-transactions/hooks";
 import type { SettledAccountRow } from "@/features/dashboard/mca-transactions/types";
@@ -224,11 +225,17 @@ export function SettlementAnalyticsCard({
               <Shimmer className="h-9 w-40" />
             ) : (
               <>
-                <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                  {isAmountMode
-                    ? formatCurrency(settledValue, "INR", "en-IN")
-                    : settledCount.toLocaleString("en-IN")}
-                </p>
+                {isAmountMode ? (
+                  <CompactAmount
+                    amount={settledValue}
+                    currency="INR"
+                    className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                  />
+                ) : (
+                  <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                    {settledCount.toLocaleString("en-IN")}
+                  </p>
+                )}
                 {/* Visually subordinate to the KPI (muted, smaller, on the
                     same baseline rather than its own row) and wraps beneath
                     it naturally on narrow widths via the flex-wrap above. */}

@@ -9,6 +9,7 @@ import { RollingNumber } from "@/components/common/RollingNumber";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
+import { formatCurrencyShort } from "@/lib/utils/format";
 
 type InvoiceOriginTimeframe = "1W" | "1M" | "3M";
 
@@ -253,7 +254,7 @@ export function McaInvoiceOriginsCard() {
                       />
                     </div>
                     <span className="w-24 shrink-0 text-right text-[13px] font-semibold tabular-nums text-foreground">
-                      {formatAmount(origin.amount, currency)}
+                      {formatCurrencyShort(origin.amount, currency)}
                     </span>
                   </div>
                 ))}
@@ -276,12 +277,12 @@ export function McaInvoiceOriginsCard() {
                     broken. */}
                 <StatCell
                   label="Total invoiced"
-                  valueLabel={formatCompact(totalInvoiced, currency)}
+                  valueLabel={formatCurrencyShort(totalInvoiced, currency)}
                   trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
                 <StatCell
                   label="Avg per country"
-                  valueLabel={formatCompact(totals?.avgPerCountry ?? 0, currency)}
+                  valueLabel={formatCurrencyShort(totals?.avgPerCountry ?? 0, currency)}
                   trendPct={
                     (totals?.avgPerCountry ?? 0) > 0
                       ? (totals?.avgPerCountryTrendPct ?? null)
