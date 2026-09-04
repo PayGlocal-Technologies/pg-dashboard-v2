@@ -660,6 +660,7 @@ function InvoiceEditor({
   today: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   /**
    * The form, derived rather than copied.
@@ -954,6 +955,53 @@ function InvoiceEditor({
     if (templateId === activeTemplateId) setTemplateLink(null);
     toast.success("Template deleted");
   };
+
+  /**
+   * "Edit" from the manage-templates list, on this editor or on the invoice
+   * list page: it always opens a brand new draft with the template applied,
+   * never the invoice already open here.
+   *
+   * A hard navigation, not `router.push` — a query-only change on this same
+   * route is exactly the case the id-resolution comment above (`invoiceId`)
+   * warns App Router doesn't reliably surface, and this editor's own
+   * `createDraft` mutation state would otherwise carry over from whatever was
+   * open before, resolving the new draft's id from the wrong response.
+   */
+  const handleEditTemplate = (templateId: string) => {
+    window.location.href = `/create-invoice?templateId=${templateId}`;
+  };
+
+  /**
+   * Applies a template requested via `?templateId=`, once.
+   *
+   * The only entry point today is "Edit" in the manage-templates dialog, which
+   * always sends a fresh draft here — so a blank invoice is exactly what this
+   * expects to find, and it applies without the picker's usual "replace what's
+   * on screen?" prompt, matching the picker's own bypass for an empty draft.
+   * `appliedFromQuery` guards it to a single run: `handleApplyTemplate` sets
+   * `templateLink`, and re-running on every render would fight a merchant who
+   * has since detached or applied something else.
+   */
+  const requestedTemplateId = searchParams.get("templateId");
+  const appliedFromQueryRef = useRef(false);
+  useEffect(() => {
+    if (appliedFromQueryRef.current || !requestedTemplateId || !templateStore.isReady) return;
+    appliedFromQueryRef.current = true;
+    // `handleApplyTemplate` calls setState directly, which the React Compiler
+    // lint plugin rejects inside an effect body (see CLAUDE.md) — deferred into
+    // a timer callback like the amount debounce elsewhere in this codebase.
+    const id = setTimeout(() => {
+      const template = templateStore.templates.find((t) => t.id === requestedTemplateId);
+      if (template) handleApplyTemplate(template);
+      else toast.error("That template could not be found. It may have been deleted.");
+    }, 0);
+    return () => clearTimeout(id);
+    // `handleApplyTemplate` is recreated every render and reads `form`/`branding`
+    // fresh each time on purpose (see its own comment); the ref guard above is
+    // what makes this run exactly once, so it is deliberately left out here —
+    // adding it would just re-fire the effect on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedTemplateId, templateStore.isReady, templateStore.templates]);
 
   // ── Branding actions ───────────────────────────────────────────────────────
 
@@ -1519,6 +1567,7 @@ function InvoiceEditor({
         isMutating={templateStore.isMutating}
         onRename={templateStore.rename}
         onDelete={handleDeleteTemplate}
+        onEdit={handleEditTemplate}
       />
 
       {/* Persistent launcher, bottom-right, replayable. Not auto-started: this

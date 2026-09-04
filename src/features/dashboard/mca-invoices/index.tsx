@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Button,
   DropdownMenu,
@@ -16,6 +17,8 @@ import { useScopeId } from "@/lib/hooks/useScopeId";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
+import { useInvoiceTemplates } from "@/features/dashboard/create-invoice/hooks";
+import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
 import {
   ALL_TIME_RANGE_VALUE,
   type SummaryRange,
@@ -34,7 +37,15 @@ import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoi
 export function McaInvoicesFeature() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader title="Invoice management" actions={<ZohoSyncAction />} />
+      <PageHeader
+        title="Invoice management"
+        actions={
+          <>
+            <ZohoSyncAction />
+            <ManageTemplatesAction />
+          </>
+        }
+      />
       <MidGuard productType="PACB">
         <McaInvoicesContent />
       </MidGuard>
@@ -94,6 +105,44 @@ function ZohoSyncAction() {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/**
+ * "Manage templates", opened from the invoice list rather than only from
+ * inside an invoice — the same dialog the create-invoice editor's split
+ * button opens, so renaming or editing a template reads identically from
+ * either surface.
+ */
+function ManageTemplatesAction() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const templateStore = useInvoiceTemplates();
+
+  const handleDeleteTemplate = (templateId: string) => templateStore.remove(templateId);
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        leftIcon={<Icon name="layout-template" className="h-3.5 w-3.5" />}
+        onClick={() => setOpen(true)}
+      >
+        Manage templates
+      </Button>
+
+      <ManageTemplatesDialog
+        open={open}
+        onOpenChange={setOpen}
+        templates={templateStore.templates}
+        isMutating={templateStore.isMutating}
+        onRename={templateStore.rename}
+        onDelete={handleDeleteTemplate}
+        onEdit={(templateId) => router.push(`/create-invoice?templateId=${templateId}`)}
+      />
+    </>
   );
 }
 
