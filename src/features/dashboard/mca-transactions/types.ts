@@ -444,3 +444,38 @@ export interface SavedAmountResponse {
   message?: string;
   errors?: unknown;
 }
+
+// ── Documents pending ────────────────────────────────────────────────────────
+
+/** Amount + count of DOCUMENT_PENDING transactions for a timeframe. */
+export interface DocumentPendingData {
+  timeframe: string;
+  reportingCurrency: string;
+  amount: number;
+  count: number;
+}
+
+export interface DocumentPendingResponse {
+  data: DocumentPendingData;
+  message?: string;
+  errors?: unknown;
+}
+
+/** One currency's slice of the currently-pending snapshot. */
+export interface DocumentPendingCurrencyRow {
+  currency: string;
+  amount: number;
+  count: number;
+}
+
+export interface DocumentPendingByCurrencyData {
+  totalAmount: number;
+  totalCount: number;
+  currencies: DocumentPendingCurrencyRow[];
+}
+
+export interface DocumentPendingByCurrencyResponse {
+  data: DocumentPendingByCurrencyData;
+  message?: string;
+  errors?: unknown;
+}

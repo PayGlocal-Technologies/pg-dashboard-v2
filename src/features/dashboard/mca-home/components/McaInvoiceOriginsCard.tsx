@@ -21,12 +21,43 @@ const TIMEFRAMES: { value: InvoiceOriginTimeframe; label: string }[] = [
 
 const TIMEFRAME_DAYS: Record<InvoiceOriginTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
 
-function countryFlag(countryCode: string): string {
-  return COUNTRIES.find((c) => c.code === countryCode)?.flag ?? "🌍";
+/**
+ * Resolve an API country code to a canonical flux COUNTRIES entry.
+ *
+ * The invoice-origins endpoint isn't consistent: most rows carry the ISO alpha-2
+ * code ("US", "CA"), but some carry the country *name* ("India") or another
+ * form. A plain `find(c => c.code === input)` then misses — which is why India
+ * showed the globe fallback flag and never lit up on the globe (its highlight is
+ * keyed off the alpha-2 code via ALPHA2_TO_NUMERIC_ID). Matching on code OR name
+ * (case-insensitive) normalises every row back to a real alpha-2 code so the
+ * flag, label, and globe highlight all line up.
+ */
+function resolveCountry(input: string): { code: string; name: string; flag: string } {
+  const query = (input ?? "").trim();
+  const upper = query.toUpperCase();
+  const entry =
+    COUNTRIES.find((c) => c.code.toUpperCase() === upper) ??
+    COUNTRIES.find((c) => c.name.toLowerCase() === query.toLowerCase());
+  if (entry) return { code: entry.code, name: entry.name, flag: entry.flag };
+  return { code: query, name: query || "Unknown", flag: "🌍" };
 }
 
-function countryName(countryCode: string): string {
-  return COUNTRIES.find((c) => c.code === countryCode)?.name ?? countryCode;
+/** Currency-aware — the invoice-origins API reports its own reportingCurrency. */
+function formatAmount(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatCompact(amount: number, currency: string): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    notation: "compact",
+    maximumFractionDigits: 1,
+  }).format(amount);
 }
 
 const BAR_COLORS = [
@@ -100,12 +131,18 @@ export function McaInvoiceOriginsCard() {
   const { origins, isLoading, isError } = useInvoiceOrigins(startDate, endDate);
 
   const currency = origins?.reportingCurrency ?? "USD";
-  const rows = (origins?.rows ?? []).map((r) => ({
-    countryCode: r.countryCode,
-    countryName: countryName(r.countryCode),
-    amount: r.amount,
-    invoiceCount: r.invoiceCount,
-  }));
+  const rows = (origins?.rows ?? []).map((r) => {
+    const country = resolveCountry(r.countryCode);
+    return {
+      // Normalised to the canonical alpha-2 code, so the flag and the globe
+      // highlight below both resolve for it.
+      countryCode: country.code,
+      countryName: country.name,
+      flag: country.flag,
+      amount: r.amount,
+      invoiceCount: r.invoiceCount,
+    };
+  });
   const totals = origins?.totals;
   const totalInvoiced = totals?.totalInvoiced ?? 0;
   const maxAmount = Math.max(...rows.map((o) => o.amount), 1);
@@ -114,15 +151,15 @@ export function McaInvoiceOriginsCard() {
     countryCode: origin.countryCode,
     color: BAR_COLORS[i % BAR_COLORS.length]!,
     countryName: origin.countryName,
-    flag: countryFlag(origin.countryCode),
-    amountLabel: formatCurrencyShort(origin.amount, currency),
+    flag: origin.flag,
+    amountLabel: formatAmount(origin.amount, currency),
     invoiceCountLabel: `${origin.invoiceCount} invoice${origin.invoiceCount === 1 ? "" : "s"}`,
     sharePct: Math.round((origin.amount / (totalInvoiced || 1)) * 100),
     rank: i + 1,
   }));
 
   const topCode = totals?.topCountry?.countryCode;
-  const topShareLabel = topCode ? `${countryName(topCode)} share` : "Top country share";
+  const topShareLabel = topCode ? `${resolveCountry(topCode).name} share` : "Top country share";
   const showData = !isLoading && !isError;
 
   return (
@@ -201,7 +238,7 @@ export function McaInvoiceOriginsCard() {
                   <div key={origin.countryCode} className="flex items-center gap-3">
                     <div className="flex w-36 shrink-0 items-center gap-1.5">
                       <span className="text-sm leading-none" aria-hidden>
-                        {countryFlag(origin.countryCode)}
+                        {origin.flag}
                       </span>
                       <span className="truncate text-[13px] font-medium text-foreground">
                         {origin.countryName}
