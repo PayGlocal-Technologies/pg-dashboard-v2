@@ -14,7 +14,8 @@ import {
 import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatCurrencyShort } from "@/lib/utils/format";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { useSettlementOverview } from "@/features/dashboard/settlement-reports/hooks";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
@@ -523,9 +524,11 @@ function MultiCurrencyContent() {
                       <>
                         {/* Same size/weight as OutstandingAmountCard's figure so
                             the pair carries equal visual weight. */}
-                        <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                          {formatCurrency(settledAmount, "INR", "en-IN")}
-                        </p>
+                        <CompactAmount
+                          amount={settledAmount}
+                          currency="INR"
+                          className="mt-4 block whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                        />
                         <p className="mt-2 text-sm text-muted-foreground">
                           {settledTxnCount.toLocaleString("en-IN")} settled transaction
                           {settledTxnCount === 1 ? "" : "s"} · Year to date
@@ -570,11 +573,7 @@ function MultiCurrencyContent() {
                             tickLine={false}
                             tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
                             tickFormatter={(v: number) =>
-                              v >= 100_000
-                                ? `₹${(v / 100_000).toFixed(0)}L`
-                                : v >= 1_000
-                                  ? `₹${(v / 1_000).toFixed(0)}K`
-                                  : `₹${v}`
+                              v === 0 ? "₹0" : formatCurrencyShort(v, "INR")
                             }
                             width={48}
                           />

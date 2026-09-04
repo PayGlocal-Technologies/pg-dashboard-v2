@@ -9,6 +9,7 @@ import { RollingNumber } from "@/components/common/RollingNumber";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
+import { formatCurrencyShort } from "@/lib/utils/format";
 
 type InvoiceOriginTimeframe = "1W" | "1M" | "3M";
 
@@ -26,24 +27,6 @@ function countryFlag(countryCode: string): string {
 
 function countryName(countryCode: string): string {
   return COUNTRIES.find((c) => c.code === countryCode)?.name ?? countryCode;
-}
-
-/** Currency-aware — the invoice-origins API reports its own reportingCurrency. */
-function formatAmount(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function formatCompact(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(amount);
 }
 
 const BAR_COLORS = [
@@ -132,7 +115,7 @@ export function McaInvoiceOriginsCard() {
     color: BAR_COLORS[i % BAR_COLORS.length]!,
     countryName: origin.countryName,
     flag: countryFlag(origin.countryCode),
-    amountLabel: formatAmount(origin.amount, currency),
+    amountLabel: formatCurrencyShort(origin.amount, currency),
     invoiceCountLabel: `${origin.invoiceCount} invoice${origin.invoiceCount === 1 ? "" : "s"}`,
     sharePct: Math.round((origin.amount / (totalInvoiced || 1)) * 100),
     rank: i + 1,
@@ -234,7 +217,7 @@ export function McaInvoiceOriginsCard() {
                       />
                     </div>
                     <span className="w-24 shrink-0 text-right text-[13px] font-semibold tabular-nums text-foreground">
-                      {formatAmount(origin.amount, currency)}
+                      {formatCurrencyShort(origin.amount, currency)}
                     </span>
                   </div>
                 ))}
@@ -257,12 +240,12 @@ export function McaInvoiceOriginsCard() {
                     broken. */}
                 <StatCell
                   label="Total invoiced"
-                  valueLabel={formatCompact(totalInvoiced, currency)}
+                  valueLabel={formatCurrencyShort(totalInvoiced, currency)}
                   trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
                 <StatCell
                   label="Avg per country"
-                  valueLabel={formatCompact(totals?.avgPerCountry ?? 0, currency)}
+                  valueLabel={formatCurrencyShort(totals?.avgPerCountry ?? 0, currency)}
                   trendPct={
                     (totals?.avgPerCountry ?? 0) > 0
                       ? (totals?.avgPerCountryTrendPct ?? null)

@@ -4,8 +4,7 @@ import { useState } from "react";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { RollingNumber } from "@/components/common/RollingNumber";
-import { formatCurrency } from "@/lib/utils/format";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import { useSavedAmount } from "@/features/dashboard/mca-transactions/hooks";
 
 /**
@@ -88,8 +87,9 @@ export function McaSavedAmountCard() {
         {isLoading ? (
           <Shimmer className="mt-1 h-8 w-32" />
         ) : (
-          <RollingNumber
-            value={formatCurrency(savedInr, currency, "en-IN")}
+          <CompactAmount
+            amount={savedInr}
+            currency={currency}
             className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
         )}

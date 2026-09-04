@@ -12,7 +12,6 @@ import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { Button, Card, DataTable, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { formatCurrency } from "@/lib/utils";
 import { TransactionColumnsMenu } from "@/features/dashboard/settlement-reports/components/TransactionColumnsMenu";
 import type { TableReqBody } from "@/types/transactions";
 import { formatDayMonth, formatWeekdayDate, formatWeekdayName } from "@/lib/utils/format";
@@ -70,10 +69,6 @@ import type {
 } from "@/features/dashboard/settlement-reports/types";
 
 const SETTLEMENT_PAGE_LIMIT = 50;
-
-function formatLakh(amount: number): string {
-  return `₹${(amount / 100_000).toFixed(2)}L`;
-}
 
 /** "Tonight" only holds when today's payments are still on track for a plain
  * T+1 cutoff, once a weekend/holiday pushes the date out, name the actual day
@@ -227,7 +222,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   // No mock fallback: an unloaded/unsupported overview shows 0 / empty, never a
   // fake figure.
-  const totalSettledLabel = formatLakh(overview?.totalSettled ?? 0);
+  const totalSettled = overview?.totalSettled ?? 0;
   const totalSettledTrendPct = overview?.totalSettledTrendPct ?? 0;
   const totalSettledChartData = overview
     ? overview.series.map((point) => ({ x: point.label, y: point.value }))
@@ -236,7 +231,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // Previous settled: amount / date / count from the overview, else zeros. The
   // UTR and gross/tax/fee breakup have no endpoint and stay hidden (see below).
   const prevSettlement = overview?.previousSettlement;
-  const previousSettledLabel = formatCurrency(prevSettlement?.amount ?? 0, "INR");
+  const previousSettledAmount = prevSettlement?.amount ?? 0;
   const previousSettledDateLabel = prevSettlement
     ? formatDayMonth(prevSettlement.settlementDate)
     : "—";
@@ -245,9 +240,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // Upcoming settlement — live, current-state (no date range). No mock fallback:
   // we don't show a placeholder amount while it loads.
   const { upcoming: upcomingSettlementData } = useSettlementUpcoming(scopeId);
-  const upcomingSettlementLabel = upcomingSettlementData
-    ? formatCurrency(upcomingSettlementData.amount, "INR")
-    : "—";
+  const upcomingSettlementAmount = upcomingSettlementData?.amount ?? null;
   const upcomingPendingInvoiceCount = upcomingSettlementData?.pendingInvoiceCount;
 
   const onSearch = (v: string) => setSearch(v);
@@ -359,13 +352,13 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
             {/* BACKEND GAP: mock summary — see the banner note above. */}
             <div data-guide="mca-settlement-analytics">
               <SettlementStatCards
-                totalSettledLabel={totalSettledLabel}
+                totalSettled={totalSettled}
                 totalSettledTrendPct={totalSettledTrendPct}
                 totalSettledComparisonLabel={overview?.comparisonLabel}
                 totalSettledTimeframe={settlementTimeframe}
                 onTotalSettledTimeframeChange={setSettlementTimeframe}
                 totalSettledChartData={totalSettledChartData}
-                previousSettledLabel={previousSettledLabel}
+                previousSettledAmount={previousSettledAmount}
                 previousSettledDateLabel={previousSettledDateLabel}
                 previousSettledTransactionCount={previousSettledTransactionCount}
                 onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
@@ -381,7 +374,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
                 // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
                 // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
-                upcomingSettlementLabel={upcomingSettlementLabel}
+                upcomingSettlementAmount={upcomingSettlementAmount}
                 upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
                 pendingInvoiceCount={upcomingPendingInvoiceCount}
                 onUploadInvoice={() => router.push("/mca-transactions")}
