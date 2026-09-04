@@ -13,9 +13,9 @@ import { PaymentLinksStatCards } from "@/features/dashboard/payment-links/compon
 import { PaymentLinkDetailsModal } from "@/features/dashboard/payment-links/components/PaymentLinkDetailsModal";
 import { CreatePaymentLinkModal } from "@/features/dashboard/payment-links/components/CreatePaymentLinkModal";
 import {
-  PaymentLinksDurationFilter,
-  type PaymentLinksDurationValue,
-} from "@/features/dashboard/payment-links/components/PaymentLinksDurationFilter";
+  PaymentLinksDateFilter,
+  type PaymentLinksDateValue,
+} from "@/features/dashboard/payment-links/components/PaymentLinksDateFilter";
 import {
   PaymentLinksAmountFilter,
   type AmountRangeValue,
@@ -46,21 +46,12 @@ export function PaymentLinksFeature() {
 
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("All");
-  const [duration, setDuration] = useState<PaymentLinksDurationValue | undefined>(undefined);
+  const [dateFilter, setDateFilter] = useState<PaymentLinksDateValue | undefined>(undefined);
   const [amountRange, setAmountRange] = useState<AmountRangeValue | undefined>(undefined);
   const [currency, setCurrency] = useState<string[] | undefined>(undefined);
 
   const onSearch = (v: string) => setSearch(v);
   const onStatus = (v: string) => setStatus(v);
-  const onClear = () => {
-    setStatus("All");
-    setSearch("");
-    setDuration(undefined);
-    setAmountRange(undefined);
-    setCurrency(undefined);
-  };
-  const hasActive =
-    status !== "All" || search !== "" || !!duration || !!amountRange || !!currency?.length;
 
   const currencyOptions = useMemo(
     () => Array.from(new Set(rows.map((row) => row.currency))).map((c) => ({ value: c, label: c })),
@@ -71,9 +62,9 @@ export function PaymentLinksFeature() {
     return rows.filter((row) => {
       if (status !== "All" && row.status !== status) return false;
       if (currency && !currency.includes(row.currency)) return false;
-      if (duration) {
+      if (dateFilter) {
         const dateKey = row.createdAt.slice(0, 10);
-        if (dateKey < duration.from || dateKey > duration.to) return false;
+        if (dateKey < dateFilter.from || dateKey > dateFilter.to) return false;
       }
       if (amountRange) {
         if (amountRange.min != null && row.amount < amountRange.min) return false;
@@ -90,10 +81,10 @@ export function PaymentLinksFeature() {
       }
       return true;
     });
-  }, [rows, search, status, currency, duration, amountRange]);
+  }, [rows, search, status, currency, dateFilter, amountRange]);
 
   // Metrics-section time period, deliberately independent of the table's own
-  // search/status/amount/currency/duration filters above (see mock-data.ts).
+  // search/status/amount/currency/dateFilter filters above (see mock-data.ts).
   const [metricsPeriod, setMetricsPeriod] = useState<MetricsPeriod>("today");
   const metricsSnapshot = paymentLinksMetricsByPeriod[metricsPeriod];
 
@@ -194,7 +185,7 @@ export function PaymentLinksFeature() {
               <div className="hidden sm:block h-4 w-px bg-border" />
 
               <div className="flex items-center gap-2 flex-wrap">
-                <PaymentLinksDurationFilter value={duration} onChange={setDuration} />
+                <PaymentLinksDateFilter value={dateFilter} onChange={setDateFilter} />
                 <PaymentLinksAmountFilter value={amountRange} onChange={setAmountRange} />
                 <MultiSelectChipFilter
                   value={currency}
@@ -203,18 +194,6 @@ export function PaymentLinksFeature() {
                   placeholder="Currency"
                 />
               </div>
-
-              {hasActive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<Icon name="x" className="w-3 h-3" />}
-                  onClick={onClear}
-                  className="ml-auto text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </Button>
-              )}
             </div>
           </div>
         </div>
@@ -238,15 +217,15 @@ export function PaymentLinksFeature() {
             tableLayout="content"
             className="rounded-none border-0 border-t border-border"
             rowAction={(row) => (
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="eye" className="h-2.5 w-2.5" />}
-              onClick={() => openDetails(row)}
-              className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-            >
-              View details
-            </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Icon name="eye" className="h-2.5 w-2.5" />}
+                onClick={() => openDetails(row)}
+                className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+              >
+                View details
+              </Button>
             )}
           />
         )}

@@ -11,11 +11,8 @@ import { ViewPortal } from "@/components/layout/ViewPortal";
 import { MerchantSelector, useHasMultipleMids } from "@/components/layout/MerchantSelector";
 import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
 import {
-  homeNavigation,
-  regularNavigation,
-  mcaNavigation,
-  partnerNavigation,
-  globalNavigation,
+  navigationForContext,
+  filterNavigation,
   type NavItem,
   type NavGroup,
 } from "@/lib/navigation";
@@ -360,48 +357,20 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   const checkPermissions = useNewPermissions();
 
-  // "Home" gets its own short nav tree (see homeNavigation), "Multi-Currency
-  // Accounts" gets its own dedicated tree (see mcaNavigation), "Payments"
-  // uses the shared regularNavigation tree, filtered by product tag.
-  const baseNavigation = isPartnerUser
-    ? partnerNavigation
-    : isGlobalTenant
-      ? globalNavigation
-      : activeContext === "HOME"
-        ? homeNavigation
-        : activeContext === "PACB"
-          ? mcaNavigation
-          : regularNavigation;
+  // "Home" gets its own short nav tree, "Multi-Currency Accounts" its own
+  // dedicated one, "Payments" the shared tree filtered by product tag — see
+  // navigationForContext. The header's global search builds its index from
+  // these same two calls, so the two surfaces can never disagree about what
+  // this user can reach.
+  const baseNavigation = navigationForContext({ isPartnerUser, isGlobalTenant, activeContext });
 
   const showReferBanner = !isPartnerUser && !isGlobalTenant && activeContext === "PACB";
 
-  // Filter groups based on permissions, mirrors pg-dashboard formatMenuItems logic.
-  // An item or child tagged with `product` (e.g. the two "Dashboard" entries,
-  // "Payment Links" / "MCA Links") only shows while the Header's active
-  // product context matches, see useProductContext.ts, everything else in
-  // the sidebar is shared by both.
-  const filteredNavigation: NavGroup[] = baseNavigation
-    .map((group) => {
-      const visibleItems = group.items
-        .filter(
-          (item) =>
-            (!item.permission?.length || checkPermissions(item.permission)) &&
-            (!item.product || item.product === activeProduct)
-        )
-        .map((item) => ({
-          ...item,
-          children: item.children?.filter(
-            (c) =>
-              (!c.permission?.length || checkPermissions(c.permission)) &&
-              (!c.product || c.product === activeProduct)
-          ),
-        }))
-        // Drop parent items whose children have all been filtered away
-        .filter((item) => !item.children || item.children.length > 0);
-
-      return { ...group, items: visibleItems };
-    })
-    .filter((group) => group.items.length > 0);
+  const filteredNavigation: NavGroup[] = filterNavigation(
+    baseNavigation,
+    checkPermissions,
+    activeProduct
+  );
 
   return (
     <>

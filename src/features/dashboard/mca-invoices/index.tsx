@@ -12,13 +12,13 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
-import { useApp } from "@/stores/useApp";
-import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
 import {
   ALL_TIME_RANGE_VALUE,
+  INVOICE_DATA_KEYS,
   type SummaryRange,
 } from "@/features/dashboard/mca-invoices/constants";
 import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoices/helpers";
@@ -54,10 +54,13 @@ export function McaInvoicesFeature() {
 function ZohoSyncAction() {
   // Invoices only. The same endpoint can pull clients across, and this list
   // deliberately doesn't ask it to, mirroring Client Management's inverse.
-  const { isConnected, isSyncing, sync, pacbMids, selectedMid } = useZohoPullSync({
-    isClientSync: false,
-    isInvoiceSync: true,
-  });
+  //
+  // A pull can add or restate any number of invoices, so both the list and the
+  // summary counts have to refetch once it lands.
+  const { isConnected, isSyncing, sync, pacbMids, selectedMid } = useZohoPullSync(
+    { isClientSync: false, isInvoiceSync: true },
+    INVOICE_DATA_KEYS
+  );
 
   if (!isConnected) return null;
 
@@ -99,13 +102,10 @@ function ZohoSyncAction() {
 }
 
 function McaInvoicesContent() {
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
-  const paCbMids = useApp((s) => s.paCbMids);
-
-  // The summary endpoint takes a single MID in its path, so it uses the
-  // selected one, falling back to the first PACB MID exactly as production's
-  // McaInvoiceSummary does.
-  const summaryMid = selectedMid || (paCbMids[0] ?? "");
+  // The summary endpoint takes a single id in its path: the product MID, the
+  // selected MID, or the UCIC id for a multi-MID account with nothing selected
+  // (see lib/hooks/useScopeId.ts).
+  const { scopeId: summaryMid } = useScopeId("PACB");
 
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
 

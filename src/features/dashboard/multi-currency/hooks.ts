@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import {
   amzAccountStatementApi,
   amzAccountStatementPollApi,
@@ -41,23 +42,16 @@ export type AccountBucket = "general" | "amazon";
 /**
  * The MID every endpoint in this feature is scoped to.
  *
- * The explicitly selected MID wins, falling back to the first PACB MID for a
- * merchant who has only one. This mirrors pg-dashboard, whose VirtualAccounts
- * resolves `overrideMid || selectedMid || paCbMids[0]`.
- *
- * Reading `paCbMids[0]` alone — as this did — is wrong for a multi-MID
- * merchant: every one of these endpoints puts a single MID in the request path,
- * so the page silently showed the first account's data no matter which MID was
- * chosen in the header. Because the MID is part of each query key, routing it
- * through here also makes switching accounts refetch on its own.
+ * Delegates to the shared resolver (see lib/hooks/useScopeId.ts): the product
+ * MID for a single-MID account, the selected MID, or the UCIC id for a
+ * multi-MID account with nothing selected. Kept as a named hook because this
+ * feature's endpoints all read it and the name says what it is.
  *
  * `useResolvedMids("PACB")` remains the wrong tool: it builds an OpenSearch
  * `merchantId` filter across many MIDs, and none of these endpoints take one.
  */
 export function useMcaMerchantId(): string {
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
-  const fallbackMid = useApp((s) => s.paCbMids?.[0]) ?? "";
-  return selectedMid || fallbackMid;
+  return useScopeId("PACB").scopeId;
 }
 
 /**

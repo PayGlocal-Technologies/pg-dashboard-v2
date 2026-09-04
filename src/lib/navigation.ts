@@ -1,5 +1,7 @@
 import type { IconName } from "@/components/icon";
 import type { ProductType } from "@/lib/hooks/useResolvedMids";
+import type { UseNewPermissionsFn } from "@/hooks/useNewPermissions";
+import type { NavContext } from "@/stores/useProductContext";
 
 export type NavChild = {
   label: string;
@@ -97,12 +99,10 @@ export const regularNavigation: NavGroup[] = [
           // not Payments products.
           //
           // Receipts is this branch's own: uat carries no entry for it. Second
-          // way into /receipts, the first being Finance's own entry below.
-          // Tagged PACB so it only surfaces while the header's product context
-          // is Multi-Currency Accounts — a receipt is a finance record wherever
-          // you enter from, but it is only an MCA artefact while that product is
-          // the one in view.
-          { label: "Receipts", href: "/receipts", permission: [], product: "PACB" },
+          // way into /mca-receipts, the first being Finance's own entry below.
+          // Tagged PACB because the page is scoped to MCA receipts alone (see
+          // RECEIPT_PRODUCT) — it has nothing to show a PA-only merchant.
+          { label: "Receipts", href: "/mca-receipts", permission: [], product: "PACB" },
           { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
           { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
@@ -138,9 +138,13 @@ export const regularNavigation: NavGroup[] = [
       // reach receipts either as a finance record or from the product they were
       // raised under, and the sidebar's active state keys off the pathname, so
       // whichever entry is on screen highlights.
+      //
+      // OPEN ITEM: this entry is untagged, so it shows for a PA-only merchant —
+      // who now lands on a page that only ever lists MCA receipts. Tag it
+      // `product: "PACB"` (or drop it) once the placement is decided.
       {
         label: "Receipts",
-        href: "/receipts",
+        href: "/mca-receipts",
         icon: "receipt",
         badge: "NEW",
         permission: [],
@@ -278,13 +282,13 @@ export const mcaNavigation: NavGroup[] = [
     items: [
       { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
       { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
-      // Same /receipts page the Payments tree reaches under Payment Products and
+      // Same /mca-receipts page the Payments tree reaches under Payment Products and
       // Finance, labelled for what an MCA merchant comes here for: the GST
       // invoices PayGlocal raises against them. A compliance record in this tree,
       // a finance record in that one, one page either way.
       {
         label: "GST Invoices",
-        href: "/receipts",
+        href: "/mca-receipts",
         icon: "receipt",
         badge: "NEW",
         permission: [],
@@ -435,3 +439,68 @@ export const globalNavigation: NavGroup[] = [
     ],
   },
 ];
+
+// ─── Tree selection and filtering ─────────────────────────────────────────────
+// Both live here rather than inside the Sidebar because the header's global
+// search runs the same two steps to build its index (see lib/search/registry.ts).
+// Keeping one implementation is what stops search from offering a page the
+// sidebar has hidden, or missing one it shows.
+
+/**
+ * Which of the five trees above applies. Partner and global-tenant accounts get
+ * their own regardless of product context; everyone else follows the Header's
+ * active tab — the short Home tree, the dedicated MCA tree, or the full
+ * Payments one.
+ */
+export function navigationForContext({
+  isPartnerUser,
+  isGlobalTenant,
+  activeContext,
+}: {
+  isPartnerUser: boolean;
+  isGlobalTenant: boolean;
+  activeContext: NavContext;
+}): NavGroup[] {
+  if (isPartnerUser) return partnerNavigation;
+  if (isGlobalTenant) return globalNavigation;
+  if (activeContext === "HOME") return homeNavigation;
+  if (activeContext === "PACB") return mcaNavigation;
+  return regularNavigation;
+}
+
+/**
+ * Drops everything the user cannot or should not see, mirroring pg-dashboard's
+ * formatMenuItems logic. An item or child tagged with `product` (e.g. the two
+ * "Dashboard" entries, "Payment Links" / "MCA Links") only survives while the
+ * Header's active product context matches; everything untagged is shared.
+ *
+ * Parents whose children all filter away are dropped too — an expandable item
+ * with nothing under it is a dead toggle.
+ */
+export function filterNavigation(
+  navigation: NavGroup[],
+  checkPermissions: UseNewPermissionsFn,
+  activeProduct: ProductType
+): NavGroup[] {
+  return navigation
+    .map((group) => {
+      const visibleItems = group.items
+        .filter(
+          (item) =>
+            (!item.permission?.length || checkPermissions(item.permission)) &&
+            (!item.product || item.product === activeProduct)
+        )
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter(
+            (c) =>
+              (!c.permission?.length || checkPermissions(c.permission)) &&
+              (!c.product || c.product === activeProduct)
+          ),
+        }))
+        .filter((item) => !item.children || item.children.length > 0);
+
+      return { ...group, items: visibleItems };
+    })
+    .filter((group) => group.items.length > 0);
+}

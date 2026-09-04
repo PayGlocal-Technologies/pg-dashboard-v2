@@ -72,5 +72,6 @@ export function mapFfmsRowToRow(row: FfmsSettlementSummaryRow): SettlementRow {
     reportAvailable: true,
     bankTransferStatus: "completed",
     affectedByNonWorkingDay: false,
+    merchantId: row.merchantId ?? undefined,
   };
 }

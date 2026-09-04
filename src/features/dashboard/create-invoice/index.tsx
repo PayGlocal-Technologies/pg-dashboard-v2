@@ -7,6 +7,8 @@ import { Button, Shimmer, SplitButton, SplitButtonItem, StatusBadge } from "@/co
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { useGet, usePost } from "@/lib/api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
 import {
   billerDetailsApi,
   createInvoiceApi,
@@ -328,9 +330,11 @@ function CreateInvoiceBootstrap() {
    *
    * The handlers live in the hook options, NOT on the `mutate()` call.
    * TanStack drops per-call callbacks if the component unmounts before the
-   * mutation settles; hook-level ones always run. `history.replaceState` then
-   * writes the id to the address bar without involving the router, so a
-   * remount can read it straight back off the URL.
+   * mutation settles; hook-level ones always run.
+   *
+   * `router.replace` syncs the id into the address bar so a refresh reopens
+   * this draft. Nothing waits on it: the id is read off the mutation response
+   * itself, see `createdInvoiceId` below.
    */
   const {
     mutate: createDraft,
@@ -353,7 +357,6 @@ function CreateInvoiceBootstrap() {
       if (gidRef.current) params.set("gid", gidRef.current);
       const nextUrl = `/create-invoice?${params.toString()}`;
 
-      if (typeof window !== "undefined") window.history.replaceState(null, "", nextUrl);
       routerRef.current.replace(nextUrl, { scroll: false });
     },
     onError: (error) => {
@@ -380,7 +383,23 @@ function CreateInvoiceBootstrap() {
    */
   const createdInvoiceId =
     createResponse?.data?.invoiceId ?? createResponse?.data?.invoice?.id ?? "";
-  const invoiceId = searchParams.get("invoiceId") || createdInvoiceId;
+  /** The id in the address bar, which is also what tells a fresh "create" entry
+   *  apart from resuming or reopening a specific invoice. */
+  const urlInvoiceId = searchParams.get("invoiceId") ?? "";
+  const invoiceId = urlInvoiceId || createdInvoiceId;
+
+  /**
+   * The invoice THIS mount generated, and nothing else.
+   *
+   * Component state on purpose: it cannot outlive the page, so entering the
+   * editor again always starts on a blank draft. The success view used to be
+   * derived from `?status=SUCCESS` plus "the details query says ACTIVE", both of
+   * which can still be true on a later visit — the query string can be restored
+   * with the route and the react-query entry for a finished invoice stays in
+   * cache — so "Create invoice" could land straight on the previous invoice's
+   * success screen instead of a new draft.
+   */
+  const [generatedId, setGeneratedId] = useState("");
 
   const detailsUrl = getInvoiceDetailsApi(merchantId, invoiceId);
   const {
@@ -495,7 +514,20 @@ function CreateInvoiceBootstrap() {
     return () => clearTimeout(timer);
   }, [isReady]);
 
-  if (status === "SUCCESS" || invoice?.status === "ACTIVE") {
+  /**
+   * Show the success screen when this mount generated the invoice, or when the
+   * URL names a specific invoice that is already finished (a refresh of the
+   * success URL, or a link straight to it).
+   *
+   * The `urlInvoiceId` guard is what makes "Create invoice" always start fresh:
+   * that entry point navigates to a bare /create-invoice, so there is no
+   * invoice for this branch to claim and the editor falls through to creating
+   * a new draft.
+   */
+  const showSuccess =
+    !!generatedId || (!!urlInvoiceId && (status === "SUCCESS" || invoice?.status === "ACTIVE"));
+
+  if (showSuccess) {
     return (
       <div className="h-full overflow-y-auto">
         <CreateInvoiceSuccess
@@ -628,6 +660,7 @@ function CreateInvoiceBootstrap() {
           gid={gid}
           clientIdParam={clientIdParam}
           today={today}
+          onGenerated={setGeneratedId}
         />
       ) : (
         <EditorSkeleton onClose={() => router.push("/mca-invoices")} />
@@ -647,6 +680,7 @@ function InvoiceEditor({
   gid,
   clientIdParam,
   today,
+  onGenerated,
 }: {
   invoice: InvoiceData;
   biller: BillerDetails;
@@ -658,8 +692,12 @@ function InvoiceEditor({
   gid: string;
   clientIdParam: string;
   today: string;
+  /** Called with the invoice id once it has been generated, which is what
+   *  switches this page over to the success screen. */
+  onGenerated: (invoiceId: string) => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   /**
    * The form, derived rather than copied.
@@ -1195,7 +1233,30 @@ function InvoiceEditor({
           // in its create flow either.
           { isGstInvoice: false },
           {
-            onSuccess: () => {
+            /**
+             * Async on purpose: react-query awaits an onSuccess that returns a
+             * promise before settling the mutation, so `isGenerating` stays true
+             * across the refetch below and the button keeps its spinner.
+             *
+             * Generating rewrites the invoice server-side — it takes its number,
+             * its final totals and its ACTIVE status — and the details query
+             * still holds the draft as it was a moment ago. Nothing invalidated
+             * it, so the success screen rendered that stale copy and only showed
+             * the real figures after a manual refresh. pg-dashboard never hits
+             * this because its generate mutation omits `invalidateQueries`
+             * entirely, which invalidates every query in the cache; this does
+             * the same thing to the three keys that actually went stale.
+             */
+            onSuccess: async () => {
+              await queryClient.invalidateQueries({
+                queryKey: ["invoice-details", merchantId, invoiceId],
+              });
+              // A new ACTIVE invoice now exists, so the list and its counts are
+              // stale too, whichever way this flow exits.
+              for (const key of INVOICE_DATA_KEYS) {
+                void queryClient.invalidateQueries({ queryKey: key });
+              }
+
               if (linkedGid) {
                 toast.success("Invoice generated and linked", {
                   description: `Attached to transaction ****${linkedGid.slice(-6)}.`,
@@ -1203,6 +1264,9 @@ function InvoiceEditor({
                 router.push("/mca-transactions");
                 return;
               }
+              // The URL still records the outcome so a refresh comes back here,
+              // but it is no longer what decides to show it — see `generatedId`.
+              onGenerated(invoiceId);
               router.replace(`/create-invoice?invoiceId=${invoiceId}&status=SUCCESS`);
             },
             onError: (error) =>

@@ -113,7 +113,7 @@ export function ReferralEarnings({
 
       {/* One shared card — tabs, desktop table and mobile card list all
           inside the same bordered/rounded surface, the same structure
-          ReceiptsTable uses for its own product tabs. DataTable and the card
+          McaReceiptTable uses for its own controls. DataTable and the card
           lists both drop their own border/radius (rounded-none border-0, and no
           extra wrapping div) so there's a single outer edge rather than a card
           nested inside a card. */}

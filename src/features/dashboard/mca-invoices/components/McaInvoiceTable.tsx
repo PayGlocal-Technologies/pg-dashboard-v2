@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -20,9 +20,11 @@ import {
   relativeRangeToEpochMs,
   type RelativeRangeValue,
 } from "@/components/common/filters/FilterChips";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDelete, usePost, usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { reorderColumns } from "@/lib/utils/columns";
 import {
   allInvoicesApi,
@@ -39,7 +41,10 @@ import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
 import {
   FIXED_COLUMN_KEYS,
   INVOICES_PAGE_LIMIT,
+  INVOICE_DATA_KEYS,
+  INVOICE_LIST_KEY,
   INVOICE_STATUS_FILTERS,
+  INVOICE_SUMMARY_KEY,
   INVOICE_VIEW_TABS,
   SEARCH_WORDS,
   STATUS_PINNED_TABS,
@@ -137,11 +142,17 @@ export function McaInvoiceTable({
   onStatusFiltersChange,
 }: McaInvoiceTableProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
   const paCbMids = useApp((s) => s.paCbMids);
+  const { scopeId } = useScopeId("PACB");
 
-  const [search, setSearch] = useState("");
+  // Seeded from ?q= so the header's global search can hand an identifier
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   /**
    * The Date chip's own value, and nobody else's.
    *
@@ -197,7 +208,11 @@ export function McaInvoiceTable({
   );
 
   // Any MID can address the endpoint; fieldSearch.mid is what scopes results.
-  const searchUrl = allInvoicesApi(mids[0] ?? "");
+  // The search endpoint takes a single id in its path. `mids` above is the
+  // body-side filter list; the path id comes from the shared resolver, so a
+  // multi-MID account with nothing selected searches at UCIC scope instead of
+  // silently searching only its first MID.
+  const searchUrl = allInvoicesApi(scopeId);
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     McaInvoicesResponse,
@@ -256,13 +271,17 @@ export function McaInvoiceTable({
   const { mutate: viewInvoice } = usePost<BaseResponse<{ url: string }>, object>("", {
     invalidateQueries: false,
   });
+  // A duplicate lands as a new DRAFT, which the list shows but the summary
+  // cards do not count, so this one refreshes the list alone.
   const { mutate: duplicateInvoice, isPending: isDuplicating } = usePost<
     BaseResponse<null>,
     object
-  >("", { invalidateQueries: ["mca-invoices"] });
+  >("", { invalidateQueries: [INVOICE_LIST_KEY] });
+  // A delete removes the invoice from whichever status bucket it was counted
+  // in, so the cards are wrong until they refetch too.
   const { mutate: deleteInvoice, isPending: isDeleting } = useDelete<BaseResponse<null>, object>(
     "",
-    { invalidateQueries: ["mca-invoices"] }
+    { invalidateQueries: INVOICE_DATA_KEYS }
   );
 
   const openDocument = (row: McaInvoiceRow) => {
@@ -339,8 +358,13 @@ export function McaInvoiceTable({
     );
   };
 
+  // Refresh means the whole view, not just the rows: the counts above the table
+  // are part of what the merchant is asking to bring up to date.
   const handleRefresh = async () => {
-    const { isError: failed } = await refetch();
+    const [{ isError: failed }] = await Promise.all([
+      refetch(),
+      queryClient.invalidateQueries({ queryKey: INVOICE_SUMMARY_KEY }),
+    ]);
     if (failed) toast.error("Couldn't refresh invoices. Please try again.");
     else toast.success("Invoices updated");
   };

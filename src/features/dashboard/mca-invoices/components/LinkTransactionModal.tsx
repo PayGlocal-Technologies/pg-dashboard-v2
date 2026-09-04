@@ -19,6 +19,7 @@ import {
   linkInvoiceToTransactionApi,
   linkableTransactionsApi,
 } from "@/features/dashboard/mca-invoices/services";
+import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
 import type { InvoiceRef } from "@/features/dashboard/mca-invoices/types";
 import type { BaseResponse } from "@/types/common";
 
@@ -110,10 +111,14 @@ function LinkTransactionBody({
 
   // Blank URL: the gid is only known once a row is picked, so the real target
   // is supplied per call via dynamicUrl.
+  //
+  // Linking settles the invoice against the transaction, so it changes which
+  // status bucket the invoice counts in as well as the row itself: both the
+  // list and the summary cards above it have to refetch.
   const { mutate: linkTransaction, isPending } = usePost<
     BaseResponse<null>,
     { userLinkConsent: boolean }
-  >("", { invalidateQueries: ["mca-invoices"] });
+  >("", { invalidateQueries: INVOICE_DATA_KEYS });
 
   const handleLink = () => {
     if (!selectedGid || !consent) return;

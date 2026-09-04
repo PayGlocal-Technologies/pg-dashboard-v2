@@ -15,7 +15,6 @@ import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { useSettlementOverview } from "@/features/dashboard/settlement-reports/hooks";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
@@ -27,12 +26,14 @@ import {
   MCA_INTL_ACCOUNTS_GUIDE_STEPS,
 } from "@/features/dashboard/multi-currency/guide";
 import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
+import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/components/AccountCurrencyNotice";
 // Side-panel variant, kept for reference — superseded below by the modal.
 // import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
 import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
 import {
   useAccountDocumentDownload,
+  useMcaMerchantId,
   useNeedsMidSelection,
   useVirtualAccounts,
 } from "@/features/dashboard/multi-currency/hooks";
@@ -125,8 +126,8 @@ function MultiCurrencyContent() {
   // region — matching OutstandingAmountCard beside it, which is aggregate too;
   // there's no per-currency monthly series to plot, so both metrics read across
   // all accounts.
-  const { urlMid, midFilter } = useResolvedMids("PACB");
-  const settlementMid = urlMid || midFilter?.value?.[0] || "";
+  // Same endpoint, and now the same scope, as the settlement report page.
+  const settlementMid = useMcaMerchantId();
   const { overview: settlementOverview, isLoading: isSettledLoading } = useSettlementOverview(
     settlementMid,
     "ytd"
@@ -154,6 +155,12 @@ function MultiCurrencyContent() {
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [fxModalOpen, setFxModalOpen] = useState(false);
+
+  // "Forex calculator" picked from the header search lands here as
+  // ?action=fx-calculator. Set inside MultiCurrencyContent rather than the
+  // exported feature above, so it only fires once the page has cleared its own
+  // MID guard and is actually showing the accounts view.
+  useUrlAction("fx-calculator", () => setFxModalOpen(true));
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
 
   const { download: downloadProofOfOwnership, isDownloading: isDownloadingProof } =

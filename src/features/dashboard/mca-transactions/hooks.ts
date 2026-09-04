@@ -21,9 +21,8 @@ import {
   allPurposeCodeOptions,
   toPurposeCodeOptions,
   type PurposeCodeOption,
-} from "@/features/dashboard/mca-transactions/purposeCodes";
-import { useApp } from "@/stores/useApp";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+} from "@/lib/purposeCodes";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import type {
   CurrencySplitData,
   CurrencySplitResponse,
@@ -205,15 +204,11 @@ export function useMcaOverview(): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-
-  const scopeId = urlMid || ucicId;
-  const url = urlMid ? mcaOverviewByMidApi(urlMid) : mcaOverviewByUcicApi(ucicId);
+  const { scopeId, scope, isReady } = useScopeId("PACB");
+  const url = scope === "mid" ? mcaOverviewByMidApi(scopeId) : mcaOverviewByUcicApi(scopeId);
 
   const { data, isPending, isError } = useGet<McaOverviewResponse>(["mca-overview", scopeId], url, {
-    enabled: isReady && !!scopeId,
+    enabled: isReady,
   });
 
   return {
@@ -232,18 +227,15 @@ export function useSettledByAccount(timeframe: string): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const merchantId = urlMid || ucicId;
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<SettledByAccountResponse>(
     ["mca-settled-by-account", merchantId, timeframe],
     mcaSettledByAccountApi(merchantId, timeframe),
-    { enabled: isReady && !!merchantId }
+    { enabled: isReady }
   );
 
-  return { settled: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+  return { settled: data?.data, isLoading: isReady && isPending, isError };
 }
 
 /**
@@ -302,18 +294,15 @@ export function useSavedAmount(): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const merchantId = urlMid || ucicId;
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<SavedAmountResponse>(
     ["mca-saved-amount", merchantId],
     mcaSavedAmountApi(merchantId),
-    { enabled: isReady && !!merchantId }
+    { enabled: isReady }
   );
 
-  return { saved: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+  return { saved: data?.data, isLoading: isReady && isPending, isError };
 }
 
 /**
@@ -325,18 +314,15 @@ export function useInvoiceOrigins(
   startDate: string,
   endDate: string
 ): { origins: InvoiceOriginsData | undefined; isLoading: boolean; isError: boolean } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const merchantId = urlMid || ucicId;
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<InvoiceOriginsResponse>(
     ["mca-invoice-origins", merchantId, startDate, endDate],
     mcaInvoiceOriginsApi(merchantId, startDate, endDate),
-    { enabled: isReady && !!merchantId }
+    { enabled: isReady }
   );
 
-  return { origins: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+  return { origins: data?.data, isLoading: isReady && isPending, isError };
 }
 
 /**
@@ -348,21 +334,18 @@ export function useCurrencySplit(
   startDate: string,
   endDate: string
 ): { split: CurrencySplitData | undefined; isLoading: boolean; isError: boolean } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const merchantId = urlMid || ucicId;
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<CurrencySplitResponse>(
     ["mca-currency-split", merchantId, startDate, endDate],
     mcaCurrencySplitApi(merchantId, startDate, endDate),
-    { enabled: isReady && !!merchantId }
+    { enabled: isReady }
   );
 
   const body = data?.data ?? data;
   const split = body?.slices ? (body as CurrencySplitData) : undefined;
 
-  return { split, isLoading: isReady && !!merchantId && isPending, isError };
+  return { split, isLoading: isReady && isPending, isError };
 }
 
 /** Metric values arrive as either a number or a numeric string. */

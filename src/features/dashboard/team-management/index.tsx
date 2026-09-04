@@ -10,7 +10,7 @@ import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useApp } from "@/stores/useApp";
-import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { teamMemberColumns } from "@/features/dashboard/team-management/columns";
 import { TeamMemberRowActions } from "@/features/dashboard/team-management/components/TeamMemberRowActions";
@@ -45,12 +45,12 @@ export function TeamManagementFeature() {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGuestUser = useApp((s) => s.isGuestUser);
   const profile = useApp((s) => s.profile);
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
 
-  // Team management is scoped to a single MID (the caller's account or the
-  // explicitly-selected sub-MID), not a product filter — so it reads the MID
-  // directly rather than through useResolvedMids (see plan risk note).
-  const mid = selectedMid || profile?.mid || "";
+  // Team management is always scoped to the profile MID — the account the
+  // signed-in user belongs to — never to a selected sub-MID and never to the
+  // UCIC id. Team membership is a property of that account, so it does not
+  // follow the header's merchant selection the way the reporting pages do.
+  const mid = profile?.mid ?? "";
   const midType = profile?.midType ?? "";
 
   const [search, setSearch] = useState("");
@@ -58,7 +58,20 @@ export function TeamManagementFeature() {
   const [roleFilter, setRoleFilter] = useState<string[] | undefined>(undefined);
 
   const [addOpen, setAddOpen] = useState(false);
+
   const [deactivatingRow, setDeactivatingRow] = useState<TeamMemberRow | null>(null);
+
+  // "Add team member" picked from the header search lands here as
+  // ?action=add-member.
+  //
+  // Gated on isPartnerUser alone, and deliberately NOT on `mid` as well. Unlike
+  // the MCA pages there is no MID *choice* to protect here — team membership is
+  // always scoped to the profile MID (see above), never to a selected sub-MID —
+  // so waiting on `mid` would add a race for no safety: the gate starts false
+  // while the profile loads, and the modal only has to know the MID by the time
+  // the form is submitted, which the prop below supplies.
+  useUrlAction("add-member", () => setAddOpen(true), !isPartnerUser);
+
   // OUT OF SCOPE — limited-time access not required for now.
   // const [limitedTimeRow, setLimitedTimeRow] = useState<TeamMemberRow | null>(null);
 
@@ -114,12 +127,6 @@ export function TeamManagementFeature() {
 
   const onSearch = (v: string) => setSearch(v);
   const onStatusFilter = (v: string) => setStatusFilter(v);
-  const onClear = () => {
-    setSearch("");
-    setStatusFilter("All");
-    setRoleFilter(undefined);
-  };
-  const hasActive = search !== "" || statusFilter !== "All" || !!roleFilter?.length;
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -221,17 +228,6 @@ export function TeamManagementFeature() {
                 />
               </div>
 
-              {hasActive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<Icon name="x" className="w-3 h-3" />}
-                  onClick={onClear}
-                  className="ml-auto text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </Button>
-              )}
             </div>
           </div>
         </div>
