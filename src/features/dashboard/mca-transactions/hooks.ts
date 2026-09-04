@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useGet } from "@/lib/api/hooks";
 import {
   mcaCurrencySplitApi,
+  mcaDocumentPendingApi,
+  mcaDocumentPendingByCurrencyApi,
   mcaFircDownloadApi,
   mcaInvoiceOriginsApi,
   mcaOverviewByMidApi,
@@ -24,6 +26,10 @@ import { useScopeId } from "@/lib/hooks/useScopeId";
 import type {
   CurrencySplitData,
   CurrencySplitResponse,
+  DocumentPendingByCurrencyData,
+  DocumentPendingByCurrencyResponse,
+  DocumentPendingData,
+  DocumentPendingResponse,
   FircDownloadResponse,
   InvoiceOriginsData,
   InvoiceOriginsResponse,
@@ -230,6 +236,53 @@ export function useSettledByAccount(timeframe: string): {
   );
 
   return { settled: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Documents pending amount + count for a timeframe (today | week | month |
+ * ytd). Backs OutstandingAmountCard's headline. Scoped like useSettledByAccount:
+ * a selected MID, else the UCIC roll-up.
+ */
+export function useDocumentPending(timeframe: string): {
+  documentPending: DocumentPendingData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<DocumentPendingResponse>(
+    ["mca-document-pending", merchantId, timeframe],
+    mcaDocumentPendingApi(merchantId, timeframe),
+    { enabled: isReady && !!merchantId }
+  );
+
+  return { documentPending: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+}
+
+/**
+ * Documents pending broken down by currency — a live snapshot of everything
+ * currently DOCUMENT_PENDING (no timeframe). Scoped like useDocumentPending.
+ */
+export function useDocumentPendingByCurrency(): {
+  breakdown: DocumentPendingByCurrencyData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<DocumentPendingByCurrencyResponse>(
+    ["mca-document-pending-by-currency", merchantId],
+    mcaDocumentPendingByCurrencyApi(merchantId),
+    { enabled: isReady && !!merchantId }
+  );
+
+  return { breakdown: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
 }
 
 /**
