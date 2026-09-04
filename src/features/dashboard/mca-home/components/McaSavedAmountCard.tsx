@@ -42,7 +42,7 @@ export function McaSavedAmountCard() {
   const currency = saved?.currency ?? "INR";
 
   return (
-    <Card className="gap-3 p-5">
+    <Card className="h-full gap-3 p-5">
       {/* Icon left, toggle right: the same top-row split OutstandingAmountCard
           uses for its icon and pending chip, rather than a second row. */}
       <div className="flex items-start justify-between gap-2">
