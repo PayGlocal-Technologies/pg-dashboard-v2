@@ -16,7 +16,8 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
-import { useSettlementOverview } from "@/features/dashboard/settlement-reports/hooks";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { useSettledCurrencyTrend } from "@/features/dashboard/mca-transactions/hooks";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
@@ -33,7 +34,6 @@ import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/compo
 import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
 import {
   useAccountDocumentDownload,
-  useMcaMerchantId,
   useNeedsMidSelection,
   useVirtualAccounts,
 } from "@/features/dashboard/multi-currency/hooks";
@@ -52,20 +52,10 @@ const MODULE_TITLE = "text-base font-semibold text-foreground";
 /** Supporting copy under a module title, and secondary text inside a module. */
 const MODULE_SUBTITLE = "text-[13px] text-muted-foreground";
 
-/** The last `count` months (including the current one) as month-key + short
- *  label — the fixed axis the settled chart plots against, so it always shows a
- *  run of months even when the API only returns the ones that had settlements.
- *  Computed once on mount (no `new Date()` in render — React Compiler rule). */
-function buildRecentMonths(count: number): { key: string; label: string }[] {
-  const now = new Date();
-  const months: { key: string; label: string }[] = [];
-  for (let i = count - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    months.push({ key, label: d.toLocaleString("en-US", { month: "short" }) });
-  }
-  return months;
-}
+/** Account currencies the settled-currency-trend endpoint groups under its
+ *  REST_OF_WORLD row — the two folded rails (AED/SGD) plus the dollar/global
+ *  buckets the Rest of the World virtual account can carry. */
+const REST_OF_WORLD_CURRENCIES = new Set(["AED", "SGD", "REST_OF_WORLD", "Dollar", "GLOBAL"]);
 
 export function MultiCurrencyFeature() {
   // A multi-MID merchant has to say which account they mean before anything is
@@ -119,36 +109,21 @@ function MultiCurrencyContent() {
 
   const selectAccount = (account: VirtualAccount) => setSelectedAccountId(account.id);
 
-  // Settled amount + its monthly trend, from the settlement-overview endpoint
-  // (the same one the Settlement Reports page's Total settled card charts). Year
-  // to date, so the series is a month-by-month breakdown. This is the merchant's
-  // overall settled figure, spanning every account rather than the selected
-  // region — matching OutstandingAmountCard beside it, which is aggregate too;
-  // there's no per-currency monthly series to plot, so both metrics read across
-  // all accounts.
-  // Same endpoint, and now the same scope, as the settlement report page.
-  const settlementMid = useMcaMerchantId();
-  const { overview: settlementOverview, isLoading: isSettledLoading } = useSettlementOverview(
-    settlementMid,
-    "ytd"
-  );
-  const settledAmount = settlementOverview?.totalSettled ?? 0;
-  const settledTxnCount = settlementOverview?.transactionCount ?? 0;
-  // A fixed six-month axis (five prior + current), computed once on mount. The
-  // API only returns months that had settlements, so its points are bucketed by
-  // month onto this axis and every other month renders as zero — the chart then
-  // always shows a run of months rather than collapsing to the single one with
-  // data.
-  const [recentMonths] = useState(() => buildRecentMonths(6));
-  const settledByMonth = new Map<string, number>();
-  for (const point of settlementOverview?.series ?? []) {
-    const monthKey = (point.periodStart ?? "").slice(0, 7);
-    if (monthKey) settledByMonth.set(monthKey, (settledByMonth.get(monthKey) ?? 0) + point.value);
-  }
-  const settledSeries = recentMonths.map((month) => ({
-    x: month.label,
-    y: settledByMonth.get(month.key) ?? 0,
-  }));
+  // Settled amount for the selected region only. The settled-currency-trend
+  // endpoint returns one entry per account (currency), each with an INR total
+  // and a monthly INR series; picking the row for the selected account's
+  // currency scopes the whole card — figure, count and chart — to that region.
+  // AED/SGD and the dollar/global rest-of-world buckets all resolve to the
+  // REST_OF_WORLD row the endpoint groups them under.
+  const { currencies: settledCurrencies, isLoading: isSettledLoading } = useSettledCurrencyTrend();
+  const selectedCurrencyKey = REST_OF_WORLD_CURRENCIES.has(selectedAccount?.currency ?? "")
+    ? "REST_OF_WORLD"
+    : (selectedAccount?.currency ?? "");
+  const selectedTrend = (settledCurrencies ?? []).find((c) => c.currency === selectedCurrencyKey);
+  const settledAmount = selectedTrend?.totalInrAmount ?? 0;
+  const settledTxnCount = selectedTrend?.totalCount ?? 0;
+  // Monthly series for the chart, in INR (a mix of currencies only sums in one).
+  const settledSeries = (selectedTrend?.points ?? []).map((p) => ({ x: p.month, y: p.inrAmount }));
   // Unique per mount so the chart's fill gradient id can't collide with another
   // <linearGradient> elsewhere on the page.
   const settledGradientId = useId().replace(/:/g, "");
@@ -505,43 +480,54 @@ function MultiCurrencyContent() {
                 same height on a shared line, and therefore a shared top and
                 bottom edge. */}
             <div className="flex flex-wrap gap-4">
-              {/* Settled amount: the KPI on the left, a month-by-month area
-                  chart on the right — the same shape and recharts styling as the
-                  Settlement Reports "Total settled" card and the dashboard's
-                  revenue chart, so the graphs across the product read as a set.
-                  Figure + series both come from the settlement-overview endpoint
-                  (year to date). flex-[1.6] gives the card with the chart the
-                  extra width; Outstanding beside it stays flex-1. */}
+              {/* Settled amount for the selected region: the KPI on the left, a
+                  month-by-month area chart on the right, both scoped to the
+                  selected account's currency via settled-currency-trend — pick
+                  US and it reads only USD settlements. flex-[1.6] gives this card
+                  the extra width; Outstanding beside it stays flex-1. */}
               <Card size="sm" className="min-w-[min(470px,100%)] flex-[1.6] gap-0">
-                <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
-                  <div className="flex-1 sm:basis-2/5">
-                    <p className="text-sm font-semibold text-foreground">Settled amount</p>
-
-                    {isSettledLoading ? (
+                {isSettledLoading ? (
+                  <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
+                    <div className="flex-1 sm:basis-2/5">
+                      <p className="text-sm font-semibold text-foreground">Settled amount</p>
                       <Shimmer className="mt-4 h-9 w-40" />
-                    ) : (
-                      <>
-                        {/* Same size/weight as OutstandingAmountCard's figure so
-                            the pair carries equal visual weight. */}
-                        <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                          {formatCurrency(settledAmount, "INR", "en-IN")}
-                        </p>
-                        <p className="mt-2 text-sm text-muted-foreground">
-                          {settledTxnCount.toLocaleString("en-IN")} settled transaction
-                          {settledTxnCount === 1 ? "" : "s"} · Year to date
-                        </p>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
-                    {isSettledLoading ? (
+                    </div>
+                    <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
                       <Shimmer className="h-full min-h-36 w-full" />
-                    ) : settledSeries.every((point) => point.y === 0) ? (
-                      <div className="flex h-full min-h-36 items-center justify-center text-sm text-muted-foreground">
-                        No settlements yet
-                      </div>
-                    ) : (
+                    </div>
+                  </div>
+                ) : settledTxnCount === 0 ? (
+                  /* No settlements for the selected region: the shared
+                     illustration + copy, the same empty state the Settlement
+                     Reports page shows, rather than a ₹0 figure beside a bare
+                     "No settlements yet" line. Boxed to the same height the
+                     KPI + chart layout occupies (min-h-36, sm illustration) so
+                     the card doesn't grow when it's empty. */
+                  <div className="flex min-h-36 flex-1 items-center justify-center">
+                    <PlaceholderState
+                      variant="no-settlements"
+                      size="xs"
+                      title="No settlements yet"
+                      description="Settlement reports will appear here once transactions are processed."
+                      className="gap-2 py-2"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
+                    <div className="flex-1 sm:basis-2/5">
+                      <p className="text-sm font-semibold text-foreground">Settled amount</p>
+                      {/* Same size/weight as OutstandingAmountCard's figure so
+                          the pair carries equal visual weight. */}
+                      <p className="mt-4 whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                        {formatCurrency(settledAmount, "INR", "en-IN")}
+                      </p>
+                      <p className="mt-2 text-sm text-muted-foreground">
+                        {settledTxnCount.toLocaleString("en-IN")} settled transaction
+                        {settledTxnCount === 1 ? "" : "s"} · Year to date
+                      </p>
+                    </div>
+
+                    <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart
                           data={settledSeries}
@@ -597,9 +583,9 @@ function MultiCurrencyContent() {
                           />
                         </AreaChart>
                       </ResponsiveContainer>
-                    )}
+                    </div>
                   </div>
-                </div>
+                )}
               </Card>
 
               {/* The same Outstanding card the MCA Transactions page renders, not
