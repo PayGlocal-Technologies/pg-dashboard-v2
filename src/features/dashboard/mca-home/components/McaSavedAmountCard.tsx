@@ -4,8 +4,7 @@ import { useState } from "react";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { RollingNumber } from "@/components/common/RollingNumber";
-import { formatCurrency } from "@/lib/utils/format";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import { useSavedAmount } from "@/features/dashboard/mca-transactions/hooks";
 
 /**
@@ -43,7 +42,7 @@ export function McaSavedAmountCard() {
   const currency = saved?.currency ?? "INR";
 
   return (
-    <Card className="gap-3 p-5">
+    <Card className="h-full gap-3 p-5">
       {/* Icon left, toggle right: the same top-row split OutstandingAmountCard
           uses for its icon and pending chip, rather than a second row. */}
       <div className="flex items-start justify-between gap-2">
@@ -88,8 +87,9 @@ export function McaSavedAmountCard() {
         {isLoading ? (
           <Shimmer className="mt-1 h-8 w-32" />
         ) : (
-          <RollingNumber
-            value={formatCurrency(savedInr, currency, "en-IN")}
+          <CompactAmount
+            amount={savedInr}
+            currency={currency}
             className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
         )}

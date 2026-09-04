@@ -14,8 +14,9 @@ import {
 import { Button, Card, Separator, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { RollingNumber } from "@/components/common/RollingNumber";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { CompactAmount } from "@/components/common/CompactAmount";
+import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   revenueTimeframes,
   type RevenuePoint,
@@ -55,18 +56,11 @@ function buildRevenueRanges(): Record<RevenueTimeframe, { startDate: string; end
  * thousands, above it in lakhs with one decimal until the whole-lakh figure is
  * unambiguous on its own.
  */
+/** Y-axis tick label. Delegates to the shared short form so the axis reads in
+ *  the same ₹K/₹L/₹Cr units as every headline and bar figure (an earlier
+ *  lakh-only version showed "10000L" instead of "₹1.00Cr"). */
 function formatMoneyAxis(value: number): string {
-  if (value === 0) return "₹0";
-  const abs = Math.abs(value);
-  if (abs >= 100_000) {
-    const lakh = value / 100_000;
-    return `₹${lakh < 10 ? lakh.toFixed(1) : lakh.toFixed(0)}L`;
-  }
-  return `₹${Math.round(value / 1000)}K`;
-}
-
-function formatLakhTotal(value: number): string {
-  return `₹${(value / 100_000).toFixed(2)}L`;
+  return value === 0 ? "₹0" : formatCurrencyShort(value, "INR");
 }
 
 function RevenueTooltip({
@@ -144,10 +138,17 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
           <Shimmer className="h-8 w-32" />
         ) : (
           <>
-            <RollingNumber
-              value={trend ? formatLakhTotal(trend.total) : "—"}
-              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-            />
+            {trend ? (
+              <CompactAmount
+                amount={trend.total}
+                currency={trend.currency}
+                className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+              />
+            ) : (
+              <span className="block text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                —
+              </span>
+            )}
             {trend && (
               <span className="text-xs font-medium text-muted-foreground">{trend.currency}</span>
             )}
@@ -247,10 +248,17 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-muted-foreground">Upcoming settlement</p>
-          <RollingNumber
-            value={upcoming ? `₹${upcoming.amount.toLocaleString("en-IN")}` : "—"}
-            className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-          />
+          {upcoming ? (
+            <CompactAmount
+              amount={upcoming.amount}
+              currency="INR"
+              className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+            />
+          ) : (
+            <span className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums">
+              —
+            </span>
+          )}
           {upcoming && upcoming.transactionCount > 0 && (
             <p className="mt-1 text-xs text-muted-foreground">
               {upcoming.transactionCount} transaction{upcoming.transactionCount === 1 ? "" : "s"}

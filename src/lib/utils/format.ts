@@ -197,6 +197,58 @@ export function formatCurrency(amount: number, currency: string = "INR", locale 
   })}`;
 }
 
+/**
+ * Always-compact currency, the single short form every dashboard figure uses so
+ * they read the same everywhere. For rupees it's the Indian scale — ₹8.5K,
+ * ₹9.95L, ₹6.91Cr (two decimals for lakh/crore, one for thousand); for any
+ * other reporting currency it's the Western scale — $8.5K, $1.20M, $2.00B —
+ * since lakh/crore only make sense against ₹. Below a thousand the exact grouped
+ * figure is shown, as there's nothing to shorten.
+ *
+ * This is for bar labels, axis ticks and inline stat cells. For a standalone
+ * headline KPI use formatCurrencyCompact (below) via the CompactAmount
+ * component, which keeps small figures exact and reveals the full number on
+ * hover.
+ */
+export function formatCurrencyShort(amount: number, currency: string = "INR"): string {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+
+  if (currency !== "INR") {
+    // Western short scale — lakh/crore would be wrong against a non-rupee code.
+    if (abs >= 1_000_000_000) return `${sign}${symbol}${(abs / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000) return `${sign}${symbol}${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`;
+    return `${sign}${symbol}${Math.round(abs).toLocaleString("en-US")}`;
+  }
+
+  if (abs >= 10_000_000) return `${sign}${symbol}${(abs / 10_000_000).toFixed(2)}Cr`;
+  if (abs >= 100_000) return `${sign}${symbol}${(abs / 100_000).toFixed(2)}L`;
+  if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`;
+  return `${sign}${symbol}${Math.round(abs).toLocaleString("en-IN")}`;
+}
+
+/**
+ * Currency for a standalone headline KPI. The full grouped amount up to five
+ * digits (₹39,860.28), then the same compact short form as formatCurrencyShort
+ * once it reaches a lakh — ₹9.95L, ₹6.91Cr — so a big figure never runs past
+ * its card while a small one stays exact.
+ *
+ * Pair with the CompactAmount component, which shows the exact figure
+ * (formatCurrency) in a hover tooltip whenever this compacts.
+ */
+export function formatCurrencyCompact(
+  amount: number,
+  currency: string = "INR",
+  locale = "en-IN"
+): string {
+  // Five digits or fewer (under a lakh): the reader wants the exact figure and
+  // it fits, so nothing is compacted and no tooltip is warranted.
+  if (Math.abs(amount) < 100_000) return formatCurrency(amount, currency, locale);
+  return formatCurrencyShort(amount, currency);
+}
+
 /** Compact number formatting: 1_500 -> "1.5K", 2_400_000 -> "2.4M". */
 export function formatNumber(num: number): string {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
