@@ -20,11 +20,12 @@ import {
   merchantInvoicesViewApi,
 } from "@/features/dashboard/receipts/services";
 import {
+  buildReceiptRequestBody,
+  defaultReceiptPeriod,
   filterReceipts,
-  getDefault18MonthRange,
   mapInvoiceRecordToReceipt,
-  receiptMonthRange,
   receiptMonthsWithData,
+  receiptPeriodBounds,
 } from "@/features/dashboard/receipts/utils";
 import {
   DEFAULT_RECEIPT_PRODUCT,
@@ -41,6 +42,7 @@ import type {
   Receipt,
   ReceiptProduct,
 } from "@/features/dashboard/receipts/types";
+import type { MonthRange } from "@/components/common/filters/FilterChips";
 
 const EMPTY_AMOUNT_RANGE: AmountRangeValue = { min: "", max: "" };
 const EMPTY_ROWS: Receipt[] = [];
@@ -71,7 +73,11 @@ export function ReceiptsTable() {
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
-  const [monthFilters, setMonthFilters] = useState<string[]>([]);
+  // The service window the list request is bounded by. Lazy initialisers: both
+  // read the clock, which must not happen during render (CLAUDE.md).
+  const [defaultPeriod] = useState<MonthRange>(() => defaultReceiptPeriod());
+  const [periodBounds] = useState<MonthRange>(() => receiptPeriodBounds());
+  const [period, setPeriod] = useState<MonthRange>(defaultPeriod);
   const [page, setPage] = useState(1);
 
   const [rows, setRows] = useState<Receipt[]>(EMPTY_ROWS);
@@ -89,10 +95,11 @@ export function ReceiptsTable() {
 
   const showMerchantId = isMultiMidUser && !selectedMid;
 
-  // Lazy init so `new Date()` runs once on mount, not on every render (see
-  // CLAUDE.md hooks purity). No `products` filter — everything is fetched and
-  // the product tabs slice client-side.
-  const [reqBody] = useState<InvoiceViewRequestParams>(() => getDefault18MonthRange());
+  // Both the selected tab and the period go to the server, so this is derived
+  // from them rather than fixed on mount. It used to be built once with neither:
+  // every tab fetched every product over a hardcoded 15-month window, and the
+  // tabs and the month chip then filtered the result client-side.
+  const reqBody = useMemo(() => buildReceiptRequestBody(product, period), [product, period]);
 
   const midsKey = midsToFetch.join(",");
   const enabled = midsToFetch.length > 0 && !isGuestUser;
@@ -133,21 +140,17 @@ export function ReceiptsTable() {
   // reset state synchronously.
   const sourceRows = enabled ? rows : EMPTY_ROWS;
 
-  // The months the Month grid may offer: the window the request itself covers, so
-  // the chip is drawn even before any row lands (see receiptMonthRange).
-  const monthRange = useMemo(() => receiptMonthRange(reqBody), [reqBody]);
-
-  // Which of those months this product has a receipt for — the grid's dots.
-  // Computed before the other filters are applied: narrowing it as the merchant
-  // filters would unmark the month they just ticked.
+  // Which months in the window this product has a receipt for — the grid's dots.
+  // Computed before search/amount are applied: narrowing it as the merchant
+  // filters would unmark months that do have a receipt.
   const monthsWithData = useMemo(
     () => receiptMonthsWithData(sourceRows.filter((r) => r.product === product)),
     [sourceRows, product]
   );
 
   const filtered = useMemo(
-    () => filterReceipts(sourceRows, { product, search, amountRange, monthFilters }),
-    [sourceRows, product, search, amountRange, monthFilters]
+    () => filterReceipts(sourceRows, { product, search, amountRange }),
+    [sourceRows, product, search, amountRange]
   );
 
   const totalCount = filtered.length;
@@ -166,13 +169,10 @@ export function ReceiptsTable() {
     setPage(1);
   };
 
-  // Switching products keeps every filter — search, amount range and months — the
-  // same way SkuTable keeps its search across type tabs. The months used to be
-  // cleared here because the chip's options were the selected product's own rows,
-  // so a month carried across could be one the new tab had no checkbox for; the
-  // grid now spans the whole fetched window for every product, so a carried-over
-  // month is always a month the new tab can show (and unmark, if it has no receipt
-  // for it).
+  // Switching products keeps search, amount and the period, the same way SkuTable
+  // keeps its search across type tabs. The tab is part of the request now, so
+  // this also refetches — the period carries over unchanged, which is what makes
+  // the two tabs comparable over the same window.
   const onProductChange = (value: string) => {
     setProduct(value as ReceiptProduct);
     setPage(1);
@@ -204,11 +204,12 @@ export function ReceiptsTable() {
         setAmountRange(next);
         setPage(1);
       }}
-      monthRange={monthRange}
+      periodBounds={periodBounds}
       monthsWithData={monthsWithData}
-      monthFilters={monthFilters}
-      onMonthFiltersChange={(next) => {
-        setMonthFilters(next);
+      period={period}
+      defaultPeriod={defaultPeriod}
+      onPeriodChange={(next) => {
+        setPeriod(next);
         setPage(1);
       }}
     />

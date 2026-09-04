@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   AmountFilterChip,
-  MonthFilterChip,
+  MonthRangeFilterChip,
   type AmountRangeValue,
   type MonthRange,
 } from "@/components/common/filters/FilterChips";
@@ -14,10 +14,14 @@ import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/receipts/constants";
  * no others.
  *
  * Both are shared chips from FilterChips.tsx: Amount is the min/max range every
- * other table uses, and Month is the year-and-month grid, fed the window the
- * receipts request covers plus the months that came back with a row in them. They
- * narrow independently and compose — an amount range and a month applied together
- * match only the rows satisfying both.
+ * other table uses, and Period is the year-and-month grid in its range form,
+ * picking the start and end months the list request is bounded by.
+ *
+ * They do not narrow the same way. Amount is applied client-side over whatever
+ * came back; Period goes into the request body, so changing it refetches. And
+ * Period always has a value — the window the page opens on — which is why the
+ * chip renders as active from first paint rather than reading as unset while it
+ * silently bounds every row on screen.
  *
  * This owns the "which popover is open" state itself rather than taking it as a
  * prop, and that ownership is load-bearing: the table renders this row twice —
@@ -35,10 +39,11 @@ export function ReceiptFilterChips({
   idPrefix,
   amountRange,
   onAmountRangeChange,
-  monthRange,
+  periodBounds,
   monthsWithData,
-  monthFilters,
-  onMonthFiltersChange,
+  period,
+  defaultPeriod,
+  onPeriodChange,
 }: {
   /**
    * Distinguishes the Amount popover's min/max input ids between the two mounted
@@ -49,12 +54,16 @@ export function ReceiptFilterChips({
   idPrefix: string;
   amountRange: AmountRangeValue;
   onAmountRangeChange: (next: AmountRangeValue) => void;
-  monthRange: MonthRange;
+  /** The outer limits the Period grid can navigate within. */
+  periodBounds: MonthRange;
   monthsWithData: Set<string>;
-  monthFilters: string[];
-  onMonthFiltersChange: (next: string[]) => void;
+  /** The window currently in force, and in the request body. */
+  period: MonthRange;
+  /** What the chip's Reset goes back to. */
+  defaultPeriod: MonthRange;
+  onPeriodChange: (next: MonthRange) => void;
 }) {
-  const [openChip, setOpenChip] = useState<"amount" | "month" | null>(null);
+  const [openChip, setOpenChip] = useState<"amount" | "period" | null>(null);
 
   return (
     <>
@@ -66,13 +75,14 @@ export function ReceiptFilterChips({
         idPrefix={idPrefix}
         hint={RECEIPT_AMOUNT_HINT}
       />
-      <MonthFilterChip
-        range={monthRange}
+      <MonthRangeFilterChip
+        bounds={periodBounds}
+        value={period}
+        defaultRange={defaultPeriod}
         monthsWithData={monthsWithData}
-        selected={monthFilters}
-        onChange={onMonthFiltersChange}
-        open={openChip === "month"}
-        onOpenChange={(next) => setOpenChip(next ? "month" : null)}
+        onChange={onPeriodChange}
+        open={openChip === "period"}
+        onOpenChange={(next) => setOpenChip(next ? "period" : null)}
       />
     </>
   );

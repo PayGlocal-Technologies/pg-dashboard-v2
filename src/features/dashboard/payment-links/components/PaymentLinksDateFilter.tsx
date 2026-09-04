@@ -3,37 +3,41 @@
 import { useState } from "react";
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
 import {
   DateRangeCalendarPicker,
   type DateRangeValue,
-  type DurationPickMode,
+  type DatePickMode,
 } from "@/components/common/DateRangeCalendarPicker";
 import { formatDateKey, formatShortDate, parseDateKey } from "@/lib/utils/format";
+import {
+  FilterChipClearButton,
+  FilterChipLabelTrigger,
+  FilterChipShell,
+} from "@/components/common/filters/FilterChips";
 
-export type DurationPreset = "today" | "last7" | "last30" | "last3months" | "custom";
+export type DatePreset = "today" | "last7" | "last30" | "last3months" | "custom";
 
-export interface PaymentLinksDurationValue {
-  preset: DurationPreset;
+export interface PaymentLinksDateValue {
+  preset: DatePreset;
   /** YYYY-MM-DD */
   from: string;
   /** YYYY-MM-DD */
   to: string;
 }
 
-interface PaymentLinksDurationFilterProps {
-  value: PaymentLinksDurationValue | undefined;
-  onChange: (value: PaymentLinksDurationValue | undefined) => void;
+interface PaymentLinksDateFilterProps {
+  value: PaymentLinksDateValue | undefined;
+  onChange: (value: PaymentLinksDateValue | undefined) => void;
 }
 
-const PRESETS: { value: Exclude<DurationPreset, "custom">; label: string }[] = [
+const PRESETS: { value: Exclude<DatePreset, "custom">; label: string }[] = [
   { value: "today", label: "Today" },
   { value: "last7", label: "Last 7 days" },
   { value: "last30", label: "Last 30 days" },
   { value: "last3months", label: "Last 3 months" },
 ];
 
-function durationLabel(value: PaymentLinksDurationValue): string {
+function dateLabel(value: PaymentLinksDateValue): string {
   const preset = PRESETS.find((p) => p.value === value.preset);
   if (preset) return preset.label;
   return value.from === value.to
@@ -41,10 +45,10 @@ function durationLabel(value: PaymentLinksDurationValue): string {
     : `${formatShortDate(value.from)} – ${formatShortDate(value.to)}`;
 }
 
-export function PaymentLinksDurationFilter({ value, onChange }: PaymentLinksDurationFilterProps) {
+export function PaymentLinksDateFilter({ value, onChange }: PaymentLinksDateFilterProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"presets" | "custom">("presets");
-  const [mode, setMode] = useState<DurationPickMode>("single");
+  const [mode, setMode] = useState<DatePickMode>("single");
   const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
   const [range, setRange] = useState<DateRangeValue | undefined>(undefined);
 
@@ -73,7 +77,7 @@ export function PaymentLinksDurationFilter({ value, onChange }: PaymentLinksDura
     setOpen(next);
   }
 
-  function handlePresetClick(preset: Exclude<DurationPreset, "custom">) {
+  function handlePresetClick(preset: Exclude<DatePreset, "custom">) {
     const today = new Date();
     const to = new Date(today);
     const from = new Date(today);
@@ -105,35 +109,30 @@ export function PaymentLinksDurationFilter({ value, onChange }: PaymentLinksDura
     setOpen(false);
   }
 
+  // Clear resets the calendar's own selection and drops the applied filter, but
+  // deliberately leaves the popover OPEN. It used to close it, which made the
+  // control look like it had merely dismissed itself: the merchant never saw the
+  // date deselect, so the only feedback was the popover vanishing. Staying open
+  // shows the calendar go empty, and leaves them somewhere to pick a new date
+  // without reopening. Done is still what commits a *selection*; this is the one
+  // action that also takes effect immediately, because "Clear" that needs a
+  // second confirming click is not a clear.
   function handleClear() {
     setSingleDate(undefined);
     setRange(undefined);
     onChange(undefined);
-    setOpen(false);
   }
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Icon name="plus" className="h-3 w-3" />}
-          className={cn(
-            "relative h-auto rounded-full border-dotted bg-transparent px-4 py-2 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground",
-            open && "text-foreground"
-          )}
-        >
-          {value ? durationLabel(value) : "Duration"}
-          {value && (
-            <span
-              className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary"
-              aria-hidden="true"
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
+      {/* The shared chip shell, matching every other filter in the app — see the
+          note in SettlementDateFilter for what this replaced. */}
+      <FilterChipShell active={!!value}>
+        {value && <FilterChipClearButton label="Date" onClick={handleClear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger label={value ? dateLabel(value) : "Date"} active={!!value} />
+        </PopoverTrigger>
+      </FilterChipShell>
       <PopoverContent align="start" className="w-auto p-3">
         {view === "presets" ? (
           <div className="flex w-44 flex-col gap-0.5">

@@ -33,6 +33,38 @@ export const RECEIPT_PRODUCT_TABS = [
 /** The tab the page opens on. */
 export const DEFAULT_RECEIPT_PRODUCT: ReceiptProduct = "MCA";
 
+/**
+ * The tab union → the value the list endpoint's `products` field takes.
+ *
+ * Only Fraud screening differs: the backend calls it "FS" (see pg-dashboard's
+ * productTypeDisplayMap and its merchantInvoiceFilters static data), while the
+ * tab union spells it out. The inverse mapping lives in mapProductType, and the
+ * two have to agree — send "FS" and read "FS" back — or the tab would request
+ * one product and then filter the response for another.
+ */
+export const RECEIPT_PRODUCT_API_VALUE: Record<ReceiptProduct, string> = {
+  MCA: "MCA",
+  PA: "PA",
+  FRAUD: "FS",
+};
+
+/**
+ * How far back the Period chip lets the merchant navigate, in months from the
+ * current one. A navigation bound for the year grid, not an API limit —
+ * pg-dashboard's equivalent filter is an unbounded date picker, and the endpoint
+ * accepts any range inside one request.
+ */
+export const RECEIPT_MAX_LOOKBACK_MONTHS = 36;
+
+/**
+ * The window the page opens on, in months back from the current one.
+ *
+ * 15, matching pg-dashboard's getDefault18MonthRange — which despite its name
+ * subtracts 15 months, not 18. Kept at the production value rather than the one
+ * the name implies, so both dashboards request the same span.
+ */
+export const RECEIPT_DEFAULT_LOOKBACK_MONTHS = 15;
+
 /** Supporting line under the page title — what these receipts are for. */
 export const RECEIPTS_PAGE_SUBTITLE =
   "View monthly payment receipts that you can use to redeem your GST.";

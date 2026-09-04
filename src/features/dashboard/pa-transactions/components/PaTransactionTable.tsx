@@ -72,13 +72,6 @@ export function PaTransactionTable() {
     setSearch(v);
     setPage(1);
   };
-  const onClear = () => {
-    setStatus("All");
-    setMethod("All");
-    setSearch("");
-    setPage(1);
-  };
-  const hasActive = status !== "All" || method !== "All" || search !== "";
 
   const onViewDetails = (row: PaTransaction) => {
     // TODO: open the transaction details view for this row (keyed by row.gid).
@@ -138,17 +131,6 @@ export function PaTransactionTable() {
           ))}
         </div>
 
-        {hasActive && (
-          <Button
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon name="x" className="w-3 h-3" />}
-            onClick={onClear}
-            className="ml-auto text-muted-foreground hover:text-foreground"
-          >
-            Clear
-          </Button>
-        )}
       </div>
 
       {isError ? (

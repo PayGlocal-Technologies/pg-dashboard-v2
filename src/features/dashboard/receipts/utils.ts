@@ -1,5 +1,10 @@
 import type { AmountRangeValue, MonthRange } from "@/components/common/filters/FilterChips";
 import { formatCurrency } from "@/lib/utils/format";
+import {
+  RECEIPT_DEFAULT_LOOKBACK_MONTHS,
+  RECEIPT_MAX_LOOKBACK_MONTHS,
+  RECEIPT_PRODUCT_API_VALUE,
+} from "@/features/dashboard/receipts/constants";
 import type {
   InvoiceDownloadViewRecord,
   InvoiceViewRequestParams,
@@ -20,21 +25,66 @@ export function formatReceiptAmount(receipt: Receipt): string {
   return formatCurrency(amount, currency, currency === "INR" ? "en-IN" : "en-US");
 }
 
+/** "YYYY-MM" for the month `monthsBack` months before `from`. */
+function monthKeyBefore(from: Date, monthsBack: number): string {
+  const d = new Date(from.getFullYear(), from.getMonth() - monthsBack, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 /**
- * The billing months the Month chip may offer, taken from the window the list
- * request itself covers (getDefault18MonthRange).
+ * The window the page opens on: RECEIPT_DEFAULT_LOOKBACK_MONTHS back through the
+ * current month, the same span pg-dashboard's getDefault18MonthRange builds.
  *
- * Derived from the request rather than from the rows on purpose: the chip used to
- * list only the months the response happened to contain, which meant a product
- * with no receipts yet — or a request that failed — opened an empty popover with
- * nothing in it but Clear and Apply. The shared year-and-month grid it renders
- * now always has something to show, and months without a receipt behind them are
- * marked rather than missing (see MonthFilterChip).
+ * Call from a `useState` lazy initialiser or an effect, never during render —
+ * it reads the clock (see CLAUDE.md hooks purity).
  */
-export function receiptMonthRange(params: InvoiceViewRequestParams): MonthRange {
+export function defaultReceiptPeriod(): MonthRange {
+  const now = new Date();
   return {
-    start: `${params.serviceYearStart}-${params.serviceMonthStart}`,
-    end: `${params.serviceYearEnd}-${params.serviceMonthEnd}`,
+    start: monthKeyBefore(now, RECEIPT_DEFAULT_LOOKBACK_MONTHS),
+    end: monthKeyBefore(now, 0),
+  };
+}
+
+/**
+ * The outer limits the Period chip lets the merchant navigate within. Wider than
+ * the default window, so the range can be widened as well as narrowed — a chip
+ * bounded by its own current value could only ever shrink.
+ */
+export function receiptPeriodBounds(): MonthRange {
+  const now = new Date();
+  return {
+    start: monthKeyBefore(now, RECEIPT_MAX_LOOKBACK_MONTHS),
+    end: monthKeyBefore(now, 0),
+  };
+}
+
+/**
+ * The list request body for one product over one month range.
+ *
+ * Both halves are real filters the endpoint applies, which is the point of
+ * building this from the page's state rather than once on mount:
+ *
+ *  - `products` carries the selected tab. It used to be omitted entirely and the
+ *    tabs sliced the response client-side, so every tab fetched every product's
+ *    receipts and threw most of them away. pg-dashboard sends this from its
+ *    Product Type filter (`products: filters.type`).
+ *  - the four service year/month fields carry the Period chip, the same way
+ *    pg-dashboard's transformFiltersToInvoiceParams turns its date range into
+ *    them.
+ */
+export function buildReceiptRequestBody(
+  product: ReceiptProduct,
+  period: MonthRange
+): InvoiceViewRequestParams {
+  return {
+    serviceYearStart: period.start.slice(0, 4),
+    serviceMonthStart: period.start.slice(5, 7),
+    serviceYearEnd: period.end.slice(0, 4),
+    serviceMonthEnd: period.end.slice(5, 7),
+    // A one-element array: the field is a multi-select on the wire (see
+    // InvoiceViewRequestParams), and these tabs select exactly one product.
+    products: [RECEIPT_PRODUCT_API_VALUE[product]],
   };
 }
 
@@ -51,21 +101,19 @@ export interface ReceiptFilters {
   product: ReceiptProduct;
   search: string;
   amountRange: AmountRangeValue;
-  monthFilters: string[];
 }
 
 /**
- * Every filter the page offers, applied in one pass.
+ * The filters that stay on the client, applied in one pass.
  *
- * Client-side because there is no receipts endpoint yet (rows come from
- * MOCK_RECEIPTS). When the endpoint lands, replace this with a request body —
- * mirroring buildTxnRequestBody — and a usePostQuery call; the tabs, chips and
- * columns that feed it need no changes.
+ * Product and period are NOT among them any more: both are in the request body
+ * (see buildReceiptRequestBody), so the response already covers one product over
+ * one window. Search and amount stay here because the endpoint takes neither.
  *
- * The product tab is applied here too, and first: it is the page's context, so
- * the search box and both chips only ever see the selected product's rows. The
- * filters compose — an amount range and a set of months applied together match
- * only the rows satisfying both.
+ * The product test below is kept even so, as a narrowing safety net rather than
+ * the primary filter: if a backend ignored `products`, every tab would otherwise
+ * show every product's receipts. It is a no-op whenever the server honours the
+ * field.
  */
 export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Receipt[] {
   const query = filters.search.trim().toLowerCase();
@@ -102,41 +150,11 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
       if (hasMax && amount > max) return false;
     }
 
-    // Months are matched as whole periods, not as a range: the chip offers a
-    // year-and-month grid and the merchant picks the ones they want, so this is a
-    // set membership test rather than a comparison.
-    if (filters.monthFilters.length && !filters.monthFilters.includes(receipt.periodMonth)) {
-      return false;
-    }
-
     return true;
   });
 }
 
 // ── API mapping (ported from pg-dashboard invoice-download) ──────────────────
-
-/**
- * Default service range = the last ~18 months, ported verbatim from the old
- * feature's getDefault18MonthRange. Call from a `useState` lazy initialiser or
- * an effect, never directly during render (uses `new Date()`).
- */
-export function getDefault18MonthRange(): InvoiceViewRequestParams {
-  const now = new Date();
-  const endYear = now.getFullYear();
-  const endMonth = String(now.getMonth() + 1).padStart(2, "0");
-
-  const start = new Date(now);
-  start.setMonth(start.getMonth() - 15);
-  const startYear = start.getFullYear();
-  const startMonth = String(start.getMonth() + 1).padStart(2, "0");
-
-  return {
-    serviceYearStart: String(startYear),
-    serviceMonthStart: startMonth,
-    serviceYearEnd: String(endYear),
-    serviceMonthEnd: endMonth,
-  };
-}
 
 /**
  * Backend productType ("PA" | "MCA" | "FS") → the tab union. The old feature's
