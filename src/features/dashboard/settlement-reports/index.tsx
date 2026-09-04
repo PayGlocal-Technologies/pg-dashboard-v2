@@ -28,6 +28,7 @@ import {
   MCA_SETTLEMENT_GUIDE_KEY,
   MCA_SETTLEMENT_GUIDE_STEPS,
 } from "@/features/dashboard/settlement-reports/guide";
+import { ClassicSettlementTable } from "@/features/dashboard/settlement-reports/components/ClassicSettlementTable";
 import {
   SettlementDateFilter,
   type SettlementDateValue,
@@ -39,6 +40,7 @@ import {
 } from "@/features/dashboard/settlement-reports/columns";
 import {
   mcaSettlementSummary,
+  mockSettlementRowsFor,
   // MOCK (unused — chart has no fallback now): mcaTotalSettledChartsByTimeframe,
   settlementSummary,
   // MOCK (unused — chart has no fallback now): totalSettledChartsByTimeframe,
@@ -50,6 +52,7 @@ import {
   useSettlementUpcoming,
 } from "@/features/dashboard/settlement-reports/hooks";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import {
   ffmsSettlementDownloadApi,
   ffmsSettlementSummaryApi,
@@ -90,6 +93,23 @@ interface SettlementReportsFeatureProps {
   product: NavContext;
 }
 
+/**
+ * Whether an empty settlement list falls back to the mock dataset.
+ *
+ * Development only. See the `rows` memo below for why the fallback exists and
+ * why it must never reach a merchant.
+ */
+const SHOW_MOCK_SETTLEMENTS = process.env.NODE_ENV !== "production";
+
+type SettlementView = "enhanced" | "classic";
+
+/** Labelled for what each one IS, not for which codebase it came from: a
+ *  merchant reading this toggle has never heard of pg-dashboard. */
+const SETTLEMENT_VIEWS: { value: SettlementView; label: string }[] = [
+  { value: "enhanced", label: "Enhanced" },
+  { value: "classic", label: "Classic" },
+];
+
 export function SettlementReportsFeature({ product }: SettlementReportsFeatureProps) {
   const router = useRouter();
 
@@ -124,6 +144,22 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [dateFilter, setDateFilter] = useState<SettlementDateValue | undefined>(undefined);
   const [showCycleInfo, setShowCycleInfo] = useState(false);
+  /**
+   * Which version of this page to render.
+   *
+   * "enhanced" is v2's own: summary cards and chart, the settlement calendar,
+   * the bank-holiday banner, search, column controls, per-row status and the
+   * per-settlement detail page behind each row.
+   *
+   * "classic" reproduces pg-dashboard's settlement report as it stands today —
+   * five columns, a date filter, refresh, download — so the two can be compared
+   * side by side without leaving the app. See ClassicSettlementTable.
+   */
+  const [view, setView] = useState<SettlementView>("enhanced");
+  /** The classic table pages at 15 rows to production's own pageLimit, so it
+   *  keeps a page index separate from the enhanced table's 10. */
+  const [classicPage, setClassicPage] = useState(1);
+  const isClassic = view === "classic";
   const [columnOrder, setColumnOrder] = useState<string[]>(SETTLEMENT_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   // Set when a row's download is requested; drives the lazy download queries
@@ -274,22 +310,47 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
     return (paQuery.data?.data?.views ?? []).map(mapPaViewToRow);
   }, [isMca, paQuery.data, ffmsQuery.data]);
 
+  const isPending = isMca ? ffmsQuery.isPending : paQuery.isPending;
+
+  /**
+   * Sample rows, when the endpoint has answered with none.
+   *
+   * Most dev and UAT accounts have no settlement history, so this page rendered
+   * as an empty table and there was no way to review the states it is supposed
+   * to draw — every status, the non-working-day pushes, the detail page behind a
+   * row. The mock dataset covers all of them (see mock-data.ts).
+   *
+   * Gated on NODE_ENV so it can never reach a merchant: an empty settlement list
+   * in production is a real answer, and filling it with invented settlements
+   * would be worse than showing nothing. It waits for `isPending` to clear, so a
+   * slow response shows a skeleton rather than flashing sample data first.
+   */
+  const rows = useMemo(() => {
+    if (apiRows.length > 0 || isPending) return apiRows;
+    return SHOW_MOCK_SETTLEMENTS ? mockSettlementRowsFor(isMca) : apiRows;
+  }, [apiRows, isPending, isMca]);
+
   // The old settlement tables only supported a date filter server-side; text
   // search over the visible UTR / settlement date stays client-side.
   const filteredSettlementRows = useMemo(() => {
-    if (!search) return apiRows;
+    if (!search) return rows;
     const q = search.toLowerCase();
-    return apiRows.filter(
+    return rows.filter(
       (row) => (row.utrNumber ?? "").toLowerCase().includes(q) || row.id.toLowerCase().includes(q)
     );
-  }, [apiRows, search]);
+  }, [rows, search]);
 
-  const isPending = isMca ? ffmsQuery.isPending : paQuery.isPending;
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
 
   // Schedule from the live calendar, amount still from mock-data (no summary
   // endpoint exists — see BACKEND GAP below).
+  /** Row-scoped report download, shared by both views: the endpoint is keyed by
+   *  the settlement date, and by the row's own merchant when the summary names
+   *  one (a UCIC-scoped list can span merchants). */
+  const downloadRowReport = (row: SettlementRow) =>
+    setDownloadTarget({ date: row.id, merchantId: row.merchantId ?? scopeId });
+
   const upcoming = calendar.upcomingSchedule;
   const showHolidayBanner =
     upcoming.affectedByNonWorkingDay && upcoming.nonWorkingDayReason === "holiday";
@@ -332,7 +393,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
               /> */}
               <span data-guide="mca-settlement-calendar" className="inline-flex">
                 <SettlementCalendarButton
-                  rows={apiRows}
+                  rows={rows}
                   todayKey={calendar.today}
                   nextSettlementDate={calendar.nextSettlement.date}
                   nextSettlementReason={calendar.nextSettlement.reason}
@@ -379,111 +440,141 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
                 // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
                 upcomingSettlementLabel={upcomingSettlementLabel}
-                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
+                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(
+                  calendar.upcomingSchedule
+                )}
                 pendingInvoiceCount={upcomingPendingInvoiceCount}
                 onUploadInvoice={() => router.push("/mca-transactions")}
               />
             </div>
 
-            <Card className="gap-0 overflow-hidden p-0">
-              <div className="pl-5 pr-3 pb-3 pt-5">
-                {/* Status SegmentedTabs removed: the settlement summary API only
-                 * returns already-completed settlements, so there is no per-row
-                 * status to filter on (see BACKEND GAP in helper.ts). */}
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <RotatingSearchInput
-                    value={search}
-                    onSearch={onSearch}
-                    words={["UTR", "Settlement ID"]}
-                    className="min-w-40 max-w-xs flex-1"
-                  />
+            {/* The comparison toggle, in its own row between the summary
+                cards/chart above and whichever table it selects below. It
+                labels the table, so it sits with it rather than up in the
+                page header's action row; kept right-aligned (where it used to
+                be, and clear of the search input directly beneath it) so it
+                doesn't read as a second heading for the section. Switching it
+                swaps ONLY the table below: the banner, the header actions and
+                the summary above are the page, not the enhanced view, and
+                stay put in both — otherwise flipping to classic reads as the
+                page emptying out rather than as a table comparison. */}
+            <div className="flex justify-end">
+              <SegmentedTabs
+                options={SETTLEMENT_VIEWS}
+                value={view}
+                onChange={(next) => setView(next as SettlementView)}
+              />
+            </div>
 
-                  <div className="hidden sm:block h-4 w-px bg-border" />
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
-                  </div>
-
-                  <div className="ml-auto flex items-center gap-2">
-                    <TransactionColumnsMenu
-                      items={SETTLEMENT_COLUMN_DEFS}
-                      order={columnOrder}
-                      hidden={hiddenColumns}
-                      onOrderChange={setColumnOrder}
-                      onToggle={onToggleColumn}
-                      onReset={onResetColumns}
+            {isClassic ? (
+              <ClassicSettlementTable
+                rows={filteredSettlementRows}
+                isLoading={isPending}
+                isError={isError}
+                onRefresh={() => void refetch()}
+                dateFilter={dateFilter}
+                onDateFilterChange={(next) => {
+                  onDateFilter(next);
+                  // A narrower range can leave the current page past the end.
+                  setClassicPage(1);
+                }}
+                onDownload={downloadRowReport}
+                page={classicPage}
+                onPageChange={setClassicPage}
+              />
+            ) : (
+              <Card className="gap-0 overflow-hidden p-0">
+                <div className="pl-5 pr-3 pb-3 pt-5">
+                  {/* Status SegmentedTabs removed: the settlement summary API only
+                   * returns already-completed settlements, so there is no per-row
+                   * status to filter on (see BACKEND GAP in helper.ts). */}
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <RotatingSearchInput
+                      value={search}
+                      onSearch={onSearch}
+                      words={["UTR", "Settlement ID"]}
+                      className="min-w-40 max-w-xs flex-1"
                     />
+
+                    <div className="hidden sm:block h-4 w-px bg-border" />
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
+                    </div>
+
+                    <div className="ml-auto flex items-center gap-2">
+                      <TransactionColumnsMenu
+                        items={SETTLEMENT_COLUMN_DEFS}
+                        order={columnOrder}
+                        hidden={hiddenColumns}
+                        onOrderChange={setColumnOrder}
+                        onToggle={onToggleColumn}
+                        onReset={onResetColumns}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {isError ? (
-                <PlaceholderState
-                  variant="error"
-                  title="Couldn't load settlements"
-                  description="Something went wrong while fetching data."
-                  className="border-t border-border py-14"
-                  action={
-                    <Button variant="outline" size="sm" onClick={() => void refetch()}>
-                      Retry
-                    </Button>
-                  }
-                />
-              ) : !isPending && filteredSettlementRows.length === 0 ? (
-                <PlaceholderState
-                  variant="no-settlements"
-                  title="No settlements yet"
-                  description="Settlement reports will appear here once transactions are processed."
-                  className="border-t border-border py-14"
-                />
-              ) : (
-                <DataTable
-                  columns={buildSettlementColumns({ columnOrder, hiddenColumns })}
-                  data={filteredSettlementRows}
-                  isLoading={isPending}
-                  skeletonRows={8}
-                  emptyTitle="No settlements yet"
-                  emptyDescription="Settlement reports will appear here once transactions are processed"
-                  rowKey={(row) => row.id}
-                  pageSize={10}
-                  density="compact"
-                  tableLayout="content"
-                  className="rounded-none border-0 border-t border-border"
-                  rowAction={(row) => (
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setDownloadTarget({
-                            date: row.id,
-                            // row.merchantId once the summary returns it; until
-                            // then the scope the list was fetched at, which is
-                            // right for a single-merchant response.
-                            merchantId: row.merchantId ?? scopeId,
-                          })
-                        }
-                        leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
-                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                      >
-                        Download
+                {isError ? (
+                  <PlaceholderState
+                    variant="error"
+                    title="Couldn't load settlements"
+                    description="Something went wrong while fetching data."
+                    className="border-t border-border py-14"
+                    action={
+                      <Button variant="outline" size="sm" onClick={() => void refetch()}>
+                        Retry
                       </Button>
-                      {/* BACKEND GAP: detail route is mock-backed (no per-settlement
-                       * detail endpoint in the old API). */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push(`${listPath}/${row.id}`)}
-                        rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                      >
-                        View details
-                      </Button>
-                    </div>
-                  )}
-                />
-              )}
-            </Card>
+                    }
+                  />
+                ) : !isPending && filteredSettlementRows.length === 0 ? (
+                  <PlaceholderState
+                    variant="no-settlements"
+                    title="No settlements yet"
+                    description="Settlement reports will appear here once transactions are processed."
+                    className="border-t border-border py-14"
+                  />
+                ) : (
+                  <DataTable
+                    columns={buildSettlementColumns({ columnOrder, hiddenColumns })}
+                    data={filteredSettlementRows}
+                    isLoading={isPending}
+                    skeletonRows={8}
+                    emptyTitle="No settlements yet"
+                    emptyDescription="Settlement reports will appear here once transactions are processed"
+                    rowKey={(row) => row.id}
+                    pageSize={10}
+                    density="compact"
+                    tableLayout="content"
+                    className="rounded-none border-0 border-t border-border"
+                    rowAction={(row) => (
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadRowReport(row)}
+                          leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
+                          className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                        >
+                          Download
+                        </Button>
+                        {/* BACKEND GAP: detail route is mock-backed (no per-settlement
+                         * detail endpoint in the old API). */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => router.push(`${listPath}/${row.id}`)}
+                          rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+                          className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                        >
+                          View details
+                        </Button>
+                      </div>
+                    )}
+                  />
+                )}
+              </Card>
+            )}
           </div>
 
           {showCycleInfo && (

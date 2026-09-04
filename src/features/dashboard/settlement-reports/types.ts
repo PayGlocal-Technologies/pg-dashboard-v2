@@ -32,6 +32,13 @@ export interface SettlementRow {
   transactionCount: number;
   /** Assigned by the bank once the transfer is actually processed, unset until then. */
   utrNumber?: string;
+  /**
+   * Every UTR the settlement carries, as the summary endpoints return them.
+   * `utrNumber` above is the first of these and is what the v2 table shows;
+   * pg-dashboard's own table lists the whole array, so the classic view needs
+   * it intact rather than truncated to one.
+   */
+  utrNumbers?: string[];
   /** ISO date string, the settlement's actual (settled) or expected (processing) date. */
   date: string;
   /** ISO date string, when the underlying payments were captured, T+1's "Day 0". */

@@ -248,18 +248,15 @@ export function useDocumentPending(timeframe: string): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const merchantId = urlMid || ucicId;
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<DocumentPendingResponse>(
     ["mca-document-pending", merchantId, timeframe],
     mcaDocumentPendingApi(merchantId, timeframe),
-    { enabled: isReady && !!merchantId }
+    { enabled: isReady }
   );
 
-  return { documentPending: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+  return { documentPending: data?.data, isLoading: isReady && isPending, isError };
 }
 
 /**
@@ -271,18 +268,15 @@ export function useDocumentPendingByCurrency(): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const merchantId = urlMid || ucicId;
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<DocumentPendingByCurrencyResponse>(
     ["mca-document-pending-by-currency", merchantId],
     mcaDocumentPendingByCurrencyApi(merchantId),
-    { enabled: isReady && !!merchantId }
+    { enabled: isReady }
   );
 
-  return { breakdown: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+  return { breakdown: data?.data, isLoading: isReady && isPending, isError };
 }
 
 /**

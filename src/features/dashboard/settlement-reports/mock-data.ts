@@ -167,6 +167,19 @@ interface SettlementSeed {
   status: SettlementStatus;
   /** Required once a settlement reaches its terminal state, see isSettlementComplete(). */
   utrNumber?: string;
+  /**
+   * Defaults true. Set false to model a settlement whose breakdown has not been
+   * generated yet, which is the one case where the detail page renders no
+   * Download report button at all (see settlement.reportAvailable there).
+   */
+  reportAvailable?: boolean;
+  /**
+   * The MID this settlement belongs to. Only worth setting on a couple of rows:
+   * it is what the row's report download is scoped by, so a list spanning two
+   * merchants proves the download addresses the row's own MID rather than the
+   * scope the list was fetched at.
+   */
+  merchantId?: string;
 }
 
 /**
@@ -188,12 +201,16 @@ function buildSettlementRow(seed: SettlementSeed, bankAccount = "HDFC ****4521")
     bankAccount,
     transactionCount: seed.transactionCount,
     utrNumber: isComplete ? seed.utrNumber : undefined,
+    // The classic (pg-dashboard) table lists the whole array, so mock rows have
+    // to carry one too rather than only the single UTR the v2 table reads.
+    utrNumbers: isComplete && seed.utrNumber ? [seed.utrNumber] : [],
     date: `${schedule.settlementDate}T00:00:00+05:30`,
     paymentReceivedAt: `${seed.paymentReceivedDateKey}T00:00:00+05:30`,
-    // Every scenario here has a report ready, a breakdown can be generated
-    // mid-processing since it only depends on the underlying payments, not
-    // on the bank transfer's own progress.
-    reportAvailable: true,
+    // Defaults to ready: a breakdown can be generated mid-processing, since it
+    // only depends on the underlying payments and not on the bank transfer's
+    // own progress. One MCA row opts out to cover the other branch.
+    reportAvailable: seed.reportAvailable ?? true,
+    merchantId: seed.merchantId,
     bankTransferStatus: isComplete ? "completed" : "pending",
     affectedByNonWorkingDay: schedule.affectedByNonWorkingDay,
     nonWorkingDayReason: schedule.nonWorkingDayReason ?? undefined,
@@ -274,6 +291,10 @@ export const settlementRows: SettlementRow[] = [
 
 const MCA_BANK_ACCOUNT = "Citibank N.A. ****9081";
 
+/** A second PACB MID, so the list spans merchants the way a UCIC-scoped
+ *  response does and each row's report download has to name its own. */
+const SECOND_MCA_MERCHANT_ID = "ptplsecondmca0042";
+
 // Same shape and same T+1 calendar as settlementRows above, scoped to the
 // Multi-Currency Accounts product, mock-only per the TODO(integration) at
 // the top of this file. previousSettled/upcomingSettlement in
@@ -285,6 +306,10 @@ const MCA_BANK_ACCOUNT = "Citibank N.A. ****9081";
 // (funds have reached the merchant, UTR issued), see the SettlementStatus
 // doc comment in types.ts.
 export const mcaSettlementRows: SettlementRow[] = [
+  // ── In progress (today is 2026-03-12 in this dataset) ────────────────────
+  // Today's cycle: payments captured 03-12 walk straight into the 03-13 bank
+  // holiday, so the schedule pushes to Monday 03-16. Report already available,
+  // which is the "breakdown exists mid-processing" case.
   buildSettlementRow(
     {
       id: "mca_p1q2r3s4",
@@ -295,6 +320,24 @@ export const mcaSettlementRows: SettlementRow[] = [
     },
     MCA_BANK_ACCOUNT
   ),
+  // Same cycle, second MID — which is why two settlements share a payment date.
+  // The only row with no report yet, so the detail page renders without its
+  // Download report button.
+  buildSettlementRow(
+    {
+      id: "mca_j1k2l3m4",
+      amount: 2150.4,
+      transactionCount: 4,
+      paymentReceivedDateKey: "2026-03-12",
+      status: "sent_for_settlement",
+      reportAvailable: false,
+      merchantId: SECOND_MCA_MERCHANT_ID,
+    },
+    MCA_BANK_ACCOUNT
+  ),
+  // Converted and sent to the bank, no UTR yet — and part of it is under
+  // compliance review, so this is the row that carries Funds on hold and the
+  // extra "Compliance review" step in the detail timeline.
   buildSettlementRow(
     {
       id: "mca_t5u6v7w8",
@@ -305,6 +348,9 @@ export const mcaSettlementRows: SettlementRow[] = [
     },
     MCA_BANK_ACCOUNT
   ),
+
+  // ── Complete (firc: funds received, UTR issued) ──────────────────────────
+  // Mirrored by mcaSettlementSummary.previousSettled — keep the three in step.
   buildSettlementRow(
     {
       id: "mca_x9y0z1a2",
@@ -338,7 +384,104 @@ export const mcaSettlementRows: SettlementRow[] = [
     },
     MCA_BANK_ACCOUNT
   ),
+  // Saturday capture: T+1 lands on Sunday, so the schedule skips to Monday
+  // 03-09. Completed, and its timeline still shows the weekend it skipped —
+  // the non-working-day math has to survive into a finished cycle.
+  buildSettlementRow(
+    {
+      id: "mca_r9s0t1u2",
+      amount: 27680.25,
+      transactionCount: 33,
+      paymentReceivedDateKey: "2026-03-07",
+      status: "firc",
+      utrNumber: "UTRMCA2603100010",
+    },
+    MCA_BANK_ACCOUNT
+  ),
+  // Also weekend-pushed, and the row whose payments carry "Released from hold"
+  // chips: flagged during review, cleared in time to make this settlement.
+  buildSettlementRow(
+    {
+      id: "mca_h5i6j7k8",
+      amount: 19430.8,
+      transactionCount: 26,
+      paymentReceivedDateKey: "2026-03-06",
+      status: "firc",
+      utrNumber: "UTRMCA2603100011",
+    },
+    MCA_BANK_ACCOUNT
+  ),
+  // Single transaction and a small amount: the one row that proves the
+  // singular copy ("1 transaction") and a sub-100 total format correctly.
+  buildSettlementRow(
+    {
+      id: "mca_v3w4x5y6",
+      amount: 84.6,
+      transactionCount: 1,
+      paymentReceivedDateKey: "2026-03-05",
+      status: "firc",
+      utrNumber: "UTRMCA2603060012",
+    },
+    MCA_BANK_ACCOUNT
+  ),
+  // The opposite end: a crore-scale total over 137 remittances, so the amount
+  // column's lakh grouping and the detail page's payments pagination both have
+  // something real to render.
+  buildSettlementRow(
+    {
+      id: "mca_z7a8b9c0",
+      amount: 14273905.4,
+      transactionCount: 137,
+      paymentReceivedDateKey: "2026-03-04",
+      status: "firc",
+      utrNumber: "UTRMCA2603050013",
+    },
+    MCA_BANK_ACCOUNT
+  ),
+  // Second MID again, this time completed, so a multi-merchant list has one
+  // finished and one in-progress row to download reports for.
+  buildSettlementRow(
+    {
+      id: "mca_d1e2f3g4",
+      amount: 9875.15,
+      transactionCount: 14,
+      paymentReceivedDateKey: "2026-03-03",
+      status: "firc",
+      utrNumber: "UTRMCA2603040014",
+      merchantId: SECOND_MCA_MERCHANT_ID,
+    },
+    MCA_BANK_ACCOUNT
+  ),
+  // Complete at settlement level while a few of its own remittances are still
+  // waiting on their FIRC — the mixed per-payment status case, see
+  // MIXED_PAYMENT_STATUS_SETTLEMENT_ID.
+  buildSettlementRow(
+    {
+      id: "mca_c5d6e7f8",
+      amount: 63420.9,
+      transactionCount: 47,
+      paymentReceivedDateKey: "2026-03-02",
+      status: "firc",
+      utrNumber: "UTRMCA2603030015",
+    },
+    MCA_BANK_ACCOUNT
+  ),
+  // Oldest cycle here, deliberately unremarkable: the baseline every scenario
+  // above is a departure from. Also the 13th row, which is what pushes this
+  // list past the table's 10-row page and exercises pagination.
+  buildSettlementRow(
+    {
+      id: "mca_g9h0i1j2",
+      amount: 21105,
+      transactionCount: 19,
+      paymentReceivedDateKey: "2026-03-01",
+      status: "firc",
+      utrNumber: "UTRMCA2603020016",
+    },
+    MCA_BANK_ACCOUNT
+  ),
 ];
+
 
 // Ratios back-derived from the one settlement whose breakdown is already
 // shown elsewhere (the "Settlement breakup" tooltip on the list page, for
@@ -361,10 +504,11 @@ function deriveAmountBreakdown(netAmount: number): {
 
 const PAYMENT_METHOD_CYCLE = ["UPI", "Card", "Net Banking"];
 
-/** stl_e5f6g7h8's first 3 payments were previously flagged and held, then
- * cleared in time to be included in this settlement, see the "Released from
- * hold" chip on the detail page's Payments table. */
-const RELEASED_HOLD_SETTLEMENT_ID = "stl_e5f6g7h8";
+/** These settlements' first few payments were previously flagged and held, then
+ * cleared in time to be included, see the "Released from hold" chip on the
+ * detail page's Payments table. One per product, since the chip is rendered
+ * from `payments` for MCA settlements too, not from `mcaPayments`. */
+const RELEASED_HOLD_SETTLEMENT_IDS = new Set(["stl_e5f6g7h8", "mca_h5i6j7k8"]);
 const RELEASED_HOLD_REASONS = [
   "Compliance Review",
   "Business Verification Pending",
@@ -411,7 +555,7 @@ function buildPayments(
     netRemaining -= rowNet;
 
     const releasedFromHold =
-      settlement.id === RELEASED_HOLD_SETTLEMENT_ID && i < RELEASED_HOLD_REASONS.length
+      RELEASED_HOLD_SETTLEMENT_IDS.has(settlement.id) && i < RELEASED_HOLD_REASONS.length
         ? { reason: RELEASED_HOLD_REASONS[i]! }
         : undefined;
 
@@ -473,6 +617,52 @@ const MCA_REMITTERS: {
   },
   { name: "test", countryCode: "CA", countryName: "Canada", currency: "CAD", amount: 11 },
   { name: "test", countryCode: "CA", countryName: "Canada", currency: "CAD", amount: 150 },
+  // Beyond USD/CAD, so the country flag and the currency formatting are
+  // exercised across the corridors an MCA merchant actually collects from,
+  // including a zero-decimal currency (JPY) and a long remitter name that has
+  // to truncate rather than push the column wide.
+  {
+    name: "Northwind Trading GmbH",
+    countryCode: "DE",
+    countryName: "Germany",
+    currency: "EUR",
+    amount: 2450.75,
+  },
+  {
+    name: "Halcyon Studios Ltd",
+    countryCode: "GB",
+    countryName: "United Kingdom",
+    currency: "GBP",
+    amount: 890,
+  },
+  {
+    name: "Meridian FZ-LLC",
+    countryCode: "AE",
+    countryName: "United Arab Emirates",
+    currency: "AED",
+    amount: 15750,
+  },
+  {
+    name: "Sakura Godo Kaisha",
+    countryCode: "JP",
+    countryName: "Japan",
+    currency: "JPY",
+    amount: 320000,
+  },
+  {
+    name: "Lion City Ventures Pte Ltd",
+    countryCode: "SG",
+    countryName: "Singapore",
+    currency: "SGD",
+    amount: 4120.4,
+  },
+  {
+    name: "Kangaroo Digital Pty",
+    countryCode: "AU",
+    countryName: "Australia",
+    currency: "AUD",
+    amount: 640.25,
+  },
 ];
 /**
  * A transaction only becomes part of a settlement, and therefore only shows
@@ -484,13 +674,25 @@ const MCA_REMITTERS: {
  * transactions waiting to be picked up into the next settlement, counted by
  * mcaSettlementSummary.pendingInvoiceCount instead.
  */
+/**
+ * The one settlement whose remittances do NOT all share a status: complete at
+ * settlement level (UTR issued) while a few of its own transactions are still
+ * waiting on their FIRC. Everything else is uniform, so without this the MCA
+ * payments table would never render two states at once.
+ */
+const MIXED_PAYMENT_STATUS_SETTLEMENT_ID = "mca_c5d6e7f8";
+const MIXED_PAYMENT_STILL_PROCESSING = 3;
+
 function buildMcaPayments(settlement: SettlementRow, dateOnly: string): McaSettlementPayment[] {
-  const status: McaSettlementPayment["status"] = isSettlementComplete(settlement.status)
-    ? "settled"
-    : "processing";
+  const settled = isSettlementComplete(settlement.status);
+  const mixed = settlement.id === MIXED_PAYMENT_STATUS_SETTLEMENT_ID;
 
   return Array.from({ length: settlement.transactionCount }, (_, i) => {
     const remitter = MCA_REMITTERS[i % MCA_REMITTERS.length]!;
+    // Never "invoice_pending"/"under_review": a transaction only joins a
+    // settlement once it has cleared review, see the McaPaymentStatus note.
+    const status: McaSettlementPayment["status"] =
+      mixed && i < MIXED_PAYMENT_STILL_PROCESSING ? "processing" : settled ? "settled" : "processing";
     return {
       id: `pay_${settlement.id}_${String(i + 1).padStart(2, "0")}`,
       amount: remitter.amount,
@@ -504,9 +706,50 @@ function buildMcaPayments(settlement: SettlementRow, dateOnly: string): McaSettl
   });
 }
 
-/** Only the in-progress settlement carries held transactions in this mock
- * dataset, a settled settlement wouldn't still have funds on hold. */
+/** Only in-progress settlements carry held transactions: a completed one would
+ *  not still have funds under review. One per product — the PA row's holds are
+ *  domestic payments, the MCA row's are cross-border remittances, which is why
+ *  they are two different sets rather than one shared list. */
 const HELD_FUNDS_SETTLEMENT_ID = "stl_a1b2c3d4";
+const MCA_HELD_FUNDS_SETTLEMENT_ID = "mca_t5u6v7w8";
+
+/**
+ * Held cross-border remittances. Amounts are in INR like the settlement they
+ * belong to (they have already been converted), but the reasons and the actions
+ * are the MCA ones: an inward remittance is held for its invoice or its purpose
+ * code, never for a card chargeback.
+ */
+function buildMcaHeldFunds(): HeldFundsSummary {
+  return {
+    transactions: [
+      {
+        id: "pay_mca_h1a2b3",
+        amount: 4210.75,
+        currency: "INR",
+        paymentMethod: "Wire transfer",
+        holdReason: "Invoice Pending",
+        actionShortLabel: "Upload Invoice",
+      },
+      {
+        id: "pay_mca_h4c5d6",
+        amount: 1875,
+        currency: "INR",
+        paymentMethod: "Wire transfer",
+        holdReason: "Purpose Code Clarification",
+        actionShortLabel: "Confirm Purpose Code",
+      },
+      {
+        id: "pay_mca_h7e8f9",
+        amount: 9320.5,
+        currency: "INR",
+        paymentMethod: "Wire transfer",
+        holdReason: "Compliance Review",
+        actionShortLabel: "Wait",
+      },
+    ],
+    reasonSummary: "An invoice and a purpose code are needed before these funds can be released.",
+  };
+}
 
 function buildHeldFunds(): HeldFundsSummary {
   return {
@@ -556,7 +799,12 @@ function buildSettlementDetail(settlement: SettlementRow): SettlementDetail {
   const expectedAt = `${settlementDateOnly}T23:59:00+05:30`;
   const depositedAt = isSettlementComplete(settlement.status) ? expectedAt : null;
 
-  const heldFunds = settlement.id === HELD_FUNDS_SETTLEMENT_ID ? buildHeldFunds() : null;
+  const heldFunds =
+    settlement.id === HELD_FUNDS_SETTLEMENT_ID
+      ? buildHeldFunds()
+      : settlement.id === MCA_HELD_FUNDS_SETTLEMENT_ID
+        ? buildMcaHeldFunds()
+        : null;
   const complianceReviewAt = heldFunds
     ? `${settlementDateOnly}T${timeAtOffset(11, 35, 35)}+05:30`
     : null;
@@ -585,3 +833,16 @@ function buildSettlementDetail(settlement: SettlementRow): SettlementDetail {
 export const settlementDetailsById: Record<string, SettlementDetail> = Object.fromEntries(
   [...settlementRows, ...mcaSettlementRows].map((row) => [row.id, buildSettlementDetail(row)])
 );
+
+/**
+ * The mock list for a product, used as a fallback when the real summary
+ * endpoint returns nothing — see SHOW_MOCK_SETTLEMENTS in index.tsx.
+ *
+ * Ids here are opaque ("mca_x9y0z1a2"), which is what lets the detail page find
+ * them in settlementDetailsById. Real rows are keyed by settlement DATE instead
+ * (see mapFfmsRowToRow), so a real row has no mock detail to land on — a
+ * separate gap, noted where the detail page reads this map.
+ */
+export function mockSettlementRowsFor(isMca: boolean): SettlementRow[] {
+  return isMca ? mcaSettlementRows : settlementRows;
+}
