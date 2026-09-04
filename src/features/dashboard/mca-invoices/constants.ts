@@ -4,6 +4,28 @@ import type { McaInvoiceRow } from "@/features/dashboard/mca-invoices/types";
 
 export const INVOICES_PAGE_LIMIT = 10;
 
+// ── Query keys ──────────────────────────────────────────────────────────────
+// The prefixes the two reads on this page are cached under. Named here rather
+// than typed as literals at each mutation, because getting one character wrong
+// fails silently: react-query invalidates nothing and the stale list simply
+// stays on screen.
+//
+// Note the nesting. useApiMutation's `invalidateQueries` treats an ARRAY as a
+// LIST OF KEYS, so a single key must itself be wrapped: `[["mca-invoices"]]`
+// invalidates the list, while `["mca-invoices"]` is read as one key per string
+// and invalidates nothing at all.
+
+/** The invoice list, keyed `["mca-invoices", ...mids, url, body]`. */
+export const INVOICE_LIST_KEY = ["mca-invoices"];
+
+/** The summary cards, keyed `["invoice-summary", mid, start, end]`. Separate
+ *  from the list, so an action that moves an invoice between status buckets
+ *  has to invalidate both or the counts above the table go stale. */
+export const INVOICE_SUMMARY_KEY = ["invoice-summary"];
+
+/** For any action that changes an invoice's status: list and counts together. */
+export const INVOICE_DATA_KEYS = [INVOICE_LIST_KEY, INVOICE_SUMMARY_KEY];
+
 /** Rotating placeholder hints for the search box. */
 export const SEARCH_WORDS = ["Client name", "Business name", "Invoice number"];
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
+import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useGet, usePost, useDelete } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -51,7 +52,14 @@ function useZohoIdentifier(): { identifier: string; pacbMids: string[]; selected
  * show their "Sync from Zoho" action without also mounting the connect,
  * callback and disconnect machinery, none of which those screens use.
  */
-export function useZohoPullSync(syncOptions: ZohoPullSyncPayload): {
+export function useZohoPullSync(
+  syncOptions: ZohoPullSyncPayload,
+  /** Query keys to invalidate once a sync lands. A pull can add or update any
+   *  number of records, so whichever list called this has to be told to
+   *  refetch; this hook is shared and deliberately does not know which one that
+   *  is. Each entry is a key prefix, e.g. `[["mca-invoices"]]`. */
+  invalidateKeys: QueryKey[] = []
+): {
   isConnected: boolean;
   isSyncing: boolean;
   pacbMids: string[];
@@ -59,6 +67,7 @@ export function useZohoPullSync(syncOptions: ZohoPullSyncPayload): {
   sync: (mid?: string) => void;
 } {
   const { identifier, pacbMids, selectedMid } = useZohoIdentifier();
+  const queryClient = useQueryClient();
 
   const { data, refetch: refetchStatus } = useGet<ZohoStatusResponse>(
     ["zoho-status", identifier],
@@ -85,6 +94,9 @@ export function useZohoPullSync(syncOptions: ZohoPullSyncPayload): {
         {
           onSuccess: () => {
             void refetchStatus();
+            for (const key of invalidateKeys) {
+              void queryClient.invalidateQueries({ queryKey: key });
+            }
             toast.success("Sync completed successfully");
           },
         }
