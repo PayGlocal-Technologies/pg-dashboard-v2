@@ -140,6 +140,14 @@ export const mcaSettledByAccountApi = (merchantId: string, timeframe: string) =>
       `?timeframe=${encodeURIComponent(timeframe)}`
     : "";
 
+/** Settled currency trend: per-account (currency) settled totals + a monthly
+ *  series, in native currency and INR. Backs the Multi-Currency "Settled amount"
+ *  region breakdown. No query params. */
+export const mcaSettledCurrencyTrendApi = (merchantId: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settled-currency-trend`
+    : "";
+
 /** Saved amount vs banks: an overall figure plus a per-timeframe breakdown
  *  (today | week | month | ytd). Backs SavedAmountCard. No query params. */
 export const mcaSavedAmountApi = (merchantId: string) =>

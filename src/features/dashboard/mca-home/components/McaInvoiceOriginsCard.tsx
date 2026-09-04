@@ -22,24 +22,36 @@ const TIMEFRAMES: { value: InvoiceOriginTimeframe; label: string }[] = [
 const TIMEFRAME_DAYS: Record<InvoiceOriginTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
 
 /**
+ * Non-standard country codes the endpoint sends for a country it also sends
+ * under its real ISO code — folded onto the canonical alpha-2 so the two rows
+ * merge into one (see the row grouping in the component). "UK" is the same
+ * country as ISO "GB"; "FA" is a bad code for France, which also arrives as
+ * "FR"/"France".
+ */
+const COUNTRY_CODE_ALIASES: Record<string, string> = {
+  UK: "GB",
+  FA: "FR",
+};
+
+/**
  * Resolve an API country code to a canonical flux COUNTRIES entry.
  *
  * The invoice-origins endpoint isn't consistent: most rows carry the ISO alpha-2
- * code ("US", "CA"), but some carry the country *name* ("India") or another
- * form. A plain `find(c => c.code === input)` then misses — which is why India
- * showed the globe fallback flag and never lit up on the globe (its highlight is
- * keyed off the alpha-2 code via ALPHA2_TO_NUMERIC_ID). Matching on code OR name
- * (case-insensitive) normalises every row back to a real alpha-2 code so the
- * flag, label, and globe highlight all line up.
+ * code ("US", "CA"), but some carry the country *name* ("India"), a non-ISO code
+ * ("UK", "FA") or another form. Aliases fold the known bad codes onto their real
+ * ISO code first; then matching on code OR name (case-insensitive) normalises
+ * every row back to a real alpha-2 code so the flag, label, globe highlight —
+ * and the row grouping that de-dupes them — all line up.
  */
 function resolveCountry(input: string): { code: string; name: string; flag: string } {
   const query = (input ?? "").trim();
-  const upper = query.toUpperCase();
+  const aliased = COUNTRY_CODE_ALIASES[query.toUpperCase()] ?? query;
+  const upper = aliased.toUpperCase();
   const entry =
     COUNTRIES.find((c) => c.code.toUpperCase() === upper) ??
-    COUNTRIES.find((c) => c.name.toLowerCase() === query.toLowerCase());
+    COUNTRIES.find((c) => c.name.toLowerCase() === aliased.toLowerCase());
   if (entry) return { code: entry.code, name: entry.name, flag: entry.flag };
-  return { code: query, name: query || "Unknown", flag: "🌍" };
+  return { code: aliased, name: aliased || "Unknown", flag: "🌍" };
 }
 
 /** Currency-aware — the invoice-origins API reports its own reportingCurrency. */
@@ -131,18 +143,34 @@ export function McaInvoiceOriginsCard() {
   const { origins, isLoading, isError } = useInvoiceOrigins(startDate, endDate);
 
   const currency = origins?.reportingCurrency ?? "USD";
-  const rows = (origins?.rows ?? []).map((r) => {
+  // Group by canonical country code, so rows the endpoint splits across an ISO
+  // code and a non-ISO alias for the same country (GB + UK, FR + France + FA)
+  // collapse into one — their amounts and invoice counts summed — rather than
+  // showing as separate near-duplicate bars. Sorted by amount so the merged
+  // figures still rank correctly.
+  const rowsByCode = new Map<
+    string,
+    { countryCode: string; countryName: string; flag: string; amount: number; invoiceCount: number }
+  >();
+  for (const r of origins?.rows ?? []) {
     const country = resolveCountry(r.countryCode);
-    return {
-      // Normalised to the canonical alpha-2 code, so the flag and the globe
-      // highlight below both resolve for it.
-      countryCode: country.code,
-      countryName: country.name,
-      flag: country.flag,
-      amount: r.amount,
-      invoiceCount: r.invoiceCount,
-    };
-  });
+    const existing = rowsByCode.get(country.code);
+    if (existing) {
+      existing.amount += r.amount;
+      existing.invoiceCount += r.invoiceCount;
+    } else {
+      rowsByCode.set(country.code, {
+        // Normalised to the canonical alpha-2 code, so the flag and the globe
+        // highlight below both resolve for it.
+        countryCode: country.code,
+        countryName: country.name,
+        flag: country.flag,
+        amount: r.amount,
+        invoiceCount: r.invoiceCount,
+      });
+    }
+  }
+  const rows = [...rowsByCode.values()].sort((a, b) => b.amount - a.amount);
   const totals = origins?.totals;
   const totalInvoiced = totals?.totalInvoiced ?? 0;
   const maxAmount = Math.max(...rows.map((o) => o.amount), 1);

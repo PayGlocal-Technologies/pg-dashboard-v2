@@ -46,8 +46,10 @@ const VARIANT_ASSET: Record<PlaceholderVariant, string> = {
   "404": "/assets/404-error.svg",
 };
 
-/** Illustration edge length in px. The artwork is square (200×200 viewBox). */
-const SIZE_PX = { sm: 88, md: 132, lg: 180 } as const;
+/** Illustration edge length in px. The artwork is square (200×200 viewBox).
+ *  `xs` is for tight inline slots (e.g. a short metric card) where the default
+ *  padding is trimmed via className. */
+const SIZE_PX = { xs: 60, sm: 88, md: 132, lg: 180 } as const;
 
 /**
  * Per-variant scale correcting for uneven internal padding: each 200×200 SVG

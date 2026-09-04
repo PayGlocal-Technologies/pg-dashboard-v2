@@ -479,3 +479,37 @@ export interface DocumentPendingByCurrencyResponse {
   message?: string;
   errors?: unknown;
 }
+
+// ── Settled currency trend ───────────────────────────────────────────────────
+// Per-account (currency) settled totals + a monthly series. `amount` is in the
+// account's own currency; `inrAmount` is that figure converted to INR, which is
+// what the ₹ bars/totals read from since a mix of currencies only sums in one.
+
+export interface SettledCurrencyPoint {
+  month: string;
+  periodStart: string;
+  amount: number;
+  inrAmount: number;
+  count: number;
+}
+
+export interface SettledCurrencyTrendRow {
+  currency: string;
+  totalAmount: number;
+  totalInrAmount: number;
+  totalCount: number;
+  /** null when there's no prior period to compare against. */
+  changePercentage: number | null;
+  comparisonLabel: string;
+  points: SettledCurrencyPoint[];
+}
+
+export interface SettledCurrencyTrendData {
+  currencies: SettledCurrencyTrendRow[];
+}
+
+export interface SettledCurrencyTrendResponse {
+  data: SettledCurrencyTrendData;
+  message?: string;
+  errors?: unknown;
+}
