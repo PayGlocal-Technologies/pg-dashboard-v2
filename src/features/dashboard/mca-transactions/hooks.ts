@@ -19,7 +19,7 @@ import {
   allPurposeCodeOptions,
   toPurposeCodeOptions,
   type PurposeCodeOption,
-} from "@/features/dashboard/mca-transactions/purposeCodes";
+} from "@/lib/purposeCodes";
 import { useScopeId } from "@/lib/hooks/useScopeId";
 import type {
   CurrencySplitData,

@@ -14,7 +14,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import type { PurposeCodeOption } from "@/features/dashboard/mca-transactions/purposeCodes";
+import type { PurposeCodeOption } from "@/lib/purposeCodes";
 
 export interface PurposeCodeComboboxHandle {
   focus: () => void;

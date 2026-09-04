@@ -9,10 +9,16 @@ import {
   contactDetailsApi,
   merchantLogoUploadApi,
   merchantProfileApi,
+  purposeCodeOptionsApi,
   secureSettlementDetailsApi,
   settlementDetailsApi,
   updateAccountDetailsApi,
 } from "@/features/dashboard/settings/services";
+import {
+  allPurposeCodeOptions,
+  getPurposeCodeDescription,
+  type PurposeCodeOption,
+} from "@/lib/purposeCodes";
 import type {
   AccountDetailsUpdatePayload,
   BusinessData,
@@ -23,6 +29,7 @@ import type {
   MerchantBusinessSummary,
   MerchantLogoUploadResponse,
   MerchantProfileResponse,
+  PurposeCodesResponse,
   SettlementData,
   SettlementDataResponse,
 } from "@/features/dashboard/settings/types";
@@ -69,6 +76,67 @@ export function useMerchantBusinessProfile(): {
     isLoading: !!merchantId && isPending,
     isError,
   };
+}
+
+/**
+ * The purpose codes this merchant may pick from, for the Business details
+ * selector.
+ *
+ * `possiblePurposeCodes` off the banner endpoint is the merchant's own
+ * narrowed list (code -> description), the same source pg-dashboard's
+ * tid-management AddProduct builds its dropdown from. When the API returns
+ * nothing the full static RBI table stands in, so the field is never empty.
+ *
+ * `extraCodes` are codes the merchant already has saved. They are folded in
+ * even when the API does not offer them, so an account configured before this
+ * list narrowed can still see and re-select what it is currently on rather
+ * than facing a dropdown its own value is missing from.
+ */
+export function usePurposeCodeOptions(extraCodes: string[] = []): {
+  options: PurposeCodeOption[];
+  isLoading: boolean;
+} {
+  const onbId = useOnboardingId();
+  const { data, isPending } = useGet<PurposeCodesResponse>(
+    ["settings-purpose-codes", onbId],
+    purposeCodeOptionsApi(onbId),
+    { enabled: !!onbId }
+  );
+
+  // `known` is the running dedupe set across both sources. The API's own map
+  // can still collide once codes are upper-cased (a "p0103"/"P0103" pair), and
+  // extraCodes may repeat a code the API already offers or repeat itself, so
+  // every candidate goes through the same gate. A duplicate in the option list
+  // means a repeated row in the dropdown and a duplicate React key.
+  const known = new Set<string>();
+  const add = (list: PurposeCodeOption[], option: PurposeCodeOption): void => {
+    if (!option.code || known.has(option.code)) return;
+    known.add(option.code);
+    list.push(option);
+  };
+
+  const possible = data?.data?.possiblePurposeCodes;
+  const fromApi: PurposeCodeOption[] = [];
+  if (possible) {
+    for (const [code, description] of Object.entries(possible)) {
+      add(fromApi, {
+        code: code.trim().toUpperCase(),
+        description: description || getPurposeCodeDescription(code),
+      });
+    }
+  } else {
+    for (const option of allPurposeCodeOptions()) add(fromApi, option);
+  }
+
+  // The merchant's saved codes go first so whatever the account is currently on
+  // is the first thing in the list.
+  const missing: PurposeCodeOption[] = [];
+  for (const raw of extraCodes) {
+    const code = raw.trim().toUpperCase();
+    add(missing, { code, description: getPurposeCodeDescription(code) });
+  }
+
+  return { options: [...missing, ...fromApi], isLoading: !!onbId && isPending };
 }
 
 /** Update the merchant's purpose codes. pg-dashboard sends `{ purposeCodes }`
