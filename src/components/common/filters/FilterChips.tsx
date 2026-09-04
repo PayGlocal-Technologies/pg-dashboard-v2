@@ -1010,6 +1010,200 @@ function startingYear(selected: string[], fallbackYear: number): number {
   return Number.isNaN(parsed) ? fallbackYear : parsed;
 }
 
+/**
+ * Month RANGE chip: pick a start month and an end month on the same year grid.
+ *
+ * Distinct from MonthFilterChip below, which ticks an arbitrary SET of months.
+ * A range is the right shape when the value is going into a request rather than
+ * being matched client-side — a start/end pair is what a "from month, to month"
+ * endpoint takes, and a set of months is not expressible in one.
+ *
+ * The value is never empty: a caller sending it to an API always has some window
+ * in force, so "Reset" restores `defaultRange` rather than clearing to nothing,
+ * and the chip renders the range it is on at all times. That is deliberate — a
+ * filter that silently governs a request should say what it is set to, not read
+ * as unset while quietly bounding every row on screen.
+ *
+ * Clicking cycles the way a date-range picker does: the first click starts a new
+ * range, the second closes it, and a click before the open start moves the start
+ * instead of making a backwards range.
+ */
+export function MonthRangeFilterChip({
+  label = "Period",
+  bounds,
+  value,
+  defaultRange,
+  monthsWithData,
+  onChange,
+  open,
+  onOpenChange,
+}: {
+  label?: string;
+  /** The outer limits the grid lets the merchant navigate and pick within. */
+  bounds: MonthRange;
+  /** The range currently in force. Always set — see the note above. */
+  value: MonthRange;
+  /** What Reset goes back to, typically the window the page opens on. */
+  defaultRange: MonthRange;
+  /** Months with a row behind them, as "YYYY-MM". Drives the grid's dots. */
+  monthsWithData: Set<string>;
+  onChange: (next: MonthRange) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const minYear = yearOf(bounds.start);
+  const maxYear = yearOf(bounds.end);
+
+  const [draft, setDraft] = useState<MonthRange>(value);
+  /** Set once a start has been picked and the end is still open, so the next
+   *  click closes the range instead of starting another one. */
+  const [awaitingEnd, setAwaitingEnd] = useState(false);
+  const [year, setYear] = useState(() => yearOf(value.end) || maxYear);
+
+  // Always active: there is always a window in force.
+  const isDefault = value.start === defaultRange.start && value.end === defaultRange.end;
+
+  const pick = (month: string) => {
+    if (!awaitingEnd) {
+      setDraft({ start: month, end: month });
+      setAwaitingEnd(true);
+      return;
+    }
+    // A click before the open start moves the start rather than inverting the
+    // range, which is what every date-range picker does and what a merchant
+    // correcting an over-shot first click means.
+    setDraft((prev) =>
+      month < prev.start ? { start: month, end: prev.end } : { start: prev.start, end: month }
+    );
+    setAwaitingEnd(false);
+  };
+
+  const reset = () => {
+    setDraft(defaultRange);
+    setAwaitingEnd(false);
+  };
+
+  const summary = `${formatMonthLabel(draft.start)} – ${formatMonthLabel(draft.end)}`;
+
+  return (
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        onOpenChange(next);
+        if (next) {
+          setDraft(value);
+          setAwaitingEnd(false);
+          setYear(yearOf(value.end) || maxYear);
+        }
+      }}
+    >
+      <FilterChipShell active>
+        <PopoverTrigger asChild>
+          {/* The chip carries the range itself, not just the word "Period":
+              this value is in the request body, so the merchant should be able
+              to read what the table is bounded by without opening anything. */}
+          <FilterChipLabelTrigger
+            label={`${label}: ${formatMonthLabel(value.start)} – ${formatMonthLabel(value.end)}`}
+            active
+          />
+        </PopoverTrigger>
+      </FilterChipShell>
+      <PopoverContent align="end" className="w-60 p-3">
+        <div className="flex items-center justify-between">
+          <IconButton
+            aria-label="Previous year"
+            variant="ghost"
+            size="xs"
+            disabled={year <= minYear}
+            onClick={() => setYear((prev) => prev - 1)}
+          >
+            <Icon name="chevron-left" className="h-3.5 w-3.5" />
+          </IconButton>
+          <span className="text-[12.5px] font-semibold text-foreground">{year}</span>
+          <IconButton
+            aria-label="Next year"
+            variant="ghost"
+            size="xs"
+            disabled={year >= maxYear}
+            onClick={() => setYear((prev) => prev + 1)}
+          >
+            <Icon name="chevron-right" className="h-3.5 w-3.5" />
+          </IconButton>
+        </div>
+
+        <div className="mt-2 grid grid-cols-4 gap-1">
+          {MONTH_SHORT_LABELS.map((monthLabel, index) => {
+            const monthValue = monthKey(year, index);
+            // Plain string comparison: "YYYY-MM" sorts chronologically.
+            const inBounds = monthValue >= bounds.start && monthValue <= bounds.end;
+            const isEdge = monthValue === draft.start || monthValue === draft.end;
+            const isBetween = monthValue > draft.start && monthValue < draft.end;
+            const hasData = monthsWithData.has(monthValue);
+
+            return (
+              <Button
+                key={monthValue}
+                type="button"
+                variant={isEdge ? "primary" : "ghost"}
+                size="sm"
+                disabled={!inBounds}
+                aria-pressed={isEdge || isBetween}
+                aria-label={`${monthLabel} ${year}${hasData ? ", has receipts" : ""}`}
+                onClick={() => pick(monthValue)}
+                className={cn(
+                  "relative h-auto min-h-0 w-full justify-center rounded-md px-0 pb-2.5 pt-1.5 text-[12px]",
+                  !isEdge && "text-foreground hover:bg-muted/60",
+                  isBetween && "bg-primary/15 text-primary"
+                )}
+              >
+                {monthLabel}
+                {hasData && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full",
+                      isEdge ? "bg-primary-foreground" : "bg-primary"
+                    )}
+                  />
+                )}
+              </Button>
+            );
+          })}
+        </div>
+
+        <p className="mt-2 truncate text-[11px] text-muted-foreground" title={summary}>
+          {awaitingEnd ? `${formatMonthLabel(draft.start)} – pick an end month` : summary}
+        </p>
+
+        <Separator className="my-2" />
+
+        <div className="flex items-center justify-between gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="x" className="w-3 h-3" />}
+            onClick={reset}
+            disabled={isDefault && draft.start === defaultRange.start && draft.end === defaultRange.end}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Reset
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              onChange(draft);
+              onOpenChange(false);
+            }}
+          >
+            Apply
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // Month chip: pick a year, then tick months inside it.
 //
 // A year header over a twelve-cell grid, rather than the flat checkbox list of

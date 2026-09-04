@@ -35,15 +35,15 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/pa-transactions",
   "/payment-links",
   "/platforms",
-  "/receipts",
+  "/mca-receipts",
   "/refer-and-earn",
   "/settlement-report",
   "/sku-management",
   "/team-management",
-  // Settings and its live sub-pages. The rest of src/app/(dashboard)/settings
-  // (developer, notifications, payments) exists on disk but is commented out
-  // of SETTINGS_NAV_GROUPS, so it never reaches the registry to begin with.
-  "/settings",
+  // The live settings sub-pages. /settings itself only redirects, and the rest
+  // of src/app/(dashboard)/settings (developer, notifications, payments) exists
+  // on disk but is commented out of SETTINGS_NAV_GROUPS, so neither reaches the
+  // registry to begin with.
   "/settings/personal",
   "/settings/business",
   "/settings/banking",
@@ -65,7 +65,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/edpms": ["shipping bill", "regularise", "export data processing"],
   // The MCA tree labels this page "GST Invoices", so without "receipts" here a
   // merchant who types the word the route is named after finds nothing.
-  "/receipts": ["receipts", "GST invoice", "tax invoice", "invoice ID"],
+  "/mca-receipts": ["receipts", "GST invoice", "tax invoice", "invoice ID"],
   // Plurals earn their place: the matcher works forwards, so a trailing "s"
   // the singular label does not have makes the whole query fail. "invoices"
   // finds nothing against "Invoice Management" without this, and neither does
@@ -105,7 +105,7 @@ export function popularPaths(context: NavContext): readonly string[] {
     context === "PACB" ? "/mca-transactions" : "/pa-transactions",
     settlementListPath(context),
     "/mca-invoices",
-    "/settings",
+    "/settings/personal",
   ];
 }
 
@@ -134,8 +134,9 @@ export interface StandalonePage {
  * such page. The other absences are all correct and must stay that way:
  * /settings/developer (+ api-keys, webhooks), /settings/notifications and
  * /settings/payments are commented out of SETTINGS_NAV_GROUPS as OUT OF SCOPE,
- * so search must not resurface what the product deliberately hid; "/" only
- * redirects; and /mca-links is an existing nav orphan (see ACTION_ENTRIES).
+ * so search must not resurface what the product deliberately hid; "/" and
+ * "/settings" only redirect; and /mca-links is an existing nav orphan (see
+ * ACTION_ENTRIES).
  */
 export const STANDALONE_PAGES: readonly StandalonePage[] = [
   {
@@ -263,7 +264,7 @@ export interface LookupTarget {
  *   /mca-transactions, /pa-transactions  SEARCH_WORDS   -> "Transaction ID"
  *   /mca-invoices                        SEARCH_WORDS   -> "Invoice number"
  *   settlement reports                   inline words   -> "UTR", "Settlement ID"
- *   /receipts                            RECEIPT_SEARCH_HINTS -> "invoice ID"
+ *   /mca-receipts                        RECEIPT_SEARCH_HINTS -> "invoice ID"
  *   /mca-links                           inline words   -> "invoice number", "link"
  *
  * Deliberately excluded: /client-management (business name, contact name,
@@ -284,7 +285,7 @@ export function lookupTargets(context: NavContext): readonly LookupTarget[] {
     },
     { label: "Invoice Management", path: "/mca-invoices", icon: "receipt" },
     { label: "Settlements", path: settlementListPath(context), icon: "file-text" },
-    { label: "Receipts", path: "/receipts", icon: "receipt" },
+    { label: "Receipts", path: "/mca-receipts", icon: "receipt" },
     { label: "MCA Links", path: "/mca-links", icon: "link" },
   ];
 }

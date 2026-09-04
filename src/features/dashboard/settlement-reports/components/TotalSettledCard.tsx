@@ -101,23 +101,34 @@ export function TotalSettledCard({
           />
           {/* No trend beside a zero total — "+0%/-100% vs last week" against
               nothing settled reads as broken, so it's hidden until there's a
-              real figure to compare. */}
-          {hasData && (
-            <div
-              className={cn(
-                "mt-2 flex items-center gap-1 text-xs font-medium",
-                trendPositive
-                  ? "text-emerald-600 dark:text-emerald-400"
-                  : "text-red-600 dark:text-red-400"
-              )}
-            >
-              <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
-              <RollingNumber
-                value={`${trendPositive ? "+" : ""}${totalSettledTrendPct}% ${comparisonLabel ?? "vs last"}`}
-                className="tabular-nums"
-              />
-            </div>
-          )}
+              real figure to compare.
+              The row itself always stays in the layout, though, held open by
+              `min-h-4` (one text-xs line). Dropping the whole element in the
+              empty state made this card shorter than its filled self, and the
+              grid is `items-stretch`, so the two cards in the column beside it
+              resized along with it every time a timeframe came back empty. */}
+          <div
+            className={cn(
+              "mt-2 flex min-h-4 items-center gap-1 text-xs font-medium",
+              trendPositive
+                ? "text-emerald-600 dark:text-emerald-400"
+                : "text-red-600 dark:text-red-400"
+            )}
+          >
+            {hasData && (
+              <>
+                <Icon
+                  name={trendPositive ? "trending-up" : "trending-down"}
+                  size={13}
+                  aria-hidden
+                />
+                <RollingNumber
+                  value={`${trendPositive ? "+" : ""}${totalSettledTrendPct}% ${comparisonLabel ?? "vs last"}`}
+                  className="tabular-nums"
+                />
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex shrink-0 flex-wrap gap-1 rounded-lg border border-border bg-muted/50 p-1">

@@ -8,6 +8,15 @@ import { BASE_URL_V1, BASE_URL_V2, BASE_URL_V3 } from "@/api";
 export const businessDetailsApi = (onbId: string): string =>
   `${BASE_URL_V3}/merchants/profile/${onbId}/business`;
 
+/** The purpose codes this merchant may pick from. GET returns
+ *  `{ data: { suggestedPurposeCodes, possiblePurposeCodes } }`, where
+ *  `possiblePurposeCodes` is a code -> description map. Same endpoint
+ *  pg-dashboard's PurposeCodeBanner and tid-management AddProduct read (see
+ *  its OnboardingBanners/services.ts purposeCodeApi); the codes are saved
+ *  through businessDetailsApi above, not here. */
+export const purposeCodeOptionsApi = (onbId: string): string =>
+  onbId ? `${BASE_URL_V3}/merchants/banner/${onbId}/purpose-codes` : "";
+
 /** Settlement account, masked. Account number comes back masked. */
 export const settlementDetailsApi = (onbId: string): string =>
   `${BASE_URL_V3}/merchants/profile/${onbId}/settlement`;

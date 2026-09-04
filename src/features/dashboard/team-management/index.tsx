@@ -127,12 +127,6 @@ export function TeamManagementFeature() {
 
   const onSearch = (v: string) => setSearch(v);
   const onStatusFilter = (v: string) => setStatusFilter(v);
-  const onClear = () => {
-    setSearch("");
-    setStatusFilter("All");
-    setRoleFilter(undefined);
-  };
-  const hasActive = search !== "" || statusFilter !== "All" || !!roleFilter?.length;
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -234,17 +228,6 @@ export function TeamManagementFeature() {
                 />
               </div>
 
-              {hasActive && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<Icon name="x" className="w-3 h-3" />}
-                  onClick={onClear}
-                  className="ml-auto text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </Button>
-              )}
             </div>
           </div>
         </div>

@@ -12,10 +12,10 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableCell } from "@/components/common/CopyableCell";
-import { formatReceiptAmount } from "@/features/dashboard/receipts/utils";
+import { formatReceiptAmount } from "@/features/dashboard/mca-receipts/utils";
 import { formatMonthLabel } from "@/lib/utils/format";
-import { RECEIPT_MONTH_HINT, RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/receipts/constants";
-import type { Receipt } from "@/features/dashboard/receipts/types";
+import { RECEIPT_MONTH_HINT, RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/mca-receipts/constants";
+import type { Receipt } from "@/features/dashboard/mca-receipts/types";
 
 /**
  * The Month column's heading, with its info tip.
@@ -178,7 +178,7 @@ export const RECEIPT_COLUMNS: Column<Receipt>[] = [
  * The columns, with an optional leading Merchant ID column.
  *
  * The receipts list merges rows across every one of the merchant's MIDs (see
- * ReceiptsTable), so a multi-MID merchant with no MID selected needs to see
+ * McaReceiptTable), so a multi-MID merchant with no MID selected needs to see
  * which account each receipt belongs to — mirrors pg-dashboard's
  * `showMerchantId` gate. Single-MID (or a selected MID) hides it: the column
  * would repeat one value down every row.

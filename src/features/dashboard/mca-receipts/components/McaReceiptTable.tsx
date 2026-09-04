@@ -5,42 +5,40 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { DataTable } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { type AmountRangeValue } from "@/components/common/filters/FilterChips";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { usePost } from "@/lib/api/hooks";
-import { buildReceiptColumns, ReceiptDownloadAction } from "@/features/dashboard/receipts/columns";
-import { ReceiptCardList } from "@/features/dashboard/receipts/components/ReceiptCardList";
-import { ReceiptFilterChips } from "@/features/dashboard/receipts/components/ReceiptFilterChips";
+import { buildReceiptColumns, ReceiptDownloadAction } from "@/features/dashboard/mca-receipts/columns";
+import { ReceiptCardList } from "@/features/dashboard/mca-receipts/components/ReceiptCardList";
+import { ReceiptFilterChips } from "@/features/dashboard/mca-receipts/components/ReceiptFilterChips";
 import {
   merchantInvoiceDownloadApi,
   merchantInvoicesViewApi,
-} from "@/features/dashboard/receipts/services";
+} from "@/features/dashboard/mca-receipts/services";
 import {
+  buildReceiptRequestBody,
+  defaultReceiptPeriod,
   filterReceipts,
-  getDefault18MonthRange,
   mapInvoiceRecordToReceipt,
-  receiptMonthRange,
   receiptMonthsWithData,
-} from "@/features/dashboard/receipts/utils";
+  receiptPeriodBounds,
+} from "@/features/dashboard/mca-receipts/utils";
 import {
-  DEFAULT_RECEIPT_PRODUCT,
   RECEIPTS_PAGE_LIMIT,
-  RECEIPT_PRODUCT_LABEL,
-  RECEIPT_PRODUCT_TABS,
+  RECEIPT_PRODUCT,
   RECEIPT_SEARCH_ARIA_LABEL,
   RECEIPT_SEARCH_HINTS,
-} from "@/features/dashboard/receipts/constants";
+} from "@/features/dashboard/mca-receipts/constants";
 import type {
   InvoiceDownloadResponse,
   InvoiceDownloadViewResponse,
   InvoiceViewRequestParams,
   Receipt,
-  ReceiptProduct,
-} from "@/features/dashboard/receipts/types";
+} from "@/features/dashboard/mca-receipts/types";
+import type { MonthRange } from "@/components/common/filters/FilterChips";
 
 const EMPTY_AMOUNT_RANGE: AmountRangeValue = { min: "", max: "" };
 const EMPTY_ROWS: Receipt[] = [];
@@ -56,7 +54,7 @@ const EMPTY_ROWS: Receipt[] = [];
  * month) is applied client-side over the merged set. A multi-MID merchant with
  * no MID selected also sees a Merchant ID column (see buildReceiptColumns).
  */
-export function ReceiptsTable() {
+export function McaReceiptTable() {
   const paMids = useApp((s) => s.paMids);
   const paCbMids = useApp((s) => s.paCbMids);
   const profileMid = useApp((s) => s.profile?.mid);
@@ -64,14 +62,17 @@ export function ReceiptsTable() {
   const isMultiMidUser = useApp((s) => s.isMultiMidUser);
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
 
-  const [product, setProduct] = useState<ReceiptProduct>(DEFAULT_RECEIPT_PRODUCT);
   // Seeded from ?q= so the header's global search can hand an identifier
   // straight to this table. Read once on mount; the URL is not kept in sync as
   // the merchant edits filters afterwards.
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
-  const [monthFilters, setMonthFilters] = useState<string[]>([]);
+  // The service window the list request is bounded by. Lazy initialisers: both
+  // read the clock, which must not happen during render (CLAUDE.md).
+  const [defaultPeriod] = useState<MonthRange>(() => defaultReceiptPeriod());
+  const [periodBounds] = useState<MonthRange>(() => receiptPeriodBounds());
+  const [period, setPeriod] = useState<MonthRange>(defaultPeriod);
   const [page, setPage] = useState(1);
 
   const [rows, setRows] = useState<Receipt[]>(EMPTY_ROWS);
@@ -89,10 +90,11 @@ export function ReceiptsTable() {
 
   const showMerchantId = isMultiMidUser && !selectedMid;
 
-  // Lazy init so `new Date()` runs once on mount, not on every render (see
-  // CLAUDE.md hooks purity). No `products` filter — everything is fetched and
-  // the product tabs slice client-side.
-  const [reqBody] = useState<InvoiceViewRequestParams>(() => getDefault18MonthRange());
+  // Both the selected tab and the period go to the server, so this is derived
+  // from them rather than fixed on mount. It used to be built once with neither:
+  // every tab fetched every product over a hardcoded 15-month window, and the
+  // tabs and the month chip then filtered the result client-side.
+  const reqBody = useMemo(() => buildReceiptRequestBody(RECEIPT_PRODUCT, period), [period]);
 
   const midsKey = midsToFetch.join(",");
   const enabled = midsToFetch.length > 0 && !isGuestUser;
@@ -133,21 +135,14 @@ export function ReceiptsTable() {
   // reset state synchronously.
   const sourceRows = enabled ? rows : EMPTY_ROWS;
 
-  // The months the Month grid may offer: the window the request itself covers, so
-  // the chip is drawn even before any row lands (see receiptMonthRange).
-  const monthRange = useMemo(() => receiptMonthRange(reqBody), [reqBody]);
-
-  // Which of those months this product has a receipt for — the grid's dots.
-  // Computed before the other filters are applied: narrowing it as the merchant
-  // filters would unmark the month they just ticked.
-  const monthsWithData = useMemo(
-    () => receiptMonthsWithData(sourceRows.filter((r) => r.product === product)),
-    [sourceRows, product]
-  );
+  // Which months in the window this product has a receipt for — the grid's dots.
+  // Computed before search/amount are applied: narrowing it as the merchant
+  // filters would unmark months that do have a receipt.
+  const monthsWithData = useMemo(() => receiptMonthsWithData(sourceRows), [sourceRows]);
 
   const filtered = useMemo(
-    () => filterReceipts(sourceRows, { product, search, amountRange, monthFilters }),
-    [sourceRows, product, search, amountRange, monthFilters]
+    () => filterReceipts(sourceRows, { search, amountRange }),
+    [sourceRows, search, amountRange]
   );
 
   const totalCount = filtered.length;
@@ -163,18 +158,6 @@ export function ReceiptsTable() {
   // merchant filtering while on page 3 lands on an empty page of a shorter list.
   const onSearch = (value: string) => {
     setSearch(value);
-    setPage(1);
-  };
-
-  // Switching products keeps every filter — search, amount range and months — the
-  // same way SkuTable keeps its search across type tabs. The months used to be
-  // cleared here because the chip's options were the selected product's own rows,
-  // so a month carried across could be one the new tab had no checkbox for; the
-  // grid now spans the whole fetched window for every product, so a carried-over
-  // month is always a month the new tab can show (and unmark, if it has no receipt
-  // for it).
-  const onProductChange = (value: string) => {
-    setProduct(value as ReceiptProduct);
     setPage(1);
   };
 
@@ -204,11 +187,12 @@ export function ReceiptsTable() {
         setAmountRange(next);
         setPage(1);
       }}
-      monthRange={monthRange}
+      periodBounds={periodBounds}
       monthsWithData={monthsWithData}
-      monthFilters={monthFilters}
-      onMonthFiltersChange={(next) => {
-        setMonthFilters(next);
+      period={period}
+      defaultPeriod={defaultPeriod}
+      onPeriodChange={(next) => {
+        setPeriod(next);
         setPage(1);
       }}
     />
@@ -219,7 +203,7 @@ export function ReceiptsTable() {
       value={search}
       onSearch={onSearch}
       words={RECEIPT_SEARCH_HINTS}
-      ariaLabel={RECEIPT_SEARCH_ARIA_LABEL[product]}
+      ariaLabel={RECEIPT_SEARCH_ARIA_LABEL}
       className="w-full lg:w-56"
     />
   );
@@ -229,14 +213,6 @@ export function ReceiptsTable() {
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="scrollbar-none overflow-x-auto border-b border-border px-4 pt-3">
-        <UnderlineTabs
-          tabs={RECEIPT_PRODUCT_TABS}
-          value={product}
-          onValueChange={onProductChange}
-        />
-      </div>
-
       <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
         {searchInput}
         <div className="flex flex-wrap items-center gap-1.5">

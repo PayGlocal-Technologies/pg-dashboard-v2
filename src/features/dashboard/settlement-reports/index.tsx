@@ -28,9 +28,9 @@ import {
   MCA_SETTLEMENT_GUIDE_STEPS,
 } from "@/features/dashboard/settlement-reports/guide";
 import {
-  SettlementDurationFilter,
-  type SettlementDurationValue,
-} from "@/features/dashboard/settlement-reports/components/SettlementDurationFilter";
+  SettlementDateFilter,
+  type SettlementDateValue,
+} from "@/features/dashboard/settlement-reports/components/SettlementDateFilter";
 import {
   SETTLEMENT_COLUMN_DEFS,
   SETTLEMENT_COLUMN_ORDER,
@@ -117,7 +117,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // the merchant edits filters afterwards.
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
-  const [duration, setDuration] = useState<SettlementDurationValue | undefined>(undefined);
+  const [dateFilter, setDateFilter] = useState<SettlementDateValue | undefined>(undefined);
   const [showCycleInfo, setShowCycleInfo] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>(SETTLEMENT_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
@@ -132,16 +132,18 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   } | null>(null);
   const downloadDate = downloadTarget?.date ?? null;
 
-  const durationEnd = duration
-    ? duration.mode === "range"
-      ? (duration.to ?? duration.from)
-      : duration.from
+  const dateFilterEnd = dateFilter
+    ? dateFilter.mode === "range"
+      ? (dateFilter.to ?? dateFilter.from)
+      : dateFilter.from
     : undefined;
-  const startTime = duration ? new Date(`${duration.from}T00:00:00`).getTime() : undefined;
-  const endTime = durationEnd ? new Date(`${durationEnd}T23:59:59.999`).getTime() : undefined;
+  const startTime = dateFilter ? new Date(`${dateFilter.from}T00:00:00`).getTime() : undefined;
+  const endTime = dateFilterEnd ? new Date(`${dateFilterEnd}T23:59:59.999`).getTime() : undefined;
 
   // ── PA (Payments) settlement summary — GET, date range in the URL path ──────
-  const dateRange = duration ? `${duration.from}/${durationEnd ?? duration.from}` : undefined;
+  const dateRange = dateFilter
+    ? `${dateFilter.from}/${dateFilterEnd ?? dateFilter.from}`
+    : undefined;
   const paQuery = useGet<PaSettlementResponse>(
     ["settlement-pa", paMid, dateRange ?? ""],
     paSettlementReportsApi(paMid, dateRange),
@@ -244,12 +246,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const upcomingPendingInvoiceCount = upcomingSettlementData?.pendingInvoiceCount;
 
   const onSearch = (v: string) => setSearch(v);
-  const onDuration = (v: SettlementDurationValue | undefined) => setDuration(v);
-  const onClear = () => {
-    setSearch("");
-    setDuration(undefined);
-  };
-  const hasActive = search !== "" || !!duration;
+  const onDateFilter = (v: SettlementDateValue | undefined) => setDateFilter(v);
 
   const onToggleColumn = (key: string) => {
     setHiddenColumns((prev) => {
@@ -397,20 +394,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                   <div className="hidden sm:block h-4 w-px bg-border" />
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    <SettlementDurationFilter value={duration} onChange={onDuration} />
+                    <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
                   </div>
-
-                  {hasActive && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leftIcon={<Icon name="x" className="w-3 h-3" />}
-                      onClick={onClear}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      Clear
-                    </Button>
-                  )}
 
                   <div className="ml-auto flex items-center gap-2">
                     <TransactionColumnsMenu

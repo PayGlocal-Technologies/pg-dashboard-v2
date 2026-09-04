@@ -47,7 +47,7 @@ export function buildSearchRegistry(
   { isPartnerUser = false }: { isPartnerUser?: boolean } = {}
 ): SearchEntry[] {
   const entries: SearchEntry[] = [];
-  // First occurrence of a path wins. /receipts appears three times across the
+  // First occurrence of a path wins. /mca-receipts appears three times across the
   // trees under three labels ("Receipts" twice, "GST Invoices" once) and
   // /team-management appears in several, so without this the dropdown would
   // offer the same destination repeatedly.
@@ -84,14 +84,7 @@ export function buildSearchRegistry(
         }
         continue;
       }
-      // "All settings" is the /settings landing page itself, so it reads as a
-      // top-level destination rather than one nested under Settings.
-      push({
-        path: item.href,
-        label: item.label,
-        parent: item.href === "/settings" ? undefined : "Settings",
-        icon: item.icon,
-      });
+      push({ path: item.href, label: item.label, parent: "Settings", icon: item.icon });
     }
   }
 

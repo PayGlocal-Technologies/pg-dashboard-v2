@@ -1,4 +1,4 @@
-import type { Receipt } from "@/features/dashboard/receipts/types";
+import type { Receipt } from "@/features/dashboard/mca-receipts/types";
 
 /**
  * Placeholder receipts, one set covering all three products.

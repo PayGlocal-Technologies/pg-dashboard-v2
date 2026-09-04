@@ -14,6 +14,7 @@ import {
 } from "@/components/ui";
 import { usePost } from "@/lib/api/hooks";
 import { markInvoicePaidApi } from "@/features/dashboard/mca-invoices/services";
+import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
 import type { InvoiceRef } from "@/features/dashboard/mca-invoices/types";
 import type { BaseResponse } from "@/types/common";
 
@@ -40,7 +41,9 @@ export function MarkAsPaidDialog({
 
   const { mutate: markAsPaid, isPending } = usePost<BaseResponse<null>, { paidDate: string }>(
     invoice ? markInvoicePaidApi(invoice.mid, invoice.id) : "",
-    { invalidateQueries: ["mca-invoices"] }
+    // Moves the invoice out of Outstanding and into Paid, so both the list and
+    // the counts above it are stale until they refetch.
+    { invalidateQueries: INVOICE_DATA_KEYS }
   );
 
   const handleConfirm = () => {

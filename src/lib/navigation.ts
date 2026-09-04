@@ -99,12 +99,10 @@ export const regularNavigation: NavGroup[] = [
           // not Payments products.
           //
           // Receipts is this branch's own: uat carries no entry for it. Second
-          // way into /receipts, the first being Finance's own entry below.
-          // Tagged PACB so it only surfaces while the header's product context
-          // is Multi-Currency Accounts — a receipt is a finance record wherever
-          // you enter from, but it is only an MCA artefact while that product is
-          // the one in view.
-          { label: "Receipts", href: "/receipts", permission: [], product: "PACB" },
+          // way into /mca-receipts, the first being Finance's own entry below.
+          // Tagged PACB because the page is scoped to MCA receipts alone (see
+          // RECEIPT_PRODUCT) — it has nothing to show a PA-only merchant.
+          { label: "Receipts", href: "/mca-receipts", permission: [], product: "PACB" },
           { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
           { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
@@ -140,9 +138,13 @@ export const regularNavigation: NavGroup[] = [
       // reach receipts either as a finance record or from the product they were
       // raised under, and the sidebar's active state keys off the pathname, so
       // whichever entry is on screen highlights.
+      //
+      // OPEN ITEM: this entry is untagged, so it shows for a PA-only merchant —
+      // who now lands on a page that only ever lists MCA receipts. Tag it
+      // `product: "PACB"` (or drop it) once the placement is decided.
       {
         label: "Receipts",
-        href: "/receipts",
+        href: "/mca-receipts",
         icon: "receipt",
         badge: "NEW",
         permission: [],
@@ -280,13 +282,13 @@ export const mcaNavigation: NavGroup[] = [
     items: [
       { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
       { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
-      // Same /receipts page the Payments tree reaches under Payment Products and
+      // Same /mca-receipts page the Payments tree reaches under Payment Products and
       // Finance, labelled for what an MCA merchant comes here for: the GST
       // invoices PayGlocal raises against them. A compliance record in this tree,
       // a finance record in that one, one page either way.
       {
         label: "GST Invoices",
-        href: "/receipts",
+        href: "/mca-receipts",
         icon: "receipt",
         badge: "NEW",
         permission: [],
