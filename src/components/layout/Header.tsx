@@ -9,6 +9,7 @@ import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { SwitchToOldViewButton } from "@/components/layout/SwitchToOldViewButton";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -186,6 +187,10 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             <Icon name="bell" size={17} className="text-muted-foreground" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-header" />
           </Button> */}
+
+          {/* Escape hatch to pg-dashboard (v1), with a two-question feedback
+              ask on the way out — see SwitchToOldViewButton. */}
+          <SwitchToOldViewButton />
 
           <ThemeToggle />
 
