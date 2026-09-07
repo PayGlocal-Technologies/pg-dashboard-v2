@@ -32,6 +32,15 @@ const LAST_PAGE = PAGE_LABELS.length - 1;
 // width instead of the analytics section switching early on its own.
 const PAGE_CLASSES = "w-full shrink-0 snap-start lg:w-auto";
 
+/** Section TimeRange → the document-pending endpoint's timeframe param. Same
+ *  mapping the settled/saved cards use internally. */
+const TIMEFRAME_BY_RANGE: Record<TimeRange, string> = {
+  today: "today",
+  week: "week",
+  month: "month",
+  year: "ytd",
+};
+
 // Both of these take the element as a parameter rather than reading
 // scrollRef.current inline, matching restoreScrollTop in McaTransactionTable:
 // React Compiler's lint forbids touching a hook-returned value directly in a
@@ -124,7 +133,7 @@ export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRa
             below lg via the carousel's own row-direction flex (which
             stretches by the same default), from lg up via the grid. */}
         <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
-          <OutstandingAmountCard className="grow" />
+          <OutstandingAmountCard className="grow" timeframe={TIMEFRAME_BY_RANGE[timeRange]} />
           <SavedAmountCard className="grow" timeRange={timeRange} />
         </div>
       </div>

@@ -4,11 +4,11 @@ import { Button, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { cn } from "@/lib/utils";
-import { ReceiptDownloadAction } from "@/features/dashboard/receipts/columns";
-import { formatReceiptAmount } from "@/features/dashboard/receipts/utils";
+import { ReceiptDownloadAction } from "@/features/dashboard/mca-receipts/columns";
+import { formatReceiptAmount } from "@/features/dashboard/mca-receipts/utils";
 import { formatMonthLabel } from "@/lib/utils/format";
-import { RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/receipts/constants";
-import type { Receipt } from "@/features/dashboard/receipts/types";
+import { RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/mca-receipts/constants";
+import type { Receipt } from "@/features/dashboard/mca-receipts/types";
 
 function ReceiptCardSkeleton() {
   return (

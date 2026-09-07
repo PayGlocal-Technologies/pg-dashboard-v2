@@ -5,12 +5,15 @@ import { toast } from "sonner";
 import { useGet } from "@/lib/api/hooks";
 import {
   mcaCurrencySplitApi,
+  mcaDocumentPendingApi,
+  mcaDocumentPendingByCurrencyApi,
   mcaFircDownloadApi,
   mcaInvoiceOriginsApi,
   mcaOverviewByMidApi,
   mcaOverviewByUcicApi,
   mcaSavedAmountApi,
   mcaSettledByAccountApi,
+  mcaSettledCurrencyTrendApi,
   mcaTxnDocumentPresignApi,
   merchantProfileApi,
   merchantPurposeCodesApi,
@@ -19,11 +22,17 @@ import {
   allPurposeCodeOptions,
   toPurposeCodeOptions,
   type PurposeCodeOption,
-} from "@/features/dashboard/mca-transactions/purposeCodes";
+} from "@/lib/purposeCodes";
 import { useScopeId } from "@/lib/hooks/useScopeId";
+import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useApp } from "@/stores/useApp";
 import type {
   CurrencySplitData,
   CurrencySplitResponse,
+  DocumentPendingByCurrencyData,
+  DocumentPendingByCurrencyResponse,
+  DocumentPendingData,
+  DocumentPendingResponse,
   FircDownloadResponse,
   InvoiceOriginsData,
   InvoiceOriginsResponse,
@@ -35,6 +44,8 @@ import type {
   SavedAmountResponse,
   SettledByAccountData,
   SettledByAccountResponse,
+  SettledCurrencyTrendResponse,
+  SettledCurrencyTrendRow,
   SuggestedPurposeCodesResponse,
 } from "@/features/dashboard/mca-transactions/types";
 
@@ -230,6 +241,75 @@ export function useSettledByAccount(timeframe: string): {
   );
 
   return { settled: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Per-account (currency) settled totals + monthly series, scoped like
+ * useSettledByAccount. Backs the Multi-Currency "Settled amount" region
+ * breakdown. Each row carries a native-currency total and an INR total; ₹ views
+ * read the INR figure since a mix of currencies only sums in one.
+ */
+export function useSettledCurrencyTrend(): {
+  currencies: SettledCurrencyTrendRow[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<SettledCurrencyTrendResponse>(
+    ["mca-settled-currency-trend", merchantId],
+    mcaSettledCurrencyTrendApi(merchantId),
+    { enabled: isReady }
+  );
+
+  return { currencies: data?.data?.currencies, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Documents pending amount + count for a timeframe (today | week | month |
+ * ytd). Backs OutstandingAmountCard's headline. Scoped like useSettledByAccount:
+ * a selected MID, else the UCIC roll-up.
+ */
+export function useDocumentPending(timeframe: string): {
+  documentPending: DocumentPendingData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<DocumentPendingResponse>(
+    ["mca-document-pending", merchantId, timeframe],
+    mcaDocumentPendingApi(merchantId, timeframe),
+    { enabled: isReady && !!merchantId }
+  );
+
+  return { documentPending: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
+}
+
+/**
+ * Documents pending broken down by currency — a live snapshot of everything
+ * currently DOCUMENT_PENDING (no timeframe). Scoped like useDocumentPending.
+ */
+export function useDocumentPendingByCurrency(): {
+  breakdown: DocumentPendingByCurrencyData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, isReady } = useResolvedMids("PACB");
+  const profile = useApp((s) => s.profile);
+  const ucicId = profile?.ucicId ?? "";
+  const merchantId = urlMid || ucicId;
+
+  const { data, isPending, isError } = useGet<DocumentPendingByCurrencyResponse>(
+    ["mca-document-pending-by-currency", merchantId],
+    mcaDocumentPendingByCurrencyApi(merchantId),
+    { enabled: isReady && !!merchantId }
+  );
+
+  return { breakdown: data?.data, isLoading: isReady && !!merchantId && isPending, isError };
 }
 
 /**

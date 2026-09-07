@@ -47,9 +47,25 @@ export interface MerchantLogoUploadResponse {
   data: MerchantLogoUploadData;
 }
 
+/** GET /merchants/banner/{onbId}/purpose-codes, mirrored from pg-dashboard's
+ *  OnboardingBanners/types.ts PurposeCodesResponse.
+ *
+ *  `possiblePurposeCodes` is the option list: code -> description. Both halves
+ *  are nullable, so callers must fall back to the static RBI table. */
+export interface PurposeCodesData {
+  suggestedPurposeCodes?: string[] | null;
+  possiblePurposeCodes?: Record<string, string> | null;
+}
+
+export interface PurposeCodesResponse {
+  data?: PurposeCodesData | null;
+}
+
 /** The PUT body pg-dashboard sends — note the plural key `purposeCodes`, which
  *  differs from the singular `purposeCode` the GET returns. */
 export interface BusinessUpdatePayload {
+  /** Still an array on the wire, so the contract is untouched, but the UI now
+   *  only ever sends a single code, see BusinessDetailsFeature. */
   purposeCodes: string[];
 }
 

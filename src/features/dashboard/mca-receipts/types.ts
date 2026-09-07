@@ -64,13 +64,23 @@ export interface Receipt {
 
 // ── Real API contracts (ported verbatim from pg-dashboard invoice-download) ──
 
-/** POST body for the invoice list. Year/month bounds define the service range. */
+/**
+ * POST body for the invoice list. Year/month bounds define the service range.
+ *
+ * `products` is an ARRAY, despite pg-dashboard's own InvoiceViewRequestParams
+ * declaring it `string | null`. That declaration is wrong about its own code:
+ * the value comes from a Product Type filter declared `mode: "multiple"`, and
+ * FilterSelect applies antd's multi-select value straight through — an array,
+ * clearing to `[]` rather than `""` (see FilterSelect.handleSubmit). So every
+ * request production has ever sent carried an array here, which is what the
+ * live endpoint expects.
+ */
 export interface InvoiceViewRequestParams {
   serviceYearStart: string | null;
   serviceMonthStart: string | null;
   serviceYearEnd: string | null;
   serviceMonthEnd: string | null;
-  products?: string | null;
+  products?: string[] | null;
 }
 
 /** One invoice as the backend returns it. productType is "PA" | "MCA" | "FS". */

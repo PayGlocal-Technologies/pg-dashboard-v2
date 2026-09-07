@@ -235,15 +235,27 @@ export function SettlementCalendarButton({
         size="sm"
         onClick={() => setOpen((o) => !o)}
         leftIcon={<Icon name="calendar-days" className="h-3.5 w-3.5" />}
-        className={cn("relative", open && "bg-muted")}
+        /* The badge rides in the rightIcon slot, inside the button's own flex
+         * row, rather than as an absolutely positioned corner dot. It used to
+         * be `absolute -right-1 -top-1`, which put it 4px above the button —
+         * and this button sits at the very top of the page container, whose
+         * `overflow-x-hidden overflow-y-visible` resolves to `overflow-y: auto`
+         * (one axis hidden forces the other to compute to auto, it cannot stay
+         * visible). Anything overhanging the top edge is therefore clipped and
+         * unreachable, which is why only the top half of the dot ever drew.
+         * The popover below is unaffected because it overhangs downward, into
+         * scrollable space. */
+        rightIcon={
+          hasUpcomingHoliday ? (
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+              aria-hidden="true"
+            />
+          ) : undefined
+        }
+        className={cn(open && "bg-muted")}
       >
         Settlement calendar
-        {hasUpcomingHoliday && (
-          <span
-            className="absolute -right-1 -top-1 h-2 w-2 rounded-full bg-amber-500"
-            aria-hidden="true"
-          />
-        )}
       </Button>
 
       {open && (

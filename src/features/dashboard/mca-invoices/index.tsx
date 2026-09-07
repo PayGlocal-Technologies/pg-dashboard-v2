@@ -21,6 +21,7 @@ import { useInvoiceTemplates } from "@/features/dashboard/create-invoice/hooks";
 import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
 import {
   ALL_TIME_RANGE_VALUE,
+  INVOICE_DATA_KEYS,
   type SummaryRange,
 } from "@/features/dashboard/mca-invoices/constants";
 import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoices/helpers";
@@ -64,10 +65,13 @@ export function McaInvoicesFeature() {
 function ZohoSyncAction() {
   // Invoices only. The same endpoint can pull clients across, and this list
   // deliberately doesn't ask it to, mirroring Client Management's inverse.
-  const { isConnected, isSyncing, sync, pacbMids, selectedMid } = useZohoPullSync({
-    isClientSync: false,
-    isInvoiceSync: true,
-  });
+  //
+  // A pull can add or restate any number of invoices, so both the list and the
+  // summary counts have to refetch once it lands.
+  const { isConnected, isSyncing, sync, pacbMids, selectedMid } = useZohoPullSync(
+    { isClientSync: false, isInvoiceSync: true },
+    INVOICE_DATA_KEYS
+  );
 
   if (!isConnected) return null;
 

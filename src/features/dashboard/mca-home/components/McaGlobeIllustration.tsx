@@ -134,13 +134,41 @@ export interface GlobeHighlight {
 }
 
 /** ISO 3166-1 alpha-2 -> the numeric id world-atlas's topojson keys countries by. */
+// Covers every country in flux's COUNTRIES set (the invoice-origins endpoint can
+// report any of them), keyed by the zero-padded numeric id world-atlas's 110m
+// topology uses. Singapore (702) has no geometry at this resolution, so it
+// simply never lights up — harmless, kept for completeness.
 const ALPHA2_TO_NUMERIC_ID: Record<string, string> = {
   US: "840",
   GB: "826",
-  SG: "702",
-  DE: "276",
-  AE: "784",
+  IN: "356",
   AU: "036",
+  CA: "124",
+  DE: "276",
+  FR: "250",
+  JP: "392",
+  SG: "702",
+  AE: "784",
+  CN: "156",
+  BR: "076",
+  MX: "484",
+  KR: "410",
+  IT: "380",
+  ES: "724",
+  NL: "528",
+  SE: "752",
+  NO: "578",
+  DK: "208",
+  FI: "246",
+  CH: "756",
+  NZ: "554",
+  ZA: "710",
+  NG: "566",
+  EG: "818",
+  PK: "586",
+  BD: "050",
+  ID: "360",
+  TH: "764",
 };
 
 const featureByNumericId = new Map(worldFeatures.map((f) => [String(f.id), f]));

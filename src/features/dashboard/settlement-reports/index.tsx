@@ -12,7 +12,6 @@ import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { Button, Card, DataTable, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { formatCurrency } from "@/lib/utils";
 import { TransactionColumnsMenu } from "@/features/dashboard/settlement-reports/components/TransactionColumnsMenu";
 import type { TableReqBody } from "@/types/transactions";
 import { formatDayMonth, formatWeekdayDate, formatWeekdayName } from "@/lib/utils/format";
@@ -29,9 +28,9 @@ import {
   MCA_SETTLEMENT_GUIDE_STEPS,
 } from "@/features/dashboard/settlement-reports/guide";
 import {
-  SettlementDurationFilter,
-  type SettlementDurationValue,
-} from "@/features/dashboard/settlement-reports/components/SettlementDurationFilter";
+  SettlementDateFilter,
+  type SettlementDateValue,
+} from "@/features/dashboard/settlement-reports/components/SettlementDateFilter";
 import {
   SETTLEMENT_COLUMN_DEFS,
   SETTLEMENT_COLUMN_ORDER,
@@ -70,10 +69,6 @@ import type {
 } from "@/features/dashboard/settlement-reports/types";
 
 const SETTLEMENT_PAGE_LIMIT = 50;
-
-function formatLakh(amount: number): string {
-  return `₹${(amount / 100_000).toFixed(2)}L`;
-}
 
 /** "Tonight" only holds when today's payments are still on track for a plain
  * T+1 cutoff, once a weekend/holiday pushes the date out, name the actual day
@@ -122,7 +117,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // the merchant edits filters afterwards.
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
-  const [duration, setDuration] = useState<SettlementDurationValue | undefined>(undefined);
+  const [dateFilter, setDateFilter] = useState<SettlementDateValue | undefined>(undefined);
   const [showCycleInfo, setShowCycleInfo] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[]>(SETTLEMENT_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
@@ -137,16 +132,18 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   } | null>(null);
   const downloadDate = downloadTarget?.date ?? null;
 
-  const durationEnd = duration
-    ? duration.mode === "range"
-      ? (duration.to ?? duration.from)
-      : duration.from
+  const dateFilterEnd = dateFilter
+    ? dateFilter.mode === "range"
+      ? (dateFilter.to ?? dateFilter.from)
+      : dateFilter.from
     : undefined;
-  const startTime = duration ? new Date(`${duration.from}T00:00:00`).getTime() : undefined;
-  const endTime = durationEnd ? new Date(`${durationEnd}T23:59:59.999`).getTime() : undefined;
+  const startTime = dateFilter ? new Date(`${dateFilter.from}T00:00:00`).getTime() : undefined;
+  const endTime = dateFilterEnd ? new Date(`${dateFilterEnd}T23:59:59.999`).getTime() : undefined;
 
   // ── PA (Payments) settlement summary — GET, date range in the URL path ──────
-  const dateRange = duration ? `${duration.from}/${durationEnd ?? duration.from}` : undefined;
+  const dateRange = dateFilter
+    ? `${dateFilter.from}/${dateFilterEnd ?? dateFilter.from}`
+    : undefined;
   const paQuery = useGet<PaSettlementResponse>(
     ["settlement-pa", paMid, dateRange ?? ""],
     paSettlementReportsApi(paMid, dateRange),
@@ -227,7 +224,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   // No mock fallback: an unloaded/unsupported overview shows 0 / empty, never a
   // fake figure.
-  const totalSettledLabel = formatLakh(overview?.totalSettled ?? 0);
+  const totalSettled = overview?.totalSettled ?? 0;
   const totalSettledTrendPct = overview?.totalSettledTrendPct ?? 0;
   const totalSettledChartData = overview
     ? overview.series.map((point) => ({ x: point.label, y: point.value }))
@@ -236,7 +233,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // Previous settled: amount / date / count from the overview, else zeros. The
   // UTR and gross/tax/fee breakup have no endpoint and stay hidden (see below).
   const prevSettlement = overview?.previousSettlement;
-  const previousSettledLabel = formatCurrency(prevSettlement?.amount ?? 0, "INR");
+  const previousSettledAmount = prevSettlement?.amount ?? 0;
   const previousSettledDateLabel = prevSettlement
     ? formatDayMonth(prevSettlement.settlementDate)
     : "—";
@@ -245,18 +242,11 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // Upcoming settlement — live, current-state (no date range). No mock fallback:
   // we don't show a placeholder amount while it loads.
   const { upcoming: upcomingSettlementData } = useSettlementUpcoming(scopeId);
-  const upcomingSettlementLabel = upcomingSettlementData
-    ? formatCurrency(upcomingSettlementData.amount, "INR")
-    : "—";
+  const upcomingSettlementAmount = upcomingSettlementData?.amount ?? null;
   const upcomingPendingInvoiceCount = upcomingSettlementData?.pendingInvoiceCount;
 
   const onSearch = (v: string) => setSearch(v);
-  const onDuration = (v: SettlementDurationValue | undefined) => setDuration(v);
-  const onClear = () => {
-    setSearch("");
-    setDuration(undefined);
-  };
-  const hasActive = search !== "" || !!duration;
+  const onDateFilter = (v: SettlementDateValue | undefined) => setDateFilter(v);
 
   const onToggleColumn = (key: string) => {
     setHiddenColumns((prev) => {
@@ -359,13 +349,13 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
             {/* BACKEND GAP: mock summary — see the banner note above. */}
             <div data-guide="mca-settlement-analytics">
               <SettlementStatCards
-                totalSettledLabel={totalSettledLabel}
+                totalSettled={totalSettled}
                 totalSettledTrendPct={totalSettledTrendPct}
                 totalSettledComparisonLabel={overview?.comparisonLabel}
                 totalSettledTimeframe={settlementTimeframe}
                 onTotalSettledTimeframeChange={setSettlementTimeframe}
                 totalSettledChartData={totalSettledChartData}
-                previousSettledLabel={previousSettledLabel}
+                previousSettledAmount={previousSettledAmount}
                 previousSettledDateLabel={previousSettledDateLabel}
                 previousSettledTransactionCount={previousSettledTransactionCount}
                 onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
@@ -381,7 +371,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
                 // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
                 // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
-                upcomingSettlementLabel={upcomingSettlementLabel}
+                upcomingSettlementAmount={upcomingSettlementAmount}
                 upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
                 pendingInvoiceCount={upcomingPendingInvoiceCount}
                 onUploadInvoice={() => router.push("/mca-transactions")}
@@ -404,20 +394,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                   <div className="hidden sm:block h-4 w-px bg-border" />
 
                   <div className="flex items-center gap-2 flex-wrap">
-                    <SettlementDurationFilter value={duration} onChange={onDuration} />
+                    <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
                   </div>
-
-                  {hasActive && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      leftIcon={<Icon name="x" className="w-3 h-3" />}
-                      onClick={onClear}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      Clear
-                    </Button>
-                  )}
 
                   <div className="ml-auto flex items-center gap-2">
                     <TransactionColumnsMenu

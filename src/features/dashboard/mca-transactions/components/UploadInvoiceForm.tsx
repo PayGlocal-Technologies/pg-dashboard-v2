@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import {
   PurposeCodeCombobox,
   type PurposeCodeComboboxHandle,
-} from "@/features/dashboard/mca-transactions/components/PurposeCodeCombobox";
+} from "@/components/common/PurposeCodeCombobox";
 import { usePurposeCodes } from "@/features/dashboard/mca-transactions/hooks";
 import { merchantProfilePurposeCodeApi } from "@/features/dashboard/mca-transactions/services";
 import { usePut } from "@/lib/api/hooks";

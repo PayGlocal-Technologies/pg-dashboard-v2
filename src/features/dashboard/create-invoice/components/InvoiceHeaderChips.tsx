@@ -209,8 +209,12 @@ export function IssueDateChip({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
+        {/* bg-transparent: see the note in DateRangeCalendarPicker — flux's
+            Calendar cannot detect that it is inside a popover, so it paints the
+            page background over the popover's own surface. */}
         <Calendar
           mode="single"
+          className="bg-transparent p-0"
           selected={value ? new Date(`${value}T00:00:00`) : undefined}
           disabled={{ after: new Date(`${maxDate}T00:00:00`) }}
           onSelect={(date?: Date) => {

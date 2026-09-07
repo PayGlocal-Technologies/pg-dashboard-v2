@@ -7,8 +7,10 @@
 // truth — do not edit a description here without changing it there too.
 //
 // What is *not* static is which of these a given merchant may choose. That
-// comes from the API; see usePurposeCodes in this feature's hooks.ts. This
-// table only supplies the human-readable text for whichever codes it returns.
+// comes from the API: usePurposeCodes in the mca-transactions feature (invoice
+// upload) and usePurposeCodeOptions in settings (Business details). This table
+// only supplies the human-readable text for whichever codes they return, and
+// is the last-resort option list when neither returns anything.
 export const PURPOSE_CODES: Record<string, string> = {
   P0102:
     "Realisation of export bills (in respect of goods) sent on collection (full invoice value)",
@@ -66,7 +68,10 @@ export interface PurposeCodeOption {
   description: string;
 }
 
-const NO_DESCRIPTION = "No description available";
+/** Stand-in text for a code the RBI table does not carry. Exported so a caller
+ *  rendering a code's description can tell "we have no text for this" from a
+ *  real description and omit the line entirely. */
+export const NO_DESCRIPTION = "No description available";
 
 /** Description for a code, tolerant of casing and of codes the table doesn't
  *  know — the API is free to return a code newer than this build. */

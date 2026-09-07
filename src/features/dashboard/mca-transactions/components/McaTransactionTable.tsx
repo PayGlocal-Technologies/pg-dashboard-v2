@@ -40,7 +40,7 @@ import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import { downloadBlob } from "@/lib/utils/format";
 import useNewPermissions from "@/hooks/useNewPermissions";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   MCA_CURRENCY_FILTERS,
@@ -116,9 +116,22 @@ export function McaTransactionTable({
   const queryClient = useQueryClient();
   const [scrollPosition, setScrollPosition] = useState(0);
 
-  const [search, setSearch] = useState("");
-  // Defaults to "Invoice Pending" (rather than "All") when the page loads.
-  const [statusFilters, setStatusFilters] = useState<string[]>(INVOICE_PENDING_STATUSES);
+  // Seeded from ?q= so the header's global search can hand a transaction ID
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get("q") ?? "";
+
+  const [search, setSearch] = useState(initialQuery);
+  // Defaults to "Invoice Pending" (rather than "All") when the page loads —
+  // except when arriving with a query, which is a lookup rather than a review
+  // of the pending queue. Leaving the default on would hide an already-settled
+  // transaction and the page would read as "no such transaction". The tab bar
+  // below derives its selection from this state, so [] shows the "All" tab
+  // active and the merchant can see why they are looking at everything.
+  const [statusFilters, setStatusFilters] = useState<string[]>(
+    initialQuery ? [] : INVOICE_PENDING_STATUSES
+  );
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   // "Last N weeks/days/hours/minutes", kept as two pieces of state on

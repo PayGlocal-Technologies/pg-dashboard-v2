@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogTitle,
   Field,
+  FieldError,
   FieldLabel,
   Input,
   InputGroup,
@@ -40,6 +41,34 @@ const EMPTY: LineItemValues = {
   quantity: "1",
   saveAsSku: false,
 };
+
+/** The four fields the API requires on a line item, in the order they appear in
+ *  the form — which is also the order a failed submit walks to find the first
+ *  one to focus. */
+const REQUIRED_FIELDS = ["type", "description", "unitPrice", "quantity"] as const;
+
+type RequiredField = (typeof REQUIRED_FIELDS)[number];
+type FieldErrors = Partial<Record<RequiredField, string>>;
+
+/** Where focus goes when a field is missing. The type radio has no single
+ *  input, so the first option stands in for the group. */
+const FIELD_IDS: Record<RequiredField, string> = {
+  type: "line-item-type-GOOD",
+  description: "line-item-name",
+  unitPrice: "line-item-rate",
+  quantity: "line-item-qty",
+};
+
+/** Says what to do, not what went wrong: "Pick Good or Service" is actionable
+ *  where "Item type is required" only restates the label. */
+function validate(values: LineItemValues): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!values.type.trim()) errors.type = "Pick whether this is a good or a service.";
+  if (!values.description.trim()) errors.description = "Give this item a name.";
+  if (!values.unitPrice.trim()) errors.unitPrice = "Enter the rate you are charging.";
+  if (!values.quantity.trim()) errors.quantity = "Enter a quantity.";
+  return errors;
+}
 
 /**
  * Add or edit a line item.
@@ -127,7 +156,41 @@ function LineItemBody({
 
   const suggestions = useLineItemSuggestions(currency);
 
-  const patch = (next: Partial<LineItemValues>) => setValues((prev) => ({ ...prev, ...next }));
+  /**
+   * Which required fields have been asked about and left empty.
+   *
+   * The submit button used to be disabled until all four were filled, which
+   * said nothing about *which* was missing — and the one most often missed is
+   * the item type, whose two radios read as optional when nothing is selected.
+   * So the button always acts, and a failed attempt names every gap at once and
+   * moves focus to the first.
+   */
+  const [errors, setErrors] = useState<FieldErrors>({});
+
+  const patch = (next: Partial<LineItemValues>) => {
+    setValues((prev) => ({ ...prev, ...next }));
+    // Clear as soon as the field is answered, so the message never outlives the
+    // problem it describes.
+    setErrors((prev) => {
+      const cleared = { ...prev };
+      for (const key of Object.keys(next) as (keyof LineItemValues)[]) {
+        if (key in cleared) delete cleared[key as RequiredField];
+      }
+      return cleared;
+    });
+  };
+
+  const handleSubmit = () => {
+    const found = validate(values);
+    setErrors(found);
+
+    const firstMissing = REQUIRED_FIELDS.find((field) => found[field]);
+    if (!firstMissing) {
+      onSubmit(values);
+      return;
+    }
+    document.getElementById(FIELD_IDS[firstMissing])?.focus();
+  };
 
   // Suggestions are previously-billed line items and carry no id, so the same
   // name recurs whenever an item was billed more than once. Two entries that
@@ -170,13 +233,6 @@ function LineItemBody({
     return unique;
   }, [suggestions, values.description]);
 
-  // Same four fields production requires before it will leave the items step.
-  const isValid =
-    !!values.description.trim() &&
-    !!values.type.trim() &&
-    !!values.unitPrice.trim() &&
-    !!values.quantity.trim();
-
   const isService = values.type === "SERVICE";
 
   return (
@@ -186,6 +242,7 @@ function LineItemBody({
         <RadioGroup
           value={values.type}
           onValueChange={(next) => patch({ type: next })}
+          aria-invalid={!!errors.type || undefined}
           // flex-row is explicit: RadioGroup defaults to flex-col, and a bare
           // `flex` does not override a direction tailwind-merge sees no conflict
           // with — without it the two options stack.
@@ -201,6 +258,7 @@ function LineItemBody({
             </label>
           ))}
         </RadioGroup>
+        {errors.type && <FieldError>{errors.type}</FieldError>}
       </Field>
 
       {/* `modal` for the same reason SearchableSelect needs it: this popover
@@ -225,7 +283,9 @@ function LineItemBody({
                 patch({ description: e.target.value });
                 setSuggestionsOpen(true);
               }}
+              aria-invalid={!!errors.description || undefined}
             />
+            {errors.description && <FieldError>{errors.description}</FieldError>}
           </Field>
         </PopoverAnchor>
 
@@ -298,8 +358,10 @@ function LineItemBody({
               placeholder="0.00"
               value={values.unitPrice}
               onChange={(e) => patch({ unitPrice: e.target.value })}
+              aria-invalid={!!errors.unitPrice || undefined}
             />
           </InputGroup>
+          {errors.unitPrice && <FieldError>{errors.unitPrice}</FieldError>}
         </Field>
 
         <Field>
@@ -309,7 +371,9 @@ function LineItemBody({
             inputMode="numeric"
             value={values.quantity}
             onChange={(e) => patch({ quantity: e.target.value })}
+            aria-invalid={!!errors.quantity || undefined}
           />
+          {errors.quantity && <FieldError>{errors.quantity}</FieldError>}
         </Field>
       </div>
 
@@ -380,13 +444,9 @@ function LineItemBody({
       </div>
 
       <div className="space-y-2 border-t border-border pt-4">
-        <Button
-          type="button"
-          variant="primary"
-          className="w-full"
-          disabled={!isValid}
-          onClick={() => onSubmit(values)}
-        >
+        {/* Never disabled: a dead button cannot say why it is dead. Pressing it
+            with something missing is what surfaces the messages above. */}
+        <Button type="button" variant="primary" className="w-full" onClick={handleSubmit}>
           {editingItem ? "Save changes" : "Add item"}
         </Button>
         <Button type="button" variant="secondary" className="w-full" onClick={onCancel}>

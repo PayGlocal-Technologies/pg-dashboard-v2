@@ -20,6 +20,7 @@ import {
   relativeRangeToEpochMs,
   type RelativeRangeValue,
 } from "@/components/common/filters/FilterChips";
+import { useQueryClient } from "@tanstack/react-query";
 import { useDelete, usePost, usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -40,7 +41,10 @@ import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
 import {
   FIXED_COLUMN_KEYS,
   INVOICES_PAGE_LIMIT,
+  INVOICE_DATA_KEYS,
+  INVOICE_LIST_KEY,
   INVOICE_STATUS_FILTERS,
+  INVOICE_SUMMARY_KEY,
   INVOICE_VIEW_TABS,
   SEARCH_WORDS,
   STATUS_PINNED_TABS,
@@ -138,6 +142,7 @@ export function McaInvoiceTable({
   onStatusFiltersChange,
 }: McaInvoiceTableProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
   const paCbMids = useApp((s) => s.paCbMids);
@@ -266,13 +271,17 @@ export function McaInvoiceTable({
   const { mutate: viewInvoice } = usePost<BaseResponse<{ url: string }>, object>("", {
     invalidateQueries: false,
   });
+  // A duplicate lands as a new DRAFT, which the list shows but the summary
+  // cards do not count, so this one refreshes the list alone.
   const { mutate: duplicateInvoice, isPending: isDuplicating } = usePost<
     BaseResponse<null>,
     object
-  >("", { invalidateQueries: ["mca-invoices"] });
+  >("", { invalidateQueries: [INVOICE_LIST_KEY] });
+  // A delete removes the invoice from whichever status bucket it was counted
+  // in, so the cards are wrong until they refetch too.
   const { mutate: deleteInvoice, isPending: isDeleting } = useDelete<BaseResponse<null>, object>(
     "",
-    { invalidateQueries: ["mca-invoices"] }
+    { invalidateQueries: INVOICE_DATA_KEYS }
   );
 
   const openDocument = (row: McaInvoiceRow) => {
@@ -349,8 +358,13 @@ export function McaInvoiceTable({
     );
   };
 
+  // Refresh means the whole view, not just the rows: the counts above the table
+  // are part of what the merchant is asking to bring up to date.
   const handleRefresh = async () => {
-    const { isError: failed } = await refetch();
+    const [{ isError: failed }] = await Promise.all([
+      refetch(),
+      queryClient.invalidateQueries({ queryKey: INVOICE_SUMMARY_KEY }),
+    ]);
     if (failed) toast.error("Couldn't refresh invoices. Please try again.");
     else toast.success("Invoices updated");
   };

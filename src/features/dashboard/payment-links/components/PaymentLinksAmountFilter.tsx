@@ -10,8 +10,11 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui";
-import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
+import {
+  FilterChipClearButton,
+  FilterChipLabelTrigger,
+  FilterChipShell,
+} from "@/components/common/filters/FilterChips";
 
 export interface AmountRangeValue {
   min?: number;
@@ -63,26 +66,17 @@ export function PaymentLinksAmountFilter({ value, onChange }: PaymentLinksAmount
 
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Icon name="plus" className="h-3 w-3" />}
-          className={cn(
-            "relative h-auto rounded-full border-dotted bg-transparent px-4 py-2 text-muted-foreground shadow-none hover:bg-transparent hover:text-foreground",
-            open && "text-foreground"
-          )}
-        >
-          {hasValue && value ? amountLabel(value) : "Amount"}
-          {hasValue && (
-            <span
-              className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary"
-              aria-hidden="true"
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
+      {/* The shared chip shell, matching every other filter in the app — see the
+          note in SettlementDateFilter for what this replaced. */}
+      <FilterChipShell active={hasValue}>
+        {hasValue && <FilterChipClearButton label="Amount" onClick={handleClear} />}
+        <PopoverTrigger asChild>
+          <FilterChipLabelTrigger
+            label={hasValue && value ? amountLabel(value) : "Amount"}
+            active={hasValue}
+          />
+        </PopoverTrigger>
+      </FilterChipShell>
       <PopoverContent align="start" className="w-64 p-3">
         <div className="flex items-start gap-2">
           <Field className="flex-1">
