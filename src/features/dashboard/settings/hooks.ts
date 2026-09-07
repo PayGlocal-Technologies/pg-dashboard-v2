@@ -1,9 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import type { UseMutateFunction } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGet, usePost, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
+import { getPublicKey } from "@/features/auth/helpers";
+import { useEncryptPayload, type EncryptedPayload } from "@/features/auth/hooks";
+import { EMAIL_CHANGE_COMPLETED_STATUS } from "@/features/dashboard/settings/constants";
 import {
   businessDetailsApi,
   contactDetailsApi,
@@ -30,7 +34,7 @@ import type {
   BusinessData,
   BusinessDataResponse,
   BusinessUpdatePayload,
-  ChangeEmailRequest,
+  ChangeEmailCommit,
   ChangeEmailResponse,
   ContactData,
   ContactDataResponse,
@@ -270,69 +274,123 @@ export function useContactDetails(): {
 }
 
 /** The six change-email steps, in order. Each resolves with the server's own
- *  message and rejects with the server envelope — see parseChangeEmailFailure. */
+ *  message and rejects with the server envelope — see parseChangeEmailFailure.
+ *  Step 4 also reports whether the change actually committed. */
 export interface ChangeEmailSteps {
   initiate: () => Promise<string>;
   verifyOld: (otp: string) => Promise<string>;
   sendNewOtp: (newEmail: string) => Promise<string>;
-  verifyNew: (otp: string, newEmail: string) => Promise<string>;
+  verifyNew: (otp: string, newEmail: string) => Promise<ChangeEmailCommit>;
   resendOld: () => Promise<string>;
   resendNew: (newEmail: string) => Promise<string>;
 }
 
-/** Wraps a payload the way every authenticated endpoint here expects. */
-function changeEmailBody<TPayload extends object>(payload: TPayload): ChangeEmailRequest<TPayload> {
-  return { isEnc: false, payload };
+/**
+ * Whether the payload-encryption key is available yet.
+ *
+ * It has to be asked for here, because nothing on the dashboard side fetches
+ * it: getPublicKey runs in the (auth) layout only, and useApp is in-memory with
+ * no persistence — so on any dashboard page reached by a refresh or a direct
+ * link, publicKey is null. useEncryptPayload answers that by falling back to
+ * `isEnc: "false"` with the fields in the clear, which is exactly what this
+ * flow must not do with an OTP. So the dialog waits on "ready" before its first
+ * call and refuses to start on "failed", rather than quietly sending plaintext.
+ */
+export function useEncryptionReady(): "pending" | "ready" | "failed" {
+  const publicKey = useApp((s) => s.publicKey);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    if (publicKey) return;
+    let cancelled = false;
+    // getPublicKey swallows its own failures and leaves publicKey null, so the
+    // only way to tell "still fetching" from "gave up" is to look afterwards.
+    void getPublicKey().then(() => {
+      if (!cancelled && !useApp.getState().publicKey) setFailed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [publicKey]);
+
+  if (publicKey) return "ready";
+  return failed ? "failed" : "pending";
 }
 
 /**
  * The change-email wizard's data layer: one mutation per endpoint, exposed as
  * plain async functions so the dialog stays a state machine and never touches
- * react-query directly.
+ * react-query or the encryption helper directly.
  *
- * No invalidation anywhere. These calls change server-side session state, not
- * cached reads, and the default (invalidate everything) would fire refetches
- * mid-wizard — including right after step 4, when the session is already gone
- * and every one of them would 401.
+ * Every call goes up inside the app-wide isEnc envelope, the same one the login
+ * screens use — the plaintext fields are JWE-encrypted into `payload`. Callers
+ * must gate the first call on useEncryptionReady; without the key,
+ * useEncryptPayload silently sends the fields in the clear.
+ *
+ * Automatic invalidation is off on all six. These calls move server-side flow
+ * state, not cached reads, and the default (invalidate everything) would fire a
+ * refetch of every mounted query on each step of the wizard. The one read that
+ * genuinely goes stale is the contact details, and step 4 invalidates that by
+ * hand once the change has actually committed.
  */
 export function useChangeEmail(): ChangeEmailSteps {
+  const encryptPayload = useEncryptPayload();
+  const queryClient = useQueryClient();
+  const profile = useApp((s) => s.profile);
+  const setProfile = useApp((s) => s.setProfile);
   const noInvalidation = { invalidateQueries: false as const };
 
-  const initiate = usePost<ChangeEmailResponse, ChangeEmailRequest<object>>(
+  const initiate = usePost<ChangeEmailResponse, EncryptedPayload>(
     initiateEmailChangeApi,
     noInvalidation
   );
-  const verifyOld = usePost<ChangeEmailResponse, ChangeEmailRequest<{ otp: string }>>(
+  const verifyOld = usePost<ChangeEmailResponse, EncryptedPayload>(
     verifyOldEmailApi,
     noInvalidation
   );
-  const sendNewOtp = usePost<ChangeEmailResponse, ChangeEmailRequest<{ newEmail: string }>>(
+  const sendNewOtp = usePost<ChangeEmailResponse, EncryptedPayload>(
     sendNewEmailOtpApi,
     noInvalidation
   );
-  const verifyNew = usePost<
-    ChangeEmailResponse,
-    ChangeEmailRequest<{ otp: string; newEmail: string }>
-  >(verifyNewEmailApi, noInvalidation);
-  const resendOld = usePost<ChangeEmailResponse, ChangeEmailRequest<object>>(
+  const verifyNew = usePost<ChangeEmailResponse, EncryptedPayload>(
+    verifyNewEmailApi,
+    noInvalidation
+  );
+  const resendOld = usePost<ChangeEmailResponse, EncryptedPayload>(
     resendOldEmailOtpApi,
     noInvalidation
   );
-  const resendNew = usePost<ChangeEmailResponse, ChangeEmailRequest<{ newEmail: string }>>(
+  const resendNew = usePost<ChangeEmailResponse, EncryptedPayload>(
     resendNewEmailOtpApi,
     noInvalidation
   );
 
+  /** The merchant now stays signed in, so anything already on screen that shows
+   *  the old address has to be corrected: the Personal details row reads the
+   *  /contact query, and useApp.profile.emailId is read elsewhere (the
+   *  multi-currency share modal) and has no refetch of its own. */
+  const adoptNewEmail = (newEmail: string): void => {
+    void queryClient.invalidateQueries({ queryKey: ["settings-contact"] });
+    if (profile) setProfile({ ...profile, emailId: newEmail });
+  };
+
   return {
-    initiate: async () => (await initiate.mutateAsync(changeEmailBody({}))).message ?? "",
-    verifyOld: async (otp) => (await verifyOld.mutateAsync(changeEmailBody({ otp }))).message ?? "",
+    initiate: async () => (await initiate.mutateAsync(await encryptPayload({}))).message ?? "",
+    verifyOld: async (otp) =>
+      (await verifyOld.mutateAsync(await encryptPayload({ otp }))).message ?? "",
     sendNewOtp: async (newEmail) =>
-      (await sendNewOtp.mutateAsync(changeEmailBody({ newEmail }))).message ?? "",
+      (await sendNewOtp.mutateAsync(await encryptPayload({ newEmail }))).message ?? "",
     // newEmail goes up again alongside the code, carried forward from step 3.
-    verifyNew: async (otp, newEmail) =>
-      (await verifyNew.mutateAsync(changeEmailBody({ otp, newEmail }))).message ?? "",
-    resendOld: async () => (await resendOld.mutateAsync(changeEmailBody({}))).message ?? "",
+    verifyNew: async (otp, newEmail) => {
+      const res = await verifyNew.mutateAsync(await encryptPayload({ otp, newEmail }));
+      // A 2xx is not the confirmation — this status is. Anything else means the
+      // email did not change, so the dialog must not claim it did.
+      const committed = res.status === EMAIL_CHANGE_COMPLETED_STATUS;
+      if (committed) adoptNewEmail(newEmail);
+      return { message: res.message ?? "", committed };
+    },
+    resendOld: async () => (await resendOld.mutateAsync(await encryptPayload({}))).message ?? "",
     resendNew: async (newEmail) =>
-      (await resendNew.mutateAsync(changeEmailBody({ newEmail }))).message ?? "",
+      (await resendNew.mutateAsync(await encryptPayload({ newEmail }))).message ?? "",
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Dialog,
@@ -20,29 +20,33 @@ import {
   MAX_EMAIL_OTP_ATTEMPTS,
 } from "@/features/dashboard/settings/constants";
 import { parseChangeEmailFailure, validateNewEmail } from "@/features/dashboard/settings/helper";
-import { useChangeEmail } from "@/features/dashboard/settings/hooks";
+import { useChangeEmail, useEncryptionReady } from "@/features/dashboard/settings/hooks";
 
 /** One screen per server-gated step, in the order the API enforces. `sending`
- *  covers the initiate call fired on open; `stopped` is the dead end, which the
- *  flow reaches two different ways — see StopReason. */
+ *  covers waiting on the encryption key and the initiate call fired on open;
+ *  `stopped` is the dead end, which the flow reaches two different ways — see
+ *  StopReason. */
 type Step = "sending" | "verify-old" | "enter-new-email" | "verify-new" | "done" | "stopped";
 
 /** Why the flow stopped, and therefore what the merchant has to do next.
- *  `signed-out` — three wrong codes; the API ended the login session, so the
- *  only way on is to log in again. `restart` — a 403 (a step called out of
- *  order, e.g. the flow was left open too long) or a failed initiate; the login
- *  session is intact and they can simply try again. */
+ *  `signed-out` — three wrong codes, or a 403; either way the login session is
+ *  gone and the only way on is to log in again. `restart` — the server no
+ *  longer counts an earlier step as cleared (a 401 on a non-OTP call, e.g. the
+ *  dialog was left open across a logout elsewhere) or initiate failed outright;
+ *  the login session is intact and reopening the dialog starts a clean flow. */
 type StopReason = "signed-out" | "restart";
 
 interface ChangeEmailDialogProps {
   /** The merchant's current email, shown on the first OTP screen. */
   currentEmail: string;
   onOpenChange: (open: boolean) => void;
-  /** The change is committed and the session is gone — send the merchant to log
-   *  in again with the new address. */
+  /** The change committed. The session survives it, so this is only a "close
+   *  and tell them" hook — there is nothing to sign out of or redirect to. The
+   *  new address is passed for the confirmation copy; the data behind the
+   *  screen has already been refreshed by useChangeEmail. */
   onCompleted: (newEmail: string) => void;
-  /** The session was ended without the change going through (three wrong
-   *  codes). Also a log-in-again path, but nothing was updated. */
+  /** The login session itself ended (three wrong codes, or a 403) with nothing
+   *  updated. The only path on is a fresh login. */
   onSessionEnded: () => void;
 }
 
@@ -64,10 +68,12 @@ function useResendCooldown(): { secondsLeft: number; start: () => void } {
  * Change-email wizard for the Personal details Email row, over the six
  * /gcc/v3/iam/users/contact/change endpoints (see services.ts).
  *
- * The server owns the state: each step only succeeds when the previous one just
- * did, so this component walks forward on success responses rather than
- * tracking eligibility itself. Two endings are terminal for the login session —
- * a committed change, and three wrong codes.
+ * The server owns the sequencing — each step checks that the previous one
+ * happened — so this component walks forward on success responses rather than
+ * tracking eligibility itself. That check is a stored fact about the account,
+ * not a narrowed session, so having this dialog open costs the rest of the
+ * dashboard nothing and a committed change leaves the merchant logged in. The
+ * one terminal ending left is three wrong codes, which does end the session.
  *
  * The caller must mount this only while open (`{editing && <ChangeEmailDialog/>}`),
  * so each open starts from a fresh `sending` state.
@@ -79,6 +85,7 @@ export function ChangeEmailDialog({
   onSessionEnded,
 }: ChangeEmailDialogProps) {
   const api = useChangeEmail();
+  const encryption = useEncryptionReady();
 
   const [step, setStep] = useState<Step>("sending");
   const [stopReason, setStopReason] = useState<StopReason>("restart");
@@ -92,32 +99,42 @@ export function ChangeEmailDialog({
    *  a new step begins. Warning only — the server enforces the limit. */
   const [wrongCodes, setWrongCodes] = useState(0);
   const cooldown = useResendCooldown();
+  const initiated = useRef(false);
 
-  // Step 1 fires as soon as the dialog opens: there is nothing for the merchant
-  // to fill in for it. setState happens in the async callback, not the effect
-  // body, so this stays within the app's hook rules.
+  // Step 1 fires as soon as the encryption key is in hand: there is nothing for
+  // the merchant to fill in for it, but its body still goes up encrypted, so it
+  // cannot run before the key resolves. The ref keeps it to one call even
+  // though the effect re-runs as `encryption` settles. setState happens in the
+  // async callbacks, not the effect body, so this stays within the app's hook
+  // rules.
+  //
+  // No cancellation flag on purpose. It would have to be set from this effect's
+  // cleanup, and under StrictMode's mount/unmount/remount the cleanup runs
+  // while the one call this ref allows is still in flight — the remount then
+  // hits the ref and registers no new cleanup, so the flag stays set and the
+  // response is dropped on the floor, leaving the dialog spinning on "sending"
+  // forever whatever the server said. The ref alone already guarantees a single
+  // call, and a setState after a real unmount is a no-op in React 18+.
   useEffect(() => {
-    let cancelled = false;
+    if (encryption !== "ready" || initiated.current) return;
+    initiated.current = true;
+
     void api
       .initiate()
       .then((message) => {
-        if (cancelled) return;
         setNotice(message);
         setStep("verify-old");
         cooldown.start();
       })
       .catch((err: unknown) => {
-        if (cancelled) return;
         setError(parseChangeEmailFailure(err).message);
         setStopReason("restart");
         setStep("stopped");
       });
-    return () => {
-      cancelled = true;
-    };
-    // Runs once per mount; the dialog is mounted fresh on every open.
+    // Keyed on the encryption gate only; the dialog is mounted fresh on every
+    // open, and `api`/`cooldown` are new objects on each render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [encryption]);
 
   const stop = (reason: StopReason, message: string): void => {
     setError(message);
@@ -129,32 +146,38 @@ export function ChangeEmailDialog({
    * Every call funnels through here so one place owns the busy flag and the
    * failure branching.
    *
-   * `isOtpSubmit` marks the two calls where a 401 means "wrong code". The
-   * server ends the session on the third one, after which the next call would
-   * 403 anyway — the count here only buys a warning before that happens, and a
-   * clearer final screen.
+   * `isOtpSubmit` marks the two calls where a 401 means "wrong code" rather
+   * than "out of order" — the API uses the one status for both, and only the
+   * caller knows which endpoint it just hit. The server ends the session on the
+   * third wrong code; the count here only buys a warning before that happens,
+   * and a clearer final screen.
    */
-  async function run(
-    action: () => Promise<string>,
-    onDone: (message: string) => void,
+  async function run<T>(
+    action: () => Promise<T>,
+    onDone: (result: T) => void,
     options: { isOtpSubmit?: boolean } = {}
   ): Promise<void> {
     setIsBusy(true);
     setError(null);
     try {
-      const message = await action();
-      onDone(message);
+      onDone(await action());
     } catch (err) {
       const failure = parseChangeEmailFailure(err);
 
-      // 403: the server has no live step for this session. Nothing to do but
-      // start over — the login session itself is still fine.
+      // 403 is reserved for "not logged in at all" — the session is gone, so
+      // there is nothing to retry in place.
       if (failure.status === 403) {
-        stop("restart", failure.message);
+        stop("signed-out", failure.message);
         return;
       }
 
-      if (failure.status === 401 && options.isOtpSubmit) {
+      if (failure.status === 401) {
+        // Not an OTP submit, so this is the sequencing check: the server no
+        // longer treats the earlier step as cleared for this account.
+        if (!options.isOtpSubmit) {
+          stop("restart", failure.message);
+          return;
+        }
         const used = wrongCodes + 1;
         setWrongCodes(used);
         const left = MAX_EMAIL_OTP_ATTEMPTS - used;
@@ -208,7 +231,14 @@ export function ChangeEmailDialog({
   const submitNewOtp = (code: string): void => {
     void run(
       () => api.verifyNew(code, newEmail.trim()),
-      () => {
+      ({ message, committed }) => {
+        // A 2xx is not the confirmation: only the EMAIL_CHANGE_COMPLETED status
+        // is. Without it the email did not change, and telling the merchant it
+        // did is worse than showing them whatever the server said.
+        if (!committed) {
+          setError(message || "Your email was not changed. Please try again.");
+          return;
+        }
         setNotice(null);
         setStep("done");
       },
@@ -251,7 +281,32 @@ export function ChangeEmailDialog({
     <Dialog open onOpenChange={(next) => !next && close()}>
       <DialogContent className="sm:max-w-md">
         <div className="space-y-4">
-          {step === "sending" && (
+          {/* Rendered rather than folded into `step`, so no state is set from
+              the effect body. Without the key the OTP and the address would go
+              up in the clear, so the flow does not start at all. */}
+          {encryption === "failed" && step === "sending" && (
+            <>
+              <div className="flex items-start gap-3">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                  <Icon name="shield-alert" size={18} />
+                </span>
+                <div>
+                  <DialogTitle>Can&apos;t start right now</DialogTitle>
+                  <DialogDescription>
+                    We couldn&apos;t set up a secure connection to change your email. Reload the
+                    page and try again — your email is unchanged.
+                  </DialogDescription>
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" onClick={close}>
+                  Close
+                </Button>
+              </div>
+            </>
+          )}
+
+          {encryption !== "failed" && step === "sending" && (
             <div className="flex items-center gap-3 py-4">
               <Icon name="loader" className="h-4 w-4 animate-spin text-muted-foreground" />
               <div>
@@ -379,10 +434,11 @@ export function ChangeEmailDialog({
                 />
                 <FieldError>{error}</FieldError>
               </Field>
-              {/* The commit ends the session — say so before they click. */}
+              {/* The commit can't be undone, and it's what the next sign-in will
+                  ask for — worth saying before they click. */}
               <p className="text-xs text-muted-foreground">
-                You&apos;ll be signed out once the change is confirmed, and will need to sign in
-                again with your new email.
+                This can&apos;t be undone. You&apos;ll stay signed in, and will use your new email
+                to sign in from now on.
               </p>
               {resendRow}
               <div className="flex justify-end gap-2">
@@ -412,14 +468,14 @@ export function ChangeEmailDialog({
                   <DialogDescription>
                     Your account email is now{" "}
                     <span className="font-medium text-foreground">{newEmail.trim()}</span>.
-                    We&apos;ve emailed a confirmation to both addresses. For security you&apos;ve
-                    been signed out — sign in again with your new email.
+                    We&apos;ve emailed a confirmation to both addresses. You&apos;re still signed
+                    in — use the new address next time you sign in.
                   </DialogDescription>
                 </div>
               </div>
               <div className="flex justify-end">
                 <Button type="button" onClick={() => onCompleted(newEmail.trim())}>
-                  Go to login
+                  Done
                 </Button>
               </div>
             </>
@@ -437,7 +493,7 @@ export function ChangeEmailDialog({
                     {error ?? "This verification is no longer valid."}{" "}
                     {stopReason === "signed-out"
                       ? "For security, your email is unchanged and you've been signed out — sign in again to retry."
-                      : "Your email is unchanged. Close this and start again when you're ready."}
+                      : "Your email is unchanged and you're still signed in. Close this and start again when you're ready."}
                   </DialogDescription>
                 </div>
               </div>

@@ -23,8 +23,17 @@ export function validateNewEmail(value: string, currentEmail?: string | null): s
 /** Reads a change-email rejection into something the dialog can branch on.
  *
  *  handleApiError rejects with the server envelope (its fields plus a
- *  normalised `message`), not an AxiosError — so the HTTP status survives only
- *  when the response body carried one, and callers must cope with it missing. */
+ *  normalised `message`), not an AxiosError — so the HTTP status is only
+ *  recoverable from the envelope's own `status` field, which the server prints
+ *  as Java HttpStatus text ("401 UNAUTHORIZED"). parseInt takes the leading
+ *  code and tolerates a bare "401" too; a body without one (a network failure,
+ *  a non-envelope error) leaves the status off and the caller falls back to
+ *  showing the message alone.
+ *
+ *  What the codes mean here: 403 is "not logged in at all", 400 is a rejected
+ *  input, and 401 is either a wrong code or a step called out of order —
+ *  telling those two apart is the caller's job, since only it knows which
+ *  endpoint was being called. */
 export function parseChangeEmailFailure(error: unknown): ChangeEmailFailure {
   const fallback = "Something went wrong. Please try again.";
   if (!error || typeof error !== "object") return { message: fallback };
@@ -33,9 +42,9 @@ export function parseChangeEmailFailure(error: unknown): ChangeEmailFailure {
   const message =
     typeof envelope.message === "string" && envelope.message.trim() ? envelope.message : fallback;
 
-  // Envelope `status` is a string like "401". Only error codes are useful here;
-  // anything else (a success code, a missing field, a network failure) leaves
-  // the status off and the caller falls back to showing the message alone.
-  const status = Number(envelope.status);
+  const status =
+    typeof envelope.status === "string" || typeof envelope.status === "number"
+      ? parseInt(String(envelope.status), 10)
+      : NaN;
   return Number.isInteger(status) && status >= 400 ? { message, status } : { message };
 }

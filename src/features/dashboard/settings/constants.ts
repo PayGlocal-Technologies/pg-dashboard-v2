@@ -12,6 +12,11 @@ export const MAX_EMAIL_OTP_ATTEMPTS = 3;
 
 export const EMAIL_OTP_RESEND_COOLDOWN_SECONDS = 30;
 
+/** Step 4 (verify-new) overrides the response's `status` with this literal
+ *  instead of an HTTP code, and it is the only signal that the email actually
+ *  committed. A 2xx without it means the change did not go through. */
+export const EMAIL_CHANGE_COMPLETED_STATUS = "EMAIL_CHANGE_COMPLETED";
+
 export interface SettingsNavChild {
   label: string;
   href: string;

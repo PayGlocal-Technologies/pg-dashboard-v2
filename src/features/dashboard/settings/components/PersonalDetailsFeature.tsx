@@ -91,8 +91,9 @@ export function PersonalDetailsFeature() {
   };
 
   // Email + phone come from the real /contact endpoint (read-only in
-  // pg-dashboard). Email is changed through its own six-step flow, which ends
-  // the session — so there is nothing to update in place here.
+  // pg-dashboard). Email is changed through its own six-step flow; the session
+  // survives it, and useChangeEmail invalidates this query on the commit, so
+  // the row below picks the new address up on its own.
   const { contact, isLoading } = useContactDetails();
 
   const email = contact?.emailId ?? profile?.emailId ?? "Not available";
@@ -207,10 +208,15 @@ export function PersonalDetailsFeature() {
         <ChangeEmailDialog
           currentEmail={email}
           onOpenChange={setChangingEmail}
-          // Both endings ended the session server-side, so both lead to login.
-          // useLogout clears the local stores on the way out — without that the
-          // next visitor to this browser would rehydrate the old profile.
-          onCompleted={() => logout()}
+          // A committed change leaves the session alone now, so there is
+          // nothing to do but close and confirm.
+          onCompleted={(next) => {
+            setChangingEmail(false);
+            toast.success(`Your account email is now ${next}.`);
+          }}
+          // Three wrong codes still ends the session server-side. useLogout
+          // clears the local stores on the way out — without that the next
+          // visitor to this browser would rehydrate the old profile.
           onSessionEnded={() => logout()}
         />
       )}

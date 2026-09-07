@@ -49,29 +49,48 @@ export const merchantLogoUploadApi = (merchantId: string): string =>
 
 // ── Change email (six server-gated steps) ────────────────────────────────────
 //
-// Every step is authenticated by the merchant's existing session cookie and
-// gated on the previous one having just succeeded for that session: calling one
-// out of order returns 403 before it reaches application logic. Two of them are
-// terminal for the session — step 4 ends it on success, and three wrong codes at
-// either OTP step end it too.
+// Every step rides the merchant's existing session cookie, and the ones that
+// need step 2 are gated on a stored fact ("this account verified its old
+// email") rather than on narrowing what the session may do. So the flow never
+// affects the rest of the dashboard: the merchant can navigate away between
+// steps, other authenticated screens keep working, and a successful step 4
+// leaves them logged in. The one thing that still ends the session is three
+// wrong codes at either OTP step.
+//
+// Bodies below are the PLAINTEXT fields. All six go up inside the app-wide
+// isEnc envelope from useEncryptPayload, same as the login screens — the fields
+// are JWE-encrypted into `payload`, never sent as plain JSON.
+//
+// Statuses: 403 means not logged in at all. 401 means either a wrong code or a
+// step called out of order — which of the two is decided by the endpoint, not
+// the code.
 
 const CHANGE_EMAIL_BASE = `${BASE_URL_V3}/iam/users/contact/change`;
 
-/** Step 1. Emails a code to the merchant's CURRENT address. Body: {}. */
+/** Step 1. Emails a code to the merchant's CURRENT address. Fields: {}.
+ *  Requires only a logged-in merchant. */
 export const initiateEmailChangeApi = `${CHANGE_EMAIL_BASE}/initiate`;
 
-/** Step 2. Body: { otp }. */
+/** Step 2. Fields: { otp }. Requires only a logged-in merchant — this endpoint
+ *  is itself the check on step 1's code. Success marks the account's old email
+ *  verified, which is what clears steps 3 and 6; the mark has no timer and
+ *  lasts until the flow completes or the merchant logs out. */
 export const verifyOldEmailApi = `${CHANGE_EMAIL_BASE}/verify-old`;
 
-/** Step 3. Body: { newEmail }. Emails a second code to the new address. */
+/** Step 3. Fields: { newEmail }. Emails a second code to the new address.
+ *  Requires the old email verified. */
 export const sendNewEmailOtpApi = `${CHANGE_EMAIL_BASE}/send-new-otp`;
 
-/** Step 4. Body: { otp, newEmail } — newEmail is carried forward from step 3,
- *  not retyped. Commits the change irreversibly and ends the session. */
+/** Step 4. Fields: { otp, newEmail } — newEmail is carried forward from step 3,
+ *  not retyped. Requires step 3 to have sent a code for that same address.
+ *  Commits the change irreversibly and mails both addresses; the session is
+ *  left intact. Success comes back with status EMAIL_CHANGE_COMPLETED. */
 export const verifyNewEmailApi = `${CHANGE_EMAIL_BASE}/verify-new`;
 
-/** Step 5. Body: {}. Only while step 2 is pending. */
+/** Step 5. Fields: {}. Requires only a logged-in merchant — no step condition,
+ *  so it is callable whether or not step 2 is outstanding. */
 export const resendOldEmailOtpApi = `${CHANGE_EMAIL_BASE}/resend-old`;
 
-/** Step 6. Body: { newEmail }. Only while step 4 is pending. */
+/** Step 6. Fields: { newEmail }. Requires the old email verified, the same
+ *  condition as step 3. */
 export const resendNewEmailOtpApi = `${CHANGE_EMAIL_BASE}/resend-new`;
