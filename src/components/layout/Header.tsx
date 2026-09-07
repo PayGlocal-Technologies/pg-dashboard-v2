@@ -10,6 +10,7 @@ import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { SwitchToOldViewButton } from "@/components/layout/SwitchToOldViewButton";
+import { AskEchoButton } from "@/components/layout/AskEchoButton";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -176,6 +177,10 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
         {/* Actions */}
         <div className="flex items-center gap-2">
+          {/* Echo — navigates to /echo. Renders itself away when the account
+              lacks getEchoActiveSession, see AskEchoButton. */}
+          <AskEchoButton />
+
           {/* OUT OF SCOPE — Notification bell hidden for now (no notifications
               backend yet). Restore by un-commenting this block. */}
           {/* <Button

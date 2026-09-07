@@ -79,6 +79,7 @@ import {
   Paperclip,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRight,
   Pencil,
   Percent,
   Phone,
@@ -130,6 +131,7 @@ import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
 import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
 import { LinkGreenFilled } from "@/components/icon/LinkGreenFilled";
+import { EchoMark } from "@/components/icon/EchoMark";
 import { MdrOfferIcon } from "@/components/icon/MdrOfferIcon";
 import { NoTransactionsIllustration } from "@/components/icon/NoTransactionsIllustration";
 import { RecurringOutlined } from "@/components/icon/RecurringOutlined";
@@ -220,6 +222,7 @@ export const ICONS = {
   paperclip: Paperclip,
   "panel-left-close": PanelLeftClose,
   "panel-left-open": PanelLeftOpen,
+  "panel-right": PanelRight,
   palette: Palette,
   pencil: Pencil,
   percent: Percent,
@@ -283,6 +286,11 @@ export const ICONS = {
   "recurring-outlined": RecurringOutlined as unknown as LucideIcon,
   "link-custom-outlined": LinkCustomOutlined as unknown as LucideIcon,
   "link-green-filled": LinkGreenFilled as unknown as LucideIcon,
+
+  // ─── Echo ──────────────────────────────────────────────────────────────────
+  // The assistant's own mark, used for the sidebar entry, the header button
+  // and every assistant turn in the transcript.
+  "echo-mark": EchoMark as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;
