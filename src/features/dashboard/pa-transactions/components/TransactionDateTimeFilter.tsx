@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import {
   DateRangeCalendarPicker,
   type DateRangeValue,
-  type DurationPickMode,
+  type DatePickMode,
 } from "@/components/common/DateRangeCalendarPicker";
 
 export type DateTimePreset = "today" | "last7" | "last30" | "custom";
@@ -55,7 +55,7 @@ export function TransactionDateTimeFilter({
 }: TransactionDateTimeFilterProps) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<"presets" | "custom">("presets");
-  const [mode, setMode] = useState<DurationPickMode>("range");
+  const [mode, setMode] = useState<DatePickMode>("range");
   const [singleDate, setSingleDate] = useState<Date | undefined>(undefined);
   const [range, setRange] = useState<DateRangeValue | undefined>(undefined);
 
