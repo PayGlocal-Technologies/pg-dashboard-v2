@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { ViewPortal } from "@/components/layout/ViewPortal";
 import { MerchantSelector, useHasMultipleMids } from "@/components/layout/MerchantSelector";
 import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
+import { AskEchoButton } from "@/components/layout/AskEchoButton";
 import {
   navigationForContext,
   filterNavigation,
@@ -160,6 +161,13 @@ function SidebarBody({
   return (
     <>
       <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+        {/* Echo — above the groups, not in one: it reaches the features below
+            rather than being another of them. Renders itself away when the
+            account lacks getEchoActiveSession, see AskEchoButton. */}
+        <div className={cn("mb-4", collapsed && "flex justify-center")}>
+          <AskEchoButton collapsed={collapsed} onNavigate={onNavClick} />
+        </div>
+
         {navigation.map((group) => (
           <div key={group.label} className="mb-4">
             {!collapsed ? (

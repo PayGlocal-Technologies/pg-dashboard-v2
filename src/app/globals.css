@@ -391,3 +391,71 @@ textarea:focus-visible {
     animation: field-flash 1.8s step-end;
   }
 }
+
+/* ─── Echo ────────────────────────────────────────────────────────────────
+   Two small pieces of chrome for the assistant, ported from Nova.
+
+   The typing dots stand in for a streaming reply: the Echo API answers in one
+   shot rather than token by token, so there is nothing to stream — this just
+   says a turn is in flight. The ring is the gradient halo behind the header's
+   "Ask Echo" button, drawn as a masked pseudo-element so it hugs the button's
+   own radius without a wrapper border eating a pixel of it. */
+@keyframes echo-typing {
+  0%,
+  60%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+.echo-typing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--muted-foreground);
+  animation: echo-typing 1.2s ease-in-out infinite;
+}
+
+.echo-typing-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.echo-typing-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* Display is left to the utility class on the element: the sidebar rail wants
+   this as a w-fit box and the expanded rail as a full-width one, and this rule
+   sits after Tailwind's utilities in the cascade, so setting it here would win
+   over both. */
+.echo-ask-ring {
+  position: relative;
+  padding: 1px;
+  background: linear-gradient(120deg, #bfdbfe, #3b82f6, #0061e3, #bfdbfe);
+  background-size: 300% 100%;
+  animation: echo-ask-ring-shift 6s linear infinite;
+}
+
+@keyframes echo-ask-ring-shift {
+  to {
+    background-position: 300% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Both are decoration, not information — hold them still rather than
+     translating the dots and cycling the gradient. */
+  .echo-typing-dot,
+  .echo-ask-ring {
+    animation: none;
+  }
+
+  .echo-typing-dot {
+    opacity: 0.6;
+  }
+}
