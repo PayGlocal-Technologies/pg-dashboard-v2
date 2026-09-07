@@ -2,15 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import {
   Button,
   Card,
   DataTable,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   Separator,
   StatusBadge,
   Tooltip,
@@ -41,7 +36,8 @@ import type {
   SettlementPayment,
 } from "@/features/dashboard/settlement-reports/types";
 import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
-import { type NavContext } from "@/stores/useProductContext";
+import { toProductType, type NavContext } from "@/stores/useProductContext";
+import { useSettlementReportDownload } from "@/features/dashboard/settlement-reports/hooks";
 
 /** "UTR2603120001" → "UTR26....0001" */
 function truncateMiddle(value: string): string {
@@ -269,6 +265,11 @@ interface SettlementDetailFeatureProps {
 export function SettlementDetailFeature({ settlementId, product }: SettlementDetailFeatureProps) {
   const router = useRouter();
   const listPath = settlementListPath(product);
+  // Same hook the list page uses, so a report downloaded from here and from a
+  // row behave identically. See useSettlementReportDownload.
+  const { download: downloadSettlementReport } = useSettlementReportDownload(
+    toProductType(product)
+  );
   const [showReportInfo, setShowReportInfo] = useState(false);
   const [showReleasedInfo, setShowReleasedInfo] = useState(false);
   const detail = settlementDetailsById[settlementId];
@@ -327,44 +328,26 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
   // TODO(integration): wire up to the real settlement report download
   // endpoint once it exists, see the list page's "Export" action, which is
   // the same mock-only placeholder.
-  function handleDownloadReport(format: "CSV" | "Excel" | "PDF") {
-    toast.success("Download started", {
-      description: `Preparing ${format} report for ${settlement.id}`,
-    });
+  /** Same call a row's Download button makes: one settlement's report, keyed by
+   *  its settlement date. No format choice — the endpoint produces one format,
+   *  so offering three would have been a menu over a single outcome. */
+  function handleDownloadReport() {
+    downloadSettlementReport(settlement.date, settlement.merchantId);
   }
 
   // A report can exist mid-processing (see settlement.reportAvailable), it's
   // deliberately independent of `isSettled`, a report being ready never
-  // implies the bank transfer itself is complete. Format choice is an
-  // inline dropdown menu, not a modal, so picking a format doesn't
-  // interrupt whatever else the merchant is doing on this page.
+  // implies the bank transfer itself is complete.
   const downloadReportButton = settlement.reportAvailable ? (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-        >
-          Download Report
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleDownloadReport("CSV")}>
-          <Icon name="file-text" className="h-3.5 w-3.5" />
-          CSV
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDownloadReport("Excel")}>
-          <Icon name="file-text" className="h-3.5 w-3.5" />
-          Excel (.xlsx)
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDownloadReport("PDF")}>
-          <Icon name="file-text" className="h-3.5 w-3.5" />
-          PDF
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={handleDownloadReport}
+      leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+    >
+      Download Report
+    </Button>
   ) : (
     <TooltipProvider delayDuration={200}>
       <Tooltip>

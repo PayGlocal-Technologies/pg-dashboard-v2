@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useScopeId } from "@/lib/hooks/useScopeId";
@@ -49,25 +49,21 @@ import {
 import {
   useSettlementCalendar,
   useSettlementOverview,
+  useSettlementReportDownload,
   useSettlementUpcoming,
 } from "@/features/dashboard/settlement-reports/hooks";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import {
-  ffmsSettlementDownloadApi,
   ffmsSettlementSummaryApi,
-  paSettlementDownloadApi,
   paSettlementReportsApi,
 } from "@/features/dashboard/settlement-reports/services";
 import {
   mapFfmsRowToRow,
   mapPaViewToRow,
-  triggerBrowserDownload,
 } from "@/features/dashboard/settlement-reports/helper";
 import type {
-  FfmsSettlementDownloadResponse,
   FfmsSettlementResponse,
-  PaSettlementDownloadResponse,
   PaSettlementResponse,
   SettlementRow,
 } from "@/features/dashboard/settlement-reports/types";
@@ -94,12 +90,37 @@ interface SettlementReportsFeatureProps {
 }
 
 /**
- * Whether an empty settlement list falls back to the mock dataset.
+ * Whether the ENHANCED view runs on the mock dataset.
  *
- * Development only. See the `rows` memo below for why the fallback exists and
- * why it must never reach a merchant.
+ * Not a fallback any more. The enhanced table and the per-settlement detail
+ * page behind it are v2's own design and have NO backing endpoint: the live
+ * summary returns four thin fields (date / amount / txn count / UTR) with no
+ * per-row status and no settlement id, so real rows render a constant status
+ * badge, a settlement DATE under the "Settlement ID" header, and a "Settlement
+ * not found" detail page. That is unreviewable, which is the whole reason this
+ * exists — see mock-data.ts and MCA_API_SPEC_FOR_BACKEND.md section 6.3.
+ *
+ * So outside production the enhanced view renders the mock dataset outright,
+ * whether or not the endpoint returned rows. The CLASSIC view is untouched and
+ * always renders live API rows, so real settlements are always one toggle away.
+ *
+ * NOTE ON THE GATE: `npm run uat` is `next dev`, so NODE_ENV is "development"
+ * there too and this is on in UAT as well as locally. That is deliberate —
+ * UAT is where this gets reviewed. Only a real `next build` deployment turns it
+ * off, at which point the enhanced view falls back to live API rows. An empty
+ * settlement list in production is a real answer and must render as one.
  */
 const SHOW_MOCK_SETTLEMENTS = process.env.NODE_ENV !== "production";
+
+/** Client-side text search over the visible UTR / settlement id, shared by both
+ *  views. The old settlement tables only ever filtered by date server-side. */
+function filterSettlementRows(rows: SettlementRow[], search: string): SettlementRow[] {
+  if (!search) return rows;
+  const q = search.toLowerCase();
+  return rows.filter(
+    (row) => (row.utrNumber ?? "").toLowerCase().includes(q) || row.id.toLowerCase().includes(q)
+  );
+}
 
 type SettlementView = "enhanced" | "classic";
 
@@ -123,6 +144,10 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // behind the banner, and the calendar popover's holiday markers. Only the
   // settlement *money* below is still mock.
   const calendar = useSettlementCalendar();
+  // The one download path every surface on this screen goes through: both
+  // tables' rows, the Previous settled card, and the detail page behind a row
+  // (which calls the same hook itself). See useSettlementReportDownload.
+  const { download: downloadSettlementReport } = useSettlementReportDownload(activeProduct);
 
   const { urlMid, midFilter } = useResolvedMids(activeProduct);
   const isGuestUser = useApp((s) => s.isGuestUser);
@@ -162,17 +187,6 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const isClassic = view === "classic";
   const [columnOrder, setColumnOrder] = useState<string[]>(SETTLEMENT_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
-  // Set when a row's download is requested; drives the lazy download queries
-  // below (mirrors pg-dashboard's reportDownloadDate + refetch pattern). Both
-  // the date and the merchant come off the clicked row, so a row from a
-  // UCIC-scoped summary downloads against its own merchant rather than the
-  // scope the list was fetched at.
-  const [downloadTarget, setDownloadTarget] = useState<{
-    date: string;
-    merchantId: string;
-  } | null>(null);
-  const downloadDate = downloadTarget?.date ?? null;
-
   const dateFilterEnd = dateFilter
     ? dateFilter.mode === "range"
       ? (dateFilter.to ?? dateFilter.from)
@@ -204,51 +218,6 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
     { staleTime: 0 },
     isMca && !!scopeId && !isGuestUser
   );
-
-  // ── Lazy per-row download queries (fired via refetch on downloadDate) ────────
-  const paDownloadQuery = useGet<PaSettlementDownloadResponse>(
-    ["settlement-pa-download", paMid, downloadDate ?? ""],
-    paSettlementDownloadApi(paMid, downloadDate ?? ""),
-    { enabled: false }
-  );
-  // Scoped to the clicked row's own merchant, not to the scope the summary was
-  // fetched at: a UCIC-scoped summary can return rows from several merchants.
-  const ffmsDownloadMid = downloadTarget?.merchantId ?? "";
-  const ffmsDownloadQuery = usePostQuery<FfmsSettlementDownloadResponse, Record<string, never>>(
-    ["settlement-ffms-download", ffmsDownloadMid, downloadDate ?? ""],
-    ffmsSettlementDownloadApi(ffmsDownloadMid, downloadDate ?? ""),
-    {},
-    undefined,
-    false
-  );
-
-  const { refetch: refetchPaDownload } = paDownloadQuery;
-  const { refetch: refetchFfmsDownload } = ffmsDownloadQuery;
-
-  useEffect(() => {
-    if (!downloadDate) return;
-    let cancelled = false;
-    const run = async () => {
-      // Separate branches so each refetch keeps its own response type (the
-      // PA endpoint returns { downloadUrl }, FFMS returns { presignedUrl }).
-      let link: string | undefined;
-      if (isMca) {
-        const res = await refetchFfmsDownload();
-        link = res.data?.data?.presignedUrl;
-      } else {
-        const res = await refetchPaDownload();
-        link = res.data?.data?.downloadUrl;
-      }
-      if (cancelled) return;
-      if (link) triggerBrowserDownload(link);
-      // Reset inside the async callback (not the effect body) per CLAUDE.md.
-      setDownloadTarget(null);
-    };
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [downloadDate, isMca, refetchPaDownload, refetchFfmsDownload]);
 
   // Mock-only summary/calendar/detail data — see BACKEND GAP below.
   const summary = isMca ? mcaSettlementSummary : settlementSummary;
@@ -313,43 +282,52 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const isPending = isMca ? ffmsQuery.isPending : paQuery.isPending;
 
   /**
-   * Sample rows, when the endpoint has answered with none.
+   * Rows the ENHANCED view (and the settlement calendar) renders: the mock
+   * dataset outside production, live API rows inside it. Unconditional, not a
+   * fallback — see SHOW_MOCK_SETTLEMENTS above for why the enhanced design
+   * cannot be reviewed against the live contract.
    *
-   * Most dev and UAT accounts have no settlement history, so this page rendered
-   * as an empty table and there was no way to review the states it is supposed
-   * to draw — every status, the non-working-day pushes, the detail page behind a
-   * row. The mock dataset covers all of them (see mock-data.ts).
-   *
-   * Gated on NODE_ENV so it can never reach a merchant: an empty settlement list
-   * in production is a real answer, and filling it with invented settlements
-   * would be worse than showing nothing. It waits for `isPending` to clear, so a
-   * slow response shows a skeleton rather than flashing sample data first.
+   * The mock arrays are module constants, so this hands back the same reference
+   * every render and nothing downstream re-renders on its account.
    */
-  const rows = useMemo(() => {
-    if (apiRows.length > 0 || isPending) return apiRows;
-    return SHOW_MOCK_SETTLEMENTS ? mockSettlementRowsFor(isMca) : apiRows;
-  }, [apiRows, isPending, isMca]);
+  const enhancedRows = useMemo(
+    () => (SHOW_MOCK_SETTLEMENTS ? mockSettlementRowsFor(isMca) : apiRows),
+    [isMca, apiRows]
+  );
 
-  // The old settlement tables only supported a date filter server-side; text
-  // search over the visible UTR / settlement date stays client-side.
-  const filteredSettlementRows = useMemo(() => {
-    if (!search) return rows;
-    const q = search.toLowerCase();
-    return rows.filter(
-      (row) => (row.utrNumber ?? "").toLowerCase().includes(q) || row.id.toLowerCase().includes(q)
-    );
-  }, [rows, search]);
+  /** Whether the enhanced view is showing invented settlements right now. Drives
+   *  the loading/error suppression below: a mock-driven table must not sit on a
+   *  skeleton waiting for, or report the failure of, a request it never reads. */
+  const enhancedIsMock = SHOW_MOCK_SETTLEMENTS;
+
+  const filteredApiRows = useMemo(() => filterSettlementRows(apiRows, search), [apiRows, search]);
+  const filteredEnhancedRows = useMemo(
+    () => filterSettlementRows(enhancedRows, search),
+    [enhancedRows, search]
+  );
 
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
 
-  // Schedule from the live calendar, amount still from mock-data (no summary
-  // endpoint exists — see BACKEND GAP below).
-  /** Row-scoped report download, shared by both views: the endpoint is keyed by
-   *  the settlement date, and by the row's own merchant when the summary names
-   *  one (a UCIC-scoped list can span merchants). */
+  /** Row-scoped report download, shared by both views.
+   *
+   *  Keyed off `row.date`, not `row.id`. For a live row the two are the same
+   *  value (the mapper uses the settlement date as the id, for want of a real
+   *  settlement id), but a mock row's id is opaque ("mca_p1q2r3s4") and would
+   *  build a nonsense path segment. `date` is what the endpoint actually wants
+   *  in both cases. The row's own merchant is passed when the summary names one,
+   *  since a UCIC-scoped list can span merchants. */
   const downloadRowReport = (row: SettlementRow) =>
-    setDownloadTarget({ date: row.id, merchantId: row.merchantId ?? scopeId });
+    downloadSettlementReport(row.date, row.merchantId);
+
+  /** The "Previous settled" card's own download, through the same endpoint.
+   *  The date comes from the overview's `previousSettlement.settlementDate`,
+   *  passed verbatim exactly as pg-dashboard passes a row's own
+   *  `settlementDate` into the path (reports/columns.tsx). No merchant of its
+   *  own — the overview is a roll-up at the page's scope, which the hook
+   *  defaults to. */
+  const downloadPreviousSettledReport = () =>
+    downloadSettlementReport(prevSettlement?.settlementDate ?? "");
 
   const upcoming = calendar.upcomingSchedule;
   const showHolidayBanner =
@@ -358,13 +336,15 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   return (
     <MidGuard productType={activeProduct}>
       <div className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden overflow-y-visible">
-        {/* BACKEND GAP: the non-working-day banner, the summary StatCards
-         * (trend %, previous/upcoming settlement breakdown, held funds) and the
-         * per-settlement detail page below are all driven by mock-data.ts. The
-         * old settlement API only returns the flat table (date / amount / txn
-         * count / UTR) + a download URL, there is no summary or detail endpoint
-         * to back these. They stay on mock, clearly flagged, until a backend
-         * contract exists — the table and downloads are the real, wired parts. */}
+        {/* BACKEND GAP, narrowed: the table, the per-date report downloads, the
+         * holiday calendar behind this banner, and the three summary cards
+         * (total settled + trend + sparkline, previous settled, upcoming
+         * settlement) are all live now. What is still mock-backed is the
+         * per-settlement detail page below, the settlement-cycle dialog's
+         * cycle/bank-account block, the held-funds card, and the previous
+         * settlement's UTR and gross/tax/fee breakup — those last are passed
+         * nowhere rather than rendered from mock-data.ts, so nothing invented
+         * reaches the screen. They stay flagged until a contract exists. */}
         {showHolidayBanner && (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
             <Icon name="alert-triangle" size={13} className="shrink-0" />
@@ -393,7 +373,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
               /> */}
               <span data-guide="mca-settlement-calendar" className="inline-flex">
                 <SettlementCalendarButton
-                  rows={rows}
+                  rows={enhancedRows}
                   todayKey={calendar.today}
                   nextSettlementDate={calendar.nextSettlement.date}
                   nextSettlementReason={calendar.nextSettlement.reason}
@@ -414,7 +394,10 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
         <div className="flex items-start gap-4">
           <div className="min-w-0 flex-1 space-y-4">
-            {/* BACKEND GAP: mock summary — see the banner note above. */}
+            {/* Live: overview (total settled, trend, sparkline, previous
+                settlement) and upcoming settlement. The previous settlement's
+                UTR and gross/tax/fee breakup have no endpoint and stay hidden —
+                see the commented props below and the note above. */}
             <div data-guide="mca-settlement-analytics">
               <SettlementStatCards
                 totalSettledLabel={totalSettledLabel}
@@ -427,10 +410,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 previousSettledDateLabel={previousSettledDateLabel}
                 previousSettledTransactionCount={previousSettledTransactionCount}
                 onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
-                // BACKEND GAP: the "previous settled" summary card is mock data
-                // (no summary endpoint), so there is no real settlement date to
-                // download here. Row-level downloads in the table below are wired.
-                onDownloadPreviousSettled={() => {}}
+                onDownloadPreviousSettled={downloadPreviousSettledReport}
+                canDownloadPreviousSettled={!!prevSettlement?.settlementDate}
                 // MOCK — hidden for now (no endpoint): the previous-settlement time,
                 // UTR and gross/tax/fee breakup. Re-enable by un-commenting these
                 // and the matching blocks in SettlementStatCards.
@@ -468,7 +449,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
             {isClassic ? (
               <ClassicSettlementTable
-                rows={filteredSettlementRows}
+                rows={filteredApiRows}
                 isLoading={isPending}
                 isError={isError}
                 onRefresh={() => void refetch()}
@@ -515,7 +496,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                   </div>
                 </div>
 
-                {isError ? (
+                {isError && !enhancedIsMock ? (
                   <PlaceholderState
                     variant="error"
                     title="Couldn't load settlements"
@@ -527,7 +508,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                       </Button>
                     }
                   />
-                ) : !isPending && filteredSettlementRows.length === 0 ? (
+                ) : (enhancedIsMock || !isPending) && filteredEnhancedRows.length === 0 ? (
                   <PlaceholderState
                     variant="no-settlements"
                     title="No settlements yet"
@@ -537,8 +518,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 ) : (
                   <DataTable
                     columns={buildSettlementColumns({ columnOrder, hiddenColumns })}
-                    data={filteredSettlementRows}
-                    isLoading={isPending}
+                    data={filteredEnhancedRows}
+                    isLoading={!enhancedIsMock && isPending}
                     skeletonRows={8}
                     emptyTitle="No settlements yet"
                     emptyDescription="Settlement reports will appear here once transactions are processed"
@@ -581,9 +562,13 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
             <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
               <SettlementCycleInfoPanel
                 onClose={() => setShowCycleInfo(false)}
-                previousSettledDateLabel={summary.previousSettled.dateLabel}
-                previousSettledTimeLabel={summary.previousSettled.timeLabel}
-                previousSettledTransactionCount={summary.previousSettled.transactionCount}
+                // Same two live values the "Previous settled" card this panel
+                // explains is showing, so the two can no longer disagree. The
+                // time of day has no source (the overview returns a date, not a
+                // timestamp) and is deliberately not passed — see the prop's
+                // doc comment.
+                previousSettledDateLabel={previousSettledDateLabel}
+                previousSettledTransactionCount={previousSettledTransactionCount}
                 upcomingSchedule={{
                   affectedByNonWorkingDay: upcoming.affectedByNonWorkingDay,
                   paymentReceivedDate: calendar.today,

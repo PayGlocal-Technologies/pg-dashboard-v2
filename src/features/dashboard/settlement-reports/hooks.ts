@@ -1,11 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { useGet, useMultipleGet } from "@/lib/api/hooks";
+import { toast } from "sonner";
+import { useGet, useMultipleGet, usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
+import { useScopeId } from "@/lib/hooks/useScopeId";
+import type { ProductType } from "@/lib/hooks/useResolvedMids";
+import { triggerBrowserDownload } from "@/features/dashboard/settlement-reports/helper";
 import {
   bankHolidayCalendarApi,
+  ffmsSettlementDownloadApi,
+  paSettlementDownloadApi,
   settlementOverviewApi,
   settlementUpcomingApi,
 } from "@/features/dashboard/settlement-reports/services";
@@ -20,7 +26,9 @@ import {
   type SettlementSchedule,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
 import type {
+  FfmsSettlementDownloadResponse,
   HolidayCalendarResponse,
+  PaSettlementDownloadResponse,
   SettlementOverviewData,
   SettlementOverviewResponse,
   SettlementUpcomingData,
@@ -258,4 +266,97 @@ export function useSettlementUpcoming(merchantId: string): {
   );
 
   return { upcoming: data?.data, isLoading: !!merchantId && isPending, isError };
+}
+
+
+/**
+ * The settlement report download, for every surface that offers one.
+ *
+ * There are four: a row in the enhanced table, a row in the classic table, the
+ * "Previous settled" summary card, and the Download Report button on a
+ * settlement's detail page. All four ask the same question — give me this one
+ * settlement's report — so they all come through here rather than each building
+ * its own query.
+ *
+ * Shape is a disabled query plus an explicit trigger, mirroring pg-dashboard's
+ * reportDownloadDate + refetch pattern (reports/components/FfmsReportTable.tsx).
+ * The endpoint is keyed by settlement DATE, not by settlement id: the summary
+ * contract has no id, so the date is all there is to address a report with.
+ *
+ * `merchantId` is per call rather than per hook because a UCIC-scoped summary
+ * can return rows from several merchants, and each row's report has to be asked
+ * for against its own. Callers pass the row's merchant where the response names
+ * one, and fall back to the page's scope where it does not.
+ */
+export function useSettlementReportDownload(productType: ProductType): {
+  /** Fire a download. `date` is the settlement date, `merchantId` the merchant
+   *  that settlement belongs to (defaults to the page's resolved scope). */
+  download: (date: string, merchantId?: string) => void;
+  /** True between the click and the presigned URL resolving. */
+  isDownloading: boolean;
+} {
+  const isMca = productType === "PACB";
+  const { scopeId } = useScopeId(productType);
+  const [target, setTarget] = useState<{ date: string; merchantId: string } | null>(null);
+  const date = target?.date ?? null;
+  const mid = target?.merchantId ?? "";
+
+  const paDownload = useGet<PaSettlementDownloadResponse>(
+    ["settlement-pa-download", mid, date ?? ""],
+    paSettlementDownloadApi(mid, date ?? ""),
+    { enabled: false }
+  );
+  const ffmsDownload = usePostQuery<FfmsSettlementDownloadResponse, Record<string, never>>(
+    ["settlement-ffms-download", mid, date ?? ""],
+    ffmsSettlementDownloadApi(mid, date ?? ""),
+    {},
+    undefined,
+    false
+  );
+
+  const { refetch: refetchPa } = paDownload;
+  const { refetch: refetchFfms } = ffmsDownload;
+
+  useEffect(() => {
+    if (!date) return;
+    let cancelled = false;
+    const run = async () => {
+      // Separate branches so each refetch keeps its own response type: the PA
+      // endpoint returns { downloadUrl }, FFMS returns { presignedUrl }.
+      let link: string | undefined;
+      let message: string | undefined;
+      if (isMca) {
+        const res = await refetchFfms();
+        link = res.data?.data?.presignedUrl;
+        message = res.data?.message;
+      } else {
+        const res = await refetchPa();
+        link = res.data?.data?.downloadUrl;
+        message = res.data?.message;
+      }
+      if (cancelled) return;
+      // Both endpoints answer one of two ways: a ready presigned URL, or no URL
+      // and a `message` explaining why (still generating, or it will be
+      // emailed). pg-dashboard's handleDownloadReport surfaces that message as a
+      // success notification — without it a click that produced no file looks
+      // like a dead button.
+      if (link) triggerBrowserDownload(link);
+      else if (message) toast.success(message);
+      else toast.error("Could not generate the settlement report. Please try again.");
+      // Reset inside the async callback, not the effect body, per CLAUDE.md.
+      setTarget(null);
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [date, isMca, refetchPa, refetchFfms]);
+
+  return {
+    download: (nextDate: string, merchantId?: string) => {
+      if (!nextDate) return;
+      setTarget({ date: nextDate, merchantId: merchantId || scopeId });
+    },
+    isDownloading: !!date,
+  };
 }

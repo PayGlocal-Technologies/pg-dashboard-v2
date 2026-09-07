@@ -17,7 +17,11 @@ interface UpcomingScheduleInfo {
 interface SettlementCycleInfoPanelProps {
   onClose: () => void;
   previousSettledDateLabel: string;
-  previousSettledTimeLabel: string;
+  /** Time of day the payout landed. Optional: the settlement overview endpoint
+   * returns a settlement DATE and no clock time, so the sentence below drops
+   * the "at <time>" clause rather than inventing one. Same treatment the
+   * "Previous settled" card gives its own time label. */
+  previousSettledTimeLabel?: string;
   previousSettledTransactionCount: number;
   /** Only rendered when affectedByNonWorkingDay is true, this panel never
    * shows a permanent weekend/holiday warning, see NonWorkingDayExplanation. */
@@ -59,7 +63,8 @@ export function SettlementCycleInfoPanel({
         <p className="text-xs leading-relaxed text-muted-foreground">
           The net payout from your most recently completed settlement cycle, gross value across{" "}
           {previousSettledTransactionCount} transactions, minus tax and platform fees. It was
-          credited to your bank account on {previousSettledDateLabel} at {previousSettledTimeLabel}.
+          credited to your bank account on {previousSettledDateLabel}
+          {previousSettledTimeLabel ? ` at ${previousSettledTimeLabel}` : ""}.
         </p>
       </div>
 

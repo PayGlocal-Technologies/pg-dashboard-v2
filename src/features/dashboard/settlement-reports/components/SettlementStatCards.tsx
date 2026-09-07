@@ -96,6 +96,13 @@ interface SettlementStatCardsProps {
   previousSettledFeeLabel?: string;
   onShowPreviousSettledInfo: () => void;
   onDownloadPreviousSettled: () => void;
+  /** Whether there is a settlement to download a report for. False when the
+   * overview returned no previous settlement (a merchant who has never
+   * settled), in which case there is no settlement date to key the download
+   * endpoint on and the affordance is disabled rather than left clickable with
+   * nothing behind it. Defaults to true so the card is unchanged wherever the
+   * caller has not resolved this yet. */
+  canDownloadPreviousSettled?: boolean;
   upcomingSettlementLabel: string;
   upcomingSettlementTimeLabel: string;
   /** MCA only, count of transactions still waiting on an invoice upload
@@ -121,6 +128,7 @@ export function SettlementStatCards({
   previousSettledFeeLabel,
   onShowPreviousSettledInfo,
   onDownloadPreviousSettled,
+  canDownloadPreviousSettled = true,
   upcomingSettlementLabel,
   upcomingSettlementTimeLabel,
   pendingInvoiceCount,
@@ -148,6 +156,7 @@ export function SettlementStatCards({
               type="button"
               variant="ghost"
               onClick={onDownloadPreviousSettled}
+              disabled={!canDownloadPreviousSettled}
               aria-label="Download settlement report"
               className="h-7 w-7 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground hover:text-foreground"
             >
