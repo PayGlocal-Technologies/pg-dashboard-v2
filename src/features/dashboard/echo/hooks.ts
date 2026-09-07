@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect } from "react";
 import { usePost } from "@/lib/api/hooks";
-import { ECHO_ERROR_MESSAGE, ECHO_OPENING_REQUEST } from "@/features/dashboard/echo/constants";
+import {
+  ECHO_ERROR_MESSAGE,
+  ECHO_OPENING_REQUEST,
+  ECHO_RESTART_REQUEST,
+} from "@/features/dashboard/echo/constants";
 import { isRenderableChunk } from "@/features/dashboard/echo/helper";
 import { echoAppApi } from "@/features/dashboard/echo/services";
 import type { EchoAppResponse, EchoRequest } from "@/features/dashboard/echo/types";
@@ -102,12 +106,22 @@ export function useEchoSession() {
     [dispatch]
   );
 
-  /** Starts over: clears the transcript and re-sends the opening request. */
+  /**
+   * Starts over. `BTN_RESTART_CHAT`, not the opening `BTN_MAIN_MENU`: the
+   * guide is explicit that going back to the main menu keeps the same server
+   * session and everything it has accumulated, so only this id gives a real
+   * clean slate. It answers with the full welcome screen, which is why the
+   * transcript is emptied first rather than appended to.
+   */
   const restart = useCallback(() => {
-    if (useEcho.getState().status !== "idle") return;
-    useEcho.getState().clear();
-    start();
-  }, [start]);
+    const store = useEcho.getState();
+    if (store.status !== "idle") return;
+    store.clear();
+    // Claimed here so the auto-start effect cannot race a second opening turn
+    // against this one on the now-cleared session.
+    useEcho.getState().claimSessionStart();
+    dispatch(ECHO_RESTART_REQUEST, { opening: true });
+  }, [dispatch]);
 
   return {
     entries,
