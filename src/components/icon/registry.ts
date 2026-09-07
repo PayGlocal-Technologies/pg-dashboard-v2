@@ -70,6 +70,7 @@ import {
   Meh,
   Menu,
   MessageCircle,
+  Mic,
   Minimize2,
   Monitor,
   Moon,
@@ -78,6 +79,7 @@ import {
   Paperclip,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRight,
   Pencil,
   Percent,
   Phone,
@@ -126,6 +128,7 @@ import {
 } from "lucide-react";
 import { AmazonLogo } from "@/components/icon/AmazonLogo";
 import { DeelLogo } from "@/components/icon/DeelLogo";
+import { EchoMark } from "@/components/icon/EchoMark";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
 import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
 import { LinkGreenFilled } from "@/components/icon/LinkGreenFilled";
@@ -210,6 +213,7 @@ export const ICONS = {
   meh: Meh,
   menu: Menu,
   "message-circle": MessageCircle,
+  mic: Mic,
   monitor: Monitor,
   moon: Moon,
   "more-horizontal": MoreHorizontal,
@@ -217,6 +221,7 @@ export const ICONS = {
   package: Package,
   paperclip: Paperclip,
   "panel-left-close": PanelLeftClose,
+  "panel-right": PanelRight,
   "panel-left-open": PanelLeftOpen,
   palette: Palette,
   pencil: Pencil,
@@ -269,6 +274,7 @@ export const ICONS = {
   // stay `<Icon name="…" />` and never reference an asset path.
   "amazon-logo": AmazonLogo as unknown as LucideIcon,
   "deel-logo": DeelLogo as unknown as LucideIcon,
+  "echo-mark": EchoMark as unknown as LucideIcon,
   "freelancer-logo": FreelancerLogo as unknown as LucideIcon,
   "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
   "toptal-logo": ToptalLogo as unknown as LucideIcon,

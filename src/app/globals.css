@@ -388,3 +388,123 @@ textarea:focus-visible {
     animation: field-flash 1.8s step-end;
   }
 }
+
+/* ─── Ask Echo (header pill) ──────────────────────────────────────────────
+   A 1px rotating gradient ring around the header's "Ask Echo" button — the
+   one thing in the header that isn't a plain utility icon. Masked ::before +
+   a large circle (not the wrapper's own rounded-rect) rotated behind it: a
+   circle rotated is still a circle, so no corner ever pokes past the ring,
+   and `overflow: hidden` on the wrapper clips it to the button's own shape —
+   which is what makes the gradient sweep ALONG the border instead of just
+   spinning a circle behind a static ring. */
+@property --echo-ask-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+.echo-ask-ring-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  padding: 1px;
+  isolation: isolate;
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.echo-ask-ring-wrap::before {
+  content: "";
+  position: absolute;
+  /* 200px covers the button diagonally with room to spare, whatever its
+     text width ends up being. */
+  width: 200px;
+  height: 200px;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    #082f73 0deg,
+    var(--primary) 55deg,
+    #1d4ed8 95deg,
+    #38bdf8 118deg,
+    #e0f2fe 128deg,
+    #38bdf8 138deg,
+    var(--primary) 175deg,
+    #172554 215deg,
+    var(--primary) 255deg,
+    #7dd3fc 278deg,
+    #f8fafc 288deg,
+    #7dd3fc 298deg,
+    #082f73 360deg
+  );
+  animation: echo-ask-ring-rotate 4s linear infinite;
+}
+
+.dark .echo-ask-ring-wrap::before {
+  background: conic-gradient(
+    from 0deg,
+    #0c1e3d 0deg,
+    var(--primary) 50deg,
+    #1e40af 90deg,
+    #38bdf8 115deg,
+    #bae6fd 125deg,
+    #38bdf8 135deg,
+    var(--primary) 170deg,
+    #020617 210deg,
+    var(--primary) 248deg,
+    #22d3ee 272deg,
+    #e0f2fe 282deg,
+    #22d3ee 292deg,
+    #0c1e3d 360deg
+  );
+}
+
+@keyframes echo-ask-ring-rotate {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .echo-ask-ring-wrap::before {
+    animation: none;
+  }
+}
+
+/* ─── Echo status ellipsis ────────────────────────────────────────────────
+   Three dots blinking in sequence, next to "Working on it" / "Thinking"
+   style status text. */
+@keyframes echo-ellipsis-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+.echo-status-ellipsis-dot {
+  animation: echo-ellipsis-blink 1.4s ease-in-out infinite;
+}
+.echo-status-ellipsis-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.echo-status-ellipsis-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .echo-status-ellipsis-dot {
+    animation: none;
+    opacity: 1;
+  }
+}

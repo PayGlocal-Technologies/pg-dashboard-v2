@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { ViewPortal } from "@/components/layout/ViewPortal";
 import { MerchantSelector, useHasMultipleMids } from "@/components/layout/MerchantSelector";
 import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
+import { AskEchoSidebarRow } from "@/components/layout/AskEchoAction";
 import {
   homeNavigation,
   regularNavigation,
@@ -163,6 +164,23 @@ function SidebarBody({
   return (
     <>
       <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+        {/* "Assistant" — a section of its own rather than folded into
+            "Overview", so Echo reads as a distinct kind of entry (an AI
+            action, not a page to navigate to) the moment the sidebar loads,
+            matching the reference this is built from. Kept outside the
+            permission-filtered `navigation` groups below since it isn't a
+            real nav destination yet — see AskEchoAction. */}
+        <div className="mb-4">
+          {!collapsed ? (
+            <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground px-2 mb-1.5">
+              Assistant
+            </p>
+          ) : (
+            <div className="h-px bg-sidebar-border my-2 mx-1" />
+          )}
+          <AskEchoSidebarRow collapsed={collapsed} />
+        </div>
+
         {navigation.map((group) => (
           <div key={group.label} className="mb-4">
             {!collapsed ? (

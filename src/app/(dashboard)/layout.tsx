@@ -8,6 +8,8 @@ import { Header } from "@/components/layout/Header";
 import { ContentAreaProvider } from "@/components/layout/ContentAreaContext";
 import { Icon } from "@/components/icon";
 import { FeedbackSheet } from "@/features/dashboard/feedback/FeedbackSheet";
+import { McaV2AnnouncementModal } from "@/components/layout/McaV2AnnouncementModal";
+import { EchoPanel } from "@/features/dashboard/echo/components/EchoPanel";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { isError } = useFetchCommonData();
@@ -35,10 +37,22 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
 
+      {/* Echo's side panel — a flex sibling of the main column, sliding open
+          rather than overlaying, so it shares the row with Sidebar/main
+          instead of covering either. See EchoPanel for why it (and its full
+          page at /echo) share one conversation via a store. */}
+      <EchoPanel />
+
       {/* App-wide, not tied to any page: the survey asks about PayGlocal as a
           whole. Whether it actually appears is the server's call — see the
           eligibility check inside. */}
       <FeedbackSheet />
+
+      {/* One-time "MCA has a new look" announcement, gated on actually
+          having MCA access — see the component for why this is a plain
+          localStorage flag rather than something tied to the login action
+          itself. */}
+      <McaV2AnnouncementModal />
     </div>
   );
 }

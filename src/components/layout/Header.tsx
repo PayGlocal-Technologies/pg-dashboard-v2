@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
+import { AskEchoHeaderButton } from "@/components/layout/AskEchoAction";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -187,6 +188,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           {/* Help — support contacts and hours, see HeaderHelpMenu. */}
           <HeaderHelpMenu />
+
+          {/* Ask Echo — placeholder entry point, see AskEchoAction. */}
+          <AskEchoHeaderButton />
 
           {/* Create button */}
           {SHOW_CREATE_BUTTON && (
