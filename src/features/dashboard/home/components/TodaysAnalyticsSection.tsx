@@ -16,6 +16,7 @@ import {
 import { Button, Card, ChartSkeleton, Tabs, TabsList, TabsTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { formatCurrencyShort } from "@/lib/utils/format";
 import { todaysAnalytics } from "@/features/dashboard/home/mock-data";
 
 const VOLUME_PAY_MODE_LABELS = ["UPI", "Cards", "Net banking", "Wallets"] as const;
@@ -319,12 +320,11 @@ const CHART_PRIMARY = "#0061e3";
 const CHART_PRIMARY_SOFT = "#38bdf8";
 const CHART_YESTERDAY = "#94a3b8";
 
+/** Indian short form (₹9.95L / ₹6.91Cr), the same scale every other dashboard
+ *  figure uses. Was full grouped rupees despite the name, which let a big KPI
+ *  run long and read differently from the compact cards beside it. */
 function formatInrCompact(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+  return formatCurrencyShort(n, "INR");
 }
 
 export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {

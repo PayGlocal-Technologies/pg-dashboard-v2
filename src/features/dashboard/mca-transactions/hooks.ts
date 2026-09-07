@@ -13,6 +13,7 @@ import {
   mcaOverviewByUcicApi,
   mcaSavedAmountApi,
   mcaSettledByAccountApi,
+  mcaSettledCurrencyTrendApi,
   mcaTxnDocumentPresignApi,
   merchantProfileApi,
   merchantPurposeCodesApi,
@@ -23,6 +24,8 @@ import {
   type PurposeCodeOption,
 } from "@/lib/purposeCodes";
 import { useScopeId } from "@/lib/hooks/useScopeId";
+import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useApp } from "@/stores/useApp";
 import type {
   CurrencySplitData,
   CurrencySplitResponse,
@@ -41,6 +44,8 @@ import type {
   SavedAmountResponse,
   SettledByAccountData,
   SettledByAccountResponse,
+  SettledCurrencyTrendResponse,
+  SettledCurrencyTrendRow,
   SuggestedPurposeCodesResponse,
 } from "@/features/dashboard/mca-transactions/types";
 
@@ -236,6 +241,28 @@ export function useSettledByAccount(timeframe: string): {
   );
 
   return { settled: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Per-account (currency) settled totals + monthly series, scoped like
+ * useSettledByAccount. Backs the Multi-Currency "Settled amount" region
+ * breakdown. Each row carries a native-currency total and an INR total; ₹ views
+ * read the INR figure since a mix of currencies only sums in one.
+ */
+export function useSettledCurrencyTrend(): {
+  currencies: SettledCurrencyTrendRow[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<SettledCurrencyTrendResponse>(
+    ["mca-settled-currency-trend", merchantId],
+    mcaSettledCurrencyTrendApi(merchantId),
+    { enabled: isReady }
+  );
+
+  return { currencies: data?.data?.currencies, isLoading: isReady && isPending, isError };
 }
 
 /**

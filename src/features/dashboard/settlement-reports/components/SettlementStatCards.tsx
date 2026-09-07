@@ -12,7 +12,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { RollingNumber } from "@/components/common/RollingNumber";
+import { CompactAmount } from "@/components/common/CompactAmount";
+import { formatCurrency } from "@/lib/utils/format";
 import { TotalSettledCard } from "@/features/dashboard/settlement-reports/components/TotalSettledCard";
 import type { TotalSettledTimeframe } from "@/features/dashboard/settlement-reports/mock-data";
 import type { SparklinePoint } from "@/features/dashboard/settlement-reports/types";
@@ -78,13 +79,13 @@ function UtrCopyButton({ utrNumber }: UtrCopyButtonProps) {
 }
 
 interface SettlementStatCardsProps {
-  totalSettledLabel: string;
+  totalSettled: number;
   totalSettledTrendPct: number;
   totalSettledComparisonLabel?: string;
   totalSettledTimeframe: TotalSettledTimeframe;
   onTotalSettledTimeframeChange: (timeframe: TotalSettledTimeframe) => void;
   totalSettledChartData: SparklinePoint[];
-  previousSettledLabel: string;
+  previousSettledAmount: number;
   previousSettledDateLabel: string;
   previousSettledTransactionCount: number;
   // MOCK (hidden for now — no endpoint): rendered only when provided. index.tsx
@@ -112,13 +113,13 @@ interface SettlementStatCardsProps {
 }
 
 export function SettlementStatCards({
-  totalSettledLabel,
+  totalSettled,
   totalSettledTrendPct,
   totalSettledComparisonLabel,
   totalSettledTimeframe,
   onTotalSettledTimeframeChange,
   totalSettledChartData,
-  previousSettledLabel,
+  previousSettledAmount,
   previousSettledDateLabel,
   previousSettledTimeLabel,
   previousSettledTransactionCount,
@@ -138,7 +139,7 @@ export function SettlementStatCards({
     <div className="grid gap-3 lg:grid-cols-12 lg:items-stretch">
       <TotalSettledCard
         className="lg:col-span-8"
-        totalSettledLabel={totalSettledLabel}
+        totalSettled={totalSettled}
         totalSettledTrendPct={totalSettledTrendPct}
         comparisonLabel={totalSettledComparisonLabel}
         timeframe={totalSettledTimeframe}
@@ -197,7 +198,7 @@ export function SettlementStatCards({
                     <div className="border-t border-border pt-1.5">
                       <SettlementBreakupRow
                         label="Net amount"
-                        value={previousSettledLabel}
+                        value={formatCurrency(previousSettledAmount, "INR")}
                         emphasis
                       />
                     </div>
@@ -207,8 +208,9 @@ export function SettlementStatCards({
             )}
           </div>
 
-          <RollingNumber
-            value={previousSettledLabel}
+          <CompactAmount
+            amount={previousSettledAmount}
+            currency="INR"
             className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
           <p className="text-xs text-muted-foreground">
@@ -225,10 +227,17 @@ export function SettlementStatCards({
             <Icon name="arrow-up-right" size={14} aria-hidden />
           </span>
           <p className="text-[13px] font-medium text-primary">Upcoming settlement</p>
-          <RollingNumber
-            value={upcomingSettlementLabel}
-            className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-          />
+          {upcomingSettlementAmount !== null ? (
+            <CompactAmount
+              amount={upcomingSettlementAmount}
+              currency="INR"
+              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+            />
+          ) : (
+            <span className="block text-2xl font-bold tracking-tight text-foreground tabular-nums">
+              —
+            </span>
+          )}
           <p className="text-xs text-muted-foreground">{upcomingSettlementTimeLabel}</p>
 
           {!!pendingInvoiceCount && pendingInvoiceCount > 0 && (

@@ -3,7 +3,7 @@
 import { Card, CardContent, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/format";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import { useSavedAmount } from "@/features/dashboard/mca-transactions/hooks";
 import type { TimeRange } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
 
@@ -60,9 +60,11 @@ export function SavedAmountCard({
           {isLoading ? (
             <Shimmer className="mt-1 h-9 w-32" />
           ) : (
-            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-              {formatCurrency(amount, currency, "en-IN")}
-            </p>
+            <CompactAmount
+              amount={amount}
+              currency={currency}
+              className="mt-1 block text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+            />
           )}
         </div>
       </CardContent>

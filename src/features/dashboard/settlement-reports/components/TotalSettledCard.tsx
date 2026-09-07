@@ -13,15 +13,19 @@ import { Button, Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   totalSettledTimeframes,
   type TotalSettledTimeframe,
 } from "@/features/dashboard/settlement-reports/mock-data";
 import type { SparklinePoint } from "@/features/dashboard/settlement-reports/types";
 
+/** Y-axis tick label. Shared short form so ticks read in the same ₹K/₹L/₹Cr
+ *  units as the headline (an earlier lakh-only version showed "6814.6L"). */
 function formatLakhAxis(value: number): string {
-  return value === 0 ? "₹0" : `₹${(value / 100_000).toFixed(1)}L`;
+  return value === 0 ? "₹0" : formatCurrencyShort(value, "INR");
 }
 
 /** Evenly-spaced 0..max ticks (4 divisions), max rounded up to the nearest ₹10k. */
@@ -53,7 +57,9 @@ function TotalSettledTooltip({
 }
 
 interface TotalSettledCardProps {
-  totalSettledLabel: string;
+  /** Raw settled total; the card compacts it (₹9.95L / ₹6.91Cr) and shows the
+   *  exact figure on hover via CompactAmount. */
+  totalSettled: number;
   totalSettledTrendPct: number;
   /** Trend comparison caption from the overview API (e.g. "vs last week").
    *  Falls back to "vs last" for the mock/PA path. */
@@ -68,7 +74,7 @@ interface TotalSettledCardProps {
 }
 
 export function TotalSettledCard({
-  totalSettledLabel,
+  totalSettled,
   totalSettledTrendPct,
   comparisonLabel,
   timeframe,
@@ -88,8 +94,9 @@ export function TotalSettledCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-foreground">Total settled</p>
-          <RollingNumber
-            value={totalSettledLabel}
+          <CompactAmount
+            amount={totalSettled}
+            currency="INR"
             className="mt-2 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
           {/* No trend beside a zero total — "+0%/-100% vs last week" against

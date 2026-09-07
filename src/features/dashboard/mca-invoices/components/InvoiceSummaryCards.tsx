@@ -99,10 +99,9 @@ export function InvoiceSummaryCards({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Subheading, then the time tabs directly beneath it (left-aligned)
-          rather than across the row from it, so the window reads as scoping the
-          Summary below. */}
-      <div className="flex flex-col gap-2">
+      {/* Subheading on the left with the time tabs pushed to the row's right
+          edge (justify-between). gap-y-2 keeps them readable if they wrap. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
           Summary
         </h2>
