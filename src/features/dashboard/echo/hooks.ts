@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { usePost } from "@/lib/api/hooks";
-import { ECHO_ERROR_MESSAGE, ECHO_GREETING } from "@/features/dashboard/echo/constants";
+import { ECHO_ERROR_MESSAGE, ECHO_OPENING_REQUEST } from "@/features/dashboard/echo/constants";
 import { isRenderableChunk } from "@/features/dashboard/echo/helper";
 import { echoAppApi } from "@/features/dashboard/echo/services";
 import type { EchoAppResponse, EchoRequest } from "@/features/dashboard/echo/types";
@@ -59,10 +59,10 @@ export function useEchoSession() {
     [mutate]
   );
 
-  /** Opens the session. No-ops if the other surface already did. */
+  /** Opens the session. No-ops if it has already been opened. */
   const start = useCallback(() => {
     if (!useEcho.getState().claimSessionStart()) return;
-    dispatch({ userInput: ECHO_GREETING, inputType: "text" }, { opening: true });
+    dispatch(ECHO_OPENING_REQUEST, { opening: true });
   }, [dispatch]);
 
   const sendText = useCallback(
@@ -102,7 +102,7 @@ export function useEchoSession() {
     [dispatch]
   );
 
-  /** Starts over. The server treats a fresh greeting as a new session. */
+  /** Starts over: clears the transcript and re-sends the opening request. */
   const restart = useCallback(() => {
     if (useEcho.getState().status !== "idle") return;
     useEcho.getState().clear();

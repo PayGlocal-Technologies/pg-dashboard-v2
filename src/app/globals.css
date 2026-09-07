@@ -429,9 +429,12 @@ textarea:focus-visible {
   animation-delay: 0.3s;
 }
 
+/* Display is left to the utility class on the element: the sidebar rail wants
+   this as a w-fit box and the expanded rail as a full-width one, and this rule
+   sits after Tailwind's utilities in the cascade, so setting it here would win
+   over both. */
 .echo-ask-ring {
   position: relative;
-  display: inline-flex;
   padding: 1px;
   background: linear-gradient(120deg, #bfdbfe, #3b82f6, #0061e3, #bfdbfe);
   background-size: 300% 100%;

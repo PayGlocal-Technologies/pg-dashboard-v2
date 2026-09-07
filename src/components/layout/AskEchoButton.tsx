@@ -6,8 +6,20 @@ import { Icon } from "@/components/icon";
 import useNewPermissions from "@/hooks/useNewPermissions";
 import { cn } from "@/lib/utils";
 
+type Props = {
+  /** Sidebar rail mode: icon only, no label. */
+  collapsed?: boolean;
+  /** Closes the mobile drawer the sidebar renders into. */
+  onNavigate?: () => void;
+  className?: string;
+};
+
 /**
- * Header entry point: the only way into Echo, and it goes straight to /echo.
+ * Sidebar entry point: the only way into Echo, and it goes straight to /echo.
+ *
+ * Sits above the nav groups rather than inside one, and keeps its gradient
+ * ring, because Echo is a way into everything below it rather than one more
+ * destination in the list.
  *
  * Gated on `getEchoActiveSession`, the same permission pg-dashboard uses to
  * decide who gets Echo at all (see its whatsapp-banner and payglocal-go
@@ -15,31 +27,47 @@ import { cn } from "@/lib/utils";
  * button does not appear rather than leading to a page that cannot work.
  *
  * A Button with router.push rather than a Link, because flux's Button has no
- * `asChild` and the header's own Create menu already navigates this way.
+ * `asChild`.
  */
-export function AskEchoButton({ className }: { className?: string }) {
+export function AskEchoButton({ collapsed = false, onNavigate, className }: Props) {
   const checkPermissions = useNewPermissions();
   const pathname = usePathname();
   const router = useRouter();
 
   if (!checkPermissions(["getEchoActiveSession"])) return null;
-  // Nothing to offer while the merchant is already looking at it.
-  if (pathname === "/echo") return null;
+
+  const isActive = pathname === "/echo";
 
   return (
-    <span className={cn("echo-ask-ring rounded-lg", className)}>
+    <span
+      className={cn(
+        "echo-ask-ring block rounded-[9px]",
+        collapsed ? "w-fit" : "w-full",
+        className
+      )}
+    >
       <Button
         type="button"
         variant="ghost"
-        onClick={() => router.push("/echo")}
         aria-label="Ask Echo"
+        aria-current={isActive ? "page" : undefined}
+        title={collapsed ? "Ask Echo" : undefined}
+        onClick={() => {
+          onNavigate?.();
+          if (!isActive) router.push("/echo");
+        }}
+        leftIcon={<Icon name="echo-mark" className="shrink-0 text-[18px]" />}
         className={cn(
-          "relative z-[1] h-9 gap-2 rounded-[7px] bg-muted px-2.5 text-[13px] font-medium",
-          "text-foreground shadow-sm hover:bg-accent hover:text-accent-foreground sm:px-3"
+          "relative z-[1] h-9 min-h-0 gap-2.5 rounded-lg bg-card text-[14px] font-medium",
+          "text-foreground shadow-sm hover:bg-muted",
+          collapsed ? "w-9 justify-center px-0" : "w-full justify-start px-2.5",
+          // The ring already makes this the loudest thing in the rail, so the
+          // active state is just the label going primary rather than the
+          // card/border treatment the nav rows use.
+          isActive && "text-primary"
         )}
-        leftIcon={<Icon name="echo-mark" className="text-[18px]" />}
       >
-        <span className="hidden sm:inline">Ask Echo</span>
+        {!collapsed && <span className="flex-1 truncate text-left">Ask Echo</span>}
       </Button>
     </span>
   );

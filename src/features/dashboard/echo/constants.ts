@@ -1,14 +1,20 @@
+import type { EchoRequest } from "@/features/dashboard/echo/types";
+
 /**
- * The opening handshake.
+ * The opening handshake, sent once per session to get the server to the
+ * welcome screen (the image + main-menu list the guide documents on the
+ * `INITIATED` step).
  *
- * The rendering guide documents the welcome screen (image + main-menu list) as
- * what the server returns on the `INITIATED` step, but not how a client gets
- * the session there. The WhatsApp flow it shares an engine with starts by
- * saying "Hi", so this app does the same: one plain-text turn, sent once per
- * session, with no user bubble in the transcript — the merchant did not type
- * it, so showing it would be a lie about what happened.
+ * A `BTN_MAIN_MENU` button reply rather than the WhatsApp flow's plain "Hi":
+ * it asks for the main menu explicitly instead of relying on the server to
+ * read a greeting as "start over". Nothing is appended to the transcript for
+ * it — the merchant did not tap anything, so showing a bubble would be a lie
+ * about what happened.
  */
-export const ECHO_GREETING = "Hi";
+export const ECHO_OPENING_REQUEST: EchoRequest = {
+  userInput: "BTN_MAIN_MENU",
+  inputType: "button_reply",
+};
 
 /**
  * Shown when the call fails or comes back with no messages. Per §7 of the
