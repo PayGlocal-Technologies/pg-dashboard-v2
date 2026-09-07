@@ -5,6 +5,7 @@ import { Badge, Button, Card, CardContent, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import {
   useDocumentPending,
   useDocumentPendingByCurrency,
@@ -98,9 +99,11 @@ export function OutstandingAmountCard({
           {isLoading ? (
             <Shimmer className="mt-1 h-9 w-32" />
           ) : (
-            <p className="mt-1 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-              {formatCurrency(amount, displayCurrency, "en-IN")}
-            </p>
+            <CompactAmount
+              amount={amount}
+              currency={displayCurrency}
+              className="mt-1 block text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+            />
           )}
         </div>
 
