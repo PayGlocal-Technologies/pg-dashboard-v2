@@ -100,3 +100,32 @@ export interface ContactData {
 export interface ContactDataResponse {
   data?: ContactData | null;
 }
+
+// ── Change email ─────────────────────────────────────────────────────────────
+
+/** The wrapper every change-email call uses: the real fields nested under
+ *  `payload`, with `isEnc: false` because this flow sends plain JSON — no JWE,
+ *  unlike the login endpoints. */
+export interface ChangeEmailRequest<TPayload> {
+  isEnc: false;
+  payload: TPayload;
+}
+
+/** The standard envelope all six endpoints answer with. `status` is the
+ *  server's own code as a string ("201"), not the HTTP status. */
+export interface ChangeEmailResponse {
+  gid?: string;
+  status?: string;
+  message?: string;
+  timestamp?: string;
+  reasonCode?: string;
+  data?: unknown;
+}
+
+/** What the dialog needs out of a failed call. The shared error handler rejects
+ *  with the server envelope rather than an AxiosError, so the HTTP status is
+ *  only available when the body carried it. */
+export interface ChangeEmailFailure {
+  message: string;
+  status?: number;
+}

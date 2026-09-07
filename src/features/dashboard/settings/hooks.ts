@@ -2,17 +2,23 @@
 
 import type { UseMutateFunction } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
-import { useGet, usePut } from "@/lib/api/hooks";
+import { useGet, usePost, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import {
   businessDetailsApi,
   contactDetailsApi,
+  initiateEmailChangeApi,
   merchantLogoUploadApi,
   merchantProfileApi,
   purposeCodeOptionsApi,
+  resendNewEmailOtpApi,
+  resendOldEmailOtpApi,
   secureSettlementDetailsApi,
+  sendNewEmailOtpApi,
   settlementDetailsApi,
   updateAccountDetailsApi,
+  verifyNewEmailApi,
+  verifyOldEmailApi,
 } from "@/features/dashboard/settings/services";
 import {
   allPurposeCodeOptions,
@@ -24,6 +30,8 @@ import type {
   BusinessData,
   BusinessDataResponse,
   BusinessUpdatePayload,
+  ChangeEmailRequest,
+  ChangeEmailResponse,
   ContactData,
   ContactDataResponse,
   MerchantBusinessSummary,
@@ -259,4 +267,72 @@ export function useContactDetails(): {
     { enabled: !!onbId }
   );
   return { contact: data?.data ?? null, isLoading: !!onbId && isPending, isError };
+}
+
+/** The six change-email steps, in order. Each resolves with the server's own
+ *  message and rejects with the server envelope — see parseChangeEmailFailure. */
+export interface ChangeEmailSteps {
+  initiate: () => Promise<string>;
+  verifyOld: (otp: string) => Promise<string>;
+  sendNewOtp: (newEmail: string) => Promise<string>;
+  verifyNew: (otp: string, newEmail: string) => Promise<string>;
+  resendOld: () => Promise<string>;
+  resendNew: (newEmail: string) => Promise<string>;
+}
+
+/** Wraps a payload the way every authenticated endpoint here expects. */
+function changeEmailBody<TPayload extends object>(payload: TPayload): ChangeEmailRequest<TPayload> {
+  return { isEnc: false, payload };
+}
+
+/**
+ * The change-email wizard's data layer: one mutation per endpoint, exposed as
+ * plain async functions so the dialog stays a state machine and never touches
+ * react-query directly.
+ *
+ * No invalidation anywhere. These calls change server-side session state, not
+ * cached reads, and the default (invalidate everything) would fire refetches
+ * mid-wizard — including right after step 4, when the session is already gone
+ * and every one of them would 401.
+ */
+export function useChangeEmail(): ChangeEmailSteps {
+  const noInvalidation = { invalidateQueries: false as const };
+
+  const initiate = usePost<ChangeEmailResponse, ChangeEmailRequest<object>>(
+    initiateEmailChangeApi,
+    noInvalidation
+  );
+  const verifyOld = usePost<ChangeEmailResponse, ChangeEmailRequest<{ otp: string }>>(
+    verifyOldEmailApi,
+    noInvalidation
+  );
+  const sendNewOtp = usePost<ChangeEmailResponse, ChangeEmailRequest<{ newEmail: string }>>(
+    sendNewEmailOtpApi,
+    noInvalidation
+  );
+  const verifyNew = usePost<
+    ChangeEmailResponse,
+    ChangeEmailRequest<{ otp: string; newEmail: string }>
+  >(verifyNewEmailApi, noInvalidation);
+  const resendOld = usePost<ChangeEmailResponse, ChangeEmailRequest<object>>(
+    resendOldEmailOtpApi,
+    noInvalidation
+  );
+  const resendNew = usePost<ChangeEmailResponse, ChangeEmailRequest<{ newEmail: string }>>(
+    resendNewEmailOtpApi,
+    noInvalidation
+  );
+
+  return {
+    initiate: async () => (await initiate.mutateAsync(changeEmailBody({}))).message ?? "",
+    verifyOld: async (otp) => (await verifyOld.mutateAsync(changeEmailBody({ otp }))).message ?? "",
+    sendNewOtp: async (newEmail) =>
+      (await sendNewOtp.mutateAsync(changeEmailBody({ newEmail }))).message ?? "",
+    // newEmail goes up again alongside the code, carried forward from step 3.
+    verifyNew: async (otp, newEmail) =>
+      (await verifyNew.mutateAsync(changeEmailBody({ otp, newEmail }))).message ?? "",
+    resendOld: async () => (await resendOld.mutateAsync(changeEmailBody({}))).message ?? "",
+    resendNew: async (newEmail) =>
+      (await resendNew.mutateAsync(changeEmailBody({ newEmail }))).message ?? "",
+  };
 }

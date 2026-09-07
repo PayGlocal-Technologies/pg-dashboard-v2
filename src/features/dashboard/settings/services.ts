@@ -46,3 +46,32 @@ export const merchantProfileApi = (merchantId: string): string =>
  *  merchant id (profile.mid), like merchantProfileApi above. */
 export const merchantLogoUploadApi = (merchantId: string): string =>
   merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/profile/logo` : "";
+
+// ── Change email (six server-gated steps) ────────────────────────────────────
+//
+// Every step is authenticated by the merchant's existing session cookie and
+// gated on the previous one having just succeeded for that session: calling one
+// out of order returns 403 before it reaches application logic. Two of them are
+// terminal for the session — step 4 ends it on success, and three wrong codes at
+// either OTP step end it too.
+
+const CHANGE_EMAIL_BASE = `${BASE_URL_V3}/iam/users/contact/change`;
+
+/** Step 1. Emails a code to the merchant's CURRENT address. Body: {}. */
+export const initiateEmailChangeApi = `${CHANGE_EMAIL_BASE}/initiate`;
+
+/** Step 2. Body: { otp }. */
+export const verifyOldEmailApi = `${CHANGE_EMAIL_BASE}/verify-old`;
+
+/** Step 3. Body: { newEmail }. Emails a second code to the new address. */
+export const sendNewEmailOtpApi = `${CHANGE_EMAIL_BASE}/send-new-otp`;
+
+/** Step 4. Body: { otp, newEmail } — newEmail is carried forward from step 3,
+ *  not retyped. Commits the change irreversibly and ends the session. */
+export const verifyNewEmailApi = `${CHANGE_EMAIL_BASE}/verify-new`;
+
+/** Step 5. Body: {}. Only while step 2 is pending. */
+export const resendOldEmailOtpApi = `${CHANGE_EMAIL_BASE}/resend-old`;
+
+/** Step 6. Body: { newEmail }. Only while step 4 is pending. */
+export const resendNewEmailOtpApi = `${CHANGE_EMAIL_BASE}/resend-new`;
