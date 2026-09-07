@@ -76,7 +76,7 @@ export function MyQueriesFeature() {
   }, [tickets, dateRange, topicFilter, statusFilter, search]);
 
   return (
-    <div className="max-w-3xl space-y-4 page-enter">
+    <div className="mx-auto max-w-3xl space-y-4 page-enter">
       <PageHeader
         title="My queries"
         subtitle="Raise a ticket, or track one you've already raised."

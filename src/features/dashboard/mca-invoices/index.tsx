@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Button,
   DropdownMenu,
@@ -14,6 +13,7 @@ import {
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { useScopeId } from "@/lib/hooks/useScopeId";
+import { withBasePath } from "@/constants/basePath";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
@@ -119,11 +119,21 @@ function ZohoSyncAction() {
  * either surface.
  */
 function ManageTemplatesAction() {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const templateStore = useInvoiceTemplates();
 
   const handleDeleteTemplate = (templateId: string) => templateStore.remove(templateId);
+
+  // Hard navigation, matching the create-invoice editor's own "Edit template":
+  // router.push lands on /create-invoice as a client transition, and the
+  // bootstrap there reads `?templateId=` in a first-render lazy initializer that
+  // useSearchParams does not reliably populate on a soft navigation — so the
+  // template id was captured as empty and the draft opened blank. A full load
+  // makes the URL synchronous, and withBasePath keeps the /app-v2 prefix a raw
+  // window.location navigation would otherwise drop.
+  const handleEditTemplate = (templateId: string) => {
+    window.location.href = withBasePath(`/create-invoice?templateId=${templateId}`);
+  };
 
   return (
     <>
@@ -144,7 +154,7 @@ function ManageTemplatesAction() {
         isMutating={templateStore.isMutating}
         onRename={templateStore.rename}
         onDelete={handleDeleteTemplate}
-        onEdit={(templateId) => router.push(`/create-invoice?templateId=${templateId}`)}
+        onEdit={handleEditTemplate}
       />
     </>
   );

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button, Shimmer, SplitButton, SplitButtonItem, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/constants/basePath";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
@@ -293,6 +294,20 @@ function CreateInvoiceBootstrap() {
   const gid = searchParams.get("gid") ?? "";
   const clientIdParam = searchParams.get("clientId") ?? "";
   const status = searchParams.get("status") ?? "";
+
+  /**
+   * The template to apply, captured once on mount.
+   *
+   * "Edit" in the manage-templates dialog lands here on `?templateId=` with no
+   * `invoiceId`, so this mount creates a fresh draft and then `router.replace`s
+   * the address bar to `?invoiceId=…` — a URL rebuilt from the new id alone,
+   * which DROPS `templateId`. The editor only mounts after that replace, so by
+   * the time it could read the param it is already gone. Reading it here, in a
+   * lazy initializer that runs on the first render before any draft exists,
+   * keeps it stable and hands it down as a prop rather than a URL the replace
+   * is about to overwrite.
+   */
+  const [templateIdParam] = useState(() => searchParams.get("templateId") ?? "");
 
   // The hook-level mutation callbacks below outlive any single render, so they
   // read through refs rather than capturing stale values. Written in an effect,
@@ -660,6 +675,7 @@ function CreateInvoiceBootstrap() {
           gid={gid}
           clientIdParam={clientIdParam}
           today={today}
+          templateIdParam={templateIdParam}
           onGenerated={setGeneratedId}
         />
       ) : (
@@ -680,6 +696,7 @@ function InvoiceEditor({
   gid,
   clientIdParam,
   today,
+  templateIdParam,
   onGenerated,
 }: {
   invoice: InvoiceData;
@@ -692,12 +709,15 @@ function InvoiceEditor({
   gid: string;
   clientIdParam: string;
   today: string;
+  /** The template to apply on open, captured by the bootstrap before the
+   *  draft-creation `router.replace` drops it from the URL. Empty when this
+   *  editor was not opened from "Edit template". */
+  templateIdParam: string;
   /** Called with the invoice id once it has been generated, which is what
    *  switches this page over to the success screen. */
   onGenerated: (invoiceId: string) => void;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
   /**
@@ -936,7 +956,7 @@ function InvoiceEditor({
     const followUp =
       next.isRecurring && !form.recurringStartDate
         ? "Set the recurring start date: a schedule cannot be reused from a template."
-        : "Client, invoice number, dates and receiving account are unchanged.";
+        : "Client, invoice number and dates are unchanged.";
 
     toast.success(`Applied "${template.name}"`, { description: followUp });
   };
@@ -1006,7 +1026,10 @@ function InvoiceEditor({
    * open before, resolving the new draft's id from the wrong response.
    */
   const handleEditTemplate = (templateId: string) => {
-    window.location.href = `/create-invoice?templateId=${templateId}`;
+    // withBasePath because a raw `window.location` navigation is handed to the
+    // browser as-is — Next only prefixes /app-v2 for framework navigation
+    // (router.push, next/link), not this. See src/constants/basePath.ts.
+    window.location.href = withBasePath(`/create-invoice?templateId=${templateId}`);
   };
 
   /**
@@ -1020,10 +1043,17 @@ function InvoiceEditor({
    * `templateLink`, and re-running on every render would fight a merchant who
    * has since detached or applied something else.
    */
-  const requestedTemplateId = searchParams.get("templateId");
+  const requestedTemplateId = templateIdParam;
   const appliedFromQueryRef = useRef(false);
   useEffect(() => {
     if (appliedFromQueryRef.current || !requestedTemplateId || !templateStore.isReady) return;
+    // `isReady` is `!isLoading`, which is already true while the list query is
+    // merely disabled — on this fresh page load the merchant id (`scopeId`)
+    // resolves a tick after mount, so `listUrl` is empty and the query never
+    // ran, with `templates` still []. Consuming the one-shot then would apply an
+    // empty list, spend the ref, and the real templates arriving afterwards
+    // would never fill. Wait for the list to actually land first.
+    if (templateStore.templates.length === 0) return;
     appliedFromQueryRef.current = true;
     // `handleApplyTemplate` calls setState directly, which the React Compiler
     // lint plugin rejects inside an effect body (see CLAUDE.md) — deferred into

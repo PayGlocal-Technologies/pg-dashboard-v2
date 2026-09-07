@@ -16,26 +16,13 @@ import { feedbackApi } from "@/features/dashboard/feedback/services";
 import type { FeedbackPayload } from "@/features/dashboard/feedback/types";
 
 /**
- * pg-dashboard's (v1) origin per environment — mirrors `dashboardOrigin()` in
- * `refer-and-earn/constants.ts` (UAT moved to pygcl.com; dev/test/prod stay on
- * payglocal.in). Kept local rather than imported: that helper is private to
- * the referral feature and this is the only other call site so far, so
- * sharing it isn't worth a new export yet.
- */
-function oldDashboardOrigin(): string {
-  const env = process.env.NEXT_PUBLIC_ENV;
-  if (env === "prod") return "https://dashboard.payglocal.in";
-  const domain = env === "uat" ? "pygcl.com" : "payglocal.in";
-  return `https://${env ?? "dev"}.dashboard.${domain}`;
-}
-
-/**
  * "Switch to old view" — an escape hatch back to pg-dashboard for a merchant
  * who isn't ready for this one yet, with a two-question feedback ask on the
  * way out. A raw browser navigation, not `router.push`: pg-dashboard is a
- * separate app (a different origin outside prod, and outside this app's own
- * basePath even in prod — see `src/constants/basePath.ts`), not a route
- * within this one.
+ * separate app served from `/app` on the same origin as this one's `/app-v2`
+ * (see `src/constants/basePath.ts`), so it is reachable only by leaving this
+ * app's basePath, not by routing within it. Origin-relative so the switch
+ * stays on whatever host the merchant is on — see `goToOldView`.
  *
  * The popover owns its own trigger, matching `HeaderHelpMenu` beside it, and
  * Radix doesn't mount `PopoverContent` until the trigger is actually clicked
@@ -57,7 +44,11 @@ export function SwitchToOldViewButton() {
   });
 
   const goToOldView = () => {
-    window.location.href = `${oldDashboardOrigin()}/app`;
+    // Origin-relative on purpose: pg-dashboard (the old view) is served from
+    // `/app` on the SAME origin this app runs on (`/app-v2`), so switching must
+    // stay on the current host — localhost when local, the uat/prod host when
+    // deployed. Hardcoding a live host is what sent a local session off to uat.
+    window.location.href = `${window.location.origin}/app/dashboard`;
   };
 
   const handleSubmit = () => {

@@ -314,6 +314,16 @@ export interface InvoiceTheme {
  */
 export interface InvoiceTemplateSnapshot {
   currency: string;
+  /**
+   * The receiving account, by its reference (the editor's `accountNo`).
+   *
+   * The one identifying field a template does carry: unlike a client, a
+   * merchant's own settlement account is reusable across invoices, and it is
+   * paired with `currency` above, which is stored alongside it, so applying the
+   * template lands on an account valid for that currency. Empty when the draft
+   * had none picked, in which case applying leaves the form's own selection be.
+   */
+  accountNo: string;
   lineItems: LineItemDraft[];
   discountName: string;
   discountValue: string;
@@ -364,6 +374,9 @@ export interface TemplateLineItem {
 export interface TemplateWriteBody {
   name: string;
   currency: string;
+  /** The receiving account reference the template restores. Null when none was
+   *  picked. Round-trips through the API's own `bankAccountReference` field. */
+  bankAccountReference: string | null;
   lineItems: TemplateLineItem[];
   isGstInvoice: boolean;
   themeMetadata: ThemeMetadata;
