@@ -837,12 +837,17 @@ export function StatusFilterChip({
   onChange,
   open,
   onOpenChange,
+  label = "Status",
 }: {
   options: FilterChipOption[];
   selected: string[];
   onChange: (next: string[]) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** What this checkbox list is filtering on, e.g. "Topic" for a ticket
+   *  list's subject filter — the checkboxes, Apply/Clear and staged-draft
+   *  behaviour are identical, only the chip's own wording changes. */
+  label?: string;
 }) {
   const [draft, setDraft] = useState<string[]>(selected);
   const isActive = selected.length > 0;
@@ -866,9 +871,9 @@ export function StatusFilterChip({
       }}
     >
       <FilterChipShell active={isActive}>
-        {isActive && <FilterChipClearButton label="Status" onClick={clear} />}
+        {isActive && <FilterChipClearButton label={label} onClick={clear} />}
         <PopoverTrigger asChild>
-          <FilterChipLabelTrigger label="Status" active={isActive} />
+          <FilterChipLabelTrigger label={label} active={isActive} />
         </PopoverTrigger>
       </FilterChipShell>
       <PopoverContent align="end" className="w-auto p-0">

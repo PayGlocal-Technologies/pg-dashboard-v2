@@ -1,5 +1,6 @@
 import { getApps, getApp, initializeApp } from "firebase/app";
 import { BASE_PATH, withBasePath } from "@/constants/basePath";
+import { cdnOrigin } from "@/constants/environment";
 import { getAuth, type Auth } from "firebase/auth";
 import { signInWithPopup, signInWithRedirect, type UserCredential } from "firebase/auth";
 import { authProvider } from "@/features/auth/login/single-sign-on/authProvider";
@@ -20,25 +21,8 @@ export function firebaseConfigProvider(): Auth {
   return getAuth(app);
 }
 
-const ENV_VALUES = ["dev", "uat", "prod"] as const;
-
-function getCdnEnv(): string {
-  const env = process.env.NEXT_PUBLIC_ENV;
-  if (env && ENV_VALUES.includes(env as (typeof ENV_VALUES)[number])) return env;
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname.split(".")[0];
-    if (hostname && ENV_VALUES.includes(hostname as (typeof ENV_VALUES)[number])) return hostname;
-  }
-  return "dev";
-}
-
 function getKeyUrl(kid?: string): string {
-  const env = getCdnEnv();
-  if (env === "prod") {
-    return `https://cdn.payglocal.in/public-key/${kid ? "kid" : "key"}.txt`;
-  }
-  const cdnDomain = env === "uat" ? "pygcl.com" : "payglocal.in";
-  return `https://cdn.${env}.${cdnDomain}/public-key/${kid ? "kid" : "key"}.txt`;
+  return `${cdnOrigin()}/public-key/${kid ? "kid" : "key"}.txt`;
 }
 
 async function fetchText(url: string): Promise<string> {

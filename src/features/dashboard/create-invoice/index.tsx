@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Button, Shimmer, SplitButton, SplitButtonItem, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/constants/basePath";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
@@ -293,6 +294,20 @@ function CreateInvoiceBootstrap() {
   const gid = searchParams.get("gid") ?? "";
   const clientIdParam = searchParams.get("clientId") ?? "";
   const status = searchParams.get("status") ?? "";
+
+  /**
+   * The template to apply, captured once on mount.
+   *
+   * "Edit" in the manage-templates dialog lands here on `?templateId=` with no
+   * `invoiceId`, so this mount creates a fresh draft and then `router.replace`s
+   * the address bar to `?invoiceId=…` — a URL rebuilt from the new id alone,
+   * which DROPS `templateId`. The editor only mounts after that replace, so by
+   * the time it could read the param it is already gone. Reading it here, in a
+   * lazy initializer that runs on the first render before any draft exists,
+   * keeps it stable and hands it down as a prop rather than a URL the replace
+   * is about to overwrite.
+   */
+  const [templateIdParam] = useState(() => searchParams.get("templateId") ?? "");
 
   // The hook-level mutation callbacks below outlive any single render, so they
   // read through refs rather than capturing stale values. Written in an effect,
@@ -660,6 +675,7 @@ function CreateInvoiceBootstrap() {
           gid={gid}
           clientIdParam={clientIdParam}
           today={today}
+          templateIdParam={templateIdParam}
           onGenerated={setGeneratedId}
         />
       ) : (
@@ -680,6 +696,7 @@ function InvoiceEditor({
   gid,
   clientIdParam,
   today,
+  templateIdParam,
   onGenerated,
 }: {
   invoice: InvoiceData;
@@ -692,6 +709,10 @@ function InvoiceEditor({
   gid: string;
   clientIdParam: string;
   today: string;
+  /** The template to apply on open, captured by the bootstrap before the
+   *  draft-creation `router.replace` drops it from the URL. Empty when this
+   *  editor was not opened from "Edit template". */
+  templateIdParam: string;
   /** Called with the invoice id once it has been generated, which is what
    *  switches this page over to the success screen. */
   onGenerated: (invoiceId: string) => void;
@@ -935,7 +956,7 @@ function InvoiceEditor({
     const followUp =
       next.isRecurring && !form.recurringStartDate
         ? "Set the recurring start date: a schedule cannot be reused from a template."
-        : "Client, invoice number, dates and receiving account are unchanged.";
+        : "Client, invoice number and dates are unchanged.";
 
     toast.success(`Applied "${template.name}"`, { description: followUp });
   };
@@ -992,6 +1013,63 @@ function InvoiceEditor({
     if (templateId === activeTemplateId) setTemplateLink(null);
     toast.success("Template deleted");
   };
+
+  /**
+   * "Edit" from the manage-templates list, on this editor or on the invoice
+   * list page: it always opens a brand new draft with the template applied,
+   * never the invoice already open here.
+   *
+   * A hard navigation, not `router.push` — a query-only change on this same
+   * route is exactly the case the id-resolution comment above (`invoiceId`)
+   * warns App Router doesn't reliably surface, and this editor's own
+   * `createDraft` mutation state would otherwise carry over from whatever was
+   * open before, resolving the new draft's id from the wrong response.
+   */
+  const handleEditTemplate = (templateId: string) => {
+    // withBasePath because a raw `window.location` navigation is handed to the
+    // browser as-is — Next only prefixes /app-v2 for framework navigation
+    // (router.push, next/link), not this. See src/constants/basePath.ts.
+    window.location.href = withBasePath(`/create-invoice?templateId=${templateId}`);
+  };
+
+  /**
+   * Applies a template requested via `?templateId=`, once.
+   *
+   * The only entry point today is "Edit" in the manage-templates dialog, which
+   * always sends a fresh draft here — so a blank invoice is exactly what this
+   * expects to find, and it applies without the picker's usual "replace what's
+   * on screen?" prompt, matching the picker's own bypass for an empty draft.
+   * `appliedFromQuery` guards it to a single run: `handleApplyTemplate` sets
+   * `templateLink`, and re-running on every render would fight a merchant who
+   * has since detached or applied something else.
+   */
+  const requestedTemplateId = templateIdParam;
+  const appliedFromQueryRef = useRef(false);
+  useEffect(() => {
+    if (appliedFromQueryRef.current || !requestedTemplateId || !templateStore.isReady) return;
+    // `isReady` is `!isLoading`, which is already true while the list query is
+    // merely disabled — on this fresh page load the merchant id (`scopeId`)
+    // resolves a tick after mount, so `listUrl` is empty and the query never
+    // ran, with `templates` still []. Consuming the one-shot then would apply an
+    // empty list, spend the ref, and the real templates arriving afterwards
+    // would never fill. Wait for the list to actually land first.
+    if (templateStore.templates.length === 0) return;
+    appliedFromQueryRef.current = true;
+    // `handleApplyTemplate` calls setState directly, which the React Compiler
+    // lint plugin rejects inside an effect body (see CLAUDE.md) — deferred into
+    // a timer callback like the amount debounce elsewhere in this codebase.
+    const id = setTimeout(() => {
+      const template = templateStore.templates.find((t) => t.id === requestedTemplateId);
+      if (template) handleApplyTemplate(template);
+      else toast.error("That template could not be found. It may have been deleted.");
+    }, 0);
+    return () => clearTimeout(id);
+    // `handleApplyTemplate` is recreated every render and reads `form`/`branding`
+    // fresh each time on purpose (see its own comment); the ref guard above is
+    // what makes this run exactly once, so it is deliberately left out here —
+    // adding it would just re-fire the effect on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedTemplateId, templateStore.isReady, templateStore.templates]);
 
   // ── Branding actions ───────────────────────────────────────────────────────
 
@@ -1583,6 +1661,7 @@ function InvoiceEditor({
         isMutating={templateStore.isMutating}
         onRename={templateStore.rename}
         onDelete={handleDeleteTemplate}
+        onEdit={handleEditTemplate}
       />
 
       {/* Persistent launcher, bottom-right, replayable. Not auto-started: this
