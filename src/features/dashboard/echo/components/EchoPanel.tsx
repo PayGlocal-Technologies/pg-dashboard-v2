@@ -33,7 +33,7 @@ import { ECHO_PANEL_WIDTH, useEchoPanel } from "@/stores/useEchoPanel";
  */
 export function EchoPanel() {
   const { open, setOpen } = useEchoPanel();
-  const { entries, status, busy, start, sendText, sendButton, sendListRow, retry, restart } =
+  const { entries, status, busy, ended, start, sendText, sendButton, sendListRow, retry, restart } =
     useEchoSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -121,6 +121,8 @@ export function EchoPanel() {
           onButton={sendButton}
           onListRow={sendListRow}
           onRetry={retry}
+          ended={ended}
+          onRestart={restart}
           className="px-3 md:px-3"
           // Always mounted — see the matching note in the full page.
           hero={(options) => (
@@ -130,7 +132,7 @@ export function EchoPanel() {
           )}
         />
 
-        <EchoComposer onSend={sendText} busy={busy} autoFocus={open} />
+        <EchoComposer onSend={sendText} busy={busy} disabled={ended} autoFocus={open} />
       </div>
     </motion.aside>
   );

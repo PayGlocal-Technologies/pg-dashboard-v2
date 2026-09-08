@@ -8,6 +8,7 @@ import { EchoChunk } from "@/features/dashboard/echo/components/EchoChunk";
 import { EchoListOptions } from "@/features/dashboard/echo/components/EchoListOptions";
 import { EchoOptionsSkeleton } from "@/features/dashboard/echo/components/EchoOptionsSkeleton";
 import { EchoMessageActions } from "@/features/dashboard/echo/components/EchoMessageActions";
+import { ECHO_ENDED_MESSAGE } from "@/features/dashboard/echo/constants";
 import { isListChunk, toPlainText } from "@/features/dashboard/echo/helper";
 import type { EchoEntry, EchoRequest, EchoStatus } from "@/features/dashboard/echo/types";
 import { cn } from "@/lib/utils";
@@ -18,6 +19,10 @@ type Props = {
   onButton: (id: string, title: string) => void;
   onListRow: (id: string, title: string) => void;
   onRetry: (entryId: string, request: EchoRequest) => void;
+  /** The merchant ended the chat: history stays, nothing in it is actionable. */
+  ended?: boolean;
+  /** Opens a fresh conversation from the ended footer. */
+  onRestart?: () => void;
   /**
    * Welcome block for the opening screen, inside this scroll container so it
    * scrolls away with the conversation rather than pinning to the top. The
@@ -38,6 +43,8 @@ export function EchoTranscript({
   onButton,
   onListRow,
   onRetry,
+  ended = false,
+  onRestart,
   hero,
   className,
 }: Props) {
@@ -50,10 +57,13 @@ export function EchoTranscript({
   // Only the last assistant turn is live — see the `interactive` note in
   // EchoChunk. A turn that failed does not count: the live screen is still
   // whichever one came before it.
-  const liveEntryId = entries.reduce<string | null>(
-    (live, entry) => (entry.role === "assistant" && "chunks" in entry ? entry.id : live),
-    null
-  );
+  // null once the chat has ended: no turn is live, so nothing is tappable.
+  const liveEntryId = ended
+    ? null
+    : entries.reduce<string | null>(
+        (live, entry) => (entry.role === "assistant" && "chunks" in entry ? entry.id : live),
+        null
+      );
 
   /**
    * The opening turn, when it is one this screen can absorb into the hero.
@@ -144,6 +154,7 @@ export function EchoTranscript({
                       type="button"
                       variant="outline"
                       size="sm"
+                      disabled={ended}
                       onClick={() => onRetry(entry.id, entry.failure.request)}
                       leftIcon={<Icon name="rotate-ccw" size={13} />}
                       className="text-[13px] font-medium"
@@ -171,6 +182,30 @@ export function EchoTranscript({
             </div>
           );
         })}
+
+        {ended ? (
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <div className="flex w-full items-center gap-3">
+              <span className="h-px flex-1 bg-border" />
+              <span className="text-[11.5px] font-medium text-muted-foreground">
+                {ECHO_ENDED_MESSAGE}
+              </span>
+              <span className="h-px flex-1 bg-border" />
+            </div>
+            {onRestart ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onRestart}
+                leftIcon={<Icon name="rotate-ccw" size={13} />}
+                className="text-[13px] font-medium"
+              >
+                Start a new conversation
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
 
         {/* The stepped loader, not the old typing dots. Mounted only while a
             turn is in flight, which is also what resets it — see

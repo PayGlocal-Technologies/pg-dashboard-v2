@@ -1,5 +1,10 @@
 import { create } from "zustand";
-import type { EchoChunk, EchoEntry, EchoRequest, EchoStatus } from "@/features/dashboard/echo/types";
+import type {
+  EchoChunk,
+  EchoEntry,
+  EchoRequest,
+  EchoStatus,
+} from "@/features/dashboard/echo/types";
 
 /**
  * One Echo conversation.
@@ -28,6 +33,15 @@ interface EchoState {
   /** Set the moment the opening handshake is dispatched, so a remount cannot
    *  send a second one. */
   sessionStarted: boolean;
+  /**
+   * The merchant ended the conversation.
+   *
+   * Separate from an empty transcript, and that is the point: the transcript
+   * stays readable but nothing in it is actionable, the composer is closed,
+   * and the auto-start effect must not quietly open a fresh session behind
+   * the merchant's back. Only `clear()` (i.e. "New conversation") lifts it.
+   */
+  ended: boolean;
 
   appendUser: (label: string) => void;
   appendAssistant: (chunks: EchoChunk[]) => void;
@@ -36,6 +50,8 @@ interface EchoState {
   setStatus: (status: EchoStatus) => void;
   /** Claims the handshake. Returns false when it has already been claimed. */
   claimSessionStart: () => boolean;
+  /** Closes the conversation, keeping the transcript on screen. */
+  endChat: () => void;
   clear: () => void;
 }
 
@@ -43,6 +59,7 @@ export const useEcho = create<EchoState>()((set, get) => ({
   entries: [],
   status: "idle",
   sessionStarted: false,
+  ended: false,
 
   appendUser: (label) =>
     set((state) => ({
@@ -72,5 +89,9 @@ export const useEcho = create<EchoState>()((set, get) => ({
     return true;
   },
 
-  clear: () => set({ entries: [], status: "idle", sessionStarted: false }),
+  // The server session is finished, so sessionStarted goes back to false:
+  // "New conversation" has to be free to open a real one.
+  endChat: () => set({ status: "idle", sessionStarted: false, ended: true }),
+
+  clear: () => set({ entries: [], status: "idle", sessionStarted: false, ended: false }),
 }));

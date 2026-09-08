@@ -7,6 +7,7 @@ import {
   ECHO_ERROR_MESSAGE,
   ECHO_OPENING_REQUEST,
   ECHO_RESTART_REQUEST,
+  isEchoEndChat,
 } from "@/features/dashboard/echo/constants";
 import { isRenderableChunk } from "@/features/dashboard/echo/helper";
 import { echoAppApi } from "@/features/dashboard/echo/services";
@@ -45,6 +46,7 @@ export function useEchoSession() {
   const entries = useEcho((s) => s.entries);
   const status = useEcho((s) => s.status);
   const sessionStarted = useEcho((s) => s.sessionStarted);
+  const ended = useEcho((s) => s.ended);
 
   // invalidateQueries: false — an Echo turn changes nothing this app has
   // cached, and the default in usePost is to invalidate every query in the
@@ -98,12 +100,47 @@ export function useEchoSession() {
     [dispatch]
   );
 
+  /**
+   * Ends the conversation.
+   *
+   * The request still goes out — the server owns the session and has to be
+   * told to close it, or the next opening handshake resumes this one part-way
+   * through its own goodbye. What changes is that the reply is discarded
+   * instead of appended: the server answers an end-chat button with another
+   * screen (a goodbye, sometimes a rating prompt, with its own buttons), and
+   * rendering that is what made "End Chat" look like just another step rather
+   * than the end of the conversation.
+   *
+   * Fire-and-forget, deliberately: nothing is retried and no failure is
+   * surfaced. The merchant asked to be done, and the local conversation is
+   * over either way — an abandoned session times out server-side, which is a
+   * better outcome than an error bubble under a chat that has visibly ended.
+   */
+  const endChat = useCallback(
+    (id: string, title: string) => {
+      const store = useEcho.getState();
+      if (store.status !== "idle") return;
+
+      store.appendUser(title || id);
+      store.endChat();
+      mutate({ userInput: id, inputType: "button_reply" });
+    },
+    [mutate]
+  );
+
   /** `id` goes on the wire, `title` goes in the transcript. */
   const sendButton = useCallback(
     (id: string, title: string) => {
+      // An end-chat button is the one reply that does not advance the
+      // conversation — see endChat, and isEchoEndChat for how it is
+      // recognised (and why the title is part of that for one id).
+      if (isEchoEndChat(id, title)) {
+        endChat(id, title);
+        return;
+      }
       dispatch({ userInput: id, inputType: "button_reply" }, { label: title || id });
     },
-    [dispatch]
+    [dispatch, endChat]
   );
 
   const sendListRow = useCallback(
@@ -147,6 +184,7 @@ export function useEchoSession() {
     entries,
     status,
     sessionStarted,
+    ended,
     busy: status !== "idle",
     start,
     sendText,
@@ -169,7 +207,12 @@ export function useEchoSession() {
 export function useEchoAutoStart(active: boolean, start: () => void) {
   useEffect(() => {
     if (!active) return;
-    if (useEcho.getState().sessionStarted) return;
+    const store = useEcho.getState();
+    // `ended` is checked as well as `sessionStarted`: ending the chat resets
+    // sessionStarted so that "New conversation" can open a real one, which
+    // would otherwise leave this effect free to reopen the session the
+    // merchant just closed.
+    if (store.sessionStarted || store.ended) return;
     const timer = window.setTimeout(() => start(), 0);
     return () => window.clearTimeout(timer);
   }, [active, start]);
