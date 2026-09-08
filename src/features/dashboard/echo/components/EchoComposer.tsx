@@ -11,6 +11,8 @@ type Props = {
   onSend: (text: string) => void;
   /** True while a turn is in flight. The field stays usable; only send is held. */
   busy?: boolean;
+  /** Closes the composer entirely — used when the chat has ended. */
+  disabled?: boolean;
   autoFocus?: boolean;
   /**
    * Shows the "Add context of this page" chip. Off, and nothing passes it
@@ -41,6 +43,7 @@ type Props = {
 export function EchoComposer({
   onSend,
   busy = false,
+  disabled = false,
   autoFocus = false,
   showPageContext = false,
   className,
@@ -53,10 +56,10 @@ export function EchoComposer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    if (!autoFocus) return;
+    if (!autoFocus || disabled) return;
     const timer = window.setTimeout(() => textareaRef.current?.focus(), 100);
     return () => window.clearTimeout(timer);
-  }, [autoFocus]);
+  }, [autoFocus, disabled]);
 
   // A chip left on from a previous screen would attach the wrong page's name to
   // the next message. Deferred to a timer callback rather than called in the
@@ -75,7 +78,7 @@ export function EchoComposer({
   }, [value]);
 
   const submit = useCallback(() => {
-    if (busy) return;
+    if (busy || disabled) return;
     const trimmed = value.trim();
     // The page name goes as a plain prefix in the text turn — there is no
     // context field in EchoRequest, so this is the only way to pass it, and
@@ -88,7 +91,7 @@ export function EchoComposer({
     onSend(parts.join("\n\n"));
     setValue("");
     if (textareaRef.current) textareaRef.current.style.height = "auto";
-  }, [busy, onSend, pageContext, pageContextActive, showPageContext, value]);
+  }, [busy, disabled, onSend, pageContext, pageContextActive, showPageContext, value]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
@@ -148,7 +151,8 @@ export function EchoComposer({
             onChange={(event) => setValue(event.target.value)}
             onKeyDown={onKeyDown}
             rows={2}
-            placeholder="Ask Echo anything…"
+            disabled={disabled}
+            placeholder={disabled ? "This chat has ended" : "Ask Echo anything…"}
             aria-label="Message Echo"
             className="max-h-36 min-h-11 flex-1 resize-none border-0 bg-transparent px-0 py-0 text-[13.5px] leading-relaxed shadow-none focus-visible:ring-0"
           />
@@ -156,7 +160,7 @@ export function EchoComposer({
             type="button"
             variant="primary"
             size="sm"
-            disabled={busy || !canSend}
+            disabled={busy || disabled || !canSend}
             isLoading={busy}
             onClick={submit}
             aria-label="Send message"

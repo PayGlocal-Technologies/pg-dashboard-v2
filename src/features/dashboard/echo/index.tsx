@@ -19,7 +19,7 @@ import { useApp } from "@/stores/useApp";
  * panel continues that same conversation rather than opening a second one.
  */
 export function EchoFeature() {
-  const { entries, status, busy, start, sendText, sendButton, sendListRow, retry, restart } =
+  const { entries, status, busy, ended, start, sendText, sendButton, sendListRow, retry, restart } =
     useEchoSession();
   const profile = useApp((s) => s.profile);
   useEchoAutoStart(true, start);
@@ -58,6 +58,8 @@ export function EchoFeature() {
         onButton={sendButton}
         onListRow={sendListRow}
         onRetry={retry}
+        ended={ended}
+        onRestart={restart}
         // Always mounted: the greeting is the top of the conversation, and it
         // scrolls away like any other history. Unmounting it on the first
         // interaction is what made the opening menu re-render in a different
@@ -66,7 +68,13 @@ export function EchoFeature() {
           <EchoHero firstName={profile?.firstName || profile?.username || ""}>{options}</EchoHero>
         )}
       />
-      <EchoComposer onSend={sendText} busy={busy} autoFocus className="mx-auto w-full max-w-3xl" />
+      <EchoComposer
+        onSend={sendText}
+        busy={busy}
+        disabled={ended}
+        autoFocus
+        className="mx-auto w-full max-w-3xl"
+      />
     </div>
   );
 }

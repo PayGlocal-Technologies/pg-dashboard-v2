@@ -38,6 +38,44 @@ export const ECHO_RESTART_REQUEST: EchoRequest = {
 };
 
 /**
+ * Recognising the server's "end the conversation" button.
+ *
+ * A client-side interpretation, and it has to be: the protocol carries no flag
+ * for "this button ends the session". These are ids the server offers on its
+ * own buttons, unlike ECHO_RESTART_REQUEST which this app sends proactively.
+ *
+ * The two error directions are not equal. Failing to recognise an end button
+ * costs one extra screen — the old behaviour. Wrongly recognising one ends a
+ * conversation the merchant wanted to continue, and there is no undo. So the
+ * ids are split by how certain they are.
+ */
+
+/** Unambiguous: these ids exist only to close the session. */
+export const ECHO_END_CHAT_IDS: readonly string[] = ["BTN_END_CHAT", "BTN_END_CHAT_NOW"];
+
+/**
+ * Ids that end the chat in the flow we have seen but do not say so.
+ *
+ * `BTN_HELP_NO` is the post-answer "anything else?" prompt's negative reply,
+ * titled "End Chat" there. The id itself means "no", though, and the server is
+ * free to reuse it wherever a no belongs — so it counts only when the title
+ * agrees. Matching on title alone would be worse (display copy gets reworded);
+ * requiring both is what keeps a plain "No" from silently ending a chat.
+ */
+const ECHO_AMBIGUOUS_END_CHAT_IDS: readonly string[] = ["BTN_HELP_NO"];
+
+const END_CHAT_TITLE = /\bend\s+chat\b/i;
+
+export function isEchoEndChat(id: string, title: string): boolean {
+  if (ECHO_END_CHAT_IDS.includes(id)) return true;
+  return ECHO_AMBIGUOUS_END_CHAT_IDS.includes(id) && END_CHAT_TITLE.test(title);
+}
+
+/** Closing line for a conversation the merchant ended. */
+export const ECHO_ENDED_MESSAGE = "Chat ended.";
+
+/**
+ * Shown when the call fails/**
  * Shown when the call fails or comes back with no messages. Per §7 of the
  * guide, resending the same input is safe: the server has not advanced its
  * step, so nothing is duplicated by a retry.
