@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
@@ -53,6 +53,54 @@ function formatLineOfBusiness(code: string | null | undefined): string {
   if (LINE_OF_BUSINESS_LABELS[code]) return LINE_OF_BUSINESS_LABELS[code];
   const words = code.toLowerCase().replace(/_/g, " ").trim();
   return words ? words.charAt(0).toUpperCase() + words.slice(1) : "";
+}
+
+/** A group of related fields, each rendered as its own Card — the eleven
+ *  fields this page shows used to sit in one undifferentiated list, which is
+ *  exactly what made the page read as a wall of text rather than something
+ *  scannable. The split mirrors how a merchant actually thinks about this
+ *  information: what's on file for compliance, what's shown to the public,
+ *  and who a customer's query reaches. */
+function FieldGroupCard({
+  title,
+  description,
+  fields,
+  children,
+}: {
+  title: string;
+  description: string;
+  fields: BusinessField[];
+  /** Extra rows rendered before the field list — Business details uses this
+   *  for the one editable row (purpose code), which belongs in this group
+   *  but isn't a plain read-only `BusinessField`. */
+  children?: ReactNode;
+}) {
+  return (
+    <Card className="gap-0 p-0">
+      <div className="border-b border-border p-5">
+        <h2 className="text-base font-bold text-foreground">{title}</h2>
+        <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>
+      </div>
+
+      <div className="divide-y divide-border px-5">
+        {children}
+        {fields.map((field) => (
+          <SettingsDetailRow
+            key={field.label}
+            label={field.label}
+            description={field.description}
+            value={
+              field.isLoading && !field.value ? (
+                <Shimmer className="h-4 w-40" />
+              ) : (
+                field.value.trim() || "Not available"
+              )
+            }
+          />
+        ))}
+      </div>
+    </Card>
+  );
 }
 
 export function BusinessDetailsFeature() {
@@ -120,17 +168,11 @@ export function BusinessDetailsFeature() {
   // state); tradeName/purposeCode from the /business endpoint; the rest from the
   // merchant profile's merchantBusinessSummary block. An empty value renders as
   // "Not available" in the row below, so none of these need their own fallback.
-  const readOnlyFields: BusinessField[] = [
+  const legalFields: BusinessField[] = [
     {
       label: "Legal business name",
       description: "As on your incorporation / GST records.",
       value: profile?.registeredName ?? "",
-    },
-    {
-      label: "Trade name",
-      description: "The name customers see, if different from your legal name.",
-      value: business?.tradeName ?? "",
-      isLoading,
     },
     {
       label: "Merchant ID",
@@ -155,12 +197,24 @@ export function BusinessDetailsFeature() {
       value: formatLineOfBusiness(businessProfile?.lineOfBusiness),
       isLoading: isProfileLoading,
     },
+  ];
+
+  const publicProfileFields: BusinessField[] = [
+    {
+      label: "Trade name",
+      description: "The name customers see, if different from your legal name.",
+      value: business?.tradeName ?? "",
+      isLoading,
+    },
     {
       label: "Website",
       description: "Your public-facing business website.",
       value: businessProfile?.websiteUrl ?? "",
       isLoading: isProfileLoading,
     },
+  ];
+
+  const supportFields: BusinessField[] = [
     {
       label: "Support contact name",
       description: "Person customer queries are addressed to.",
@@ -188,114 +242,108 @@ export function BusinessDetailsFeature() {
         subtitle="Legal and public-facing information for your entity."
       />
 
-      <Card className="gap-0 p-0">
-        <div className="border-b border-border p-5">
-          <h2 className="text-base font-bold text-foreground">Legal & public profile</h2>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Details shown where required for compliance and customer support.
-          </p>
-        </div>
-
-        <div className="divide-y divide-border px-5">
-          {/* Real, editable purpose code row — the one field on this page that
-              takes input, so it is the only one that shows a boxed control, and
-              only while actually editing. Label styling matches
-              SettingsDetailRow so it reads as part of the same list. */}
-          <div className="flex items-start justify-between gap-6 py-3">
-            <div className="max-w-xs">
-              <p className="text-sm text-muted-foreground">Purpose code</p>
-              <p className="mt-0.5 text-xs text-muted-foreground/70">
-                RBI purpose code used for cross-border transactions.
-              </p>
-            </div>
-            {editing ? (
-              <div className="w-full max-w-md space-y-2">
-                <PurposeCodeCombobox
-                  id="business-purpose-code"
-                  value={selectedCode}
-                  onChange={setSelectedCode}
-                  options={purposeCodeOptions}
-                  isLoading={isOptionsLoading}
-                />
-                {hasLegacyMultiple ? (
-                  <p className="text-[11px] text-destructive">
-                    This account currently holds {purposeCodes.length} purpose codes (
-                    {purposeCodes.join(", ")}). Accounts now carry a single code, so saving replaces
-                    all of them with the one you pick here.
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-muted-foreground">
-                    One code per account. Search by code or by what it covers.
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={saveCodes}
-                    isLoading={isSaving}
-                    disabled={!selectedCode}
-                  >
-                    Save changes
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setEditing(false)}
-                    disabled={isSaving}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-start gap-3">
-                {isLoading ? (
-                  <Shimmer className="h-4 w-40" />
-                ) : purposeCodes.length ? (
-                  // Every saved code is listed, not just the first: an account
-                  // configured before the single-code rule still has several and
-                  // hiding the extras would misreport what it is set to.
-                  <div className="space-y-1 text-right">
-                    {purposeCodes.map((code) => {
-                      const description = describeCode(code);
-                      return (
-                        <div key={code}>
-                          <span className="text-sm font-semibold text-foreground">{code}</span>
-                          {description && (
-                            <p className="text-xs text-muted-foreground">{description}</p>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <span className="text-sm font-semibold text-foreground">Not set</span>
-                )}
-                <Button type="button" variant="outline" size="sm" onClick={startEditing}>
-                  Edit
+      <FieldGroupCard
+        title="Legal & registration"
+        description="On file for compliance — matches your incorporation and GST records."
+        fields={legalFields}
+      >
+        {/* Real, editable purpose code row — the one field on this page that
+            takes input, so it is the only one that shows a boxed control, and
+            only while actually editing. Label styling matches
+            SettingsDetailRow so it reads as part of the same list. Sits with
+            the legal/compliance group since RBI purpose codes belong there,
+            not among public-facing or support fields. */}
+        <div className="flex items-start justify-between gap-6 py-3">
+          <div className="max-w-xs">
+            <p className="text-sm text-muted-foreground">Purpose code</p>
+            <p className="mt-0.5 text-xs text-muted-foreground/70">
+              RBI purpose code used for cross-border transactions.
+            </p>
+          </div>
+          {editing ? (
+            <div className="w-full max-w-md space-y-2">
+              <PurposeCodeCombobox
+                id="business-purpose-code"
+                value={selectedCode}
+                onChange={setSelectedCode}
+                options={purposeCodeOptions}
+                isLoading={isOptionsLoading}
+              />
+              {hasLegacyMultiple ? (
+                <p className="text-[11px] text-destructive">
+                  This account currently holds {purposeCodes.length} purpose codes (
+                  {purposeCodes.join(", ")}). Accounts now carry a single code, so saving replaces
+                  all of them with the one you pick here.
+                </p>
+              ) : (
+                <p className="text-[11px] text-muted-foreground">
+                  One code per account. Search by code or by what it covers.
+                </p>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={saveCodes}
+                  isLoading={isSaving}
+                  disabled={!selectedCode}
+                >
+                  Save changes
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditing(false)}
+                  disabled={isSaving}
+                >
+                  Cancel
                 </Button>
               </div>
-            )}
-          </div>
-
-          {readOnlyFields.map((field) => (
-            <SettingsDetailRow
-              key={field.label}
-              label={field.label}
-              description={field.description}
-              value={
-                field.isLoading && !field.value ? (
-                  <Shimmer className="h-4 w-40" />
-                ) : (
-                  field.value.trim() || "Not available"
-                )
-              }
-            />
-          ))}
+            </div>
+          ) : (
+            <div className="flex items-start gap-3">
+              {isLoading ? (
+                <Shimmer className="h-4 w-40" />
+              ) : purposeCodes.length ? (
+                // Every saved code is listed, not just the first: an account
+                // configured before the single-code rule still has several and
+                // hiding the extras would misreport what it is set to.
+                <div className="space-y-1 text-right">
+                  {purposeCodes.map((code) => {
+                    const description = describeCode(code);
+                    return (
+                      <div key={code}>
+                        <span className="text-sm font-semibold text-foreground">{code}</span>
+                        {description && (
+                          <p className="text-xs text-muted-foreground">{description}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <span className="text-sm font-semibold text-foreground">Not set</span>
+              )}
+              <Button type="button" variant="outline" size="sm" onClick={startEditing}>
+                Edit
+              </Button>
+            </div>
+          )}
         </div>
-      </Card>
+      </FieldGroupCard>
+
+      <FieldGroupCard
+        title="Public profile"
+        description="What customers see on receipts, payment pages and your website."
+        fields={publicProfileFields}
+      />
+
+      <FieldGroupCard
+        title="Support contact"
+        description="Where a customer's query about a payment reaches you."
+        fields={supportFields}
+      />
     </div>
   );
 }
