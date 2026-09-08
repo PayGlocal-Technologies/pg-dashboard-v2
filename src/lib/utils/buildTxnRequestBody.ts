@@ -1,5 +1,9 @@
 import type { TableReqBody, TxnFilterValues } from "@/types/transactions";
 
+// Not @/validators' isValidEmail: that one trims, and this classifier
+// feeds the untrimmed searchQuery straight into an exact-match encEmailId
+// lookup. Trimming here would route a padded query to a search that then can't
+// match. Worth unifying, but only alongside trimming the value itself.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isEmail = (v: string) => EMAIL_RE.test(v);
 

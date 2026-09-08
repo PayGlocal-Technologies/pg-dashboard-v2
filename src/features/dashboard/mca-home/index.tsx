@@ -132,13 +132,7 @@ export function McaDashboardFeature() {
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-[1.35rem] font-bold leading-snug tracking-tight text-foreground">
-            {greeting}, {displayName}{" "}
-            <span
-              className="inline-block origin-bottom-right"
-              style={{ animation: "wave 2.4s ease-in-out infinite" }}
-            >
-              👋
-            </span>
+            {greeting}, {displayName}
           </h1>
           <p className="mt-0.5 text-[13px] text-muted-foreground">{contextLine}</p>
         </div>

@@ -100,3 +100,39 @@ export interface ContactData {
 export interface ContactDataResponse {
   data?: ContactData | null;
 }
+
+// ── Change email ─────────────────────────────────────────────────────────────
+
+/** GlocalApiResponse — the app-wide envelope all six endpoints answer with, on
+ *  success and on error alike.
+ *
+ *  `status` is Java's HttpStatus printed as text ("201 CREATED"), not a bare
+ *  code — with one exception: step 4 overrides it to
+ *  EMAIL_CHANGE_COMPLETED_STATUS on the success that commits the change.
+ *  `reasonCode` is the app-wide "GL-201-001" constant on every success and
+ *  carries no per-endpoint meaning. */
+export interface ChangeEmailResponse {
+  gid?: string;
+  status?: string;
+  message?: string;
+  timestamp?: string;
+  reasonCode?: string;
+  data?: unknown;
+  errors?: unknown;
+}
+
+/** What step 4 tells the dialog. `committed` is keyed off the response's
+ *  EMAIL_CHANGE_COMPLETED status, the server's only confirmation that the email
+ *  actually changed — a 2xx alone does not mean it did. */
+export interface ChangeEmailCommit {
+  message: string;
+  committed: boolean;
+}
+
+/** What the dialog needs out of a failed call. The shared error handler rejects
+ *  with the server envelope rather than an AxiosError, so the HTTP status is
+ *  only available when the body carried it. */
+export interface ChangeEmailFailure {
+  message: string;
+  status?: number;
+}

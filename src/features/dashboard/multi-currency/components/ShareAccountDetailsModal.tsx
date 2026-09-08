@@ -532,8 +532,12 @@ export function ShareAccountDetailsModal({
                     step. gap-4 keeps every row inside at the same medium
                     rhythm; the tighter groups below (metadata rows, body
                     paragraphs) override it locally with their own
-                    space-y-1/space-y-2. */}
-                <Card size="sm" className="mt-4 gap-4">
+                    space-y-1/space-y-2. text-xs sets the whole preview at
+                    12px, the size pg-dashboard renders this email body at
+                    (TG.CR / TG.CSB); without it the unclassed rows below
+                    inherit the 16px body default and the preview shouts
+                    louder than the form beside it. */}
+                <Card size="sm" className="mt-4 gap-4 text-xs">
                   <div className="flex items-center justify-between gap-4">
                     <p className="min-w-0 truncate">
                       <span className="font-semibold text-foreground">From: </span>
@@ -612,7 +616,7 @@ export function ShareAccountDetailsModal({
                         the amber here identical to every other warning in the
                         product. */}
                     <Alert variant="warning">
-                      <AlertDescription className="font-semibold text-foreground">
+                      <AlertDescription className="text-xs font-semibold text-foreground">
                         Important: Please note that our bank account details remain unchanged unless
                         officially communicated by us through verified channels
                       </AlertDescription>
