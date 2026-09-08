@@ -19,7 +19,7 @@ import {
 // TODO(integration): no real OTP/verification-link endpoints exist yet for
 // changing a signed-in user's own email/phone, this whole flow is mocked:
 // "123456" is accepted as the correct code at every OTP step.
-const MOCK_OTP_LENGTH = 6;
+const MOCK_OTP_LENGTH = 4;
 const MOCK_OTP_CODE = "123456";
 
 export type ContactType = "email" | "phone";

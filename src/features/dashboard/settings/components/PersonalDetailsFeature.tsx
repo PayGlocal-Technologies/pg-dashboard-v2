@@ -4,12 +4,10 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { AppImage } from "@/components/common/AppImage";
 import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
+import { useLogout } from "@/lib/hooks/useLogout";
 import { useApp } from "@/stores/useApp";
 import { SettingsDetailRow } from "@/features/dashboard/settings/components/SettingsDetailRow";
-import {
-  EditContactDialog,
-  type ContactType,
-} from "@/features/dashboard/settings/components/EditContactDialog";
+import { ChangeEmailDialog } from "@/features/dashboard/settings/components/ChangeEmailDialog";
 import { ChangePasswordDialog } from "@/features/dashboard/settings/components/ChangePasswordDialog";
 import {
   useContactDetails,
@@ -92,18 +90,18 @@ export function PersonalDetailsFeature() {
     });
   };
 
-  // Email + phone now come from the real /contact endpoint (read-only in
-  // pg-dashboard). The overrides below only carry the mock edit dialog's result
-  // for this session — see the BACKEND GAP note on the Edit buttons.
+  // Email + phone come from the real /contact endpoint (read-only in
+  // pg-dashboard). Email is changed through its own six-step flow; the session
+  // survives it, and useChangeEmail invalidates this query on the commit, so
+  // the row below picks the new address up on its own.
   const { contact, isLoading } = useContactDetails();
-  const [emailOverride, setEmailOverride] = useState<string | null>(null);
-  const [phoneOverride, setPhoneOverride] = useState<string | null>(null);
 
-  const email = emailOverride ?? contact?.emailId ?? profile?.emailId ?? "Not available";
-  const phone = phoneOverride ?? contact?.phoneNumber ?? "Not available";
+  const email = contact?.emailId ?? profile?.emailId ?? "Not available";
+  const phone = contact?.phoneNumber ?? "Not available";
 
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
-  const [editingContact, setEditingContact] = useState<ContactType | null>(null);
+  const [changingEmail, setChangingEmail] = useState(false);
+  const { logout } = useLogout();
 
   return (
     <div className="space-y-5">
@@ -155,13 +153,13 @@ export function PersonalDetailsFeature() {
 
           <SettingsDetailRow label="Full name" value={fullName} />
 
-          {/* BACKEND GAP: /contact is read-only — there is no endpoint to change
-              a signed-in user's own email/phone, so the Edit dialog is a mocked
-              OTP flow. The displayed value itself is real. */}
+          {/* BACKEND GAP: /contact is read-only and there is no endpoint to
+              change a signed-in user's own phone, so this row has no Edit
+              action. Email does — see ChangeEmailDialog. */}
           <div className="flex items-center justify-between gap-4 py-3">
             <p className="text-sm text-muted-foreground">Phone number</p>
             <div className="flex items-center gap-3">
-              {isLoading && !phoneOverride ? (
+              {isLoading ? (
                 <Shimmer className="h-4 w-32" />
               ) : (
                 <span className="text-sm font-semibold text-foreground">{phone}</span>
@@ -172,12 +170,19 @@ export function PersonalDetailsFeature() {
           <div className="flex items-center justify-between gap-4 py-3">
             <p className="text-sm text-muted-foreground">Email ID</p>
             <div className="flex items-center gap-3">
-              {isLoading && !emailOverride ? (
+              {isLoading ? (
                 <Shimmer className="h-4 w-40" />
               ) : (
                 <span className="text-sm font-semibold text-foreground">{email}</span>
               )}
-              <Button variant="outline" size="sm" onClick={() => setEditingContact("email")}>
+              {/* Gated on a known current address: step 1 mails the code there,
+                  and the first screen has nothing to show without it. */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setChangingEmail(true)}
+                disabled={isLoading || email === "Not available"}
+              >
                 Edit
               </Button>
             </div>
@@ -198,14 +203,21 @@ export function PersonalDetailsFeature() {
 
       <ChangePasswordDialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen} />
 
-      {editingContact && (
-        <EditContactDialog
-          type={editingContact}
-          open
-          onOpenChange={(next) => {
-            if (!next) setEditingContact(null);
+      {/* Mounted only while open so each run starts from step 1. */}
+      {changingEmail && (
+        <ChangeEmailDialog
+          currentEmail={email}
+          onOpenChange={setChangingEmail}
+          // A committed change leaves the session alone now, so there is
+          // nothing to do but close and confirm.
+          onCompleted={(next) => {
+            setChangingEmail(false);
+            toast.success(`Your account email is now ${next}.`);
           }}
-          onConfirm={editingContact === "email" ? setEmailOverride : setPhoneOverride}
+          // Three wrong codes still ends the session server-side. useLogout
+          // clears the local stores on the way out — without that the next
+          // visitor to this browser would rehydrate the old profile.
+          onSessionEnded={() => logout()}
         />
       )}
     </div>
