@@ -87,7 +87,9 @@ export function PlatformsFeature() {
  * column, so the workflow starts at the top of the page rather than below a
  * band of logos. The workflow itself reads top-down as one funnel — name the
  * platform and the currency you're paid in, check the account those resolve to,
- * collect the documents you'll be asked for, then work down the numbered steps.
+ * then work down the numbered steps. The documents the platform may ask you for
+ * sit under the platform column on the left, beside that funnel rather than in
+ * it — the same place Virtual Accounts keeps its own.
  *
  * Nothing here is a new component. The platform rows are flux-ui Buttons in the
  * same ghost/secondary selected treatment RegionSelector uses, the mobile
@@ -244,125 +246,216 @@ function PlatformsContent() {
         {/* ─── Platform navigation ─────────────────────────────────────── */}
         {/* lg:sticky, so the platform list stays on screen while the workflow
             beside it scrolls: it is this page's only navigation, and the
-            connect steps, account fields and documents run well past one
+            connect steps, account fields and screenshots run well past one
             screen. Sticks inside <main> (the dashboard's scroll container), and
             top-6 matches that container's own md:p-6 inset so the column pins
             level with where it started rather than flush against the header.
             Works only because the grid sets lg:items-start — a stretched grid
             item is as tall as its row and has nothing to slide within. The
-            caption sticks with the list, since both live in this one item. */}
-        <div className="lg:sticky lg:top-6 lg:col-start-1" data-guide="mca-platform-selector">
-          {/* The smallest, muted, uppercase step: the navigation is how you
-              reach the content rather than content itself, so its caption stays
-              lighter than any title in the workflow beside it. The list's own
-              aria-label is what a screen reader announces here. */}
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Select platform
-          </div>
+            caption and the documents stick with the list, since all three live
+            in this one item. */}
+        <div className="lg:sticky lg:top-6 lg:col-start-1">
+          {/* The selector itself — caption plus whichever of the two
+              controls the width calls for — as one element, so the guide
+              spotlights the platform choice rather than the whole column
+              (which now carries the documents below it as well). */}
+          <div data-guide="mca-platform-selector">
+            {/* The smallest, muted, uppercase step: the navigation is how you
+                reach the content rather than content itself, so its caption stays
+                lighter than any title in the workflow beside it. The list's own
+                aria-label is what a screen reader announces here. */}
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Select platform
+            </div>
 
-          {/* Below `lg` the same choice is a dropdown: a five-row vertical list
-              above the workflow would push the content it selects off the first
-              screen, where a collapsed trigger costs one row. Both controls are
-              driven by the same state, so which one is on screen is purely a
-              matter of width. */}
-          <div className="mt-2 lg:hidden">
-            <Select value={selectedPlatform.id} onValueChange={setSelectedPlatformId}>
-              <SelectTrigger className="w-full" aria-label="Select platform">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {platforms.map((platform) => (
-                  <SelectItem key={platform.id} value={platform.id}>
-                    <span className="flex items-center gap-2.5">
-                      <Image
-                        src={platform.logoSrc}
-                        alt=""
-                        width={90}
-                        height={60}
-                        className="h-5 w-8 shrink-0 object-contain"
-                      />
-                      {platform.name}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* At `lg` and up, the vertical tab list. Wrapped rather than hiding
-              the Card itself, so the Card keeps its own flex-column layout
-              instead of having it overridden by a display utility.
-
-              p-3 rather than Card's own 28px inset: the rows carry their own
-              horizontal padding, so the card only has to keep them clear of its
-              edge. Same treatment as the Virtual Accounts region card. */}
-          <div className="hidden lg:block">
-            <Card size="sm" className="mt-2 gap-0 p-3">
-              <div className="space-y-1" role="list" aria-label="Select a platform">
-                {platforms.map((platform) => {
-                  const isSelected = platform.id === selectedPlatform.id;
-                  return (
-                    <Button
-                      key={platform.id}
-                      type="button"
-                      role="listitem"
-                      aria-current={isSelected}
-                      variant={isSelected ? "secondary" : "ghost"}
-                      size="md"
-                      // flux-ui's Button lays leftIcon / label / rightIcon out
-                      // as three direct flex children, so the chevron would
-                      // otherwise sit immediately after the platform name.
-                      // Letting the label span take the free space pushes it to
-                      // the far right of the row instead.
-                      className={cn(
-                        "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
-                        // The selected row is the only one at full emphasis:
-                        // `secondary` carries the design system's own selected
-                        // surface, and the primary tint on top is its accent.
-                        // Unselected rows drop to the muted token, which is
-                        // what keeps the whole column from out-weighing the
-                        // workflow beside it.
-                        isSelected ? "font-semibold text-primary" : "text-muted-foreground"
-                      )}
-                      // The platform's own brand mark, sized by the box rather
-                      // than by the file so all five sit on the same optical
-                      // line whatever padding each PNG carries. object-contain
-                      // keeps every mark inside its footprint uncropped.
-                      leftIcon={
+            {/* Below `lg` the same choice is a dropdown: a five-row vertical list
+                above the workflow would push the content it selects off the first
+                screen, where a collapsed trigger costs one row. Both controls are
+                driven by the same state, so which one is on screen is purely a
+                matter of width. */}
+            <div className="mt-2 lg:hidden">
+              <Select value={selectedPlatform.id} onValueChange={setSelectedPlatformId}>
+                <SelectTrigger className="w-full" aria-label="Select platform">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {platforms.map((platform) => (
+                    <SelectItem key={platform.id} value={platform.id}>
+                      <span className="flex items-center gap-2.5">
                         <Image
                           src={platform.logoSrc}
                           alt=""
                           width={90}
                           height={60}
-                          className="h-6 w-9 shrink-0 object-contain"
+                          className="h-5 w-8 shrink-0 object-contain"
                         />
-                      }
-                      // Only on the selected row: it points at the workflow
-                      // that row is currently driving, so showing it on every
-                      // row would read as five affordances instead of one
-                      // pointer.
-                      rightIcon={
-                        isSelected ? (
-                          <Icon name="chevron-right" className="h-3.5 w-3.5" />
-                        ) : undefined
-                      }
-                      onClick={() => setSelectedPlatformId(platform.id)}
-                    >
-                      <span className="truncate">{platform.name}</span>
-                    </Button>
-                  );
-                })}
-              </div>
-            </Card>
+                        {platform.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* At `lg` and up, the vertical tab list. Wrapped rather than hiding
+                the Card itself, so the Card keeps its own flex-column layout
+                instead of having it overridden by a display utility.
+
+                p-3 rather than Card's own 28px inset: the rows carry their own
+                horizontal padding, so the card only has to keep them clear of its
+                edge. Same treatment as the Virtual Accounts region card. */}
+            <div className="hidden lg:block">
+              <Card size="sm" className="mt-2 gap-0 p-3">
+                <div className="space-y-1" role="list" aria-label="Select a platform">
+                  {platforms.map((platform) => {
+                    const isSelected = platform.id === selectedPlatform.id;
+                    return (
+                      <Button
+                        key={platform.id}
+                        type="button"
+                        role="listitem"
+                        aria-current={isSelected}
+                        variant={isSelected ? "secondary" : "ghost"}
+                        size="md"
+                        // flux-ui's Button lays leftIcon / label / rightIcon out
+                        // as three direct flex children, so the chevron would
+                        // otherwise sit immediately after the platform name.
+                        // Letting the label span take the free space pushes it to
+                        // the far right of the row instead.
+                        className={cn(
+                          "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
+                          // The selected row is the only one at full emphasis:
+                          // `secondary` carries the design system's own selected
+                          // surface, and the primary tint on top is its accent.
+                          // Unselected rows drop to the muted token, which is
+                          // what keeps the whole column from out-weighing the
+                          // workflow beside it.
+                          isSelected ? "font-semibold text-primary" : "text-muted-foreground"
+                        )}
+                        // The platform's own brand mark, sized by the box rather
+                        // than by the file so all five sit on the same optical
+                        // line whatever padding each PNG carries. object-contain
+                        // keeps every mark inside its footprint uncropped.
+                        leftIcon={
+                          <Image
+                            src={platform.logoSrc}
+                            alt=""
+                            width={90}
+                            height={60}
+                            className="h-6 w-9 shrink-0 object-contain"
+                          />
+                        }
+                        // Only on the selected row: it points at the workflow
+                        // that row is currently driving, so showing it on every
+                        // row would read as five affordances instead of one
+                        // pointer.
+                        rightIcon={
+                          isSelected ? (
+                            <Icon name="chevron-right" className="h-3.5 w-3.5" />
+                          ) : undefined
+                        }
+                        onClick={() => setSelectedPlatformId(platform.id)}
+                      >
+                        <span className="truncate">{platform.name}</span>
+                      </Button>
+                    );
+                  })}
+                </div>
+              </Card>
+            </div>
           </div>
+
+          {/* ─── Documents you might need ─────────────────────────────── */}
+          {/* Preparation a merchant collects before working through the
+              steps, so it belongs with the platform choice that decides
+              which documents these are — the same place Virtual Accounts
+              keeps its own document card, under the region selector, rather
+              than partway down the content beside it. Only Amazon carries
+              documents, so on every other platform this section doesn't
+              exist and the column is the selector alone.
+
+              mt-6 rather than a space-y on the column: the selector's two
+              controls already carry their own mt-2 off the caption, so the
+              spacing in here stays per-sibling. */}
+          {documents.length > 0 && (
+            <section className="mt-6">
+              {/* The same title step the workflow's own section titles use,
+                  a step above the card metadata beneath it — deliberately
+                  heavier than the selector's caption above, since these are
+                  content rather than navigation. */}
+              <h2 className={MODULE_TITLE}>Documents you might need</h2>
+              <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+                Statements {selectedPlatform.name} may ask you for.
+              </p>
+
+              {/* One card per document rather than rows inside a single card:
+                  each is its own action target. Stacked rather than paired in
+                  columns — this now sits in the narrow 288px column, where two
+                  cards on one line would truncate their own titles at every
+                  width. mt-3 binds the pair to the heading that names them. */}
+              <div className="mt-3 space-y-3">
+                {documents.map((doc) => (
+                  // The whole card is the target, not just the icon: the card
+                  // carries one action, so anywhere on it should trigger it
+                  // rather than asking for a hit on a 32px button.
+                  // role/tabIndex and the Enter/Space handler are what make that
+                  // reachable by keyboard too; the accessible name comes from
+                  // the card's own caption and title text.
+                  //
+                  // No preventDefault on mousedown: the card should keep browser
+                  // focus after a click, so that closing the drawer returns
+                  // focus to the card that opened it.
+                  <Card
+                    key={doc.title}
+                    size="sm"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => handleDocumentAction(doc)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        handleDocumentAction(doc);
+                      }
+                    }}
+                    className="min-w-0 cursor-pointer flex-row items-center justify-between gap-3 p-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md"
+                  >
+                    <div className="min-w-0">
+                      {/* Metadata above, title below — the caption qualifies the
+                          title, so it sits muted and a size smaller. */}
+                      <p className="truncate text-[12px] text-muted-foreground">{doc.caption}</p>
+                      <p className="truncate text-[13px] font-medium text-foreground">
+                        {doc.title}
+                      </p>
+                    </div>
+                    {/* Kept as an affordance — it says the card does something —
+                        but it runs the same handler the card does.
+                        stopPropagation so a click on the icon fires that handler
+                        once, not twice. */}
+                    <IconButton
+                      aria-label={doc.actionLabel}
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDocumentAction(doc);
+                      }}
+                    >
+                      <Icon name={doc.actionIcon} className="h-4 w-4" />
+                    </IconButton>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
         </div>
 
         {/* ─── Workflow ────────────────────────────────────────────────── */}
         {/* key remounts the column on every platform change so the fade
             replays on each switch, not just the first render. Every heading,
-            the currency control, the account fields, the documents and the
-            steps below all read off the selected platform, so switching tabs
-            reprints the whole column in place.
+            the currency control, the account fields and the steps below all
+            read off the selected platform, so switching tabs reprints the whole
+            column in place.
 
             max-w-4xl caps the measure: past about 900px an instruction line
             runs longer than is comfortable to read and a screenshot frame grows
@@ -500,86 +593,7 @@ function PlatformsContent() {
             </Card>
           )}
 
-          {/* ─── 3. Documents you might need ──────────────────────────── */}
-          {/* The other half of the preparation, and the last thing before the
-              instructions begin — this is where a merchant reaches for them,
-              mid-setup rather than after it. Separated from the account panel
-              above by space only, no rule. Only Amazon carries documents, so on
-              every other platform this section doesn't exist and the steps
-              follow the account panel directly. */}
-          {documents.length > 0 && (
-            <section>
-              {/* A step below the workflow title and a step above the card
-                  metadata beneath it — the middle of the page's three type
-                  levels. */}
-              <h2 className={MODULE_TITLE}>Documents you might need</h2>
-              <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-                Statements {selectedPlatform.name} may ask you for.
-              </p>
-
-              {/* One card per document rather than rows inside a single card:
-                  each is its own action target. Side by side in equal columns
-                  from `sm` up — they shrink together on a tablet rather than one
-                  dropping under the other — and stacked below it, where two
-                  cards on one line would truncate their own titles. mt-3 binds
-                  the pair to the heading that names them. */}
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                {documents.map((doc) => (
-                  // The whole card is the target, not just the icon: the card
-                  // carries one action, so anywhere on it should trigger it
-                  // rather than asking for a hit on a 32px button.
-                  // role/tabIndex and the Enter/Space handler are what make that
-                  // reachable by keyboard too; the accessible name comes from
-                  // the card's own caption and title text.
-                  //
-                  // No preventDefault on mousedown: the card should keep browser
-                  // focus after a click, so that closing the drawer returns
-                  // focus to the card that opened it.
-                  <Card
-                    key={doc.title}
-                    size="sm"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => handleDocumentAction(doc)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        handleDocumentAction(doc);
-                      }
-                    }}
-                    className="min-w-0 cursor-pointer flex-row items-center justify-between gap-3 p-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md"
-                  >
-                    <div className="min-w-0">
-                      {/* Metadata above, title below — the caption qualifies the
-                          title, so it sits muted and a size smaller. */}
-                      <p className="truncate text-[12px] text-muted-foreground">{doc.caption}</p>
-                      <p className="truncate text-[13px] font-medium text-foreground">
-                        {doc.title}
-                      </p>
-                    </div>
-                    {/* Kept as an affordance — it says the card does something —
-                        but it runs the same handler the card does.
-                        stopPropagation so a click on the icon fires that handler
-                        once, not twice. */}
-                    <IconButton
-                      aria-label={doc.actionLabel}
-                      variant="ghost"
-                      size="sm"
-                      className="shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDocumentAction(doc);
-                      }}
-                    >
-                      <Icon name={doc.actionIcon} className="h-4 w-4" />
-                    </IconButton>
-                  </Card>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* ─── 4. Steps ────────────────────────────────────────────── */}
+          {/* ─── 3. Steps ────────────────────────────────────────────── */}
           {/* The page's primary instructional content, and the only section
               carrying full-width art, which is what gives it the weight the two
               compact sections above it deliberately don't have. */}
