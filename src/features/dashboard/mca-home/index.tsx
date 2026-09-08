@@ -9,7 +9,7 @@ import { useApp } from "@/stores/useApp";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
-import useNewPermissions from "@/hooks/useNewPermissions";
+import { useHasEcho } from "@/features/dashboard/echo/hooks";
 import {
   MCA_DASHBOARD_GUIDE_ECHO_TARGET,
   MCA_DASHBOARD_GUIDE_KEY,
@@ -68,11 +68,10 @@ export function McaDashboardFeature() {
   const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
 
   // The tour's Echo step points at the sidebar's Echo row, which only exists
-  // for accounts with getEchoActiveSession. Dropped rather than left to
-  // Spotlight's onMissing, which waits ~6s before moving on — see the note on
+  // for accounts that have Echo. Dropped rather than left to Spotlight's
+  // onMissing, which waits ~6s before moving on — see the note on
   // MCA_DASHBOARD_GUIDE_ECHO_TARGET.
-  const checkPermissions = useNewPermissions();
-  const hasEcho = checkPermissions(["getEchoActiveSession"]);
+  const hasEcho = useHasEcho();
   const guideSteps = hasEcho
     ? MCA_DASHBOARD_GUIDE_STEPS
     : MCA_DASHBOARD_GUIDE_STEPS.filter((step) => step.target !== MCA_DASHBOARD_GUIDE_ECHO_TARGET);

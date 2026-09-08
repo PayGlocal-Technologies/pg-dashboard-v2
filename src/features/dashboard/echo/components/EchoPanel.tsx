@@ -7,8 +7,7 @@ import { Icon } from "@/components/icon";
 import { EchoComposer } from "@/features/dashboard/echo/components/EchoComposer";
 import { EchoHero } from "@/features/dashboard/echo/components/EchoHero";
 import { EchoTranscript } from "@/features/dashboard/echo/components/EchoTranscript";
-import { useEchoAutoStart, useEchoSession } from "@/features/dashboard/echo/hooks";
-import useNewPermissions from "@/hooks/useNewPermissions";
+import { useEchoAutoStart, useEchoSession, useHasEcho } from "@/features/dashboard/echo/hooks";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { ECHO_PANEL_WIDTH, useEchoPanel } from "@/stores/useEchoPanel";
@@ -27,13 +26,12 @@ import { ECHO_PANEL_WIDTH, useEchoPanel } from "@/stores/useEchoPanel";
  * `start` is what keeps the panel and the page from racing two opening
  * handshakes when both are mounted on /echo.
  *
- * Gated on `getEchoActiveSession` like every other Echo surface. Below `md`
+ * Gated on `useHasEcho` like every other Echo surface. Below `md`
  * nothing renders it: the entry points navigate to /echo on those viewports
  * instead (see AskEchoButton), since a 420px panel beside the content needs a
  * viewport that has 420px to spare.
  */
 export function EchoPanel() {
-  const checkPermissions = useNewPermissions();
   const { open, setOpen } = useEchoPanel();
   const { entries, status, busy, start, sendText, sendButton, sendListRow, retry, restart } =
     useEchoSession();
@@ -44,7 +42,7 @@ export function EchoPanel() {
 
   useEchoAutoStart(open, start);
 
-  const hasEcho = checkPermissions(["getEchoActiveSession"]);
+  const hasEcho = useHasEcho();
 
   const expand = () => {
     setOpen(false);

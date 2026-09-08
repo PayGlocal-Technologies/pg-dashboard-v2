@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { usePost } from "@/lib/api/hooks";
+import useNewPermissions from "@/hooks/useNewPermissions";
 import {
   ECHO_ERROR_MESSAGE,
   ECHO_OPENING_REQUEST,
@@ -13,6 +14,25 @@ import type { EchoAppResponse, EchoRequest } from "@/features/dashboard/echo/typ
 import { useEcho } from "@/stores/useEcho";
 
 /**
+ * Whether this account has Echo at all.
+ *
+ * `getEchoActiveSession` is the permission pg-dashboard uses to decide who
+ * gets Echo; without it there is no server session to talk to, so every Echo
+ * surface hides rather than opening something that cannot work.
+ *
+ * A hook rather than the same `checkPermissions([...])` call copied into each
+ * surface, because the answer has to be shared: the sidebar's "Assistant"
+ * heading and the row underneath it are different components, and when only
+ * the row knew the answer the heading rendered over an empty gap for accounts
+ * without Echo.
+ */
+export function useHasEcho(): boolean {
+  const checkPermissions = useNewPermissions();
+  return checkPermissions(["getEchoActiveSession"]);
+}
+
+/**
+ * Drives one turn of the Echo conversation./**
  * Drives one turn of the Echo conversation.
  *
  * Everything the app knows about where it is in the flow comes back from the

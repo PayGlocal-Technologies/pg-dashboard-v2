@@ -3,7 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { Badge, Button, useBreakpoint } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import useNewPermissions from "@/hooks/useNewPermissions";
+import { useHasEcho } from "@/features/dashboard/echo/hooks";
 import { cn } from "@/lib/utils";
 import { useEchoPanel } from "@/stores/useEchoPanel";
 
@@ -12,10 +12,10 @@ import { useEchoPanel } from "@/stores/useEchoPanel";
  * and the header pill beside Help. Both toggle the same side panel through
  * `useEchoPanel`, so they can never disagree about whether it is open.
  *
- * Both are gated on `getEchoActiveSession`, the same permission pg-dashboard
- * uses to decide who gets Echo at all — a merchant without it has no server
+ * Both are gated on `useHasEcho` — a merchant without Echo has no server
  * session to talk to, so the control does not appear rather than opening a
- * panel that cannot work.
+ * panel that cannot work. The sidebar's "Assistant" heading reads the same
+ * hook, so the two cannot disagree and leave a heading over an empty gap.
  *
  * Below `md` there is no room for a 420px panel beside the content, so on
  * those viewports both controls navigate to /echo instead of toggling. The
@@ -71,15 +71,14 @@ type SidebarProps = {
  *
  * Carries `data-guide="echo-ask"`, the anchor for the Echo step in the MCA
  * dashboard walkthrough (see `mca-home/guide.ts`). The attribute sits on the
- * element that only exists when the permission check passes, so a merchant
- * without Echo has no target and the tour's `onMissing` quietly skips that
- * step rather than spotlighting an empty box.
+ * element that only exists when the permission check passes; the tour drops
+ * that step for the same accounts, reading `useHasEcho` itself.
  */
 export function AskEchoButton({ collapsed = false, onNavigate, className }: SidebarProps) {
-  const checkPermissions = useNewPermissions();
+  const hasEcho = useHasEcho();
   const { pressed, activate, onEchoPage } = useEchoEntryAction(onNavigate);
 
-  if (!checkPermissions(["getEchoActiveSession"])) return null;
+  if (!hasEcho) return null;
 
   return (
     // flux's Button wraps all children in one plain <span>, so `items-center`
@@ -128,10 +127,10 @@ export function AskEchoButton({ collapsed = false, onNavigate, className }: Side
  * on those viewports.
  */
 export function AskEchoHeaderButton() {
-  const checkPermissions = useNewPermissions();
+  const hasEcho = useHasEcho();
   const { pressed, activate, onEchoPage } = useEchoEntryAction();
 
-  if (!checkPermissions(["getEchoActiveSession"])) return null;
+  if (!hasEcho) return null;
 
   return (
     // The rotating gradient ring (.echo-ask-ring-wrap in globals.css) is a
