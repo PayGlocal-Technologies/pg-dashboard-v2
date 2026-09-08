@@ -2,9 +2,8 @@ import type { IconName } from "@/components/icon";
 
 // ── Change email ─────────────────────────────────────────────────────────────
 
-/** Both change-email codes are 6 digits. Not to be confused with login's
- *  OTP_LENGTH, which is 4. */
-export const EMAIL_OTP_LENGTH = 6;
+/** Both change-email codes are 4 digits, matching login's OTP_LENGTH. */
+export const EMAIL_OTP_LENGTH = 4;
 
 /** The API ends the session on the third wrong code at either OTP step. Counted
  *  client-side only to warn before it happens — the server is the authority. */
