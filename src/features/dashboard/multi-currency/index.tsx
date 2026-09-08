@@ -170,7 +170,7 @@ function MultiCurrencyContent() {
         // User dismissed the sheet, or the browser refused — fall through to copy.
       }
     }
-    await copyToClipboard(text, "Account details copied — ready to send to your client");
+    await copyToClipboard(text, "Account details copied, ready to send to your client");
   };
 
   const handleShareFullAccount = (account: VirtualAccount) => {
@@ -360,7 +360,7 @@ function MultiCurrencyContent() {
                     Need proof of account ownership?
                   </p>
                   <p className={MODULE_SUBTITLE}>
-                    An official document confirming this receiving account belongs to you — for
+                    An official document confirming this receiving account belongs to you, for
                     clients or banks that ask.
                   </p>
                 </div>

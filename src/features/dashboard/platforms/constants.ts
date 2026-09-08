@@ -171,13 +171,13 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
         quickAccess: true,
       },
       {
-        instruction: "Upwork asks you to set up a withdrawal schedule — fill it in or skip it",
+        instruction: "Upwork asks you to set up a withdrawal schedule. Fill it in or skip it",
         screenshotSrc: "/assets/platform-withdrawals/upwork/step-6.svg",
         screenshotAlt: "Upwork withdrawal schedule setup screen",
       },
       {
         instruction: "Enable the checkbox and click 'Save changes'",
-        note: "Upwork might ask you to submit certain tax documents before you can withdraw funds — a PAN, a W-8BEN form, and similar.",
+        note: "Upwork might ask you to submit certain tax documents before you can withdraw funds, such as a PAN or a W-8BEN form.",
         screenshotSrc: "/assets/platform-withdrawals/upwork/step-7.svg",
         screenshotAlt: "Upwork save changes confirmation with the consent checkbox enabled",
       },
@@ -243,7 +243,7 @@ export const SUPPORTED_PLATFORMS: Platform[] = [
       },
       {
         instruction:
-          "In the Business section, enter the account details — the sort code field takes your routing number",
+          "In the Business section, enter the account details. The sort code field takes your routing number",
         screenshotSrc: "/assets/platform-withdrawals/deel/step-5.jpg",
         screenshotAlt: "Deel business bank details form filled with virtual account details",
         quickAccess: true,

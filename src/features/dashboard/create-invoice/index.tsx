@@ -1179,7 +1179,7 @@ function InvoiceEditor({
       clientIssue.kind === "not-selected"
         ? "Pick who this invoice bills."
         : clientIssue.kind === "incomplete-address"
-          ? "Complete their billing address — it prints on the invoice."
+          ? "Complete their billing address. It prints on the invoice."
           : clientIssue.kind === "remitter-mismatch"
             ? "This client is not the remitter on the linked transaction."
             : null,

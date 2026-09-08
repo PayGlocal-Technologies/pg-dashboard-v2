@@ -39,7 +39,7 @@ export function WebhooksFeature() {
         }
       />
 
-      <BackendGapNotice message="No webhook-management endpoint exists yet — endpoints and actions here are illustrative." />
+      <BackendGapNotice message="No webhook-management endpoint exists yet, so endpoints and actions here are illustrative." />
 
       <Card className="gap-0 p-5">
         <div className="flex flex-col gap-3">

@@ -38,14 +38,14 @@ export type PayGlocalInsight = {
 
 const DEFAULT_INSIGHTS: PayGlocalInsight[] = [
   {
-    headline: "International revenue up 31% MoM — your fastest growing channel",
+    headline: "International revenue up 31% MoM, your fastest growing channel",
     iconName: "trending-up",
     sparkline: [38, 42, 40, 48, 52, 50, 58, 62, 68, 72, 78, 85, 92],
     chartTone: "brand",
     chartKind: "area",
   },
   {
-    headline: "Your payment success rate is 94.2% — 18% above industry average",
+    headline: "Your payment success rate is 94.2%, 18% above industry average",
     iconName: "check-circle",
     sparkline: [72, 76, 80, 84, 88, 91, 94],
     chartTone: "green",

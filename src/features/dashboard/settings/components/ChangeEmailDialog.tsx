@@ -294,7 +294,7 @@ export function ChangeEmailDialog({
                   <DialogTitle>Can&apos;t start right now</DialogTitle>
                   <DialogDescription>
                     We couldn&apos;t set up a secure connection to change your email. Reload the
-                    page and try again — your email is unchanged.
+                    page and try again. Your email is unchanged.
                   </DialogDescription>
                 </div>
               </div>
@@ -469,7 +469,7 @@ export function ChangeEmailDialog({
                     Your account email is now{" "}
                     <span className="font-medium text-foreground">{newEmail.trim()}</span>.
                     We&apos;ve emailed a confirmation to both addresses. You&apos;re still signed
-                    in — use the new address next time you sign in.
+                    in. Use the new address next time you sign in.
                   </DialogDescription>
                 </div>
               </div>
@@ -492,7 +492,7 @@ export function ChangeEmailDialog({
                   <DialogDescription>
                     {error ?? "This verification is no longer valid."}{" "}
                     {stopReason === "signed-out"
-                      ? "For security, your email is unchanged and you've been signed out — sign in again to retry."
+                      ? "For security, your email is unchanged and you've been signed out. Sign in again to retry."
                       : "Your email is unchanged and you're still signed in. Close this and start again when you're ready."}
                   </DialogDescription>
                 </div>

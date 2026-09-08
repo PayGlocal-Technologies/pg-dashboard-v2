@@ -102,7 +102,7 @@ export function RaiseTicketForm({ onRaised }: { onRaised?: (ticket: SupportTicke
           rows={4}
           value={details}
           onChange={(e) => setDetails(e.target.value)}
-          placeholder="Describe what's happening — include any transaction, settlement or account IDs that would help us look into it."
+          placeholder="Describe what's happening. Include any transaction, settlement or account IDs that would help us look into it."
           className="min-h-28 px-3 py-2 text-[13px] leading-normal"
         />
       </Field>

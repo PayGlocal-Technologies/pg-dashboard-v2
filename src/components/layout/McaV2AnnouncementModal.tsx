@@ -120,8 +120,8 @@ export function McaV2AnnouncementModal() {
               Multi-Currency Accounts just got a new look
             </DialogTitle>
             <p className="mt-1.5 text-[13.5px] text-muted-foreground">
-              We&apos;ve rebuilt this experience to be faster and easier to use — everything you
-              rely on is still here, just easier to find.
+              We&apos;ve rebuilt this experience to be faster and easier to use. Everything you rely
+              on is still here, just easier to find.
             </p>
 
             <div className="mt-6 space-y-2">

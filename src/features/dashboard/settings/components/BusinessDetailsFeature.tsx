@@ -244,7 +244,7 @@ export function BusinessDetailsFeature() {
 
       <FieldGroupCard
         title="Legal & registration"
-        description="On file for compliance — matches your incorporation and GST records."
+        description="On file for compliance. Matches your incorporation and GST records."
         fields={legalFields}
       >
         {/* Real, editable purpose code row — the one field on this page that
