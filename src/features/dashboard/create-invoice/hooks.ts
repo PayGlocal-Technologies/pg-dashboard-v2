@@ -1,16 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useDelete, useGet, usePost, usePut } from "@/lib/api/hooks";
+import { useGet, usePost, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useScopeId } from "@/lib/hooks/useScopeId";
 import { themeFor } from "@/features/dashboard/create-invoice/helpers";
-import {
-  fromApiTemplate,
-  toTemplateWriteBody,
-} from "@/features/dashboard/invoice-templates/helpers";
 // toDateKey is local-timezone YYYY-MM-DD. Imported from the chips module for the
 // same reason mca-invoices and mca-invoice-details do: it is the one
 // implementation, and `toISOString().slice(0, 10)` rolls the date back a day for
@@ -29,10 +24,6 @@ import {
   uploadAssetApi,
   ffmsTxnSearchApi,
 } from "@/features/dashboard/create-invoice/services";
-import {
-  invoiceTemplateApi,
-  invoiceTemplatesApi,
-} from "@/features/dashboard/invoice-templates/services";
 import {
   FALLBACK_THEME_ACCENTS,
   FALLBACK_THEME_COLORS,
@@ -57,15 +48,6 @@ import type {
   StateCodesResponse,
   ThemePaletteOption,
 } from "@/features/dashboard/create-invoice/types";
-import type {
-  InvoiceTemplate,
-  InvoiceTemplateSnapshot,
-  TemplateListResponse,
-  TemplateResponse,
-  TemplateWriteBody,
-  TemplateWriteResponse,
-} from "@/features/dashboard/invoice-templates/types";
-import type { BaseResponse } from "@/types/common";
 
 /**
  * The MID every mca-invoice endpoint puts in its path.

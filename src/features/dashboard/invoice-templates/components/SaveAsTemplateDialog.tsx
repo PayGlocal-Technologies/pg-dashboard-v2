@@ -29,7 +29,7 @@ export function SaveAsTemplateDialog({
   open,
   onOpenChange,
   snapshot,
-  existingNames,
+  isNameTaken,
   isSaving,
   onSave,
 }: {
@@ -37,8 +37,17 @@ export function SaveAsTemplateDialog({
   onOpenChange: (open: boolean) => void;
   /** What will be stored. Used for the summary; null while the form is empty. */
   snapshot: InvoiceTemplateSnapshot | null;
-  /** Rejected as duplicates, case-insensitively. */
-  existingNames: string[];
+  /**
+   * The shared duplicate-name rule, from the templates hook.
+   *
+   * A predicate rather than a list of names this dialog compares itself. It
+   * used to take `existingNames` and lower-case both sides, which is the same
+   * rule as `isNameTakenIn` right up until a stored name has a stray trailing
+   * space — that one trims, this one did not, so the same name was a duplicate
+   * to the rename controls and not to this dialog. See the Names block in
+   * helpers.ts: one implementation, no re-derivation.
+   */
+  isNameTaken: (name: string) => boolean;
   /** True while the POST is in flight. */
   isSaving: boolean;
   onSave: (name: string) => void;
@@ -51,7 +60,7 @@ export function SaveAsTemplateDialog({
           // Remount per open so the field never reopens holding the last name.
           key={open ? "open" : "closed"}
           snapshot={snapshot}
-          existingNames={existingNames}
+          isNameTaken={isNameTaken}
           isSaving={isSaving}
           onCancel={() => onOpenChange(false)}
           // Deliberately does not close: saving is a request now, and the caller
@@ -67,13 +76,13 @@ export function SaveAsTemplateDialog({
 
 function SaveBody({
   snapshot,
-  existingNames,
+  isNameTaken,
   isSaving,
   onCancel,
   onSave,
 }: {
   snapshot: InvoiceTemplateSnapshot | null;
-  existingNames: string[];
+  isNameTaken: (name: string) => boolean;
   isSaving: boolean;
   onCancel: () => void;
   onSave: (name: string) => void;
@@ -82,9 +91,7 @@ function SaveBody({
   const [touched, setTouched] = useState(false);
 
   const trimmed = name.trim();
-  const isDuplicate = existingNames.some(
-    (existing) => existing.toLowerCase() === trimmed.toLowerCase()
-  );
+  const isDuplicate = isNameTaken(trimmed);
   const error = !trimmed
     ? "Give the template a name."
     : isDuplicate

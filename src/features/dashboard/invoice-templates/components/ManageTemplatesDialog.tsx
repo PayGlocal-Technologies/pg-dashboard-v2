@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Button,
   Dialog,
@@ -18,7 +17,6 @@ import {
   Shimmer,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
 import { withBasePath } from "@/constants/basePath";
 import { formatEpochDay } from "@/features/dashboard/invoice-templates/helpers";
 import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/invoice-templates/constants";
@@ -34,15 +32,15 @@ import type { InvoiceTemplate } from "@/features/dashboard/invoice-templates/typ
  * delete, plus a way out to the full editor.
  *
  * It stays a dialog on purpose. Routing a merchant away from a half-filled
- * invoice to rename a template would cost them their work, so the link opens
- * the templates page in a new tab.
+ * invoice to rename a template would cost them their work, so both ways out of
+ * here — one template's editor, and the templates page — open in a new tab.
  */
 export function ManageTemplatesDialog({
   open,
   onOpenChange,
   templates,
   isReady,
-  mutatingId,
+  isMutatingId,
   activeTemplateId,
   onRename,
   onDuplicate,
@@ -61,12 +59,12 @@ export function ManageTemplatesDialog({
    */
   isReady: boolean;
   /**
-   * Which template has a request in flight, or null.
+   * Whether this template has a request in flight.
    *
    * Per template rather than one global flag, so deleting one no longer greys
    * out the actions on every other row.
    */
-  mutatingId: string | null;
+  isMutatingId: (templateId: string) => boolean;
   /** The template the open invoice was built from, if any. */
   activeTemplateId: string | null;
   onRename: (templateId: string, name: string) => void;
@@ -74,13 +72,25 @@ export function ManageTemplatesDialog({
   onDelete: (templateId: string) => void;
   isNameTaken: (name: string, exceptId: string | null) => boolean;
 }) {
-  const router = useRouter();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  /**
+   * The row asking to be confirmed before it is deleted.
+   *
+   * The templates page can offer delete with no confirmation because it holds
+   * the request for DELETE_UNDO_MS and puts an Undo in the toast. This dialog
+   * cannot: it hands straight off to the caller's `onDelete`, which issues the
+   * request immediately, so the only thing standing between a mis-click and a
+   * template the merchant has to rebuild is this. Inline on the row rather than
+   * a second modal stacked over the list — over a list of rows, a nested modal
+   * leaves it unclear which one is about to go.
+   */
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const reset = () => {
     setRenamingId(null);
     setRenameValue("");
+    setPendingDeleteId(null);
   };
 
   const renameError =
@@ -129,8 +139,9 @@ export function ManageTemplatesDialog({
           <div className="mt-4 max-h-[22rem] divide-y divide-border overflow-y-auto">
             {templates.map((template) => {
               const isRenaming = renamingId === template.id;
-              const isMutating = mutatingId === template.id;
+              const isMutating = isMutatingId(template.id);
               const isActive = template.id === activeTemplateId;
+              const isConfirmingDelete = pendingDeleteId === template.id;
 
               if (isRenaming) {
                 return (
@@ -203,60 +214,87 @@ export function ManageTemplatesDialog({
                     </p>
                   </div>
 
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                  {isConfirmingDelete ? (
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-[12px] text-muted-foreground">Delete?</span>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        size="sm"
+                        disabled={isMutating}
+                        onClick={() => {
+                          setPendingDeleteId(null);
+                          onDelete(template.id);
+                        }}
+                      >
+                        Delete
+                      </Button>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        aria-label={`Actions for ${template.name}`}
-                        className="h-7 w-7 shrink-0 p-0"
-                        disabled={isMutating}
+                        onClick={() => setPendingDeleteId(null)}
                       >
-                        <Icon name="more-horizontal" className="h-4 w-4" />
+                        Keep
                       </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-52">
-                      <DropdownMenuItem
-                        // A new tab, not a navigation: editing a template is a
-                        // side trip, and the merchant has a half-filled invoice
-                        // behind this dialog. withBasePath because window.open
-                        // is handed to the browser as-is — Next only prefixes
-                        // /app-v2 for framework navigation. See basePath.ts.
-                        onSelect={() =>
-                          window.open(
-                            withBasePath(`/invoice-template/${template.id}`),
-                            "_blank",
-                            "noopener"
-                          )
-                        }
-                      >
-                        <Icon name="expand" className="mr-2 h-3.5 w-3.5" />
-                        Edit contents
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => onDuplicate(template.id)}>
-                        <Icon name="copy" className="mr-2 h-3.5 w-3.5" />
-                        Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onSelect={() => {
-                          setRenamingId(template.id);
-                          setRenameValue(template.name);
-                        }}
-                      >
-                        <Icon name="pencil" className="mr-2 h-3.5 w-3.5" />
-                        Rename
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onSelect={() => onDelete(template.id)}
-                        className={cn("text-destructive focus:text-destructive")}
-                      >
-                        <Icon name="trash-2" className="mr-2 h-3.5 w-3.5" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </div>
+                  ) : (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          aria-label={`Actions for ${template.name}`}
+                          className="h-7 w-7 shrink-0 p-0"
+                          disabled={isMutating}
+                        >
+                          <Icon name="more-horizontal" className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-52">
+                        <DropdownMenuItem
+                          // A new tab, not a navigation: editing a template is a
+                          // side trip, and the merchant has a half-filled invoice
+                          // behind this dialog. withBasePath because window.open
+                          // is handed to the browser as-is — Next only prefixes
+                          // /app-v2 for framework navigation. See basePath.ts.
+                          onSelect={() =>
+                            window.open(
+                              withBasePath(`/invoice-template/${template.id}`),
+                              "_blank",
+                              "noopener"
+                            )
+                          }
+                        >
+                          <Icon name="expand" className="mr-2 h-3.5 w-3.5" />
+                          Edit contents
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => onDuplicate(template.id)}>
+                          <Icon name="copy" className="mr-2 h-3.5 w-3.5" />
+                          Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onSelect={() => {
+                            setPendingDeleteId(null);
+                            setRenamingId(template.id);
+                            setRenameValue(template.name);
+                          }}
+                        >
+                          <Icon name="pencil" className="mr-2 h-3.5 w-3.5" />
+                          Rename
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onSelect={() => setPendingDeleteId(template.id)}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Icon name="trash-2" className="mr-2 h-3.5 w-3.5" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </div>
               );
             })}
@@ -264,12 +302,21 @@ export function ManageTemplatesDialog({
         )}
 
         <div className="mt-4 flex justify-end border-t border-border pt-4">
+          {/* A new tab, like "Edit contents" above and for the same reason:
+              there is a half-filled invoice behind this dialog. It autosaves,
+              so a same-tab navigation would usually be survivable — but "would
+              usually be" is not a promise worth making about someone's work
+              when a tab costs nothing. withBasePath because window.open is
+              handed to the browser as-is; Next only prefixes /app-v2 for
+              framework navigation. See basePath.ts. */}
           <Button
             type="button"
             variant="secondary"
             size="sm"
             rightIcon={<Icon name="arrow-up-right" className="h-3.5 w-3.5" />}
-            onClick={() => router.push("/mca-invoices/templates")}
+            onClick={() =>
+              window.open(withBasePath("/mca-invoices/templates"), "_blank", "noopener")
+            }
           >
             Open templates page
           </Button>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   Dialog,
@@ -14,6 +14,8 @@ import {
 import { Icon } from "@/components/icon";
 import { usePostQuery } from "@/lib/api/hooks";
 import { useScopeId } from "@/lib/hooks/useScopeId";
+import { useApp } from "@/stores/useApp";
+import { useAccountSetup } from "@/stores/useAccountSetup";
 import { formatDate } from "@/lib/utils/format";
 import { allInvoicesApi } from "@/features/dashboard/mca-invoices/services";
 import { buildInvoiceRequestBody } from "@/features/dashboard/mca-invoices/helpers";
@@ -24,6 +26,15 @@ import type {
 
 /** How many recent invoices the picker offers before asking you to search. */
 const PICKER_LIMIT = 25;
+
+/**
+ * How long after a keystroke the search actually goes out.
+ *
+ * The list behind this endpoint is a POST, so react-query keys on the body and
+ * every character typed was a request — eight for "retainer", of which seven
+ * were already stale when they landed.
+ */
+const SEARCH_DEBOUNCE_MS = 300;
 
 /**
  * "Start from a past invoice."
@@ -46,28 +57,60 @@ export function StartFromInvoiceDialog({
   onPick: (invoiceId: string) => void;
 }) {
   const { scopeId } = useScopeId("PACB");
+  const paCbMids = useApp((s) => s.paCbMids);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
   const [search, setSearch] = useState("");
+
+  /**
+   * The search the request actually carries, a beat behind the field.
+   *
+   * setState in a timer callback rather than in the effect body, which the
+   * React Compiler lint plugin rejects (see CLAUDE.md).
+   */
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  /**
+   * Which MIDs the picker may offer, matching McaInvoiceTable exactly.
+   *
+   * It used to pass `mids: []`, which omits `fieldSearch.mid` altogether and so
+   * searched wider than the invoice list does. That let a merchant pick an
+   * invoice belonging to a MID other than the one the template editor resolves,
+   * and the editor's own `getInvoiceDetailsApi(merchantId, …)` read would then
+   * fail against a MID that does not hold it.
+   */
+  const mids = useMemo(() => (selectedMid ? [selectedMid] : paCbMids), [selectedMid, paCbMids]);
 
   const body = useMemo(
     () =>
       buildInvoiceRequestBody(
         {},
-        { mids: [], searchQuery: search, pageLimit: PICKER_LIMIT, from: 0 }
+        { mids, searchQuery: debouncedSearch, pageLimit: PICKER_LIMIT, from: 0 }
       ),
-    [search]
+    [mids, debouncedSearch]
   );
 
-  const { data, isPending } = usePostQuery<McaInvoicesResponse, InvoiceSearchBody>(
-    ["template-source-invoices", scopeId, search],
+  const { data, isPending, isError } = usePostQuery<McaInvoicesResponse, InvoiceSearchBody>(
+    ["template-source-invoices", scopeId],
     allInvoicesApi(scopeId),
     body,
     { staleTime: 0 },
     // Only while the dialog is open: this is a POST, and firing it behind a
     // closed dialog on every list render would be a request per mount.
-    open && !!scopeId
+    open && !!scopeId && mids.length > 0
   );
 
   const rows = data?.data?.data ?? [];
+  // The field, not the debounced copy: what the merchant typed is what an empty
+  // result is about, and lagging this by 300ms shows "No invoices yet" over a
+  // search that has one.
+  const isSearching = !!search.trim();
+  // A keystroke ahead of the request. Without this the list shows the previous
+  // result as though it matched what is now in the field.
+  const isStale = search !== debouncedSearch;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -96,17 +139,25 @@ export function StartFromInvoiceDialog({
         </div>
 
         <div className="mt-3 max-h-[22rem] overflow-y-auto">
-          {isPending ? (
+          {isPending || isStale ? (
             <div className="space-y-2">
               {[0, 1, 2, 3].map((i) => (
                 <Shimmer key={i} className="h-12 w-full rounded-lg" />
               ))}
             </div>
+          ) : isError ? (
+            /* Said rather than swallowed. An error used to fall through to the
+               empty state, which told the merchant they had no invoices — a
+               confident wrong answer about their own data. */
+            <EmptyState
+              title="Couldn't load your invoices"
+              description="Something went wrong fetching the list. Close this and try again."
+            />
           ) : rows.length === 0 ? (
             <EmptyState
-              title={search ? "No invoices match that search" : "No invoices yet"}
+              title={isSearching ? "No invoices match that search" : "No invoices yet"}
               description={
-                search
+                isSearching
                   ? "Try an invoice number or a client name."
                   : "Create and send an invoice first, then you can reuse its shape here."
               }

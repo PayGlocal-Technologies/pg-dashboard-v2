@@ -134,7 +134,17 @@ const addressLines = (address: Address | BillerDetails | undefined): string[] =>
  */
 const PLACEHOLDER = {
   invoiceNumber: "INV-0000",
-  issueDate: "01 Jan 2026",
+  /**
+   * The date's shape, not a date.
+   *
+   * It has to occupy the same visual space as a real value — a short word where
+   * a date goes reads as a rendering fault — but any actual date would either
+   * be mistaken for entered data or, if hardcoded, quietly go stale: the first
+   * version of this said "01 Jan 2026" and was in the past within the year.
+   * Computing today's date instead is not available here, since this is read
+   * during render and `Date.now()` there is impure (see CLAUDE.md).
+   */
+  issueDate: "DD Mon YYYY",
   clientName: "Client name",
   clientSecondary: "Chosen on each invoice",
   clientLines: ["Street address", "City, State 000000", "Country"],
@@ -190,8 +200,12 @@ export function buildPreviewModel(source: PreviewSource): PreviewModel {
     issueDate: placeholders ? PLACEHOLDER.issueDate : longDate(form.invoiceDate) || "-",
     // The one placeholder that is NOT a stand-in: a template stores a term, so
     // this is the real stored value. See PreviewSource.placeholders.
+    // "Set per invoice", not "On receipt": a template with no term has not
+    // chosen one, and naming a term it does not carry would be read as a
+    // default it will apply.
     dueDate: placeholders
-      ? (DUE_TERM_OPTIONS.find((option) => option.id === form.dueTermId)?.label ?? "On receipt")
+      ? (DUE_TERM_OPTIONS.find((option) => option.id === form.dueTermId)?.label ??
+        "Set per invoice")
       : longDate(form.dueDate),
 
     billerName: biller?.legalName || "-",

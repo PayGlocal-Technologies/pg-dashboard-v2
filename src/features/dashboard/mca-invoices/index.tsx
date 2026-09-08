@@ -13,7 +13,6 @@ import {
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { useScopeId } from "@/lib/hooks/useScopeId";
-import { withBasePath } from "@/constants/basePath";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";

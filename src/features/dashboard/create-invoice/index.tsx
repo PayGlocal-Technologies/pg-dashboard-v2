@@ -962,10 +962,12 @@ function InvoiceEditor({
   };
 
   const handleDeleteTemplate = (templateId: string) => {
-    templateStore.remove(templateId);
-    // The invoice keeps its content; it just no longer descends from anything.
+    // Unlinked straight away, and the toast only once the server has it. The
+    // link is local state, so dropping it early costs nothing and is undone by
+    // nothing; announcing the delete early would put a success toast on screen
+    // that the hook's own error toast then contradicts.
     if (templateId === activeTemplateId) setTemplateLink(null);
-    toast.success("Template deleted");
+    templateStore.remove(templateId, () => toast.success("Template deleted"));
   };
 
   // ── Branding actions ───────────────────────────────────────────────────────
@@ -1543,7 +1545,7 @@ function InvoiceEditor({
             ? toTemplateSnapshot(form, branding, activeTemplate?.snapshot)
             : null
         }
-        existingNames={templateStore.templates.map((template) => template.name)}
+        isNameTaken={(name) => templateStore.isNameTaken(name)}
         isSaving={templateStore.isMutating}
         onSave={handleSaveTemplate}
       />
@@ -1553,10 +1555,16 @@ function InvoiceEditor({
         onOpenChange={setManageTemplatesOpen}
         templates={templateStore.templates}
         isReady={templateStore.isReady}
-        mutatingId={templateStore.mutatingId}
+        isMutatingId={templateStore.isMutatingId}
         activeTemplateId={activeTemplateId}
         onRename={templateStore.rename}
-        onDuplicate={templateStore.duplicate}
+        onDuplicate={(templateId) =>
+          templateStore.duplicate(templateId, () =>
+            toast.success("Template duplicated", {
+              description: "The copy is on the templates page, ready to edit.",
+            })
+          )
+        }
         onDelete={handleDeleteTemplate}
         isNameTaken={templateStore.isNameTaken}
       />

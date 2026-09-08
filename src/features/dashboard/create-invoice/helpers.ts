@@ -1,4 +1,3 @@
-import { formatDate } from "@/lib/utils/format";
 import {
   DEFAULT_THEME_METADATA,
   DUE_TERM_OPTIONS,
@@ -15,12 +14,6 @@ import type {
   LineItemDraft,
   ThemeMetadata,
 } from "@/features/dashboard/create-invoice/types";
-import type {
-  ApiInvoiceTemplate,
-  InvoiceTemplate,
-  InvoiceTemplateSnapshot,
-  TemplateWriteBody,
-} from "@/features/dashboard/invoice-templates/types";
 
 // ─── Totals ───────────────────────────────────────────────────────────────────
 // Ported verbatim from pg-dashboard/src/features/create-invoice/helpers.ts.

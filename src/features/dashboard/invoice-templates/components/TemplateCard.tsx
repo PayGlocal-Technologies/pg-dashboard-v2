@@ -9,7 +9,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
-  StatusBadge,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { DUE_TERM_OPTIONS } from "@/features/dashboard/create-invoice/constants";
@@ -24,10 +23,12 @@ import type { InvoiceTemplate } from "@/features/dashboard/invoice-templates/typ
  *
  * Two departures from the row it replaces in the manage dialog:
  *
- *  - It shows what the template holds. A thumbnail, the item count and total,
- *    the currency, the term, the receiving account. The dialog offered one
- *    generated line ("3 items · USD · due 30 days"), which is the same string
- *    for two retainers billing two different clients.
+ *  - It shows what the template holds. A thumbnail, the item count, the
+ *    currency, the payment term and when it was last used. The dialog offered
+ *    one generated line ("3 items · USD · due 30 days"), which is the same
+ *    string for two retainers billing two different clients. No total and no
+ *    receiving account: a total moves with every quantity, and a template
+ *    carries no account at all.
  *  - Edit is the whole card, not an icon. Opening a template is the reason
  *    someone is on this page; rename, duplicate and delete are maintenance and
  *    live in the overflow, where their relative weight is honest.
@@ -37,7 +38,6 @@ export function TemplateCard({
   palette,
   today,
   isMutating,
-  isActive,
   onOpen,
   onRename,
   onDuplicate,
@@ -49,8 +49,6 @@ export function TemplateCard({
   today: string;
   /** True only while THIS template has a request in flight. */
   isMutating: boolean;
-  /** True when an invoice open elsewhere is built from this template. */
-  isActive?: boolean;
   onOpen: () => void;
   onRename: (name: string) => void;
   onDuplicate: () => void;
@@ -122,7 +120,7 @@ export function TemplateCard({
             </div>
           ) : (
             <>
-              <div className="flex items-center gap-2">
+              <div>
                 {/* `title` because the name truncates: two templates differing
                     only in their tails are otherwise indistinguishable.
                     `[&>span]:min-w-0` lets flux's own children wrapper shrink,
@@ -136,7 +134,6 @@ export function TemplateCard({
                 >
                   {template.name}
                 </Button>
-                {isActive && <StatusBadge variant="info" label="In use" size="sm" />}
               </div>
               <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
                 {template.description}

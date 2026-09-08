@@ -223,9 +223,14 @@ export function InvoiceTemplatePicker({
       >
         <DialogContent className="max-w-md">
           <DialogTitle>Apply &ldquo;{pendingTemplate?.name}&rdquo;?</DialogTitle>
+          {/* The two lists have to match what `toTemplateSnapshot` actually
+              captures, or this dialog is a promise of unknown size. The
+              receiving account moved to the second list when templates stopped
+              carrying one — see TemplateWriteBody.bankAccountReference. */}
           <p className="mt-2 text-[13px] text-muted-foreground">
-            This replaces the items, totals, receiving account, notes and branding on this invoice
-            with the template&apos;s. The client, invoice number and dates stay as they are.
+            This replaces the items, totals, notes and branding on this invoice with the
+            template&apos;s. The client, invoice number, dates and receiving account stay as they
+            are.
           </p>
           {pendingTemplate && (
             <p className="mt-3 rounded-lg bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">

@@ -16,6 +16,9 @@ import {
   Shimmer,
 } from "@/components/ui";
 import { useGet } from "@/lib/api/hooks";
+import { SelectMidView } from "@/components/common/SelectMidView";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { Icon } from "@/components/icon";
 import {
   useInvoiceAsset,
   useInvoiceMerchantId,
@@ -52,6 +55,21 @@ import type {
 } from "@/features/dashboard/create-invoice/types";
 
 /**
+ * A due term a template can actually keep, or null.
+ *
+ * `toFormState` derives the term by comparing an invoice's two dates, and
+ * answers the literal `"custom"` when the gap matches no preset — a date
+ * somebody picked by hand for one invoice. That is not a term a template can
+ * store: `toTemplateWriteBody` has no day count to send for it and drops it, and
+ * the Payment term select below offers only the presets, so a `"custom"` value
+ * would render the control blank. Both roads lead to "no default term", so the
+ * seed says so up front rather than showing an empty control and losing the
+ * value quietly on save.
+ */
+const reusableTerm = (dueTermId: string | null): string | null =>
+  DUE_TERM_OPTIONS.some((option) => option.id === dueTermId) ? dueTermId : null;
+
+/**
  * The template editor, at /invoice-template/new and /invoice-template/[id].
  *
  * It renders the same section components as the invoice editor, because a
@@ -69,7 +87,7 @@ import type {
 export function TemplateEditorFeature({ templateId }: { templateId?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const store = useInvoiceTemplates();
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
 
   /**
    * The invoice to seed from, captured once.
@@ -78,6 +96,47 @@ export function TemplateEditorFeature({ templateId }: { templateId?: string }) {
    * initializer so it survives any later navigation that rewrites the query.
    */
   const [fromInvoiceId] = useState(() => searchParams.get("fromInvoice") ?? "");
+
+  /**
+   * Which merchant's templates these are, answered before anything is read.
+   *
+   * Every /templates endpoint puts a single MID in its path, and with several
+   * PACB MIDs and none selected `useInvoiceMerchantId` resolves to the UCIC id
+   * — so the list would be read, and a save written, against something that is
+   * not a MID at all. The same gate /create-invoice puts in front of its draft
+   * creation, for the same reason and in the same shape.
+   *
+   * The picker is inline rather than a pointer at the sidebar's selector: this
+   * is the full-screen editor shell, which draws no sidebar.
+   */
+  if (needsMidChoice) {
+    return (
+      <MidChoiceGate
+        midOptions={midOptions}
+        onSelectMid={selectMid}
+        onClose={() => router.push("/mca-invoices/templates")}
+      />
+    );
+  }
+
+  return <TemplateEditorResolver templateId={templateId} fromInvoiceId={fromInvoiceId} />;
+}
+
+/**
+ * Finds the requested template in the list, or says it is gone.
+ *
+ * Split from the gate above so `useInvoiceTemplates` is never called — and so
+ * its list query never fires — while the MID is still unanswered.
+ */
+function TemplateEditorResolver({
+  templateId,
+  fromInvoiceId,
+}: {
+  templateId?: string;
+  fromInvoiceId: string;
+}) {
+  const router = useRouter();
+  const store = useInvoiceTemplates();
 
   const isNew = !templateId;
   const template = templateId
@@ -108,7 +167,7 @@ export function TemplateEditorFeature({ templateId }: { templateId?: string }) {
 
   return (
     <TemplateEditorBody
-      key={templateId ?? fromInvoiceId ?? "blank"}
+      key={templateId || fromInvoiceId || "blank"}
       templateId={templateId}
       isNew={isNew}
       fromInvoiceId={fromInvoiceId}
@@ -164,12 +223,39 @@ function TemplateEditorBody({
     { enabled: !!merchantId }
   );
 
-  const { data: sourceInvoice, isLoading: sourceLoading } = useGet<InvoiceDetailsResponse>(
+  const {
+    data: sourceInvoice,
+    isLoading: sourceLoading,
+    isError: sourceFailed,
+  } = useGet<InvoiceDetailsResponse>(
     ["template-source-invoice", merchantId, fromInvoiceId],
     fromInvoiceId ? getInvoiceDetailsApi(merchantId, fromInvoiceId) : "",
     undefined,
     { enabled: !!fromInvoiceId && !!merchantId }
   );
+
+  /**
+   * Says so when the invoice being copied could not be read.
+   *
+   * Without this the failure was silent: `sourceLoading` goes false, `seeded`
+   * stays false, and the merchant is left looking at a blank template they
+   * asked to be pre-filled — with no way to tell that from an invoice that
+   * genuinely had nothing on it. Toast rather than a blocking screen, because a
+   * blank template is still a usable place to be.
+   */
+  const warnedRef = useRef(false);
+  useEffect(() => {
+    if (!sourceFailed || warnedRef.current) return;
+    warnedRef.current = true;
+    const id = setTimeout(
+      () =>
+        toast.error("Couldn't load that invoice", {
+          description: "Starting from a blank template instead.",
+        }),
+      0
+    );
+    return () => clearTimeout(id);
+  }, [sourceFailed]);
 
   const [seeded, setSeeded] = useState(false);
   const [name, setName] = useState(() => template?.name ?? "");
@@ -193,7 +279,8 @@ function TemplateEditorBody({
     if (!invoice) return;
 
     const id = setTimeout(() => {
-      setForm(toFormState(invoice, emptyForm(today, currencies[0]?.currencyCode ?? "")));
+      const seededForm = toFormState(invoice, emptyForm(today, currencies[0]?.currencyCode ?? ""));
+      setForm({ ...seededForm, dueTermId: reusableTerm(seededForm.dueTermId) });
       setBranding(brandingFrom(invoice.themeMetadata));
       setSeeded(true);
     }, 0);
@@ -254,6 +341,17 @@ function TemplateEditorBody({
 
   const snapshot = () => toTemplateSnapshot(form, branding, template?.snapshot);
 
+  /**
+   * Back to "unsaved changes" after a failed write.
+   *
+   * The hook reports a failure as a toast and returns nothing, so without this
+   * `saveState` would stay "saving" for good — and since `canSave` excludes
+   * that state, both Save buttons would be disabled with no way back but a
+   * reload, which is precisely when the merchant's unsaved work is lost. The
+   * work is still dirty, so that is what the state says.
+   */
+  const markFailed = useCallback(() => setSaveState("dirty"), []);
+
   const handleSave = () => {
     if (nameError) return;
     setSaveState("saving");
@@ -262,20 +360,31 @@ function TemplateEditorBody({
       // One request carrying both the new name and the new contents. `rename`
       // and `update` each rebuild the body from the cached template, so issuing
       // both would race and the second would undo the first's half.
-      store.replace(template.id, trimmedName, snapshot(), () => {
-        markSaved();
-        toast.success("Template saved");
-      });
+      store.replace(
+        template.id,
+        trimmedName,
+        snapshot(),
+        () => {
+          markSaved();
+          toast.success("Template saved");
+        },
+        markFailed
+      );
       return;
     }
 
-    store.save(trimmedName, snapshot(), (newId) => {
-      markSaved();
-      toast.success("Template saved", { description: `"${trimmedName}" is ready to reuse.` });
-      // replace, not push: the blank route is not somewhere Back should return
-      // to, and this makes a refresh reopen the template that now exists.
-      router.replace(`/invoice-template/${newId}`);
-    });
+    store.save(
+      trimmedName,
+      snapshot(),
+      (newId) => {
+        markSaved();
+        toast.success("Template saved", { description: `"${trimmedName}" is ready to reuse.` });
+        // replace, not push: the blank route is not somewhere Back should return
+        // to, and this makes a refresh reopen the template that now exists.
+        router.replace(`/invoice-template/${newId}`);
+      },
+      markFailed
+    );
   };
 
   const handleSaveAsNew = () => {
@@ -284,11 +393,18 @@ function TemplateEditorBody({
       ? store.suggestCopyName(trimmedName)
       : trimmedName;
     setSaveState("saving");
-    store.save(forkName, snapshot(), (newId) => {
-      markSaved();
-      toast.success("Saved as a new template", { description: `"${forkName}" is ready to reuse.` });
-      router.replace(`/invoice-template/${newId}`);
-    });
+    store.save(
+      forkName,
+      snapshot(),
+      (newId) => {
+        markSaved();
+        toast.success("Saved as a new template", {
+          description: `"${forkName}" is ready to reuse.`,
+        });
+        router.replace(`/invoice-template/${newId}`);
+      },
+      markFailed
+    );
   };
 
   const handleClose = () => {
@@ -328,7 +444,7 @@ function TemplateEditorBody({
     accentHex: palette.accentHexFor(branding.accent),
   };
 
-  if (fromInvoiceId && !seeded && sourceLoading) return <EditorLoading />;
+  if (fromInvoiceId && !seeded && sourceLoading && !sourceFailed) return <EditorLoading />;
 
   return (
     <div className="flex h-full flex-col">
@@ -474,6 +590,45 @@ function EditorLoading() {
       </div>
       <div className="bg-muted p-4 md:p-6">
         <Shimmer className="h-[36rem] w-full rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "Which account?", in the full-screen editor's own chrome.
+ *
+ * Mirrors /create-invoice's gate: a bare header carrying the close action, so a
+ * merchant who followed a bookmark into the wrong shell can still get out, and
+ * the picker rendered in the card rather than a pointer at a sidebar this route
+ * does not draw.
+ */
+function MidChoiceGate({
+  midOptions,
+  onSelectMid,
+  onClose,
+}: {
+  midOptions: string[];
+  onSelectMid: (mid: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="flex h-full flex-col">
+      <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label="Close"
+          className="h-9 w-9 shrink-0 p-0"
+          onClick={onClose}
+        >
+          <Icon name="x" className="h-4 w-4" />
+        </Button>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Invoice template</h1>
+      </header>
+      <div className="mx-auto w-full max-w-2xl px-6 py-16">
+        <SelectMidView midType="PACB" midOptions={midOptions} onSelectMid={onSelectMid} />
       </div>
     </div>
   );

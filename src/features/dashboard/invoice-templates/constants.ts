@@ -2,7 +2,7 @@
 export const TEMPLATE_NAME_MAX_LENGTH = 60;
 
 /**
- * The `mutatingId` a create reports, since the server has not minted an id yet.
+ * The id a create reports as in-flight, since the server has not minted one yet.
  *
  * A sentinel rather than null, so "a template is being created" and "nothing is
  * happening" stay tellable apart. It can never collide with a real id, which

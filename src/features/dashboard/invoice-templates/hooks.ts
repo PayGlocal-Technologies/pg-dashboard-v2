@@ -47,19 +47,34 @@ export interface InvoiceTemplates {
   /** True while any create, update, rename or delete is in flight. */
   isMutating: boolean;
   /**
-   * The template a mutation is currently in flight for, or null.
+   * True while a request is in flight for this specific template.
    *
    * Row actions gate on this rather than on `isMutating`, so deleting one
    * template no longer greys out the actions on every other one. `isMutating`
    * stays for the two dialogs that only ever act on a single template at a
    * time.
+   *
+   * A predicate over a SET of in-flight ids, not a comparison against one
+   * "currently mutating" id: the templates page can have several deletes in
+   * flight at once (each card's undo window is independent), and a single slot
+   * meant the first one to settle cleared the flag for all of them.
    */
-  mutatingId: string | null;
+  isMutatingId: (templateId: string) => boolean;
   /**
    * Creates one. The server mints the id, so it arrives in `onSaved` rather than
    * being returned — the caller needs it to link the invoice to the new template.
+   *
+   * `onFailed` is not optional decoration: this hook reports a failure as a
+   * toast and nothing else, so a caller that moved its own UI into a pending
+   * state on the way in has no other signal to move it back out. The template
+   * editor's Save button is exactly that — see its `handleSave`.
    */
-  save: (name: string, snapshot: InvoiceTemplateSnapshot, onSaved: (id: string) => void) => void;
+  save: (
+    name: string,
+    snapshot: InvoiceTemplateSnapshot,
+    onSaved: (id: string) => void,
+    onFailed?: () => void
+  ) => void;
   /** Full replace, keeping the name. */
   update: (templateId: string, snapshot: InvoiceTemplateSnapshot) => void;
   /** Also a full replace: the API has no rename endpoint. */
@@ -76,9 +91,19 @@ export interface InvoiceTemplates {
     templateId: string,
     name: string,
     snapshot: InvoiceTemplateSnapshot,
-    onSaved?: () => void
+    onSaved?: () => void,
+    onFailed?: () => void
   ) => void;
-  remove: (templateId: string) => void;
+  /**
+   * Deletes one.
+   *
+   * `onRemoved` fires only once the server has it. Callers that report the
+   * deletion need it: the templates page can announce one up front because it
+   * holds the request and offers Undo, but anywhere the request goes out
+   * immediately, a toast written before the response is a success message that
+   * a failure then contradicts with a second toast.
+   */
+  remove: (templateId: string, onRemoved?: () => void) => void;
   /**
    * Copies one, under a name the caller picks.
    *
@@ -170,34 +195,71 @@ export function useInvoiceTemplates(): InvoiceTemplates {
   >("", { invalidateQueries: false });
 
   /**
-   * Which template a request is currently in flight for.
+   * Which templates have a request in flight.
    *
    * The three mutation hooks each expose one boolean for "something is
    * happening", which was enough while every caller acted on a single template
    * at a time. The templates list shows every template at once, so it needs to
    * know *which* — otherwise deleting one row disables the actions on all of
    * them. Creation has no id yet and reports the sentinel below.
+   *
+   * A set rather than one id, because these genuinely overlap: every card's
+   * delete is held for its own undo window, so two deletes armed a second apart
+   * fire a second apart and are both in flight. With a single slot the first
+   * `settle()` cleared the flag while the second request was still running.
    */
-  const [mutatingId, setMutatingId] = useState<string | null>(null);
-  const settle = useCallback(() => setMutatingId(null), []);
+  const [mutatingIds, setMutatingIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  const beginMutating = useCallback((templateId: string) => {
+    setMutatingIds((current) => new Set(current).add(templateId));
+  }, []);
+
+  const settle = useCallback((templateId: string) => {
+    setMutatingIds((current) => {
+      if (!current.has(templateId)) return current;
+      const next = new Set(current);
+      next.delete(templateId);
+      return next;
+    });
+  }, []);
+
+  const isMutatingId = useCallback(
+    (templateId: string) => mutatingIds.has(templateId),
+    [mutatingIds]
+  );
 
   const save = useCallback(
-    (name: string, snapshot: InvoiceTemplateSnapshot, onSaved: (id: string) => void) => {
-      setMutatingId(NEW_TEMPLATE_ID);
+    (
+      name: string,
+      snapshot: InvoiceTemplateSnapshot,
+      onSaved: (id: string) => void,
+      onFailed?: () => void
+    ) => {
+      beginMutating(NEW_TEMPLATE_ID);
       create(toTemplateWriteBody(name, snapshot), {
         onSuccess: (response) => {
-          settle();
+          settle(NEW_TEMPLATE_ID);
           invalidateList();
           const templateId = response?.data?.templateId;
+          // A 2xx with no id is a failure for every caller's purposes: there is
+          // nothing to link an invoice to and nothing to navigate to, so it
+          // must not leave a pending Save button pending forever.
           if (templateId) onSaved(templateId);
+          else {
+            toast.error("Couldn't save the template", {
+              description: "The server did not return a template id.",
+            });
+            onFailed?.();
+          }
         },
         onError: (error) => {
-          settle();
+          settle(NEW_TEMPLATE_ID);
           toast.error("Couldn't save the template", { description: error.message });
+          onFailed?.();
         },
       });
     },
-    [create, invalidateList, settle]
+    [create, invalidateList, beginMutating, settle]
   );
 
   /**
@@ -223,9 +285,10 @@ export function useInvoiceTemplates(): InvoiceTemplates {
       name: string,
       snapshot: InvoiceTemplateSnapshot,
       failure: string,
-      onSaved?: () => void
+      onSaved?: () => void,
+      onFailed?: () => void
     ) => {
-      setMutatingId(templateId);
+      beginMutating(templateId);
       replace(
         {
           dynamicUrl: invoiceTemplateApi(merchantId, templateId),
@@ -233,23 +296,29 @@ export function useInvoiceTemplates(): InvoiceTemplates {
         },
         {
           onSuccess: () => {
-            settle();
+            settle(templateId);
             invalidateList();
             onSaved?.();
           },
           onError: (error) => {
-            settle();
+            settle(templateId);
             toast.error(failure, { description: error.message });
+            onFailed?.();
           },
         }
       );
     },
-    [replace, merchantId, invalidateList, settle]
+    [replace, merchantId, invalidateList, beginMutating, settle]
   );
 
   const replaceTemplate = useCallback(
-    (templateId: string, name: string, snapshot: InvoiceTemplateSnapshot, onSaved?: () => void) =>
-      put(templateId, name, snapshot, "Couldn't save the template", onSaved),
+    (
+      templateId: string,
+      name: string,
+      snapshot: InvoiceTemplateSnapshot,
+      onSaved?: () => void,
+      onFailed?: () => void
+    ) => put(templateId, name, snapshot, "Couldn't save the template", onSaved, onFailed),
     [put]
   );
 
@@ -277,23 +346,24 @@ export function useInvoiceTemplates(): InvoiceTemplates {
   );
 
   const remove = useCallback(
-    (templateId: string) => {
-      setMutatingId(templateId);
+    (templateId: string, onRemoved?: () => void) => {
+      beginMutating(templateId);
       destroy(
         { dynamicUrl: invoiceTemplateApi(merchantId, templateId) },
         {
           onSuccess: () => {
-            settle();
+            settle(templateId);
             invalidateList();
+            onRemoved?.();
           },
           onError: (error) => {
-            settle();
+            settle(templateId);
             toast.error("Couldn't delete the template", { description: error.message });
           },
         }
       );
     },
-    [destroy, merchantId, invalidateList, settle]
+    [destroy, merchantId, invalidateList, beginMutating, settle]
   );
 
   /**
@@ -340,7 +410,7 @@ export function useInvoiceTemplates(): InvoiceTemplates {
 
   return {
     templates,
-    mutatingId,
+    isMutatingId,
     duplicate,
     replace: replaceTemplate,
     isNameTaken,

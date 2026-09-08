@@ -21,6 +21,8 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
+import { SelectMidView } from "@/components/common/SelectMidView";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { useInvoiceThemes } from "@/features/dashboard/create-invoice/hooks";
 import { toDateKey } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
 import { useInvoiceTemplates } from "@/features/dashboard/invoice-templates/hooks";
@@ -43,17 +45,31 @@ import type { InvoiceTemplate } from "@/features/dashboard/invoice-templates/typ
  * over a persistent object set, and it wants room for a search field, a sort
  * control, thumbnails, and somewhere for the editor to return to.
  *
- * It sits inside <MidGuard> like the invoice list beside it, which is what
- * fixes the old failure where a merchant with several PACB MIDs and none
- * selected was told they had no templates rather than being asked to pick one.
+ * It sits inside <MidGuard> like the invoice list beside it, and behind its own
+ * MID gate as well. The two answer different questions and this page needs
+ * both: MidGuard catches "the selected MID cannot do PACB", and the gate below
+ * catches "several PACB MIDs and none selected" — which MidGuard passes
+ * straight through (see useResolvedMids: no selection is still `ready`).
+ *
+ * The gate matters more here than on the invoice list beside it. That list
+ * filters across every PACB MID in its request BODY, so a roll-up is a
+ * meaningful answer for it; every /templates endpoint puts a single MID in its
+ * PATH, and with none selected `useInvoiceMerchantId` resolves to the UCIC id —
+ * which is not a MID, so the list read and every save would address the wrong
+ * scope silently.
  */
 export function InvoiceTemplatesFeature() {
+  const { needsMidChoice } = usePacbMidScope();
+
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
       <PageHeader title="Invoice management" />
       <InvoiceTabs />
       <MidGuard productType="PACB">
-        <TemplatesContent />
+        {/* No inline picker: this page renders inside the dashboard shell, so
+            SelectMidView points at the sidebar's own MID selector — the one
+            control a merchant switching accounts across pages should learn. */}
+        {needsMidChoice ? <SelectMidView midType="PACB" /> : <TemplatesContent />}
       </MidGuard>
     </div>
   );
@@ -259,7 +275,7 @@ function TemplatesContent() {
               template={template}
               palette={palette}
               today={today}
-              isMutating={store.mutatingId === template.id}
+              isMutating={store.isMutatingId(template.id)}
               onOpen={() => router.push(`/invoice-template/${template.id}`)}
               onRename={(name) => store.rename(template.id, name)}
               onDuplicate={() =>

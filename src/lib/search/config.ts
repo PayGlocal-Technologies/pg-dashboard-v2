@@ -197,6 +197,26 @@ export const ACTION_ENTRIES: readonly ActionEntry[] = [
     keywords: ["new invoice", "raise invoice", "invoice editor", "bill a client"],
   },
   {
+    // Reached only from the tab row on Invoice management, which is exactly the
+    // "the sidebar is not the whole surface" case this block exists for. An
+    // ACTION_ENTRIES row rather than a NAVIGABLE_ROUTES one so it inherits the
+    // parent page's permission gate.
+    label: "Invoice templates",
+    parentPath: "/mca-invoices",
+    path: "/mca-invoices/templates",
+    icon: "layout-template",
+    keywords: ["templates", "saved invoice", "reuse invoice", "recurring shape"],
+  },
+  {
+    // Its own route, and safe to link into: the editor renders its own MID
+    // picker when none is selected, for pasted links and bookmarks.
+    label: "New invoice template",
+    parentPath: "/mca-invoices",
+    path: "/invoice-template/new",
+    icon: "plus",
+    keywords: ["blank template", "create template", "save invoice shape"],
+  },
+  {
     label: "Add client",
     parentPath: "/client-management",
     path: "/client-management?action=add-client",
