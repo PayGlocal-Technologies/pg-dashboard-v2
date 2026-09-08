@@ -177,7 +177,11 @@ export interface ExchangeRateData {
   gst: string;
   payGlocalFeeAmount: string;
   payGlocalFeeRate: string;
-  payGlocalFeeType: "PERCENTAGE" | "FLAT";
+  /** pg-dashboard's own type says `"PERCENTAGE" | "FLAT"`, but the live
+   *  response sends "FIXED" for a flat fee, so that is included here. Nothing
+   *  reads this field yet; the fee row is driven by `payGlocalFeeAmount` and
+   *  `payGlocalFeeRate` as the response quotes them. */
+  payGlocalFeeType: "PERCENTAGE" | "FLAT" | "FIXED";
   settlementAmount: string;
 }
 

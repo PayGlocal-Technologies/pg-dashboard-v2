@@ -86,8 +86,19 @@ function sanitizeAmount(raw: string): string {
  * An INR figure that counts to its new value instead of being replaced.
  *
  * The API returns these as strings, so the raw value is parsed once and the
- * tween runs on the number; rounding at render keeps the digits from jittering
- * through fractional paise mid-animation.
+ * tween runs on the number.
+ *
+ * The tween value is rendered at paise precision, never rounded to whole
+ * rupees. It used to be `Math.round`ed — meant to stop the digits jittering
+ * through fractional paise mid-animation, but it silently destroyed every
+ * figure the response quotes below ₹1: a `payGlocalFeeAmount` of "0.11" and a
+ * `gst` of "0.02" both rendered as ₹0.00, and the larger figures lost their
+ * paise while `formatCurrency`'s fixed two decimals made the result look
+ * exact ("₹47,380.00" for a settlementAmount of "47380.24"). The response is
+ * the only source of truth for these amounts, so nothing here may round them.
+ *
+ * Jitter is handled instead by quantising the in-flight tween to paise, so the
+ * digits move in the same steps the final figure is quoted in.
  */
 function AnimatedAmount({ value, className }: { value: string | undefined; className?: string }) {
   const parsed = value === undefined ? undefined : Number(value);
@@ -95,7 +106,8 @@ function AnimatedAmount({ value, className }: { value: string | undefined; class
   const animated = useAnimatedNumber(target);
 
   if (target === undefined) return <span className={className}>—</span>;
-  return <span className={className}>{formatCurrency(Math.round(animated ?? target), "INR")}</span>;
+  const shown = Math.round((animated ?? target) * 100) / 100;
+  return <span className={className}>{formatCurrency(shown, "INR")}</span>;
 }
 
 /** A "− ₹x INR" deduction row. */
