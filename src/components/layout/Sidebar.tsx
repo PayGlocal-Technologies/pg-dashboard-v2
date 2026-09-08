@@ -143,8 +143,8 @@ function SidebarBody({
   pathname: string;
   onNavClick?: () => void;
   navigation: NavGroup[];
-  /** MCA-only: a compact "Refer & Earn" promo below the nav groups, above the
-   * fixed profile section, see SidebarReferBanner. */
+  /** MCA-only: a compact "Refer & Earn" promo pinned between the scrolling nav
+   * and the fixed profile section, see SidebarReferBanner. */
   showReferBanner?: boolean;
 }) {
   const profile = useApp((s) => s.profile);
@@ -160,7 +160,7 @@ function SidebarBody({
 
   return (
     <>
-      <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+      <nav className="flex-1 min-h-0 overflow-y-auto py-3 px-2.5">
         {/* Echo — above the groups, not in one: it reaches the features below
             rather than being another of them. Renders itself away when the
             account lacks getEchoActiveSession, see AskEchoButton. */}
@@ -230,13 +230,15 @@ function SidebarBody({
             </div>
           </div>
         ))}
-
-        {showReferBanner && !collapsed && (
-          <div className="mt-1">
-            <SidebarReferBanner />
-          </div>
-        )}
       </nav>
+
+      {/* Refer & Earn — pinned outside the scrolling nav so it stays visible
+          however many nav items the account has. */}
+      {showReferBanner && !collapsed && (
+        <div className="flex-shrink-0 px-2.5 pb-2.5">
+          <SidebarReferBanner />
+        </div>
+      )}
 
       {/* ── Bottom profile section ── */}
       <div className="px-2.5 py-2.5 flex-shrink-0 border-t border-sidebar-border space-y-2">
