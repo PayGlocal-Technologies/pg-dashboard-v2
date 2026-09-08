@@ -1,3 +1,4 @@
+import type { IconName } from "@/components/icon";
 import type { EchoRequest } from "@/features/dashboard/echo/types";
 
 /**
@@ -43,3 +44,79 @@ export const ECHO_RESTART_REQUEST: EchoRequest = {
  */
 export const ECHO_ERROR_MESSAGE =
   "I could not reach Echo just then. Nothing was lost, so you can try that again.";
+
+/**
+ * The prompt chips shown on a fresh conversation, in the panel's two-column
+ * grid and the full page's "Try asking" list.
+ *
+ * `prompt` is what actually goes on the wire, as an ordinary
+ * `inputType: "text"` turn — the same thing typing it by hand would send. The
+ * server decides what it understands; nothing here is routed client-side.
+ * Kept distinct from `label` because a couple read better as a question in the
+ * transcript than as a chip.
+ */
+export const ECHO_QUICK_ACTIONS: { id: string; label: string; icon: IconName; prompt: string }[] = [
+  {
+    id: "create-invoice",
+    label: "Create invoice",
+    icon: "file-text",
+    prompt: "Create invoice",
+  },
+  {
+    id: "last-transactions",
+    label: "Show me last 5 transactions",
+    icon: "credit-card",
+    prompt: "Show me my last 5 transactions",
+  },
+  {
+    id: "earnings-this-month",
+    label: "What were my earnings for this month",
+    icon: "trending-up",
+    prompt: "What were my earnings for this month?",
+  },
+  {
+    id: "last-fircs",
+    label: "Show my last 5 FIRCs",
+    icon: "landmark",
+    prompt: "Show my last 5 FIRCs",
+  },
+];
+
+/**
+ * Icons for the welcome screen's menu rows, keyed on the row id the server
+ * sends.
+ *
+ * Purely cosmetic. The server owns this list and can add a row whenever it
+ * likes, so `EchoListOptions` shows the icon column only when EVERY row in a
+ * section is mapped — a list of merchant accounts or currencies gets no icons
+ * rather than a column of identical fallback glyphs. Nothing here affects what
+ * goes on the wire; the id is still sent back verbatim.
+ */
+export const ECHO_MENU_ICONS: Record<string, IconName> = {
+  BTN_TRANSACTIONS: "credit-card",
+  BTN_SETTLEMENTS: "landmark",
+  BTN_RAISE_QUERY: "message-circle",
+  BTN_ACCOUNTS: "wallet",
+  BTN_DISPUTES: "help-circle",
+  BTN_PAYMENT_LINKS: "link",
+  BTN_INVOICES: "file-text",
+  BTN_RECEIPTS: "receipt",
+  BTN_MAIN_MENU: "layout-grid",
+  BTN_END_CHAT: "log-out",
+};
+
+/**
+ * The stepped loader's lines, advanced on timers while a turn is in flight.
+ *
+ * Cosmetic: the protocol is one request/one response, so the client never
+ * learns which of these the server is actually doing. See
+ * `useEchoCosmeticSteps`.
+ */
+export const ECHO_PROGRESS_STEPS: { id: string; label: string }[] = [
+  { id: "understand", label: "Understanding your request" },
+  { id: "look", label: "Looking into your account" },
+  { id: "prepare", label: "Preparing the answer" },
+];
+
+/** How long each cosmetic step holds before the next one lights up. */
+export const ECHO_STEP_INTERVAL_MS = 900;

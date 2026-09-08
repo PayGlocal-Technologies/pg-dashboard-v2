@@ -8,7 +8,7 @@ import { Header } from "@/components/layout/Header";
 import { ContentAreaProvider } from "@/components/layout/ContentAreaContext";
 import { Icon } from "@/components/icon";
 import { FeedbackSheet } from "@/features/dashboard/feedback/FeedbackSheet";
-import { EchoLaunchBanner } from "@/features/dashboard/echo/components/EchoLaunchBanner";
+import { EchoPanel } from "@/features/dashboard/echo/components/EchoPanel";
 import { McaV2AnnouncementModal } from "@/components/layout/McaV2AnnouncementModal";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -37,11 +37,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </main>
       </div>
 
+      {/* Echo's side panel — a flex sibling of the main column rather than an
+          overlay, so opening it slides the content over instead of covering
+          it. It and the /echo page share one conversation through useEcho;
+          see EchoPanel. */}
+      <EchoPanel />
+
       {/* App-wide, not tied to any page: the survey asks about PayGlocal as a
           whole. Whether it actually appears is the server's call — see the
           eligibility check inside. */}
       <FeedbackSheet />
-      <EchoLaunchBanner />
 
       {/* One-time "MCA has a new look" announcement, gated on actually
           having MCA access — see the component for why this is a plain
