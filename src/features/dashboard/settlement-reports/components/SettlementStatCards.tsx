@@ -104,7 +104,10 @@ interface SettlementStatCardsProps {
    * nothing behind it. Defaults to true so the card is unchanged wherever the
    * caller has not resolved this yet. */
   canDownloadPreviousSettled?: boolean;
-  upcomingSettlementLabel: string;
+  /** Amount due in the next settlement, live from the upcoming endpoint.
+   * null while it has not resolved (or is unsupported), which renders an em
+   * dash rather than a placeholder figure. */
+  upcomingSettlementAmount: number | null;
   upcomingSettlementTimeLabel: string;
   /** MCA only, count of transactions still waiting on an invoice upload
    * before they can be bundled into this upcoming settlement. */
@@ -130,7 +133,7 @@ export function SettlementStatCards({
   onShowPreviousSettledInfo,
   onDownloadPreviousSettled,
   canDownloadPreviousSettled = true,
-  upcomingSettlementLabel,
+  upcomingSettlementAmount,
   upcomingSettlementTimeLabel,
   pendingInvoiceCount,
   onUploadInvoice,

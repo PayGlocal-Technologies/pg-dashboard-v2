@@ -268,7 +268,6 @@ export function useSettlementUpcoming(merchantId: string): {
   return { upcoming: data?.data, isLoading: !!merchantId && isPending, isError };
 }
 
-
 /**
  * The settlement report download, for every surface that offers one.
  *

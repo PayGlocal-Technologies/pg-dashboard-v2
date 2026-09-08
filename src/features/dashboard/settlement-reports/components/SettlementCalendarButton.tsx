@@ -11,7 +11,6 @@ import {
   type CalendarCell,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { useBankHolidays } from "@/features/dashboard/settlement-reports/hooks";
-import { isSettlementComplete } from "@/features/dashboard/settlement-reports/columns";
 import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -185,11 +184,10 @@ export function SettlementCalendarButton({
     [monthHolidays]
   );
 
+  // Every row IS a settled day now: a settlement only enters the list once it
+  // has happened, so there is no in-progress state left to filter out.
   const settledRowByDate = useMemo(
-    () =>
-      new Map(
-        rows.filter((r) => isSettlementComplete(r.status)).map((r) => [r.date.slice(0, 10), r])
-      ),
+    () => new Map(rows.map((r) => [r.date.slice(0, 10), r])),
     [rows]
   );
 
@@ -247,10 +245,7 @@ export function SettlementCalendarButton({
          * scrollable space. */
         rightIcon={
           hasUpcomingHoliday ? (
-            <span
-              className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
-              aria-hidden="true"
-            />
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden="true" />
           ) : undefined
         }
         className={cn(open && "bg-muted")}

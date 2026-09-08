@@ -47,6 +47,51 @@ export const settlementUpcomingApi = (merchantId: string): string =>
     ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settlement/upcoming`
     : "";
 
+// ── Settlement list and detail (new contract) ───────────────────────────────
+// Replace the PA/FFMS summary pair above once these are deployed. Keyed by
+// settlement DATE, not by a settlement id: an account settles at most once a
+// day, so (merchantId, settlementDate) is the primary key.
+
+export interface SettlementListParams {
+  /** YYYY-MM-DD, optional — omit both bounds for the unfiltered list. */
+  startDate?: string;
+  endDate?: string;
+  /** 1-based. */
+  page?: number;
+  limit?: number;
+}
+
+/** Settlement list → { data: { settlements, totalCount } }. Merchant-scoped;
+ *  accepts the UCIC id for a multi-MID account, in which case rows span
+ *  merchants and each names its own `merchantId`. */
+export const settlementListApi = (
+  merchantId: string,
+  params: SettlementListParams = {}
+): string => {
+  if (!merchantId) return "";
+  const query = new URLSearchParams();
+  if (params.startDate && params.endDate) {
+    query.set("startDate", params.startDate);
+    query.set("endDate", params.endDate);
+  }
+  if (params.page) query.set("page", String(params.page));
+  if (params.limit) query.set("limit", String(params.limit));
+  const suffix = query.toString();
+  return (
+    `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settlement-list` +
+    (suffix ? `?${suffix}` : "")
+  );
+};
+
+/** One settlement in full → { data: { ...breakup, payments } }. The merchant is
+ *  in the path and the date in the query, so a UCIC-scoped list row must pass
+ *  its OWN merchantId here rather than the page's scope. */
+export const settlementDetailApi = (merchantId: string, settlementDate: string): string =>
+  merchantId && settlementDate
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settlement-detail` +
+      `?settlementDate=${encodeURIComponent(settlementDate)}`
+    : "";
+
 // ── Bank holiday calendar ───────────────────────────────────────────────────
 // Verbatim from pg-dashboard's src/features/BankHolidayCalendar/services.ts.
 // Both dates are inclusive YYYY-MM-DD keys; production always asks for whole

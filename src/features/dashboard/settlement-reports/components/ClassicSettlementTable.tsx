@@ -99,7 +99,7 @@ export function ClassicSettlementTable({
       // Production joins the array and shows "-" for an empty one. No copy
       // affordance and no truncation: it prints the raw join.
       render: (row) => {
-        const utrs = row.utrNumbers?.length ? row.utrNumbers : row.utrNumber ? [row.utrNumber] : [];
+        const utrs = row.utrNumbers ?? [];
         return (
           <span className="text-[13px] text-muted-foreground">
             {utrs.length === 0 ? "-" : utrs.join(", ")}
@@ -148,7 +148,7 @@ export function ClassicSettlementTable({
           skeletonRows={8}
           emptyTitle="No settlement reports yet"
           emptyDescription="Settlement reports will appear here once transactions are processed"
-          rowKey={(row) => row.id}
+          rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
           pageSize={CLASSIC_PAGE_SIZE}
           totalRows={rows.length}
           page={page}

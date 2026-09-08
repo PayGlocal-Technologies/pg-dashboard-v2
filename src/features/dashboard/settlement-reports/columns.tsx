@@ -1,71 +1,56 @@
-import { type Column, StatusBadge } from "@/components/ui";
-import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
+import { type Column } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CopyableCell } from "@/components/common/CopyableCell";
-import { SettlementUtrCell } from "@/features/dashboard/settlement-reports/components/SettlementUtrCell";
-import type {
-  SettlementRow,
-  SettlementStatus,
-} from "@/features/dashboard/settlement-reports/types";
-
-/** "stl_a1b2c3d4" -> "stl_....c3d4", first 4 / last 4 characters. */
-function truncateId(value: string): string {
-  if (value.length <= 10) return value;
-  return `${value.slice(0, 4)}....${value.slice(-4)}`;
-}
-
-export const SETTLEMENT_STATUS_META: Record<
-  SettlementStatus,
-  { label: string; variant: BadgeVariant; trailIcon: BadgeTrailIcon }
-> = {
-  settled: { label: "Settled", variant: "success", trailIcon: "check" },
-  processing: { label: "Processing", variant: "warning", trailIcon: "clock" },
-  // MCA (PACB) only, see the SettlementStatus doc comment in types.ts.
-  sent_for_settlement: { label: "Sent for Settlement", variant: "warning", trailIcon: "clock" },
-  mca_settled: { label: "Settled", variant: "info", trailIcon: "arrow-right" },
-  firc: { label: "FIRC", variant: "success", trailIcon: "check" },
-};
-
-/** Whether a settlement has actually reached its terminal, funds-arrived
- * state, "settled" for Payments, "firc" for MCA (its own "mca_settled" is
- * only halfway there, money has moved to the bank but not to the merchant
- * yet), see the SettlementStatus doc comment in types.ts. */
-export function isSettlementComplete(status: SettlementStatus): boolean {
-  return status === "settled" || status === "firc";
-}
+import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
 
 // Every reorderable/hideable data column lives here, keyed so
 // TransactionColumnsMenu (reused as-is from the transactions feature) can
 // toggle visibility and reorder independently of the trailing rowAction
 // space, which isn't a real column.
-export const SETTLEMENT_COLUMN_DEFS: { key: string; label: string }[] = [
-  { key: "amount", label: "Amount" },
-  { key: "transactionCount", label: "Transactions" },
-  { key: "utrNumber", label: "UTR Number" },
-  { key: "id", label: "Settlement ID" },
-  { key: "status", label: "Status" },
-  { key: "date", label: "Date" },
-];
+/**
+ * No "Settlement ID" column: settlements are keyed by date, so an id column
+ * would have repeated the Date column beside it. No "Status" or "UTR Number"
+ * either — the settlement APIs carry neither, and a settlement only appears in
+ * the list once it has happened, so there is no state to distinguish.
+ *
+ * Merchant ID takes the freed slot, and only for an account that actually has
+ * more than one PACB MID. For everyone else it is one value repeated down the
+ * page, which is why it is dropped outright rather than merely hidden: a hidden
+ * column still shows up in the columns menu, inviting someone to turn on a
+ * useless one.
+ */
+export function settlementColumnDefs(showMerchantId: boolean): { key: string; label: string }[] {
+  return [
+    { key: "amount", label: "Amount" },
+    { key: "transactionCount", label: "Transactions" },
+    ...(showMerchantId ? [{ key: "merchantId", label: "Merchant ID" }] : []),
+    { key: "date", label: "Date" },
+  ];
+}
 
-export const SETTLEMENT_COLUMN_ORDER: string[] = SETTLEMENT_COLUMN_DEFS.map((d) => d.key);
+export function settlementColumnOrder(showMerchantId: boolean): string[] {
+  return settlementColumnDefs(showMerchantId).map((d) => d.key);
+}
 
 function buildColumn(key: string): Column<SettlementRow> | null {
   switch (key) {
-    case "id":
+    case "merchantId":
       return {
-        key: "id",
-        header: "Settlement ID",
-        minWidth: 150,
-        cellClassName: "pl-5",
-        render: (row) => (
-          <CopyableCell
-            value={truncateId(row.id)}
-            copyValue={row.id}
-            label="Settlement ID"
-            monospace
-            className="text-primary/80 transition-colors hover:text-primary"
-          />
-        ),
+        key: "merchantId",
+        header: "Merchant ID",
+        minWidth: 170,
+        render: (row) =>
+          row.merchantId ? (
+            <CopyableCell
+              value={row.merchantId}
+              copyValue={row.merchantId}
+              label="Merchant ID"
+              monospace
+              className="text-primary/80 transition-colors hover:text-primary"
+            />
+          ) : (
+            <span className="text-[13px] text-muted-foreground">—</span>
+          ),
       };
     case "amount":
       return {
@@ -73,28 +58,12 @@ function buildColumn(key: string): Column<SettlementRow> | null {
         header: "Amount",
         minWidth: 140,
         align: "right",
+        cellClassName: "pl-5",
         render: (row) => (
           <span className="whitespace-nowrap font-semibold text-foreground tabular-nums">
             {formatCurrency(row.amount, row.currency)}
           </span>
         ),
-      };
-    case "status":
-      return {
-        key: "status",
-        header: "Status",
-        minWidth: 120,
-        render: (row) => {
-          const meta = SETTLEMENT_STATUS_META[row.status];
-          return (
-            <StatusBadge
-              variant={meta.variant}
-              label={meta.label}
-              trailIcon={meta.trailIcon}
-              size="sm"
-            />
-          );
-        },
       };
     case "transactionCount":
       return {
@@ -106,13 +75,6 @@ function buildColumn(key: string): Column<SettlementRow> | null {
             {row.transactionCount.toLocaleString("en-IN")} txns
           </span>
         ),
-      };
-    case "utrNumber":
-      return {
-        key: "utrNumber",
-        header: "UTR Number",
-        minWidth: 170,
-        render: (row) => <SettlementUtrCell row={row} />,
       };
     case "date":
       return {
@@ -133,15 +95,20 @@ function buildColumn(key: string): Column<SettlementRow> | null {
 interface BuildSettlementColumnsOptions {
   columnOrder?: string[];
   hiddenColumns?: Set<string>;
+  /** Whether the account has more than one PACB MID — see settlementColumnDefs. */
+  showMerchantId?: boolean;
 }
 
 export function buildSettlementColumns({
-  columnOrder = SETTLEMENT_COLUMN_ORDER,
+  columnOrder,
   hiddenColumns,
+  showMerchantId = false,
 }: BuildSettlementColumnsOptions = {}): Column<SettlementRow>[] {
   const cols: Column<SettlementRow>[] = [];
+  const order = columnOrder ?? settlementColumnOrder(showMerchantId);
 
-  for (const key of columnOrder) {
+  for (const key of order) {
+    if (key === "merchantId" && !showMerchantId) continue;
     if (hiddenColumns?.has(key)) continue;
     const col = buildColumn(key);
     if (col) cols.push(col);

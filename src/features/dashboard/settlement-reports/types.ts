@@ -1,51 +1,33 @@
 import type { NonWorkingDayReason } from "@/features/dashboard/settlement-reports/calendarUtils";
 
 /**
- * Payments (PA) settlements move through "processing" -> "settled" (funds
- * have arrived, UTR issued). Multi-Currency Accounts (PACB) settlements have
- * an extra step because of the forex conversion: money is first
- * "sent_for_settlement" (conversion in progress), then "mca_settled"
- * (converted and sent to the bank in INR, UTR not issued yet), and only
- * reaches its terminal state at "firc" (funds have reached the merchant's
- * account, UTR issued), see isSettlementComplete() in columns.tsx for the
- * per-product "is this actually done" check. There is no "failed" state,
- * every settlement in this mock dataset eventually completes.
- */
-export type SettlementStatus =
-  "settled" | "processing" | "sent_for_settlement" | "mca_settled" | "firc";
-
-export type BankTransferStatus = "pending" | "completed";
-
-/**
- * Explicit settlement state, deliberately not collapsed into `status` alone.
- * A report can exist mid-processing, a UTR can't, and a bank transfer can be
- * pending even once a report is ready, these need to vary independently so
- * the UI never has to infer "why" from a single enum (see the settlement
- * detail page and table's UTR column for where this pays off).
+ * One row of the settlement list.
+ *
+ * There is no `status` and no UTR. A settlement only appears here once it has
+ * happened, so there is no state to distinguish, and the settlement APIs do not
+ * carry a UTR at all. `utrNumbers` survives for the CLASSIC view alone, which
+ * still reads the old FFMS/PA summary endpoints that do return them.
+ *
+ * `id` is the settlement DATE. Settlements have no id of their own: an account
+ * settles at most once a day. It is not unique on its own across a UCIC-scoped
+ * response, so anything keying or routing on a row pairs it with `merchantId`.
  */
 export interface SettlementRow {
   id: string;
   amount: number;
   currency: string;
-  status: SettlementStatus;
-  bankAccount: string;
   transactionCount: number;
-  /** Assigned by the bank once the transfer is actually processed, unset until then. */
-  utrNumber?: string;
-  /**
-   * Every UTR the settlement carries, as the summary endpoints return them.
-   * `utrNumber` above is the first of these and is what the v2 table shows;
-   * pg-dashboard's own table lists the whole array, so the classic view needs
-   * it intact rather than truncated to one.
-   */
+  /** OLD CONTRACT ONLY: the classic table's UTR column. The new settlement
+   *  APIs return no UTR, so this is empty on anything they feed. */
   utrNumbers?: string[];
-  /** ISO date string, the settlement's actual (settled) or expected (processing) date. */
+  /** ISO date string, the settlement date. */
   date: string;
-  /** ISO date string, when the underlying payments were captured, T+1's "Day 0". */
+  /** ISO date string, when the underlying payments were captured, T+1's "Day 0".
+   *  Derived client-side by walking the holiday calendar back from `date`, not
+   *  returned by any endpoint. One settlement can cover several capture days —
+   *  a Friday, Saturday and Sunday all settle on the Monday — and this is the
+   *  first of them. Read only by the non-working-day explanation. */
   paymentReceivedAt: string;
-  /** A breakdown/report can be generated while still processing, independent of the transfer's own progress. */
-  reportAvailable: boolean;
-  bankTransferStatus: BankTransferStatus;
   /** True when `date` above got pushed out by a weekend or bank holiday rather than landing on a plain T+1. */
   affectedByNonWorkingDay: boolean;
   nonWorkingDayReason?: NonWorkingDayReason;
@@ -64,43 +46,20 @@ export interface SparklinePoint {
   y: number;
 }
 
-export interface SettlementPayment {
-  id: string;
-  /** ISO date string */
-  createdOn: string;
-  paymentMethod: string;
-  grossAmount: number;
-  deductions: number;
-  netAmount: number;
-  /** Set when this payment was previously flagged and placed on hold, then
-   * cleared and included in this settlement once the review resolved. */
-  releasedFromHold?: {
-    reason: string;
-  };
-}
-
 /**
- * Per-payment review state for an individual cross-border remittance,
- * distinct from the settlement-level SettlementStatus above:
- * "invoice_pending" (the merchant needs to upload an invoice for this
- * transaction) -> "under_review" (invoice submitted, PayGlocal is reviewing
- * it) -> "processing" (cleared review, currency conversion done, sent to the
- * bank) -> "settled" (its FIRC has been generated).
+ * One cross-border remittance inside a settlement.
  *
- * A transaction only gets bundled into a settlement, and therefore only
- * appears in that settlement's payment list, once it has cleared review, so
- * "invoice_pending"/"under_review" transactions never appear inside an
- * existing settlement's payment table, they're not part of a settlement yet.
- * They're surfaced separately, on the "Upcoming settlement" card's Upload
- * Invoice CTA, see mcaSettlementSummary.pendingInvoiceCount in mock-data.ts.
+ * `status` is the RAW uppercase value the API returns, rendered through
+ * mca-transactions' `getStatusMeta` so the badge is identical to the one on the
+ * transactions table and the two can never drift. In practice only SETTLED and
+ * FIRC_SETTLED appear here: a transaction is not bundled into a settlement
+ * until it has cleared invoice review.
  */
-export type McaPaymentStatus = "invoice_pending" | "under_review" | "processing" | "settled";
-
 export interface McaSettlementPayment {
   id: string;
   amount: number;
   currency: string;
-  status: McaPaymentStatus;
+  status: string;
   /** ISO date string */
   createdOn: string;
   /** ISO 3166-1 alpha-2 */
@@ -109,49 +68,26 @@ export interface McaSettlementPayment {
   remitterName: string;
 }
 
-export interface HeldTransaction {
-  id: string;
-  amount: number;
-  currency: string;
-  paymentMethod: string;
-  holdReason: string;
-  /** Short label for the table's "Action Required" column, e.g. "Wait". */
-  actionShortLabel: string;
-}
-
-export interface HeldFundsSummary {
-  transactions: HeldTransaction[];
-  /** One-line reason shown on the card, e.g. "Documents are required before these funds can be released." */
-  reasonSummary: string;
-}
-
 export interface SettlementDetail {
   settlement: SettlementRow;
+  /** The account this settlement landed in — see SettlementAccount below. */
+  account: SettlementAccount;
   grossAmount: number;
   gst: number;
+  /** The fee actually charged, already net of the two discounts below. */
   platformFee: number;
-  /** ISO date string */
-  initiatedAt: string;
-  /** ISO date string */
-  processingAt: string;
-  /** ISO date string, only set when the settlement has held transactions to review */
-  complianceReviewAt: string | null;
-  /** ISO date string, null while still processing */
-  depositedAt: string | null;
-  /** ISO date string, SLA deadline for this settlement's deposit, same day as depositedAt when settled on schedule */
-  expectedAt: string;
-  payments: SettlementPayment[];
-  /** Only present for MCA (PACB) settlements, see McaSettlementPayment. */
-  mcaPayments?: McaSettlementPayment[];
-  /** Only present when one or more transactions in this settlement are on hold. */
-  heldFunds: HeldFundsSummary | null;
+  /** Negotiated rate discount on the fee, 0 when none applied. */
+  discountAmount: number;
+  /** Promotional offer discount on the fee, 0 when none applied. */
+  offerDiscountAmount: number;
+  payments: McaSettlementPayment[];
 }
 
 // ── Real API contracts (ported verbatim from pg-dashboard reports/types.ts) ──
 // These are the ONLY settlement shapes the backend actually returns. Both the
 // PA and FFMS summaries are intentionally thin: a settlement date, an amount,
 // a transaction count and the UTR(s). Everything richer on SettlementRow above
-// (bankAccount, bankTransferStatus, non-working-day info, the summary StatCards
+// (bankTransferStatus, non-working-day info, the summary StatCards
 // and the per-settlement SettlementDetail) has NO backing endpoint yet and is
 // flagged // BACKEND GAP where it is consumed.
 
@@ -226,6 +162,138 @@ export interface HolidayCalendarResponse {
     holidays: Record<string, CalendarHoliday[]>;
   };
   message?: string;
+}
+
+/**
+ * The one thing the settlement screens render that neither endpoint returns.
+ *
+ * Not a backend gap: the capture window is derived client-side by walking the
+ * holiday calendar back from the settlement date, which is also how the
+ * non-working-day metadata is worked out. It stays a separate argument to the
+ * mappers so the derivation has one home rather than being inlined at each
+ * call site.
+ */
+export interface SettlementSupplement {
+  /** First capture day. `captureWindow` is the full range it stands in for —
+   *  a weekend or holiday rolls several capture days into one settlement. */
+  paymentReceivedAt: string;
+  captureWindow: string[];
+}
+
+// ── Settlement list (new contract) ─────────────────────────────────
+// GET /gcc/v3/analytics/{merchantId}/merchant/settlement-list
+//        ?startDate=&endDate=&page=&limit=      (startDate/endDate optional)
+//
+// Replaces the PA `views` and FFMS `summary` shapes above. There is no
+// settlement id: an account settles at most once a day, so the primary key is
+// (merchantId, settlementDate). `merchantId` is per row because the list is
+// fetched at UCIC scope for a multi-MID account and its rows span merchants —
+// which is also why settlementDate ALONE is not unique in a response.
+
+export interface SettlementListItem {
+  merchantId: string;
+  amount: number;
+  transactionCount: number;
+  /** YYYY-MM-DD. Half of this row's primary key, the other half is merchantId. */
+  settlementDate: string;
+}
+
+export interface SettlementListResponse {
+  data: {
+    settlements: SettlementListItem[];
+    /** Rows matching the filter across all pages, for server-side pagination. */
+    totalCount: number;
+  };
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Settlement detail (new contract) ───────────────────────────────
+// GET /gcc/v3/analytics/{merchantId}/merchant/settlement-detail?settlementDate=
+
+/**
+ * Per-payment state, as the raw uppercase value the API returns. Rendered
+ * through mca-transactions' MCA_STATUS_META rather than remapped here, so a
+ * payment inside a settlement badges exactly as the same payment does on the
+ * transactions table: SETTLED is "Settled", FIRC_SETTLED is "FIRC Settled",
+ * both green with a check.
+ *
+ * Typed loosely on purpose. Only these two can appear inside a settlement, but
+ * the shared badge map covers the full transaction status set and falls back
+ * gracefully, so a new value from the server degrades rather than crashes.
+ */
+export type SettlementDetailPaymentStatus = "SETTLED" | "FIRC_SETTLED" | (string & {});
+
+export interface SettlementDetailPayment {
+  gid: string;
+  amount: number;
+  currency: string;
+  /** ISO 8601 (UTC). */
+  createdTime: string;
+  /** Amounts are in the remittance's own currency; the settlement itself is
+   *  always INR, which is a contract decision rather than a returned field. */
+  /** ISO 3166-1 alpha-2. The display name is resolved client-side from COUNTRIES. */
+  country: string;
+  remitterName: string;
+  status: SettlementDetailPaymentStatus;
+}
+
+/**
+ * The account this settlement landed in, as the detail endpoint will return it.
+ *
+ * Confirmed as coming, shape proposed here. `bankName` matters: the profile
+ * endpoint this row was briefly read from (GET /merchants/profile/{onbId}/
+ * settlement) returns an IFSC and a masked number but no name, and the row
+ * reads badly as a bare number. It also belongs on the settlement rather than
+ * the profile because a multi-MID account can settle to more than one bank, and
+ * a profile-level read cannot say which one a given settlement used.
+ */
+export interface SettlementAccount {
+  bankName: string;
+  /** Masked, e.g. "****9081". Never the full number on this endpoint. */
+  maskedAccountNumber: string;
+  ifscCode?: string;
+}
+
+export interface SettlementDetailData {
+  transactionCount: number;
+  settlementAccount: SettlementAccount;
+  grossAmount: number;
+  /** GST charged on the platform fee. */
+  gstDeduction: number;
+  /**
+   * Platform fee actually CHARGED: GST excluded, and already net of the two
+   * discounts below. The identity the Amount Breakdown card renders is
+   * `netAmount === grossAmount - gstDeduction - deductionAmount`; it holds
+   * exactly for the sample payload and the card shows all four, so a backend
+   * that folds GST into this field would make the card visibly disagree.
+   */
+  deductionAmount: number;
+  netAmount: number;
+  /**
+   * PayGlocal's own discounts on the platform fee: a negotiated rate discount
+   * and a promotional offer. Both are ALREADY absorbed into `deductionAmount`,
+   * so neither participates in the net identity above — the fee before either
+   * was applied is `deductionAmount + discountAmount + offerDiscountAmount`,
+   * and GST is charged on the post-discount fee (32.51 is 31.67% of 102.66,
+   * not of 122.66).
+   *
+   * The Amount Breakdown card shows them as a nested explanation under the fee
+   * line rather than as deductions of their own, precisely so the column the
+   * merchant reads downward still foots. Zero when no discount applied, in
+   * which case the nested block is not rendered at all.
+   */
+  discountAmount: number;
+  offerDiscountAmount: number;
+  /** The full list. Not paginated, by decision: a settlement's payment list is
+   *  returned inline however long it is. */
+  payments: SettlementDetailPayment[];
+}
+
+export interface SettlementDetailResponse {
+  data: SettlementDetailData;
+  message?: string;
+  errors?: unknown;
 }
 
 // ── Settlement overview analytics ────────────────────────────────────────────

@@ -17,3 +17,22 @@ export const MCA_SETTLEMENT_LIST_PATH = "/mca-settlement-report";
 export function settlementListPath(context: NavContext): string {
   return context === "PACB" ? MCA_SETTLEMENT_LIST_PATH : SETTLEMENT_LIST_PATH;
 }
+
+/**
+ * A settlement's detail route: `/…-settlement-report/{merchantId}/{date}`.
+ *
+ * Both halves of the key are path segments, mirroring the endpoint behind the
+ * page. The merchant is required, not optional: an account settles at most once
+ * a day, but a UCIC-scoped list spans MIDs, so the date alone does not identify
+ * a settlement there, and the detail endpoint takes the merchant in its path.
+ */
+export function settlementDetailPath(
+  context: NavContext,
+  merchantId: string,
+  settlementDate: string
+): string {
+  return (
+    `${settlementListPath(context)}/${encodeURIComponent(merchantId)}` +
+    `/${encodeURIComponent(settlementDate)}`
+  );
+}

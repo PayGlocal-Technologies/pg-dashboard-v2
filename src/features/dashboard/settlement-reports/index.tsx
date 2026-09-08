@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useScopeId } from "@/lib/hooks/useScopeId";
 import { toProductType, type NavContext } from "@/stores/useProductContext";
-import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
+import { settlementDetailPath } from "@/features/dashboard/settlement-reports/routes";
 import { useApp } from "@/stores/useApp";
 import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { MidGuard } from "@/components/common/MidGuard";
@@ -33,8 +33,8 @@ import {
   type SettlementDateValue,
 } from "@/features/dashboard/settlement-reports/components/SettlementDateFilter";
 import {
-  SETTLEMENT_COLUMN_DEFS,
-  SETTLEMENT_COLUMN_ORDER,
+  settlementColumnDefs,
+  settlementColumnOrder,
   buildSettlementColumns,
 } from "@/features/dashboard/settlement-reports/columns";
 import {
@@ -57,10 +57,7 @@ import {
   ffmsSettlementSummaryApi,
   paSettlementReportsApi,
 } from "@/features/dashboard/settlement-reports/services";
-import {
-  mapFfmsRowToRow,
-  mapPaViewToRow,
-} from "@/features/dashboard/settlement-reports/helper";
+import { mapFfmsRowToRow, mapPaViewToRow } from "@/features/dashboard/settlement-reports/helper";
 import type {
   FfmsSettlementResponse,
   PaSettlementResponse,
@@ -88,12 +85,17 @@ interface SettlementReportsFeatureProps {
  * Whether the ENHANCED view runs on the mock dataset.
  *
  * Not a fallback any more. The enhanced table and the per-settlement detail
- * page behind it are v2's own design and have NO backing endpoint: the live
- * summary returns four thin fields (date / amount / txn count / UTR) with no
- * per-row status and no settlement id, so real rows render a constant status
- * badge, a settlement DATE under the "Settlement ID" header, and a "Settlement
- * not found" detail page. That is unreviewable, which is the whole reason this
- * exists — see mock-data.ts and MCA_API_SPEC_FOR_BACKEND.md section 6.3.
+ * page behind it are v2's own design, and the endpoints they need — the
+ * date-keyed settlement-list and settlement-detail pair — are agreed but not
+ * deployed. The live summary still in place returns four thin fields and
+ * nothing at all behind a row, so a real row drills into a "Settlement not
+ * found" page. That is unreviewable, which is the whole reason this exists.
+ *
+ * The mock is shaped like those two responses exactly (Section A of
+ * mock-data.ts) and goes through the same mappers the live path will, so
+ * wiring them up is a matter of swapping the source, not rewriting the screen.
+ * Section B of that file is the list of fields NEITHER response carries and
+ * that the page still renders — those remain open with the backend.
  *
  * So outside production the enhanced view renders the mock dataset outright,
  * whether or not the endpoint returned rows. The CLASSIC view is untouched and
@@ -107,13 +109,24 @@ interface SettlementReportsFeatureProps {
  */
 const SHOW_MOCK_SETTLEMENTS = process.env.NODE_ENV !== "production";
 
-/** Client-side text search over the visible UTR / settlement id, shared by both
- *  views. The old settlement tables only ever filtered by date server-side. */
+/**
+ * Client-side text search over the settlement date / merchant id, plus the UTRs
+ * the CLASSIC view still gets from the old summary endpoints. There is no
+ * settlement id to search for any more — the date is the key, so `row.id`
+ * matched here IS the date.
+ *
+ * BACKEND GAP: the new list endpoint pages server-side (`page`/`limit`) but has
+ * no `q`, so once it is wired this searches only the page in hand. It needs a
+ * server-side search parameter, or the search has to move onto the date filter.
+ */
 function filterSettlementRows(rows: SettlementRow[], search: string): SettlementRow[] {
   if (!search) return rows;
   const q = search.toLowerCase();
   return rows.filter(
-    (row) => (row.utrNumber ?? "").toLowerCase().includes(q) || row.id.toLowerCase().includes(q)
+    (row) =>
+      row.id.toLowerCase().includes(q) ||
+      (row.merchantId ?? "").toLowerCase().includes(q) ||
+      (row.utrNumbers ?? []).some((utr) => utr.toLowerCase().includes(q))
   );
 }
 
@@ -132,7 +145,6 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const activeContext = product;
   const activeProduct = toProductType(activeContext);
   const isMca = activeProduct === "PACB";
-  const listPath = settlementListPath(activeContext);
 
   // Real bank-holiday calendar (/gcc/v1/calendar). Everything date-shaped on
   // this page now derives from it: today, the next settlement, the T+1 pushout
@@ -146,6 +158,16 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   const { urlMid, midFilter } = useResolvedMids(activeProduct);
   const isGuestUser = useApp((s) => s.isGuestUser);
+  /**
+   * The Merchant ID column exists only for an account whose settlements can
+   * actually come from more than one MID. Settlements are keyed by date, and a
+   * UCIC-scoped list spans MIDs, so on a multi-MID account the date no longer
+   * identifies a row on its own and the merchant has to be visible — and has to
+   * travel with every drill-down and download. On a single-MID account it would
+   * be one value repeated down the page, so the column is not rendered at all.
+   */
+  const paCbMids = useApp((s) => s.paCbMids);
+  const showMerchantId = isMca && paCbMids.length > 1;
   // The one id every path-scoped endpoint on this page takes: the product MID
   // for a single-MID account, the selected MID, or the UCIC id for a multi-MID
   // account with nothing selected. The FFMS settlement endpoints accept the
@@ -168,8 +190,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
    * Which version of this page to render.
    *
    * "enhanced" is v2's own: summary cards and chart, the settlement calendar,
-   * the bank-holiday banner, search, column controls, per-row status and the
-   * per-settlement detail page behind each row.
+   * the bank-holiday banner, search, column controls and the per-settlement
+   * detail page behind each row.
    *
    * "classic" reproduces pg-dashboard's settlement report as it stands today —
    * five columns, a date filter, refresh, download — so the two can be compared
@@ -180,7 +202,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
    *  keeps a page index separate from the enhanced table's 10. */
   const [classicPage, setClassicPage] = useState(1);
   const isClassic = view === "classic";
-  const [columnOrder, setColumnOrder] = useState<string[]>(SETTLEMENT_COLUMN_ORDER);
+  const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   const dateFilterEnd = dateFilter
     ? dateFilter.mode === "range"
@@ -262,7 +284,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
     });
   };
   const onResetColumns = () => {
-    setColumnOrder(SETTLEMENT_COLUMN_ORDER);
+    setColumnOrder(null);
     setHiddenColumns(new Set());
   };
 
@@ -293,6 +315,14 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
    *  skeleton waiting for, or report the failure of, a request it never reads. */
   const enhancedIsMock = SHOW_MOCK_SETTLEMENTS;
 
+  /** Column order falls back to the default for the current column set, so
+   *  toggling the Merchant ID column on cannot leave a stale order behind. */
+  const columnDefs = useMemo(() => settlementColumnDefs(showMerchantId), [showMerchantId]);
+  const effectiveColumnOrder = useMemo(
+    () => columnOrder ?? settlementColumnOrder(showMerchantId),
+    [columnOrder, showMerchantId]
+  );
+
   const filteredApiRows = useMemo(() => filterSettlementRows(apiRows, search), [apiRows, search]);
   const filteredEnhancedRows = useMemo(
     () => filterSettlementRows(enhancedRows, search),
@@ -304,12 +334,10 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   /** Row-scoped report download, shared by both views.
    *
-   *  Keyed off `row.date`, not `row.id`. For a live row the two are the same
-   *  value (the mapper uses the settlement date as the id, for want of a real
-   *  settlement id), but a mock row's id is opaque ("mca_p1q2r3s4") and would
-   *  build a nonsense path segment. `date` is what the endpoint actually wants
-   *  in both cases. The row's own merchant is passed when the summary names one,
-   *  since a UCIC-scoped list can span merchants. */
+   *  Keyed off `row.date`, the settlement date, which is also the row's id now
+   *  that settlements have no id of their own. The row's own merchant is passed
+   *  when the summary names one, since a UCIC-scoped list can span merchants and
+   *  each row's report has to be asked for against its own account. */
   const downloadRowReport = (row: SettlementRow) =>
     downloadSettlementReport(row.date, row.merchantId);
 
@@ -413,10 +441,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
                 // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
                 // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
-                upcomingSettlementLabel={upcomingSettlementLabel}
-                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(
-                  calendar.upcomingSchedule
-                )}
+                upcomingSettlementAmount={upcomingSettlementAmount}
+                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
                 pendingInvoiceCount={upcomingPendingInvoiceCount}
                 onUploadInvoice={() => router.push("/mca-transactions")}
               />
@@ -459,14 +485,11 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
             ) : (
               <Card className="gap-0 overflow-hidden p-0">
                 <div className="pl-5 pr-3 pb-3 pt-5">
-                  {/* Status SegmentedTabs removed: the settlement summary API only
-                   * returns already-completed settlements, so there is no per-row
-                   * status to filter on (see BACKEND GAP in helper.ts). */}
                   <div className="flex items-center gap-2.5 flex-wrap">
                     <RotatingSearchInput
                       value={search}
                       onSearch={onSearch}
-                      words={["UTR", "Settlement ID"]}
+                      words={["Settlement date", "Merchant ID"]}
                       className="min-w-40 max-w-xs flex-1"
                     />
 
@@ -478,8 +501,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
                     <div className="ml-auto flex items-center gap-2">
                       <TransactionColumnsMenu
-                        items={SETTLEMENT_COLUMN_DEFS}
-                        order={columnOrder}
+                        items={columnDefs}
+                        order={effectiveColumnOrder}
                         hidden={hiddenColumns}
                         onOrderChange={setColumnOrder}
                         onToggle={onToggleColumn}
@@ -510,13 +533,17 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                   />
                 ) : (
                   <DataTable
-                    columns={buildSettlementColumns({ columnOrder, hiddenColumns })}
+                    columns={buildSettlementColumns({
+                      columnOrder: effectiveColumnOrder,
+                      hiddenColumns,
+                      showMerchantId,
+                    })}
                     data={filteredEnhancedRows}
                     isLoading={!enhancedIsMock && isPending}
                     skeletonRows={8}
                     emptyTitle="No settlements yet"
                     emptyDescription="Settlement reports will appear here once transactions are processed"
-                    rowKey={(row) => row.id}
+                    rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
                     pageSize={10}
                     density="compact"
                     tableLayout="content"
@@ -537,7 +564,18 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => router.push(`${listPath}/${row.id}`)}
+                          onClick={() =>
+                            router.push(
+                              settlementDetailPath(
+                                activeContext,
+                                // A live summary row does not name its merchant
+                                // yet, so the page's own scope stands in — see
+                                // downloadRowReport, which has the same fallback.
+                                row.merchantId || scopeId,
+                                row.id
+                              )
+                            )
+                          }
                           rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
                           className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                         >
