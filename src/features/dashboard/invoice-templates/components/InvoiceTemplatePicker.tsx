@@ -14,8 +14,8 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
-import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
+import { formatEpochDay } from "@/features/dashboard/invoice-templates/helpers";
+import type { InvoiceTemplate } from "@/features/dashboard/invoice-templates/types";
 
 /**
  * "Start from a template".

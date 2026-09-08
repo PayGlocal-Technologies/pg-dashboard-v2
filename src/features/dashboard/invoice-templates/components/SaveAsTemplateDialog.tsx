@@ -13,8 +13,8 @@ import {
   Input,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/create-invoice/constants";
-import type { InvoiceTemplateSnapshot } from "@/features/dashboard/create-invoice/types";
+import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/invoice-templates/constants";
+import type { InvoiceTemplateSnapshot } from "@/features/dashboard/invoice-templates/types";
 
 /**
  * Names a new template.
@@ -96,14 +96,19 @@ function SaveBody({
         `${snapshot.lineItems.length} line item${snapshot.lineItems.length === 1 ? "" : "s"}`,
         `Currency (${snapshot.currency || "not set"})`,
         "Discount and tax",
-        "Receiving account",
         "Memo, notes and LUT",
         "Branding: theme and colours",
         snapshot.isRecurring ? "Recurring schedule" : "Due-date term",
       ]
     : [];
 
-  const excluded = ["Client", "Invoice number", "Issue and due dates", "Declaration"];
+  const excluded = [
+    "Client",
+    "Invoice number",
+    "Issue and due dates",
+    "Receiving account",
+    "Declaration",
+  ];
 
   return (
     <div className="mt-4">

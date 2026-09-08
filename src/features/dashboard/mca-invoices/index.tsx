@@ -17,8 +17,7 @@ import { withBasePath } from "@/constants/basePath";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
-import { useInvoiceTemplates } from "@/features/dashboard/create-invoice/hooks";
-import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
+import { InvoiceTabs } from "@/features/dashboard/invoice-templates/components/InvoiceTabs";
 import {
   ALL_TIME_RANGE_VALUE,
   INVOICE_DATA_KEYS,
@@ -38,15 +37,8 @@ import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoi
 export function McaInvoicesFeature() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
-      <PageHeader
-        title="Invoice management"
-        actions={
-          <>
-            <ZohoSyncAction />
-            <ManageTemplatesAction />
-          </>
-        }
-      />
+      <PageHeader title="Invoice management" actions={<ZohoSyncAction />} />
+      <InvoiceTabs />
       <MidGuard productType="PACB">
         <McaInvoicesContent />
       </MidGuard>
@@ -109,54 +101,6 @@ function ZohoSyncAction() {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/**
- * "Manage templates", opened from the invoice list rather than only from
- * inside an invoice — the same dialog the create-invoice editor's split
- * button opens, so renaming or editing a template reads identically from
- * either surface.
- */
-function ManageTemplatesAction() {
-  const [open, setOpen] = useState(false);
-  const templateStore = useInvoiceTemplates();
-
-  const handleDeleteTemplate = (templateId: string) => templateStore.remove(templateId);
-
-  // Hard navigation, matching the create-invoice editor's own "Edit template":
-  // router.push lands on /create-invoice as a client transition, and the
-  // bootstrap there reads `?templateId=` in a first-render lazy initializer that
-  // useSearchParams does not reliably populate on a soft navigation — so the
-  // template id was captured as empty and the draft opened blank. A full load
-  // makes the URL synchronous, and withBasePath keeps the /app-v2 prefix a raw
-  // window.location navigation would otherwise drop.
-  const handleEditTemplate = (templateId: string) => {
-    window.location.href = withBasePath(`/create-invoice?templateId=${templateId}`);
-  };
-
-  return (
-    <>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        leftIcon={<Icon name="layout-template" className="h-3.5 w-3.5" />}
-        onClick={() => setOpen(true)}
-      >
-        Manage templates
-      </Button>
-
-      <ManageTemplatesDialog
-        open={open}
-        onOpenChange={setOpen}
-        templates={templateStore.templates}
-        isMutating={templateStore.isMutating}
-        onRename={templateStore.rename}
-        onDelete={handleDeleteTemplate}
-        onEdit={handleEditTemplate}
-      />
-    </>
   );
 }
 

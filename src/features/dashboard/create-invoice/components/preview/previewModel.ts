@@ -1,5 +1,6 @@
 import { formatDate } from "@/lib/utils/format";
 import { getAmount, getInvoiceTotals, themeFor } from "@/features/dashboard/create-invoice/helpers";
+import { DUE_TERM_OPTIONS } from "@/features/dashboard/create-invoice/constants";
 import { INVOICE_LABELS, type InvoiceLabels } from "@/features/dashboard/create-invoice/labels";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";
 import type {
@@ -40,6 +41,20 @@ export interface PreviewSource {
   theme: string;
   primaryHex: string;
   accentHex: string;
+  /**
+   * Draws the fields a template does NOT carry as greyed stand-ins.
+   *
+   * The template editor renders the same document as the invoice editor,
+   * because choosing a theme and a colour pair against an abstract form is
+   * choosing blind. But client, invoice number and issue date belong to an
+   * invoice, not to a template, so showing them empty would read as fields the
+   * merchant forgot rather than fields that are decided later.
+   *
+   * The due date is the one that matters most: the snapshot stores a *term*, so
+   * this renders "30 days" where an invoice renders a date. Drawing a computed
+   * date here would teach merchants that a template remembers one.
+   */
+  placeholders?: boolean;
 }
 
 export interface PreviewItem {
@@ -109,8 +124,40 @@ const addressLines = (address: Address | BillerDetails | undefined): string[] =>
   );
 };
 
+/**
+ * What the template preview draws where an invoice's own fields will go.
+ *
+ * Deliberately generic and obviously not real: a merchant must never mistake
+ * these for data they entered. But they are the right SHAPE, because the point
+ * of the template preview is to show how the finished document will sit on the
+ * page, and a document full of one-word stand-ins does not.
+ */
+const PLACEHOLDER = {
+  invoiceNumber: "INV-0000",
+  issueDate: "01 Jan 2026",
+  clientName: "Client name",
+  clientSecondary: "Chosen on each invoice",
+  clientLines: ["Street address", "City, State 000000", "Country"],
+  /**
+   * A stand-in receiving account.
+   *
+   * Templates no longer carry one at all, so without this the preview would be
+   * permanently missing a panel that every real invoice has, and the page would
+   * sit noticeably shorter than the document it is previewing.
+   */
+  account: {
+    title: "Receiving account",
+    accountHolderName: "Your account name",
+    accountNumber: "0000 0000 0000",
+    bankName: "Chosen on each invoice",
+    routing: "XXXX0000000",
+    isRecommended: false,
+  },
+};
+
 export function buildPreviewModel(source: PreviewSource): PreviewModel {
   const { form, biller, client, account, logoUrl, signatureUrl, symbol } = source;
+  const placeholders = !!source.placeholders;
 
   const theme = themeFor(source.theme);
 
@@ -136,20 +183,38 @@ export function buildPreviewModel(source: PreviewSource): PreviewModel {
     discountLabel: form.discountName || INVOICE_LABELS.discount,
     taxLabel: form.taxName || INVOICE_LABELS.tax,
 
-    invoiceNumber: form.invoiceNumber || "-",
-    issueDate: longDate(form.invoiceDate) || "-",
-    dueDate: longDate(form.dueDate),
+    invoiceNumber: placeholders ? PLACEHOLDER.invoiceNumber : form.invoiceNumber || "-",
+    // Shaped like a date, not spelled "Issue date": a stand-in has to occupy the
+    // same visual space as the real value, and a word where a date goes reads as
+    // a rendering fault rather than as a blank the merchant will fill.
+    issueDate: placeholders ? PLACEHOLDER.issueDate : longDate(form.invoiceDate) || "-",
+    // The one placeholder that is NOT a stand-in: a template stores a term, so
+    // this is the real stored value. See PreviewSource.placeholders.
+    dueDate: placeholders
+      ? (DUE_TERM_OPTIONS.find((option) => option.id === form.dueTermId)?.label ?? "On receipt")
+      : longDate(form.dueDate),
 
     billerName: biller?.legalName || "-",
     billerLines: addressLines(biller),
     billerGstIn: biller?.gstIn ?? "",
 
-    clientName: client?.businessName || client?.name || "-",
-    clientSecondary: client?.businessName && client?.name ? client.name : "",
-    clientLines: addressLines(client?.address),
-    hasClient: !!client,
+    clientName: placeholders ? PLACEHOLDER.clientName : client?.businessName || client?.name || "-",
+    clientSecondary: placeholders
+      ? PLACEHOLDER.clientSecondary
+      : client?.businessName && client?.name
+        ? client.name
+        : "",
+    // A full address block, not a one-line note. The billed-to panel is one of
+    // the largest areas on the page, and collapsing it to a single grey line is
+    // what made the template preview look half-rendered.
+    clientLines: placeholders ? PLACEHOLDER.clientLines : addressLines(client?.address),
+    // Placeholder mode draws the block so the layout keeps its real proportions;
+    // without this the paper would reflow around a gap that will not be there.
+    hasClient: placeholders || !!client,
 
-    account,
+    // A template stores no receiving account, so the preview shows a stand-in
+    // rather than dropping the panel. See PLACEHOLDER.account.
+    account: placeholders ? PLACEHOLDER.account : account,
 
     items: form.lineItems.map((item) => ({
       key: item.key,

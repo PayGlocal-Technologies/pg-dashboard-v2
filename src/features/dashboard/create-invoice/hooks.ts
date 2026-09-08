@@ -6,11 +6,11 @@ import { toast } from "sonner";
 import { useDelete, useGet, usePost, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useScopeId } from "@/lib/hooks/useScopeId";
+import { themeFor } from "@/features/dashboard/create-invoice/helpers";
 import {
   fromApiTemplate,
-  themeFor,
   toTemplateWriteBody,
-} from "@/features/dashboard/create-invoice/helpers";
+} from "@/features/dashboard/invoice-templates/helpers";
 // toDateKey is local-timezone YYYY-MM-DD. Imported from the chips module for the
 // same reason mca-invoices and mca-invoice-details do: it is the one
 // implementation, and `toISOString().slice(0, 10)` rolls the date back a day for
@@ -23,14 +23,16 @@ import {
   clientStateCodesApi,
   getAssetApi,
   getLineItemsApi,
-  invoiceTemplateApi,
-  invoiceTemplatesApi,
   invoiceThemesApi,
   mcaCurrenciesApi,
   suggestedAccountsApi,
   uploadAssetApi,
   ffmsTxnSearchApi,
 } from "@/features/dashboard/create-invoice/services";
+import {
+  invoiceTemplateApi,
+  invoiceTemplatesApi,
+} from "@/features/dashboard/invoice-templates/services";
 import {
   FALLBACK_THEME_ACCENTS,
   FALLBACK_THEME_COLORS,
@@ -47,20 +49,22 @@ import type {
   ClientListResponse,
   CountryCodesResponse,
   CurrencyData,
-  InvoiceTemplate,
-  InvoiceTemplateSnapshot,
   InvoiceTheme,
   InvoiceThemesResponse,
   LineItemSuggestion,
   LineItemsResponse,
   McaCurrencyListResponse,
   StateCodesResponse,
+  ThemePaletteOption,
+} from "@/features/dashboard/create-invoice/types";
+import type {
+  InvoiceTemplate,
+  InvoiceTemplateSnapshot,
   TemplateListResponse,
   TemplateResponse,
   TemplateWriteBody,
   TemplateWriteResponse,
-  ThemePaletteOption,
-} from "@/features/dashboard/create-invoice/types";
+} from "@/features/dashboard/invoice-templates/types";
 import type { BaseResponse } from "@/types/common";
 
 /**
@@ -612,211 +616,4 @@ export function useDebouncedAutosave(
     const timer = setTimeout(() => saveRef.current(), delayMs);
     return () => clearTimeout(timer);
   }, [dependency, enabled, delayMs]);
-}
-
-/** Convenience wrapper so callers can type the envelope without repeating it. */
-export type SimpleResponse = BaseResponse<Record<string, unknown>>;
-// ─── Templates ────────────────────────────────────────────────────────────────
-
-export interface InvoiceTemplates {
-  templates: InvoiceTemplate[];
-  /** False while the list is loading, so the picker can shimmer. */
-  isReady: boolean;
-  /** True while any create, update, rename or delete is in flight. */
-  isMutating: boolean;
-  /**
-   * Creates one. The server mints the id, so it arrives in `onSaved` rather than
-   * being returned — the caller needs it to link the invoice to the new template.
-   */
-  save: (name: string, snapshot: InvoiceTemplateSnapshot, onSaved: (id: string) => void) => void;
-  /** Full replace, keeping the name. */
-  update: (templateId: string, snapshot: InvoiceTemplateSnapshot) => void;
-  /** Also a full replace: the API has no rename endpoint. */
-  rename: (templateId: string, name: string) => void;
-  remove: (templateId: string) => void;
-  /**
-   * Records that a template was used.
-   *
-   * Implemented as a read of `/templates/{id}`, because bumping `lastUsedAt` is
-   * that endpoint's documented side effect and there is no other way to signal
-   * it. The response is discarded: the list already carries full templates, so
-   * the merchant's invoice is filled in from the row they clicked and this only
-   * moves the template up the list next time.
-   */
-  markUsed: (templateId: string) => void;
-}
-
-/**
- * Saved invoice templates, from the API.
- *
- * This hook is the whole of the feature's template storage: the picker card, the
- * save dialog, the manage dialog and the header's split button all go through
- * it and none of them knows where a template lives. It used to be backed by a
- * persisted zustand store, because the endpoints did not exist; that store is
- * deleted, and nothing about templates touches localStorage any more.
- *
- * Every mutation invalidates the list rather than patching a local copy, so what
- * the picker shows is always what the server holds — including `savedAt` and
- * `lastUsedAt`, which only it can supply.
- */
-export function useInvoiceTemplates(): InvoiceTemplates {
-  const merchantId = useInvoiceMerchantId();
-  const queryClient = useQueryClient();
-
-  const listKey = useMemo(() => ["invoice-templates", merchantId], [merchantId]);
-  const listUrl = invoiceTemplatesApi(merchantId);
-
-  const { data, isLoading } = useGet<TemplateListResponse>(listKey, listUrl, undefined, {
-    enabled: !!listUrl,
-  });
-
-  const invalidateList = useCallback(
-    () => void queryClient.invalidateQueries({ queryKey: listKey }),
-    [queryClient, listKey]
-  );
-
-  /**
-   * Most recently used first, then most recently saved.
-   *
-   * Sorted here because the list endpoint promises no order, and because recency
-   * is what a picker wants: the template a merchant reaches for weekly would
-   * otherwise sink as they add others.
-   */
-  const templates = useMemo(() => {
-    const mapped = (data?.data?.templates ?? []).map(fromApiTemplate);
-    return mapped.sort((a, b) => {
-      const used = Number(b.lastUsedAt ?? 0) - Number(a.lastUsedAt ?? 0);
-      return used !== 0 ? used : Number(b.savedAt ?? 0) - Number(a.savedAt ?? 0);
-    });
-  }, [data]);
-
-  const { mutate: create, isPending: isCreating } = usePost<
-    TemplateWriteResponse,
-    TemplateWriteBody
-  >(listUrl, { invalidateQueries: false });
-
-  // One hook each for PUT and DELETE, addressed per call through `dynamicUrl`:
-  // the template id is only known at click time, and useApiMutation resolves
-  // `dynamicUrl` over the hook's own url for exactly this case.
-  const { mutate: replace, isPending: isReplacing } = usePut<
-    TemplateWriteResponse,
-    { dynamicUrl: string; reqBody: TemplateWriteBody }
-  >("", { invalidateQueries: false });
-
-  const { mutate: destroy, isPending: isDeleting } = useDelete<
-    SimpleResponse,
-    { dynamicUrl: string }
-  >("", { invalidateQueries: false });
-
-  const save = useCallback(
-    (name: string, snapshot: InvoiceTemplateSnapshot, onSaved: (id: string) => void) => {
-      create(toTemplateWriteBody(name, snapshot), {
-        onSuccess: (response) => {
-          invalidateList();
-          const templateId = response?.data?.templateId;
-          if (templateId) onSaved(templateId);
-        },
-        onError: (error) =>
-          toast.error("Couldn't save the template", { description: error.message }),
-      });
-    },
-    [create, invalidateList]
-  );
-
-  /** PUT takes the same body as POST, so both write paths share one builder. */
-  const put = useCallback(
-    (templateId: string, name: string, snapshot: InvoiceTemplateSnapshot, failure: string) => {
-      replace(
-        {
-          dynamicUrl: invoiceTemplateApi(merchantId, templateId),
-          reqBody: toTemplateWriteBody(name, snapshot),
-        },
-        {
-          onSuccess: invalidateList,
-          onError: (error) => toast.error(failure, { description: error.message }),
-        }
-      );
-    },
-    [replace, merchantId, invalidateList]
-  );
-
-  const update = useCallback(
-    (templateId: string, snapshot: InvoiceTemplateSnapshot) => {
-      const existing = templates.find((template) => template.id === templateId);
-      if (!existing) return;
-      put(templateId, existing.name, snapshot, "Couldn't update the template");
-    },
-    [templates, put]
-  );
-
-  /**
-   * Renaming is a full replace of the template's contents with a new name, since
-   * the API exposes no rename. The snapshot therefore has to come from the list,
-   * which is why this cannot be issued for a template that is not in it.
-   */
-  const rename = useCallback(
-    (templateId: string, name: string) => {
-      const existing = templates.find((template) => template.id === templateId);
-      if (!existing) return;
-      put(templateId, name, existing.snapshot, "Couldn't rename the template");
-    },
-    [templates, put]
-  );
-
-  const remove = useCallback(
-    (templateId: string) => {
-      destroy(
-        { dynamicUrl: invoiceTemplateApi(merchantId, templateId) },
-        {
-          onSuccess: invalidateList,
-          onError: (error) =>
-            toast.error("Couldn't delete the template", { description: error.message }),
-        }
-      );
-    },
-    [destroy, merchantId, invalidateList]
-  );
-
-  /**
-   * The read that records a use.
-   *
-   * A disabled query plus an explicit refetch, the same idiom mca-transactions
-   * uses for its presigned-URL downloads: the id is only known at click time, so
-   * it goes into state, and the fetch runs from the effect's async callback
-   * rather than the effect body. Failure is silent by design — the invoice has
-   * already been filled in, and "couldn't record that you used this template" is
-   * not something to interrupt a merchant with.
-   */
-  const [pendingUseId, setPendingUseId] = useState<string | null>(null);
-
-  const { refetch: readTemplate } = useGet<TemplateResponse>(
-    ["invoice-template", merchantId, pendingUseId],
-    pendingUseId ? invoiceTemplateApi(merchantId, pendingUseId) : "",
-    undefined,
-    { enabled: false, staleTime: 0 }
-  );
-
-  useEffect(() => {
-    if (!pendingUseId) return;
-
-    const run = async (): Promise<void> => {
-      await readTemplate();
-      setPendingUseId(null);
-      // The bump only shows up in the list, which this hook holds.
-      void queryClient.invalidateQueries({ queryKey: listKey });
-    };
-
-    void run();
-  }, [pendingUseId, readTemplate, queryClient, listKey]);
-
-  return {
-    templates,
-    isReady: !isLoading,
-    isMutating: isCreating || isReplacing || isDeleting,
-    save,
-    update,
-    rename,
-    remove,
-    markUsed: setPendingUseId,
-  };
 }

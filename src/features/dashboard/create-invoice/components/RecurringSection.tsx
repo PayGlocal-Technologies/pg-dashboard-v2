@@ -13,6 +13,7 @@ import {
   Switch,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { RECURRING_OPTIONS } from "@/features/dashboard/create-invoice/constants";
 import type { RecurringType } from "@/features/dashboard/create-invoice/types";
 
@@ -29,6 +30,7 @@ export function RecurringSection({
   recurringType,
   recurringStartDate,
   minStartDate,
+  hideStartDate,
   onChange,
 }: {
   isRecurring: boolean;
@@ -36,6 +38,15 @@ export function RecurringSection({
   recurringStartDate: string;
   /** Recurrence cannot start in the past. */
   minStartDate: string;
+  /**
+   * Drops the start-date field, for the template editor.
+   *
+   * A template stores the frequency ("monthly") and deliberately not the date
+   * the schedule began: a start date in the past cannot be reused, so it is
+   * re-picked on each invoice. Rendering the field here would offer to save
+   * something the snapshot has no room for.
+   */
+  hideStartDate?: boolean;
   onChange: (patch: {
     isRecurring?: boolean;
     recurringType?: RecurringType | "";
@@ -73,7 +84,12 @@ export function RecurringSection({
       </div>
 
       {isRecurring && (
-        <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
+        <div
+          className={cn(
+            "mt-4 grid gap-3 border-t border-border pt-4",
+            !hideStartDate && "sm:grid-cols-2"
+          )}
+        >
           <Field>
             <FieldLabel htmlFor="recurring-frequency">Frequency</FieldLabel>
             <Select
@@ -93,15 +109,21 @@ export function RecurringSection({
             </Select>
           </Field>
 
-          <Field>
-            <FieldLabel htmlFor="recurring-start">Start date</FieldLabel>
-            <DatePicker
-              value={recurringStartDate}
-              min={minStartDate}
-              onChange={(next) => onChange({ recurringStartDate: next })}
-            />
-            <FieldDescription>The first repeat is issued on this date.</FieldDescription>
-          </Field>
+          {hideStartDate ? (
+            <p className="text-[12px] text-muted-foreground">
+              The start date is set on each invoice, because a schedule cannot begin in the past.
+            </p>
+          ) : (
+            <Field>
+              <FieldLabel htmlFor="recurring-start">Start date</FieldLabel>
+              <DatePicker
+                value={recurringStartDate}
+                min={minStartDate}
+                onChange={(next) => onChange({ recurringStartDate: next })}
+              />
+              <FieldDescription>The first repeat is issued on this date.</FieldDescription>
+            </Field>
+          )}
         </div>
       )}
     </div>

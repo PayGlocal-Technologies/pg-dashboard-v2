@@ -164,8 +164,3 @@ export const FALLBACK_THEME_ACCENTS: ThemePaletteOption[] = [
 
 /** Drawn for a colour name neither the endpoint nor the table above knows. */
 export const UNKNOWN_COLOR_HEX = "#475569";
-
-// ─── Templates ────────────────────────────────────────────────────────────────
-
-/** Longest a merchant-chosen template name may be. */
-export const TEMPLATE_NAME_MAX_LENGTH = 60;
