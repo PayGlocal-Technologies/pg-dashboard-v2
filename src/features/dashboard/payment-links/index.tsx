@@ -8,7 +8,7 @@ import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { paymentLinkColumns, withRowClick } from "@/features/dashboard/payment-links/columns";
+import { paymentLinkColumns } from "@/features/dashboard/payment-links/columns";
 import { PaymentLinksStatCards } from "@/features/dashboard/payment-links/components/PaymentLinksStatCards";
 import { PaymentLinkDetailsModal } from "@/features/dashboard/payment-links/components/PaymentLinkDetailsModal";
 import { CreatePaymentLinkModal } from "@/features/dashboard/payment-links/components/CreatePaymentLinkModal";
@@ -101,8 +101,6 @@ export function PaymentLinksFeature() {
     setRows((prev) => [row, ...prev]);
     openDetails(row);
   };
-
-  const columns = withRowClick(paymentLinkColumns, openDetails);
 
   return (
     <div className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden">
@@ -207,11 +205,14 @@ export function PaymentLinksFeature() {
           />
         ) : (
           <DataTable
-            columns={columns}
+            columns={paymentLinkColumns}
             data={filteredRows}
             emptyTitle="No payment links found"
             emptyDescription="Try adjusting your filters or search query"
             rowKey={(row) => row.id}
+            // The whole row opens the link's details, through DataTable's
+            // row-level handler rather than a wrapper around every cell.
+            onRowClick={openDetails}
             pageSize={PAYMENT_LINKS_PAGE_LIMIT}
             density="compact"
             tableLayout="content"

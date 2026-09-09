@@ -28,7 +28,8 @@ function TransactionCardSkeleton() {
 }
 
 // Same row data and action as buildMcaColumns' amount/status/action columns
-// and RowClick, just laid out as a stacked card instead of table cells: the
+// and DataTable's onRowClick, just laid out as a stacked card instead of
+// table cells: the
 // whole card opens the drawer (see TransactionCardList's own role="button"
 // treatment below), while the View/Upload invoice action stops propagation
 // so it fires its own handler instead of also opening the drawer.

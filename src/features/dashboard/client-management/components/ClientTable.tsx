@@ -267,7 +267,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
     }
   }, [detailsOpen, contentEl, scrollPosition]);
 
-  const baseColumns = buildClientColumns(openDetails);
+  const baseColumns = buildClientColumns();
   const columns = reorderColumns(baseColumns, columnOrder);
   const reorderableColumns = baseColumns.map((c) => ({
     key: c.key,
@@ -416,6 +416,11 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           emptyTitle={emptyTitle}
           emptyDescription={emptyDescription}
           rowKey={(row) => row.id}
+          // The whole row opens the details view, through DataTable's row-level
+          // handler rather than a wrapper inside every cell. Clicks on the
+          // row's own buttons and menus are skipped by it, so each still does
+          // only its own job.
+          onRowClick={openDetails}
           pageSize={CLIENT_PAGE_LIMIT}
           totalRows={totalCount}
           page={page}
@@ -423,27 +428,27 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           tableLayout="content"
           density="compact"
           isLoading={isLoading}
-        // Edit rides the rowAction slot rather than a column of its own — the
-        // same arrangement, and the same button treatment, as the Upload Invoice
-        // action on the client's transactions table. Revealed on row hover and on
-        // keyboard focus within the row, pinned right while the columns scroll
-        // under it, and out of the way of column reordering.
-        rowAction={(row) => (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="pencil" className="h-3 w-3" />}
-            onClick={(e) => {
-              // The action floats over the row, whose own click opens the
-              // details drawer — without this, editing would open both.
-              e.stopPropagation();
-              onEditClient(row);
-            }}
-            className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
-          >
-            Edit
-          </Button>
+          // Edit rides the rowAction slot rather than a column of its own — the
+          // same arrangement, and the same button treatment, as the Upload Invoice
+          // action on the client's transactions table. Revealed on row hover and on
+          // keyboard focus within the row, pinned right while the columns scroll
+          // under it, and out of the way of column reordering.
+          rowAction={(row) => (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              leftIcon={<Icon name="pencil" className="h-3 w-3" />}
+              onClick={(e) => {
+                // The action floats over the row, whose own click opens the
+                // details drawer — without this, editing would open both.
+                e.stopPropagation();
+                onEditClient(row);
+              }}
+              className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
+            >
+              Edit
+            </Button>
           )}
         />
       )}

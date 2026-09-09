@@ -188,7 +188,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
     />
   );
 
-  const columns = buildSkuColumns(onPriceChange, setPreviewProduct, needsMidChoice);
+  const columns = buildSkuColumns(onPriceChange, needsMidChoice);
 
   const onSearch = (value: string) => {
     setSearch(value);
@@ -324,6 +324,12 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
               emptyTitle={emptyTitle}
               emptyDescription={emptyDescription}
               rowKey={(row) => row.id}
+              // The whole row opens the product preview, through DataTable's
+              // row-level handler rather than a wrapper inside every cell.
+              // Clicks on the row's own controls (the two price editors, the
+              // overflow menu) are skipped by it, so each still does only its
+              // own job.
+              onRowClick={setPreviewProduct}
               rowAction={renderRowActions}
               pageSize={SKU_PAGE_LIMIT}
               totalRows={totalCount}

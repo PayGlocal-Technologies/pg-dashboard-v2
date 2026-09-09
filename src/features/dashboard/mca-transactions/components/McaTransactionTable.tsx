@@ -639,6 +639,11 @@ export function McaTransactionTable({
                 emptyTitle="No transactions found"
                 emptyDescription="Try adjusting your filters or search query"
                 rowKey={(row) => row.gid}
+                // The whole row opens the details drawer, through DataTable's
+                // row-level handler rather than a wrapper inside every cell.
+                // Clicks landing on the row's own buttons and menus are
+                // skipped by it, so each still does only its own job.
+                onRowClick={openDetails}
                 pageSize={TRANSACTIONS_PAGE_LIMIT}
                 totalRows={totalCount}
                 page={page}

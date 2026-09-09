@@ -156,7 +156,7 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
     }
   };
 
-  const baseColumns = buildMcaLinkColumns(openDetails, (row) => void copyLink(row));
+  const baseColumns = buildMcaLinkColumns((row) => void copyLink(row));
   const columns = reorderColumns(baseColumns, columnOrder);
   const reorderableColumns = baseColumns
     .filter((c) => c.key !== "action")
@@ -299,6 +299,11 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
           emptyTitle="No payment links found"
           emptyDescription="Try adjusting your filters or search query"
           rowKey={(row) => row.gid}
+          // The whole row opens the details view, through DataTable's row-level
+          // handler rather than a wrapper inside every cell. Clicks on the
+          // row's own buttons and menus are skipped by it, so each still does
+          // only its own job.
+          onRowClick={openDetails}
           pageSize={MCA_LINKS_PAGE_LIMIT}
           totalRows={totalCount}
           page={page}

@@ -22,7 +22,6 @@ import { COUNTRY_NAME_MAP } from "@/features/dashboard/mca-transactions/constant
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 import { useApp } from "@/stores/useApp";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { RowClick } from "@/components/common/table/RowClick";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -253,7 +252,6 @@ export function buildMcaColumns(
   options: { showActions?: boolean } = {}
 ): Column<McaTransaction>[] {
   const { showActions = true } = options;
-  const onOpenDetails = handlers.onOpenDetails;
   const cols: Column<McaTransaction>[] = [
     {
       key: "amount",
@@ -264,7 +262,7 @@ export function buildMcaColumns(
         const amount = parseFloat(row.amount ?? "0");
         const currency = row.currency ?? "USD";
         return (
-          <RowClick onClick={() => onOpenDetails(row)} align="left">
+          <>
             {/* The offer badge leads the amount (items-center against the
                 amount block's own baseline alignment) so a discounted
                 transaction is identifiable while scanning the column, the
@@ -279,7 +277,7 @@ export function buildMcaColumns(
                 <span className="text-[11px] text-muted-foreground font-medium">{currency}</span>
               </span>
             </div>
-          </RowClick>
+          </>
         );
       },
     },
@@ -290,11 +288,7 @@ export function buildMcaColumns(
       render: (row) => {
         const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
         const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
-        return (
-          <RowClick onClick={() => onOpenDetails(row)}>
-            <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />
-          </RowClick>
-        );
+        return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
       },
     },
     {
@@ -302,11 +296,9 @@ export function buildMcaColumns(
       header: "Date & Time",
       minWidth: 150,
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
-          <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-            {formatTransactionTimestamp(row.formattedTransactionCreationDateTime)}
-          </span>
-        </RowClick>
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {formatTransactionTimestamp(row.formattedTransactionCreationDateTime)}
+        </span>
       ),
     },
     {
@@ -317,11 +309,7 @@ export function buildMcaColumns(
       // column's content must never clip, so it's cancelled here specifically
       // (min-w-max on CountryCell above is what actually grows the column).
       cellClassName: "overflow-visible",
-      render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
-          <CountryCell iso2={row.partnerCustomerCountry} />
-        </RowClick>
-      ),
+      render: (row) => <CountryCell iso2={row.partnerCustomerCountry} />,
     },
     {
       key: "partnerMaskedCustomerFullName",
@@ -330,11 +318,9 @@ export function buildMcaColumns(
       render: (row) => {
         const name = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName;
         return (
-          <RowClick onClick={() => onOpenDetails(row)}>
-            <span className="block w-[150px] truncate text-[13px] text-foreground">
-              {name ?? "—"}
-            </span>
-          </RowClick>
+          <span className="block w-[150px] truncate text-[13px] text-foreground">
+            {name ?? "—"}
+          </span>
         );
       },
     },
@@ -348,54 +334,52 @@ export function buildMcaColumns(
         const isPendingInvoice = isWaitingForInvoice(row);
 
         return (
-          <RowClick onClick={() => handlers.onOpenDetails(row)}>
-            <div className="flex items-center gap-1">
-              {/* Upload Invoice stays a labelled button rather than hiding in
+          <div className="flex items-center gap-1">
+            {/* Upload Invoice stays a labelled button rather than hiding in
                   the menu: it is the one action the merchant is being asked
                   to take, and burying it behind "…" would cost a click on the
                   transactions that most need one. */}
-              {isPendingInvoice ? (
-                <span data-guide="mca-txn-upload-invoice" className="inline-flex">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    leftIcon={<Icon name="upload" className="w-3 h-3" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlers.onOpenDetails(row);
-                    }}
-                    className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-                  >
-                    Upload Invoice
-                  </Button>
-                </span>
-              ) : (
-                /* Hidden until the row is hovered/focused, opacity-only (no
-                   display/width change) so revealing it never shifts the
-                   layout. Opens the same drawer a click anywhere else on the
-                   row does. */
+            {isPendingInvoice ? (
+              <span data-guide="mca-txn-upload-invoice" className="inline-flex">
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  leftIcon={<Icon name="eye" className="w-3 h-3" />}
+                  leftIcon={<Icon name="upload" className="w-3 h-3" />}
                   onClick={(e) => {
                     e.stopPropagation();
                     handlers.onOpenDetails(row);
                   }}
-                  className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                  className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
                 >
-                  View details
+                  Upload Invoice
                 </Button>
-              )}
+              </span>
+            ) : (
+              /* Hidden until the row is hovered/focused, opacity-only (no
+                   display/width change) so revealing it never shifts the
+                   layout. Opens the same drawer a click anywhere else on the
+                   row does. */
+              <Button
+                variant="ghost"
+                size="sm"
+                leftIcon={<Icon name="eye" className="w-3 h-3" />}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlers.onOpenDetails(row);
+                }}
+                className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+              >
+                View details
+              </Button>
+            )}
 
-              {/* The status-specific extras. On an invoice-pending row Upload
+            {/* The status-specific extras. On an invoice-pending row Upload
                   Invoice is already the button above, so it only appears here
                   when there is something else alongside it. */}
-              {actions.length > (isPendingInvoice ? 1 : 0) && (
-                <RowActionsMenu actions={isPendingInvoice ? actions.slice(1) : actions} />
-              )}
-            </div>
-          </RowClick>
+            {actions.length > (isPendingInvoice ? 1 : 0) && (
+              <RowActionsMenu actions={isPendingInvoice ? actions.slice(1) : actions} />
+            )}
+          </div>
         );
       },
     },
@@ -407,11 +391,9 @@ export function buildMcaColumns(
       header: "Merchant ID",
       minWidth: 145,
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
-          <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-            {row.merchantId ?? "—"}
-          </span>
-        </RowClick>
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {row.merchantId ?? "—"}
+        </span>
       ),
     });
   }

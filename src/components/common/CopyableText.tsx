@@ -51,8 +51,10 @@ export function CopyableText({
   const [copied, setCopied] = useState(false);
 
   // Takes the event so it can stop it: this control is often rendered inside a
-  // clickable row (see RowClick), and copying a value is never also a request
-  // to open the record it belongs to.
+  // clickable row, and copying a value is never also a request to open the
+  // record it belongs to. DataTable's own onRowClick already skips clicks on a
+  // button like this one; stopping here also covers the rows that are made
+  // clickable some other way.
   const handleCopy = async (e?: { stopPropagation: () => void }) => {
     e?.stopPropagation();
     await navigator.clipboard.writeText(value);
