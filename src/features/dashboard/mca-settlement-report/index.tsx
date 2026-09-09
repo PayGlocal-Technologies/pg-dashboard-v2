@@ -499,33 +499,22 @@ export function McaSettlementReportFeature() {
                   density="compact"
                   tableLayout="content"
                   className="rounded-none border-0"
-                  // Two hover-revealed row actions, as on the old settlement
-                  // table: Download, and "View details" — the explicit entry
-                  // point into the drawer, kept alongside the row click itself
-                  // so details are reachable either way. Neither needs to stop
-                  // propagation: onRowClick already ignores clicks that land
-                  // inside a button.
+                  // Download is the only hover-revealed row action. No "View
+                  // details" button beside it: the row itself opens the drawer
+                  // (see onRowClick above), so a button for the same thing was
+                  // a second affordance for the row's own default action.
+                  // Download does not need to stop propagation, since
+                  // onRowClick already ignores clicks landing inside a button.
                   rowAction={(row) => (
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadRowReport(row)}
-                        leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
-                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                      >
-                        Download
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openDetailsDrawer(row)}
-                        rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                      >
-                        View details
-                      </Button>
-                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => downloadRowReport(row)}
+                      leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
+                      className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                    >
+                      Download
+                    </Button>
                   )}
                 />
               )}
