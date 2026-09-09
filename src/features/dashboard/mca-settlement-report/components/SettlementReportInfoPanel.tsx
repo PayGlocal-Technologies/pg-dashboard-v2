@@ -1,18 +1,28 @@
 import { Button, Card, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { NonWorkingDayExplanation } from "@/features/dashboard/settlement-reports/components/NonWorkingDayExplanation";
-import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
+import { NonWorkingDayExplanation } from "@/features/dashboard/mca-settlement-report/components/NonWorkingDayExplanation";
+import type { SettlementSchedule } from "@/features/dashboard/mca-settlement-report/calendarUtils";
 
 interface SettlementReportInfoPanelProps {
   onClose: () => void;
-  settlement: SettlementRow;
+  /** YYYY-MM-DD. */
+  settlementDate: string;
+  /** YYYY-MM-DD, the capture day this settlement covers from. */
+  paymentReceivedDate: string;
+  /** Derived against the live holiday calendar, not returned by any endpoint. */
+  schedule: SettlementSchedule;
 }
 
 /** Explains the top "Download Report" button, opened via its info icon.
  * Same right-docked, non-overlay pattern as the list page's "About this
  * settlement" panel (SettlementCycleInfoPanel), so the interaction reads
  * identically wherever a merchant asks "why" on this feature. */
-export function SettlementReportInfoPanel({ onClose, settlement }: SettlementReportInfoPanelProps) {
+export function SettlementReportInfoPanel({
+  onClose,
+  settlementDate,
+  paymentReceivedDate,
+  schedule,
+}: SettlementReportInfoPanelProps) {
   return (
     <Card className="sticky top-4 gap-5 p-5">
       <div className="flex items-start justify-between gap-2">
@@ -42,17 +52,17 @@ export function SettlementReportInfoPanel({ onClose, settlement }: SettlementRep
       {/* Only when a weekend or bank holiday actually moved the date. It answers
           "why did my Friday payments land on Monday", which stays a live
           question even for a settlement that has already completed. */}
-      {settlement.affectedByNonWorkingDay &&
-        settlement.nonWorkingDayDate &&
-        settlement.nonWorkingDayReason && (
+      {schedule.affectedByNonWorkingDay &&
+        schedule.nonWorkingDayDate &&
+        schedule.nonWorkingDayReason && (
           <>
             <Separator />
             <NonWorkingDayExplanation
-              paymentReceivedDate={settlement.paymentReceivedAt.slice(0, 10)}
-              nonWorkingDayDate={settlement.nonWorkingDayDate}
-              nonWorkingDayReason={settlement.nonWorkingDayReason}
-              nonWorkingDayName={settlement.nonWorkingDayName}
-              settlementDate={settlement.date.slice(0, 10)}
+              paymentReceivedDate={paymentReceivedDate}
+              nonWorkingDayDate={schedule.nonWorkingDayDate}
+              nonWorkingDayReason={schedule.nonWorkingDayReason}
+              nonWorkingDayName={schedule.nonWorkingDayName ?? undefined}
+              settlementDate={settlementDate}
               settlementComplete
             />
           </>

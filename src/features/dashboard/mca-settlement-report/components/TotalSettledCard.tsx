@@ -19,8 +19,8 @@ import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   totalSettledTimeframes,
   type TotalSettledTimeframe,
-} from "@/features/dashboard/settlement-reports/mock-data";
-import type { SparklinePoint } from "@/features/dashboard/settlement-reports/types";
+} from "@/features/dashboard/mca-settlement-report/constants";
+import type { SparklinePoint } from "@/features/dashboard/mca-settlement-report/types";
 
 /** Y-axis tick label. Shared short form so ticks read in the same ₹K/₹L/₹Cr
  *  units as the headline (an earlier lakh-only version showed "6814.6L"). */

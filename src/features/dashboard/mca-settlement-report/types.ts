@@ -1,4 +1,4 @@
-import type { NonWorkingDayReason } from "@/features/dashboard/settlement-reports/calendarUtils";
+import type { NonWorkingDayReason } from "@/features/dashboard/mca-settlement-report/calendarUtils";
 
 /**
  * One row of the settlement list.
@@ -17,9 +17,6 @@ export interface SettlementRow {
   amount: number;
   currency: string;
   transactionCount: number;
-  /** OLD CONTRACT ONLY: the classic table's UTR column. The new settlement
-   *  APIs return no UTR, so this is empty on anything they feed. */
-  utrNumbers?: string[];
   /** ISO date string, the settlement date. */
   date: string;
   /** ISO date string, when the underlying payments were captured, T+1's "Day 0".
@@ -35,9 +32,9 @@ export interface SettlementRow {
   nonWorkingDayDate?: string;
   /** Holiday name, only set when nonWorkingDayReason === "holiday". */
   nonWorkingDayName?: string;
-  /** Which merchant this settlement belongs to, used to scope its report
-   *  download. Optional because the summary endpoint does not return it yet —
-   *  see FfmsSettlementSummaryRow.merchantId. */
+  /** Which merchant this settlement belongs to. The other half of the row's
+   *  primary key, and what scopes its report download — a UCIC-scoped list
+   *  spans merchants. */
   merchantId?: string;
 }
 
@@ -81,57 +78,6 @@ export interface SettlementDetail {
   /** Promotional offer discount on the fee, 0 when none applied. */
   offerDiscountAmount: number;
   payments: McaSettlementPayment[];
-}
-
-// ── Real API contracts (ported verbatim from pg-dashboard reports/types.ts) ──
-// These are the ONLY settlement shapes the backend actually returns. Both the
-// PA and FFMS summaries are intentionally thin: a settlement date, an amount,
-// a transaction count and the UTR(s). Everything richer on SettlementRow above
-// (bankTransferStatus, non-working-day info, the summary StatCards
-// and the per-settlement SettlementDetail) has NO backing endpoint yet and is
-// flagged // BACKEND GAP where it is consumed.
-
-/** PA (Payments) settlement summary row. Amount/count are strings, nullable. */
-export interface PaSettlementView {
-  settlementDate: string | null;
-  settlementAmount: string | null;
-  numberOfTransactions: string | null;
-  utrNumbers: string[];
-}
-
-export interface PaSettlementResponse {
-  data: {
-    views: PaSettlementView[];
-  };
-}
-
-/** FFMS (PACB) settlement summary row. Note: `totalSettlementAmount`, not `settlementAmount`. */
-export interface FfmsSettlementSummaryRow {
-  settlementDate: string | null;
-  totalSettlementAmount: string | null;
-  numberOfTransactions: string | null;
-  utrNumbers: string[];
-  /**
-   * BACKEND GAP: not returned today. The summary is called at UCIC scope for a
-   * multi-MID account with no MID selected, so its rows can span merchants and
-   * each row has to name its own before that row's report can be downloaded.
-   * Until it arrives the download falls back to the scope the summary was
-   * fetched at, which is correct only for a single-merchant response.
-   */
-  merchantId?: string | null;
-}
-
-export interface FfmsSettlementResponse {
-  data: {
-    summary: FfmsSettlementSummaryRow[];
-  };
-}
-
-export interface PaSettlementDownloadResponse {
-  data: {
-    downloadUrl: string;
-  };
-  message?: string;
 }
 
 export interface FfmsSettlementDownloadResponse {
@@ -190,12 +136,21 @@ export interface SettlementSupplement {
 // fetched at UCIC scope for a multi-MID account and its rows span merchants —
 // which is also why settlementDate ALONE is not unique in a response.
 
+/**
+ * Every field is typed as the live endpoint actually answers, not as the agreed
+ * contract reads: UAT returns `settlementDate: null` on some rows, and the
+ * numerics follow the same house style as the older settlement endpoints, which
+ * send amounts as nullable strings. The mapper coerces rather than trusting any
+ * of it — see mapSettlementListItemToRow.
+ */
 export interface SettlementListItem {
-  merchantId: string;
-  amount: number;
-  transactionCount: number;
-  /** YYYY-MM-DD. Half of this row's primary key, the other half is merchantId. */
-  settlementDate: string;
+  merchantId?: string | null;
+  amount?: number | string | null;
+  transactionCount?: number | string | null;
+  /** YYYY-MM-DD. Half of this row's primary key, the other half is merchantId.
+   *  A row without one cannot be keyed, routed to, or downloaded, so the list
+   *  hook drops it rather than rendering a broken row. */
+  settlementDate?: string | null;
 }
 
 export interface SettlementListResponse {

@@ -5,16 +5,25 @@ import { keepPreviousData } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useGet, useMultipleGet, usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
-import { useScopeId } from "@/lib/hooks/useScopeId";
-import type { ProductType } from "@/lib/hooks/useResolvedMids";
-import { triggerBrowserDownload } from "@/features/dashboard/settlement-reports/helper";
+import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
+import { mcaTxnSearchApi } from "@/features/dashboard/mca-transactions/services";
+import type {
+  McaTransaction,
+  McaTransactionsResponse,
+} from "@/features/dashboard/mca-transactions/types";
+import type { TableReqBody } from "@/types/transactions";
+import { useAccountSetup } from "@/stores/useAccountSetup";
+import { downloadPresignedFile } from "@/features/dashboard/mca-settlement-report/helper";
 import {
   bankHolidayCalendarApi,
   ffmsSettlementDownloadApi,
-  paSettlementDownloadApi,
+  settlementDetailApi,
+  settlementListApi,
   settlementOverviewApi,
   settlementUpcomingApi,
-} from "@/features/dashboard/settlement-reports/services";
+  type SettlementListParams,
+} from "@/features/dashboard/mca-settlement-report/services";
 import { formatDateKey } from "@/lib/utils/format";
 import {
   computeNextSettlement,
@@ -24,16 +33,23 @@ import {
   type HolidayInfo,
   type NextSettlementInfo,
   type SettlementSchedule,
-} from "@/features/dashboard/settlement-reports/calendarUtils";
+} from "@/features/dashboard/mca-settlement-report/calendarUtils";
 import type {
   FfmsSettlementDownloadResponse,
   HolidayCalendarResponse,
-  PaSettlementDownloadResponse,
+  SettlementDetail,
+  SettlementDetailResponse,
+  SettlementListResponse,
   SettlementOverviewData,
   SettlementOverviewResponse,
+  SettlementRow,
   SettlementUpcomingData,
   SettlementUpcomingResponse,
-} from "@/features/dashboard/settlement-reports/types";
+} from "@/features/dashboard/mca-settlement-report/types";
+import {
+  mapDetailPaymentToMcaPayment,
+  mapSettlementListItemToRow,
+} from "@/features/dashboard/mca-settlement-report/helper";
 
 /**
  * The settlement rail these screens are about. Production's BankHolidayCalendar
@@ -268,93 +284,250 @@ export function useSettlementUpcoming(merchantId: string): {
   return { upcoming: data?.data, isLoading: !!merchantId && isPending, isError };
 }
 
+// ── Settlement list and detail ──────────────────────────────────────────────
+
+export interface SettlementListResult {
+  rows: SettlementRow[];
+  /** Rows matching the filter across ALL pages, not just the one in hand. */
+  totalCount: number;
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+}
+
 /**
- * The settlement report download, for every surface that offers one.
+ * The settlement list, paged server-side.
  *
- * There are four: a row in the enhanced table, a row in the classic table, the
- * "Previous settled" summary card, and the Download Report button on a
- * settlement's detail page. All four ask the same question — give me this one
- * settlement's report — so they all come through here rather than each building
- * its own query.
+ * `keepPreviousData` because this drives a table: without it, stepping to page
+ * 2 empties the table to a skeleton and back, which reads as a reload rather
+ * than a page turn. The old row set stays on screen until the new one lands.
+ *
+ * Rows come back mapped onto SettlementRow, with the non-working-day metadata
+ * layered on by the caller from the live holiday calendar — the response has no
+ * such field and none is asked for, see mapSettlementListItemToRow.
+ */
+export function useSettlementList(
+  merchantId: string,
+  params: SettlementListParams
+): SettlementListResult {
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const url = settlementListApi(merchantId, params);
+  const { startDate, endDate, page, limit } = params;
+
+  const { data, isPending, isError, refetch } = useGet<SettlementListResponse>(
+    ["settlement-list", merchantId, startDate ?? "", endDate ?? "", page ?? 1, limit ?? 0],
+    url,
+    { enabled: !!url && !isGuestUser, placeholderData: keepPreviousData }
+  );
+
+  // Rows without a settlement date are dropped, not rendered — see
+  // mapSettlementListItemToRow. `totalCount` is left as the server reported it:
+  // it is the count the pager is built on, and quietly decrementing it here
+  // would desynchronise the page numbers from what the endpoint is paging.
+  const rows = useMemo(
+    () =>
+      (data?.data?.settlements ?? [])
+        .map((item) => mapSettlementListItemToRow(item, null))
+        .filter((row): row is SettlementRow => row !== null),
+    [data]
+  );
+
+  return {
+    rows,
+    totalCount: data?.data?.totalCount ?? 0,
+    isLoading: !!url && isPending,
+    isError,
+    refetch: () => void refetch(),
+  };
+}
+
+/**
+ * One settlement in full, keyed by the pair (merchant, date). Settlements have
+ * no id of their own: an account settles at most once a day.
+ *
+ * Returns `detail: null` for a 404 as well as for a merchant/date the account
+ * does not own, which the page renders as "Settlement not found" — the same
+ * outcome either way, so the caller does not branch on which.
+ */
+export function useSettlementDetail(
+  merchantId: string,
+  settlementDate: string
+): { detail: SettlementDetail | null; isLoading: boolean; isError: boolean } {
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const url = settlementDetailApi(merchantId, settlementDate);
+
+  const { data, isPending, isError } = useGet<SettlementDetailResponse>(
+    ["settlement-detail", merchantId, settlementDate],
+    url,
+    { enabled: !!url && !isGuestUser }
+  );
+
+  const detail = useMemo((): SettlementDetail | null => {
+    const body = data?.data;
+    if (!body) return null;
+    return {
+      settlement: {
+        id: settlementDate,
+        merchantId,
+        amount: body.netAmount,
+        // INR by contract, not returned: settlements always land in INR.
+        currency: "INR",
+        transactionCount: body.transactionCount,
+        date: `${settlementDate}T00:00:00+05:30`,
+        // Derived by the caller against the live holiday calendar, not returned.
+        paymentReceivedAt: `${settlementDate}T00:00:00+05:30`,
+        affectedByNonWorkingDay: false,
+      },
+      account: body.settlementAccount,
+      grossAmount: body.grossAmount,
+      gst: body.gstDeduction,
+      platformFee: body.deductionAmount,
+      discountAmount: body.discountAmount ?? 0,
+      offerDiscountAmount: body.offerDiscountAmount ?? 0,
+      payments: (body.payments ?? []).map(mapDetailPaymentToMcaPayment),
+    };
+  }, [data, merchantId, settlementDate]);
+
+  return { detail, isLoading: !!url && isPending, isError };
+}
+
+/**
+ * The settlement report download, for every surface that offers one: a row in
+ * the table, the "Previous settled" card, and the Download Report button on a
+ * settlement's detail page. All three ask the same question, so they all come
+ * through here rather than each building its own query.
  *
  * Shape is a disabled query plus an explicit trigger, mirroring pg-dashboard's
- * reportDownloadDate + refetch pattern (reports/components/FfmsReportTable.tsx).
- * The endpoint is keyed by settlement DATE, not by settlement id: the summary
- * contract has no id, so the date is all there is to address a report with.
+ * reportDownloadDate + refetch pattern. The endpoint is keyed by settlement
+ * DATE: settlements have no id of their own.
  *
- * `merchantId` is per call rather than per hook because a UCIC-scoped summary
- * can return rows from several merchants, and each row's report has to be asked
- * for against its own. Callers pass the row's merchant where the response names
- * one, and fall back to the page's scope where it does not.
+ * `merchantId` is per call rather than per hook because a UCIC-scoped list can
+ * span merchants, and each row's report has to be asked for against its own.
  */
-export function useSettlementReportDownload(productType: ProductType): {
-  /** Fire a download. `date` is the settlement date, `merchantId` the merchant
-   *  that settlement belongs to (defaults to the page's resolved scope). */
+/**
+ * One MCA transaction, by gid.
+ *
+ * There is no get-by-id endpoint: the only way to reach a single transaction is
+ * the same OpenSearch POST the transactions table uses, with the gid as its
+ * free-text query (that table's own search matches Transaction ID, so this is
+ * the documented behaviour rather than a trick). One row is asked for and the
+ * first is taken.
+ *
+ * Lives here rather than in mca-transactions so wiring the settlement payments
+ * table to that feature's drawer needs no change inside it; only the endpoint,
+ * the body builder and the row type are borrowed.
+ */
+export function useMcaTransactionByGid(gid: string | null): {
+  transaction: McaTransaction | null;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const { urlMid, midFilter } = useResolvedMids("PACB");
+
+  const body = buildTxnRequestBody(
+    {},
+    { searchQuery: gid ?? undefined, selectedMid: midFilter, pageLimit: 1, from: 0 }
+  );
+
+  const { data, isPending, isError } = usePostQuery<McaTransactionsResponse, TableReqBody>(
+    ["mca-transaction-by-gid", urlMid, gid ?? ""],
+    mcaTxnSearchApi(urlMid),
+    body,
+    { staleTime: 0 },
+    !!gid && !isGuestUser
+  );
+
+  // Exact match only. The query is free-text, so a gid that no longer exists
+  // could still return a neighbouring row, and showing the wrong transaction
+  // is worse than showing none.
+  const transaction = (data?.data?.data ?? []).find((row) => row.gid === gid) ?? null;
+
+  return { transaction, isLoading: !!gid && isPending, isError };
+}
+
+/** Matches the name the bucket already uses, with the settlement date appended
+ *  so successive downloads do not all collide in the browser's folder. */
+const SETTLEMENT_REPORT_FILE_PREFIX = "daily_settlement_report";
+
+export function useSettlementReportDownload(): {
+  /**
+   * Fire a download.
+   *
+   * `date` must be the bare YYYY-MM-DD settlement date, because it goes into
+   * the URL path verbatim. Pass `row.id`, NOT `row.date` — the latter is the
+   * display timestamp ("2026-03-16T00:00:00+05:30") and produces a URL the
+   * endpoint cannot parse.
+   *
+   * `merchantId` is the merchant that settlement belongs to.
+   */
   download: (date: string, merchantId?: string) => void;
   /** True between the click and the presigned URL resolving. */
   isDownloading: boolean;
 } {
-  const isMca = productType === "PACB";
-  const { scopeId } = useScopeId(productType);
+  /**
+   * The fallback merchant, mirroring pg-dashboard's FfmsReportTable exactly:
+   * the selected MID, else the first PACB MID.
+   *
+   * Deliberately NOT the page's `scopeId`. That resolves to the UCIC id for a
+   * multi-MID account with nothing selected, and while the list and overview
+   * endpoints accept a UCIC id, this one is per-merchant and would reject it.
+   * Callers with a row pass the row's own merchant anyway; this only covers the
+   * surfaces that have no row, such as the Previous settled card.
+   */
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails?.mid);
+  const firstPaCbMid = useApp((s) => s.paCbMids?.[0] ?? "");
+  const fallbackMid = selectedMid || firstPaCbMid;
   const [target, setTarget] = useState<{ date: string; merchantId: string } | null>(null);
   const date = target?.date ?? null;
   const mid = target?.merchantId ?? "";
 
-  const paDownload = useGet<PaSettlementDownloadResponse>(
-    ["settlement-pa-download", mid, date ?? ""],
-    paSettlementDownloadApi(mid, date ?? ""),
-    { enabled: false }
-  );
-  const ffmsDownload = usePostQuery<FfmsSettlementDownloadResponse, Record<string, never>>(
-    ["settlement-ffms-download", mid, date ?? ""],
+  const { refetch } = usePostQuery<FfmsSettlementDownloadResponse, Record<string, never>>(
+    ["settlement-report-download", mid, date ?? ""],
     ffmsSettlementDownloadApi(mid, date ?? ""),
     {},
     undefined,
     false
   );
 
-  const { refetch: refetchPa } = paDownload;
-  const { refetch: refetchFfms } = ffmsDownload;
-
   useEffect(() => {
     if (!date) return;
     let cancelled = false;
     const run = async () => {
-      // Separate branches so each refetch keeps its own response type: the PA
-      // endpoint returns { downloadUrl }, FFMS returns { presignedUrl }.
-      let link: string | undefined;
-      let message: string | undefined;
-      if (isMca) {
-        const res = await refetchFfms();
-        link = res.data?.data?.presignedUrl;
-        message = res.data?.message;
-      } else {
-        const res = await refetchPa();
-        link = res.data?.data?.downloadUrl;
-        message = res.data?.message;
+      try {
+        const res = await refetch();
+        if (cancelled) return;
+        const link = res.data?.data?.presignedUrl;
+        const message = res.data?.message;
+        // The endpoint answers one of two ways: a ready presigned URL, or no
+        // URL and a `message` explaining why (still generating, or it will be
+        // emailed). Surfacing that message matters — without it a click that
+        // produced no file looks like a dead button.
+        // Named after the settlement it covers, so a folder of these stays
+        // tellable apart — the bucket calls every one of them the same thing.
+        if (link) await downloadPresignedFile(link, `${SETTLEMENT_REPORT_FILE_PREFIX}_${date}`);
+        else if (message) toast.success(message);
+        else toast.error("Could not generate the settlement report. Please try again.");
+      } catch {
+        if (!cancelled) toast.error("Could not download the settlement report. Please try again.");
+      } finally {
+        // Must run even on failure. Without it `target` stays set, so the
+        // button spins forever AND a retry of the same date is a no-op,
+        // because the effect only fires when `date` changes.
+        // Reset inside the async callback, not the effect body, per CLAUDE.md.
+        if (!cancelled) setTarget(null);
       }
-      if (cancelled) return;
-      // Both endpoints answer one of two ways: a ready presigned URL, or no URL
-      // and a `message` explaining why (still generating, or it will be
-      // emailed). pg-dashboard's handleDownloadReport surfaces that message as a
-      // success notification — without it a click that produced no file looks
-      // like a dead button.
-      if (link) triggerBrowserDownload(link);
-      else if (message) toast.success(message);
-      else toast.error("Could not generate the settlement report. Please try again.");
-      // Reset inside the async callback, not the effect body, per CLAUDE.md.
-      setTarget(null);
     };
     void run();
     return () => {
       cancelled = true;
     };
-  }, [date, isMca, refetchPa, refetchFfms]);
+  }, [date, refetch]);
 
   return {
     download: (nextDate: string, merchantId?: string) => {
       if (!nextDate) return;
-      setTarget({ date: nextDate, merchantId: merchantId || scopeId });
+      setTarget({ date: nextDate, merchantId: merchantId || fallbackMid });
     },
     isDownloading: !!date,
   };

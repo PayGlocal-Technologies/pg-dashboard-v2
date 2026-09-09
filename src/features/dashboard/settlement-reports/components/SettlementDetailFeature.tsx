@@ -2,52 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import {
-  Button,
-  Card,
-  DataTable,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Separator,
-  StatusBadge,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-  type Column,
-} from "@/components/ui";
+import { Button, Card, DataTable, Separator, StatusBadge, type Column } from "@/components/ui";
 import { COUNTRIES } from "@payglocal_ui/flux-ui";
 import { Icon } from "@/components/icon";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { CopyableValue } from "@/components/common/CopyableValue";
 import { SettlementReportInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementReportInfoPanel";
-import { ReleasedFromHoldInfoPanel } from "@/features/dashboard/settlement-reports/components/ReleasedFromHoldInfoPanel";
-import { FundsOnHoldCard } from "@/features/dashboard/settlement-reports/components/FundsOnHoldCard";
-import {
-  SETTLEMENT_STATUS_META,
-  isSettlementComplete,
-} from "@/features/dashboard/settlement-reports/columns";
-import { settlementDetailsById } from "@/features/dashboard/settlement-reports/mock-data";
-import {
-  processingBannerCopy,
-  utrPendingReason,
-} from "@/features/dashboard/settlement-reports/settlementCopy";
-import type {
-  McaPaymentStatus,
-  McaSettlementPayment,
-  SettlementPayment,
-} from "@/features/dashboard/settlement-reports/types";
+import { mockSettlementDetail } from "@/features/dashboard/settlement-reports/mock-data";
+import { getStatusMeta } from "@/features/dashboard/mca-transactions/columns";
+import type { McaSettlementPayment } from "@/features/dashboard/settlement-reports/types";
 import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
-import { type NavContext } from "@/stores/useProductContext";
-
-/** "UTR2603120001" → "UTR26....0001" */
-function truncateMiddle(value: string): string {
-  if (value.length <= 9) return value;
-  return `${value.slice(0, 5)}....${value.slice(-4)}`;
-}
+import { toProductType, type NavContext } from "@/stores/useProductContext";
+import { useSettlementReportDownload } from "@/features/dashboard/settlement-reports/hooks";
 
 interface BreakupRowProps {
   label: string;
@@ -55,12 +21,20 @@ interface BreakupRowProps {
   muted?: boolean;
   negative?: boolean;
   emphasis?: boolean;
-  indent?: boolean;
+  /** 1 explains the line above it, 2 explains that explanation. Two levels is
+   *  the limit: the fee discounts sit at 2 and nothing goes deeper. */
+  indent?: 1 | 2;
 }
 
 function BreakupRow({ label, value, muted, negative, emphasis, indent }: BreakupRowProps) {
   return (
-    <div className={cn("flex items-center justify-between gap-4 py-2.5", indent && "pl-4")}>
+    <div
+      className={cn(
+        "flex items-center justify-between gap-4 py-2.5",
+        indent === 1 && "pl-4",
+        indent === 2 && "pl-8"
+      )}
+    >
       <span
         className={cn(
           "text-sm",
@@ -90,111 +64,16 @@ function BreakupRow({ label, value, muted, negative, emphasis, indent }: Breakup
   );
 }
 
-function buildPaymentColumns(onReleasedInfoClick: () => void): Column<SettlementPayment>[] {
-  return [
-    {
-      key: "createdOn",
-      header: "Created on",
-      minWidth: 160,
-      cellClassName: "pl-5",
-      render: (p) => (
-        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-          {formatDate(p.createdOn)}
-        </span>
-      ),
-    },
-    {
-      key: "id",
-      header: "Transaction ID",
-      minWidth: 190,
-      render: (p) => (
-        <div className="flex flex-col items-start gap-1">
-          <span className="whitespace-nowrap font-mono text-[13px] text-primary/80">{p.id}</span>
-          {p.releasedFromHold && (
-            <div className="flex items-center gap-1">
-              <StatusBadge variant="info" label="Released from hold" trailIcon="check" size="sm" />
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={onReleasedInfoClick}
-                aria-label="About released holds"
-                className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
-              >
-                <Icon name="info" size={11} />
-              </Button>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      key: "paymentMethod",
-      header: "Payment method",
-      minWidth: 130,
-      render: (p) => <span className="text-[13px] text-muted-foreground">{p.paymentMethod}</span>,
-    },
-    {
-      key: "grossAmount",
-      header: "Gross amount",
-      minWidth: 130,
-      align: "right",
-      render: (p) => (
-        <span className="whitespace-nowrap tabular-nums text-[13px] font-medium text-foreground">
-          {formatCurrency(p.grossAmount, "INR")}
-        </span>
-      ),
-    },
-    {
-      key: "deductions",
-      header: "Deductions",
-      minWidth: 130,
-      align: "right",
-      render: (p) => (
-        <span className="whitespace-nowrap tabular-nums text-[13px] text-foreground">
-          −{formatCurrency(p.deductions, "INR")}
-        </span>
-      ),
-    },
-    {
-      key: "netAmount",
-      header: "Net amount",
-      minWidth: 130,
-      align: "right",
-      cellClassName: "pr-5",
-      render: (p) => (
-        <span className="whitespace-nowrap tabular-nums text-[13px] font-semibold text-foreground">
-          {formatCurrency(p.netAmount, "INR")}
-        </span>
-      ),
-    },
-  ];
-}
-
-// invoice_pending/under_review never appear here, see the McaPaymentStatus
-// doc comment in types.ts, but the map stays exhaustive over the full type.
-const MCA_PAYMENT_STATUS_META: Record<
-  McaPaymentStatus,
-  { label: string; variant: "success" | "warning" | "info"; trailIcon: "check" | "clock" }
-> = {
-  invoice_pending: { label: "Invoice Upload", variant: "warning", trailIcon: "clock" },
-  under_review: { label: "Under Review", variant: "info", trailIcon: "clock" },
-  processing: { label: "Processing", variant: "warning", trailIcon: "clock" },
-  settled: { label: "Settled", variant: "success", trailIcon: "check" },
-};
-
 function countryFlag(countryCode: string): string {
   return COUNTRIES.find((c) => c.code === countryCode)?.flag ?? "";
 }
 
-/** MCA settlements bundle individual cross-border remittances, each with its
- * own review history, rather than card/UPI/Net Banking payments split off
- * one settlement total, so this table is shaped completely differently from
- * buildPaymentColumns above: amount + currency per remittance, a per-payment
- * status, remitter and origin country. Every payment here has already
- * cleared invoice review to be part of this settlement, so unlike an earlier
- * version of this table there's no "Upload Invoice" action, that only
- * applies to transactions still waiting to be bundled, see the "Upcoming
- * settlement" card's Upload Invoice CTA instead. */
+/** A settlement bundles individual cross-border remittances, each with its own
+ * review history: amount and currency per remittance, a per-payment status,
+ * remitter and origin country. Every payment here has already cleared invoice
+ * review to be part of this settlement, so there is no "Upload Invoice" action
+ * — that only applies to transactions still waiting to be bundled, see the
+ * "Upcoming settlement" card's Upload Invoice CTA instead. */
 function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
   return [
     {
@@ -215,8 +94,10 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
       key: "status",
       header: "Settlement Status",
       minWidth: 150,
+      // Badged through mca-transactions' own map, so a payment inside a
+      // settlement reads exactly as the same payment does on that table.
       render: (p) => {
-        const meta = MCA_PAYMENT_STATUS_META[p.status];
+        const meta = getStatusMeta(p.status, false);
         return (
           <StatusBadge
             variant={meta.variant}
@@ -260,18 +141,30 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
 }
 
 interface SettlementDetailFeatureProps {
-  settlementId: string;
+  /** The account this settlement belongs to. Both halves of the key come from
+   *  the route — see settlementDetailPath in routes.ts for why. */
+  merchantId: string;
+  /** YYYY-MM-DD. */
+  settlementDate: string;
   /** Which product's list to go back to. Comes from the route, as on the list
    *  screen. */
   product: NavContext;
 }
 
-export function SettlementDetailFeature({ settlementId, product }: SettlementDetailFeatureProps) {
+export function SettlementDetailFeature({
+  merchantId,
+  settlementDate,
+  product,
+}: SettlementDetailFeatureProps) {
   const router = useRouter();
   const listPath = settlementListPath(product);
+  // Same hook the list page uses, so a report downloaded from here and from a
+  // row behave identically. See useSettlementReportDownload.
+  const { download: downloadSettlementReport } = useSettlementReportDownload(
+    toProductType(product)
+  );
   const [showReportInfo, setShowReportInfo] = useState(false);
-  const [showReleasedInfo, setShowReleasedInfo] = useState(false);
-  const detail = settlementDetailsById[settlementId];
+  const detail = mockSettlementDetail(merchantId, settlementDate);
 
   if (!detail) {
     return (
@@ -283,7 +176,7 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
           <div>
             <h3 className="text-sm font-semibold text-foreground">Settlement not found</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              This settlement ID doesn&apos;t match any record.
+              No settlement was found for this date on this account.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => router.push(listPath)}>
@@ -296,98 +189,50 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
 
   const {
     settlement,
+    account,
     grossAmount,
+    discountAmount,
+    offerDiscountAmount,
     gst,
     platformFee,
-    initiatedAt,
-    depositedAt,
-    expectedAt,
     payments,
-    mcaPayments,
-    heldFunds,
   } = detail;
-  const isSettled = isSettlementComplete(settlement.status);
-  const statusMeta = SETTLEMENT_STATUS_META[settlement.status];
   const netAmountLabel = formatCurrency(settlement.amount, settlement.currency);
-  const bannerCopy = processingBannerCopy(settlement);
-  const releasedPayments = payments.filter((p) => p.releasedFromHold);
 
-  // Only one side panel shows at a time, opening one closes the other rather
-  // than stacking two asides.
-  function openReportInfo() {
-    setShowReleasedInfo(false);
-    setShowReportInfo(true);
-  }
-
-  function openReleasedInfo() {
-    setShowReportInfo(false);
-    setShowReleasedInfo(true);
-  }
+  /**
+   * PayGlocal's discounts on the platform fee. `platformFee` is already net of
+   * them, so they are shown as a nested explanation of that line rather than as
+   * deductions of their own: the Amount Breakdown column is something the
+   * merchant reads downward and checks against their bank credit, and a row
+   * that did not participate in the sum would make it look wrong.
+   */
+  const feeBeforeDiscount =
+    Math.round((platformFee + discountAmount + offerDiscountAmount) * 100) / 100;
+  const hasFeeDiscount = discountAmount > 0 || offerDiscountAmount > 0;
 
   // TODO(integration): wire up to the real settlement report download
   // endpoint once it exists, see the list page's "Export" action, which is
   // the same mock-only placeholder.
-  function handleDownloadReport(format: "CSV" | "Excel" | "PDF") {
-    toast.success("Download started", {
-      description: `Preparing ${format} report for ${settlement.id}`,
-    });
+  /** Same call a row's Download button makes: one settlement's report, keyed by
+   *  its settlement date. No format choice — the endpoint produces one format,
+   *  so offering three would have been a menu over a single outcome. */
+  function handleDownloadReport() {
+    downloadSettlementReport(settlement.date, settlement.merchantId);
   }
 
-  // A report can exist mid-processing (see settlement.reportAvailable), it's
-  // deliberately independent of `isSettled`, a report being ready never
-  // implies the bank transfer itself is complete. Format choice is an
-  // inline dropdown menu, not a modal, so picking a format doesn't
-  // interrupt whatever else the merchant is doing on this page.
-  const downloadReportButton = settlement.reportAvailable ? (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-        >
-          Download Report
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleDownloadReport("CSV")}>
-          <Icon name="file-text" className="h-3.5 w-3.5" />
-          CSV
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDownloadReport("Excel")}>
-          <Icon name="file-text" className="h-3.5 w-3.5" />
-          Excel (.xlsx)
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDownloadReport("PDF")}>
-          <Icon name="file-text" className="h-3.5 w-3.5" />
-          PDF
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  ) : (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="inline-flex">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled
-              aria-disabled
-              title="Report not available yet"
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-            >
-              Download Report
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent side="top" className="text-xs">
-          Report not available yet
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+  // Always offered: a report is generated for every settlement, including one
+  // still processing — it depends on the underlying payments, not on the bank
+  // transfer's progress. There is no "not available yet" state to render.
+  const downloadReportButton = (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      onClick={handleDownloadReport}
+      leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+    >
+      Download Report
+    </Button>
   );
 
   return (
@@ -404,56 +249,25 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
 
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1 space-y-4">
-          {/* Page header, the settlement amount is the page's identity, status
-           * sits inline next to it as a compact chip, not a floating summary
-           * widget. */}
+          {/* Page header. The settlement amount is the page's identity; the
+           * date beneath it is the other half of its key. No status chip and no
+           * lifecycle line — a settlement only exists here once it has
+           * happened, and the timeline has no source. */}
           <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">
-                {isSettled ? "Settlement amount" : "Expected settlement amount"}
+              <p className="text-xs font-medium text-muted-foreground">Settlement amount</p>
+              <p className="mt-1 text-4xl font-bold tracking-tight text-foreground tabular-nums">
+                {netAmountLabel}
               </p>
-              <div className="mt-1 flex items-center gap-3">
-                <p className="text-4xl font-bold tracking-tight text-foreground tabular-nums">
-                  {netAmountLabel}
-                </p>
-                <StatusBadge
-                  variant={statusMeta.variant}
-                  label={statusMeta.label}
-                  trailIcon={statusMeta.trailIcon}
-                  size="sm"
-                />
-              </div>
               <div className="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-                {isSettled ? (
-                  <span>
-                    Deposited on{" "}
-                    {formatDate(depositedAt!, {
-                      month: "short",
-                      day: "2-digit",
-                      year: "numeric",
-                    })}
-                  </span>
-                ) : (
-                  <>
-                    <span>
-                      Initiated on{" "}
-                      {formatDate(initiatedAt, {
-                        month: "short",
-                        day: "2-digit",
-                        year: "numeric",
-                      })}
-                    </span>
-                    <Separator orientation="vertical" className="h-3" />
-                    <span>
-                      Expected settlement:{" "}
-                      {formatDate(expectedAt, {
-                        month: "short",
-                        day: "2-digit",
-                        year: "numeric",
-                      })}
-                    </span>
-                  </>
-                )}
+                <span>
+                  Settled on{" "}
+                  {formatDate(settlement.date, {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                  })}
+                </span>
               </div>
             </div>
 
@@ -462,7 +276,7 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
               <Button
                 type="button"
                 variant="ghost"
-                onClick={openReportInfo}
+                onClick={() => setShowReportInfo(true)}
                 aria-label="About this settlement"
                 className="h-9 w-9 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
               >
@@ -471,28 +285,21 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
             </div>
           </div>
 
-          {/* Processing only, a settled settlement needs no further
-           * explanation beyond the status chip above. A thin single-strip
-           * banner, not a boxed callout, so it reads as a status line rather
-           * than an alarming block. Ties the exact same copy used by the
-           * table's UTR tooltip (see settlementCopy.ts) so the wording never
-           * contradicts itself across the two surfaces. */}
-          {!isSettled && (
-            <div
-              className={cn(
-                "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-1.5 text-xs leading-relaxed",
-                settlement.affectedByNonWorkingDay
-                  ? "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
-                  : "border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-900/60 dark:bg-blue-950/30 dark:text-blue-200"
-              )}
-            >
-              <Icon
-                name={settlement.affectedByNonWorkingDay ? "alert-triangle" : "info"}
-                size={13}
-                className="shrink-0"
-              />
+          {/* Not a status line — there is no status. This answers the one
+           * question a completed settlement still raises: why did Friday's
+           * payments land on Monday. Only shown when a weekend or bank holiday
+           * actually moved the date. */}
+          {settlement.affectedByNonWorkingDay && (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+              <Icon name="alert-triangle" size={13} className="shrink-0" />
               <p className="min-w-0 flex-1">
-                <span className="font-semibold">{bannerCopy.title}.</span> {bannerCopy.body}
+                <span className="font-semibold">
+                  {settlement.nonWorkingDayReason === "holiday"
+                    ? "Moved by a bank holiday."
+                    : "Moved by the weekend."}
+                </span>{" "}
+                Banks do not process transfers on non-working days, so this settlement landed on the
+                next working day.
               </p>
             </div>
           )}
@@ -512,45 +319,46 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
                 <CopyableValue
                   layout="stack"
                   className="gap-1.5 p-0"
-                  label="Settlement ID"
-                  value={settlement.id}
-                  tooltip="Unique identifier for this settlement batch."
+                  label="Settlement Date"
+                  value={formatDate(settlement.date, {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                  })}
+                  copyValue={settlement.id}
+                  tooltip="An account settles at most once a day, so the date identifies this settlement."
                 />
 
                 <Separator />
 
-                <div className="flex flex-col gap-1.5">
-                  {settlement.utrNumber ? (
+                {/* The other half of the key. Shown whenever the settlement
+                    names its own merchant, which is what a UCIC-scoped list
+                    row does; a single-MID account has nothing to add here. */}
+                {settlement.merchantId && (
+                  <>
                     <CopyableValue
                       layout="stack"
                       className="gap-1.5 p-0"
-                      label="UTR Number"
-                      value={truncateMiddle(settlement.utrNumber)}
-                      copyValue={settlement.utrNumber}
-                      tooltip="Unique Transaction Reference issued by the bank."
-                      valueClassName="text-primary"
+                      label="Merchant ID"
+                      value={settlement.merchantId}
+                      tooltip="The account this settlement belongs to."
                     />
-                  ) : (
-                    <CopyableValue
-                      layout="stack"
-                      className="gap-1.5 p-0"
-                      label="UTR Number"
-                      value="Not generated yet"
-                      copyable={false}
-                      tooltip={utrPendingReason(settlement)}
-                      valueClassName="text-muted-foreground"
-                    />
-                  )}
-                </div>
 
-                <Separator />
+                    <Separator />
+                  </>
+                )}
 
                 <CopyableValue
                   layout="stack"
                   className="gap-1.5 p-0"
                   label="Bank Account"
-                  value={settlement.bankAccount}
+                  value={`${account.bankName} ${account.maskedAccountNumber}`}
                   copyable={false}
+                  tooltip={
+                    account.ifscCode
+                      ? `The account this settlement landed in. IFSC ${account.ifscCode}.`
+                      : "The account this settlement landed in."
+                  }
                 />
 
                 <Separator />
@@ -576,99 +384,79 @@ export function SettlementDetailFeature({ settlementId, product }: SettlementDet
                   value={gst}
                   muted
                   negative
-                  indent
+                  indent={1}
                 />
                 <BreakupRow
                   label="Platform fee charged on payments"
                   value={platformFee}
                   muted
                   negative
-                  indent
+                  indent={1}
                 />
-                <BreakupRow
-                  label={isSettled ? "Net Settlement" : "Expected Net Settlement"}
-                  value={settlement.amount}
-                  emphasis
-                />
+                {/* Only when something was actually discounted — on most
+                    settlements this block is noise. */}
+                {hasFeeDiscount && (
+                  <>
+                    <BreakupRow
+                      label="Fee before discount"
+                      value={feeBeforeDiscount}
+                      muted
+                      indent={2}
+                    />
+                    {discountAmount > 0 && (
+                      <BreakupRow
+                        label="Discount"
+                        value={discountAmount}
+                        muted
+                        negative
+                        indent={2}
+                      />
+                    )}
+                    {offerDiscountAmount > 0 && (
+                      <BreakupRow
+                        label="Offer discount"
+                        value={offerDiscountAmount}
+                        muted
+                        negative
+                        indent={2}
+                      />
+                    )}
+                  </>
+                )}
+                <BreakupRow label="Net Settlement" value={settlement.amount} emphasis />
               </div>
               <p className="text-xs leading-relaxed text-muted-foreground">
-                Net settlement is the amount{" "}
-                {isSettled ? "transferred" : "scheduled to be transferred"} to your registered bank
-                account.
+                Net settlement is the amount transferred to your registered bank account.
               </p>
             </Card>
           </div>
 
-          {/* Funds on Hold, only rendered when this settlement actually has
-           * held transactions, so it never appears as empty/placeholder chrome.
-           * Sits between the Details/Amount Breakdown row and the Payments
-           * table per the requested hierarchy. */}
-          {heldFunds && <FundsOnHoldCard heldFunds={heldFunds} currency={settlement.currency} />}
-
           {/* Payments, full width; this table is the settlement's evidence and
-           * gets the most visual room, no longer sharing a row with Timeline. */}
+           * gets the most visual room. */}
           <Card className="gap-0 overflow-hidden p-0">
             <div className="px-5 pb-3 pt-5">
               <h2 className="text-sm font-semibold text-foreground">Payments in this settlement</h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 Payments ({settlement.transactionCount})
               </p>
-              {releasedPayments.length > 0 && (
-                <div className="mt-1.5 flex items-center gap-1">
-                  <StatusBadge
-                    variant="info"
-                    label={`${releasedPayments.length} released from hold`}
-                    trailIcon="check"
-                    size="sm"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={openReleasedInfo}
-                    aria-label="About released holds"
-                    className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
-                  >
-                    <Icon name="info" size={11} />
-                  </Button>
-                </div>
-              )}
             </div>
-            {mcaPayments ? (
-              <DataTable
-                columns={buildMcaPaymentColumns()}
-                data={mcaPayments}
-                rowKey={(p) => p.id}
-                density="compact"
-                tableLayout="content"
-                className="rounded-none border-0 border-t border-border"
-              />
-            ) : (
-              <DataTable
-                columns={buildPaymentColumns(openReleasedInfo)}
-                data={payments}
-                rowKey={(p) => p.id}
-                density="compact"
-                tableLayout="content"
-                className="rounded-none border-0 border-t border-border"
-              />
-            )}
+            <DataTable
+              columns={buildMcaPaymentColumns()}
+              data={payments}
+              rowKey={(p) => p.id}
+              density="compact"
+              tableLayout="content"
+              className="rounded-none border-0 border-t border-border"
+            />
           </Card>
         </div>
 
-        {(showReportInfo || showReleasedInfo) && (
+        {showReportInfo && (
           <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
-            {showReportInfo && (
-              <SettlementReportInfoPanel
-                onClose={() => setShowReportInfo(false)}
-                settlement={settlement}
-              />
-            )}
-            {showReleasedInfo && (
-              <ReleasedFromHoldInfoPanel
-                onClose={() => setShowReleasedInfo(false)}
-                payments={releasedPayments}
-              />
-            )}
+            <SettlementReportInfoPanel
+              onClose={() => setShowReportInfo(false)}
+              settlement={settlement}
+            />
           </aside>
         )}
       </div>

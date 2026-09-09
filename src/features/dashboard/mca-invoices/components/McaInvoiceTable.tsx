@@ -550,6 +550,11 @@ export function McaInvoiceTable({
                 emptyTitle={emptyCopy.title}
                 emptyDescription={emptyCopy.description}
                 rowKey={(row) => row.id}
+                // The whole row opens the details view, through DataTable's
+                // row-level handler rather than a wrapper inside every cell.
+                // Clicks on the row's own buttons and menus are skipped by it,
+                // so each still does only its own job.
+                onRowClick={handlers.onOpenRow}
                 pageSize={INVOICES_PAGE_LIMIT}
                 totalRows={totalRows}
                 page={page}

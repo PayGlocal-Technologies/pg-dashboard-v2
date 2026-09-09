@@ -1,7 +1,7 @@
 import { Button, Card, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { NonWorkingDayExplanation } from "@/features/dashboard/settlement-reports/components/NonWorkingDayExplanation";
-import type { NonWorkingDayReason } from "@/features/dashboard/settlement-reports/calendarUtils";
+import { NonWorkingDayExplanation } from "@/features/dashboard/mca-settlement-report/components/NonWorkingDayExplanation";
+import type { NonWorkingDayReason } from "@/features/dashboard/mca-settlement-report/calendarUtils";
 
 interface UpcomingScheduleInfo {
   affectedByNonWorkingDay: boolean;

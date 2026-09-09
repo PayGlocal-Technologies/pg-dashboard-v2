@@ -1,6 +1,6 @@
 import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import type { PaymentLinkRow, PaymentLinkStatus } from "@/features/dashboard/payment-links/types";
 
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -85,28 +85,3 @@ export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
     ),
   },
 ];
-
-/**
- * Wraps every column's cell in a click handler that opens the row's details —
- * DataTable has no row-level onClick, only a hover action slot, so this makes
- * "click anywhere on the row" work by reclaiming the `<td>`'s own padding via
- * negative margins (`-mx-3 -my-2.5` matches this table's `density="compact"`
- * cell padding exactly) rather than covering just the rendered content.
- */
-export function withRowClick<T>(columns: Column<T>[], onRowClick: (row: T) => void): Column<T>[] {
-  return columns.map((col) => ({
-    ...col,
-    render: (row: T, index: number) => (
-      <div
-        onClick={() => onRowClick(row)}
-        className={cn(
-          "-mx-3 -my-2.5 flex min-h-[inherit] cursor-pointer items-center px-3 py-2.5",
-          col.align === "right" && "justify-end",
-          col.align === "center" && "justify-center"
-        )}
-      >
-        {col.render(row, index)}
-      </div>
-    ),
-  }));
-}

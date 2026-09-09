@@ -263,7 +263,7 @@ export interface LookupTarget {
  *
  *   /mca-transactions, /pa-transactions  SEARCH_WORDS   -> "Transaction ID"
  *   /mca-invoices                        SEARCH_WORDS   -> "Invoice number"
- *   settlement reports                   inline words   -> "UTR", "Settlement ID"
+ *   settlement reports                   inline words   -> "UTR", "Settlement date"
  *   /mca-receipts                        RECEIPT_SEARCH_HINTS -> "invoice ID"
  *   /mca-links                           inline words   -> "invoice number", "link"
  *

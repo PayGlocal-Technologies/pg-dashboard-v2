@@ -15,7 +15,6 @@ import {
   type Column,
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
-import { RowClick } from "@/components/common/table/RowClick";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import {
   FREQUENCY_LABELS,
@@ -170,7 +169,7 @@ function RecurringMark() {
  *
  * Column set, order and conditional visibility are pg-dashboard's
  * MCA_INVOICES_COLUMNS; the cell rendering follows the MCA transactions table
- * so the two read as one product (RowClick-wrapped cells, 13px body text,
+ * so the two read as one product (row-level click, 13px body text,
  * StatusBadge, a hover-revealed CTA plus an overflow menu in Actions).
  */
 export function buildInvoiceColumns(
@@ -178,7 +177,6 @@ export function buildInvoiceColumns(
   options: { showMid: boolean; showFrequency: boolean }
 ): Column<McaInvoiceRow>[] {
   const { showMid, showFrequency } = options;
-  const open = handlers.onOpenRow;
 
   const cols: Column<McaInvoiceRow>[] = [
     {
@@ -186,15 +184,13 @@ export function buildInvoiceColumns(
       header: "Invoice Number",
       minWidth: 190,
       render: (row) => (
-        <RowClick onClick={() => open(row)}>
-          <div className="flex items-center gap-2">
-            {row.source === "ZOHO" && <ZohoMark />}
-            <span className="truncate text-[13px] font-medium text-foreground">
-              {row.invoiceNumber || "—"}
-            </span>
-            {row.type === "RECURRING" && <RecurringMark />}
-          </div>
-        </RowClick>
+        <div className="flex items-center gap-2">
+          {row.source === "ZOHO" && <ZohoMark />}
+          <span className="truncate text-[13px] font-medium text-foreground">
+            {row.invoiceNumber || "—"}
+          </span>
+          {row.type === "RECURRING" && <RecurringMark />}
+        </div>
       ),
     },
     {
@@ -206,14 +202,12 @@ export function buildInvoiceColumns(
         const amount = parseFloat(row.totalAmount ?? "0");
         const currency = row.currency ?? "INR";
         return (
-          <RowClick onClick={() => open(row)} align="right">
-            <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-              <span className="text-[13px] font-semibold tabular-nums text-foreground">
-                {formatCurrency(amount, currency, "en-IN")}
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground">{currency}</span>
+          <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+            <span className="text-[13px] font-semibold tabular-nums text-foreground">
+              {formatCurrency(amount, currency, "en-IN")}
             </span>
-          </RowClick>
+            <span className="text-[11px] font-medium text-muted-foreground">{currency}</span>
+          </span>
         );
       },
     },
@@ -222,11 +216,9 @@ export function buildInvoiceColumns(
       header: "Client Name",
       minWidth: 170,
       render: (row) => (
-        <RowClick onClick={() => open(row)}>
-          <span className="block w-[150px] truncate text-[13px] text-foreground">
-            {row.clientName || "—"}
-          </span>
-        </RowClick>
+        <span className="block w-[150px] truncate text-[13px] text-foreground">
+          {row.clientName || "—"}
+        </span>
       ),
     },
     {
@@ -234,11 +226,9 @@ export function buildInvoiceColumns(
       header: "Business Name",
       minWidth: 180,
       render: (row) => (
-        <RowClick onClick={() => open(row)}>
-          <span className="block w-[160px] truncate text-[13px] text-muted-foreground">
-            {row.clientBusinessName || "—"}
-          </span>
-        </RowClick>
+        <span className="block w-[160px] truncate text-[13px] text-muted-foreground">
+          {row.clientBusinessName || "—"}
+        </span>
       ),
     },
     {
@@ -247,11 +237,7 @@ export function buildInvoiceColumns(
       minWidth: 140,
       render: (row) => {
         const { label, variant } = getInvoiceStatusMeta(row.status);
-        return (
-          <RowClick onClick={() => open(row)}>
-            <StatusBadge variant={variant} label={label} size="sm" />
-          </RowClick>
-        );
+        return <StatusBadge variant={variant} label={label} size="sm" />;
       },
     },
     {
@@ -259,13 +245,11 @@ export function buildInvoiceColumns(
       header: "Invoice Date",
       minWidth: 140,
       render: (row) => (
-        <RowClick onClick={() => open(row)}>
-          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {row.invoiceDate
-              ? formatDate(row.invoiceDate, { day: "2-digit", month: "short", year: "2-digit" })
-              : "—"}
-          </span>
-        </RowClick>
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {row.invoiceDate
+            ? formatDate(row.invoiceDate, { day: "2-digit", month: "short", year: "2-digit" })
+            : "—"}
+        </span>
       ),
     },
     {
@@ -273,13 +257,11 @@ export function buildInvoiceColumns(
       header: "Due Date",
       minWidth: 140,
       render: (row) => (
-        <RowClick onClick={() => open(row)}>
-          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {row.dueDate
-              ? formatDate(row.dueDate, { day: "2-digit", month: "short", year: "2-digit" })
-              : "—"}
-          </span>
-        </RowClick>
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {row.dueDate
+            ? formatDate(row.dueDate, { day: "2-digit", month: "short", year: "2-digit" })
+            : "—"}
+        </span>
       ),
     },
     {
@@ -292,9 +274,8 @@ export function buildInvoiceColumns(
         const isDraft = row.status === "DRAFT";
 
         return (
-          <RowClick onClick={() => open(row)}>
-            <div className="flex items-center gap-1">
-              {/* A draft's one obvious next step is finishing it, so that
+          <div className="flex items-center gap-1">
+            {/* A draft's one obvious next step is finishing it, so that
                   stays a labelled button rather than hiding behind "…" —
                   the same treatment Upload Invoice gets on transactions.
                   Everything else reveals a View button on hover only, so
@@ -305,44 +286,37 @@ export function buildInvoiceColumns(
                   overflow "…" landed at a different x on draft rows than on
                   active/paid ones. min-w rather than w so an unexpectedly wide
                   label pushes the menu out instead of overlapping it. */}
-              <span className="flex min-w-[84px] shrink-0 items-center">
-                {isDraft ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    leftIcon={<Icon name="pencil" className="h-3 w-3" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      open(row);
-                    }}
-                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                  >
-                    Continue
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<Icon name="eye" className="h-3 w-3" />}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      open(row);
-                    }}
-                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100"
-                  >
-                    View
-                  </Button>
-                )}
-              </span>
+            <span className="flex min-w-[84px] shrink-0 items-center">
+              {isDraft ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Icon name="pencil" className="h-3 w-3" />}
+                  onClick={() => handlers.onOpenRow(row)}
+                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                >
+                  Continue
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Icon name="eye" className="h-3 w-3" />}
+                  onClick={() => handlers.onOpenRow(row)}
+                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100"
+                >
+                  View
+                </Button>
+              )}
+            </span>
 
-              {/* Fixed slot too: PAID_OUTSIDE/UPLOADED rows can end up with no
+            {/* Fixed slot too: PAID_OUTSIDE/UPLOADED rows can end up with no
                   menu items at all, and an absent trigger would otherwise pull
                   the column's right edge in on those rows alone. */}
-              <span className="flex w-8 shrink-0 items-center justify-center">
-                <RowActionsMenu actions={actions} />
-              </span>
-            </div>
-          </RowClick>
+            <span className="flex w-8 shrink-0 items-center justify-center">
+              <RowActionsMenu actions={actions} />
+            </span>
+          </div>
         );
       },
     },
@@ -356,11 +330,9 @@ export function buildInvoiceColumns(
       header: "Frequency",
       minWidth: 160,
       render: (row) => (
-        <RowClick onClick={() => open(row)}>
-          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {row.recurringType ? (FREQUENCY_LABELS[row.recurringType] ?? row.recurringType) : "—"}
-          </span>
-        </RowClick>
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {row.recurringType ? (FREQUENCY_LABELS[row.recurringType] ?? row.recurringType) : "—"}
+        </span>
       ),
     });
   }
@@ -372,11 +344,9 @@ export function buildInvoiceColumns(
       header: "Merchant ID",
       minWidth: 150,
       render: (row) => (
-        <RowClick onClick={() => open(row)}>
-          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {row.mid || "—"}
-          </span>
-        </RowClick>
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {row.mid || "—"}
+        </span>
       ),
     });
   }

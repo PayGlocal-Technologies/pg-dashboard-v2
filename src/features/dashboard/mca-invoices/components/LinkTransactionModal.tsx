@@ -11,7 +11,6 @@ import {
   DialogTitle,
   type Column,
 } from "@/components/ui";
-import { RowClick } from "@/components/common/table/RowClick";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -147,30 +146,24 @@ function LinkTransactionBody({
       header: "",
       width: "44px",
       render: (row) => (
-        <RowClick onClick={() => setSelectedGid(row.gid)}>
-          <span
-            role="radio"
-            aria-checked={row.gid === selectedGid}
-            aria-label={`Select transaction ${row.gid}`}
-            className={cn(
-              "flex h-4 w-4 items-center justify-center rounded-full border-2",
-              row.gid === selectedGid ? "border-primary" : "border-border"
-            )}
-          >
-            {row.gid === selectedGid && <span className="h-2 w-2 rounded-full bg-primary" />}
-          </span>
-        </RowClick>
+        <span
+          role="radio"
+          aria-checked={row.gid === selectedGid}
+          aria-label={`Select transaction ${row.gid}`}
+          className={cn(
+            "flex h-4 w-4 items-center justify-center rounded-full border-2",
+            row.gid === selectedGid ? "border-primary" : "border-border"
+          )}
+        >
+          {row.gid === selectedGid && <span className="h-2 w-2 rounded-full bg-primary" />}
+        </span>
       ),
     },
     {
       key: "gid",
       header: "Transaction ID",
       minWidth: 170,
-      render: (row) => (
-        <RowClick onClick={() => setSelectedGid(row.gid)}>
-          <span className="font-mono text-[12px] text-foreground">{row.gid}</span>
-        </RowClick>
-      ),
+      render: (row) => <span className="font-mono text-[12px] text-foreground">{row.gid}</span>,
     },
     {
       key: "amount",
@@ -178,14 +171,12 @@ function LinkTransactionBody({
       minWidth: 140,
       align: "right",
       render: (row) => (
-        <RowClick onClick={() => setSelectedGid(row.gid)} align="right">
-          <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-            <span className="text-[13px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(parseFloat(row.amount ?? "0"), row.currency ?? "USD", "en-US")}
-            </span>
-            <span className="text-[11px] text-muted-foreground">{row.currency}</span>
+        <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
+          <span className="text-[13px] font-semibold tabular-nums text-foreground">
+            {formatCurrency(parseFloat(row.amount ?? "0"), row.currency ?? "USD", "en-US")}
           </span>
-        </RowClick>
+          <span className="text-[11px] text-muted-foreground">{row.currency}</span>
+        </span>
       ),
     },
     {
@@ -193,11 +184,9 @@ function LinkTransactionBody({
       header: "Remitter",
       minWidth: 170,
       render: (row) => (
-        <RowClick onClick={() => setSelectedGid(row.gid)}>
-          <span className="block w-[150px] truncate text-[13px] text-foreground">
-            {row.partnerCustomerFullName || "—"}
-          </span>
-        </RowClick>
+        <span className="block w-[150px] truncate text-[13px] text-foreground">
+          {row.partnerCustomerFullName || "—"}
+        </span>
       ),
     },
     {
@@ -205,11 +194,9 @@ function LinkTransactionBody({
       header: "Country",
       minWidth: 120,
       render: (row) => (
-        <RowClick onClick={() => setSelectedGid(row.gid)}>
-          <span className="text-[13px] text-muted-foreground">
-            {row.partnerCustomerCountry || "—"}
-          </span>
-        </RowClick>
+        <span className="text-[13px] text-muted-foreground">
+          {row.partnerCustomerCountry || "—"}
+        </span>
       ),
     },
     {
@@ -217,11 +204,9 @@ function LinkTransactionBody({
       header: "Transaction Time",
       minWidth: 170,
       render: (row) => (
-        <RowClick onClick={() => setSelectedGid(row.gid)}>
-          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {row.formattedCreationDateTime || "—"}
-          </span>
-        </RowClick>
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {row.formattedCreationDateTime || "—"}
+        </span>
       ),
     },
   ];
@@ -244,6 +229,10 @@ function LinkTransactionBody({
           isLoading={isLoading}
           skeletonRows={5}
           rowKey={(row) => row.gid}
+          // Selecting is what a row click does here, and the whole row is the
+          // target — including the radio in the first column, which carries no
+          // handler of its own and is only the current selection made visible.
+          onRowClick={(row) => setSelectedGid(row.gid)}
           emptyTitle="No transactions available"
           emptyDescription="There are no unlinked transactions for this invoice yet."
           density="compact"

@@ -9,9 +9,9 @@ import {
   buildMonthGrid,
   diffInDays,
   type CalendarCell,
-} from "@/features/dashboard/settlement-reports/calendarUtils";
-import { useBankHolidays } from "@/features/dashboard/settlement-reports/hooks";
-import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
+} from "@/features/dashboard/mca-settlement-report/calendarUtils";
+import { useBankHolidays } from "@/features/dashboard/mca-settlement-report/hooks";
+import type { SettlementRow } from "@/features/dashboard/mca-settlement-report/types";
 
 const WEEKDAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 
