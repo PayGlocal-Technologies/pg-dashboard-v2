@@ -13,7 +13,10 @@ import {
 import { Icon } from "@/components/icon";
 import { usePost } from "@/lib/api/hooks";
 import { feedbackApi } from "@/features/dashboard/feedback/services";
-import type { FeedbackPayload } from "@/features/dashboard/feedback/types";
+import type {
+  FeedbackSubmitResponse,
+  SwitchBackFeedbackPayload,
+} from "@/features/dashboard/feedback/types";
 
 /**
  * "Switch to old view" — an escape hatch back to pg-dashboard for a merchant
@@ -28,20 +31,27 @@ import type { FeedbackPayload } from "@/features/dashboard/feedback/types";
  * Radix doesn't mount `PopoverContent` until the trigger is actually clicked
  * — the form below never exists in the DOM until then.
  *
- * Feedback is best-effort: it rides the same generic "GENERAL" survey
- * endpoint the rest of the app uses, since there's no dedicated contract for
- * this flow. A failed submission never blocks the actual switch, via
+ * Feedback goes to POST /gcc/v3/feedback under its own survey type,
+ * `SWITCH_BACK_TO_OLD_VIEW`: the two answers are sent as `freeText` (what is
+ * making them switch) and `expectations` (what they want fixed or added). No
+ * rating is sent — nothing here scores anything, and the contract for this
+ * type carries no such field.
+ *
+ * Submission is best-effort. A failure never blocks the actual switch, via
  * `onSettled` rather than `onSuccess` — the merchant is leaving either way,
- * and a support-side hiccup shouldn't strand them here.
+ * and a support-side hiccup shouldn't strand them here. Nothing is reported
+ * back to them for the same reason: the navigation is already under way, so a
+ * toast would be torn down before it could be read.
  */
 export function SwitchToOldViewButton() {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [changeRequest, setChangeRequest] = useState("");
 
-  const { mutate: sendFeedback, isPending } = usePost<unknown, FeedbackPayload>(feedbackApi, {
-    invalidateQueries: false,
-  });
+  const { mutate: sendFeedback, isPending } = usePost<
+    FeedbackSubmitResponse,
+    SwitchBackFeedbackPayload
+  >(feedbackApi, { invalidateQueries: false });
 
   const goToOldView = () => {
     // Origin-relative on purpose: pg-dashboard (the old view) is served from
@@ -54,8 +64,7 @@ export function SwitchToOldViewButton() {
   const handleSubmit = () => {
     sendFeedback(
       {
-        type: "GENERAL",
-        rating: 0,
+        type: "SWITCH_BACK_TO_OLD_VIEW",
         freeText: reason.trim(),
         expectations: changeRequest.trim(),
       },
@@ -114,10 +123,22 @@ export function SwitchToOldViewButton() {
         </div>
 
         <div className="mt-4 flex items-center justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" disabled={isPending} onClick={goToOldView}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={isPending}
+            onClick={goToOldView}
+          >
             Skip
           </Button>
-          <Button type="button" variant="primary" size="sm" isLoading={isPending} onClick={handleSubmit}>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            isLoading={isPending}
+            onClick={handleSubmit}
+          >
             Send and continue
           </Button>
         </div>
