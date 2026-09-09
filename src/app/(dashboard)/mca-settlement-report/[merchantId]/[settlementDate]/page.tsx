@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { type Metadata } from "next";
 import { McaSettlementDetailFeature } from "@/features/dashboard/mca-settlement-report/components/SettlementDetailFeature";
 
@@ -16,5 +17,12 @@ interface McaSettlementDetailPageProps {
 // there — and a segment, unlike a query parameter, cannot be lost from a link.
 export default async function McaSettlementDetailPage({ params }: McaSettlementDetailPageProps) {
   const { merchantId, settlementDate } = await params;
-  return <McaSettlementDetailFeature merchantId={merchantId} settlementDate={settlementDate} />;
+  // Suspense boundary: the feature reads `?payment=` (the settlement drawer's
+  // Expand handoff) via useSearchParams, which Next requires be wrapped so the
+  // page can still be statically prerendered.
+  return (
+    <Suspense>
+      <McaSettlementDetailFeature merchantId={merchantId} settlementDate={settlementDate} />
+    </Suspense>
+  );
 }

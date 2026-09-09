@@ -30,3 +30,22 @@ export function mcaSettlementListPathWithDrawer(
   const query = new URLSearchParams({ mid: merchantId, settlement: settlementDate });
   return `${MCA_SETTLEMENT_LIST_PATH}?${query.toString()}`;
 }
+
+/**
+ * A settlement's detail page with one of its payments already expanded to the
+ * transaction's own full-page view.
+ *
+ * Expand inside the settlement DRAWER has nowhere to render a full transaction
+ * page — the drawer is a 36rem column over the list — so it leaves for the
+ * settlement's page and carries the payment with it, the same way Collapse
+ * carries a settlement back to the list's drawer above. The page reads it once
+ * on mount.
+ */
+export function mcaSettlementDetailPathWithPayment(
+  merchantId: string,
+  settlementDate: string,
+  gid: string
+): string {
+  const query = new URLSearchParams({ payment: gid });
+  return `${mcaSettlementDetailPath(merchantId, settlementDate)}?${query.toString()}`;
+}

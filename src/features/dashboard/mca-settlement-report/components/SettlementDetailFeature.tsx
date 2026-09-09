@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "framer-motion";
 import {
   Button,
   Card,
@@ -27,6 +28,7 @@ import { getStatusMeta } from "@/features/dashboard/mca-transactions/columns";
 import type { McaSettlementPayment } from "@/features/dashboard/mca-settlement-report/types";
 import {
   MCA_SETTLEMENT_LIST_PATH,
+  mcaSettlementDetailPathWithPayment,
   mcaSettlementListPathWithDrawer,
 } from "@/features/dashboard/mca-settlement-report/routes";
 import {
@@ -36,6 +38,7 @@ import {
   useSettlementReportDownload,
 } from "@/features/dashboard/mca-settlement-report/hooks";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
+import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 
 /** Mirrors the loaded layout — header, the two cards, the payments table — so
@@ -218,6 +221,21 @@ interface SettlementDetailsContentProps {
    * info affordance is simply not rendered when this is absent.
    */
   onShowInfo?: () => void;
+  /**
+   * A payment to open straight into the transaction's full-page view, from
+   * `?payment=` — how Expand inside the settlement drawer hands a transaction
+   * over to this page. Page-only, and read once on mount: Back and Collapse
+   * change the view from here on, not the URL.
+   */
+  initialPaymentGid?: string | null;
+  /**
+   * Fires when a payment expands to (or collapses from) the transaction's own
+   * full-page view, so the caller can drop its own chrome for the duration —
+   * the page's Back/Collapse bar and info aside would otherwise sit above a
+   * page that already has both. Mirrors onDetailsOpenChange on the MCA
+   * transactions table, which exists for the same reason.
+   */
+  onPaymentPageChange?: (open: boolean) => void;
 }
 
 /**
@@ -235,6 +253,8 @@ export function SettlementDetailsContent({
   settlementDate,
   layout = "page",
   onShowInfo,
+  initialPaymentGid = null,
+  onPaymentPageChange,
 }: SettlementDetailsContentProps) {
   const router = useRouter();
   const listPath = MCA_SETTLEMENT_LIST_PATH;
@@ -253,8 +273,24 @@ export function SettlementDetailsContent({
    * resolved against the transactions endpoint. Held as a gid rather than a
    * row because that fetch is what supplies the row.
    */
-  const [openPaymentGid, setOpenPaymentGid] = useState<string | null>(null);
+  const [openPaymentGid, setOpenPaymentGid] = useState<string | null>(initialPaymentGid);
+  /**
+   * The payment shown as a full page in place of this settlement's content —
+   * the transactions table's own Expand behaviour, which swaps the drawer for
+   * the full details view without leaving the route or losing anything behind
+   * it. Null means the drawer (or nothing) is showing.
+   *
+   * Seeded from `?payment=`, so arriving from the settlement drawer's Expand
+   * lands directly on the transaction page rather than on the drawer again.
+   */
+  const [pagePaymentGid, setPagePaymentGid] = useState<string | null>(initialPaymentGid);
   const { transaction: openPayment } = useMcaTransactionByGid(openPaymentGid);
+  /** The one way pagePaymentGid changes, so the caller is never left showing
+   *  its own chrome over the transaction page. */
+  const showPaymentPage = (gid: string | null) => {
+    setPagePaymentGid(gid);
+    onPaymentPageChange?.(!!gid);
+  };
   const isPartnerUser = useApp((state) => state.isPartnerUser);
   /**
    * Whether a weekend or bank holiday moved this settlement's date, worked out
@@ -264,6 +300,50 @@ export function SettlementDetailsContent({
   const calendar = useSettlementCalendar();
   const paymentReceivedDate = previousCaptureDay(settlementDate, calendar.holidays);
   const schedule = computeSettlementSchedule(paymentReceivedDate, calendar.holidays);
+
+  /**
+   * Expand, from the payment's drawer: the transaction's own full-page view,
+   * rendered in place of this settlement's content rather than navigated to.
+   * A transaction has no route of its own — the transactions table expands the
+   * same way, swapping its table for this page — so Back and Collapse below
+   * put the settlement back without a navigation either.
+   *
+   * The same fade + rise the transactions table uses, so the page eases in as
+   * the drawer slides away over it instead of cutting in on the same frame.
+   */
+  if (pagePaymentGid) {
+    // The gid is all Expand carries; the full transaction is still resolving.
+    // The settlement skeleton stands in rather than its content, which would
+    // otherwise flash in for a frame behind a page that is about to replace it.
+    if (!openPayment) return <SettlementDetailSkeleton />;
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.08 }}
+      >
+        <TransactionDetailsPage
+          row={openPayment}
+          // Back leaves the transaction entirely and shows this settlement
+          // again; Collapse is the inverse of Expand and hands the same
+          // transaction back to its drawer, over the settlement content.
+          onBack={() => {
+            showPaymentPage(null);
+            setOpenPaymentGid(null);
+          }}
+          onCollapse={() => showPaymentPage(null)}
+          onOpenTransaction={(next) => {
+            setOpenPaymentGid(next.gid);
+            showPaymentPage(next.gid);
+          }}
+          isPartnerUser={isPartnerUser}
+          // This view is shared by several entry points, so the label names
+          // where Back actually returns to from here — see its prop doc.
+          backLabel="Back to Settlement"
+        />
+      </motion.div>
+    );
+  }
 
   if (isLoading) return <SettlementDetailSkeleton />;
 
@@ -574,18 +654,29 @@ export function SettlementDetailsContent({
       </section>
 
       {/* The transactions drawer, reused rather than rebuilt, so a remittance
-          reads identically here and on the transactions table. Expand hands off
-          to that table's own deep link, since a transaction has no page of its
-          own to route to. */}
+          reads identically here and on the transactions table. Expand behaves
+          as it does there too: it swaps the drawer for the transaction's own
+          full-page view (see the early return above), instead of sending the
+          merchant off to the transactions list filtered by gid — which showed
+          a table, not the transaction they had open. */}
       <TransactionDetailsDrawer
         row={openPayment}
-        open={!!openPaymentGid}
+        // Closed while the full page is showing, so the two views of the same
+        // transaction are never mounted over each other.
+        open={!!openPaymentGid && !pagePaymentGid}
         onOpenChange={(next) => {
           if (!next) setOpenPaymentGid(null);
         }}
         onExpand={(row) => {
-          setOpenPaymentGid(null);
-          router.push(`/mca-transactions?q=${encodeURIComponent(row.gid)}`);
+          // In the drawer layout there is nowhere to put a full page: this
+          // content is itself inside a 36rem drawer over the list. So Expand
+          // leaves for the settlement's own page and carries the payment,
+          // which opens it expanded there. On the page it is a state swap.
+          if (isDrawer) {
+            router.push(mcaSettlementDetailPathWithPayment(merchantId, settlementDate, row.gid));
+            return;
+          }
+          showPaymentPage(row.gid);
         }}
         onOpenTransaction={(row) => setOpenPaymentGid(row.gid)}
         isPartnerUser={isPartnerUser}
@@ -613,7 +704,21 @@ export function McaSettlementDetailFeature({
   settlementDate,
 }: McaSettlementDetailFeatureProps) {
   const router = useRouter();
+  /** How Expand inside the settlement drawer hands a payment to this page —
+   *  see mcaSettlementDetailPathWithPayment. Read once, into the content's own
+   *  state; the URL is not kept in sync as the merchant moves between the
+   *  transaction page, its drawer and the settlement. */
+  const searchParams = useSearchParams();
+  const expandedPaymentGid = searchParams.get("payment");
   const [showReportInfo, setShowReportInfo] = useState(false);
+  /**
+   * Whether the content below has expanded one of its payments to the
+   * transaction's own full page. While it has, this page drops its own
+   * Back/Collapse bar and info aside: that page carries both of its own, and
+   * two stacked back bars read as a broken screen. Seeded from `?payment=`,
+   * which is exactly the case where the page opens already expanded.
+   */
+  const [paymentPageOpen, setPaymentPageOpen] = useState(!!expandedPaymentGid);
   const calendar = useSettlementCalendar();
   const paymentReceivedDate = previousCaptureDay(settlementDate, calendar.holidays);
   const schedule = computeSettlementSchedule(paymentReceivedDate, calendar.holidays);
@@ -624,28 +729,30 @@ export function McaSettlementDetailFeature({
           detail page. Collapse is the inverse of the drawer's Expand: it
           returns to the list with this settlement reopened in the drawer,
           rather than dropping the merchant back to a bare table. */}
-      <div className="flex items-center gap-1">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
-          onClick={() => router.push(MCA_SETTLEMENT_LIST_PATH)}
-          className="pl-0 text-muted-foreground hover:text-foreground"
-        >
-          Back to Settlements
-        </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          leftIcon={<Icon name="shrink" className="h-4 w-4" />}
-          onClick={() => router.push(mcaSettlementListPathWithDrawer(merchantId, settlementDate))}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          Collapse
-        </Button>
-      </div>
+      {!paymentPageOpen && (
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
+            onClick={() => router.push(MCA_SETTLEMENT_LIST_PATH)}
+            className="pl-0 text-muted-foreground hover:text-foreground"
+          >
+            Back to Settlements
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="shrink" className="h-4 w-4" />}
+            onClick={() => router.push(mcaSettlementListPathWithDrawer(merchantId, settlementDate))}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            Collapse
+          </Button>
+        </div>
+      )}
 
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
@@ -654,10 +761,12 @@ export function McaSettlementDetailFeature({
             settlementDate={settlementDate}
             layout="page"
             onShowInfo={() => setShowReportInfo(true)}
+            initialPaymentGid={expandedPaymentGid}
+            onPaymentPageChange={setPaymentPageOpen}
           />
         </div>
 
-        {showReportInfo && (
+        {showReportInfo && !paymentPageOpen && (
           <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
             <SettlementReportInfoPanel
               onClose={() => setShowReportInfo(false)}
