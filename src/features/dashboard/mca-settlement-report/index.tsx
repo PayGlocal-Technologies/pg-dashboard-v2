@@ -469,11 +469,16 @@ export function McaSettlementReportFeature() {
               ) : (
                 <DataTable
                   columns={buildSettlementColumns({
-                    onOpenDetails: openDetailsDrawer,
                     columnOrder: effectiveColumnOrder,
                     hiddenColumns,
                     showMerchantId,
                   })}
+                  // The whole row opens the drawer, via DataTable's own
+                  // row-level handler rather than a wrapper inside every cell.
+                  // Clicks on the row's buttons (Download, View details, the
+                  // Merchant ID copy control) are skipped by it, so each of
+                  // those still does only its own job.
+                  onRowClick={openDetailsDrawer}
                   data={filteredEnhancedRows}
                   isLoading={isListLoading}
                   skeletonRows={8}
@@ -492,17 +497,15 @@ export function McaSettlementReportFeature() {
                   // Two hover-revealed row actions, as on the old settlement
                   // table: Download, and "View details" — the explicit entry
                   // point into the drawer, kept alongside the row click itself
-                  // so details are reachable either way. Both stop propagation
-                  // so they perform only their own action.
+                  // so details are reachable either way. Neither needs to stop
+                  // propagation: onRowClick already ignores clicks that land
+                  // inside a button.
                   rowAction={(row) => (
                     <div className="flex items-center gap-1.5">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          downloadRowReport(row);
-                        }}
+                        onClick={() => downloadRowReport(row)}
                         leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
                         className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                       >
@@ -511,10 +514,7 @@ export function McaSettlementReportFeature() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openDetailsDrawer(row);
-                        }}
+                        onClick={() => openDetailsDrawer(row)}
                         rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
                         className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                       >

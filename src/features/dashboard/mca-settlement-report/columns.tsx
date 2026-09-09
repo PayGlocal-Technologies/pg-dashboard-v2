@@ -1,7 +1,6 @@
 import { type Column } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CopyableCell } from "@/components/common/CopyableCell";
-import { RowClick } from "@/components/common/table/RowClick";
 import type { SettlementRow } from "@/features/dashboard/mca-settlement-report/types";
 
 // Every reorderable/hideable data column lives here, keyed so
@@ -40,43 +39,31 @@ export function settlementColumnOrder(showMerchantId: boolean): string[] {
 }
 
 /**
- * Wraps a cell so the whole row opens the details drawer, matching the MCA
- * transactions table where the row itself is the target rather than a button
- * revealed on hover. See RowClick for why the wrapper is needed at all (the
- * cell's padding belongs to DataTable's own <td>).
+ * Plain cells. Opening the drawer is the ROW's job, not a cell's: the table is
+ * given `onRowClick`, which puts the handler on the `<tr>` itself, so the whole
+ * row — cell padding and the gaps between columns included — is the target. No
+ * per-cell wrapper, and nothing here has to know what a click does.
  */
-function buildColumn(
-  key: string,
-  onOpenDetails: (row: SettlementRow) => void
-): Column<SettlementRow> | null {
-  const clickable = (row: SettlementRow, content: React.ReactNode, align?: "left" | "right") => (
-    <RowClick onClick={() => onOpenDetails(row)} align={align}>
-      {content}
-    </RowClick>
-  );
-
+function buildColumn(key: string): Column<SettlementRow> | null {
   switch (key) {
     case "merchantId":
       return {
         key: "merchantId",
         header: "Merchant ID",
         minWidth: 170,
-        // The copy control inside stops its own propagation, so copying an id
-        // does not also open the drawer.
+        // The copy control inside is a <button>, which DataTable's row click
+        // skips by default, so copying an id does not also open the drawer.
         render: (row) =>
-          clickable(
-            row,
-            row.merchantId ? (
-              <CopyableCell
-                value={row.merchantId}
-                copyValue={row.merchantId}
-                label="Merchant ID"
-                monospace
-                className="text-primary/80 transition-colors hover:text-primary"
-              />
-            ) : (
-              <span className="text-[13px] text-muted-foreground">—</span>
-            )
+          row.merchantId ? (
+            <CopyableCell
+              value={row.merchantId}
+              copyValue={row.merchantId}
+              label="Merchant ID"
+              monospace
+              className="text-primary/80 transition-colors hover:text-primary"
+            />
+          ) : (
+            <span className="text-[13px] text-muted-foreground">—</span>
           ),
       };
     case "amount":
@@ -91,45 +78,36 @@ function buildColumn(
         // Locale stays the default en-IN, so a crore-scale figure keeps its
         // lakh grouping rather than switching to the transactions' en-US.
         align: "left",
-        render: (row) =>
-          clickable(
-            row,
-            <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-              <span className="text-[13px] font-semibold text-foreground tabular-nums">
-                {formatCurrency(row.amount, row.currency)}
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
+        render: (row) => (
+          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-[13px] font-semibold text-foreground tabular-nums">
+              {formatCurrency(row.amount, row.currency)}
             </span>
-          ),
+            <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
+          </span>
+        ),
       };
     case "transactionCount":
       return {
         key: "transactionCount",
         header: "Transactions",
         minWidth: 110,
-        render: (row) =>
-          clickable(
-            row,
-            <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-              {row.transactionCount.toLocaleString("en-IN")} txns
-            </span>
-          ),
+        render: (row) => (
+          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+            {row.transactionCount.toLocaleString("en-IN")} txns
+          </span>
+        ),
       };
     case "date":
       return {
         key: "date",
         header: "Date",
         minWidth: 150,
-        // No cellClassName padding override here: RowClick below re-creates the
-        // cell's own px-3 from the inside so the whole cell is clickable, and a
-        // wider pl-5 would leave a dead strip on the left of the first column.
-        render: (row) =>
-          clickable(
-            row,
-            <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-              {formatDate(row.date)}
-            </span>
-          ),
+        render: (row) => (
+          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+            {formatDate(row.date)}
+          </span>
+        ),
       };
     default:
       return null;
@@ -137,8 +115,6 @@ function buildColumn(
 }
 
 interface BuildSettlementColumnsOptions {
-  /** Opens the settlement's drawer. The whole row is the target. */
-  onOpenDetails: (row: SettlementRow) => void;
   columnOrder?: string[];
   hiddenColumns?: string[];
   /** Whether the account has more than one PACB MID — see settlementColumnDefs. */
@@ -146,7 +122,6 @@ interface BuildSettlementColumnsOptions {
 }
 
 export function buildSettlementColumns({
-  onOpenDetails,
   columnOrder,
   hiddenColumns,
   showMerchantId = false,
@@ -158,7 +133,7 @@ export function buildSettlementColumns({
     if (key === "merchantId" && !showMerchantId) continue;
     // The locked column is never hideable, whatever a stale persisted set says.
     if (key !== SETTLEMENT_LOCKED_COLUMN && hiddenColumns?.includes(key)) continue;
-    const col = buildColumn(key, onOpenDetails);
+    const col = buildColumn(key);
     if (col) cols.push(col);
   }
 

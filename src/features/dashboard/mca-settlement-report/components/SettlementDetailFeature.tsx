@@ -14,7 +14,6 @@ import {
 } from "@/components/ui";
 import { COUNTRIES } from "@payglocal_ui/flux-ui";
 import { Icon } from "@/components/icon";
-import { RowClick } from "@/components/common/table/RowClick";
 import { useApp } from "@/stores/useApp";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { CopyableValue } from "@/components/common/CopyableValue";
@@ -123,28 +122,21 @@ function countryFlag(countryCode: string): string {
  * review to be part of this settlement, so there is no "Upload Invoice" action
  * — that only applies to transactions still waiting to be bundled, see the
  * "Upcoming settlement" card's Upload Invoice CTA instead. */
-function buildMcaPaymentColumns(
-  onOpenPayment: (payment: McaSettlementPayment) => void
-): Column<McaSettlementPayment>[] {
-  const clickable = (payment: McaSettlementPayment, content: React.ReactNode) => (
-    <RowClick onClick={() => onOpenPayment(payment)}>{content}</RowClick>
-  );
+function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
   return [
     {
       key: "amount",
       header: "Amount",
       minWidth: 130,
       cellClassName: "pl-5",
-      render: (p) =>
-        clickable(
-          p,
-          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="font-semibold tabular-nums text-[13px] text-foreground">
-              {formatCurrency(p.amount, p.currency)}
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground">{p.currency}</span>
-          </div>
-        ),
+      render: (p) => (
+        <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+          <span className="font-semibold tabular-nums text-[13px] text-foreground">
+            {formatCurrency(p.amount, p.currency)}
+          </span>
+          <span className="text-[11px] font-medium text-muted-foreground">{p.currency}</span>
+        </div>
+      ),
     },
     {
       key: "status",
@@ -154,8 +146,7 @@ function buildMcaPaymentColumns(
       // settlement reads exactly as the same payment does on that table.
       render: (p) => {
         const meta = getStatusMeta(p.status, false);
-        return clickable(
-          p,
+        return (
           <StatusBadge
             variant={meta.variant}
             label={meta.label}
@@ -169,36 +160,30 @@ function buildMcaPaymentColumns(
       key: "createdOn",
       header: "Date & Time",
       minWidth: 160,
-      render: (p) =>
-        clickable(
-          p,
-          <span className="whitespace-nowrap text-[13px] text-muted-foreground">
-            {formatDate(p.createdOn)}
-          </span>
-        ),
+      render: (p) => (
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
+          {formatDate(p.createdOn)}
+        </span>
+      ),
     },
     {
       key: "country",
       header: "Country",
       minWidth: 140,
-      render: (p) =>
-        clickable(
-          p,
-          <span className="whitespace-nowrap text-[13px] text-foreground">
-            {countryFlag(p.countryCode)} {p.countryName}
-          </span>
-        ),
+      render: (p) => (
+        <span className="whitespace-nowrap text-[13px] text-foreground">
+          {countryFlag(p.countryCode)} {p.countryName}
+        </span>
+      ),
     },
     {
       key: "remitterName",
       header: "Remitter Name",
       minWidth: 130,
       cellClassName: "pr-5",
-      render: (p) =>
-        clickable(
-          p,
-          <span className="whitespace-nowrap text-[13px] text-foreground">{p.remitterName}</span>
-        ),
+      render: (p) => (
+        <span className="whitespace-nowrap text-[13px] text-foreground">{p.remitterName}</span>
+      ),
     },
   ];
 }
@@ -643,8 +628,11 @@ export function SettlementDetailsContent({
             so a third statement of the same fact only added noise. */}
         <Card className="gap-0 overflow-hidden p-0">
           <DataTable
-            columns={buildMcaPaymentColumns((p) => setOpenPaymentGid(p.id))}
+            columns={buildMcaPaymentColumns()}
             data={payments}
+            // Clicking a payment opens it in the transactions drawer. Row-level
+            // rather than per-cell, so the whole row is the target.
+            onRowClick={(p) => setOpenPaymentGid(p.id)}
             rowKey={(p) => p.id}
             density="compact"
             tableLayout="content"
