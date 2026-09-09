@@ -393,69 +393,124 @@ textarea:focus-visible {
 }
 
 /* ─── Echo ────────────────────────────────────────────────────────────────
-   Two small pieces of chrome for the assistant, ported from Nova.
+   Two pieces of chrome for the assistant.
 
-   The typing dots stand in for a streaming reply: the Echo API answers in one
-   shot rather than token by token, so there is nothing to stream — this just
-   says a turn is in flight. The ring is the gradient halo behind the header's
-   "Ask Echo" button, drawn as a masked pseudo-element so it hugs the button's
-   own radius without a wrapper border eating a pixel of it. */
-@keyframes echo-typing {
-  0%,
-  60%,
-  100% {
-    opacity: 0.25;
-    transform: translateY(0);
-  }
-  30% {
-    opacity: 1;
-    transform: translateY(-2px);
-  }
+   The ring is the rotating gradient border on the header's "Ask Echo" pill —
+   the one AI action in a row of utility icons. A masked ::before holding a
+   large circle is rotated behind the button: a rotated circle is still a
+   circle, so no corner ever pokes past the ring, and `overflow: hidden` on the
+   wrapper clips it to the pill's own shape, which is what makes the gradient
+   sweep ALONG the border rather than spin behind a static ring.
+
+   The ellipsis is the three dots beside the stepped loader's "Working on it".
+   Both are decoration; neither carries information, so both hold still under
+   prefers-reduced-motion. */
+@property --echo-ask-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
 }
 
-.echo-typing-dot {
-  width: 5px;
-  height: 5px;
-  border-radius: 9999px;
-  background: var(--muted-foreground);
-  animation: echo-typing 1.2s ease-in-out infinite;
-}
-
-.echo-typing-dot:nth-child(2) {
-  animation-delay: 0.15s;
-}
-
-.echo-typing-dot:nth-child(3) {
-  animation-delay: 0.3s;
-}
-
-/* Display is left to the utility class on the element: the sidebar rail wants
-   this as a w-fit box and the expanded rail as a full-width one, and this rule
-   sits after Tailwind's utilities in the cascade, so setting it here would win
-   over both. */
-.echo-ask-ring {
+.echo-ask-ring-wrap {
   position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 9999px;
   padding: 1px;
-  background: linear-gradient(120deg, #bfdbfe, #3b82f6, #0061e3, #bfdbfe);
-  background-size: 300% 100%;
-  animation: echo-ask-ring-shift 6s linear infinite;
+  isolation: isolate;
+  vertical-align: middle;
+  overflow: hidden;
 }
 
-@keyframes echo-ask-ring-shift {
-  to {
-    background-position: 300% 0;
+.echo-ask-ring-wrap::before {
+  content: "";
+  position: absolute;
+  /* 200px covers the pill diagonally with room to spare, whatever its label
+     width ends up being. */
+  width: 200px;
+  height: 200px;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    #082f73 0deg,
+    var(--primary) 55deg,
+    #1d4ed8 95deg,
+    #38bdf8 118deg,
+    #e0f2fe 128deg,
+    #38bdf8 138deg,
+    var(--primary) 175deg,
+    #172554 215deg,
+    var(--primary) 255deg,
+    #7dd3fc 278deg,
+    #f8fafc 288deg,
+    #7dd3fc 298deg,
+    #082f73 360deg
+  );
+  animation: echo-ask-ring-rotate 4s linear infinite;
+}
+
+.dark .echo-ask-ring-wrap::before {
+  background: conic-gradient(
+    from 0deg,
+    #0c1e3d 0deg,
+    var(--primary) 50deg,
+    #1e40af 90deg,
+    #38bdf8 115deg,
+    #bae6fd 125deg,
+    #38bdf8 135deg,
+    var(--primary) 170deg,
+    #020617 210deg,
+    var(--primary) 248deg,
+    #22d3ee 272deg,
+    #e0f2fe 282deg,
+    #22d3ee 292deg,
+    #0c1e3d 360deg
+  );
+}
+
+@keyframes echo-ask-ring-rotate {
+  from {
+    transform: translate(-50%, -50%) rotate(0deg);
   }
+  to {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+@keyframes echo-ellipsis-blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.2;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.echo-status-ellipsis-dot {
+  animation: echo-ellipsis-blink 1.4s ease-in-out infinite;
+}
+
+.echo-status-ellipsis-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.echo-status-ellipsis-dot:nth-child(3) {
+  animation-delay: 0.4s;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Both are decoration, not information — hold them still rather than
-     translating the dots and cycling the gradient. */
-  .echo-typing-dot,
-  .echo-ask-ring {
+  .echo-ask-ring-wrap::before {
     animation: none;
   }
 
-  .echo-typing-dot {
-    opacity: 0.6;
+  .echo-status-ellipsis-dot {
+    animation: none;
+    opacity: 1;
   }
 }

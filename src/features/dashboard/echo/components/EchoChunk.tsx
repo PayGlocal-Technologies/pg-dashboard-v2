@@ -2,8 +2,8 @@
 
 import { Button } from "@/components/ui";
 import { AppImage } from "@/components/common/AppImage";
-import { EchoRichText } from "@/features/dashboard/echo/components/EchoRichText";
-import { EchoListPicker } from "@/features/dashboard/echo/components/EchoListPicker";
+import { EchoBody } from "@/features/dashboard/echo/components/EchoBody";
+import { EchoListOptions } from "@/features/dashboard/echo/components/EchoListOptions";
 import {
   buttonsOf,
   chunkBodyText,
@@ -31,11 +31,7 @@ export function EchoChunk({ chunk, interactive, onButton, onListRow }: Props) {
   const body = chunkBodyText(chunk);
 
   if (isTextChunk(chunk)) {
-    return (
-      <p className="text-[13.5px] leading-relaxed text-foreground">
-        <EchoRichText text={body} />
-      </p>
-    );
+    return <EchoBody text={body} />;
   }
 
   if (isImageChunk(chunk)) {
@@ -54,11 +50,7 @@ export function EchoChunk({ chunk, interactive, onButton, onListRow }: Props) {
           unoptimized
           className="h-auto w-auto max-h-40 max-w-[10rem] object-contain"
         />
-        {body ? (
-          <p className="text-[13.5px] leading-relaxed text-foreground">
-            <EchoRichText text={body} />
-          </p>
-        ) : null}
+        {body ? <EchoBody text={body} /> : null}
       </div>
     );
   }
@@ -67,13 +59,14 @@ export function EchoChunk({ chunk, interactive, onButton, onListRow }: Props) {
     const buttons = buttonsOf(chunk);
     return (
       <div className="space-y-2.5">
-        {body ? (
-          <p className="text-[13.5px] leading-relaxed text-foreground">
-            <EchoRichText text={body} />
-          </p>
-        ) : null}
+        {body ? <EchoBody text={body} /> : null}
+        {/* Chips on one wrapping row rather than stacked full-width buttons.
+            The protocol caps reply buttons at three and they are short
+            follow-ups ("Main Menu", "Raise a Query", "End Chat"), so three
+            full-width bars overstate them and push the reply above out of
+            view — a list chunk is the control for a real set of choices. */}
         {buttons.length > 0 ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
             {buttons.map(({ reply }) => (
               <Button
                 key={reply.id}
@@ -82,7 +75,7 @@ export function EchoChunk({ chunk, interactive, onButton, onListRow }: Props) {
                 size="sm"
                 disabled={!interactive}
                 onClick={() => onButton(reply.id, reply.title)}
-                className="w-full text-[13px] font-medium"
+                className="h-auto min-h-0 rounded-lg border-border px-3 py-1.5 text-[12px] font-medium text-foreground hover:border-primary/40 hover:bg-muted/40"
               >
                 {reply.title || reply.id}
               </Button>
@@ -96,12 +89,8 @@ export function EchoChunk({ chunk, interactive, onButton, onListRow }: Props) {
   if (isListChunk(chunk)) {
     return (
       <div className="space-y-2.5">
-        {body ? (
-          <p className="text-[13.5px] leading-relaxed text-foreground">
-            <EchoRichText text={body} />
-          </p>
-        ) : null}
-        <EchoListPicker chunk={chunk} disabled={!interactive} onPick={onListRow} />
+        {body ? <EchoBody text={body} /> : null}
+        <EchoListOptions chunk={chunk} disabled={!interactive} onPick={onListRow} />
       </div>
     );
   }

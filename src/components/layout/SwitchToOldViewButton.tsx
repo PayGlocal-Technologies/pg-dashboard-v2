@@ -107,7 +107,7 @@ export function SwitchToOldViewButton() {
               rows={2}
               value={changeRequest}
               onChange={(e) => setChangeRequest(e.target.value)}
-              placeholder="Optional — we read every note"
+              placeholder="Optional, we read every note"
               className="min-h-16 px-3 py-2 text-[13px] leading-normal"
             />
           </Field>

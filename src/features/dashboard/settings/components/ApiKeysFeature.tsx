@@ -46,7 +46,7 @@ export function ApiKeysFeature() {
     <div className="space-y-5">
       <PageHeader title="API keys" subtitle="Live and test credentials for your integration." />
 
-      <BackendGapNotice message="No API-key management endpoint exists yet — the keys shown are illustrative placeholders." />
+      <BackendGapNotice message="No API-key management endpoint exists yet, so the keys shown are illustrative placeholders." />
 
       <Card className="gap-0 p-5">
         <div className="inline-flex w-fit items-center gap-0.5 rounded-full bg-muted p-1">

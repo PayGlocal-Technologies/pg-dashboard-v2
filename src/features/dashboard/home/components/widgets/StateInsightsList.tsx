@@ -88,7 +88,7 @@ export function StateInsightsList({
     >
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h3 className="text-sm font-semibold text-foreground">India — state volume</h3>
+          <h3 className="text-sm font-semibold text-foreground">India state volume</h3>
           <p className="text-xs text-muted-foreground mt-0.5">
             Domestic INR volume by state (GST relevant)
           </p>

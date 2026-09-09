@@ -366,7 +366,7 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
               </div>
             )}
             <p className="text-[11px] text-muted-foreground">
-              You can still submit it — it will go to manual review.
+              You can still submit it. It will go to manual review.
             </p>
             <div className="flex items-center gap-2">
               <Button

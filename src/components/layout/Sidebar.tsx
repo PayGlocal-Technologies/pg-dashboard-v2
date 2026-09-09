@@ -11,6 +11,7 @@ import { ViewPortal } from "@/components/layout/ViewPortal";
 import { MerchantSelector, useHasMultipleMids } from "@/components/layout/MerchantSelector";
 import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
 import { AskEchoButton } from "@/components/layout/AskEchoButton";
+import { useHasEcho } from "@/features/dashboard/echo/hooks";
 import {
   navigationForContext,
   filterNavigation,
@@ -154,6 +155,8 @@ function SidebarBody({
   // page uses, so it is fetched once and served from cache to both.
   const { businessProfile } = useMerchantBusinessProfile();
   const logoUrl = businessProfile?.merchantLogoPublicUrl ?? null;
+  // Gates the whole "Assistant" section, heading included — see below.
+  const hasEcho = useHasEcho();
 
   const displayName =
     [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || profile?.username || "";
@@ -161,12 +164,30 @@ function SidebarBody({
   return (
     <>
       <nav className="flex-1 min-h-0 overflow-y-auto py-3 px-2.5">
-        {/* Echo — above the groups, not in one: it reaches the features below
-            rather than being another of them. Renders itself away when the
-            account lacks getEchoActiveSession, see AskEchoButton. */}
-        <div className={cn("mb-4", collapsed && "flex justify-center")}>
-          <AskEchoButton collapsed={collapsed} onNavigate={onNavClick} />
-        </div>
+        {/* "Assistant" — a section of its own rather than folded into the
+            first nav group, so Echo reads as a distinct kind of entry (an AI
+            action, not a page to navigate to) the moment the sidebar loads.
+            Kept outside the permission-filtered `navigation` groups below
+            because it is not a nav destination: it opens the side panel.
+
+            The heading is gated on the same permission as the row it labels.
+            Letting the row hide itself while the heading rendered anyway left
+            accounts without Echo looking at an "ASSISTANT" label over an
+            empty gap. */}
+        {hasEcho ? (
+          <div className="mb-4">
+            {!collapsed ? (
+              <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground px-2 mb-1.5">
+                Assistant
+              </p>
+            ) : (
+              <div className="h-px bg-sidebar-border my-2 mx-1" />
+            )}
+            <div className={cn(collapsed && "flex justify-center")}>
+              <AskEchoButton collapsed={collapsed} onNavigate={onNavClick} />
+            </div>
+          </div>
+        ) : null}
 
         {navigation.map((group) => (
           <div key={group.label} className="mb-4">
