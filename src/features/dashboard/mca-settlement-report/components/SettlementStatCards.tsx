@@ -108,7 +108,10 @@ interface SettlementStatCardsProps {
    * null while it has not resolved (or is unsupported), which renders an em
    * dash rather than a placeholder figure. */
   upcomingSettlementAmount: number | null;
-  upcomingSettlementTimeLabel: string;
+  /** The working day this settlement is expected on, derived from the live
+   *  holiday calendar. A DATE, never a time of day: no endpoint returns a
+   *  settlement clock time, so none is shown. */
+  upcomingSettlementDateLabel: string;
   /** MCA only, count of transactions still waiting on an invoice upload
    * before they can be bundled into this upcoming settlement. */
   pendingInvoiceCount?: number;
@@ -134,7 +137,7 @@ export function SettlementStatCards({
   onDownloadPreviousSettled,
   canDownloadPreviousSettled = true,
   upcomingSettlementAmount,
-  upcomingSettlementTimeLabel,
+  upcomingSettlementDateLabel,
   pendingInvoiceCount,
   onUploadInvoice,
 }: SettlementStatCardsProps) {
@@ -241,7 +244,7 @@ export function SettlementStatCards({
               —
             </span>
           )}
-          <p className="text-xs text-muted-foreground">{upcomingSettlementTimeLabel}</p>
+          <p className="text-xs text-muted-foreground">{upcomingSettlementDateLabel}</p>
 
           {!!pendingInvoiceCount && pendingInvoiceCount > 0 && (
             <div className="mt-1 flex flex-col gap-1.5 border-t border-(--primary-border) pt-2.5">

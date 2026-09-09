@@ -60,11 +60,16 @@ const SETTLEMENT_PAGE_LIMIT = 50;
  *  this is the server's page size, not a client-side slice. */
 const SETTLEMENT_TABLE_PAGE_SIZE = 10;
 
-/** "Tonight" only holds when today's payments are still on track for a plain
- * T+1 cutoff, once a weekend/holiday pushes the date out, name the actual day
- * instead so the merchant isn't left assuming it's still settling tonight. */
-function upcomingSettlementTimeLabel(schedule: SettlementSchedule): string {
-  if (!schedule.affectedByNonWorkingDay) return "Tonight · 12:00 AM IST";
+/**
+ * When the next settlement is expected: the working day the T+1 rules land on,
+ * read off the live holiday calendar.
+ *
+ * The DAY only, never a time of day. This used to read "Tonight · 12:00 AM IST"
+ * whenever no weekend or holiday had moved the date, which stated a cutoff no
+ * endpoint returns: the settlement APIs carry a settlement DATE and no clock
+ * time. The date is derived, so it stays; the hour was invented, so it is gone.
+ */
+function upcomingSettlementDateLabel(schedule: SettlementSchedule): string {
   const { settlementDate } = schedule;
   return `${formatWeekdayName(settlementDate)} · ${formatDayMonth(settlementDate)}`;
 }
@@ -394,7 +399,7 @@ export function McaSettlementReportFeature() {
                 // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
                 // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
                 upcomingSettlementAmount={upcomingSettlementAmount}
-                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
+                upcomingSettlementDateLabel={upcomingSettlementDateLabel(calendar.upcomingSchedule)}
                 pendingInvoiceCount={upcomingPendingInvoiceCount}
                 onUploadInvoice={() => router.push("/mca-transactions")}
               />
