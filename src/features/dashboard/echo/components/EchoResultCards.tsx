@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Button, DataTable, type Column } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { EchoLink } from "@/features/dashboard/echo/components/EchoLink";
+import { asWholeUrl, shortUrlLabel } from "@/features/dashboard/echo/links";
 import type { EchoResult } from "@/features/dashboard/echo/types";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +64,21 @@ function MetricResultCard({ result }: { result: Extract<EchoResult, { kind: "met
 
 type TableRow = Record<string, string>;
 
+/** Statuses that put a payment link beyond use. A link in any of these is
+ *  still shown and still opens — the merchant may want to see what their
+ *  customer sees — but it loses its copy button, because copying is only ever
+ *  a prelude to sharing, and sharing a dead link collects nothing.
+ *
+ *  A deny-list rather than an allow-list of live statuses: a status word this
+ *  file has not met before keeps the copy button, which is the harmless way to
+ *  be wrong. Same heuristic caveat as `statusDotClass` above. */
+const UNSHAREABLE_STATUS_WORDS = ["expired", "cancelled", "canceled", "revoked", "paid"];
+
+function linkIsShareable(row: TableRow): boolean {
+  const status = row.status?.toLowerCase() ?? "";
+  return !UNSHAREABLE_STATUS_WORDS.some((w) => status.includes(w));
+}
+
 function TableResultCard({ result }: { result: Extract<EchoResult, { kind: "table" }> }) {
   // flux's DataTable rather than bare table markup, per CLAUDE.md. `snug`
   // + compact density is what keeps it card-sized inside a chat bubble
@@ -70,17 +87,39 @@ function TableResultCard({ result }: { result: Extract<EchoResult, { kind: "tabl
     key: col.key,
     header: col.label,
     align: col.align ?? "left",
-    render: (row) =>
-      col.key === "status" ? (
-        <span className="inline-flex items-center gap-1.5">
-          <span
-            className={cn("size-1.5 shrink-0 rounded-full", statusDotClass(row[col.key] ?? ""))}
+    render: (row) => {
+      const value = row[col.key] ?? "";
+
+      // A cell that is nothing but a URL — the `Payment Link` field of a link
+      // record — becomes the link itself. The href and the clipboard carry
+      // the whole URL; only what is on screen is elided, because a full
+      // payment link is 90-odd characters and would set the column's width
+      // for the entire table.
+      const url = asWholeUrl(value);
+      if (url) {
+        return (
+          <EchoLink
+            variant="cell"
+            url={url}
+            label={shortUrlLabel(url)}
+            copyable={linkIsShareable(row)}
+            copyLabel="Copy payment link"
+            copyToast="Payment link copied"
           />
-          {row[col.key]}
-        </span>
-      ) : (
-        (row[col.key] ?? "—")
-      ),
+        );
+      }
+
+      if (col.key === "status") {
+        return (
+          <span className="inline-flex items-center gap-1.5">
+            <span className={cn("size-1.5 shrink-0 rounded-full", statusDotClass(value))} />
+            {value}
+          </span>
+        );
+      }
+
+      return value || "—";
+    },
   }));
 
   return (
