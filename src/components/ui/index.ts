@@ -68,6 +68,8 @@ export {
   InputGroupInput,
   InputGroupText,
   Label,
+  Link,
+  type LinkProps,
   MetricText,
   type MetricTextProps,
   OtpInput,
