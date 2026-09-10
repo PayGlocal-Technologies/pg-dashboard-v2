@@ -1,16 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { PageHeader } from "@/components/ui";
+import { Button, PageHeader } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { ClientTable } from "@/features/dashboard/client-management/components/ClientTable";
-import {
-  useClientPathMid,
-  useZohoClientSync,
-} from "@/features/dashboard/client-management/hooks";
+import { useClientPathMid, useZohoClientSync } from "@/features/dashboard/client-management/hooks";
+import { zohoSyncLabel } from "@/features/dashboard/zoho-integration/hooks";
 
 export function ClientManagementFeature() {
   // The button lives here but every row it creates lives in ClientTable, so
@@ -24,7 +23,13 @@ export function ClientManagementFeature() {
   // useResolvedMids' guardState.
   const { guardState } = useClientPathMid();
   const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
-  const { isConnected: isZohoConnected, isSyncing, syncClients } = useZohoClientSync();
+  const {
+    isConnected: isZohoConnected,
+    isSyncing,
+    syncClients,
+    connectedMid,
+    hasMultipleMids,
+  } = useZohoClientSync();
 
   const openAddClient = (mid: string) => {
     // Scopes the page to that MID first, because the client the form creates
@@ -63,17 +68,20 @@ export function ClientManagementFeature() {
           <>
             {/* Only for a merchant who has actually connected Zoho — the action
                 is meaningless otherwise, which is why production gates it on the
-                same status rather than showing a disabled control. */}
+                same status rather than showing a disabled control. No MID
+                picker: the pull goes to the MID the Zoho account is linked to,
+                which the label names when there is more than one account. */}
             {isZohoConnected ? (
-              <MidScopedAction
-                label="Sync from Zoho"
-                icon="zoho-logo"
+              <Button
+                type="button"
                 variant="ghost"
+                size="sm"
+                leftIcon={<Icon name="zoho-logo" className="h-3.5 w-3.5" />}
                 isLoading={isSyncing}
-                needsMidChoice={needsMidChoice}
-                midOptions={midOptions}
-                onRun={(mid) => syncClients(mid || undefined)}
-              />
+                onClick={syncClients}
+              >
+                {zohoSyncLabel(connectedMid, hasMultipleMids)}
+              </Button>
             ) : null}
             <MidScopedAction
               label="Add client"
