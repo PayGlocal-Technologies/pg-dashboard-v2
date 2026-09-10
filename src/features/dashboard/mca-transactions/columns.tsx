@@ -233,7 +233,7 @@ function RowActionsMenu({ actions }: { actions: RowAction[] }) {
               action.onSelect();
             }}
           >
-            <Icon name={action.icon} className="mr-2 h-3.5 w-3.5" />
+            <Icon name={action.icon} className="h-3.5 w-3.5" />
             {action.label}
           </DropdownMenuItem>
         ))}

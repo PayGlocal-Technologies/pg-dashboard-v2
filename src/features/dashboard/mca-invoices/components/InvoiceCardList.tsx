@@ -125,7 +125,7 @@ function InvoiceCard({ row, handlers }: { row: McaInvoiceRow; handlers: InvoiceR
                   // No preventDefault: it suppresses Radix's own close, which
                   // left the menu open behind the confirmation dialog.
                   <DropdownMenuItem key={action.key} onSelect={() => action.onSelect()}>
-                    <Icon name={action.icon} className="mr-2 h-3.5 w-3.5" />
+                    <Icon name={action.icon} className="h-3.5 w-3.5" />
                     {action.label}
                   </DropdownMenuItem>
                 ))}

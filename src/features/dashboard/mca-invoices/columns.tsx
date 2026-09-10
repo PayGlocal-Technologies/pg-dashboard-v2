@@ -124,7 +124,7 @@ function RowActionsMenu({ actions }: { actions: RowAction[] }) {
           // dialog is rendered inside the menu; these are siblings at table
           // level, so letting the menu close normally is correct.
           <DropdownMenuItem key={action.key} onSelect={() => action.onSelect()}>
-            <Icon name={action.icon} className="mr-2 h-3.5 w-3.5" />
+            <Icon name={action.icon} className="h-3.5 w-3.5" />
             {action.label}
           </DropdownMenuItem>
         ))}
