@@ -8,60 +8,86 @@ import {
   type FilterChipOption,
 } from "@/components/common/filters/FilterChips";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
-import { EmptyState, StatusBadge } from "@/components/ui";
+import { EmptyState, Shimmer, StatusBadge } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
+import { formatTransactionTimestamp } from "@/lib/utils/format";
+import { categoryLabel, issueLabel } from "@/features/dashboard/support-tickets/classification";
 import {
-  TICKET_STATUSES,
-  TICKET_TOPICS,
+  TICKET_STATUS_FILTER_OPTIONS,
   ticketStatusMeta,
-  ticketTopicLabel,
 } from "@/features/dashboard/support-tickets/constants";
 import type { SupportTicket } from "@/features/dashboard/support-tickets/types";
 
-const TOPIC_OPTIONS: FilterChipOption[] = TICKET_TOPICS.map((topic) => ({
-  value: topic.value,
-  label: topic.label,
-}));
-const STATUS_OPTIONS: FilterChipOption[] = TICKET_STATUSES.map((status) => ({
-  value: status.value,
-  label: status.label,
-}));
+const STATUS_OPTIONS: FilterChipOption[] = TICKET_STATUS_FILTER_OPTIONS;
 
 /** Which chip's popover is open, if any — lifted here (not local to each
  *  chip) so opening one closes another, matching the transaction tables'
  *  own toolbar. */
 type ChipKey = "date" | "topic" | "status";
 
-function formatTicketDate(epochMs: number): string {
-  return new Date(epochMs).toLocaleDateString("en-IN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+function RowSkeleton() {
+  return (
+    <div className="divide-y divide-border">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="py-3 first:pt-0">
+          <Shimmer className="h-4 w-52" />
+          <Shimmer className="mt-2 h-3 w-32" />
+        </div>
+      ))}
+    </div>
+  );
 }
 
-function TicketRow({ ticket }: { ticket: SupportTicket }) {
+function TicketRow({ ticket, onOpen }: { ticket: SupportTicket; onOpen: () => void }) {
   const meta = ticketStatusMeta(ticket.status);
+  const issue = issueLabel(ticket.custom_fields?.cf_issue);
+  const category = categoryLabel(ticket.custom_fields?.cf_category);
+
   return (
-    <div className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={cn(
+        "group flex w-full items-start justify-between gap-3 py-3 text-left first:pt-0 last:pb-0",
+        "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+      )}
+    >
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] font-medium text-foreground">
-          {ticketTopicLabel(ticket.topic)}
-          {ticket.customSubject && (
-            <span className="font-normal text-muted-foreground"> · {ticket.customSubject}</span>
-          )}
+        <p className="flex items-center gap-1.5 text-[13.5px] font-medium text-foreground">
+          <span className="truncate group-hover:underline">{ticket.subject}</span>
+          <span className="shrink-0 font-normal tabular-nums text-muted-foreground">
+            #{ticket.id}
+          </span>
         </p>
-        <p className="mt-0.5 line-clamp-2 text-[12px] text-muted-foreground">{ticket.details}</p>
+        {(issue || category) && (
+          <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+            {[issue, category].filter(Boolean).join(" · ")}
+          </p>
+        )}
         <p className="mt-1 text-[11px] text-muted-foreground">
-          Raised {formatTicketDate(ticket.createdAt)}
+          Raised {formatTransactionTimestamp(ticket.created_at)}
         </p>
       </div>
-      <StatusBadge
-        variant={meta.badgeVariant}
-        label={meta.label}
-        trailIcon={meta.trailIcon}
-        size="sm"
-        className="shrink-0"
-      />
+      <div className="flex shrink-0 items-center gap-1.5">
+        <StatusBadge
+          variant={meta.badgeVariant}
+          label={meta.label}
+          trailIcon={meta.trailIcon}
+          size="sm"
+        />
+        <Icon
+          name="chevron-right"
+          className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100"
+        />
+      </div>
     </div>
   );
 }
@@ -74,10 +100,17 @@ function TicketRow({ ticket }: { ticket: SupportTicket }) {
  *
  * Filtering happens entirely in the caller, which passes down the
  * already-filtered list — this component only renders the toolbar and rows.
+ *
+ * The Topic chip's options are built from the tickets actually present rather
+ * than from the full classification list: a merchant with three tickets should
+ * not scroll twelve topics to filter them, and a ticket filed by an agent
+ * under an internal issue still needs to be filterable.
  */
 export function TicketList({
   tickets,
   totalCount,
+  isLoading,
+  topicOptions,
   search,
   onSearchChange,
   dateRange,
@@ -86,11 +119,14 @@ export function TicketList({
   onTopicFilterChange,
   statusFilter,
   onStatusFilterChange,
+  onOpenTicket,
 }: {
   tickets: SupportTicket[];
   /** Unfiltered count, so an empty result can say "no matches" instead of
    *  "no tickets" when the merchant does have some, just not matching. */
   totalCount: number;
+  isLoading: boolean;
+  topicOptions: FilterChipOption[];
   search: string;
   onSearchChange: (value: string) => void;
   dateRange: DateRangeValue;
@@ -99,6 +135,7 @@ export function TicketList({
   onTopicFilterChange: (value: string[]) => void;
   statusFilter: string[];
   onStatusFilterChange: (value: string[]) => void;
+  onOpenTicket: (ticket: SupportTicket) => void;
 }) {
   const [openChip, setOpenChip] = useState<ChipKey | null>(null);
 
@@ -110,7 +147,7 @@ export function TicketList({
         <RotatingSearchInput
           value={search}
           onSearch={onSearchChange}
-          words={["subject", "details", "ticket"]}
+          words={["subject", "ticket number", "topic"]}
           ariaLabel="Search tickets"
           className="w-full sm:w-56"
         />
@@ -125,7 +162,7 @@ export function TicketList({
           />
           <StatusFilterChip
             label="Topic"
-            options={TOPIC_OPTIONS}
+            options={topicOptions}
             selected={topicFilter}
             onChange={onTopicFilterChange}
             open={openChip === "topic"}
@@ -141,8 +178,10 @@ export function TicketList({
         </div>
       </div>
 
-      <div className="max-h-88 overflow-y-auto p-4">
-        {tickets.length === 0 ? (
+      <div className="max-h-[32rem] overflow-y-auto p-4">
+        {isLoading ? (
+          <RowSkeleton />
+        ) : tickets.length === 0 ? (
           <EmptyState
             className="py-8"
             title={totalCount === 0 ? "No tickets yet" : "No tickets match these filters"}
@@ -155,7 +194,7 @@ export function TicketList({
         ) : (
           <div className="divide-y divide-border">
             {tickets.map((ticket) => (
-              <TicketRow key={ticket.id} ticket={ticket} />
+              <TicketRow key={ticket.id} ticket={ticket} onOpen={() => onOpenTicket(ticket)} />
             ))}
           </div>
         )}

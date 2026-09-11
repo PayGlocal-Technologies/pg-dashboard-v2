@@ -29,7 +29,7 @@ import { useEcho } from "@/stores/useEcho";
  */
 export function useHasEcho(): boolean {
   const checkPermissions = useNewPermissions();
-  return checkPermissions(["getEchoActiveSession"]);
+  return checkPermissions(["getEchoSessionHistory"]);
 }
 
 /**

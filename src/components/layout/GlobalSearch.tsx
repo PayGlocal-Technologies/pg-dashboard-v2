@@ -98,7 +98,12 @@ export function GlobalSearch() {
   // in another field.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent): void {
-      if (event.key.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
+      // `key` is read defensively despite its type. A plain `new Event("keydown")`
+      // dispatched by a browser extension, a password manager, or any library
+      // forwarding input events reaches this listener typed as a KeyboardEvent but
+      // carrying no `key` at all, and calling toLowerCase on it threw all the way
+      // out of the handler and took the dashboard down with it.
+      if (event.key?.toLowerCase() !== "k" || !(event.metaKey || event.ctrlKey)) return;
       event.preventDefault();
       setExpanded(true);
       setOpen(true);

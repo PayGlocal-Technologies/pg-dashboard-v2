@@ -95,9 +95,18 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
       try {
         const isFormData = body instanceof FormData;
         const requestBody = isFormData ? body : (reqBody ?? restBody);
-        const headers = customHeaders ?? {
-          "Content-Type": isFormData ? "multipart/form-data" : "application/json",
-        };
+        // Content-Type is deliberately left unset for FormData so the browser can
+        // set it itself, because only the browser knows the `boundary=` parameter
+        // that tells the server where one part ends and the next begins.
+        //
+        // Naming it here shipped `Content-Type: multipart/form-data` with no
+        // boundary at all. axios does not rescue that: it returns FormData
+        // untouched from transformRequest and only clears the header when the
+        // body is undefined, and per the XHR spec an author-set Content-Type
+        // wins over the one the browser would otherwise derive from the body.
+        // The server then has a multipart body it cannot split, so parts (fields
+        // and files alike) go missing.
+        const headers = customHeaders ?? (isFormData ? {} : { "Content-Type": "application/json" });
 
         const res =
           method === "delete"
