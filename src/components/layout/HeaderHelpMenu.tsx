@@ -131,13 +131,20 @@ export function HeaderHelpMenu() {
           <Button
             type="button"
             variant="ghost"
-            className="h-auto w-full justify-start gap-3 px-2 py-2 text-left font-normal [&>span]:min-w-0 [&>span]:flex-1"
+            // flux's Button wraps every child in one plain <span>, so `flex`
+            // / `items-center` / `gap` set on the button itself never reach the
+            // icon and the label inside it — the icon circle is display:flex and
+            // therefore block-level, which pushed the text onto its own line
+            // below it. The `[&>span]` unwrap is the same trick AskEchoButton
+            // and Sidebar's ExpandableItem trigger use; padding moves onto the
+            // wrapper too so the row's hit area still fills the button.
+            className="h-auto w-full justify-start p-0 text-left font-normal [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-3 [&>span]:px-2 [&>span]:py-2"
             onClick={goToMyQueries}
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
               <Icon name="inbox" className="h-3.5 w-3.5 text-primary" />
             </span>
-            <span className="block min-w-0">
+            <span className="block min-w-0 flex-1">
               <span className="block text-[13px] font-medium text-foreground">My queries</span>
               <span className="block text-[11px] font-normal text-muted-foreground">
                 Raise a ticket or track one you&apos;ve already raised
