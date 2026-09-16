@@ -22,6 +22,7 @@ import {
   ticketPriorityLabel,
   ticketStatusMeta,
 } from "@/features/dashboard/support-tickets/constants";
+import { TicketAttachmentChip } from "@/features/dashboard/support-tickets/components/TicketAttachmentChip";
 import { TicketConversation } from "@/features/dashboard/support-tickets/components/TicketConversation";
 import {
   useTicketConversations,
@@ -91,6 +92,9 @@ export function TicketDetailDrawer({
   // all, so reading only the latter showed "No description was recorded" on
   // every ticket. Both are tried, and the HTML one is flattened.
   const description = bodyText(ticket.description_text, ticket.description);
+  // Only the detail endpoint carries these, so they appear once that resolves
+  // and never on the row the drawer was opened from.
+  const attachments = ticket.attachments ?? [];
   const priority = ticketPriorityLabel(ticket.priority);
 
   return (
@@ -161,6 +165,18 @@ export function TicketDetailDrawer({
                 <p className="rounded-xl border border-border bg-card px-3.5 py-3 text-[13px] italic text-muted-foreground">
                   No description was recorded for this ticket.
                 </p>
+              )}
+
+              {/* The files the ticket was raised with. Freshdesk returns an
+                  array, so a ticket can carry several. */}
+              {attachments.length > 0 && (
+                <ul className="mt-2 flex flex-col gap-1.5">
+                  {attachments.map((attachment) => (
+                    <li key={attachment.id}>
+                      <TicketAttachmentChip attachment={attachment} />
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 
