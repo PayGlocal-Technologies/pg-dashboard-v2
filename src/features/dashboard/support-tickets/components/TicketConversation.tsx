@@ -5,10 +5,8 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatTransactionTimestamp } from "@/lib/utils/format";
 import { bodyText } from "@/features/dashboard/support-tickets/helper";
-import type {
-  TicketAttachment,
-  TicketConversationEntry,
-} from "@/features/dashboard/support-tickets/types";
+import { TicketAttachmentChip } from "@/features/dashboard/support-tickets/components/TicketAttachmentChip";
+import type { TicketConversationEntry } from "@/features/dashboard/support-tickets/types";
 
 /**
  * A ticket's reply thread, oldest first.
@@ -38,52 +36,6 @@ import type {
  */
 function entryText(entry: TicketConversationEntry): string {
   return bodyText(entry.body_text, entry.body);
-}
-
-function AttachmentChip({ attachment }: { attachment: TicketAttachment }) {
-  const extension = attachment.name.split(".").pop()?.toUpperCase() ?? "";
-  const href = attachment.attachment_url ?? "";
-
-  const inner = (
-    <>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        <Icon name="file-text" className="h-4 w-4" />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[12.5px] font-medium text-foreground">
-          {attachment.name}
-        </span>
-        {extension && <span className="block text-[11px] text-muted-foreground">{extension}</span>}
-      </span>
-    </>
-  );
-
-  const shell =
-    "flex w-full max-w-sm items-center gap-2.5 rounded-lg border border-border bg-card px-2.5 py-2 text-left";
-
-  // Freshdesk's attachment URLs are pre-signed and expire. Without one there
-  // is nothing to link to, so the chip stays as a label rather than becoming
-  // a link that 403s.
-  if (!href) {
-    return (
-      <div className={cn(shell, "opacity-70")} title="This attachment is no longer available">
-        {inner}
-      </div>
-    );
-  }
-
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      aria-label={`Open ${attachment.name}`}
-      className={cn(shell, "transition-colors hover:bg-muted")}
-    >
-      {inner}
-      <Icon name="download" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-    </a>
-  );
 }
 
 export function TicketConversation({ entries }: { entries: TicketConversationEntry[] }) {
@@ -127,7 +79,7 @@ export function TicketConversation({ entries }: { entries: TicketConversationEnt
             {attachments.length > 0 && (
               <div className="mt-2.5 flex flex-col gap-2">
                 {attachments.map((attachment) => (
-                  <AttachmentChip key={attachment.id} attachment={attachment} />
+                  <TicketAttachmentChip key={attachment.id} attachment={attachment} />
                 ))}
               </div>
             )}

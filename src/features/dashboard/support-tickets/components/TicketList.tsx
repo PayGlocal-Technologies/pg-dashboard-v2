@@ -138,7 +138,6 @@ export function TicketList({
   onStatusFilterChange: (value: string[]) => void;
   onOpenTicket: (ticket: SupportTicket) => void;
 }) {
-
   return (
     <>
       {/* Same toolbar-row shell as McaInvoiceTable/McaTransactionTable:
@@ -153,11 +152,7 @@ export function TicketList({
         />
 
         <FilterChipGroup className="flex flex-wrap items-center gap-1.5">
-          <DateFilterChip
-            label="Duration"
-            value={dateRange}
-            onChange={onDateRangeChange}
-          />
+          <DateFilterChip label="Duration" value={dateRange} onChange={onDateRangeChange} />
           <StatusFilterChip
             label="Topic"
             options={topicOptions}

@@ -69,6 +69,10 @@ export interface SupportTicket {
   /** HTML. Prefer `description_text` for display. */
   description?: string | null;
   description_text?: string | null;
+  /** The files the ticket was raised with. Returned by the ticket-detail
+   *  endpoint; the list endpoint omits them, which is one more reason the
+   *  drawer fetches detail rather than rendering the row it was opened from. */
+  attachments?: TicketAttachment[] | null;
 }
 
 /** A file already attached to a ticket or a reply, as Freshdesk describes it. */
