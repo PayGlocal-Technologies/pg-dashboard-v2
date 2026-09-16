@@ -19,6 +19,7 @@ import {
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { UploadInvoiceForm } from "@/features/dashboard/mca-transactions/components/UploadInvoiceForm";
 import { SettlementTimelineSection } from "@/features/dashboard/mca-transactions/components/SettlementTimelineSection";
+import { SettlementBatchDetailsSection } from "@/features/dashboard/mca-transactions/components/SettlementBatchDetailsSection";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import { getMockUtrNumber } from "@/features/dashboard/mca-transactions/mock-data";
 import { mcaTxnTimelineApi } from "@/features/dashboard/mca-transactions/services";
@@ -315,6 +316,13 @@ export function TransactionDetailsContent({
   const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
   const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
   const isReversed = REVERSED_STATUSES.has(row.externalStatus);
+  // The two terminal "money has actually arrived" statuses — see
+  // columns.tsx's STATUS_META, which is the only other place these two are
+  // grouped together (both get the same green "success" badge there). Every
+  // other status is still some step short of that, so Payment/Sender
+  // Details — read date, UTR, receiving account — would mostly be showing
+  // "-" placeholders rather than real values.
+  const isSettled = row.externalStatus === "SETTLED" || row.externalStatus === "FIRC_SETTLED";
 
   const counterpartyName = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName ?? "—";
   const amount = parseFloat(row.amount ?? "0");
@@ -417,9 +425,7 @@ export function TransactionDetailsContent({
 
   if (layout === "drawer") {
     // Single column, in document order: no grid, no row-start math, no
-    // floated titles. The drawer is deliberately a lighter view than the full
-    // page: Payment Details and Sender Details don't render here at all (see
-    // PaymentDetailsSection/SenderDetailsSection below, page-only).
+    // floated titles.
     //
     // The invoice — whether still awaited (uploadSlot) or already uploaded
     // (a download chip) — and the settlement money breakdown all live inside
@@ -427,10 +433,39 @@ export function TransactionDetailsContent({
     // appears at the point of the settlement it belongs to. The full page's
     // 2-column grid below nests them identically, just inside its own row.
     //
+    // Payment Details and Sender Details, the same two sections the full
+    // page's right column shows, join the stack once settlement is actually
+    // done (isSettled) — not before. Both are read straight through the
+    // exact same PaymentDetailsSection/SenderDetailsSection the page uses
+    // (floatTitle={false} either way: floating only matters for sharing a
+    // grid row with a taller sibling, which a single-column stack never
+    // does), so there is nothing here that could drift from the page's own
+    // version of these two cards. Gating on isSettled rather than always
+    // showing them: before settlement, every field either of them displays
+    // is still a "-" placeholder (see DetailRow/getMockUtrNumber above), and
+    // the drawer is meant to stay the lighter of the two views up to that
+    // point.
     return (
       <div className="space-y-9">
         {summary}
         <SettlementTimelineSection row={row} uploadSlot={uploadSlot} />
+        {isSettled && (
+          <>
+            <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
+            <SenderDetailsSection
+              row={row}
+              counterpartyName={counterpartyName}
+              isPartnerUser={isPartnerUser}
+            />
+            {/* The settlement BATCH's own Details/Amount Breakdown — a
+                different, wider question than Payment Details above answers
+                (that one is this one transaction's own record; this is the
+                whole settlement it landed in). See
+                SettlementBatchDetailsSection's own doc for the distinction
+                from SettlementBreakdown nested in the timeline above. */}
+            <SettlementBatchDetailsSection row={row} layout="drawer" />
+          </>
+        )}
       </div>
     );
   }
@@ -476,6 +511,16 @@ export function TransactionDetailsContent({
           />
         </div>
       </div>
+
+      {/* Full width, below the 2-column grid rather than squeezed into the
+          1fr right column: SettlementBatchDetailsSection runs its own two
+          cards side by side from lg up (matching the standalone settlement
+          page), which the narrow right column has no room for. */}
+      {isSettled && (
+        <div className="mt-9">
+          <SettlementBatchDetailsSection row={row} layout="page" />
+        </div>
+      )}
     </div>
   );
 }

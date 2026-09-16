@@ -415,7 +415,11 @@ textarea:focus-visible {
   position: relative;
   display: inline-flex;
   flex-shrink: 0;
-  border-radius: 9999px;
+  /* Matches the Button's own rounded-lg (0.5rem) now that this is a
+     rectangular control, not a pill — the 1px padding below means this
+     radius, not the Button's, is what actually shows as the ring's outer
+     edge. */
+  border-radius: 0.5rem;
   padding: 1px;
   isolation: isolate;
   vertical-align: middle;
@@ -514,3 +518,210 @@ textarea:focus-visible {
     opacity: 1;
   }
 }
+
+/* ─── International Accounts aurora (page-scoped) ────────────────────────────
+   Decorative background wash for /multi-currency only — approved in design
+   review to soften that one page's whitespace. Everything here is scoped
+   under .intl-accounts-aurora / .intl-accounts-aurora-layer, applied only by
+   InternationalAccountsAurora.tsx (see
+   src/features/dashboard/multi-currency/index.tsx, the only importer). No
+   other route's markup ever carries either class, so this cannot leak.
+
+   Static (no animation): a page background is not something that should draw
+   the eye on its own, and a drifting gradient behind live account numbers
+   would be actively distracting. Layered radial-gradients on one element,
+   not four blurred divs — large blur filters force expensive offscreen
+   compositing, and a plain radial-gradient is already soft at effectively no
+   paint cost. */
+.intl-accounts-aurora {
+  --aurora-base: var(--background);
+  /* Alphas trimmed down from the original design spec (0.42/0.34/0.30/0.28) —
+     this app's own `--muted-foreground` (#6b7280) already sits at only
+     ~4.83:1 against pure white, a thin 7% margin over WCAG AA's 4.5:1 floor
+     for normal-size text. At the original alphas, the worst-case blend at a
+     gradient's own peak (e.g. aurora-1 over aurora-base) computed to ~3.2:1 —
+     a real AA failure, not a theoretical one, for muted-foreground text that
+     lands near a corner (the page subtitle sits close to aurora-1's). Per
+     this task's own instruction to lighten the gradient rather than darken
+     the text, these are cut by roughly a third to a half. Verified by hand
+     against the WCAG relative-luminance formula (no browser contrast tooling
+     was available to check this live) — re-verify visually/with a contrast
+     checker before shipping, particularly the page title/subtitle area
+     nearest the top-right wash. */
+  --aurora-1: rgba(124, 164, 255, 0.3);
+  --aurora-2: rgba(150, 232, 212, 0.24);
+  --aurora-3: rgba(255, 197, 156, 0.2);
+  --aurora-4: rgba(190, 166, 255, 0.18);
+}
+
+.dark .intl-accounts-aurora {
+  /* Deliberately far weaker than the light values: saturated colour on a dark
+     base reads as glow rather than atmosphere. If this ever looks luminous
+     instead of quiet, reduce these alphas further rather than reaching for
+     different hues. */
+  --aurora-base: var(--background);
+  --aurora-1: rgba(49, 96, 242, 0.22);
+  --aurora-2: rgba(47, 179, 158, 0.14);
+  --aurora-3: rgba(230, 140, 90, 0.1);
+  --aurora-4: rgba(122, 90, 230, 0.16);
+}
+
+.intl-accounts-aurora-layer {
+  background-image: none;
+}
+
+@media print {
+  .intl-accounts-aurora-layer {
+    display: none;
+  }
+}
+
+/* ─── Platforms "Select platform" card aurora (card-scoped) ──────────────────
+   The same soft-wash idea as the International Accounts page, but applied to
+   one Card, not a page — see PlatformsFeature's desktop platform-list Card,
+   the only element that carries `.platform-select-aurora`. Its own tokens
+   (not the intl-accounts ones), so the two effects can be tuned
+   independently even though they share the same visual language.
+
+   Gradient sizes are scaled down from the page version to suit a ~450px-wide
+   card rather than a full viewport — the page's 520–820px radii would read
+   as one flat wash rather than distinct corners at this size. Same
+   conservative alphas as the page version and for the same reason: this
+   card's row labels sit directly on it, and this app's own
+   `--muted-foreground` has very little contrast margin to spend. */
+.platform-select-aurora {
+  --aurora-base: #f2f5fb;
+  --aurora-1: rgba(124, 164, 255, 0.28);
+  --aurora-2: rgba(255, 197, 156, 0.2);
+  --aurora-3: rgba(150, 232, 212, 0.22);
+}
+
+.dark .platform-select-aurora {
+  --aurora-base: #0f141d;
+  --aurora-1: rgba(49, 96, 242, 0.2);
+  --aurora-2: rgba(230, 140, 90, 0.1);
+  --aurora-3: rgba(47, 179, 158, 0.13);
+}
+
+.platform-select-aurora-layer {
+  background-image:
+    radial-gradient(260px 200px at -10% -15%, var(--aurora-1), transparent 70%),
+    radial-gradient(240px 190px at 108% 30%, var(--aurora-2), transparent 68%),
+    radial-gradient(260px 210px at 15% 112%, var(--aurora-3), transparent 70%);
+}
+
+@media print {
+  .platform-select-aurora-layer {
+    display: none;
+  }
+}
+
+/* ─── Echo full page glow (page-scoped) ───────────────────────────────────────
+   A single soft corner glow behind the full-page /echo route's welcome
+   screen — see EchoPage. Unlike the two washes above, this is one directional
+   glow (top-left), not four corners, because the reference it is matching
+   shows one diffuse cloud fading into a plain white page rather than a tint
+   spanning the whole viewport.
+
+   Kept to the top-left quadrant and fully transparent by the page's vertical
+   midpoint on purpose: the welcome heading and "try asking" cards this page
+   shows sit in the upper half, so a wash strong enough to read under the
+   composer at the bottom would have needed the same contrast trim the other
+   two effects did. Staying directional avoids that trade entirely. */
+.echo-page-glow {
+  --glow-1: rgba(124, 164, 255, 0.32);
+  --glow-2: rgba(124, 164, 255, 0.14);
+}
+
+.dark .echo-page-glow {
+  --glow-1: rgba(59, 130, 246, 0.22);
+  --glow-2: rgba(59, 130, 246, 0.1);
+}
+
+.echo-page-glow-layer {
+  background-image:
+    radial-gradient(640px 520px at 6% -8%, var(--glow-1), transparent 62%),
+    radial-gradient(520px 460px at -6% 22%, var(--glow-2), transparent 68%);
+}
+
+@media print {
+  .echo-page-glow-layer {
+    display: none;
+  }
+}
+
+/* ─── MCA Dashboard aurora (page-scoped) ──────────────────────────────────────
+   The merchant's actual landing page (/mca-dashboard — see
+   McaDashboardAurora, the only importer of this class, structurally mirroring
+   InternationalAccountsAurora.tsx).
+
+   A soft diagonal sweep entering from the right edge, modelled on a
+   reference: colour pools at the right and dissolves to plain background by
+   roughly the left third, with the mass reaching further left at the top
+   than at the bottom so its inner boundary runs as a long diagonal rather
+   than a vertical seam.
+
+   Confined to a fixed-height band just under the header, NOT the whole
+   scrollable page (see the sized wrapper in McaDashboardAurora). Two things
+   follow from that. The `at x% y%` centres now resolve against a known
+   600px box instead of against whatever height a given page's content
+   happens to total, so the sweep sits in the same place regardless — a
+   full-page layer made the same percentages land hundreds of pixels apart
+   between a short page and a long one. And every radius is small enough
+   that each layer has faded out well before the band's own bottom edge,
+   which is what lets the band end without a visible cut line. Enlarging any
+   radius past roughly 500px of vertical reach will reintroduce one.
+
+   THE DIAGONAL IS THE GEOMETRY, not a rotation. Every layer is a radial
+   whose centre sits at or past the right edge; what tilts the boundary is
+   that the upper layers are centred further LEFT (87–102%) than the lower
+   ones (113%), so the colour's leftmost reach falls away as it descends. A
+   `linear-gradient` at an angle cannot do this — it would give a
+   straight-ruled edge, where the reference's is bowed and organic.
+
+   LAYER ORDER IS LOAD-BEARING. In `background-image` the FIRST layer paints
+   on TOP, so the yellows are listed first to keep the warm tone outermost,
+   at the very edge, with the blues showing through inboard of them — the
+   same warm-outside/cool-inside ordering the reference has. Where the two
+   overlap they necessarily pass through green; that band is wanted, and the
+   reference has its own version of it between lime and teal.
+
+   Alphas are deliberately weighted so the warm layers carry the top-right
+   and the blues sit lower. Yellow at these strengths barely moves
+   luminance, which matters because the page's own top-right corner holds
+   `--muted-foreground` copy ("Amount received at mid-market rate") and this
+   app's muted token has very little contrast margin to spend — the same
+   ceiling that forced the International Accounts wash down. Blue drops
+   luminance far faster, so it is kept below that copy rather than under it.
+
+   Grain (see McaDashboardAurora's feTurbulence overlay) is not only for
+   texture: gradients this large and this soft band visibly on 8-bit
+   displays, and a little noise is the standard dither for that. */
+.mca-dashboard-aurora {
+  --aurora-base: var(--background);
+  --sweep-warm: rgba(250, 204, 21, 0.2);
+  --sweep-warm-low: rgba(252, 191, 73, 0.15);
+  --sweep-blue: rgba(59, 130, 246, 0.18);
+  --sweep-blue-far: rgba(96, 165, 250, 0.1);
+  --grain-opacity: 0.12;
+}
+
+.dark .mca-dashboard-aurora {
+  --aurora-base: var(--background);
+  --sweep-warm: rgba(216, 170, 24, 0.13);
+  --sweep-warm-low: rgba(214, 156, 56, 0.09);
+  --sweep-blue: rgba(45, 104, 210, 0.15);
+  --sweep-blue-far: rgba(70, 126, 214, 0.08);
+  --grain-opacity: 0.09;
+}
+
+.mca-dashboard-aurora-layer {
+  background-image: none;
+}
+
+@media print {
+  .mca-dashboard-aurora-layer {
+    display: none;
+  }
+}
+

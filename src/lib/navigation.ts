@@ -253,14 +253,13 @@ export const mcaNavigation: NavGroup[] = [
         icon: "repeat",
         permission: ["getTxnSearchResults"],
       },
-      {
-        // /mca-settlement-report, the MCA twin of the shared /settlement-report
-        // route the Home and Payments trees use, see settlement-reports/routes.ts.
-        label: "Settlements",
-        href: "/mca-settlement-report",
-        icon: "file-text",
-        permission: ["getAllSettlementDetailReports", "getSettlementReport"],
-      },
+      // No standalone "Settlements" tab any more — /mca-settlement-report
+      // itself is untouched (still reachable via McaRevenueCard's "View
+      // settlements" button and the command-palette search, both unchanged),
+      // but a settlement's own Details/Amount Breakdown now also surface
+      // directly on a SETTLED/FIRC_SETTLED transaction's own details — see
+      // SettlementBatchDetailsSection in mca-transactions — which is what
+      // this tab was for reaching in the first place.
       { label: "Invoice Management", href: "/mca-invoices", icon: "receipt", permission: [] },
     ],
   },

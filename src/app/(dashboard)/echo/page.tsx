@@ -13,8 +13,14 @@ import { EchoFeature } from "@/features/dashboard/echo";
  */
 export default function EchoPage() {
   return (
-    <div className="absolute inset-0 flex flex-col overflow-hidden p-4 md:p-6">
-      <EchoFeature />
+    <div className="echo-page-glow absolute inset-0 isolate overflow-hidden">
+      <div
+        aria-hidden="true"
+        className="echo-page-glow-layer pointer-events-none absolute inset-0 z-0 overflow-hidden"
+      />
+      <div className="absolute inset-0 z-10 flex flex-col overflow-hidden p-4 md:p-6">
+        <EchoFeature />
+      </div>
     </div>
   );
 }

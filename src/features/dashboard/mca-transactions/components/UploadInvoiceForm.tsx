@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useStore } from "@tanstack/react-form";
 import {
   Alert,
@@ -13,6 +14,7 @@ import {
   FieldError,
   FieldLabel,
 } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import {
   PurposeCodeCombobox,
@@ -29,7 +31,67 @@ import {
   isCbaNameFlagged,
   toInvoiceComparison,
 } from "@/features/dashboard/mca-transactions/invoiceMatching";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
+
+/**
+ * The same two shortcuts the Transactions table's row-level "…" menu used to
+ * offer (Create Invoice / Link Invoice — see McaTransactionTable's
+ * onCreateInvoice/onLinkInvoice), now offered from inside the upload section
+ * itself instead: the row's own menu is gone (see columns.tsx), so this is
+ * their only remaining entry point. Both navigate away from the drawer
+ * entirely — there is no inline "create" or "link" flow to switch this form
+ * into, only a full page for each.
+ *
+ * Placed after the dropzone, not above the form: dragging/browsing a file is
+ * the primary path, these two are the fallback for a merchant who doesn't
+ * have one to drag yet — the same spot (and the same `variant="link"`,
+ * secondary-to-the-dropzone weight) the old single "Don't have an invoice
+ * yet? Create new invoice" stub occupied, just with both real destinations
+ * instead of the one that was never wired up.
+ *
+ * Only shown for the inline (drawer) variant: the standalone modal is a
+ * narrower, single-purpose surface (see its own "This transaction can't
+ * proceed…" alert above), and offering two ways OUT of it as well as one
+ * more form field defeats the point of it being the focused one.
+ */
+function InvoiceShortcutLinks({ row }: { row: McaTransaction }) {
+  const router = useRouter();
+  const { selectMid } = usePacbMidScope();
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-4">
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto min-h-0 gap-1 px-0 py-0 text-[12px]"
+        leftIcon={<Icon name="file-text" className="h-3.5 w-3.5" />}
+        // Scopes the editor to this transaction's own merchant before
+        // opening it, same as the removed row menu did — without it, a
+        // merchant with several PACB MIDs and none selected would raise the
+        // invoice under their first MID while linking it to a transaction on
+        // another.
+        onClick={() => {
+          if (row.merchantId) selectMid(row.merchantId);
+          router.push(`/create-invoice?gid=${row.gid}`);
+        }}
+      >
+        Create a new invoice
+      </Button>
+      <Button
+        type="button"
+        variant="link"
+        size="sm"
+        className="h-auto min-h-0 gap-1 px-0 py-0 text-[12px]"
+        leftIcon={<Icon name="paperclip" className="h-3.5 w-3.5" />}
+        onClick={() => router.push(`/mca-invoices?linkTo=${row.gid}`)}
+      >
+        Link an invoice
+      </Button>
+    </div>
+  );
+}
 
 interface UploadInvoiceFormProps {
   row: McaTransaction;
@@ -210,7 +272,13 @@ export function UploadInvoiceForm({
           }}
         >
           {(field) => (
-            <Field className="mt-5 mb-5" invalid={field.state.meta.errors.length > 0}>
+            // mt-5 only in the modal: there it separates this field from the
+            // "This transaction can't proceed…" alert just above it. Inline,
+            // there is nothing above this field but the surrounding card's
+            // own top padding — stacking a second top margin on top of that
+            // padding was the extra gap above "Purpose code" this card
+            // wasn't supposed to have.
+            <Field className={cn("mb-5", isModal && "mt-5")} invalid={field.state.meta.errors.length > 0}>
               <FieldLabel htmlFor="purposeCode">
                 Purpose code <span className="text-destructive">*</span>
               </FieldLabel>
@@ -252,13 +320,16 @@ export function UploadInvoiceForm({
             onReset={upload.reset}
             invalid={!!invoiceError}
             errorId="invoice-error"
-            onCreateInvoice={() => {
-              // TODO: hand off to the /invoices/create flow and populate this
-              // field with the created invoice once that flow exists here.
-            }}
           />
           <FieldError id="invoice-error">{invoiceError}</FieldError>
         </Field>
+
+        {/* Secondary to the dropzone above, not an alternative to reach for
+            first — same slot the dropzone's own "Don't have an invoice yet?"
+            link used to occupy (see InvoiceDropzone's showCreateInvoiceLink,
+            now gated off since nothing calls onCreateInvoice any more), just
+            with both real destinations instead of the one stubbed-out one. */}
+        {!isModal && <InvoiceShortcutLinks row={row} />}
       </div>
 
       <div className={cn(isModal ? "shrink-0 border-t border-border bg-card px-6 py-4" : "mt-5")}>

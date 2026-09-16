@@ -10,6 +10,7 @@ import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { useHasEcho } from "@/features/dashboard/echo/hooks";
+import { McaDashboardAurora } from "@/features/dashboard/mca-home/components/McaDashboardAurora";
 import {
   MCA_DASHBOARD_GUIDE_ECHO_TARGET,
   MCA_DASHBOARD_GUIDE_KEY,
@@ -138,7 +139,7 @@ export function McaDashboardFeature() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] space-y-4">
+    <McaDashboardAurora contentClassName="space-y-4">
       {/* ── Page header ──────────────────────────────────────────────── */}
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
         <div>
@@ -212,6 +213,6 @@ export function McaDashboardFeature() {
         storageKey={MCA_DASHBOARD_GUIDE_KEY}
         highlightOnFirstVisit
       />
-    </div>
+    </McaDashboardAurora>
   );
 }

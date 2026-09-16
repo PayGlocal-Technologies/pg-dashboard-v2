@@ -67,10 +67,26 @@ interface TotalSettledCardProps {
   /** Controlled: the selected timeframe drives the overview fetch upstream, so
    *  total/trend/chart all change together. */
   timeframe: TotalSettledTimeframe;
-  onTimeframeChange: (timeframe: TotalSettledTimeframe) => void;
+  /**
+   * Omit to hide the card's own timeframe switcher entirely, for a caller
+   * that drives `timeframe` from a control of its own — the Transactions
+   * page does, from the range control in its header. Handler and control are
+   * deliberately the same prop rather than a separate `showToggle` flag, so
+   * the two cannot contradict each other: there is no way to render a
+   * switcher that changes nothing, or to pass a handler nothing can call.
+   */
+  onTimeframeChange?: (timeframe: TotalSettledTimeframe) => void;
   /** The chart series for the selected timeframe. */
   chartData: SparklinePoint[];
   className?: string;
+  /**
+   * Overrides the plot area's height. Defaults to the `h-76` this card uses
+   * on the settlement report, where it is the page's headline card and has
+   * the room for it; the Transactions page stacks it under Total amount
+   * collected and needs it shorter to match that card. Merged through `cn`,
+   * so passing a height class simply wins over the default.
+   */
+  chartClassName?: string;
 }
 
 export function TotalSettledCard({
@@ -81,6 +97,7 @@ export function TotalSettledCard({
   onTimeframeChange,
   chartData,
   className,
+  chartClassName,
 }: TotalSettledCardProps) {
   const trendPositive = totalSettledTrendPct >= 0;
   const data = chartData;
@@ -93,7 +110,12 @@ export function TotalSettledCard({
     <Card className={cn("gap-4 p-5", className)}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-foreground">Total settled</p>
+          {/* Light/regular, not bold — matches SavedAmountCard's own label
+              style in mca-transactions, which every KPI card's header on
+              that page (Total amount collected, Documents pending) was
+              brought in line with too: a quiet caption introducing the
+              figure below it, not competing with it. */}
+          <p className="text-sm font-normal text-muted-foreground">Total settled</p>
           <CompactAmount
             amount={totalSettled}
             currency="INR"
@@ -131,27 +153,29 @@ export function TotalSettledCard({
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-1 rounded-lg border border-border bg-muted/50 p-1">
-          {totalSettledTimeframes.map((t) => (
-            <Button
-              key={t.value}
-              variant="ghost"
-              size="sm"
-              onClick={() => onTimeframeChange(t.value)}
-              className={cn(
-                "h-auto min-h-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium",
-                timeframe === t.value
-                  ? "bg-card text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t.label}
-            </Button>
-          ))}
-        </div>
+        {onTimeframeChange && (
+          <div className="flex shrink-0 flex-wrap gap-1 rounded-lg border border-border bg-muted/50 p-1">
+            {totalSettledTimeframes.map((t) => (
+              <Button
+                key={t.value}
+                variant="ghost"
+                size="sm"
+                onClick={() => onTimeframeChange(t.value)}
+                className={cn(
+                  "h-auto min-h-0 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-medium",
+                  timeframe === t.value
+                    ? "bg-card text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {t.label}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="h-76 w-full">
+      <div className={cn("h-76 w-full", chartClassName)}>
         {!hasData ? (
           <PlaceholderState
             variant="no-settlements"

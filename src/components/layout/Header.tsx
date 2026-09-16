@@ -141,7 +141,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
         {/* Top-level category tabs */}
         {!isPartnerUser && (
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden shrink-0 items-center gap-1 md:flex">
             {visibleTabs.map((tab) => {
               // Home/Payments/MCA currently share the same feature routes, so
               // their highlight is driven by the active context, not the URL.
@@ -158,7 +158,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   href={tab.href}
                   onClick={() => tab.context && setActiveContext(tab.context)}
                   className={cn(
-                    "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
+                    "whitespace-nowrap rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
                     isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -176,7 +176,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         <GlobalSearch />
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {/* OUT OF SCOPE — Notification bell hidden for now (no notifications
               backend yet). Restore by un-commenting this block. */}
           {/* <Button

@@ -249,7 +249,11 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
       if (dropped) handleFile(dropped);
     };
 
-    const showCreateInvoiceLink = phase !== "ready";
+    // Also requires a real handler now: UploadInvoiceForm no longer passes
+    // onCreateInvoice (its own InvoiceShortcutLinks row covers this, placed
+    // where this link used to sit), so without the `!!onCreateInvoice` guard
+    // this would render a link with nothing wired to its click.
+    const showCreateInvoiceLink = phase !== "ready" && !!onCreateInvoice;
 
     const handleRemove = () => {
       setRejection(null);

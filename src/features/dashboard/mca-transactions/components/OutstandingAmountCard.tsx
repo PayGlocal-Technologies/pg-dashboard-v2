@@ -1,7 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Badge, Button, Card, CardContent, Shimmer } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Shimmer,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -59,14 +68,13 @@ export function OutstandingAmountCard({
   const pendingCount = isCurrencyScoped ? (scopedRow?.count ?? 0) : (documentPending?.count ?? 0);
   const isLoading = isCurrencyScoped ? isBreakdownLoading : isTimeframeLoading;
 
-  const [expanded, setExpanded] = useState(false);
   const currencyRows = [...(breakdown?.currencies ?? [])]
     .filter((row) => row.amount > 0 || row.count > 0)
     .sort((a, b) => b.amount - a.amount);
   // The breakdown is redundant when the whole card is already scoped to one
-  // currency (International Accounts), so it's only offered on the aggregate
+  // currency (International Accounts), so it's only shown on the aggregate
   // (Transactions) placement.
-  const canExpand = !isCurrencyScoped && currencyRows.length > 0;
+  const showBreakdown = !isCurrencyScoped && currencyRows.length > 0;
 
   return (
     <Card size="sm" className={cn("w-full", className)}>
@@ -85,10 +93,13 @@ export function OutstandingAmountCard({
           </span>
         </div>
 
-        {/* KPI stack: title (with the pending-count chip beside it) then amount. */}
+        {/* KPI stack: title (with the pending-count chip beside it) then
+            amount. Title light/regular, not bold — matches SavedAmountCard's
+            own label style, which every KPI card header on this page was
+            brought in line with. */}
         <div className="mt-4">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-semibold text-foreground">Documents pending</p>
+            <p className="text-sm font-normal text-muted-foreground">Documents pending</p>
             {!isLoading && pendingCount > 0 && (
               <Badge variant="secondary" size="sm" className="shrink-0">
                 {pendingCount.toLocaleString("en-IN")} pending transaction
@@ -108,48 +119,63 @@ export function OutstandingAmountCard({
         </div>
 
         {/* Per-currency breakdown of what's currently pending — a snapshot, not
-            scoped to the timeframe above, so it's named that way. Hidden behind
-            a toggle to keep the card compact next to its neighbours. */}
-        {canExpand && (
-          <div className="mt-4 border-t border-border pt-3">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setExpanded((prev) => !prev)}
-              className="h-auto min-h-0 w-full justify-between px-0 py-0 text-xs font-medium text-muted-foreground hover:text-foreground"
-              rightIcon={
-                <Icon name={expanded ? "chevron-up" : "chevron-down"} className="h-3.5 w-3.5" />
-              }
-            >
-              Currently pending by currency
-            </Button>
+            scoped to the timeframe above, so it's named that way (and, unlike
+            the headline KPI, it does not change when the section's time-range
+            control changes — useDocumentPendingByCurrency takes no timeframe
+            argument at all).
 
-            <div
-              className={cn(
-                "grid transition-[grid-template-rows] duration-300 ease-out",
-                expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-              )}
-            >
-              <ul className="mt-3 min-h-0 space-y-2 overflow-hidden">
-                {currencyRows.map((row) => (
-                  <li
-                    key={row.currency}
-                    className="flex items-center justify-between gap-3 text-[13px]"
+            A hover tooltip now, not an always-visible list and not a
+            click-to-expand one either: both of those put the row list in
+            normal document flow, so the card's own height depended on
+            whether/how many currencies there were to show. TooltipContent
+            renders through a Radix portal (see the Tooltip source) — outside
+            this card's DOM subtree entirely — so nothing about revealing it
+            can ever change this card's height, which is the actual point
+            here, not just a smaller footprint. */}
+        {showBreakdown && (
+          // `mt-auto`, not `mt-4`: when this card is stretched taller than
+          // its own content (matched to Total amount collected's row height
+          // from lg up — see TransactionsAnalyticsCarousel), a fixed mt-4
+          // left every bit of that extra height stranded BELOW this block,
+          // as dead space under the link. mt-auto instead pushes this whole
+          // block down to the card's own bottom edge, so the leftover space
+          // collects above it (between the KPI and the divider) rather than
+          // beneath it — grounded to the bottom, not floating with a gap
+          // under it.
+          <div className="mt-auto border-t border-border pt-3">
+            <TooltipProvider delayDuration={200}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-auto min-h-0 w-auto p-0 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
                   >
-                    <span className="min-w-0 truncate font-medium text-foreground">
-                      {currencyLabel(row.currency)}
-                    </span>
-                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                      {formatCurrency(row.amount, displayCurrency, "en-IN")}
-                      <span className="ml-1.5 text-[11px]">
-                        · {row.count.toLocaleString("en-IN")}
-                      </span>
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                    Currently pending by currency
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="start" className="w-64 max-w-none p-3">
+                  <ul className="space-y-2">
+                    {currencyRows.map((row) => (
+                      <li
+                        key={row.currency}
+                        className="flex items-center justify-between gap-3 text-[13px]"
+                      >
+                        <span className="min-w-0 truncate font-medium text-popover-foreground">
+                          {currencyLabel(row.currency)}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">
+                          {formatCurrency(row.amount, displayCurrency, "en-IN")}
+                          <span className="ml-1.5 text-[11px]">
+                            · {row.count.toLocaleString("en-IN")}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         )}
       </CardContent>

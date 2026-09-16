@@ -47,7 +47,7 @@ export const SETTINGS_NAV_GROUPS: SettingsNavGroup[] = [
     label: "Account & Business",
     items: [
       { label: "Business details", href: "/settings/business", icon: "building-2" },
-      { label: "Banking & currencies", href: "/settings/banking", icon: "landmark" },
+      { label: "Account details", href: "/settings/banking", icon: "landmark" },
     ],
   },
   {

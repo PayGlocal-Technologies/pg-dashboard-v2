@@ -33,31 +33,49 @@ export function EchoHero({
   children?: ReactNode;
 }) {
   return (
-    <div className={cn("flex flex-col items-center text-center", compact ? "gap-3" : "gap-4")}>
-      <Icon name="echo-mark" className={cn("shrink-0", compact ? "text-[40px]" : "text-[56px]")} />
+    <div className="flex flex-col items-center text-center">
+      {/* Explicit margins rather than one flex `gap` on the whole column:
+          a single gap value put equal air between the mark and the heading
+          as between the heading and the "try asking" list below, so all
+          three read as one evenly-spaced stack instead of a clear mark →
+          heading → subtext group followed by a deliberately bigger breath
+          before the list. */}
+      <Icon
+        name="echo-mark"
+        className={cn("shrink-0", compact ? "mb-2 text-[40px]" : "mb-3 text-[48px]")}
+      />
 
-      <div className="space-y-1">
-        <h2
-          className={cn(
-            "font-semibold tracking-tight text-foreground",
-            compact ? "text-[15px]" : "text-xl"
-          )}
-        >
-          {firstName ? `Hi ${firstName}, how can I help?` : "How can I help?"}
-        </h2>
-        <p
-          className={cn(
-            "mx-auto max-w-md text-muted-foreground",
-            compact ? "text-[12px]" : "text-[13.5px]"
-          )}
-        >
-          Transactions, settlements, disputes, accounts and payment links, without the menus.
-        </p>
-      </div>
+      <h2
+        className={cn(
+          "font-semibold tracking-tight text-foreground",
+          compact ? "text-[15px]" : "text-[26px] font-bold"
+        )}
+      >
+        {firstName ? `Hi ${firstName}, how can I help?` : "How can I help?"}
+      </h2>
+      <p
+        className={cn(
+          "mx-auto max-w-md text-muted-foreground",
+          compact ? "mt-1 text-[12px]" : "mt-2 text-[15px]"
+        )}
+      >
+        Ask about transactions, settlements, disputes, accounts or payment
+        links — I&apos;ll skip the menus and get straight to it.
+      </p>
 
       {children ? (
-        <div className={cn("w-full text-left", compact ? "max-w-full" : "max-w-md")}>
-          <p className="mb-2 text-center text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        <div
+          className={cn(
+            "w-full text-left",
+            compact ? "mt-4 max-w-full" : "mt-8 max-w-xl"
+          )}
+        >
+          <p
+            className={cn(
+              "mb-2 text-center font-semibold uppercase tracking-[0.08em] text-muted-foreground",
+              compact ? "text-[11px]" : "text-[12px]"
+            )}
+          >
             Try asking
           </p>
           {children}

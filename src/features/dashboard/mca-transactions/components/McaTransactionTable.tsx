@@ -350,21 +350,28 @@ export function McaTransactionTable({
     downloadReport({ ...exportBody, pageLimit: REPORT_EXPORT_LIMIT, from: 0 } as TableReqBody);
   };
 
-  const baseColumns = buildMcaColumns(isPartnerUser, {
-    onOpenDetails: openDetails,
-    onDownloadFirc: (row) => downloadFirc(row.merchantId, row.gid),
-    // The row already answers "which MID?", so this never asks — it scopes the
-    // editor to the transaction's own merchant before opening it. Without that,
-    // a merchant with several PACB MIDs and none selected would raise the
-    // invoice under their first MID while linking it to a transaction on
-    // another. See usePacbMidScope for the entry points that do have to ask.
-    onCreateInvoice: (row) => {
-      if (row.merchantId) selectMid(row.merchantId);
-      router.push(`/create-invoice?gid=${row.gid}`);
+  const baseColumns = buildMcaColumns(
+    isPartnerUser,
+    {
+      onOpenDetails: openDetails,
+      onDownloadFirc: (row) => downloadFirc(row.merchantId, row.gid),
+      // The row already answers "which MID?", so this never asks — it scopes the
+      // editor to the transaction's own merchant before opening it. Without that,
+      // a merchant with several PACB MIDs and none selected would raise the
+      // invoice under their first MID while linking it to a transaction on
+      // another. See usePacbMidScope for the entry points that do have to ask.
+      onCreateInvoice: (row) => {
+        if (row.merchantId) selectMid(row.merchantId);
+        router.push(`/create-invoice?gid=${row.gid}`);
+      },
+      onLinkInvoice: (row) => router.push(`/mca-invoices?linkTo=${row.gid}`),
+      canManageInvoices,
     },
-    onLinkInvoice: (row) => router.push(`/mca-invoices?linkTo=${row.gid}`),
-    canManageInvoices,
-  });
+    // UTR Number only makes sense once a transaction has actually settled,
+    // so it's added only on the Settled tab rather than showing a column of
+    // dashes everywhere else — see buildMcaColumns' own comment on it.
+    { isSettledTab: sameStatusSet(statusFilters, SETTLED_STATUSES) }
+  );
   const orderedColumns = reorderColumns(baseColumns, columnOrder);
   // Actions is never listed as hideable (it holds the row's controls, not
   // data), so it is filtered against hiddenColumns like the rest but never

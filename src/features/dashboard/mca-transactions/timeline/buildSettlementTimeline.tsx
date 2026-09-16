@@ -178,10 +178,6 @@ export interface BuildTimelineArgs {
   onDownloadDocument: (documentPath: string) => void;
   onDownloadFirc: () => void;
   isFircDownloading?: boolean;
-  /** Rendered under the invoice-upload step while it is awaiting the
-   *  merchant's file, so the upload form sits at the point in the timeline it
-   *  belongs to rather than beside it. */
-  uploadSlot?: ReactNode;
 }
 
 export function buildSettlementTimeline({
@@ -197,7 +193,6 @@ export function buildSettlementTimeline({
   onDownloadDocument,
   onDownloadFirc,
   isFircDownloading,
-  uploadSlot,
 }: BuildTimelineArgs): SettlementTimelineStep[] {
   // Transactions predating multipleTimelineEvents carry one upload/approval
   // pair on the root instead. Normalising to a list here means the loop below
@@ -247,6 +242,11 @@ export function buildSettlementTimeline({
       SUCCESS: "Invoice approved",
     }[approvalStatus];
 
+    // The upload form itself no longer nests here while IN_PROGRESS — it
+    // renders directly in SettlementTimelineSection, in the banner's old
+    // spot, so it's the first thing visible rather than something to scroll
+    // down into the timeline to find. This step still exists and still
+    // carries its own status/date, just without the form as its child.
     let uploadChildren: ReactNode = null;
     if (uploadStatus === "SUCCESS" && displayFileName && downloadPath) {
       uploadChildren = (
@@ -255,9 +255,6 @@ export function buildSettlementTimeline({
           onDownload={() => onDownloadDocument(downloadPath)}
         />
       );
-    }
-    if (uploadStatus === "IN_PROGRESS" && uploadSlot) {
-      uploadChildren = <div className="mt-3">{uploadSlot}</div>;
     }
 
     const approvalChildren =
@@ -494,18 +491,4 @@ export function hasTimelineReversal(
   ];
 
   return events.some((event) => isReversalDone(event?.STATUS));
-}
-
-/** The alert copy shown while a transaction sits in DOCUMENT_PENDING —
- *  which differs depending on whether an earlier invoice was rejected. */
-export function getDocumentPendingMessage(multipleTimelineEvents?: MultipleTimelineEvents): string {
-  const invoiceEvents = multipleTimelineEvents?.INVOICE ?? [];
-  const hasRejection = invoiceEvents.some((e) => e?.INVOICE_APPROVED?.STATUS === "ERROR");
-  const hasResubmission =
-    hasRejection && invoiceEvents.some((e) => e?.INVOICE_APPROVED?.STATUS === "IN_PROGRESS");
-
-  if (hasResubmission) return "Revised invoice received. Compliance review in progress.";
-  if (hasRejection)
-    return "Invoice does not match the payment, upload a corrected invoice to proceed";
-  return "Upload your invoice to proceed with settlement";
 }

@@ -19,6 +19,7 @@ import { CompactAmount } from "@/components/common/CompactAmount";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useSettledCurrencyTrend } from "@/features/dashboard/mca-transactions/hooks";
+import { InternationalAccountsAurora } from "@/features/dashboard/multi-currency/components/InternationalAccountsAurora";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
 import { VirtualAccountDetails } from "@/features/dashboard/multi-currency/components/VirtualAccountDetails";
 import { ShareAccountDetailsModal } from "@/features/dashboard/multi-currency/components/ShareAccountDetailsModal";
@@ -67,10 +68,10 @@ export function MultiCurrencyFeature() {
 
   if (needsMidSelection) {
     return (
-      <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
+      <InternationalAccountsAurora contentClassName="space-y-4">
         <PageHeader title="International accounts" />
         <SelectMidView midType="PACB" />
-      </div>
+      </InternationalAccountsAurora>
     );
   }
 
@@ -196,7 +197,7 @@ function MultiCurrencyContent() {
   };
 
   return (
-    <div className="mx-auto max-w-[1400px] page-enter">
+    <InternationalAccountsAurora>
       {/* The page's spacing scale, tightest to loosest — no two of these steps
           are the same size, so proximity alone says what belongs to what:
             4px   title → its own supporting description
@@ -622,6 +623,6 @@ function MultiCurrencyContent() {
         steps={MCA_INTL_ACCOUNTS_GUIDE_STEPS}
         storageKey={MCA_INTL_ACCOUNTS_GUIDE_KEY}
       />
-    </div>
+    </InternationalAccountsAurora>
   );
 }

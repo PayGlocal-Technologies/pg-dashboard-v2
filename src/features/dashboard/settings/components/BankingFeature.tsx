@@ -74,7 +74,7 @@ export function BankingFeature() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Banking & currencies"
+        title="Account details"
         subtitle="Where we send settled funds by currency."
       />
 

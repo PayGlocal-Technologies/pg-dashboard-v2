@@ -14,7 +14,6 @@ import { useDocumentDownload, useFircDownload } from "@/features/dashboard/mca-t
 import { useVirtualAccounts } from "@/features/dashboard/multi-currency/hooks";
 import {
   buildSettlementTimeline,
-  getDocumentPendingMessage,
   hasTimelineReversal,
 } from "@/features/dashboard/mca-transactions/timeline/buildSettlementTimeline";
 import { formatMoney } from "@/features/dashboard/mca-transactions/timeline/format";
@@ -128,7 +127,6 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
         onDownloadDocument: downloadDocument,
         onDownloadFirc: () => downloadFirc(row.merchantId, row.gid),
         isFircDownloading,
-        uploadSlot,
       })
     : [];
 
@@ -155,13 +153,13 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
           </AlertDescription>
         </Alert>
       )}
-      {row.externalStatus === "DOCUMENT_PENDING" && (
-        <Alert variant="warning">
-          <AlertDescription>
-            {getDocumentPendingMessage(timeline?.multipleTimelineEvents)}
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* The amber "upload your invoice" banner is gone — this IS the
+          upload action now, not a notice pointing at one further down the
+          timeline. Same `uploadSlot` TransactionDetailsPage already builds
+          (needsAction && !isReversed), just rendered here instead of nested
+          under the timeline's own "Upload invoice" step — see
+          buildSettlementTimeline, which no longer attaches it there. */}
+      {row.externalStatus === "DOCUMENT_PENDING" && uploadSlot}
       {row.externalStatus === "FUNDS_ON_HOLD" && (
         <Alert variant="info">
           <AlertDescription>

@@ -305,8 +305,28 @@ function PlatformsContent() {
                 horizontal padding, so the card only has to keep them clear of its
                 edge. Same treatment as the Virtual Accounts region card. */}
             <div className="hidden lg:block">
-              <Card size="sm" className="mt-2 gap-0 p-3">
-                <div className="space-y-1" role="list" aria-label="Select a platform">
+              {/* The one card on this page carrying the aurora wash — see
+                  .platform-select-aurora/-layer in globals.css. Scoped to
+                  this Card alone (not the page background, unlike
+                  International Accounts): overflow-hidden clips the
+                  absolutely positioned layer to the card's own rounded-xl
+                  corners, and the row list is lifted to z-10 so the wash
+                  sits behind it, not on top — same reason as the page
+                  version: an absolutely positioned box paints after static
+                  in-flow content by default. */}
+              <Card
+                size="sm"
+                className="platform-select-aurora relative isolate mt-2 gap-0 overflow-hidden bg-(--aurora-base) p-3"
+              >
+                <div
+                  aria-hidden="true"
+                  className="platform-select-aurora-layer pointer-events-none absolute inset-0 z-0"
+                />
+                <div
+                  className="relative z-10 space-y-1"
+                  role="list"
+                  aria-label="Select a platform"
+                >
                   {platforms.map((platform) => {
                     const isSelected = platform.id === selectedPlatform.id;
                     return (
@@ -315,7 +335,13 @@ function PlatformsContent() {
                         type="button"
                         role="listitem"
                         aria-current={isSelected}
-                        variant={isSelected ? "secondary" : "ghost"}
+                        // "outline" (flux's solid bg-card fill), not
+                        // "secondary" (bg-muted): against this card's own
+                        // aurora tint, a muted-gray selected state blended
+                        // right into the wash instead of standing apart from
+                        // it. A solid white/card chip pops the same way the
+                        // Virtual Accounts region list's selected row does.
+                        variant={isSelected ? "outline" : "ghost"}
                         size="md"
                         // flux-ui's Button lays leftIcon / label / rightIcon out
                         // as three direct flex children, so the chevron would
@@ -325,12 +351,20 @@ function PlatformsContent() {
                         className={cn(
                           "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
                           // The selected row is the only one at full emphasis:
-                          // `secondary` carries the design system's own selected
-                          // surface, and the primary tint on top is its accent.
-                          // Unselected rows drop to the muted token, which is
-                          // what keeps the whole column from out-weighing the
-                          // workflow beside it.
-                          isSelected ? "font-semibold text-primary" : "text-muted-foreground"
+                          // the primary-tinted text on top of its solid white
+                          // fill is its accent. Unselected rows drop to the
+                          // muted token, which is what keeps the whole column
+                          // from out-weighing the workflow beside it.
+                          //
+                          // Explicit bg-white rather than relying on
+                          // "outline"'s own bg-card: a flat, unambiguous white
+                          // chip regardless of anything else in the cascade.
+                          // dark:bg-card keeps dark mode on its own real
+                          // surface token instead of forcing literal white
+                          // into a dark UI.
+                          isSelected
+                            ? "bg-white font-semibold text-primary dark:bg-card"
+                            : "text-muted-foreground"
                         )}
                         // The platform's own brand mark, sized by the box rather
                         // than by the file so all five sit on the same optical

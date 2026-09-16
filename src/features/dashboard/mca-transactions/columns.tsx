@@ -4,10 +4,6 @@ import {
   type Column,
   StatusBadge,
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   IconButton,
   Tooltip,
   TooltipContent,
@@ -22,6 +18,7 @@ import { COUNTRY_NAME_MAP } from "@/features/dashboard/mca-transactions/constant
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 import { useApp } from "@/stores/useApp";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { getMockUtrNumber } from "@/features/dashboard/mca-transactions/mock-data";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -211,34 +208,37 @@ function buildRowActions(row: McaTransaction, handlers: RowActionHandlers): RowA
   }
 }
 
-function RowActionsMenu({ actions }: { actions: RowAction[] }) {
+/** One row's actions, direct icon buttons rather than a "…" menu — today
+ *  that's at most a single action (FIRC Download, on a FIRC_SETTLED row),
+ *  and hiding the one thing there is to do behind a dropdown cost an extra
+ *  click for no reason. Each action gets its own icon (a tooltip carries the
+ *  label, since there's no room for text beside several of these), laid out
+ *  left of the row's View details/Take action control rather than replacing
+ *  it. */
+function RowActionButtons({ actions }: { actions: RowAction[] }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <IconButton
-          aria-label="More actions"
-          variant="ghost"
-          size="sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Icon name="more-horizontal" className="h-4 w-4" />
-        </IconButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        {actions.map((action) => (
-          <DropdownMenuItem
-            key={action.key}
-            onSelect={(e) => {
-              e.preventDefault();
-              action.onSelect();
-            }}
-          >
-            <Icon name={action.icon} className="h-3.5 w-3.5" />
-            {action.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      {actions.map((action) => (
+        <TooltipProvider key={action.key} delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <IconButton
+                aria-label={action.label}
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  action.onSelect();
+                }}
+              >
+                <Icon name={action.icon} className="h-4 w-4" />
+              </IconButton>
+            </TooltipTrigger>
+            <TooltipContent side="top">{action.label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+    </>
   );
 }
 
@@ -249,9 +249,9 @@ function RowActionsMenu({ actions }: { actions: RowAction[] }) {
 export function buildMcaColumns(
   isPartnerUser: boolean,
   handlers: RowActionHandlers,
-  options: { showActions?: boolean } = {}
+  options: { showActions?: boolean; isSettledTab?: boolean } = {}
 ): Column<McaTransaction>[] {
-  const { showActions = true } = options;
+  const { showActions = true, isSettledTab = false } = options;
   const cols: Column<McaTransaction>[] = [
     {
       key: "amount",
@@ -334,11 +334,22 @@ export function buildMcaColumns(
         const isPendingInvoice = isWaitingForInvoice(row);
 
         return (
-          <div className="flex items-center gap-1">
-            {/* Upload Invoice stays a labelled button rather than hiding in
-                  the menu: it is the one action the merchant is being asked
-                  to take, and burying it behind "…" would cost a click on the
-                  transactions that most need one. */}
+          // justify-end: this group sits flush with the right edge of the
+          // Actions column (the row's own trailing edge) rather than
+          // hugging the cell's left side — View details in particular is
+          // meant to read as a control anchored to the end of the row, not
+          // one more item drifting wherever the flex content happens to end.
+          <div className="flex items-center justify-end gap-1">
+            {/* "Take action" stays a labelled button rather than hiding in a
+                  menu: it is the one thing the merchant is being asked to do,
+                  and burying it behind "…" would cost a click on the
+                  transactions that most need one. No "…" menu on this row at
+                  all any more — Create Invoice/Link Invoice used to live
+                  there as a shortcut around the drawer, but both are now
+                  offered inside the drawer's own upload section (see
+                  UploadInvoiceForm), so there is nothing left for a menu on
+                  this row to hold, and one entry point to the same place is
+                  simpler than two. */}
             {isPendingInvoice ? (
               <span data-guide="mca-txn-upload-invoice" className="inline-flex">
                 <Button
@@ -351,33 +362,36 @@ export function buildMcaColumns(
                   }}
                   className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
                 >
-                  Upload Invoice
+                  Take action
                 </Button>
               </span>
             ) : (
-              /* Hidden until the row is hovered/focused, opacity-only (no
-                   display/width change) so revealing it never shifts the
-                   layout. Opens the same drawer a click anywhere else on the
-                   row does. */
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={<Icon name="eye" className="w-3 h-3" />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlers.onOpenDetails(row);
-                }}
-                className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-              >
-                View details
-              </Button>
-            )}
+              <>
+                {/* Direct icon button(s) — FIRC Download today — ahead of
+                    View details rather than behind a "…" menu. Always
+                    visible, unlike View details below: this is the row's own
+                    distinct action, not a secondary way to reach the same
+                    drawer. */}
+                {actions.length > 0 && <RowActionButtons actions={actions} />}
 
-            {/* The status-specific extras. On an invoice-pending row Upload
-                  Invoice is already the button above, so it only appears here
-                  when there is something else alongside it. */}
-            {actions.length > (isPendingInvoice ? 1 : 0) && (
-              <RowActionsMenu actions={isPendingInvoice ? actions.slice(1) : actions} />
+                {/* Hidden until the row is hovered/focused, opacity-only (no
+                     display/width change) so revealing it never shifts the
+                     layout. Opens the same drawer a click anywhere else on the
+                     row does. Plain text, no icon — the eye glyph read as one
+                     more action alongside FIRC Download rather than what it
+                     actually is, the row's own "open" control. */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlers.onOpenDetails(row);
+                  }}
+                  className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                >
+                  View details
+                </Button>
+              </>
             )}
           </div>
         );
@@ -393,6 +407,32 @@ export function buildMcaColumns(
       render: (row) => (
         <span className="text-[13px] text-muted-foreground whitespace-nowrap">
           {row.merchantId ?? "—"}
+        </span>
+      ),
+    });
+  }
+
+  // Settled tab only: on every other tab a row may not have settled yet, so
+  // "UTR Number" would be a column of dashes for most of the table. Spliced
+  // in right before Actions (cols.length - 1, not a fixed index, so it lands
+  // there whether or not Merchant ID was just inserted above).
+  //
+  // getMockUtrNumber is a deterministic placeholder derived from the gid —
+  // see its own doc comment in mock-data.ts — not a real UTR: no per-row UTR
+  // field exists anywhere in this codebase yet (checked McaTransaction, the
+  // timeline API, and the settlement-detail endpoint; the only real UTRs live
+  // on a different feature's batch-level settlement summary rows, with no key
+  // linking them back to an individual transaction). Same placeholder
+  // TransactionDetailsPage's own UTR number row already shows, so at least
+  // the two can't disagree with each other while this stays a mock.
+  if (isSettledTab) {
+    cols.splice(cols.length - 1, 0, {
+      key: "utrNumber",
+      header: "UTR Number",
+      minWidth: 170,
+      render: (row) => (
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {row.settlementDate ? getMockUtrNumber(row.gid) : "—"}
         </span>
       ),
     });
