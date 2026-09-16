@@ -12,6 +12,16 @@ import { BASE_URL_V1, BASE_URL_V3 } from "@/api";
 export const mcaVirtualAccountsApi = (merchantId: string) =>
   merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/ffms/virtualAccounts` : "";
 
+/**
+ * Provisions (creates) the merchant's Amazon virtual account.
+ *
+ * A merchant who has no `amazon` bucket in the virtual-accounts response has
+ * never been issued Amazon payout accounts; this is the call that issues them.
+ * Verbatim from pg-dashboard's getMcaAmazonProvisionUrl.
+ */
+export const mcaAmazonProvisionApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/ffms/virtualAccounts/amazon/provision` : "";
+
 /** Real-time exchange rates for one currency and amount. */
 export const mcaExchangeRatesApi = (merchantId: string, currency: string, amount: number) =>
   merchantId && currency

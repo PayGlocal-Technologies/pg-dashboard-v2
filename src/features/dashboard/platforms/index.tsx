@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
 import {
   Accordion,
@@ -27,12 +27,14 @@ import {
 } from "@/features/dashboard/multi-currency/utils";
 import {
   useNeedsMidSelection,
+  useProvisionAmazonAccount,
   useVirtualAccounts,
 } from "@/features/dashboard/multi-currency/hooks";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms/components/SettlementStatementDrawer";
 import { TransactionReportDrawer } from "@/features/dashboard/platforms/components/TransactionReportDrawer";
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
+import { AmazonProvisionCard } from "@/features/dashboard/platforms/components/AmazonProvisionCard";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
 import { SUPPORTED_PLATFORMS, accountsForPlatform } from "@/features/dashboard/platforms/constants";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
@@ -109,20 +111,21 @@ function PlatformsContent() {
   //
   // Both calls share one query key, so this is a single request read twice, not
   // two fetches.
-  const { accounts: amazonAccounts, isLoading: isLoadingAmazon } = useVirtualAccounts("amazon");
+  const {
+    accounts: amazonAccounts,
+    isFetched: isAmazonFetched,
+    refetch: refetchAccounts,
+  } = useVirtualAccounts("amazon");
   const { accounts: generalAccounts } = useVirtualAccounts("general");
 
-  // Amazon is offered only to merchants who actually hold Amazon payout
-  // accounts — the same `isAmazonAccountsPresent` gate pg-dashboard applies to
-  // its own platform list. Held back until the query resolves, so the row
-  // doesn't appear and then vanish while loading.
-  const platforms = useMemo(
-    () =>
-      isLoadingAmazon || amazonAccounts.length > 0
-        ? SUPPORTED_PLATFORMS
-        : SUPPORTED_PLATFORMS.filter((platform) => platform.id !== "amazon"),
-    [isLoadingAmazon, amazonAccounts.length]
-  );
+  const { provisionAmazonAccount, isProvisioning } = useProvisionAmazonAccount();
+
+  // Every platform is always listed, Amazon included. Production used to drop
+  // the Amazon row for a merchant with no Amazon payout accounts, which is
+  // exactly the merchant most likely to be looking for it; pg-dashboard's
+  // Amazon-provisioning change removed that filter and answers the state with a
+  // card instead (see isAmazonProvisionable below).
+  const platforms = SUPPORTED_PLATFORMS;
 
   // Exactly one platform is selected at all times — defaults to Amazon (the
   // first entry) so the steps and documents are populated on load, not only
@@ -130,6 +133,14 @@ function PlatformsContent() {
   const [selectedPlatformId, setSelectedPlatformId] = useState(platforms[0]?.id ?? "");
   const selectedPlatform =
     platforms.find((p) => p.id === selectedPlatformId) ?? platforms[0] ?? null;
+
+  // Amazon, selected, and the response carried no `amazon` bucket: the merchant
+  // has never been issued Amazon payout accounts, so the whole workflow is
+  // replaced by the offer to issue them. Gated on isFetched, so an in-flight
+  // request doesn't flash the provisioning card at a merchant who does hold
+  // accounts — and so a guest, whose query never runs at all, never sees it.
+  const isAmazonProvisionable =
+    selectedPlatform?.id === "amazon" && amazonAccounts.length === 0 && isAmazonFetched;
 
   // Which of the platform's receiving accounts the walkthrough is scoped to.
   //
@@ -377,7 +388,7 @@ function PlatformsContent() {
               mt-6 rather than a space-y on the column: the selector's two
               controls already carry their own mt-2 off the caption, so the
               spacing in here stays per-sibling. */}
-          {documents.length > 0 && (
+          {documents.length > 0 && !isAmazonProvisionable && (
             <section className="mt-6">
               {/* The same title step the workflow's own section titles use,
                   a step above the card metadata beneath it — deliberately
@@ -538,8 +549,19 @@ function PlatformsContent() {
             </div>
           </section>
 
-          {/* ─── 2. Account details ───────────────────────────────────── */}
-          {/* Supporting preparation, not a step: collapsed by default so it
+          {/* No Amazon payout accounts yet: neither the account details nor
+              the connect steps can say anything until one exists, so the
+              offer to create one takes the slot both of them would have.
+              This is pg-dashboard's own accountDetailsSection branch. */}
+          {isAmazonProvisionable ? (
+            <AmazonProvisionCard
+              onProvision={() => provisionAmazonAccount(refetchAccounts)}
+              isProvisioning={isProvisioning}
+            />
+          ) : (
+            <>
+              {/* ─── 2. Account details ───────────────────────────────────── */}
+              {/* Supporting preparation, not a step: collapsed by default so it
               costs a header's height until it's wanted. flux-ui's Accordion
               supplies the disclosure, the chevron and their alignment — the
               trigger is already `items-center justify-between`, so the title and
@@ -560,45 +582,45 @@ function PlatformsContent() {
               py-4 and the content's pb-4, which are the component's own. Card's
               default py-7 on top of those would double the padding around a
               collapsed row. */}
-          {selectedAccount && (
-            <Card size="sm" className="gap-0 px-7 py-0" data-guide="mca-account-details">
-              <Accordion type="single" collapsible>
-                <AccordionItem value="account-details" className="border-b-0">
-                  {/* Sized on the trigger rather than by wrapping the label in a
+              {selectedAccount && (
+                <Card size="sm" className="gap-0 px-7 py-0" data-guide="mca-account-details">
+                  <Accordion type="single" collapsible>
+                    <AccordionItem value="account-details" className="border-b-0">
+                      {/* Sized on the trigger rather than by wrapping the label in a
                       heading element: leaving the colour to the component is
                       what keeps its hover-to-primary state working — an inner
                       element setting text-foreground would block it. */}
-                  <AccordionTrigger className="text-base font-semibold">
-                    Account Details
-                  </AccordionTrigger>
-                  <AccordionContent>
-                    {/* Proximity does the grouping, not rules: 4px holds a label
+                      <AccordionTrigger className="text-base font-semibold">
+                        Account Details
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        {/* Proximity does the grouping, not rules: 4px holds a label
                         to its own value, the grid's own gaps separate one field
                         from the next, and no field carries padding of its own.
                         Three columns where the old 320px sidebar could only have
                         carried one — this column is wide enough to lay the
                         fields out the way the account card itself does, so the
                         two read as the same module. */}
-                    <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-                      {accountFields.map((field) => (
-                        <div key={field.label} className="min-w-0 space-y-1">
-                          <dt className={FIELD_LABEL}>{field.label}</dt>
-                          <dd className={FIELD_VALUE}>{field.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </Card>
-          )}
+                        <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
+                          {accountFields.map((field) => (
+                            <div key={field.label} className="min-w-0 space-y-1">
+                              <dt className={FIELD_LABEL}>{field.label}</dt>
+                              <dd className={FIELD_VALUE}>{field.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </Card>
+              )}
 
-          {/* ─── 3. Steps ────────────────────────────────────────────── */}
-          {/* The page's primary instructional content, and the only section
+              {/* ─── 3. Steps ────────────────────────────────────────────── */}
+              {/* The page's primary instructional content, and the only section
               carrying full-width art, which is what gives it the weight the two
               compact sections above it deliberately don't have. */}
-          <section>
-            {/* Step number → instruction → screenshot, in that order, every step
+              <section>
+                {/* Step number → instruction → screenshot, in that order, every step
                 the same shape so the sequence scans as one column. No "Steps"
                 heading — the numbered sequence reads as steps on its own.
 
@@ -606,26 +628,30 @@ function PlatformsContent() {
                 step's own parts sit far closer to each other than any step does
                 to the next, which is what gives the sequence its rhythm rather
                 than reading as six evenly spaced blocks. */}
-            <ol className="space-y-8">
-              {selectedPlatform.steps.map((step, index) => (
-                <li key={step.instruction}>
-                  {/* The number is a marker, not a title: smallest size, muted,
+                <ol className="space-y-8">
+                  {selectedPlatform.steps.map((step, index) => (
+                    <li key={step.instruction}>
+                      {/* The number is a marker, not a title: smallest size, muted,
                       medium weight so it still reads as a label. The instruction
                       above it in both size and colour is what makes the
                       instruction the step's own strongest element. */}
-                  <p className="text-[12px] font-medium text-muted-foreground">Step {index + 1}</p>
-                  <p className="mt-1 text-[15px] font-medium text-foreground">{step.instruction}</p>
+                      <p className="text-[12px] font-medium text-muted-foreground">
+                        Step {index + 1}
+                      </p>
+                      <p className="mt-1 text-[15px] font-medium text-foreground">
+                        {step.instruction}
+                      </p>
 
-                  {/* Caveat, not instruction: muted and a size down so it reads
+                      {/* Caveat, not instruction: muted and a size down so it reads
                       as an aside rather than another thing to do. Same "Note:"
                       prefix pg-dashboard's own step timeline uses. */}
-                  {step.note && (
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      <span className="font-medium">Note:</span> {step.note}
-                    </p>
-                  )}
+                      {step.note && (
+                        <p className="mt-1 text-[13px] text-muted-foreground">
+                          <span className="font-medium">Note:</span> {step.note}
+                        </p>
+                      )}
 
-                  {/* Quick Access — the identifiers this step asks the merchant
+                      {/* Quick Access — the identifiers this step asks the merchant
                       to type into the platform, sat between the instruction that
                       names them and the screenshot showing where they go, so
                       they're on screen at the moment they're needed rather than
@@ -641,34 +667,36 @@ function PlatformsContent() {
                       into generic ones that would be wrong on half the rails.
                       They follow the currency selector above, so switching
                       currency reprints these values. */}
-                  {step.quickAccess && selectedAccount && (
-                    <Card
-                      size="sm"
-                      className="mt-3 flex-row flex-wrap items-center justify-between gap-x-8 gap-y-4 p-6"
-                    >
-                      <p className="text-[15px] font-semibold text-foreground">Quick access</p>
+                      {step.quickAccess && selectedAccount && (
+                        <Card
+                          size="sm"
+                          className="mt-3 flex-row flex-wrap items-center justify-between gap-x-8 gap-y-4 p-6"
+                        >
+                          <p className="text-[15px] font-semibold text-foreground">Quick access</p>
 
-                      <dl className="flex flex-wrap items-start gap-x-6 gap-y-4">
-                        {selectedAccount.details.map((field) => (
-                          <div key={field.label} className="min-w-0 space-y-1.5">
-                            <dt className="text-[12px] text-muted-foreground">{field.label}:</dt>
-                            <dd>
-                              {/* The product's own copyable field, sat on a
+                          <dl className="flex flex-wrap items-start gap-x-6 gap-y-4">
+                            {selectedAccount.details.map((field) => (
+                              <div key={field.label} className="min-w-0 space-y-1.5">
+                                <dt className="text-[12px] text-muted-foreground">
+                                  {field.label}:
+                                </dt>
+                                <dd>
+                                  {/* The product's own copyable field, sat on a
                                   bordered surface so it reads as an input-shaped
                                   chip. */}
-                              <CopyableText
-                                value={field.value}
-                                className="rounded-lg border border-border px-3 py-1.5"
-                                valueClassName="font-medium"
-                              />
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </Card>
-                  )}
+                                  <CopyableText
+                                    value={field.value}
+                                    className="rounded-lg border border-border px-3 py-1.5"
+                                    valueClassName="font-medium"
+                                  />
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </Card>
+                      )}
 
-                  {/* pg-dashboard's own frame for these (StyledImageCard in its
+                      {/* pg-dashboard's own frame for these (StyledImageCard in its
                       platform-withdrawals styles) minus the border: a fixed
                       515x265 box with a 10px radius, clipped content and no
                       padding, with the image filling it edge to edge.
@@ -680,21 +708,23 @@ function PlatformsContent() {
                       these captures carry a frame in the artwork itself and one
                       added here would double up on exactly those. overflow-hidden
                       stays: it is what clips the image to the rounded corners. */}
-                  {step.screenshotSrc && (
-                    <div className="mt-3 aspect-[515/265] w-full overflow-hidden rounded-[10px]">
-                      <Image
-                        src={step.screenshotSrc}
-                        alt={step.screenshotAlt ?? ""}
-                        width={515}
-                        height={265}
-                        className="h-full w-full"
-                      />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </section>
+                      {step.screenshotSrc && (
+                        <div className="mt-3 aspect-[515/265] w-full overflow-hidden rounded-[10px]">
+                          <Image
+                            src={step.screenshotSrc}
+                            alt={step.screenshotAlt ?? ""}
+                            width={515}
+                            height={265}
+                            className="h-full w-full"
+                          />
+                        </div>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            </>
+          )}
         </div>
       </div>
 

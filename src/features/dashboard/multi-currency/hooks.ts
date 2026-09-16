@@ -10,6 +10,7 @@ import {
   amzAccountStatementApi,
   amzAccountStatementPollApi,
   mcaAccountConfirmationApi,
+  mcaAmazonProvisionApi,
   mcaBankStatementApi,
   mcaExchangeRatesApi,
   mcaGeneratedFileApi,
@@ -76,16 +77,29 @@ export function useVirtualAccounts(bucket: AccountBucket): {
   accounts: VirtualAccount[];
   isLoading: boolean;
   isError: boolean;
+  /** True only once the request has actually come back. A surface that reacts
+   *  to an *absent* bucket (no Amazon accounts, say) has to wait for this —
+   *  before it, "no accounts" is indistinguishable from "not asked yet". */
+  isFetched: boolean;
+  /** Re-reads both buckets. Both callers share one query key, so this refreshes
+   *  the page's whole account picture, not just this bucket. */
+  refetch: () => void;
 } {
   const merchantId = useMcaMerchantId();
   const isGuestUser = useApp((s) => s.isGuestUser);
   const enabled = !!merchantId && isGuestUser === false;
 
-  const { data, isPending, isError } = useGet<AccountDataResponse>(
+  const { data, isPending, isError, isFetched, refetch } = useGet<AccountDataResponse>(
     ["mca-virtual-accounts", merchantId],
     mcaVirtualAccountsApi(merchantId),
     { enabled }
   );
+
+  // Wrapped so callers get a plain `() => void` they can hand to an onSuccess
+  // without having to swallow the promise react-query's own refetch returns.
+  const refetchAccounts = useCallback(() => {
+    void refetch();
+  }, [refetch]);
 
   return {
     accounts: toViewAccounts(data?.data?.[bucket]),
@@ -93,7 +107,55 @@ export function useVirtualAccounts(bucket: AccountBucket): {
     // would report a permanent skeleton for a guest user.
     isLoading: enabled && isPending,
     isError,
+    // Same guard: a disabled query reports isFetched false forever, and that is
+    // the honest answer — nothing has been read for this user.
+    isFetched: enabled && isFetched,
+    refetch: refetchAccounts,
   };
+}
+
+/**
+ * Issues the merchant's Amazon virtual accounts.
+ *
+ * Mirrors pg-dashboard's useProvisionAmazonAccount. A merchant whose
+ * virtual-accounts response carries no `amazon` bucket has never been given
+ * Amazon payout accounts; this POST creates them. The accounts don't appear in
+ * the response instantly, so the success copy says "shortly" and the caller
+ * re-reads the accounts rather than this hook assuming they're there.
+ */
+export function useProvisionAmazonAccount(): {
+  provisionAmazonAccount: (onProvisioned: () => void) => void;
+  isProvisioning: boolean;
+} {
+  const merchantId = useMcaMerchantId();
+  const { mutate, isPending } = usePost<unknown, Record<string, never>>(
+    mcaAmazonProvisionApi(merchantId),
+    { invalidateQueries: false }
+  );
+
+  const provisionAmazonAccount = useCallback(
+    (onProvisioned: () => void) => {
+      if (!merchantId) return;
+      mutate(
+        {},
+        {
+          onSuccess: () => {
+            toast.success(
+              "Your Amazon virtual account is ready. Account details will appear shortly."
+            );
+            onProvisioned();
+          },
+          onError: () =>
+            toast.error(
+              "We couldn't set up your Amazon account right now. Please try again in a few minutes."
+            ),
+        }
+      );
+    },
+    [merchantId, mutate]
+  );
+
+  return { provisionAmazonAccount, isProvisioning: isPending };
 }
 
 /**
