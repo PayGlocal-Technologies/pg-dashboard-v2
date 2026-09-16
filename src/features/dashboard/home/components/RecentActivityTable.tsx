@@ -7,13 +7,11 @@ import { useRouter } from "next/navigation";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import {
   Button,
-  Card,
-  DataTable,
+  DataTableCard,
   type Column,
   Tabs,
   TabsList,
   TabsTrigger,
-  TabsContent,
   StatusBadge,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -250,80 +248,80 @@ export function RecentActivityTable({
   const router = useRouter();
   const [tab, setTab] = useState<"transactions" | "settlements">("transactions");
 
-  return (
-    <Card className="overflow-hidden p-0">
-      {/* Card header */}
-      <div className="flex items-center justify-between px-6 pb-0 pt-5">
-        <h3 className="text-[15px] font-semibold text-foreground">Recent Activity</h3>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
-          onClick={() =>
-            router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-report")
-          }
-          // rightIcon={<Icon name="arrow-right" className="h-3 w-3" aria-hidden />}
-        >
-          View all
-        </Button>
-      </div>
-
+  // Title row and tab strip are the same on both tabs; only the grid under them
+  // changes. They are spread onto whichever DataTableCard the tab selects, so
+  // the two branches cannot drift apart.
+  const shell = {
+    title: "Recent Activity",
+    actions: (
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
+        onClick={() =>
+          router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-report")
+        }
+      >
+        View all
+      </Button>
+    ),
+    tabs: (
       <Tabs value={tab} onValueChange={(v) => setTab(v as "transactions" | "settlements")}>
-        <div className="px-6 pt-4">
-          <TabsList className="h-8">
-            <TabsTrigger value="transactions" className="h-7 px-3 text-[13px]">
-              Transactions
-            </TabsTrigger>
-            <TabsTrigger value="settlements" className="h-7 px-3 text-[13px]">
-              Settlements
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="transactions" className="mt-3">
-          {!isLoading && transactions.length === 0 ? (
-            <PlaceholderState
-              variant="no-transactions"
-              size="sm"
-              title="No recent transactions"
-              className="border-t border-border py-12"
-            />
-          ) : (
-            <DataTable<RecentTransaction>
-              columns={transactionColumns}
-              data={transactions.slice(0, 7)}
-              rowKey={(row) => row.id}
-              isLoading={isLoading}
-              skeletonRows={7}
-              className="rounded-none border-0 border-t border-border"
-              emptyTitle="No recent transactions"
-              rowAction={rowActionButton("View details")}
-            />
-          )}
-        </TabsContent>
-
-        <TabsContent value="settlements" className="mt-3">
-          {!isLoading && settlements.length === 0 ? (
-            <PlaceholderState
-              variant="no-settlements"
-              size="sm"
-              title="No recent settlements"
-              className="border-t border-border py-12"
-            />
-          ) : (
-            <DataTable<RecentSettlement>
-              columns={settlementColumns}
-              data={settlements}
-              rowKey={(row) => row.id}
-              isLoading={isLoading}
-              skeletonRows={4}
-              className="rounded-none border-0 border-t border-border"
-              emptyTitle="No recent settlements"
-              rowAction={rowActionButton("View report")}
-            />
-          )}
-        </TabsContent>
+        <TabsList className="h-8">
+          <TabsTrigger value="transactions" className="h-7 px-3 text-[13px]">
+            Transactions
+          </TabsTrigger>
+          <TabsTrigger value="settlements" className="h-7 px-3 text-[13px]">
+            Settlements
+          </TabsTrigger>
+        </TabsList>
       </Tabs>
-    </Card>
+    ),
+    // A home-page widget sits above the fold with a handful of rows; capping and
+    // scrolling it internally would only hide rows the page already has room for.
+    maxBodyHeight: "none",
+    // The widget is a fixed-length preview, not a browsable grid — "View all" is
+    // what leads to the paged table.
+    pagination: { mode: "none" },
+  } as const;
+
+  return tab === "transactions" ? (
+    <DataTableCard<RecentTransaction>
+      {...shell}
+      columns={transactionColumns}
+      data={transactions.slice(0, 7)}
+      rowKey={(row) => row.id}
+      isLoading={isLoading}
+      skeletonRows={7}
+      emptyTitle="No recent transactions"
+      emptyState={
+        <PlaceholderState
+          variant="no-transactions"
+          size="sm"
+          title="No recent transactions"
+          className="py-12"
+        />
+      }
+      rowAction={rowActionButton("View details")}
+    />
+  ) : (
+    <DataTableCard<RecentSettlement>
+      {...shell}
+      columns={settlementColumns}
+      data={settlements}
+      rowKey={(row) => row.id}
+      isLoading={isLoading}
+      skeletonRows={4}
+      emptyTitle="No recent settlements"
+      emptyState={
+        <PlaceholderState
+          variant="no-settlements"
+          size="sm"
+          title="No recent settlements"
+          className="py-12"
+        />
+      }
+      rowAction={rowActionButton("View report")}
+    />
   );
 }

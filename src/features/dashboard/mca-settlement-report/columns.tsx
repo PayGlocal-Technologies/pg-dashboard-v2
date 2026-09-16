@@ -4,7 +4,7 @@ import { CopyableCell } from "@/components/common/CopyableCell";
 import type { SettlementRow } from "@/features/dashboard/mca-settlement-report/types";
 
 // Every reorderable/hideable data column lives here, keyed so
-// TransactionColumnsMenu (reused as-is from the transactions feature) can
+// ColumnManager can
 // toggle visibility and reorder independently of the trailing rowAction
 // space, which isn't a real column.
 /**
@@ -26,7 +26,7 @@ export function settlementColumnDefs(showMerchantId: boolean): { key: string; la
     // The date leads and stays put: it IS the settlement's identity now that
     // settlements have no id, so a row with it hidden or buried mid-table
     // cannot be read. Pinned via SETTLEMENT_LOCKED_COLUMN, which the caller
-    // hands to ReorderColumnsPopover as fixedKeys.
+    // hands to ColumnManager as fixedKeys.
     { key: "date", label: "Date" },
     { key: "amount", label: "Amount" },
     { key: "transactionCount", label: "Transactions" },

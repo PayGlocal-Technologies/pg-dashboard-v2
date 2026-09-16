@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react";
 import type { QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Button, Card, DataTable, PageHeader } from "@/components/ui";
+import { Button, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { FilterChipGroup } from "@/components/common/filters/FilterChips";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
@@ -200,86 +201,83 @@ export function TeamManagementFeature() {
         }
       />
 
-      <Card className="gap-0 overflow-hidden p-0">
-        <div className="pl-5 pr-3 pb-3 pt-5">
-          <div className="space-y-3">
-            <SegmentedTabs
-              options={TEAM_STATUS_FILTERS}
-              value={statusFilter}
-              onChange={onStatusFilter}
+      <DataTableCard<TeamMemberRow>
+        tabs={
+          <SegmentedTabs
+            options={TEAM_STATUS_FILTERS}
+            value={statusFilter}
+            onChange={onStatusFilter}
+          />
+        }
+        toolbar={
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <RotatingSearchInput
+              value={search}
+              onSearch={onSearch}
+              words={["name", "username", "email"]}
+              className="min-w-40 max-w-xs flex-1"
             />
 
-            <div className="border-t border-border pt-3 flex items-center gap-2.5 flex-wrap">
-              <RotatingSearchInput
-                value={search}
-                onSearch={onSearch}
-                words={["name", "username", "email"]}
-                className="min-w-40 max-w-xs flex-1"
+            <div className="hidden sm:block h-4 w-px bg-border" />
+
+            <FilterChipGroup className="flex items-center gap-2 flex-wrap">
+              <MultiSelectChipFilter
+                value={roleFilter}
+                options={roleOptions}
+                onChange={setRoleFilter}
+                placeholder="Role"
               />
-
-              <div className="hidden sm:block h-4 w-px bg-border" />
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <MultiSelectChipFilter
-                  value={roleFilter}
-                  options={roleOptions}
-                  onChange={setRoleFilter}
-                  placeholder="Role"
-                />
+            </FilterChipGroup>
+          </div>
+        }
+        errorState={
+          isError ? (
+            <div className="flex flex-col items-center gap-3 p-10 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
+                <Icon name="alert-circle" size={22} />
+              </span>
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Couldn&apos;t load team members
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Something went wrong while fetching data.
+                </p>
               </div>
-
+              <Button variant="outline" size="sm" onClick={() => void refetch()}>
+                Retry
+              </Button>
             </div>
-          </div>
-        </div>
-
-        {isError ? (
-          <div className="flex flex-col items-center gap-3 border-t border-border p-10 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
-              <Icon name="alert-circle" size={22} />
-            </span>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">
-                Couldn&apos;t load team members
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Something went wrong while fetching data.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => void refetch()}>
-              Retry
-            </Button>
-          </div>
-        ) : !isPending && filteredRows.length === 0 ? (
+          ) : undefined
+        }
+        emptyState={
           <PlaceholderState
             variant="no-data"
             title="No team members found"
             description="Try adjusting your filters or search query"
-            className="border-t border-border py-16"
+            className="py-16"
           />
-        ) : (
-          <DataTable
-            columns={teamMemberColumns}
-            data={filteredRows}
-            isLoading={isPending}
-            skeletonRows={8}
-            emptyTitle="No team members found"
-            emptyDescription="Try adjusting your filters or search query"
-            rowKey={(row) => row.id}
-            pageSize={TEAM_MEMBERS_PAGE_LIMIT}
-            density="compact"
-            tableLayout="content"
-            className="rounded-none border-0 border-t border-border"
-            rowAction={(row) => (
-              <TeamMemberRowActions
-                row={row}
-                onDeactivate={setDeactivatingRow}
-                onReactivate={reactivate}
-                onResend={resend}
-              />
-            )}
+        }
+        columns={teamMemberColumns}
+        data={filteredRows}
+        isLoading={isPending}
+        emptyTitle="No team members found"
+        emptyDescription="Try adjusting your filters or search query"
+        rowKey={(row) => row.id}
+        pagination={{
+          mode: "client",
+          pageSize: TEAM_MEMBERS_PAGE_LIMIT,
+        }}
+        maxBodyHeight="none"
+        rowAction={(row) => (
+          <TeamMemberRowActions
+            row={row}
+            onDeactivate={setDeactivatingRow}
+            onReactivate={reactivate}
+            onResend={resend}
           />
         )}
-      </Card>
+      />
 
       <AddTeamMemberModal
         open={addOpen}

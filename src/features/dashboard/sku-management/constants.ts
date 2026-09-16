@@ -1,7 +1,10 @@
 import type { SkuCurrency, SkuProductType } from "@/features/dashboard/sku-management/types";
 
-/** Rows per page — matches TRANSACTIONS_PAGE_LIMIT so both tables page alike. */
+/** Default rows per page — matches TRANSACTIONS_PAGE_LIMIT so both tables page alike. */
 export const SKU_PAGE_LIMIT = 10;
+
+/** What the catalogue footer offers for rows per page. */
+export const SKU_PAGE_SIZE_OPTIONS = [5, 10, 20] as const;
 
 /**
  * Runtime list of the SkuCurrency union — the same seven the merchant holds

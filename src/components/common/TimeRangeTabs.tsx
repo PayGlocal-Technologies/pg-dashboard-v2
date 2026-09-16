@@ -1,38 +1,22 @@
 "use client";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Tabs,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui";
+import { SegmentedTabs, type SegmentedTabOption } from "@/components/ui";
 
-export interface TimeRangeOption<T extends string = string> {
-  value: T;
-  label: string;
-}
+export type TimeRangeOption<T extends string = string> = SegmentedTabOption<T>;
 
 /**
- * The compact time-range control a summary or analytics block is scoped by.
+ * The compact time-range control a summary or analytics block is scoped by:
+ * tabs from `md` up, a `Select` below.
  *
- * Deliberately a different component from `UnderlineTabs`, which is the
- * page-level tab bar (sliding indicator, full-width row, the thing that
- * segments a table into views). This is the small right-aligned strip that says
- * *which period* the figures beside it describe. Two jobs, two components, so a
- * page can show both without the reader having to work out which tab row
- * governs what.
+ * Deliberately not `UnderlineTabs`, which is the page-level bar that segments a
+ * table into views. This is the small right-aligned strip saying *which period*
+ * the figures beside it describe. Two jobs, two components, so a page can show
+ * both without the reader having to work out which row governs what.
  *
- * Shared rather than reimplemented per feature: Transactions and Invoice
- * management both have one of these, and a DQA pass found them rendered as tabs
- * in one place and a dropdown in the other. One component is what keeps that
- * from happening again.
- *
- * Tabs at md and up, a Select below it. Both drive the same state, so resizing
- * mid-session never leaves the two disagreeing about which period is selected.
+ * The implementation is flux's `SegmentedTabs` — pg-internal-v2 had ported this
+ * exact component under that name, so flux now carries one of it. This stays as
+ * a named wrapper because "TimeRangeTabs" is what the call sites here ask for,
+ * and the name says which of the two strips on a page this is.
  */
 export function TimeRangeTabs<T extends string>({
   options,
@@ -43,49 +27,9 @@ export function TimeRangeTabs<T extends string>({
   options: readonly TimeRangeOption<T>[];
   value: T;
   onValueChange: (value: T) => void;
-  /** Accessible name for both controls. */
   label?: string;
 }) {
   return (
-    <>
-      <Tabs
-        value={value}
-        onValueChange={(next) => onValueChange(next as T)}
-        className="hidden md:block"
-      >
-        {/* Plain underlined triggers, not flux Tabs' own pill/segmented look:
-            no container background, border or padding, a gap row of triggers,
-            each just an underline and a colour change when active. Still Radix
-            Tabs underneath (keyboard nav, aria-selected, the works) — only the
-            className overrides differ. */}
-        <TabsList
-          aria-label={label}
-          className="h-auto gap-4 rounded-none border-0 bg-transparent p-0"
-        >
-          {options.map((option) => (
-            <TabsTrigger
-              key={option.value}
-              value={option.value}
-              className="rounded-none border-b-2 border-transparent px-0 py-1 text-[13px] font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:shadow-none"
-            >
-              {option.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
-
-      <Select value={value} onValueChange={(next) => onValueChange(next as T)}>
-        <SelectTrigger className="h-8 w-[9.5rem] md:hidden" aria-label={label}>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </>
+    <SegmentedTabs options={options} value={value} onValueChange={onValueChange} label={label} />
   );
 }

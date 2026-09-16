@@ -1,3 +1,31 @@
+import {
+  formatDateOnly,
+  formatDateStamp,
+  formatDateTime,
+  formatTimestamp,
+  parseApiDate,
+} from "@payglocal_ui/flux-ui";
+
+/**
+ * The canonical date/time formatters, re-exported from flux-ui so a feature
+ * imports them from the same place as every other formatter here rather than
+ * reaching into the design system directly.
+ *
+ * `formatTimestamp` is the one to reach for in a column renderer or a detail
+ * field: it takes whatever shape the endpoint sends — `DD/MM/YYYY HH:mm:ss`,
+ * ISO 8601, or epoch millis as a number or a string — and returns
+ * `27 Jul '26, 09:49 AM`, or an em dash when there is nothing to show.
+ */
+export {
+  formatDateTime,
+  formatDateOnly,
+  formatDateStamp,
+  formatTimestamp,
+  formatTime,
+  formatTimeStamp,
+  parseApiDate,
+} from "@payglocal_ui/flux-ui";
+
 // The app's month and day names, spelled out rather than read from Intl.
 //
 // Every date this app renders is built from these four tables, and none of them
@@ -420,18 +448,14 @@ export function parseApiDateTime(display: string | null | undefined): Date | nul
 }
 
 /**
- * The single transaction timestamp format used across the Transactions
- * table and the Transaction Details page, e.g. "24 Jul '26, 03:32 PM".
+ * The app-wide date-and-time format, e.g. "27 Jul '26, 09:49 AM".
+ *
+ * The implementation lives in flux-ui, so this app, pg-internal-v2 and any
+ * future one print a timestamp identically — the two `format.ts` files used to
+ * carry a byte-identical copy each, which is a drift waiting to happen. The
+ * names here stay as they were, because they are what every call site imports.
  */
-export function formatTransactionDateTime(date: Date): string {
-  const hours24 = date.getHours();
-  const hours12 = hours24 % 12 || 12;
-  const ampm = hours24 >= 12 ? "PM" : "AM";
-  const yy = String(date.getFullYear() % 100).padStart(2, "0");
-  const hh = String(hours12).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}, ${hh}:${min} ${ampm}`;
-}
+export const formatTransactionDateTime = formatDateTime;
 
 /**
  * Reformats a transaction timestamp into formatTransactionDateTime's display
@@ -443,23 +467,16 @@ export function formatTransactionDateTime(date: Date): string {
  */
 export function formatTransactionTimestamp(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
-  return parsed ? formatTransactionDateTime(parsed) : raw;
-}
-
-function parseIsoDateTime(raw: string): Date | null {
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
+  // Falls back to the raw string rather than an em dash: a shape the parser
+  // does not know is worth showing, because it is a bug report.
+  return parseApiDate(raw) ? formatTimestamp(raw) : raw;
 }
 
 /**
- * Date-only variant of formatTransactionDateTime, e.g. "24 Jul '26" — same
+ * Date-only variant of formatTransactionDateTime, e.g. "27 Jul '26" — same
  * day/month/year formatting, no time-of-day portion.
  */
-export function formatTransactionDate(date: Date): string {
-  const yy = String(date.getFullYear() % 100).padStart(2, "0");
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}`;
-}
+export const formatTransactionDate = formatDateOnly;
 
 /**
  * Reformats a transaction timestamp into formatTransactionDate's date-only
@@ -469,8 +486,7 @@ export function formatTransactionDate(date: Date): string {
  */
 export function formatTransactionDateOnly(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
-  return parsed ? formatTransactionDate(parsed) : raw;
+  return parseApiDate(raw) ? formatDateStamp(raw) : raw;
 }
 
 /**
@@ -520,7 +536,7 @@ export function formatEpochDate(value: string | number | null | undefined, fallb
  */
 export function formatNextSettlementDate(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  const parsed = parseApiDate(raw);
   if (!parsed) return raw;
   const day = parsed.getDate();
   return `${DAYS_SHORT[parsed.getDay()]}, ${day}${ordinalSuffix(day)} ${MONTHS_SHORT[parsed.getMonth()]}`;

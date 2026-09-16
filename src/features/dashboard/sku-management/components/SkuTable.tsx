@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, DataTable, EmptyState } from "@/components/ui";
+import { Button, DataCardList, DataTableCard, EmptyState } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
@@ -10,13 +10,17 @@ import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { SkuCardList } from "@/features/dashboard/sku-management/components/SkuCardList";
+import {
+  SkuCard,
+  SkuCardSkeleton,
+} from "@/features/dashboard/sku-management/components/SkuCardList";
 import { ProductPreviewModal } from "@/features/dashboard/sku-management/components/ProductPreviewModal";
 import { SkuRowActions } from "@/features/dashboard/sku-management/components/SkuRowActions";
 import { DeleteSkuDialog } from "@/features/dashboard/sku-management/components/DeleteSkuDialog";
 import { DuplicateSkuDialog } from "@/features/dashboard/sku-management/components/DuplicateSkuDialog";
 import {
   SKU_PAGE_LIMIT,
+  SKU_PAGE_SIZE_OPTIONS,
   SKU_SEARCH_HINTS,
   SKU_TAB_TYPE,
   SKU_VIEW_TABS,
@@ -72,6 +76,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   const [tab, setTab] = useState<SkuViewTab>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(SKU_PAGE_LIMIT);
 
   // The product being previewed, or null. Holds the product rather than an id
   // so the modal can never render a stale row while it animates closed.
@@ -97,6 +102,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
     // "don't narrow" instead of "narrow to everything".
     type: tab === "goods" || tab === "services" ? SKU_TAB_TYPE[tab] : undefined,
     page,
+    pageLimit: pageSize,
   });
 
   // Only true when several PACB MIDs are in play and none is selected — see
@@ -217,49 +223,105 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   const emptyTitle = "No products found";
   const emptyDescription = "Try a different search or switch tabs";
 
+  // Tabs and toolbar are written once and mounted on both surfaces: the card
+  // for lg+, and the bordered wrapper below it for narrower viewports. Only one
+  // is ever visible, so a merchant sees one tab bar and one search box.
+  const tabBar = <UnderlineTabs tabs={SKU_VIEW_TABS} value={tab} onValueChange={onTabChange} />;
+
+  // Search and refresh — no Report, no Reorder Columns, no filter chips.
+  const controls = (
+    <div className="flex items-center gap-2">
+      <RotatingSearchInput
+        value={search}
+        onSearch={onSearch}
+        words={SKU_SEARCH_HINTS}
+        ariaLabel="Search products by name or HSN/SAC"
+        className="w-full sm:w-56"
+      />
+
+      {/* Every mutation already invalidates the catalogue, so this is for
+          changes made elsewhere — another tab, or another member of the team.
+          Spinning the glyph on isFetching (not isLoading) is what makes a
+          press over existing rows visibly do something. */}
+      {/* Same outline treatment and compact height as the Refresh on every
+          other table toolbar (Transactions, Invoices, Settlements). It was a
+          ghost button here, which read as a different control. */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="Refresh products"
+        isLoading={false}
+        disabled={isFetching}
+        leftIcon={
+          <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+        }
+        onClick={refetch}
+        className="ml-auto h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+      >
+        Refresh
+      </Button>
+    </div>
+  );
+
+  // Two stand-ins for an empty grid. The first run offers the two ways to put
+  // something in the catalogue; every other empty result is a query or tab that
+  // matched nothing, and only wants to be told to widen it.
+  const emptyState = isFirstRun ? (
+    <EmptyState
+      title="No items yet"
+      description="Add items to your catalog to pull them into invoices."
+      action={
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+            onClick={onImport}
+          >
+            Import from a file
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+            onClick={() => onAddItemOpenChange(true)}
+          >
+            Add item
+          </Button>
+        </div>
+      }
+      className="py-12"
+    />
+  ) : (
+    <PlaceholderState
+      variant="no-data"
+      title={emptyTitle}
+      description={emptyDescription}
+      className="py-16"
+    />
+  );
+
+  const pagination = {
+    mode: "page",
+    page,
+    pageSize,
+    total: totalCount,
+    onPageChange: setPage,
+    pageSizeOptions: SKU_PAGE_SIZE_OPTIONS,
+    // Back to the first page on a size change: page 4 of a 10-per-page list is
+    // past the end of the same list at 20 per page, and the server would answer
+    // an offset beyond the data with nothing at all.
+    onPageSizeChange: (next: number) => {
+      setPageSize(next);
+      setPage(1);
+    },
+  } as const;
+
   return (
-    // Tab bar, search, and the table share one bordered surface, matching the
-    // Transactions page: DataTable's own border/radius are neutralised
-    // (rounded-none border-0) since this wrapper draws them, and a border-b
-    // under each control row stands in for the separators between them.
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      {/* Three tabs, one selected view: the whole catalogue, or one product
-          type. */}
-      <div className="border-b border-border px-4 pt-3">
-        <UnderlineTabs tabs={SKU_VIEW_TABS} value={tab} onValueChange={onTabChange} />
-      </div>
-
-      {/* Search and refresh — no Report, no Reorder Columns, no filter chips. */}
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
-        <RotatingSearchInput
-          value={search}
-          onSearch={onSearch}
-          words={SKU_SEARCH_HINTS}
-          ariaLabel="Search products by name or HSN/SAC"
-          className="w-full sm:w-56"
-        />
-
-        {/* Every mutation already invalidates the catalogue, so this is for
-            changes made elsewhere — another tab, or another member of the team.
-            Spinning the glyph on isFetching (not isLoading) is what makes a
-            press over existing rows visibly do something. */}
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-label="Refresh products"
-          isLoading={false}
-          disabled={isFetching}
-          leftIcon={
-            <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-          }
-          onClick={refetch}
-          className="ml-auto shrink-0"
-        >
-          Refresh
-        </Button>
-      </div>
-
+    <>
       {/* Desktop (lg+): the full table. The overflow menu rides `rowAction`,
           not a column — DataTable renders that slot in a zero-width cell stuck
           to the right edge of the viewport. That's what keeps it pinned right
@@ -275,87 +337,48 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
           that zero-width cell, and the descendant selector outranks the bare
           `opacity-0` class without needing !important. z-[2] lifts it above
           the row's own cells so it always paints on top. */}
-      {isFirstRun ? (
-        <EmptyState
-          title="No items yet"
-          description="Add items to your catalog to pull them into invoices."
-          action={
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
-                onClick={onImport}
-              >
-                Import from a file
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-                onClick={() => onAddItemOpenChange(true)}
-              >
-                Add item
-              </Button>
-            </div>
-          }
-          className="py-12"
-        />
-      ) : (
-        <>
-          {!isLoading && products.length === 0 ? (
-            <PlaceholderState
-              variant="no-data"
-              title={emptyTitle}
-              description={emptyDescription}
-              className="hidden py-16 lg:flex"
-            />
-          ) : (
-            <DataTable
-              className={cn(
-                "hidden rounded-none border-0 lg:block",
-                "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
-              )}
-              columns={columns}
-              data={products}
-              isLoading={isLoading}
-              emptyTitle={emptyTitle}
-              emptyDescription={emptyDescription}
-              rowKey={(row) => row.id}
-              // The whole row opens the product preview, through DataTable's
-              // row-level handler rather than a wrapper inside every cell.
-              // Clicks on the row's own controls (the two price editors, the
-              // overflow menu) are skipped by it, so each still does only its
-              // own job.
-              onRowClick={setPreviewProduct}
-              rowAction={renderRowActions}
-              pageSize={SKU_PAGE_LIMIT}
-              totalRows={totalCount}
-              page={page}
-              onPageChange={setPage}
-              tableLayout="content"
-              density="compact"
-            />
-          )}
+      <DataTableCard<SkuProduct>
+        className="hidden lg:block [&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+        tabs={tabBar}
+        toolbar={controls}
+        columns={columns}
+        data={products}
+        isLoading={isLoading}
+        rowKey={(row) => row.id}
+        emptyTitle={emptyTitle}
+        emptyDescription={emptyDescription}
+        emptyState={emptyState}
+        // The whole row opens the product preview, through DataTable's
+        // row-level handler rather than a wrapper inside every cell.
+        // Clicks on the row's own controls (the two price editors, the
+        // overflow menu) are skipped by it, so each still does only its
+        // own job.
+        onRowClick={setPreviewProduct}
+        rowAction={renderRowActions}
+        pagination={pagination}
+        maxBodyHeight="none"
+      />
 
-          {/* Tablet + mobile (below lg): the same page's rows as cards. */}
-          <SkuCardList
-            className="lg:hidden"
-            rows={products}
-            isLoading={isLoading}
-            rowAction={renderRowActions}
-            onPreview={setPreviewProduct}
-            page={page}
-            onPageChange={setPage}
-            totalRows={totalCount}
-            pageSize={SKU_PAGE_LIMIT}
-            emptyTitle={emptyTitle}
-            emptyDescription={emptyDescription}
-          />
-        </>
-      )}
+      {/* Tablet + mobile (below lg): the same page's rows as cards, on the same
+          bordered surface the card gives the table. */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+        <div className="border-b border-border px-4 pt-3">{tabBar}</div>
+        <div className="border-b border-border px-4 py-3">{controls}</div>
+        <DataCardList<SkuProduct>
+          bordered={false}
+          rows={products}
+          rowKey={(row) => row.id}
+          isLoading={isLoading}
+          renderCard={(row) => (
+            <SkuCard row={row} actions={renderRowActions(row)} onPreview={setPreviewProduct} />
+          )}
+          renderSkeleton={() => <SkuCardSkeleton />}
+          emptyTitle={emptyTitle}
+          emptyDescription={emptyDescription}
+          emptyState={emptyState}
+          pagination={pagination}
+        />
+      </div>
 
       {/* Read-only. Deliberately carries no actions — Edit, Duplicate, and
           Delete stay on the row's overflow menu, so there's one home for
@@ -391,6 +414,6 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
         initialValues={editing ? toFormValues(editing) : undefined}
         onSubmit={onSubmitItem}
       />
-    </div>
+    </>
   );
 }

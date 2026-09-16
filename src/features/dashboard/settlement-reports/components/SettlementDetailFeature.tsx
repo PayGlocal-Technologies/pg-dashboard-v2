@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, DataTable, Separator, StatusBadge, type Column } from "@/components/ui";
+import { Button, Card, DataTableCard, Separator, StatusBadge, type Column } from "@/components/ui";
 import { COUNTRIES } from "@payglocal_ui/flux-ui";
 import { Icon } from "@/components/icon";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -433,22 +433,14 @@ export function SettlementDetailFeature({
 
           {/* Payments, full width; this table is the settlement's evidence and
            * gets the most visual room. */}
-          <Card className="gap-0 overflow-hidden p-0">
-            <div className="px-5 pb-3 pt-5">
-              <h2 className="text-sm font-semibold text-foreground">Payments in this settlement</h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Payments ({settlement.transactionCount})
-              </p>
-            </div>
-            <DataTable
-              columns={buildMcaPaymentColumns()}
-              data={payments}
-              rowKey={(p) => p.id}
-              density="compact"
-              tableLayout="content"
-              className="rounded-none border-0 border-t border-border"
-            />
-          </Card>
+          <DataTableCard
+            title="Payments in this settlement"
+            description={`Payments (${settlement.transactionCount})`}
+            columns={buildMcaPaymentColumns()}
+            data={payments}
+            rowKey={(p) => p.id}
+            maxBodyHeight="none"
+          />
         </div>
 
         {showReportInfo && (

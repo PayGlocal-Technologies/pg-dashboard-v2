@@ -2,8 +2,9 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, DataTable, PageHeader } from "@/components/ui";
+import { Button, ColumnManager, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { FilterChipGroup } from "@/components/common/filters/FilterChips";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
@@ -18,7 +19,6 @@ import {
   TransactionDateTimeFilter,
   type TransactionDateTimeValue,
 } from "@/features/dashboard/pa-transactions/components/TransactionDateTimeFilter";
-import { TransactionColumnsMenu } from "@/features/dashboard/settlement-reports/components/TransactionColumnsMenu";
 import {
   buildDisputeColumns,
   DISPUTE_COLUMN_DEFS,
@@ -306,91 +306,91 @@ export function DisputeManagementFeature() {
           />
         </div>
 
-        <Card className="gap-0 overflow-hidden p-0">
-          <div className="pl-5 pr-3 pb-3 pt-5">
-            <div className="space-y-3">
-              <SegmentedTabs
-                options={DISPUTE_STATUS_SEGMENTS}
-                value={statusSegment}
-                onChange={(v) => setStatusSegment(v as DisputeStatusSegment)}
+        <DataTableCard<DisputeRow>
+          tabs={
+            <SegmentedTabs
+              options={DISPUTE_STATUS_SEGMENTS}
+              value={statusSegment}
+              onChange={(v) => setStatusSegment(v as DisputeStatusSegment)}
+            />
+          }
+          toolbar={
+            <div className="flex flex-wrap items-center gap-2.5">
+              <RotatingSearchInput
+                value={search}
+                onSearch={setSearch}
+                words={["customer name, email or dispute ID"]}
+                className="min-w-40 max-w-xs flex-1"
               />
 
-              <div className="border-t border-border pt-3 flex items-center gap-2.5 flex-wrap">
-                <RotatingSearchInput
-                  value={search}
-                  onSearch={setSearch}
-                  words={["customer name, email or dispute ID"]}
-                  className="min-w-40 max-w-xs flex-1"
+              <div className="hidden sm:block h-4 w-px bg-border" />
+
+              {/* One group for the row, so clicking from one open chip to the
+                  next closes the first and leaves the second open. Without it
+                  each chip holds its own state and the outgoing one's focus
+                  restore dismisses the incoming one. */}
+              <FilterChipGroup className="flex items-center gap-2 flex-wrap">
+                <MultiSelectChipFilter
+                  value={statusFilter}
+                  options={STATUS_FILTER_OPTIONS}
+                  onChange={setStatusFilter}
+                  placeholder="Status"
                 />
+                <DisputeReasonFilter value={reason} onChange={setReason} />
+                <TransactionAmountFilter value={amountRange} onChange={setAmountRange} />
+                <TransactionDateTimeFilter
+                  value={disputedDate}
+                  onChange={setDisputedDate}
+                  triggerLabel="Disputed Date"
+                />
+              </FilterChipGroup>
 
-                <div className="hidden sm:block h-4 w-px bg-border" />
+              {hasActive && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  leftIcon={<Icon name="x" className="w-3 h-3" />}
+                  onClick={onClear}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  Clear
+                </Button>
+              )}
 
-                <div className="flex items-center gap-2 flex-wrap">
-                  <MultiSelectChipFilter
-                    value={statusFilter}
-                    options={STATUS_FILTER_OPTIONS}
-                    onChange={setStatusFilter}
-                    placeholder="Status"
-                  />
-                  <DisputeReasonFilter value={reason} onChange={setReason} />
-                  <TransactionAmountFilter value={amountRange} onChange={setAmountRange} />
-                  <TransactionDateTimeFilter
-                    value={disputedDate}
-                    onChange={setDisputedDate}
-                    triggerLabel="Disputed Date"
-                  />
-                </div>
-
-                {hasActive && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<Icon name="x" className="w-3 h-3" />}
-                    onClick={onClear}
-                    className="text-muted-foreground hover:text-foreground"
-                  >
-                    Clear
-                  </Button>
-                )}
-
-                <div className="ml-auto flex items-center gap-2">
-                  <TransactionColumnsMenu
-                    items={DISPUTE_COLUMN_DEFS}
-                    order={columnOrder}
-                    hidden={hiddenColumns}
-                    onOrderChange={setColumnOrder}
-                    onToggle={onToggleColumn}
-                    onReset={onResetColumns}
-                  />
-                </div>
+              <div className="ml-auto flex items-center gap-2">
+                <ColumnManager
+                  columns={DISPUTE_COLUMN_DEFS}
+                  order={columnOrder}
+                  onOrderChange={setColumnOrder}
+                  hiddenKeys={[...hiddenColumns]}
+                  onHiddenKeysChange={(next) => setHiddenColumns(new Set(next))}
+                  onReset={onResetColumns}
+                />
               </div>
             </div>
-          </div>
-
-          <DataTable
-            columns={columns}
-            data={sortedRows}
-            tableLayout="content"
-            emptyTitle="No disputes yet"
-            emptyDescription="Disputed payments will appear here as they come in."
-            rowKey={(row) => row.disputeId}
-            pageSize={8}
-            rowAction={(row) => (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onViewDetails(row)}
-                rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-                className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-              >
-                View details
-              </Button>
-            )}
-            density="compact"
-            snug
-            className="rounded-none border-0 border-t border-border"
-          />
-        </Card>
+          }
+          columns={columns}
+          data={sortedRows}
+          emptyTitle="No disputes yet"
+          emptyDescription="Disputed payments will appear here as they come in."
+          rowKey={(row) => row.disputeId}
+          pagination={{
+            mode: "client",
+            pageSize: 8,
+          }}
+          rowAction={(row) => (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onViewDetails(row)}
+              rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+              className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+            >
+              View details
+            </Button>
+          )}
+          maxBodyHeight="none"
+        />
       </div>
     </div>
   );
