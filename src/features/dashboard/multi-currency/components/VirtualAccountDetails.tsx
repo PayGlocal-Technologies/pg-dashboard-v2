@@ -47,6 +47,19 @@ interface VirtualAccountDetailsProps {
    * at full width and clip against the panel next to it.
    */
   collapsed?: boolean;
+  /**
+   * Where the Share/Copy button row sits relative to the field grid.
+   *
+   * - `"bottom"` (default) — after the fields, behind a divider and the
+   *   "Share a link or copy all fields…" helper line. The original layout.
+   * - `"top"` — right after the header, before the fields, with no helper
+   *   line (the actions are already the first thing under the account name,
+   *   nothing needs to introduce them). For International Accounts 2's
+   *   layout, where the actions are meant to read as an immediate response
+   *   to "which account is this", ahead of the fields a merchant copies
+   *   individually only when the two buttons don't cover what they need.
+   */
+  actionsPlacement?: "top" | "bottom";
   /** Merged onto the Card — e.g. to override its default shrink-wrapped width. */
   className?: string;
 }
@@ -110,12 +123,39 @@ export function VirtualAccountDetails({
   headerPlacement = "above",
   showShare = true,
   collapsed = false,
+  actionsPlacement = "bottom",
   className,
 }: VirtualAccountDetailsProps) {
   const fields = buildFullAccountDetails(account);
 
   const [currenciesOpen, setCurrenciesOpen] = useState(false);
   const [methodInfoOpen, setMethodInfoOpen] = useState(false);
+
+  const actionsRow = (
+    <div
+      className={cn("flex flex-col gap-3", showShare && "sm:flex-row")}
+      data-guide="mca-share-copy"
+    >
+      {showShare && (
+        <Button
+          variant="outline"
+          className="flex-1"
+          leftIcon={<Icon name="share" className="h-4 w-4" />}
+          onClick={() => onShare(account)}
+        >
+          Share
+        </Button>
+      )}
+      <Button
+        variant="primary"
+        className={cn(showShare ? "flex-1" : "w-full")}
+        leftIcon={<Icon name="copy" className="h-4 w-4" />}
+        onClick={() => onCopy(account)}
+      >
+        Copy account details
+      </Button>
+    </div>
+  );
 
   return (
     <section aria-live="polite">
@@ -156,6 +196,13 @@ export function VirtualAccountDetails({
               </p>
             </div>
           </div>
+        )}
+
+        {actionsPlacement === "top" && (
+          <>
+            {actionsRow}
+            <Separator />
+          </>
         )}
 
         {/* mt-2 on top of the Card's own gap-4 opens the header → metadata
@@ -202,37 +249,19 @@ export function VirtualAccountDetails({
           </dl>
         </CardContent>
 
-        <Separator />
+        {actionsPlacement === "bottom" && (
+          <>
+            <Separator />
 
-        {showShare && (
-          <p className="text-[13px] text-muted-foreground">
-            Share a link or copy all fields for your client.
-          </p>
+            {showShare && (
+              <p className="text-[13px] text-muted-foreground">
+                Share a link or copy all fields for your client.
+              </p>
+            )}
+
+            {actionsRow}
+          </>
         )}
-
-        <div
-          className={cn("flex flex-col gap-3", showShare && "sm:flex-row")}
-          data-guide="mca-share-copy"
-        >
-          {showShare && (
-            <Button
-              variant="outline"
-              className="flex-1"
-              leftIcon={<Icon name="share" className="h-4 w-4" />}
-              onClick={() => onShare(account)}
-            >
-              Share
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            className={cn(showShare ? "flex-1" : "w-full")}
-            leftIcon={<Icon name="copy" className="h-4 w-4" />}
-            onClick={() => onCopy(account)}
-          >
-            Copy account details
-          </Button>
-        </div>
       </Card>
       {account.isGlobal && (
         <GlobalCurrenciesDialog open={currenciesOpen} onOpenChange={setCurrenciesOpen} />

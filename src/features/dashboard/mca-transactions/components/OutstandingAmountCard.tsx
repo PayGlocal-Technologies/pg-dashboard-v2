@@ -49,10 +49,25 @@ export function OutstandingAmountCard({
    *  breakdown toggle is hidden — the card is already scoped to one currency.
    *  "REST_OF_WORLD" for the Rest of the World region. */
   currency: scopedCurrency,
+  /** Drops the amber clock icon row entirely. Off by default; International
+   *  Accounts 2's Metrics rail turns it on to get a denser card with nothing
+   *  above the title. */
+  hideIcon = false,
+  /** Where the pending-count chip sits: beside the title (default, every
+   *  existing placement) or under the headline amount (International
+   *  Accounts 2's Metrics rail, which wants the amount to read first). */
+  badgePlacement = "title",
+  /** Swaps the card's neutral surface for a light blue fill + blue border —
+   *  International Accounts 2's Metrics rail only; every other placement
+   *  keeps the plain Card default. */
+  tint = false,
 }: {
   className?: string;
   timeframe?: string;
   currency?: string;
+  hideIcon?: boolean;
+  badgePlacement?: "title" | "below-amount";
+  tint?: boolean;
 }) {
   const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe);
   const { breakdown, isLoading: isBreakdownLoading } = useDocumentPendingByCurrency();
@@ -76,36 +91,48 @@ export function OutstandingAmountCard({
   // (Transactions) placement.
   const showBreakdown = !isCurrencyScoped && currencyRows.length > 0;
 
+  const badge = !isLoading && pendingCount > 0 && (
+    <Badge variant="secondary" size="sm" className="shrink-0">
+      {pendingCount.toLocaleString("en-IN")} pending transaction
+      {pendingCount === 1 ? "" : "s"}
+    </Badge>
+  );
+
   return (
-    <Card size="sm" className={cn("w-full", className)}>
+    <Card
+      size="sm"
+      className={cn(
+        "w-full",
+        tint && "border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-950/20",
+        className
+      )}
+    >
       {/* flex flex-1 flex-col: still needed so Card being stretched taller than
           its content (see the grow className this receives from
           TransactionsAnalyticsCarousel) leaves the extra space below rather than
           centering it. */}
       <CardContent className="flex flex-1 flex-col">
-        {/* Top row: just the icon. The pending-count chip sits beside the title. */}
-        <div className="flex items-center gap-2">
-          {/* h-12 w-12/rounded-full/amber-500 at 10% opacity: the same subtle
-              tinted-circle treatment as Saved Amount's green version, amber for
-              "pending". */}
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-            <Icon name="clock" size={22} />
-          </span>
-        </div>
+        {/* Top row: just the icon. The pending-count chip sits beside the title
+            (unless badgePlacement moves it under the amount below). */}
+        {!hideIcon && (
+          <div className="flex items-center gap-2">
+            {/* h-12 w-12/rounded-full/amber-500 at 10% opacity: the same subtle
+                tinted-circle treatment as Saved Amount's green version, amber for
+                "pending". */}
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+              <Icon name="clock" size={22} />
+            </span>
+          </div>
+        )}
 
-        {/* KPI stack: title (with the pending-count chip beside it) then
-            amount. Title light/regular, not bold — matches SavedAmountCard's
-            own label style, which every KPI card header on this page was
-            brought in line with. */}
-        <div className="mt-4">
+        {/* KPI stack: title (+ chip, if badgePlacement is "title") then
+            amount (+ chip, if "below-amount"). Title light/regular, not bold —
+            matches SavedAmountCard's own label style, which every KPI card
+            header on this page was brought in line with. */}
+        <div className={hideIcon ? undefined : "mt-4"}>
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-normal text-muted-foreground">Documents pending</p>
-            {!isLoading && pendingCount > 0 && (
-              <Badge variant="secondary" size="sm" className="shrink-0">
-                {pendingCount.toLocaleString("en-IN")} pending transaction
-                {pendingCount === 1 ? "" : "s"}
-              </Badge>
-            )}
+            {badgePlacement === "title" && badge}
           </div>
           {isLoading ? (
             <Shimmer className="mt-1 h-9 w-32" />
@@ -116,7 +143,25 @@ export function OutstandingAmountCard({
               className="mt-1 block text-3xl font-semibold tabular-nums tracking-tight text-foreground"
             />
           )}
+          {badgePlacement === "below-amount" && badge && <div className="mt-2">{badge}</div>}
         </div>
+
+        {/* These are the SAME transactions the badge/count above counts, not a
+            second population — deliberately reusing `pendingCount` rather than
+            a settlement-batch-scoped figure from a different endpoint. An
+            earlier version read pendingInvoiceCount from
+            useSettlementUpcoming, which could show a number larger than the
+            badge above it (a different, longer-accumulating scope) and read
+            as a contradiction. Every DOCUMENT_PENDING transaction blocks its
+            own inclusion in the next settlement by definition, so pendingCount
+            already *is* "how many need an invoice before the next
+            settlement" — no separate number to reconcile. */}
+        {!isCurrencyScoped && !isLoading && pendingCount > 0 && (
+          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+            {pendingCount === 1 ? "This transaction needs" : "These transactions need"} an invoice
+            before {pendingCount === 1 ? "it" : "they"} can be included in the next settlement.
+          </p>
+        )}
 
         {/* Per-currency breakdown of what's currently pending — a snapshot, not
             scoped to the timeframe above, so it's named that way (and, unlike

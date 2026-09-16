@@ -360,13 +360,49 @@ export function SettlementAnalyticsCard({
             selected window has no settled accounts at all, an illustration
             stands in rather than leaving the card body blank.
 
-            No forced minimum height on either branch any more: this card
-            used to be height-matched against its left-column neighbour
-            (Total settled), which was itself the source of an unrelated bug
-            (switching time ranges could resize both cards dramatically —
-            see TransactionsAnalyticsCarousel), so that matching was removed
-            and each card now simply sizes to its own content. */}
-        {!isLoading && accountRows.length === 0 ? (
+            Still no forced height matching against Total settled (see the
+            history above — that cross-card coupling is what caused the
+            "resizes dramatically on timeframe change" bug in the first
+            place).
+
+            No blanket min-height across the three branches any more either
+            — an earlier version floored all three at min-h-70 (~280px,
+            sized for a worst-case 5 currency rows) so none of them could
+            ever look shorter than that. In practice most windows show 1-3
+            currencies, whose real content is closer to 100-160px, so that
+            floor sat as a large, permanent, and completely unjustified
+            block of blank space under almost every real result — reserving
+            room for a case ("5 currencies") that's the exception, not the
+            norm. Each branch now sizes to its own real content: the
+            loading skeleton mirrors a typical 2-row result rather than
+            padding out to 5, and the empty-state illustration and loaded
+            list are both left to their natural height. Some size
+            difference between "just loaded 1 currency" and "just loaded 4"
+            is real, current data — not a bug to paper over with reserved
+            space the other 90% of results never use.
+
+            The loading branch still has to render SOMETHING, though: the
+            original bug here wasn't "too little height reserved", it was
+            that `!isLoading && accountRows.length === 0` is false while
+            loading (accountRows is genuinely [] before the fetch resolves,
+            but `!isLoading` is also false) and `accountRows.length > 0` is
+            false too, so NEITHER branch rendered at all — the section
+            collapsed to a genuine 0px during every fetch, then snapped to
+            whatever the loaded content needed the instant data landed.
+            That 0-height gap, not the natural variation between loaded
+            states, is the defect; the skeleton below exists to close it
+            without reserving more than a realistic result actually needs. */}
+        {isLoading ? (
+          <div className="space-y-4">
+            <Shimmer className="h-3 w-36" />
+            <Shimmer className="h-2.5 w-full rounded-full" />
+            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <Shimmer key={i} className="h-10 w-full" />
+              ))}
+            </div>
+          </div>
+        ) : accountRows.length === 0 ? (
           <PlaceholderState
             variant="no-settlements"
             size="sm"

@@ -583,31 +583,27 @@ textarea:focus-visible {
    (not the intl-accounts ones), so the two effects can be tuned
    independently even though they share the same visual language.
 
-   Gradient sizes are scaled down from the page version to suit a ~450px-wide
-   card rather than a full viewport — the page's 520–820px radii would read
-   as one flat wash rather than distinct corners at this size. Same
-   conservative alphas as the page version and for the same reason: this
-   card's row labels sit directly on it, and this app's own
-   `--muted-foreground` has very little contrast margin to spend. */
+   Re-themed to match the Refer & Earn hero banner (see
+   ReferralHero.tsx/Refer&Earn.png) rather than carrying its own multi-hue
+   wash: a single blue fading top-to-bottom into the card's own light base,
+   the same top-to-white motif that banner uses, just far softer — that
+   artwork is full-bleed decoration with no text of its own sitting on it,
+   this card has real row labels and needs to stay legible at every alpha. */
 .platform-select-aurora {
-  --aurora-base: #f2f5fb;
-  --aurora-1: rgba(124, 164, 255, 0.28);
-  --aurora-2: rgba(255, 197, 156, 0.2);
-  --aurora-3: rgba(150, 232, 212, 0.22);
+  --aurora-base: #eef3fc;
+  --aurora-top: rgba(37, 99, 235, 0.22);
 }
 
 .dark .platform-select-aurora {
-  --aurora-base: #0f141d;
-  --aurora-1: rgba(49, 96, 242, 0.2);
-  --aurora-2: rgba(230, 140, 90, 0.1);
-  --aurora-3: rgba(47, 179, 158, 0.13);
+  --aurora-base: #0d1420;
+  --aurora-top: rgba(59, 130, 246, 0.18);
 }
 
 .platform-select-aurora-layer {
-  background-image:
-    radial-gradient(260px 200px at -10% -15%, var(--aurora-1), transparent 70%),
-    radial-gradient(240px 190px at 108% 30%, var(--aurora-2), transparent 68%),
-    radial-gradient(260px 210px at 15% 112%, var(--aurora-3), transparent 70%);
+  /* 0deg ("to top"): the blue starts at the card's bottom edge and fades to
+     transparent near the top, the opposite of the first pass (which had it
+     strongest at the top). */
+  background-image: linear-gradient(0deg, var(--aurora-top), transparent 70%);
 }
 
 @media print {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
 import {
   Area,
@@ -284,24 +285,24 @@ function MultiCurrencyContent() {
             <h2 className={MODULE_TITLE}>Select client region</h2>
 
             {isLoading ? (
-            // The region list is this page's only navigation, so its loading
-            // state has to hold the column's footprint — otherwise the right
-            // column snaps sideways when the accounts land. Six rows is the
-            // typical account count; the Card and its p-3 are the same ones the
-            // loaded list sits in, so nothing moves but the row contents.
-            <Card size="sm" aria-busy className="hidden gap-0 p-3 lg:flex">
-              <div className="space-y-1">
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3 px-5 py-2.5">
-                    <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
-                    <Shimmer className="h-3.5 w-28" />
-                  </div>
-                ))}
-              </div>
-            </Card>
-          ) : (
-            <>
-              {/* Below `lg` the two columns collapse into one stack, where a full
+              // The region list is this page's only navigation, so its loading
+              // state has to hold the column's footprint — otherwise the right
+              // column snaps sideways when the accounts land. Six rows is the
+              // typical account count; the Card and its p-3 are the same ones the
+              // loaded list sits in, so nothing moves but the row contents.
+              <Card size="sm" aria-busy className="hidden gap-0 p-3 lg:flex">
+                <div className="space-y-1">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-3 px-5 py-2.5">
+                      <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
+                      <Shimmer className="h-3.5 w-28" />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            ) : (
+              <>
+                {/* Below `lg` the two columns collapse into one stack, where a full
                   vertical list of regions would push the account details most of
                   a screen down. The tiles scroll horizontally instead, so the
                   details stay near the fold. Each tile is its own surface, so
@@ -314,31 +315,35 @@ function MultiCurrencyContent() {
                   one is inactive out of the tab order and the accessibility tree,
                   so there is never a second, invisible copy of these controls to
                   land on. */}
-              <div data-guide="mca-region-selector" className="-mx-1 lg:hidden">
-                <RegionSelector
-                  accounts={accounts}
-                  selectedAccountId={selectedAccount?.id ?? ""}
-                  onSelect={selectAccount}
-                  label="Select client region"
-                  variant="cards"
-                />
-              </div>
+                <div data-guide="mca-region-selector" className="-mx-1 lg:hidden">
+                  <RegionSelector
+                    accounts={accounts}
+                    selectedAccountId={selectedAccount?.id ?? ""}
+                    onSelect={selectAccount}
+                    label="Select client region"
+                    variant="cards"
+                  />
+                </div>
 
-              {/* p-3 rather than Card's own 28px inset: the rows carry their own
+                {/* p-3 rather than Card's own 28px inset: the rows carry their own
                   px-5, so the card's padding only has to keep them clear of its
                   edge — anything more and the region names sit adrift of the
                   title above the card. */}
-              <Card size="sm" className="hidden gap-0 p-3 lg:flex" data-guide="mca-region-selector">
-                <RegionSelector
-                  accounts={accounts}
-                  selectedAccountId={selectedAccount?.id ?? ""}
-                  onSelect={selectAccount}
-                  label="Select client region"
-                  size="md"
-                />
-              </Card>
-            </>
-          )}
+                <Card
+                  size="sm"
+                  className="hidden gap-0 p-3 lg:flex"
+                  data-guide="mca-region-selector"
+                >
+                  <RegionSelector
+                    accounts={accounts}
+                    selectedAccountId={selectedAccount?.id ?? ""}
+                    onSelect={selectAccount}
+                    label="Select client region"
+                    size="md"
+                  />
+                </Card>
+              </>
+            )}
           </div>
 
           {/* Currency caveat for the selected region — a pre-payment briefing
@@ -386,91 +391,114 @@ function MultiCurrencyContent() {
             section spacing. min-w-0 lets the account-details/metrics content
             shrink instead of forcing the column past the viewport. */}
         <div className="min-w-0 space-y-3">
-          {selectedAccount && (
-            // h2 as a plain block (not a flex item), so its top edge renders
-            // identically to the left column's plain-block heading and the two
-            // line up. "How it works?" is positioned absolutely to the top-right
-            // rather than sharing a flex line, which was nudging the heading
-            // down; pr-28 keeps a long region name clear of it.
-            <div className="relative pr-28">
-              <h2 className={MODULE_TITLE}>Receive payments from {selectedAccount.countryName}</h2>
-              <Button
-                variant="link"
-                className="absolute right-0 top-0 -mr-2 text-[13px] underline"
-                onClick={() => setHowItWorksOpen(true)}
+          {/* AnimatePresence/mode="wait": switching regions used to swap the
+              heading and the whole card instantly — jarring given how much
+              detail changes at once (bank name, account number, address…).
+              `wait` makes the outgoing account's content fade+lift out
+              FIRST, and only once that finishes does the incoming one
+              fade+rise in — that hand-off is the "delay" itself, not an
+              artificial timer, and it reads as the page acknowledging a
+              real switch happened. Same easing/duration convention as the
+              settlement detail page and the dashboard's analytics tab
+              switch (see SettlementDetailFeature.tsx /
+              TodaysAnalyticsSection.tsx). Replaces the old bare `page-enter`
+              class, which only covered the account details card below, not
+              this heading or the Metrics section further down — so only
+              part of the column used to visibly change while the rest
+              snapped instantly. */}
+          <AnimatePresence mode="wait">
+            {selectedAccount && (
+              <motion.div
+                key={selectedAccount.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-8"
               >
-                How it works?
-              </Button>
-            </div>
-          )}
+                {/* h2 as a plain block (not a flex item), so its top edge renders
+                    identically to the left column's plain-block heading and the two
+                    line up. "How it works?" is positioned absolutely to the top-right
+                    rather than sharing a flex line, which was nudging the heading
+                    down; pr-28 keeps a long region name clear of it. */}
+                <div className="relative pr-28">
+                  <h2 className={MODULE_TITLE}>
+                    Receive payments from {selectedAccount.countryName}
+                  </h2>
+                  <Button
+                    variant="link"
+                    className="absolute right-0 top-0 -mr-2 text-[13px] underline"
+                    onClick={() => setHowItWorksOpen(true)}
+                  >
+                    How it works?
+                  </Button>
+                </div>
+
+                {/* Account details come before the Metrics section below: a
+                    merchant opens this page to find the numbers to hand a client,
+                    and that has to be the first thing they see, not the
+                    settled/outstanding figures. */}
+                <div className="flex flex-wrap items-start gap-x-5 gap-y-8">
+                  <section className="flex-1">
+                    {/* Details and their currency's caveat as one stack: the notice is
+                        about the account whose details sit beside it, so it travels
+                        with them. Renders nothing for a currency that carries no
+                        caveat. space-y-3 keeps it bound to the card rather than
+                        reading as the section below it.
+
+                        The notice goes *before* the account details — every one of
+                        them is a pre-payment briefing (don't convert to GBP, expect
+                        your bank's verification prompt), so the client has to read it
+                        before, not after, the account number they're about to send a
+                        payment to.
+
+                        `inside` moves the flag/name/subtitle into the card — there's
+                        no carousel here naming the account any more — and the width
+                        override drops the card's default shrink-wrapping so it fills
+                        this column. */}
+                    <VirtualAccountDetails
+                      account={selectedAccount}
+                      onCopy={handleCopyFullAccount}
+                      onShare={() => setShareModalOpen(true)}
+                      headerPlacement="inside"
+                      className="w-full max-w-none"
+                    />
+                  </section>
+
+                  {/* Side-panel variant, kept for reference — superseded below
+                      by the modal.
+                  {howItWorksOpen && (
+                    <HowItWorksPanel
+                      currency={selectedAccount.currency}
+                      onClose={() => setHowItWorksOpen(false)}
+                      className="w-full shrink-0 sm:w-[340px]"
+                    />
+                  )}
+                  */}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* space-y-8 is the 32px section → section step, the loosest on the
               page. */}
           <div className="space-y-8">
-          {selectedAccount && (
-            // Account details come before the Metrics section below: a
-            // merchant opens this page to find the numbers to hand a client,
-            // and that has to be the first thing they see, not the
-            // settled/outstanding figures. key remounts the section on every
-            // region change so the fade replays on each switch, not just the
-            // first render.
-            //
-            <div className="flex flex-wrap items-start gap-x-5 gap-y-8">
-              <section key={selectedAccount.id} className="flex-1 page-enter">
-                {/* Details and their currency's caveat as one stack: the notice is
-                    about the account whose details sit beside it, so it travels
-                    with them. Renders nothing for a currency that carries no
-                    caveat. space-y-3 keeps it bound to the card rather than
-                    reading as the section below it.
+            {selectedAccount && (
+              <HowItWorksDialog
+                open={howItWorksOpen}
+                onOpenChange={setHowItWorksOpen}
+                currency={selectedAccount.currency}
+              />
+            )}
 
-                    The notice goes *before* the account details — every one of
-                    them is a pre-payment briefing (don't convert to GBP, expect
-                    your bank's verification prompt), so the client has to read it
-                    before, not after, the account number they're about to send a
-                    payment to.
-
-                    `inside` moves the flag/name/subtitle into the card — there's
-                    no carousel here naming the account any more — and the width
-                    override drops the card's default shrink-wrapping so it fills
-                    this column. */}
-                <VirtualAccountDetails
-                  account={selectedAccount}
-                  onCopy={handleCopyFullAccount}
-                  onShare={() => setShareModalOpen(true)}
-                  headerPlacement="inside"
-                  className="w-full max-w-none"
-                />
-              </section>
-
-              {/* Side-panel variant, kept for reference — superseded below
-                  by the modal.
-              {howItWorksOpen && (
-                <HowItWorksPanel
-                  currency={selectedAccount.currency}
-                  onClose={() => setHowItWorksOpen(false)}
-                  className="w-full shrink-0 sm:w-[340px]"
-                />
-              )}
-              */}
-            </div>
-          )}
-
-          {selectedAccount && (
-            <HowItWorksDialog
-              open={howItWorksOpen}
-              onOpenChange={setHowItWorksOpen}
-              currency={selectedAccount.currency}
-            />
-          )}
-
-          <section>
-            {/* "Metrics", not "Analytics" — settled/outstanding figures, sitting
+            <section>
+              {/* "Metrics", not "Analytics" — settled/outstanding figures, sitting
                 after account details for the reason noted above. Same heading
                 treatment (MODULE_TITLE, mb-3) as Documents below it, so all
                 three modules in this column read as peers. */}
-            <h2 className={cn(MODULE_TITLE, "mb-3")}>Metrics</h2>
+              <h2 className={cn(MODULE_TITLE, "mb-3")}>Metrics</h2>
 
-            {/* flex-wrap rather than a grid, because grid tracks cannot wrap.
+              {/* flex-wrap rather than a grid, because grid tracks cannot wrap.
                 Flexbox decides line breaks from each item's hypothetical main
                 size, which for `flex-1`-style items is their min-width — so the
                 row holds both cards while 470 + 300 + the gap fits, and drops
@@ -480,116 +508,137 @@ function MultiCurrencyContent() {
 
                 No items-* override, so the default stretch gives both cards the
                 same height on a shared line, and therefore a shared top and
-                bottom edge. */}
-            <div className="flex flex-wrap gap-4">
-              {/* Settled amount for the selected region: the KPI on the left, a
+                bottom edge.
+
+                AnimatePresence/mode="wait", same timing as the account
+                details block above: Settled amount is scoped to the
+                selected region too, so it cross-fades on the same beat
+                rather than updating instantly while the card above it is
+                still mid-transition. */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={selectedAccount?.id ?? "none"}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="flex flex-wrap gap-4"
+                >
+                  {/* Settled amount for the selected region: the KPI on the left, a
                   month-by-month area chart on the right, both scoped to the
                   selected account's currency via settled-currency-trend — pick
                   US and it reads only USD settlements. flex-[1.6] gives this card
                   the extra width; Outstanding beside it stays flex-1. */}
-              <Card size="sm" className="min-w-[min(470px,100%)] flex-[1.6] gap-0">
-                {isSettledLoading ? (
-                  <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
-                    <div className="flex-1 sm:basis-2/5">
-                      <p className="text-sm font-semibold text-foreground">Settled amount</p>
-                      <Shimmer className="mt-4 h-9 w-40" />
-                    </div>
-                    <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
-                      <Shimmer className="h-full min-h-36 w-full" />
-                    </div>
-                  </div>
-                ) : settledTxnCount === 0 ? (
-                  /* No settlements for the selected region: the shared
+                  <Card size="sm" className="min-w-[min(470px,100%)] flex-[1.6] gap-0">
+                    {isSettledLoading ? (
+                      <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
+                        <div className="flex-1 sm:basis-2/5">
+                          <p className="text-sm font-semibold text-foreground">Settled amount</p>
+                          <Shimmer className="mt-4 h-9 w-40" />
+                        </div>
+                        <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
+                          <Shimmer className="h-full min-h-36 w-full" />
+                        </div>
+                      </div>
+                    ) : settledTxnCount === 0 ? (
+                      /* No settlements for the selected region: the shared
                      illustration + copy, the same empty state the Settlement
                      Reports page shows, rather than a ₹0 figure beside a bare
                      "No settlements yet" line. Boxed to the same height the
                      KPI + chart layout occupies (min-h-36, sm illustration) so
                      the card doesn't grow when it's empty. */
-                  <div className="flex min-h-36 flex-1 items-center justify-center">
-                    <PlaceholderState
-                      variant="no-settlements"
-                      size="xs"
-                      title="No settlements yet"
-                      description="Settlement reports will appear here once transactions are processed."
-                      className="gap-2 py-2"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
-                    <div className="flex-1 sm:basis-2/5">
-                      <p className="text-sm font-semibold text-foreground">Settled amount</p>
-                      {/* Same size/weight as OutstandingAmountCard's figure so
+                      <div className="flex min-h-36 flex-1 items-center justify-center">
+                        <PlaceholderState
+                          variant="no-settlements"
+                          size="xs"
+                          title="No settlements yet"
+                          description="Settlement reports will appear here once transactions are processed."
+                          className="gap-2 py-2"
+                        />
+                      </div>
+                    ) : (
+                      <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
+                        <div className="flex-1 sm:basis-2/5">
+                          <p className="text-sm font-semibold text-foreground">Settled amount</p>
+                          {/* Same size/weight as OutstandingAmountCard's figure so
                           the pair carries equal visual weight. Compact ₹ (uat
                           design) with the exact figure on hover. */}
-                      <CompactAmount
-                        amount={settledAmount}
-                        currency="INR"
-                        className="mt-4 block whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground"
-                      />
-                      <p className="mt-2 text-sm text-muted-foreground">
-                        {settledTxnCount.toLocaleString("en-IN")} settled transaction
-                        {settledTxnCount === 1 ? "" : "s"} · Year to date
-                      </p>
-                    </div>
+                          <CompactAmount
+                            amount={settledAmount}
+                            currency="INR"
+                            className="mt-4 block whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                          />
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {settledTxnCount.toLocaleString("en-IN")} settled transaction
+                            {settledTxnCount === 1 ? "" : "s"} · Year to date
+                          </p>
+                        </div>
 
-                    <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart
-                          data={settledSeries}
-                          margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
-                        >
-                          <defs>
-                            <linearGradient id={settledGradientId} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
-                              <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid
-                            strokeDasharray="3 3"
-                            stroke="color-mix(in srgb, var(--border) 65%, transparent)"
-                            vertical={false}
-                          />
-                          <XAxis
-                            dataKey="x"
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                            interval="preserveStartEnd"
-                          />
-                          <YAxis
-                            axisLine={false}
-                            tickLine={false}
-                            tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                            tickFormatter={(v: number) =>
-                              v === 0 ? "₹0" : formatCurrencyShort(v, "INR")
-                            }
-                            width={48}
-                          />
-                          <Tooltip
-                            contentStyle={{
-                              borderRadius: 10,
-                              border: "1px solid var(--border)",
-                              fontSize: 12,
-                              background: "var(--popover)",
-                              color: "var(--popover-foreground)",
-                            }}
-                            formatter={(v) => [formatCurrency(Number(v), "INR", "en-IN"), "Settled"]}
-                          />
-                          <Area
-                            type="monotone"
-                            dataKey="y"
-                            stroke="var(--chart-4)"
-                            strokeWidth={2}
-                            fill={`url(#${settledGradientId})`}
-                          />
-                        </AreaChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
-              </Card>
+                        <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart
+                              data={settledSeries}
+                              margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
+                            >
+                              <defs>
+                                <linearGradient id={settledGradientId} x1="0" y1="0" x2="0" y2="1">
+                                  <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
+                                  <stop
+                                    offset="100%"
+                                    stopColor="var(--chart-4)"
+                                    stopOpacity={0.02}
+                                  />
+                                </linearGradient>
+                              </defs>
+                              <CartesianGrid
+                                strokeDasharray="3 3"
+                                stroke="color-mix(in srgb, var(--border) 65%, transparent)"
+                                vertical={false}
+                              />
+                              <XAxis
+                                dataKey="x"
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                interval="preserveStartEnd"
+                              />
+                              <YAxis
+                                axisLine={false}
+                                tickLine={false}
+                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+                                tickFormatter={(v: number) =>
+                                  v === 0 ? "₹0" : formatCurrencyShort(v, "INR")
+                                }
+                                width={48}
+                              />
+                              <Tooltip
+                                contentStyle={{
+                                  borderRadius: 10,
+                                  border: "1px solid var(--border)",
+                                  fontSize: 12,
+                                  background: "var(--popover)",
+                                  color: "var(--popover-foreground)",
+                                }}
+                                formatter={(v) => [
+                                  formatCurrency(Number(v), "INR", "en-IN"),
+                                  "Settled",
+                                ]}
+                              />
+                              <Area
+                                type="monotone"
+                                dataKey="y"
+                                stroke="var(--chart-4)"
+                                strokeWidth={2}
+                                fill={`url(#${settledGradientId})`}
+                              />
+                            </AreaChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
 
-              {/* The same Outstanding card the MCA Transactions page renders, not
+                  {/* The same Outstanding card the MCA Transactions page renders, not
                 a second take on it: title, amount, pending-count badge, INR
                 conversion, one-line explanation, all off the real MCA overview
                 endpoint. It takes no props — the figure spans every account
@@ -602,18 +651,19 @@ function MultiCurrencyContent() {
                 amount beside its pending-count chip — needs before it starts
                 looking cramped, so the row breaks rather than letting it get
                 there. */}
-              <OutstandingAmountCard
-                className="min-w-[min(300px,100%)] flex-1"
-                currency={
-                  selectedAccount
-                    ? selectedAccount.iso2 === "ROW"
-                      ? "REST_OF_WORLD"
-                      : selectedAccount.currency
-                    : undefined
-                }
-              />
-            </div>
-          </section>
+                  <OutstandingAmountCard
+                    className="min-w-[min(300px,100%)] flex-1"
+                    currency={
+                      selectedAccount
+                        ? selectedAccount.iso2 === "ROW"
+                          ? "REST_OF_WORLD"
+                          : selectedAccount.currency
+                        : undefined
+                    }
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </section>
           </div>
         </div>
       </div>
