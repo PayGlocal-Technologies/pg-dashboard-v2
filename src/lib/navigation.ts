@@ -1,5 +1,7 @@
 import type { IconName } from "@/components/icon";
 import type { ProductType } from "@/lib/hooks/useResolvedMids";
+import type { UseNewPermissionsFn } from "@/hooks/useNewPermissions";
+import type { NavContext } from "@/stores/useProductContext";
 
 export type NavChild = {
   label: string;
@@ -17,6 +19,9 @@ export type NavItem = {
   badge?: string;
   permission?: string[];
   children?: NavChild[];
+  /** Only shown while the header's product context matches, see
+   * useProductContext.ts. Omit for items shared by both products. */
+  product?: ProductType;
 };
 
 export type NavGroup = {
@@ -24,44 +29,81 @@ export type NavGroup = {
   items: NavItem[];
 };
 
+// ─── Home navigation (Header's "Home" tab, the combined overview) ─────────────
+// Deliberately short, 3 top-level items only, the full Payments/MCA feature
+// tree below only makes sense once the merchant has picked a product.
+
+export const homeNavigation: NavGroup[] = [
+  {
+    label: "Overview",
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: "layout-grid", permission: [] },
+      { label: "Reports", href: "/settlement-report", icon: "file-text", permission: [] },
+      {
+        label: "Settings",
+        href: "/settings",
+        icon: "settings",
+        permission: [],
+        children: [{ label: "Team Management", href: "/team-management", permission: [] }],
+      },
+    ],
+  },
+];
+
 // ─── Regular merchant navigation ──────────────────────────────────────────────
+// Shown once the Header's "Payments" tab is active (see useProductContext.ts),
+// not for "Home" or "Multi-Currency Accounts", which have their own trees
+// above and below.
 
 export const regularNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [{ label: "Home", href: "/dashboard", icon: "layout-grid", permission: [] }],
+    items: [
+      {
+        label: "Dashboard",
+        href: "/pa-dashboard",
+        icon: "layout-grid",
+        permission: [],
+        product: "PA",
+      },
+      {
+        label: "Dashboard",
+        href: "/mca-dashboard",
+        icon: "layout-grid",
+        permission: [],
+        product: "PACB",
+      },
+    ],
   },
   {
     label: "Payments",
     items: [
+      {
+        // Top-level rather than nested under Payment Products, mirroring the
+        // MCA tree. /pa-transactions is this tree's table: regularNavigation
+        // only renders while the Header's "Payments" tab is active, MCA has
+        // its own tree with its own /mca-transactions entry.
+        label: "Transactions",
+        href: "/pa-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
       {
         label: "Payment Products",
         href: "/payment-products",
         icon: "shopping-cart",
         permission: [],
         children: [
-          { label: "Multi Currency Accounts", href: "/multi-currency", permission: [] },
-          // Two separate entries, both labelled "Transactions": the first is
-          // the MCA table, the second the PA (Cards/UPI/NetBanking) one. They
-          // used to be a single item whose page carried a segment toggle.
+          // Multi Currency Accounts and Platforms live in the MCA tree only
+          // (as "International Accounts" and "Connect Platforms"), they are
+          // not Payments products.
           //
-          // Tagged by product so the header's switcher surfaces one at a time
-          // (see useProductContext.ts) — untagged, both would render as two
-          // identical "Transactions" rows side by side.
-          {
-            label: "Transactions",
-            href: "/mca-transactions",
-            permission: ["getTxnSearchResults"],
-            product: "PACB",
-          },
-          {
-            label: "Transactions",
-            href: "/pa-transactions",
-            permission: ["getTxnSearchResults"],
-            product: "PA",
-          },
+          // Receipts is this branch's own: uat carries no entry for it. Second
+          // way into /mca-receipts, the first being Finance's own entry below.
+          // Tagged PACB because the page is scoped to MCA receipts alone (see
+          // RECEIPT_PRODUCT) — it has nothing to show a PA-only merchant.
+          { label: "Receipts", href: "/mca-receipts", permission: [], product: "PACB" },
           { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
-          { label: "Platforms", href: "/platforms", permission: [] },
           { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },
@@ -93,15 +135,30 @@ export const regularNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/reports/settlement-report",
+        href: "/settlement-report",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
+      },
+      // Same page the Payment Products group links to under Multi Currency
+      // Accounts (see above). Listed in both places deliberately: merchants
+      // reach receipts either as a finance record or from the product they were
+      // raised under, and the sidebar's active state keys off the pathname, so
+      // whichever entry is on screen highlights.
+      //
+      // OPEN ITEM: this entry is untagged, so it shows for a PA-only merchant —
+      // who now lands on a page that only ever lists MCA receipts. Tag it
+      // `product: "PACB"` (or drop it) once the placement is decided.
+      {
+        label: "Receipts",
+        href: "/mca-receipts",
+        icon: "receipt",
+        badge: "NEW",
+        permission: [],
       },
       {
         label: "Invoice Management",
         href: "/mca-invoices",
         icon: "receipt",
-        badge: "NEW",
         permission: ["getAllMerchantInvoice"],
       },
       {
@@ -145,16 +202,15 @@ export const regularNavigation: NavGroup[] = [
     items: [
       // Points at this app's own Client Management page (/client-management)
       // rather than pg-dashboard's /mca-clients route, which has no v2
-      // equivalent. Ungated for the same reason SKU Management is: the page
-      // reads a local client book (MOCK_CLIENTS) rather than the endpoint
-      // getAllMcaClient guards, so gating on that permission would hide a page
-      // that doesn't call it. Restore the permission once the real client
-      // endpoint is wired up.
+      // equivalent. Gated on getAllMcaClient, the permission pg-dashboard puts on
+      // the same page: the page now genuinely calls that endpoint (the client list
+      // is server-backed), so hiding it from a user who cannot call it is correct
+      // — which was not true while it read a local client book.
       {
         label: "Client Management",
         href: "/client-management",
         icon: "users",
-        permission: [],
+        permission: ["getAllMcaClient"],
       },
       {
         label: "Configure",
@@ -176,6 +232,88 @@ export const regularNavigation: NavGroup[] = [
         icon: "clock",
         permission: ["merchantAdminReport"],
       },
+    ],
+  },
+];
+
+// ─── MCA navigation ────────────────────────────────────────────────────────────
+// Shown instead of regularNavigation while the Header's "Multi-Currency
+// Accounts" tab is active, a dedicated tree (not the PA/PACB-shared one
+// above) since MCA's feature set and grouping differ enough that tagging
+// items with product:"PACB" on the shared tree stopped making sense.
+
+export const mcaNavigation: NavGroup[] = [
+  {
+    label: "Home",
+    items: [{ label: "Dashboard", href: "/mca-dashboard", icon: "layout-grid", permission: [] }],
+  },
+  {
+    label: "Payments",
+    items: [
+      {
+        // /mca-transactions, not /transactions: the single segment-toggled
+        // page this tree was designed against has since been split into the
+        // PA and MCA tables, and the MCA one is this tree's product.
+        label: "Transactions",
+        href: "/mca-transactions",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+      {
+        // /mca-settlement-report, the MCA twin of the shared /settlement-report
+        // route the Home and Payments trees use, see settlement-reports/routes.ts.
+        label: "Settlements",
+        href: "/mca-settlement-report",
+        icon: "file-text",
+        permission: ["getAllSettlementDetailReports", "getSettlementReport"],
+      },
+      { label: "Invoice Management", href: "/mca-invoices", icon: "receipt", permission: [] },
+    ],
+  },
+  {
+    label: "Accounts",
+    items: [
+      // /multi-currency, this app's existing virtual-accounts page, rather
+      // than the /international-accounts route this tree was designed
+      // against, which was never built.
+      { label: "International Accounts", href: "/multi-currency", icon: "globe-2", permission: [] },
+      // /platforms, this app's existing Platforms page, rather than the
+      // /connect-platforms route this tree was designed against, which was
+      // never built.
+      { label: "Connect Platforms", href: "/platforms", icon: "link", permission: [] },
+    ],
+  },
+  {
+    label: "Compliance Center",
+    items: [
+      { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
+      { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
+      // Same /mca-receipts page the Payments tree reaches under Payment Products and
+      // Finance, labelled for what an MCA merchant comes here for: the GST
+      // invoices PayGlocal raises against them. A compliance record in this tree,
+      // a finance record in that one, one page either way.
+      {
+        label: "GST Invoices",
+        href: "/mca-receipts",
+        icon: "receipt",
+        badge: "NEW",
+        permission: [],
+      },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
+      // /client-management, not pg-dashboard's /mca-clients route: this app
+      // has its own page, gated on the same getAllMcaClient permission.
+      {
+        label: "Client management",
+        href: "/client-management",
+        icon: "users",
+        permission: ["getAllMcaClient"],
+      },
+      { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
+      { label: "Team management", href: "/team-management", icon: "user-plus", permission: [] },
     ],
   },
 ];
@@ -270,7 +408,7 @@ export const globalNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/reports/settlement-report",
+        href: "/settlement-report",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
       },
@@ -307,3 +445,68 @@ export const globalNavigation: NavGroup[] = [
     ],
   },
 ];
+
+// ─── Tree selection and filtering ─────────────────────────────────────────────
+// Both live here rather than inside the Sidebar because the header's global
+// search runs the same two steps to build its index (see lib/search/registry.ts).
+// Keeping one implementation is what stops search from offering a page the
+// sidebar has hidden, or missing one it shows.
+
+/**
+ * Which of the five trees above applies. Partner and global-tenant accounts get
+ * their own regardless of product context; everyone else follows the Header's
+ * active tab — the short Home tree, the dedicated MCA tree, or the full
+ * Payments one.
+ */
+export function navigationForContext({
+  isPartnerUser,
+  isGlobalTenant,
+  activeContext,
+}: {
+  isPartnerUser: boolean;
+  isGlobalTenant: boolean;
+  activeContext: NavContext;
+}): NavGroup[] {
+  if (isPartnerUser) return partnerNavigation;
+  if (isGlobalTenant) return globalNavigation;
+  if (activeContext === "HOME") return homeNavigation;
+  if (activeContext === "PACB") return mcaNavigation;
+  return regularNavigation;
+}
+
+/**
+ * Drops everything the user cannot or should not see, mirroring pg-dashboard's
+ * formatMenuItems logic. An item or child tagged with `product` (e.g. the two
+ * "Dashboard" entries, "Payment Links" / "MCA Links") only survives while the
+ * Header's active product context matches; everything untagged is shared.
+ *
+ * Parents whose children all filter away are dropped too — an expandable item
+ * with nothing under it is a dead toggle.
+ */
+export function filterNavigation(
+  navigation: NavGroup[],
+  checkPermissions: UseNewPermissionsFn,
+  activeProduct: ProductType
+): NavGroup[] {
+  return navigation
+    .map((group) => {
+      const visibleItems = group.items
+        .filter(
+          (item) =>
+            (!item.permission?.length || checkPermissions(item.permission)) &&
+            (!item.product || item.product === activeProduct)
+        )
+        .map((item) => ({
+          ...item,
+          children: item.children?.filter(
+            (c) =>
+              (!c.permission?.length || checkPermissions(c.permission)) &&
+              (!c.product || c.product === activeProduct)
+          ),
+        }))
+        .filter((item) => !item.children || item.children.length > 0);
+
+      return { ...group, items: visibleItems };
+    })
+    .filter((group) => group.items.length > 0);
+}

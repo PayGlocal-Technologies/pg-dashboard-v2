@@ -31,6 +31,14 @@ export interface TxnFilterValues {
   iso2Code?: string[];
   paymentInstrument?: string[];
   currency?: string[];
+  /**
+   * Country *names*, not ISO2 codes — the client search filters on
+   * `fieldSearch.country`, which holds display names (pg-dashboard's client list
+   * feeds it straight from the country dropdown's labels). Distinct from
+   * `iso2Code` above, which is the PA transaction table's own country filter and
+   * really is coded.
+   */
+  country?: string[];
   startTime?: number;
   endTime?: number;
 }

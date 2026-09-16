@@ -1,11 +1,14 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { Button, DataTable } from "@/components/ui";
+import { motion } from "framer-motion";
+import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
   EMPTY_RELATIVE_RANGE,
   FilterChipsRow,
@@ -26,8 +29,10 @@ import {
 } from "@/features/dashboard/mca-transactions/services";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { buildMcaColumns } from "@/features/dashboard/mca-transactions/columns";
-import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
-import { TransactionCardList } from "@/features/dashboard/mca-transactions/components/TransactionCardList";
+import {
+  TransactionCard,
+  TransactionCardSkeleton,
+} from "@/features/dashboard/mca-transactions/components/TransactionCardList";
 import { reorderColumns } from "@/lib/utils/columns";
 // Upload Invoice now opens the details page instead of this modal — import
 // kept commented out (not deleted) alongside the modal's usage below.
@@ -37,7 +42,7 @@ import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import { downloadBlob } from "@/lib/utils/format";
 import useNewPermissions from "@/hooks/useNewPermissions";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   MCA_CURRENCY_FILTERS,
@@ -96,18 +101,39 @@ interface McaTransactionTableProps {
    *  search/filter controls and table/card list, so the two stay in this
    *  fixed order at every width. */
   analyticsSection?: ReactNode;
+  /** Fired as the full-page details view opens (true) and closes (false).
+   *  The page header uses it to hide the analytics time-range tabs while a
+   *  single transaction is being viewed — those tabs scope the list/analytics,
+   *  not the details page, so they're meaningless there. */
+  onDetailsOpenChange?: (open: boolean) => void;
 }
 
-export function McaTransactionTable({ analyticsSection }: McaTransactionTableProps) {
+export function McaTransactionTable({
+  analyticsSection,
+  onDetailsOpenChange,
+}: McaTransactionTableProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
   const contentEl = useContentAreaElement();
   const queryClient = useQueryClient();
   const [scrollPosition, setScrollPosition] = useState(0);
 
-  const [search, setSearch] = useState("");
-  // Defaults to "Invoice Pending" (rather than "All") when the page loads.
-  const [statusFilters, setStatusFilters] = useState<string[]>(INVOICE_PENDING_STATUSES);
+  // Seeded from ?q= so the header's global search can hand a transaction ID
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const initialQuery = searchParams.get("q") ?? "";
+
+  const [search, setSearch] = useState(initialQuery);
+  // Defaults to "Invoice Pending" (rather than "All") when the page loads —
+  // except when arriving with a query, which is a lookup rather than a review
+  // of the pending queue. Leaving the default on would hide an already-settled
+  // transaction and the page would read as "no such transaction". The tab bar
+  // below derives its selection from this state, so [] shows the "All" tab
+  // active and the merchant can see why they are looking at everything.
+  const [statusFilters, setStatusFilters] = useState<string[]>(
+    initialQuery ? [] : INVOICE_PENDING_STATUSES
+  );
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   // "Last N weeks/days/hours/minutes", kept as two pieces of state on
@@ -154,6 +180,7 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
 
   const router = useRouter();
+  const { selectMid } = usePacbMidScope();
   const checkPermissions = useNewPermissions();
   const canManageInvoices = checkPermissions(["getAllMerchantInvoice"]);
   const { downloadFirc } = useFircDownload();
@@ -230,11 +257,13 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
     setDetailsRowId(row.gid);
     setDrawerOpen(false);
     setDetailsOpen(true);
+    onDetailsOpenChange?.(true);
   };
 
   const closeDetails = () => {
     setDetailsOpen(false);
     setDetailsOverrideRow(null);
+    onDetailsOpenChange?.(false);
   };
 
   // Collapse reverses Expand: closes the full page and reopens the same
@@ -246,6 +275,7 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   const collapseToDrawer = () => {
     setDetailsOpen(false);
     setDrawerOpen(true);
+    onDetailsOpenChange?.(false);
   };
 
   // Passed through as onOpenTransaction to TransactionDetailsPage/Drawer:
@@ -325,7 +355,15 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   const baseColumns = buildMcaColumns(isPartnerUser, {
     onOpenDetails: openDetails,
     onDownloadFirc: (row) => downloadFirc(row.merchantId, row.gid),
-    onCreateInvoice: (row) => router.push(`/create-invoice?gid=${row.gid}`),
+    // The row already answers "which MID?", so this never asks — it scopes the
+    // editor to the transaction's own merchant before opening it. Without that,
+    // a merchant with several PACB MIDs and none selected would raise the
+    // invoice under their first MID while linking it to a transaction on
+    // another. See usePacbMidScope for the entry points that do have to ask.
+    onCreateInvoice: (row) => {
+      if (row.merchantId) selectMid(row.merchantId);
+      router.push(`/create-invoice?gid=${row.gid}`);
+    },
     onLinkInvoice: (row) => router.push(`/mca-invoices?linkTo=${row.gid}`),
     canManageInvoices,
   });
@@ -345,11 +383,11 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   //
   // A function, not a stored element: both control rows are mounted at once
   // (CSS decides which is visible), so calling this twice gives each row its
-  // own FilterChipsRow instance with its own open-popover state. Sharing one
-  // element — and with it one lifted `openChip` — used to open the hidden
-  // row's twin of every chip alongside the visible one, and a Radix popover
-  // anchored to a display:none trigger never positions, so it sat off-screen
-  // above the real popover and swallowed the interaction. See FilterChipsRow.
+  // own FilterChipsRow — and therefore its own FilterChipGroup, which is what
+  // scopes the open-popover state to one row. Sharing one element used to open
+  // the hidden row's twin of every chip alongside the visible one, and a Radix
+  // popover anchored to a display:none trigger never positions, so it sat
+  // off-screen above the real popover and swallowed the interaction.
   const renderFilterChips = () => (
     <FilterChipsRow
       dateRange={dateRange}
@@ -425,18 +463,148 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
   // The details page replaces the table in place (same component instance,
   // same closed-over search/filter/page state) rather than overlaying it —
   // this is what makes Back restore the table's previous state for free.
+  //
+  // Expand swaps the drawer for this full page in the same frame, which read
+  // as an abrupt jump. A short fade + rise on mount lets the page ease in as
+  // the drawer slides away over it, so the two motions blend into one
+  // handoff rather than a hard cut. Delayed a touch so it starts after the
+  // drawer has begun sliding out, not on the same frame.
   if (detailsOpen && detailsRow) {
     return (
-      <TransactionDetailsPage
-        row={detailsRow}
-        onBack={closeDetails}
-        onCollapse={collapseToDrawer}
-        onUploaded={handleInvoiceSubmitted}
-        onOpenTransaction={openLinkedTransaction}
-        isPartnerUser={isPartnerUser}
-      />
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: "easeOut", delay: 0.08 }}
+      >
+        <TransactionDetailsPage
+          row={detailsRow}
+          onBack={closeDetails}
+          onCollapse={collapseToDrawer}
+          onUploaded={handleInvoiceSubmitted}
+          onOpenTransaction={openLinkedTransaction}
+          isPartnerUser={isPartnerUser}
+        />
+      </motion.div>
     );
   }
+
+  // Tab bar: page-level navigation. An underline-style shortcut onto the same
+  // status filter state as the "Invoice Pending" option inside the Status
+  // flyout, not a separate filter axis. Written once and mounted on both
+  // surfaces; only one is ever visible.
+  const tabBar = (
+    <UnderlineTabs
+      tabs={VIEW_TABS}
+      value={
+        sameStatusSet(statusFilters, INVOICE_PENDING_STATUSES)
+          ? "invoice-pending"
+          : sameStatusSet(statusFilters, SETTLED_STATUSES)
+            ? "settled"
+            : "all"
+      }
+      onValueChange={(v) => {
+        setStatusFilters(
+          v === "invoice-pending"
+            ? INVOICE_PENDING_STATUSES
+            : v === "settled"
+              ? SETTLED_STATUSES
+              : []
+        );
+        setPage(1);
+      }}
+    />
+  );
+
+  // Desktop (lg+): search, filter chips, and the Reorder Columns/Report
+  // actions all share one row, actions pushed to the far right via ml-auto.
+  const desktopControls = (
+    <div className="flex flex-wrap items-center gap-2">
+      <RotatingSearchInput
+        value={search}
+        onSearch={onSearch}
+        words={SEARCH_WORDS}
+        className="w-40 sm:w-56"
+      />
+
+      <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
+
+      <div className="ml-auto flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          leftIcon={
+            <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+          }
+          onClick={() => void handleRefresh()}
+          disabled={isFetching}
+          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+        >
+          Refresh
+        </Button>
+        <ColumnManager
+          columns={reorderableColumns}
+          order={currentColumnOrder}
+          onOrderChange={setColumnOrder}
+          onReset={() => {
+            setColumnOrder(null);
+            setHiddenColumns([]);
+          }}
+          hiddenKeys={hiddenColumns}
+          onHiddenKeysChange={setHiddenColumns}
+          fixedKeys={FIXED_COLUMN_KEYS}
+          fixedReason="Always shown. A transaction row is unreadable without these columns."
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+          onClick={handleReport}
+          isLoading={isReportPending}
+          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+        >
+          Report
+        </Button>
+      </div>
+    </div>
+  );
+
+  // A failed request replaces the rows on both surfaces. Distinct from an empty
+  // result: column headers over nothing would imply the fetch succeeded.
+  const errorPanel = isError ? (
+    <div className="flex flex-col items-center gap-3 p-10 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
+        <Icon name="alert-circle" size={22} />
+      </span>
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">Couldn&apos;t load transactions</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Something went wrong while fetching data.
+        </p>
+      </div>
+      <Button variant="outline" size="sm" onClick={() => void refetch()}>
+        Retry
+      </Button>
+    </div>
+  ) : undefined;
+
+  const emptyPanel = (
+    <PlaceholderState
+      variant="no-transactions"
+      title="No transactions found"
+      description="Try adjusting your filters or search query"
+      className="py-16"
+    />
+  );
+
+  const pagination = {
+    mode: "page",
+    page,
+    pageSize: TRANSACTIONS_PAGE_LIMIT,
+    total: totalCount,
+    onPageChange: setPage,
+  } as const;
 
   return (
     <div className="flex flex-col gap-4">
@@ -448,164 +616,67 @@ export function McaTransactionTable({ analyticsSection }: McaTransactionTablePro
           at lg, the same breakpoint TransactionsAnalyticsCarousel itself
           switches from the carousel (with its indicator) to the plain grid,
           where the flex gap alone matches the previous spacing. */}
-      {analyticsSection && <div className="mb-4 lg:mb-0">{analyticsSection}</div>}
-
-      {/* Tab bar, search/filters, and the table itself all share one
-          bordered surface (rounded-xl border border-border bg-card,
-          matching every other card on this page) instead of each drawing
-          its own box. DataTable's own border/radius/background are
-          neutralised below
-          (className="rounded-none border-0") since this wrapper already
-          provides them; a border-b under each of the first two rows stands
-          in for the border that would otherwise separate them. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        {/* Tab bar: page-level navigation. An underline-style shortcut onto
-            the same status filter state as the "Invoice Pending" option
-            inside the Status flyout, not a separate filter axis. No bottom
-            padding here: TabsTrigger's own py-2.5 already clears the
-            border-b below before the sliding indicator meets it. */}
-        <div className="border-b border-border px-4 pt-3">
-          <UnderlineTabs
-            tabs={VIEW_TABS}
-            value={
-              sameStatusSet(statusFilters, INVOICE_PENDING_STATUSES)
-                ? "invoice-pending"
-                : sameStatusSet(statusFilters, SETTLED_STATUSES)
-                  ? "settled"
-                  : "all"
-            }
-            onValueChange={(v) => {
-              setStatusFilters(
-                v === "invoice-pending"
-                  ? INVOICE_PENDING_STATUSES
-                  : v === "settled"
-                    ? SETTLED_STATUSES
-                    : []
-              );
-              setPage(1);
-            }}
-          />
+      {analyticsSection && (
+        <div className="mb-4 lg:mb-0" data-guide="mca-txn-analytics">
+          {analyticsSection}
         </div>
+      )}
 
-        {/* Desktop (lg+): search, filter chips, and the Reorder
-            Columns/Report actions all share one row, actions pushed to the
-            far right via ml-auto. Unchanged from before. */}
-        <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
-          <RotatingSearchInput
-            value={search}
-            onSearch={onSearch}
-            words={SEARCH_WORDS}
-            className="w-40 sm:w-56"
-          />
+      {/* Desktop (lg+): the full table, columns and all, on the card surface
+          DataTableCard draws — tab bar, toolbar, grid and pager sharing one
+          bordered box with the dividers every other table on the app uses. */}
+      <DataTableCard<McaTransaction>
+        className="hidden lg:block"
+        tabs={tabBar}
+        toolbar={desktopControls}
+        columns={columns}
+        data={tableRows}
+        isLoading={isPending}
+        rowKey={(row) => row.gid}
+        emptyTitle="No transactions found"
+        emptyDescription="Try adjusting your filters or search query"
+        emptyState={emptyPanel}
+        errorState={errorPanel}
+        // The whole row opens the details drawer, through DataTable's
+        // row-level handler rather than a wrapper inside every cell.
+        // Clicks landing on the row's own buttons and menus are
+        // skipped by it, so each still does only its own job.
+        onRowClick={openDetails}
+        pagination={pagination}
+        maxBodyHeight="none"
+      />
 
-          <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
+      {/* Tablet + mobile (below lg): a vertical list of transaction cards
+          instead of table columns/header, under the same tab bar and the
+          compact control row. `tableRows` is already just this
+          server-paginated page's rows, so this reads it directly rather than
+          re-slicing or re-fetching anything.
 
-          <div className="ml-auto flex items-center gap-2">
-            <ReorderColumnsPopover
-              columns={reorderableColumns}
-              order={currentColumnOrder}
-              onOrderChange={setColumnOrder}
-              onReset={() => {
-                setColumnOrder(null);
-                setHiddenColumns([]);
-              }}
-              hiddenKeys={hiddenColumns}
-              onHiddenKeysChange={setHiddenColumns}
-              fixedKeys={FIXED_COLUMN_KEYS}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              leftIcon={
-                <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-              }
-              onClick={() => void handleRefresh()}
-              disabled={isFetching}
-              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-            >
-              Refresh
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              onClick={handleReport}
-              isLoading={isReportPending}
-              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-            >
-              Report
-            </Button>
-          </div>
-        </div>
-
-        {/* Tablet + mobile (below lg): the compact search/filter controls,
-            directly above the card list they filter, inside this same
-            bordered container, below the tab bar. No Reorder Columns here at
-            either width: there's no table to reorder columns on below lg,
-            just the card list. */}
-        <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
+          No Reorder Columns at either width: there's no table to reorder
+          columns on below lg, just the card list. */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+        <div className="border-b border-border px-4 pt-3">{tabBar}</div>
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
           {compactControls}
         </div>
-
-        {isError ? (
-          <div className="flex flex-col items-center gap-3 p-10 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
-              <Icon name="alert-circle" size={22} />
-            </span>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">
-                Couldn&apos;t load transactions
-              </h3>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Something went wrong while fetching data.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => void refetch()}>
-              Retry
-            </Button>
-          </div>
-        ) : (
-          <>
-            {/* Desktop (lg+): the full table, columns and all. */}
-            <DataTable
-              className="hidden rounded-none border-0 lg:block"
-              columns={columns}
-              data={tableRows}
-              isLoading={isPending}
-              skeletonRows={8}
-              emptyTitle="No transactions found"
-              emptyDescription="Try adjusting your filters or search query"
-              rowKey={(row) => row.gid}
-              pageSize={TRANSACTIONS_PAGE_LIMIT}
-              totalRows={totalCount}
-              page={page}
-              onPageChange={setPage}
-              tableLayout="content"
-              density="compact"
+        <DataCardList<McaTransaction>
+          bordered={false}
+          rows={tableRows}
+          rowKey={(row) => row.gid}
+          isLoading={isPending}
+          renderCard={(row) => <TransactionCard row={row} onOpenDetails={openDetails} />}
+          renderSkeleton={() => <TransactionCardSkeleton />}
+          emptyState={
+            <PlaceholderState
+              variant="no-transactions"
+              size="sm"
+              title="No transactions found"
+              description="Try adjusting your filters or search query"
             />
-
-            {/* Tablet + mobile (below lg): a vertical list of transaction
-                cards instead of table columns/header. `tableRows` is
-                already just this server-paginated page's rows (the same
-                array DataTable's own controlled `page`/`data` above
-                consumes), so this reads it directly rather than re-slicing
-                or re-fetching anything. */}
-            <TransactionCardList
-              className="lg:hidden"
-              rows={tableRows}
-              isLoading={isPending}
-              onOpenDetails={openDetails}
-              page={page}
-              onPageChange={setPage}
-              totalRows={totalCount}
-              pageSize={TRANSACTIONS_PAGE_LIMIT}
-              emptyTitle="No transactions found"
-              emptyDescription="Try adjusting your filters or search query"
-            />
-          </>
-        )}
+          }
+          errorState={errorPanel}
+          pagination={pagination}
+        />
       </div>
 
       {/* Upload Invoice now opens the details page's inline upload flow

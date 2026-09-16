@@ -1,7 +1,10 @@
 import type { SkuCurrency, SkuProductType } from "@/features/dashboard/sku-management/types";
 
-/** Rows per page — matches TRANSACTIONS_PAGE_LIMIT so both tables page alike. */
+/** Default rows per page — matches TRANSACTIONS_PAGE_LIMIT so both tables page alike. */
 export const SKU_PAGE_LIMIT = 10;
+
+/** What the catalogue footer offers for rows per page. */
+export const SKU_PAGE_SIZE_OPTIONS = [5, 10, 20] as const;
 
 /**
  * Runtime list of the SkuCurrency union — the same seven the merchant holds
@@ -26,6 +29,14 @@ export const SKU_CURRENCIES: readonly SkuCurrency[] = [
  */
 export const SKU_PRICE_LOCALE = "en-US";
 
+/**
+ * The tab bar's three views: the whole catalogue, or it split by product type.
+ *
+ * There was a fourth, Archived, until the catalogue was wired to its endpoints.
+ * The API has no archive field and no archive endpoint, so the tab and the
+ * Archive/Unarchive row actions had nothing behind them; they were removed
+ * rather than left backed by session-only state that a reload would discard.
+ */
 export const SKU_VIEW_TABS = [
   { value: "all", label: "All" },
   { value: "goods", label: "Goods" },
@@ -34,8 +45,9 @@ export const SKU_VIEW_TABS = [
 
 export type SkuViewTab = (typeof SKU_VIEW_TABS)[number]["value"];
 
-/** Which product type each non-"All" tab narrows to. */
-export const SKU_TAB_TYPE: Record<Exclude<SkuViewTab, "all">, SkuProductType> = {
+/** Which product type each type-filtering tab narrows to. "all" is absent
+ *  because it does not filter on type. */
+export const SKU_TAB_TYPE: Record<"goods" | "services", SkuProductType> = {
   goods: "GOODS",
   services: "SERVICES",
 };
@@ -77,16 +89,35 @@ export const SKU_CURRENCY_OPTIONS: { value: SkuCurrency; country: string }[] = [
   { value: "SGD", country: "Singapore" },
 ];
 
-/** Images allowed per item — enough for a small gallery, few enough that the
- *  preview strip never becomes the tallest thing in the modal. */
-export const SKU_MAX_IMAGES = 6;
-
+/**
+ * One image per item, because that is what the catalogue stores.
+ *
+ * The upload endpoint writes a single object per SKU (`sku_image.<extension>`)
+ * and the search row carries a single `imageUrl`, so a second upload replaces
+ * the first rather than joining it. The form used to accept six and keep them
+ * in the browser; there was nowhere for the other five to go.
+ */
 export const SKU_IMAGE_ACCEPTED_MIME_TYPES = [
   "image/png",
   "image/jpeg",
   "image/webp",
   "image/avif",
 ] as const;
+
+/**
+ * MIME type → the `extension` the upload endpoint is asked for.
+ *
+ * Driven by the type the browser reports rather than by whatever the file
+ * happens to be named: the extension decides the object's name on S3, and a
+ * file called `photo.txt` that is really a PNG should still be stored as one.
+ * `image/jpeg` maps to `jpg`, not `jpeg`, matching what the backend returns.
+ */
+export const SKU_IMAGE_EXTENSION: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/avif": "avif",
+};
 
 export const SKU_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
@@ -95,6 +126,8 @@ export const SKU_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
  * cycles remitter/transaction ID/UTR: each one names a field the query is
  * matched against, and the query hits any of them (see SkuTable's filter).
  * Rendered as "Search by " + hint, so these are lowercase phrases except
- * HSN/SAC, which is an initialism.
+ * HSN/SAC, which is an initialism. All three are matched server-side by the
+ * catalogue search's queryString, which is why description is named here even
+ * though no client-side predicate reads it.
  */
-export const SKU_SEARCH_HINTS = ["product name", "HSN/SAC"];
+export const SKU_SEARCH_HINTS = ["product name", "HSN/SAC", "description"];

@@ -190,7 +190,7 @@ export function PaymentPagesFeature() {
           emptyTitle="No payment pages found"
           emptyDescription="Try adjusting your filters or search query"
           rowKey={(row) => row.id}
-          pageSize={PAYMENT_PAGES_PAGE_LIMIT}
+          pagination={{ mode: "client", pageSize: PAYMENT_PAGES_PAGE_LIMIT }}
           density="compact"
           tableLayout="fixed"
           className="rounded-none border-0 border-t border-border"

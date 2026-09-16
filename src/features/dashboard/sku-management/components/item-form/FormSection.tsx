@@ -3,13 +3,13 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** Red asterisk before a required field's label — the marker the Create MCA
- *  Link form uses, so required-ness reads the same across the product. */
+/** Red asterisk after a required field's label — required-ness reads the same
+ *  across the product. The `-ml-1.5` cancels most of flux FieldLabel's own
+ *  `gap-2` between its children, so the mark sits snug against the label text
+ *  rather than a full 8px away. */
 export function RequiredMark() {
   return (
-    <span aria-hidden className="text-destructive">
-      *
-    </span>
+    <span aria-hidden className="-ml-1.5 text-destructive">*</span>
   );
 }
 

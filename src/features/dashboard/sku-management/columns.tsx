@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { type Column, StatusBadge } from "@/components/ui";
 import { SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
@@ -12,17 +13,48 @@ import type { SkuPriceField, SkuProduct } from "@/features/dashboard/sku-managem
 const SELLING_PRICE_HEADER = "Selling price";
 const PRODUCT_COST_HEADER = "Product cost";
 
+/**
+ * Fences an interactive control off from the table's row click.
+ *
+ * `data-row-click-ignore` is DataTable's own marker for this (see its
+ * onRowClick prop): a click inside the marked element never becomes a row
+ * click. Declarative rather than a second onClick in the chain, which matters
+ * here — the price editors open a Radix popover whose trigger composes its own
+ * handler, and stacking another onto that chain is exactly the arrangement the
+ * row overflow menu once failed to open from.
+ *
+ * A control that is already a button, link or form field needs no wrapper: the
+ * row click skips those on its own. This is for the ones that are not.
+ */
+function StopRowClick({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex" data-row-click-ignore>
+      {children}
+    </span>
+  );
+}
+
 // Column widths, typography (text-[13px] body, muted secondary text), and
 // alignment conventions mirror buildMcaColumns so the two tables read as one
-// system. No RowClick wrapper here: a SKU row has no details view to open, and
-// a row-level click target would swallow the clicks the price cells need.
+// system. The row itself opens the product preview, via DataTable's onRowClick
+// — including each cell's padding, which a per-cell wrapper would leave dead.
+// The two price editors are fenced off with StopRowClick above.
 //
-// These six are the table's whole column set. The row's overflow menu is
+// These are the table's whole column set, plus the optional MID column below.
+// The row's overflow menu is
 // deliberately not among them — it rides DataTable's `rowAction` slot instead
 // (see SkuTable), so it never takes column width, never reorders with the
 // data, and stays pinned to the right while the columns scroll.
 export function buildSkuColumns(
-  onPriceChange: (id: string, field: SkuPriceField, next: number) => void
+  onPriceChange: (id: string, field: SkuPriceField, next: number) => void,
+  /**
+   * Adds the MID column, second from the left. Only true when the merchant
+   * holds several PACB MIDs and has selected none — the one state where rows
+   * from different accounts sit in the same table and the row's own name is not
+   * enough to tell you which account it belongs to. Same condition and same
+   * position pg-dashboard uses (`hidden: !showMid`).
+   */
+  showMid = false
 ): Column<SkuProduct>[] {
   return [
     {
@@ -40,16 +72,32 @@ export function buildSkuColumns(
       // its Country cell.
       cellClassName: "overflow-visible",
       render: (row) => (
-        // min-w-max: the cell never shrinks below thumbnail + full name, so
-        // the column widens to fit rather than truncating or wrapping.
-        <div className="flex min-w-max items-center gap-3">
-          <ProductThumbnail product={row} className="shrink-0" />
-          <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
-            {row.name}
-          </span>
-        </div>
+        <>
+          {/* min-w-max: the cell never shrinks below thumbnail + full name, so
+              the column widens to fit rather than truncating or wrapping. */}
+          <div className="flex min-w-max items-center gap-3" data-guide="mca-sku-image">
+            <ProductThumbnail product={row} className="shrink-0" />
+            <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
+              {row.name}
+            </span>
+          </div>
+        </>
       ),
     },
+    ...(showMid
+      ? [
+          {
+            key: "mid",
+            header: "MID",
+            minWidth: 120,
+            render: (row: SkuProduct) => (
+              <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
+                {row.mid || "—"}
+              </span>
+            ),
+          } satisfies Column<SkuProduct>,
+        ]
+      : []),
     {
       key: "type",
       header: "Type of product",
@@ -57,7 +105,7 @@ export function buildSkuColumns(
       render: (row) => (
         <StatusBadge
           variant={row.type === "GOODS" ? "info" : "muted"}
-          label={SKU_TYPE_LABEL[row.type]}
+          label={row.type ? SKU_TYPE_LABEL[row.type] : "—"}
           size="sm"
         />
       ),
@@ -81,13 +129,15 @@ export function buildSkuColumns(
       // proud of the text box and would be cut off without this.
       cellClassName: "overflow-visible",
       render: (row) => (
-        <EditablePriceCell
-          label={SELLING_PRICE_HEADER}
-          value={row.sellingPrice}
-          currency={row.currency}
-          onSave={(next) => onPriceChange(row.id, "sellingPrice", next)}
-          emphasis
-        />
+        <StopRowClick>
+          <EditablePriceCell
+            label={SELLING_PRICE_HEADER}
+            value={row.sellingPrice}
+            currency={row.currency}
+            onSave={(next) => onPriceChange(row.id, "sellingPrice", next)}
+            emphasis
+          />
+        </StopRowClick>
       ),
     },
     {
@@ -97,12 +147,14 @@ export function buildSkuColumns(
       align: "right",
       cellClassName: "overflow-visible",
       render: (row) => (
-        <EditablePriceCell
-          label={PRODUCT_COST_HEADER}
-          value={row.productCost}
-          currency={row.currency}
-          onSave={(next) => onPriceChange(row.id, "productCost", next)}
-        />
+        <StopRowClick>
+          <EditablePriceCell
+            label={PRODUCT_COST_HEADER}
+            value={row.productCost}
+            currency={row.currency}
+            onSave={(next) => onPriceChange(row.id, "productCost", next)}
+          />
+        </StopRowClick>
       ),
     },
     {

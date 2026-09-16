@@ -199,7 +199,7 @@ export const WIDGET_CATALOG: WidgetCatalogEntry[] = [
   },
   {
     id: "customers_state_insights",
-    name: "India — state volume",
+    name: "India state volume",
     category: "India & growth",
     iconName: "map-pin",
     lgColSpan: 6,

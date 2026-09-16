@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import { flagSrc } from "@/features/dashboard/multi-currency/utils";
 

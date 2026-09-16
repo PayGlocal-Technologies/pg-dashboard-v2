@@ -16,6 +16,7 @@ import {
 import { Button, Card, ChartSkeleton, Tabs, TabsList, TabsTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { formatCurrencyShort } from "@/lib/utils/format";
 import { todaysAnalytics } from "@/features/dashboard/home/mock-data";
 
 const VOLUME_PAY_MODE_LABELS = ["UPI", "Cards", "Net banking", "Wallets"] as const;
@@ -319,12 +320,11 @@ const CHART_PRIMARY = "#0061e3";
 const CHART_PRIMARY_SOFT = "#38bdf8";
 const CHART_YESTERDAY = "#94a3b8";
 
+/** Indian short form (₹9.95L / ₹6.91Cr), the same scale every other dashboard
+ *  figure uses. Was full grouped rupees despite the name, which let a big KPI
+ *  run long and read differently from the compact cards beside it. */
 function formatInrCompact(n: number) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(n);
+  return formatCurrencyShort(n, "INR");
 }
 
 export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
@@ -614,7 +614,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
               variant="outline"
               size="sm"
               className="h-9 shrink-0 self-start px-3 text-sm sm:self-center"
-              onClick={() => router.push("/settlement-reports")}
+              onClick={() => router.push("/settlement-report")}
               rightIcon={
                 <Icon name="arrow-up-right" className="h-3.5 w-3.5 shrink-0" aria-hidden />
               }
@@ -738,7 +738,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-2.5 dark:bg-muted/15">
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold leading-snug text-foreground">
-                  Funds on hold
+                  Documents pending
                 </p>
                 <p className="mt-1 font-sans text-sm font-bold tabular-nums tracking-[-0.02em] text-amber-800 dark:text-amber-300 sm:text-base">
                   {formatInrCompact(attention.fundsOnHold.amount)}

@@ -1,24 +1,27 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { ViewPortal } from "@/components/layout/ViewPortal";
-import { MerchantSelector } from "@/components/layout/MerchantSelector";
+import { MerchantSelector, useHasMultipleMids } from "@/components/layout/MerchantSelector";
+import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
+import { AskEchoButton } from "@/components/layout/AskEchoButton";
+import { useHasEcho } from "@/features/dashboard/echo/hooks";
 import {
-  regularNavigation,
-  partnerNavigation,
-  globalNavigation,
+  navigationForContext,
+  filterNavigation,
   type NavItem,
   type NavGroup,
 } from "@/lib/navigation";
 import { useApp } from "@/stores/useApp";
-import { useProductContext } from "@/stores/useProductContext";
+import { useProductContext, toProductType } from "@/stores/useProductContext";
 import { useLogout } from "@/lib/hooks/useLogout";
+import { useMerchantBusinessProfile } from "@/features/dashboard/settings/hooks";
 import useNewPermissions from "@/hooks/useNewPermissions";
 
 function profileInitials(name: string) {
@@ -135,21 +138,57 @@ function SidebarBody({
   pathname,
   onNavClick,
   navigation,
+  showReferBanner = false,
 }: {
   collapsed: boolean;
   pathname: string;
   onNavClick?: () => void;
   navigation: NavGroup[];
+  /** MCA-only: a compact "Refer & Earn" promo pinned between the scrolling nav
+   * and the fixed profile section, see SidebarReferBanner. */
+  showReferBanner?: boolean;
 }) {
   const profile = useApp((s) => s.profile);
   const { logout, isLoading } = useLogout();
+  // Fetched here so the merchant's checkout logo is loaded as soon as the shell
+  // mounts and shown in this footer avatar. Shares the query key the Settings
+  // page uses, so it is fetched once and served from cache to both.
+  const { businessProfile } = useMerchantBusinessProfile();
+  const logoUrl = businessProfile?.merchantLogoPublicUrl ?? null;
+  // Gates the whole "Assistant" section, heading included — see below.
+  const hasEcho = useHasEcho();
 
   const displayName =
     [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || profile?.username || "";
 
   return (
     <>
-      <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+      <nav className="flex-1 min-h-0 overflow-y-auto py-3 px-2.5">
+        {/* "Assistant" — a section of its own rather than folded into the
+            first nav group, so Echo reads as a distinct kind of entry (an AI
+            action, not a page to navigate to) the moment the sidebar loads.
+            Kept outside the permission-filtered `navigation` groups below
+            because it is not a nav destination: it opens the side panel.
+
+            The heading is gated on the same permission as the row it labels.
+            Letting the row hide itself while the heading rendered anyway left
+            accounts without Echo looking at an "ASSISTANT" label over an
+            empty gap. */}
+        {hasEcho ? (
+          <div className="mb-4">
+            {!collapsed ? (
+              <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground px-2 mb-1.5">
+                Assistant
+              </p>
+            ) : (
+              <div className="h-px bg-sidebar-border my-2 mx-1" />
+            )}
+            <div className={cn(collapsed && "flex justify-center")}>
+              <AskEchoButton collapsed={collapsed} onNavigate={onNavClick} />
+            </div>
+          </div>
+        ) : null}
+
         {navigation.map((group) => (
           <div key={group.label} className="mb-4">
             {!collapsed ? (
@@ -214,17 +253,35 @@ function SidebarBody({
         ))}
       </nav>
 
+      {/* Refer & Earn — pinned outside the scrolling nav so it stays visible
+          however many nav items the account has. */}
+      {showReferBanner && !collapsed && (
+        <div className="flex-shrink-0 px-2.5 pb-2.5">
+          <SidebarReferBanner />
+        </div>
+      )}
+
       {/* ── Bottom profile section ── */}
-      <div className="px-2.5 py-2.5 flex-shrink-0 border-t border-sidebar-border">
+      <div className="px-2.5 py-2.5 flex-shrink-0 border-t border-sidebar-border space-y-2">
         <div
           className={cn(
             "flex gap-2 rounded-lg px-2 py-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/5",
             collapsed ? "flex-col items-center justify-center gap-1" : "items-center"
           )}
         >
-          {/* Avatar */}
+          {/* Avatar — the merchant's checkout logo once uploaded, else the
+              name initials, else a generic glyph. */}
           <div className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center overflow-hidden rounded-full ring-2 ring-transparent">
-            {displayName ? (
+            {logoUrl ? (
+              <Image
+                src={logoUrl}
+                alt="Merchant logo"
+                width={32}
+                height={32}
+                unoptimized
+                className="h-full w-full object-cover"
+              />
+            ) : displayName ? (
               <span className="flex h-full w-full items-center justify-center bg-muted-foreground text-[11px] font-bold text-background">
                 {profileInitials(displayName)}
               </span>
@@ -243,34 +300,15 @@ function SidebarBody({
                   {formatRole(profile?.role)}
                 </p>
               </div>
-              <div className="flex items-center gap-0.5 flex-shrink-0">
-                <Link
-                  href="/settings"
-                  onClick={onNavClick}
-                  className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  aria-label="Settings"
-                  title="Settings"
-                >
-                  <Icon name="settings" size={16} />
-                </Link>
-                <Button
-                  variant="ghost"
-                  disabled={isLoading}
-                  className="h-7 w-7 min-h-0 rounded-md text-muted-foreground hover:text-foreground"
-                  aria-label="Log out"
-                  title="Log out"
-                  onClick={() => {
-                    onNavClick?.();
-                    void logout();
-                  }}
-                >
-                  <Icon
-                    name={isLoading ? "loader" : "log-out"}
-                    size={16}
-                    className={isLoading ? "animate-spin" : ""}
-                  />
-                </Button>
-              </div>
+              <Link
+                href="/settings"
+                onClick={onNavClick}
+                className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0"
+                aria-label="Settings"
+                title="Settings"
+              >
+                <Icon name="settings" size={16} />
+              </Link>
             </>
           ) : (
             <>
@@ -303,6 +341,28 @@ function SidebarBody({
             </>
           )}
         </div>
+
+        {!collapsed && (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={isLoading}
+            leftIcon={
+              <Icon
+                name={isLoading ? "loader" : "log-out"}
+                size={16}
+                className={cn("text-red-600 dark:text-red-400", isLoading && "animate-spin")}
+              />
+            }
+            className="w-full justify-start gap-2 text-red-600 hover:text-red-600 dark:text-red-400 dark:hover:text-red-400"
+            onClick={() => {
+              onNavClick?.();
+              void logout();
+            }}
+          >
+            Log out
+          </Button>
+        )}
       </div>
     </>
   );
@@ -320,38 +380,28 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGlobalTenant = useApp((s) => s.isGlobalTenant);
-  const activeProduct = useProductContext((s) => s.activeProduct);
+  const activeContext = useProductContext((s) => s.activeContext);
+  const activeProduct = toProductType(activeContext);
+  // Single-MID accounts get no selector, so its wrapper (padding + bottom
+  // border) is dropped with it rather than left as an empty banded strip.
+  const hasMultipleMids = useHasMultipleMids();
 
   const checkPermissions = useNewPermissions();
 
-  const baseNavigation = isPartnerUser
-    ? partnerNavigation
-    : isGlobalTenant
-      ? globalNavigation
-      : regularNavigation;
+  // "Home" gets its own short nav tree, "Multi-Currency Accounts" its own
+  // dedicated one, "Payments" the shared tree filtered by product tag — see
+  // navigationForContext. The header's global search builds its index from
+  // these same two calls, so the two surfaces can never disagree about what
+  // this user can reach.
+  const baseNavigation = navigationForContext({ isPartnerUser, isGlobalTenant, activeContext });
 
-  // Filter groups based on permissions, mirrors pg-dashboard formatMenuItems logic.
-  // A child tagged with `product` (e.g. "Payment Links" / "MCA Links") only
-  // shows while the Header's active product context matches, see
-  // useProductContext.ts, everything else in the sidebar is shared by both.
-  const filteredNavigation: NavGroup[] = baseNavigation
-    .map((group) => {
-      const visibleItems = group.items
-        .filter((item) => !item.permission?.length || checkPermissions(item.permission))
-        .map((item) => ({
-          ...item,
-          children: item.children?.filter(
-            (c) =>
-              (!c.permission?.length || checkPermissions(c.permission)) &&
-              (!c.product || c.product === activeProduct)
-          ),
-        }))
-        // Drop parent items whose children have all been filtered away
-        .filter((item) => !item.children || item.children.length > 0);
+  const showReferBanner = !isPartnerUser && !isGlobalTenant && activeContext === "PACB";
 
-      return { ...group, items: visibleItems };
-    })
-    .filter((group) => group.items.length > 0);
+  const filteredNavigation: NavGroup[] = filterNavigation(
+    baseNavigation,
+    checkPermissions,
+    activeProduct
+  );
 
   return (
     <>
@@ -373,7 +423,13 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               collapsed ? "max-w-0 opacity-0" : "max-w-[160px] opacity-100"
             )}
           >
-            <Image src="/assets/payglocal-logo.png" alt="PayGlocal" width={126} height={28} />
+            <Image
+              src="/assets/payglocal-logo.png"
+              alt="PayGlocal"
+              width={160}
+              height={28}
+              className="h-6 w-auto"
+            />
           </div>
           <Button
             variant="ghost"
@@ -390,16 +446,23 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
           </Button>
         </div>
 
-        <div
-          className={cn(
-            "flex-shrink-0 border-b border-sidebar-border",
-            collapsed ? "px-2 py-2" : "px-2.5 py-2.5"
-          )}
-        >
-          <MerchantSelector collapsed={collapsed} />
-        </div>
+        {hasMultipleMids && (
+          <div
+            className={cn(
+              "flex-shrink-0 border-b border-sidebar-border",
+              collapsed ? "px-2 py-2" : "px-2.5 py-2.5"
+            )}
+          >
+            <MerchantSelector collapsed={collapsed} />
+          </div>
+        )}
 
-        <SidebarBody collapsed={collapsed} pathname={pathname} navigation={filteredNavigation} />
+        <SidebarBody
+          collapsed={collapsed}
+          pathname={pathname}
+          navigation={filteredNavigation}
+          showReferBanner={showReferBanner}
+        />
       </aside>
 
       {/* ── Mobile nav (portaled so fixed layers cover full viewport) ────── */}
@@ -422,7 +485,13 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
         >
           {/* Logo + close button */}
           <div className="flex h-[57px] flex-shrink-0 items-center justify-between border-b border-sidebar-border px-3.5">
-            <Image src="/assets/payglocal-logo.png" alt="PayGlocal" width={126} height={28} />
+            <Image
+              src="/assets/payglocal-logo.png"
+              alt="PayGlocal"
+              width={160}
+              height={28}
+              className="h-6 w-auto"
+            />
             <Button
               variant="ghost"
               onClick={onClose}
@@ -433,15 +502,18 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
             </Button>
           </div>
 
-          <div className="flex-shrink-0 border-b border-sidebar-border px-2.5 py-2.5">
-            <MerchantSelector />
-          </div>
+          {hasMultipleMids && (
+            <div className="flex-shrink-0 border-b border-sidebar-border px-2.5 py-2.5">
+              <MerchantSelector />
+            </div>
+          )}
 
           <SidebarBody
             collapsed={false}
             pathname={pathname}
             onNavClick={onClose}
             navigation={filteredNavigation}
+            showReferBanner={showReferBanner}
           />
         </aside>
       </ViewPortal>

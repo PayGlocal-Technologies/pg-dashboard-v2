@@ -1,4 +1,45 @@
-const MONTHS_SHORT = [
+import {
+  formatDateOnly,
+  formatDateStamp,
+  formatDateTime,
+  formatTimestamp,
+  parseApiDate,
+} from "@payglocal_ui/flux-ui";
+
+/**
+ * The canonical date/time formatters, re-exported from flux-ui so a feature
+ * imports them from the same place as every other formatter here rather than
+ * reaching into the design system directly.
+ *
+ * `formatTimestamp` is the one to reach for in a column renderer or a detail
+ * field: it takes whatever shape the endpoint sends — `DD/MM/YYYY HH:mm:ss`,
+ * ISO 8601, or epoch millis as a number or a string — and returns
+ * `27 Jul '26, 09:49 AM`, or an em dash when there is nothing to show.
+ */
+export {
+  formatDateTime,
+  formatDateOnly,
+  formatDateStamp,
+  formatTimestamp,
+  formatTime,
+  formatTimeStamp,
+  parseApiDate,
+} from "@payglocal_ui/flux-ui";
+
+// The app's month and day names, spelled out rather than read from Intl.
+//
+// Every date this app renders is built from these four tables, and none of them
+// go through toLocaleDateString. That is deliberate: Intl output varies with the
+// reader's locale and timezone, so a server-rendered date and the client's
+// rehydration of it can disagree and trigger a hydration mismatch. Fixed English
+// strings render identically in both places.
+//
+// Exported because features kept declaring their own copies (the settlement
+// calendar had a second month table and a second weekday table of its own) and
+// then drifting — abbreviate one list differently and two screens disagree about
+// what August is called.
+
+export const MONTHS_SHORT = [
   "Jan",
   "Feb",
   "Mar",
@@ -13,7 +54,7 @@ const MONTHS_SHORT = [
   "Dec",
 ] as const;
 
-const MONTHS_LONG = [
+export const MONTHS_LONG = [
   "January",
   "February",
   "March",
@@ -27,6 +68,33 @@ const MONTHS_LONG = [
   "November",
   "December",
 ] as const;
+
+export const DAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+export const DAYS_LONG = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+/** 1st/2nd/3rd/4th..., with the 11th-13th exception. */
+function ordinalSuffix(day: number): string {
+  if (day % 100 >= 11 && day % 100 <= 13) return "th";
+  switch (day % 10) {
+    case 1:
+      return "st";
+    case 2:
+      return "nd";
+    case 3:
+      return "rd";
+    default:
+      return "th";
+  }
+}
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   // Major Global Currencies
@@ -126,6 +194,12 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   // amounts rendering with a real symbol rather than the word falling through
   // as its own prefix.
   Dollar: "$",
+  // The real accounts endpoint's SWIFT catch-all bucket, renamed "GLOBAL" for
+  // display (see multi-currency/mapAccounts.ts) — the live counterpart to
+  // "Dollar" above. Without this entry the Rest of the World account's
+  // settled-amount figure fell back to showing "GLOBAL" itself as the
+  // fallback prefix instead of a real symbol.
+  GLOBAL: "$",
 };
 
 /**
@@ -151,11 +225,140 @@ export function formatCurrency(amount: number, currency: string = "INR", locale 
   })}`;
 }
 
+/**
+ * Always-compact currency, the single short form every dashboard figure uses so
+ * they read the same everywhere. For rupees it's the Indian scale — ₹8.5K,
+ * ₹9.95L, ₹6.91Cr (two decimals for lakh/crore, one for thousand); for any
+ * other reporting currency it's the Western scale — $8.5K, $1.20M, $2.00B —
+ * since lakh/crore only make sense against ₹. Below a thousand the exact grouped
+ * figure is shown, as there's nothing to shorten.
+ *
+ * This is for bar labels, axis ticks and inline stat cells. For a standalone
+ * headline KPI use formatCurrencyCompact (below) via the CompactAmount
+ * component, which keeps small figures exact and reveals the full number on
+ * hover.
+ */
+export function formatCurrencyShort(amount: number, currency: string = "INR"): string {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+
+  if (currency !== "INR") {
+    // Western short scale — lakh/crore would be wrong against a non-rupee code.
+    if (abs >= 1_000_000_000) return `${sign}${symbol}${(abs / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000) return `${sign}${symbol}${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`;
+    return `${sign}${symbol}${Math.round(abs).toLocaleString("en-US")}`;
+  }
+
+  if (abs >= 10_000_000) return `${sign}${symbol}${(abs / 10_000_000).toFixed(2)}Cr`;
+  if (abs >= 100_000) return `${sign}${symbol}${(abs / 100_000).toFixed(2)}L`;
+  if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`;
+  return `${sign}${symbol}${Math.round(abs).toLocaleString("en-IN")}`;
+}
+
+/**
+ * Currency for a standalone headline KPI. The full grouped amount up to five
+ * digits (₹39,860.28), then the same compact short form as formatCurrencyShort
+ * once it reaches a lakh — ₹9.95L, ₹6.91Cr — so a big figure never runs past
+ * its card while a small one stays exact.
+ *
+ * Pair with the CompactAmount component, which shows the exact figure
+ * (formatCurrency) in a hover tooltip whenever this compacts.
+ */
+export function formatCurrencyCompact(
+  amount: number,
+  currency: string = "INR",
+  locale = "en-IN"
+): string {
+  // Five digits or fewer (under a lakh): the reader wants the exact figure and
+  // it fits, so nothing is compacted and no tooltip is warranted.
+  if (Math.abs(amount) < 100_000) return formatCurrency(amount, currency, locale);
+  return formatCurrencyShort(amount, currency);
+}
+
 /** Compact number formatting: 1_500 -> "1.5K", 2_400_000 -> "2.4M". */
 export function formatNumber(num: number): string {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
   return num.toString();
+}
+
+// Kept as names for the billing-period callers that already read them. They were
+// a second, character-for-character copy of the two tables at the top of this
+// file until they were pointed at them — one set of month names per app.
+export const MONTH_LABELS = MONTHS_LONG;
+
+/** The same twelve, abbreviated — for anything laying months out in a grid. */
+export const MONTH_SHORT_LABELS = MONTHS_SHORT;
+
+/** (2026, 7) → "August 2026". `monthIndex` is 0-based, as Date reports it. */
+export function formatMonthYearLabel(year: number, monthIndex: number): string {
+  return `${MONTHS_LONG[monthIndex]} ${year}`;
+}
+
+/** "2026-08" → "August 2026". Returns the raw value if it isn't a "YYYY-MM" pair. */
+export function formatMonthLabel(periodMonth: string): string {
+  const [year, month] = periodMonth.split("-");
+  const name = MONTHS_LONG[Number(month) - 1];
+  if (!year || !name) return periodMonth;
+  return formatMonthYearLabel(Number(year), Number(month) - 1);
+}
+
+// ── Date keys ────────────────────────────────────────────────────────────────
+//
+// A "date key" is a calendar day written "YYYY-MM-DD" — the form the settlement
+// calendar, the duration filters and the settlement APIs all pass days around
+// in. A day, not a moment: no time, no timezone.
+//
+// These live here rather than beside the settlement calendar because three
+// separate files had grown their own private copy of parseDateKey, and the two
+// duration filters were reaching into the calendar's own module for the rest.
+
+/**
+ * "2026-08-09" → a Date at local midnight on that day.
+ *
+ * Built from the parts rather than handed to the Date constructor: `new
+ * Date("2026-08-09")` parses as UTC midnight, which is the *previous* day for
+ * anyone behind UTC, so a date key would render as the day before its own value.
+ */
+export function parseDateKey(dateKey: string): Date {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year!, month! - 1, day);
+}
+
+/** The inverse: a Date → "2026-08-09", read in local time. */
+export function formatDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/** "2026-08-09" → "Aug 9", month-first, for the settlement calendar widget. */
+export function formatShortDate(dateKey: string): string {
+  const date = parseDateKey(dateKey);
+  return `${MONTHS_SHORT[date.getMonth()]} ${date.getDate()}`;
+}
+
+/**
+ * "2026-08-09" → "9 Aug", day-first to match the rest of the dashboard.
+ * formatShortDate above is month-first, kept that way for the calendar widget it
+ * already powers.
+ */
+export function formatDayMonth(dateKey: string): string {
+  const date = parseDateKey(dateKey);
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]}`;
+}
+
+/** "2026-08-09" → "Saturday, 9 Aug". */
+export function formatWeekdayDate(dateKey: string): string {
+  return `${DAYS_LONG[parseDateKey(dateKey).getDay()]}, ${formatDayMonth(dateKey)}`;
+}
+
+/** "2026-08-09" → "Saturday". */
+export function formatWeekdayName(dateKey: string): string {
+  return DAYS_LONG[parseDateKey(dateKey).getDay()]!;
 }
 
 /**
@@ -174,7 +377,18 @@ export function formatDate(date: string | Date, options?: Intl.DateTimeFormatOpt
     ...options,
   };
 
-  const includeTime = o.hour !== undefined && o.minute !== undefined;
+  // A bare call still gets date and time, which is what most callers want. But
+  // a caller that spells out the parts it wants and names no time field is
+  // asking for a date: spreading its options over the defaults leaves hour and
+  // minute standing, so `{day, month, year}` used to render "19 Aug 2026,
+  // 05:30 AM". That is wrong for a due date or an invoice issue date, neither of
+  // which has a time at all, and callers were passing `hour: undefined,
+  // minute: undefined` to opt back out.
+  const TIME_KEYS = ["hour", "minute", "second", "hour12", "timeStyle"] as const;
+  const callerWantsTime =
+    !options || TIME_KEYS.some((key) => options[key as keyof typeof options] !== undefined);
+
+  const includeTime = callerWantsTime && o.hour !== undefined && o.minute !== undefined;
 
   let datePart: string;
   if (o.month === "long" && o.day === "numeric") {
@@ -234,18 +448,14 @@ export function parseApiDateTime(display: string | null | undefined): Date | nul
 }
 
 /**
- * The single transaction timestamp format used across the Transactions
- * table and the Transaction Details page, e.g. "24 Jul '26, 03:32 PM".
+ * The app-wide date-and-time format, e.g. "27 Jul '26, 09:49 AM".
+ *
+ * The implementation lives in flux-ui, so this app, pg-internal-v2 and any
+ * future one print a timestamp identically — the two `format.ts` files used to
+ * carry a byte-identical copy each, which is a drift waiting to happen. The
+ * names here stay as they were, because they are what every call site imports.
  */
-export function formatTransactionDateTime(date: Date): string {
-  const hours24 = date.getHours();
-  const hours12 = hours24 % 12 || 12;
-  const ampm = hours24 >= 12 ? "PM" : "AM";
-  const yy = String(date.getFullYear() % 100).padStart(2, "0");
-  const hh = String(hours12).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}, ${hh}:${min} ${ampm}`;
-}
+export const formatTransactionDateTime = formatDateTime;
 
 /**
  * Reformats a transaction timestamp into formatTransactionDateTime's display
@@ -257,23 +467,16 @@ export function formatTransactionDateTime(date: Date): string {
  */
 export function formatTransactionTimestamp(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
-  return parsed ? formatTransactionDateTime(parsed) : raw;
-}
-
-function parseIsoDateTime(raw: string): Date | null {
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
+  // Falls back to the raw string rather than an em dash: a shape the parser
+  // does not know is worth showing, because it is a bug report.
+  return parseApiDate(raw) ? formatTimestamp(raw) : raw;
 }
 
 /**
- * Date-only variant of formatTransactionDateTime, e.g. "24 Jul '26" — same
+ * Date-only variant of formatTransactionDateTime, e.g. "27 Jul '26" — same
  * day/month/year formatting, no time-of-day portion.
  */
-export function formatTransactionDate(date: Date): string {
-  const yy = String(date.getFullYear() % 100).padStart(2, "0");
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}`;
-}
+export const formatTransactionDate = formatDateOnly;
 
 /**
  * Reformats a transaction timestamp into formatTransactionDate's date-only
@@ -283,8 +486,60 @@ export function formatTransactionDate(date: Date): string {
  */
 export function formatTransactionDateOnly(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
-  return parsed ? formatTransactionDate(parsed) : raw;
+  return parseApiDate(raw) ? formatDateStamp(raw) : raw;
+}
+
+/**
+ * Parses epoch milliseconds, which several APIs send as a string rather than a
+ * number ("1771329858260").
+ *
+ * The string form is why this exists as its own step: `new Date("1771329858260")`
+ * is an Invalid Date, since the Date constructor reads a string as a date
+ * *format*, not as a count of milliseconds. It has to go through Number first,
+ * and every caller that forgot got a silently broken date.
+ */
+export function parseEpochMillis(value: string | number | null | undefined): Date | null {
+  if (value === null || value === undefined || value === "") return null;
+  const millis = Number(value);
+  if (!Number.isFinite(millis)) return null;
+  const date = new Date(millis);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Epoch millis → the app-wide transaction timestamp form, "24 Jul '26, 03:32 PM".
+ *
+ * `fallback` is what an absent or unparseable value renders as. It defaults to
+ * the em dash every other formatter here falls back to; the settlement timeline
+ * passes "" instead, because a step whose timestamp is not meaningful yet omits
+ * the line rather than showing a placeholder inside a sentence.
+ */
+export function formatEpochDateTime(
+  value: string | number | null | undefined,
+  fallback = "—"
+): string {
+  const date = parseEpochMillis(value);
+  return date ? formatTransactionDateTime(date) : fallback;
+}
+
+/** Epoch millis → date only, "31 Aug 2026". */
+export function formatEpochDate(value: string | number | null | undefined, fallback = "—"): string {
+  const date = parseEpochMillis(value);
+  if (!date) return fallback;
+  return formatDate(date, { day: "2-digit", month: "short", year: "numeric" });
+}
+
+/**
+ * Weekday, ordinal day, month, no year, e.g. "Mon, 24th Aug". Used for the
+ * Analytics card's "Next settlement" line, where naming the day of the week
+ * reads better than a bare calendar date this close to the present.
+ */
+export function formatNextSettlementDate(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const parsed = parseApiDate(raw);
+  if (!parsed) return raw;
+  const day = parsed.getDate();
+  return `${DAYS_SHORT[parsed.getDay()]}, ${day}${ordinalSuffix(day)} ${MONTHS_SHORT[parsed.getMonth()]}`;
 }
 
 /**

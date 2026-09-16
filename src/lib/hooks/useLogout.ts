@@ -2,6 +2,7 @@
 
 import { useCallback } from "react";
 import { logoutApi } from "@/api";
+import { withBasePath } from "@/constants/basePath";
 import { useGet } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -13,7 +14,8 @@ export function useLogout(): { logout: () => void; isLoading: boolean } {
 
   const logout = useCallback(() => {
     refetch().catch(() => {}); // best-effort, don't block on server response
-    window.location.href = "/login";
+    // Raw navigation, so the base path has to be added by hand.
+    window.location.href = withBasePath("/login");
     reset();
     resetAccountSetup();
   }, [refetch, reset, resetAccountSetup]);

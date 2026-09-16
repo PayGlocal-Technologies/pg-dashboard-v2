@@ -12,8 +12,17 @@ import {
 
 interface ClientContractUploadProps {
   id: string;
-  value: { name: string; size: number } | null;
-  onChange: (next: { name: string; size: number } | null) => void;
+  value: { name: string; size?: number; file?: File } | null;
+  onChange: (next: { name: string; size?: number; file?: File } | null) => void;
+  /**
+   * Opens the contract already stored against this client. Passed only when there
+   * is one: the URL is a presigned GET fetched at the moment of the click, so
+   * there is nothing to offer for a file that has not been saved yet.
+   */
+  onViewStored?: () => void;
+  /** Removes the stored contract server-side. Distinct from clearing the field:
+   *  clearing a just-picked file needs no call, deleting a saved one does. */
+  onRemoveStored?: () => void;
 }
 
 /**
@@ -28,11 +37,18 @@ interface ClientContractUploadProps {
  * arrangement, not a new one of those.
  *
  * Single-file, unlike SkuMediaUpload's gallery: a client has one contract, and
- * choosing another replaces it. Nothing is uploaded anywhere — there is no
- * document endpoint — so only the name and size are kept, which is what the
- * record stores.
+ * choosing another replaces it. The picked File is handed up alongside its name
+ * and size, because the upload happens after the client is saved — a contract can
+ * only be attached to a client that already exists — so the form has to keep hold
+ * of the bytes until then (see useClientContractUpload).
  */
-export function ClientContractUpload({ id, value, onChange }: ClientContractUploadProps) {
+export function ClientContractUpload({
+  id,
+  value,
+  onChange,
+  onViewStored,
+  onRemoveStored,
+}: ClientContractUploadProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -50,7 +66,7 @@ export function ClientContractUpload({ id, value, onChange }: ClientContractUplo
       return;
     }
     setError(null);
-    onChange({ name: file.name, size: file.size });
+    onChange({ name: file.name, size: file.size, file });
   };
 
   return (
@@ -79,8 +95,26 @@ export function ClientContractUpload({ id, value, onChange }: ClientContractUplo
           <Icon name="file-text" className="h-4 w-4 shrink-0 text-muted-foreground" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[12.5px] font-medium text-foreground">{value.name}</p>
-            <p className="text-[11px] text-muted-foreground">{formatFileSize(value.size)}</p>
+            {/* Size only when we know it — a file picked in this session. A
+                contract loaded from the server has none: the API's contract
+                object carries a filename and an id but no size, so the line is
+                dropped rather than showing a zero or a dash under every stored
+                document. */}
+            {value.size !== undefined ? (
+              <p className="text-[11px] text-muted-foreground">{formatFileSize(value.size)}</p>
+            ) : null}
           </div>
+          {onViewStored ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onViewStored}
+              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+            >
+              View
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -97,6 +131,9 @@ export function ClientContractUpload({ id, value, onChange }: ClientContractUplo
             size="sm"
             onClick={() => {
               setError(null);
+              // A stored contract has to be deleted server-side; clearing the
+              // field alone would leave it attached and the form showing nothing.
+              onRemoveStored?.();
               onChange(null);
             }}
             className="shrink-0"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { withBasePath } from "@/constants/basePath";
 import { useForm } from "@tanstack/react-form";
 import { Button, Field, FieldError, FieldLabel, OtpInput, Separator } from "@/components/ui";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
@@ -74,7 +75,9 @@ export function OtpForm({ setScreen }: LoginScreenProps) {
           } else if (res.status === "AUTHENTICATION_FOR_PHONE_NUMBER_CAPTURE") {
             setScreen("phoneNumber");
           } else if (res.status === "AUTHENTICATED_FOR_SELF_ONBOARDING") {
-            window.location.href = "/gl-gcc/self-onboarding";
+            // Left unprefixed by withBasePath: /gl-gcc is the separate
+            // legacy app, not a route this one serves.
+            window.location.href = withBasePath("/gl-gcc/self-onboarding");
           }
         },
         onError: (err) => setApiError(err.message),

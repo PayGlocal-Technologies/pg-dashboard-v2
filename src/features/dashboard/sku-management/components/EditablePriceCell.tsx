@@ -17,7 +17,6 @@ import {
 import { currencySymbol, formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { SKU_PRICE_LOCALE } from "@/features/dashboard/sku-management/constants";
-import type { SkuCurrency } from "@/features/dashboard/sku-management/types";
 
 /**
  * A price the merchant can retype, but only ever a valid one:
@@ -45,7 +44,9 @@ interface EditablePriceCellProps {
    *  from `field`) keeps the two in sync with whatever the column is called. */
   label: string;
   value: number;
-  currency: SkuCurrency;
+  /** Widened with SkuProduct.currency: a fetched row can be priced in a code
+   *  outside the seven the form offers, and formatCurrency takes any string. */
+  currency: string;
   onSave: (next: number) => void;
   /** Selling price is the figure merchants scan for and is emphasised in the
    *  table; product cost trails it as muted secondary text. */

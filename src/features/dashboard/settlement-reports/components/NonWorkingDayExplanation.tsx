@@ -1,9 +1,7 @@
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import {
-  formatWeekdayDate,
-  type NonWorkingDayReason,
-} from "@/features/dashboard/settlement-reports/calendarUtils";
+import { formatWeekdayDate } from "@/lib/utils/format";
+import type { NonWorkingDayReason } from "@/features/dashboard/settlement-reports/calendarUtils";
 
 interface NonWorkingDayExplanationProps {
   /** YYYY-MM-DD, "Day 0". */

@@ -33,3 +33,19 @@ export const SETTLEMENT_ANALYTICS_BY_ACCOUNT: SettlementAnalyticsRow[] = [
   { accountId: "sg-sgd", settledUsd: 2_900, transactionCount: 92 },
   { accountId: "row-swift", settledUsd: 1_600, transactionCount: 33 },
 ];
+
+/**
+ * TODO: replace with the real UTR once a per-transaction field exists.
+ * Checked McaTransaction, PaymentTimelineData, FxSettlementEvent, and
+ * TxnAccountDetails (types.ts): none carry one. The only real UTR in this
+ * codebase lives on settlement-reports' SettlementRow, which is a
+ * bank-settlement-batch record, not linked here to an individual
+ * transaction. Deterministic pseudo-value from the gid, so it stays stable
+ * across re-renders and matches between the two places it's shown: beside
+ * "FIRC issuance" in the collapsed timeline (buildSettlementTimeline.tsx),
+ * and its own row in Payment Details (TransactionDetailsPage.tsx).
+ */
+export function getMockUtrNumber(gid: string): string {
+  const digits = gid.replace(/\D/g, "");
+  return (digits.slice(-16) || "1234567890123456").padStart(16, "0");
+}

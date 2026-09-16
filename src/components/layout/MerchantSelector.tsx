@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Button } from "@/components/ui";
+import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -10,27 +10,15 @@ import { merchantProductsApi } from "@/api";
 import { toast } from "sonner";
 import type { MerchantEnabledProducts } from "@/stores/useApp";
 import type { BaseResponse } from "@/types/common";
+import { MidAvatar, MID_STATUS_DOT } from "@/components/common/MidAvatar";
 import { cn } from "@/lib/utils";
 
 const COLOR_SET = ["#E5B5FF", "#D4FFB5", "#A9FFCB"];
-
-const AVATAR_PALETTES: [string, string][] = [
-  ["#e0f2fe", "#0369a1"],
-  ["#fce7f3", "#9d174d"],
-  ["#d1fae5", "#065f46"],
-  ["#ede9fe", "#5b21b6"],
-];
 
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: "Active",
   INACTIVE: "Inactive",
   DISABLED: "Disabled",
-};
-
-const STATUS_DOT_COLOR: Record<string, string> = {
-  ACTIVE: "#22c55e",
-  INACTIVE: "#f59e0b",
-  DISABLED: "#9ca3af",
 };
 
 const STATUS_BADGE_STYLE: Record<string, React.CSSProperties> = {
@@ -39,23 +27,20 @@ const STATUS_BADGE_STYLE: Record<string, React.CSSProperties> = {
   DISABLED: { background: "#f9fafb", color: "#9ca3af" },
 };
 
-function MidAvatar({ name, size = "sm" }: { name: string; size?: "sm" | "md" }) {
-  const initials = name.slice(0, 2).toUpperCase();
-  const [bg, color] = AVATAR_PALETTES[name.charCodeAt(0) % AVATAR_PALETTES.length];
-  return (
-    <div
-      className={cn(
-        "flex flex-shrink-0 items-center justify-center font-bold",
-        size === "md" ? "h-8 w-8 rounded-lg text-[13px]" : "h-6 w-6 rounded-md text-[10px]"
-      )}
-      style={{ background: bg, color }}
-    >
-      {initials}
-    </div>
-  );
-}
-
 type TagUpdateVars = { dynamicUrl: string };
+
+/**
+ * Whether this account has more than one MID to pick between. The selector
+ * itself renders nothing when it doesn't, so the Sidebar reads the same
+ * condition to drop the wrapper holding it, otherwise that wrapper's padding
+ * and bottom border survive as an empty banded strip with a divider under it.
+ */
+export function useHasMultipleMids(): boolean {
+  const paMidIds = useApp((s) => s.paMids);
+  const paCbMidIds = useApp((s) => s.paCbMids);
+  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  return paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+}
 
 interface MerchantSelectorProps {
   /** Sidebar is collapsed to icon-only width, shrink the trigger to match. */
@@ -104,7 +89,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
     [paCbMidInfos, paMidInfos]
   );
 
-  const isMultiMids = paMidIds.length > 1 || (paCbMidIds.length > 1 && isMultiMidUser);
+  const isMultiMids = useHasMultipleMids();
 
   const {
     data: merchantProductsData,
@@ -350,7 +335,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
               </p>
               {activeProduct ? (
                 <div className="space-y-0.5">
-                  {activeMids.map(({ mid, status, tradeName, displayTag }) =>
+                  {activeMids.map(({ mid, status, tradeName, displayTag, merchantWebsite }) =>
                     editingMid === mid ? (
                       <div
                         key={mid}
@@ -427,13 +412,35 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
                         <div
                           className="h-1.5 w-1.5 flex-shrink-0 rounded-full"
                           style={{
-                            background: STATUS_DOT_COLOR[status] ?? "#9ca3af",
+                            background: MID_STATUS_DOT[status] ?? "#9ca3af",
                           }}
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-[12.5px] font-medium text-foreground">
-                            {displayTag || tradeName}
-                          </p>
+                          <div className="flex items-center gap-1">
+                            <p className="truncate text-[12.5px] font-medium text-foreground">
+                              {displayTag || tradeName}
+                            </p>
+                            {merchantWebsite && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span
+                                      className="inline-flex flex-shrink-0 text-muted-foreground"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <Icon name="info" size={11} />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent
+                                    className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+                                    sideOffset={4}
+                                  >
+                                    {merchantWebsite}
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <p className="truncate text-[10.5px] text-muted-foreground">{mid}</p>
                         </div>
                         <div className="flex flex-shrink-0 items-center gap-1">

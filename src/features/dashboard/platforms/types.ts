@@ -31,7 +31,7 @@ export interface PlatformStep {
   quickAccess?: boolean;
 }
 
-/** A document card in the sidebar's "Documents you might need" list. */
+/** A document card in the "Documents you might need" list. */
 export interface PlatformDocument {
   /** Small caption above the title, e.g. "Last 3 months" or the platform name. */
   caption: string;
@@ -41,12 +41,12 @@ export interface PlatformDocument {
   /** Accessible name for that button — the caption/title alone aren't enough. */
   actionLabel: string;
   /**
-   * Whether the row's action opens the settlement statement form instead of
-   * downloading something directly. The Platforms page opens that form in a
-   * drawer; rows without it keep the placeholder toast until their endpoint
-   * exists.
+   * Which drawer the card opens. Both documents are generated from details the
+   * merchant has to confirm first, so neither downloads straight from the card
+   * — the same two drawers pg-dashboard opens ("transactionReport" and
+   * "downloadReport" in its PwDrawers mapper).
    */
-  opensSettlementForm?: boolean;
+  opens: "transaction-report" | "settlement-statement";
 }
 
 /** A payout platform a merchant can point a PayGlocal virtual account at. */

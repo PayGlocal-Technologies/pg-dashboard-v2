@@ -7,34 +7,39 @@ import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
+import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
+import { AskEchoHeaderButton } from "@/components/layout/AskEchoButton";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { SwitchToOldViewButton } from "@/components/layout/SwitchToOldViewButton";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
-import { useProductContext } from "@/stores/useProductContext";
-import type { ProductType } from "@/lib/hooks/useResolvedMids";
+import { useProductContext, type NavContext } from "@/stores/useProductContext";
 
 /**
- * The 4 tabs represent 3 products: Payments (PA) and Multi-Currency Accounts
- * (PACB) each own a `product` tag, Home is a combined overview of both (no
- * tag, doesn't touch the active product) and Partners is unrelated.
+ * The 4 tabs represent 3 contexts: Home (combined overview), Payments (PA)
+ * and Multi-Currency Accounts (PACB), each carrying a `context` tag read by
+ * useProductContext.ts. Partners is unrelated and carries none.
  *
- * Most feature routes (/reports/settlement-report, /team-management, ...) are
- * shared by both products, so clicking a tab sets which product those screens
- * resolve data for (see useProductContext.ts) rather than navigating to a
- * distinct per-product page. Transactions is the exception: it is two real
- * routes, /pa-transactions and /mca-transactions, so the Payments tab lands on
- * its own table directly. Multi-Currency Accounts has no landing page of its
- * own yet, so its tab opens the settlement dashboard, scoped to PACB.
+ * Each tab lands on its context's own dashboard (/dashboard, /pa-dashboard,
+ * /mca-dashboard) and sets the active context, which decides both the Sidebar
+ * nav tree shown (the short Home tree, the MCA tree, or the full Payments
+ * tree) and the data the feature screens beneath it resolve. Many of those
+ * screens are shared by all three contexts (/team-management, ...), so the
+ * same URL renders different data depending on the tab last picked, while a
+ * few, like Transactions, are genuinely separate routes per product.
  */
-const HEADER_TABS: { label: string; href: string; product?: ProductType }[] = [
-  { label: "Home", href: "/dashboard" },
-  // /pa-transactions, not /transactions: the single segment-toggled page this
-  // tab originally pointed at was split into the PA and MCA tables, and the
-  // PA one is this tab's product.
-  { label: "Payments", href: "/pa-transactions", product: "PA" },
-  { label: "Multi-Currency Accounts", href: "/reports/settlement-report", product: "PACB" },
+const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
+  { label: "Home", href: "/dashboard", context: "HOME" },
+  // Each product tab lands on that product's own dashboard, the same way Home
+  // lands on /dashboard, rather than on one of its inner feature tables.
+  { label: "Payments", href: "/pa-dashboard", context: "PA" },
+  { label: "Multi-Currency Accounts", href: "/mca-dashboard", context: "PACB" },
   { label: "Partners", href: "/refer-and-earn" },
 ] as const;
+
+// OUT OF SCOPE — Create button hidden for now. Flip back to true to restore.
+const SHOW_CREATE_BUTTON = false;
 
 const CREATE_ITEMS = [
   {
@@ -61,8 +66,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const selectedMidDetails = useAccountSetup((s) => s.selectedMidDetails);
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
 
-  const activeProduct = useProductContext((s) => s.activeProduct);
-  const setActiveProduct = useProductContext((s) => s.setActiveProduct);
+  const activeContext = useProductContext((s) => s.activeContext);
+  const setActiveContext = useProductContext((s) => s.setActiveContext);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createHover, setCreateHover] = useState(false);
@@ -72,6 +77,39 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const pathname = usePathname();
 
   const isMultiMids = paMids.length > 1 || (paCbMids.length > 1 && isMultiMidUser);
+
+  // Only the products this account actually holds MIDs for get a tab. "Home"
+  // is the *combined* overview of both, so it only earns its place when the
+  // account has both, a single-product merchant's Home would just duplicate
+  // that product's own dashboard. Partners is unrelated to MIDs and always
+  // shows. Note both MID lists start empty and fill in once the account loads,
+  // so the tab row grows in rather than flashing tabs the account can't use.
+  const hasPa = paMids.length > 0;
+  const hasPacb = paCbMids.length > 0;
+  const visibleTabs = useMemo(
+    () =>
+      HEADER_TABS.filter((tab) => {
+        if (tab.context === "HOME") return hasPa && hasPacb;
+        if (tab.context === "PA") return hasPa;
+        if (tab.context === "PACB") return hasPacb;
+        return true;
+      }),
+    [hasPa, hasPacb]
+  );
+
+  // A persisted context whose tab this account doesn't have (most commonly the
+  // "HOME" default on a single-product merchant) would leave no tab
+  // highlighted and the Sidebar rendering a nav tree with no way back to it.
+  // Fall back to the first product tab the account does have. Deferred through
+  // a zero-delay timer rather than called straight from the effect body, per
+  // the no-synchronous-setState-in-effects rule in CLAUDE.md.
+  useEffect(() => {
+    if (visibleTabs.some((tab) => tab.context === activeContext)) return;
+    const fallback = visibleTabs.find((tab) => tab.context)?.context;
+    if (!fallback) return;
+    const timer = window.setTimeout(() => setActiveContext(fallback), 0);
+    return () => window.clearTimeout(timer);
+  }, [visibleTabs, activeContext, setActiveContext]);
 
   const tradeName = useMemo(
     () => tidsInfo.find((t) => t.mid === selectedMidDetails.mid)?.tradeName ?? "",
@@ -104,20 +142,21 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         {/* Top-level category tabs */}
         {!isPartnerUser && (
           <nav className="hidden items-center gap-1 md:flex">
-            {HEADER_TABS.map((tab) => {
-              // Payments and MCA currently share the same feature routes, so
-              // their highlight is driven by the active product context, not
-              // the URL, Home/Partners still key off their own unique route.
-              const onHomeOrPartners =
-                pathname === "/dashboard" || pathname.startsWith("/refer-and-earn");
-              const isActive = tab.product
-                ? activeProduct === tab.product && !onHomeOrPartners
+            {visibleTabs.map((tab) => {
+              // Home/Payments/MCA currently share the same feature routes, so
+              // their highlight is driven by the active context, not the URL.
+              // Partners still keys off its own unique route (it has no
+              // context tag, and never touches activeContext on click).
+              const onPartners =
+                pathname === "/refer-and-earn" || pathname.startsWith("/refer-and-earn/");
+              const isActive = tab.context
+                ? activeContext === tab.context && !onPartners
                 : pathname === tab.href || pathname.startsWith(tab.href + "/");
               return (
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  onClick={() => tab.product && setActiveProduct(tab.product)}
+                  onClick={() => tab.context && setActiveContext(tab.context)}
                   className={cn(
                     "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
                     isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
@@ -130,13 +169,17 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </nav>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* Global search — takes the space the spacer used to hold, pushed
+            right by its own ml-auto so the product tabs keep their position.
+            Resolves entirely in the browser from the sidebar's nav trees, see
+            GlobalSearch. */}
+        <GlobalSearch />
 
         {/* Actions */}
         <div className="flex items-center gap-2">
-          {/* Notification bell */}
-          <Button
+          {/* OUT OF SCOPE — Notification bell hidden for now (no notifications
+              backend yet). Restore by un-commenting this block. */}
+          {/* <Button
             type="button"
             variant="ghost"
             className="relative w-9 h-9 rounded-lg bg-muted border border-border hover:bg-accent flex items-center justify-center transition-colors"
@@ -144,21 +187,22 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           >
             <Icon name="bell" size={17} className="text-muted-foreground" />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-header" />
-          </Button>
+          </Button> */}
+
+          {/* Escape hatch to pg-dashboard (v1), with a two-question feedback
+              ask on the way out — see SwitchToOldViewButton. */}
+          <SwitchToOldViewButton />
 
           <ThemeToggle />
 
-          {/* Help */}
-          <Button
-            type="button"
-            variant="ghost"
-            className="w-9 h-9 rounded-lg bg-muted border border-border hover:bg-accent flex items-center justify-center transition-colors"
-            aria-label="Help"
-          >
-            <Icon name="help-circle" size={17} className="text-muted-foreground" />
-          </Button>
+          {/* Help — support contacts and hours, see HeaderHelpMenu. */}
+          <HeaderHelpMenu />
+
+          {/* Ask Echo — toggles the side panel, see AskEchoButton. */}
+          <AskEchoHeaderButton />
 
           {/* Create button */}
+          {SHOW_CREATE_BUTTON && (
           <div ref={createRef} className="relative">
             <AnimatePresence>
               {createHover && !createOpen && (
@@ -241,22 +285,28 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               )}
             </AnimatePresence>
           </div>
+          )}
         </div>
       </header>
 
-      {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode */}
+      {/* "Viewing as" ribbon, shown when a MID is selected in multi-MID mode.
+          Flux's primary-light tint rather than the per-merchant
+          `selectedMidDetails.color` this used to carry — that colour still
+          lives in the store and still marks the row in MerchantSelector's own
+          list, but this ribbon reads as a system-level notice, so it takes the
+          app's one fixed primary treatment instead of a colour that changes
+          with which merchant is selected. primary-light (not the solid
+          primary blue) plus primary-text keeps this a quiet strip rather than
+          a loud banner, while staying on the same primary token family. */}
       {showRibbon && (
-        <div
-          className="flex items-center justify-between px-4 py-1.5 text-[13px]"
-          style={{ backgroundColor: selectedMidDetails.color || "#f3f4f6" }}
-        >
-          <span className="text-gray-800">
+        <div className="flex items-center justify-between bg-primary-light px-4 py-1.5 text-[13px] text-[var(--primary-text)]">
+          <span>
             Viewing as <strong>{tradeName}</strong>
           </span>
           <Button
             type="button"
             variant="ghost"
-            className="h-auto min-h-0 p-0 font-medium text-gray-800 underline transition-opacity hover:opacity-70 hover:bg-transparent"
+            className="h-auto min-h-0 p-0 font-medium text-[var(--primary-text)] underline transition-opacity hover:opacity-70 hover:bg-transparent"
             onClick={() => setSelectedMidDetails({ mid: "", status: "", color: "" })}
           >
             Switch to main view

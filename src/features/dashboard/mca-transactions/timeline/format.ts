@@ -47,13 +47,11 @@ export function formatEventTime(value: string | null | undefined, show = true): 
   return formatted === "—" ? "" : formatted;
 }
 
-/** Epoch millis → the same display format, for valueDateTime. */
-export function formatEpochMillis(value: string | number | null | undefined): string {
-  if (value === null || value === undefined || value === "") return "";
-  const millis = Number(value);
-  if (Number.isNaN(millis)) return "";
-  return formatTransactionTimestamp(new Date(millis).toISOString());
-}
+// Epoch millis formatting used to live here as `formatEpochMillis`, which meant
+// zoho-integration had to reach across into this feature's timeline internals to
+// get at it. It is `formatEpochDateTime` in @/lib/utils/format now — same output,
+// and callers pass "" as the fallback to keep this file's convention of omitting
+// a line rather than rendering a placeholder into one.
 
 /** Strips any path prefix the API includes on an uploaded file's name. */
 export function fileNameFrom(value: string | null | undefined): string {

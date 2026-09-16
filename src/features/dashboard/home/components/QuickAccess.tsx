@@ -31,7 +31,7 @@ const quickActions: QuickActionItem[] = [
 // Mirrors Nova's quickAccessCardClass. Applied via Button's className override so
 // the Flux Button renders as Nova's bordered tile (no variant background bleed).
 const quickAccessCardClass = cn(
-  "group flex h-auto w-[9rem] shrink-0 flex-col items-start gap-2 rounded-xl border border-border bg-card text-left sm:w-[9.25rem]",
+  "group flex h-auto w-[11rem] shrink-0 flex-col items-start gap-2 rounded-xl border border-border bg-card text-left sm:w-[11.5rem]",
   "px-3.5 pb-2.5 pt-3.5 shadow-sm transition-shadow duration-150",
   "hover:bg-muted/40 hover:shadow"
 );
@@ -53,7 +53,9 @@ const ACTION_ROUTES: Record<QuickActionId, string> = {
   // pg-dashboard, which opens it from a banner there), not a page of its own —
   // so this tile goes to that page rather than to a route that doesn't exist.
   "fx-calculator": "/multi-currency",
-  "international-accounts": "/international-accounts",
+  // Same page: Virtual accounts is this app's international-accounts screen,
+  // there is no separate /international-accounts route.
+  "international-accounts": "/multi-currency",
   "manage-dispute": "/disputes",
 };
 
@@ -100,7 +102,7 @@ export function QuickAccess({
             <Button
               variant="ghost"
               onClick={handleEditDashboard}
-              className={cn(quickAccessCardClass, "w-[9.25rem] sm:w-[9.75rem]")}
+              className={cn(quickAccessCardClass, "w-46 sm:w-48")}
               aria-label="Customise your dashboard layout"
             >
               <Icon name="settings" className="h-4 w-4 shrink-0 text-primary" aria-hidden />

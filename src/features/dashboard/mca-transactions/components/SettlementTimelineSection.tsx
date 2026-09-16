@@ -11,6 +11,7 @@ import {
   mcaTxnTimelineApi,
 } from "@/features/dashboard/mca-transactions/services";
 import { useDocumentDownload, useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
+import { useVirtualAccounts } from "@/features/dashboard/multi-currency/hooks";
 import {
   buildSettlementTimeline,
   getDocumentPendingMessage,
@@ -95,6 +96,11 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
 
   const { downloadFirc, isDownloading: isFircDownloading } = useFircDownload();
   const { downloadDocument } = useDocumentDownload();
+  // Fallback source for the first step's masked account number when this
+  // transaction's own timeline data doesn't carry accountDetails: the
+  // merchant's real virtual account for the transaction's currency, from the
+  // same live endpoint the Multi-currency Accounts page itself reads.
+  const { accounts: virtualAccounts } = useVirtualAccounts("general");
 
   // Which thread the queries drawer opens on depends on what prompted it —
   // null means closed.
@@ -118,6 +124,7 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
         isFundDelayed: timeline?.isFundDelayed ?? false,
         isSameBankSettlement: timeline?.isSameBankSettlement ?? false,
         accountDetails: timeline?.accountDetails,
+        virtualAccounts,
         onDownloadDocument: downloadDocument,
         onDownloadFirc: () => downloadFirc(row.merchantId, row.gid),
         isFircDownloading,

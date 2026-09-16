@@ -1,15 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Button, EmptyState, Shimmer, StatusBadge } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { Shimmer, StatusBadge } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils/format";
-import { cn } from "@/lib/utils";
 import { SKU_PRICE_LOCALE, SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
-function SkuCardSkeleton() {
+export function SkuCardSkeleton() {
   return (
     <div className="flex gap-3 rounded-xl border border-border bg-card px-4 py-3.5">
       <Shimmer className="h-[70px] w-[70px] shrink-0" rounded="lg" />
@@ -22,9 +20,33 @@ function SkuCardSkeleton() {
   );
 }
 
-function SkuCard({ row, actions }: { row: SkuProduct; actions?: ReactNode }) {
+export function SkuCard({
+  row,
+  actions,
+  onPreview,
+}: {
+  row: SkuProduct;
+  actions?: ReactNode;
+  onPreview: (product: SkuProduct) => void;
+}) {
   return (
-    <div className="flex gap-3 rounded-xl border border-border bg-card px-4 py-3.5">
+    // The whole card opens the preview, the touch equivalent of the table's
+    // whole-row click. Keyboard-reachable too, since it isn't a real button.
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={`Preview ${row.name}`}
+      aria-haspopup="dialog"
+      data-guide="mca-sku-image"
+      onClick={() => onPreview(row)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPreview(row);
+        }
+      }}
+      className="flex cursor-pointer gap-3 rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+    >
       <ProductThumbnail product={row} className="shrink-0" />
 
       {/* min-w-0 so the long description below can actually truncate inside
@@ -38,10 +60,14 @@ function SkuCard({ row, actions }: { row: SkuProduct; actions?: ReactNode }) {
           <div className="flex shrink-0 items-start gap-1">
             <StatusBadge
               variant={row.type === "GOODS" ? "info" : "muted"}
-              label={SKU_TYPE_LABEL[row.type]}
+              label={row.type ? SKU_TYPE_LABEL[row.type] : "—"}
               size="sm"
             />
-            {actions}
+            {/* Fenced off from the card's own click, so the overflow menu
+                opens without also opening the preview behind it. */}
+            <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+              {actions}
+            </span>
           </div>
         </div>
 
@@ -62,83 +88,6 @@ function SkuCard({ row, actions }: { row: SkuProduct; actions?: ReactNode }) {
 
         <p className="mt-2 line-clamp-2 text-[12px] text-muted-foreground">{row.description}</p>
       </div>
-    </div>
-  );
-}
-
-interface SkuCardListProps {
-  rows: SkuProduct[];
-  isLoading: boolean;
-  /** Per-row overflow menu, mirroring DataTable's own `rowAction` signature so
-   *  the table and the card list are fed by the same call site. */
-  rowAction?: (row: SkuProduct) => ReactNode;
-  skeletonCount?: number;
-  page: number;
-  onPageChange: (page: number) => void;
-  totalRows: number;
-  pageSize: number;
-  emptyTitle: string;
-  emptyDescription?: string;
-  className?: string;
-}
-
-/**
- * Mobile/tablet stand-in for DataTable, the same arrangement the Transactions
- * page uses (see TransactionCardList): `rows` is already the current page's
- * slice, so this only lays it out as cards and adds the compact pager.
- */
-export function SkuCardList({
-  rows,
-  isLoading,
-  rowAction,
-  skeletonCount = 6,
-  page,
-  onPageChange,
-  totalRows,
-  pageSize,
-  emptyTitle,
-  emptyDescription,
-  className,
-}: SkuCardListProps) {
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-
-  return (
-    <div className={cn("flex flex-col gap-3 p-4", className)}>
-      {isLoading ? (
-        Array.from({ length: skeletonCount }).map((_, i) => <SkuCardSkeleton key={i} />)
-      ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
-      ) : (
-        rows.map((row) => <SkuCard key={row.id} row={row} actions={rowAction?.(row)} />)
-      )}
-
-      {!isLoading && rows.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
-          >
-            Prev
-          </Button>
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            rightIcon={<Icon name="chevron-right" className="h-3.5 w-3.5" />}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

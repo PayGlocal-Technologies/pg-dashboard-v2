@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useGet } from "@/lib/api/hooks";
 import {
+  mcaCurrencySplitApi,
+  mcaDocumentPendingApi,
+  mcaDocumentPendingByCurrencyApi,
   mcaFircDownloadApi,
+  mcaInvoiceOriginsApi,
   mcaOverviewByMidApi,
   mcaOverviewByUcicApi,
+  mcaSavedAmountApi,
+  mcaSettledByAccountApi,
+  mcaSettledCurrencyTrendApi,
   mcaTxnDocumentPresignApi,
   merchantProfileApi,
   merchantPurposeCodesApi,
@@ -15,15 +22,30 @@ import {
   allPurposeCodeOptions,
   toPurposeCodeOptions,
   type PurposeCodeOption,
-} from "@/features/dashboard/mca-transactions/purposeCodes";
-import { useApp } from "@/stores/useApp";
+} from "@/lib/purposeCodes";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useApp } from "@/stores/useApp";
 import type {
+  CurrencySplitData,
+  CurrencySplitResponse,
+  DocumentPendingByCurrencyData,
+  DocumentPendingByCurrencyResponse,
+  DocumentPendingData,
+  DocumentPendingResponse,
   FircDownloadResponse,
+  InvoiceOriginsData,
+  InvoiceOriginsResponse,
   McaOverviewData,
   McaOverviewResponse,
   MerchantProfileResponse,
   PresignedUrlResponse,
+  SavedAmountData,
+  SavedAmountResponse,
+  SettledByAccountData,
+  SettledByAccountResponse,
+  SettledCurrencyTrendResponse,
+  SettledCurrencyTrendRow,
   SuggestedPurposeCodesResponse,
 } from "@/features/dashboard/mca-transactions/types";
 
@@ -187,15 +209,11 @@ export function useMcaOverview(): {
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-
-  const scopeId = urlMid || ucicId;
-  const url = urlMid ? mcaOverviewByMidApi(urlMid) : mcaOverviewByUcicApi(ucicId);
+  const { scopeId, scope, isReady } = useScopeId("PACB");
+  const url = scope === "mid" ? mcaOverviewByMidApi(scopeId) : mcaOverviewByUcicApi(scopeId);
 
   const { data, isPending, isError } = useGet<McaOverviewResponse>(["mca-overview", scopeId], url, {
-    enabled: isReady && !!scopeId,
+    enabled: isReady,
   });
 
   return {
@@ -203,6 +221,152 @@ export function useMcaOverview(): {
     isLoading: isPending,
     isError,
   };
+}
+
+/**
+ * Per-account settled amount + count for a timeframe, scoped like useMcaOverview.
+ * Backs SettlementAnalyticsCard's KPI + per-account bars.
+ */
+export function useSettledByAccount(timeframe: string): {
+  settled: SettledByAccountData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<SettledByAccountResponse>(
+    ["mca-settled-by-account", merchantId, timeframe],
+    mcaSettledByAccountApi(merchantId, timeframe),
+    { enabled: isReady }
+  );
+
+  return { settled: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Per-account (currency) settled totals + monthly series, scoped like
+ * useSettledByAccount. Backs the Multi-Currency "Settled amount" region
+ * breakdown. Each row carries a native-currency total and an INR total; ₹ views
+ * read the INR figure since a mix of currencies only sums in one.
+ */
+export function useSettledCurrencyTrend(): {
+  currencies: SettledCurrencyTrendRow[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<SettledCurrencyTrendResponse>(
+    ["mca-settled-currency-trend", merchantId],
+    mcaSettledCurrencyTrendApi(merchantId),
+    { enabled: isReady }
+  );
+
+  return { currencies: data?.data?.currencies, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Documents pending amount + count for a timeframe (today | week | month |
+ * ytd). Backs OutstandingAmountCard's headline. Scoped like useSettledByAccount:
+ * a selected MID, else the UCIC roll-up.
+ */
+export function useDocumentPending(timeframe: string): {
+  documentPending: DocumentPendingData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<DocumentPendingResponse>(
+    ["mca-document-pending", merchantId, timeframe],
+    mcaDocumentPendingApi(merchantId, timeframe),
+    { enabled: isReady }
+  );
+
+  return { documentPending: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Documents pending broken down by currency — a live snapshot of everything
+ * currently DOCUMENT_PENDING (no timeframe). Scoped like useDocumentPending.
+ */
+export function useDocumentPendingByCurrency(): {
+  breakdown: DocumentPendingByCurrencyData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<DocumentPendingByCurrencyResponse>(
+    ["mca-document-pending-by-currency", merchantId],
+    mcaDocumentPendingByCurrencyApi(merchantId),
+    { enabled: isReady }
+  );
+
+  return { breakdown: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Saved amount vs banks — overall + per-timeframe breakdown. Scoped like
+ * useMcaOverview. Backs SavedAmountCard.
+ */
+export function useSavedAmount(): {
+  saved: SavedAmountData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<SavedAmountResponse>(
+    ["mca-saved-amount", merchantId],
+    mcaSavedAmountApi(merchantId),
+    { enabled: isReady }
+  );
+
+  return { saved: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Per-country invoice origins over a date range, scoped like useMcaOverview
+ * (selected MID, else the UCIC roll-up). Empty dates let the backend default
+ * the window. Backs McaInvoiceOriginsCard.
+ */
+export function useInvoiceOrigins(
+  startDate: string,
+  endDate: string
+): { origins: InvoiceOriginsData | undefined; isLoading: boolean; isError: boolean } {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<InvoiceOriginsResponse>(
+    ["mca-invoice-origins", merchantId, startDate, endDate],
+    mcaInvoiceOriginsApi(merchantId, startDate, endDate),
+    { enabled: isReady }
+  );
+
+  return { origins: data?.data, isLoading: isReady && isPending, isError };
+}
+
+/**
+ * Per-currency amount/count split over a date range, scoped like useMcaOverview.
+ * Envelope-tolerant: reads `data` if present, else the flat body. Backs
+ * McaCurrencySplitCard.
+ */
+export function useCurrencySplit(
+  startDate: string,
+  endDate: string
+): { split: CurrencySplitData | undefined; isLoading: boolean; isError: boolean } {
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
+
+  const { data, isPending, isError } = useGet<CurrencySplitResponse>(
+    ["mca-currency-split", merchantId, startDate, endDate],
+    mcaCurrencySplitApi(merchantId, startDate, endDate),
+    { enabled: isReady }
+  );
+
+  const body = data?.data ?? data;
+  const split = body?.slices ? (body as CurrencySplitData) : undefined;
+
+  return { split, isLoading: isReady && isPending, isError };
 }
 
 /** Metric values arrive as either a number or a numeric string. */

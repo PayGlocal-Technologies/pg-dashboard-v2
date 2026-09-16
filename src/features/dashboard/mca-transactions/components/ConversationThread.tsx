@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatEpochMillis } from "@/features/dashboard/mca-transactions/timeline/format";
+import { formatEpochDateTime } from "@/lib/utils/format";
 import type { FrmConversationEntry } from "@/features/dashboard/mca-transactions/types";
 
 // One query thread, oldest message first. Ops and compliance both surface as
@@ -76,7 +76,7 @@ export function ConversationThread({
                 <span className="text-[12px] text-muted-foreground">{author}</span>
               )}
               <span className="ml-auto whitespace-nowrap text-[11px] text-muted-foreground">
-                {formatEpochMillis(entry.creationTime)}
+                {formatEpochDateTime(entry.creationTime, "")}
               </span>
             </div>
 

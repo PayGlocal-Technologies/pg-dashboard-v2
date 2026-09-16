@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
+import { AppImage as Image } from "@/components/common/AppImage";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { flagSrc } from "@/features/dashboard/multi-currency/utils";

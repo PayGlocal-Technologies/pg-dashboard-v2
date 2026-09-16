@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { heartbeatApi } from "@/api";
 import { PUBLIC_ROUTE_PATTERNS, PUBLIC_ROUTE_PREFIXES } from "@/constants/publicRoutes";
 
-const AUTHED_HOME = "/mca-transactions";
+const AUTHED_HOME = "/mca-dashboard";
 
 /**
  * Paths that global-tenant users (identified by ?isGlobal=true) are allowed to

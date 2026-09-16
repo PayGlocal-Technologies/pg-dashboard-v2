@@ -3,7 +3,10 @@
 import { useRef, useState, type UIEvent } from "react";
 import { ProgressIndicator } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { SettlementAnalyticsCard } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
+import {
+  SettlementAnalyticsCard,
+  type TimeRange,
+} from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { SavedAmountCard } from "@/features/dashboard/mca-transactions/components/SavedAmountCard";
 
@@ -28,6 +31,15 @@ const LAST_PAGE = PAGE_LABELS.length - 1;
 // controls at, so the whole page moves to its "mobile" presentation at one
 // width instead of the analytics section switching early on its own.
 const PAGE_CLASSES = "w-full shrink-0 snap-start lg:w-auto";
+
+/** Section TimeRange → the document-pending endpoint's timeframe param. Same
+ *  mapping the settled/saved cards use internally. */
+const TIMEFRAME_BY_RANGE: Record<TimeRange, string> = {
+  today: "today",
+  week: "week",
+  month: "month",
+  year: "ytd",
+};
 
 // Both of these take the element as a parameter rather than reading
 // scrollRef.current inline, matching restoreScrollTop in McaTransactionTable:
@@ -62,8 +74,19 @@ function scrollToPage(el: HTMLDivElement, index: number): void {
  *   Outstanding + Saved stack as a secondary column, both filling the same
  *   overall height. No carousel and no indicator there, so desktop layout is
  *   unchanged beyond that column split and height match.
+ *
+ * The time-range control itself lives in the page header now (see
+ * McaTransactionsFeature/AnalyticsTimeRangeControl), in line with the
+ * "Transactions" title rather than inside this section; timeRange just
+ * arrives here as a prop to pass down to Settlement Analytics and Saved
+ * Amount. Neither's live endpoint actually has a period parameter (see
+ * SettlementAnalyticsCard's own TIME_RANGE_MULTIPLIERS comment), so both
+ * scale a real lifetime figure by the same approximation multiplier rather
+ * than showing a genuine per-period total. Outstanding Amount isn't wired to
+ * it at all: its own KPI (settlementsDue) is a live balance, not something a
+ * historical time window applies to.
  */
-export function TransactionsAnalyticsCarousel() {
+export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRange }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activePage, setActivePage] = useState(0);
 
@@ -97,7 +120,7 @@ export function TransactionsAnalyticsCarousel() {
             page instead (see PAGE_CLASSES), where the card's own height is
             left alone, unchanged from before. */}
         <div className={PAGE_CLASSES}>
-          <SettlementAnalyticsCard className="lg:h-full" />
+          <SettlementAnalyticsCard className="lg:h-full" timeRange={timeRange} />
         </div>
 
         {/* grow (not flex-1, whose 0 basis would force both cards to the same
@@ -110,8 +133,8 @@ export function TransactionsAnalyticsCarousel() {
             below lg via the carousel's own row-direction flex (which
             stretches by the same default), from lg up via the grid. */}
         <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
-          <OutstandingAmountCard className="grow" />
-          <SavedAmountCard className="grow" />
+          <OutstandingAmountCard className="grow" timeframe={TIMEFRAME_BY_RANGE[timeRange]} />
+          <SavedAmountCard className="grow" timeRange={timeRange} />
         </div>
       </div>
 

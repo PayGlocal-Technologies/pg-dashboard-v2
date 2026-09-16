@@ -345,3 +345,171 @@ export interface McaOverviewResponse {
   errors?: unknown;
   data: McaOverviewData;
 }
+
+// ── Invoice origins (per-country analytics) ──────────────────────────────────
+// Shape of /analytics/{merchantId}/merchant/mca/invoice-origins.
+
+export interface InvoiceOriginRowApi {
+  countryCode: string;
+  amount: number;
+  invoiceCount: number;
+  sharePct: number;
+}
+
+export interface InvoiceOriginTotals {
+  totalInvoiced: number;
+  totalInvoicedTrendPct: number;
+  avgPerCountry: number;
+  avgPerCountryTrendPct: number;
+  topCountry: { countryCode: string; sharePct: number; shareTrendPct: number };
+  activeMarkets: number;
+  activeMarketsTrendPct: number;
+}
+
+export interface InvoiceOriginsData {
+  startDate: string;
+  endDate: string;
+  reportingCurrency: string;
+  totals: InvoiceOriginTotals;
+  rows: InvoiceOriginRowApi[];
+}
+
+export interface InvoiceOriginsResponse {
+  message?: string;
+  errors?: unknown;
+  data: InvoiceOriginsData;
+}
+
+// ── Currency split ───────────────────────────────────────────────────────────
+
+export interface CurrencySplitSliceApi {
+  currency: string;
+  amount: number;
+  amountPct: number;
+  count: number;
+  countPct: number;
+}
+
+export interface CurrencySplitData {
+  reportingCurrency: string;
+  totalAmount: number;
+  totalCount: number;
+  slices: CurrencySplitSliceApi[];
+}
+
+/** Envelope-tolerant: the sampled response was flat, but every other analytics
+ *  endpoint wraps in `data`, so the hook reads whichever is present. */
+export type CurrencySplitResponse = {
+  data?: CurrencySplitData | null;
+} & Partial<CurrencySplitData>;
+
+// ── Settled by account ───────────────────────────────────────────────────────
+
+export interface SettledAccountRow {
+  currency: string;
+  amount: number;
+  count: number;
+}
+
+export interface SettledByAccountData {
+  timeframe: string;
+  totalAmount: number;
+  totalCount: number;
+  accounts: SettledAccountRow[];
+}
+
+export interface SettledByAccountResponse {
+  data: SettledByAccountData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Saved amount ─────────────────────────────────────────────────────────────
+
+export interface SavedAmountTimeframeRow {
+  timeframe: string;
+  amount: number;
+  count: number;
+}
+
+export interface SavedAmountData {
+  currency: string;
+  overallAmount: number;
+  overallCount: number;
+  timeframes: SavedAmountTimeframeRow[];
+}
+
+export interface SavedAmountResponse {
+  data: SavedAmountData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Documents pending ────────────────────────────────────────────────────────
+
+/** Amount + count of DOCUMENT_PENDING transactions for a timeframe. */
+export interface DocumentPendingData {
+  timeframe: string;
+  reportingCurrency: string;
+  amount: number;
+  count: number;
+}
+
+export interface DocumentPendingResponse {
+  data: DocumentPendingData;
+  message?: string;
+  errors?: unknown;
+}
+
+/** One currency's slice of the currently-pending snapshot. */
+export interface DocumentPendingCurrencyRow {
+  currency: string;
+  amount: number;
+  count: number;
+}
+
+export interface DocumentPendingByCurrencyData {
+  totalAmount: number;
+  totalCount: number;
+  currencies: DocumentPendingCurrencyRow[];
+}
+
+export interface DocumentPendingByCurrencyResponse {
+  data: DocumentPendingByCurrencyData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Settled currency trend ───────────────────────────────────────────────────
+// Per-account (currency) settled totals + a monthly series. `amount` is in the
+// account's own currency; `inrAmount` is that figure converted to INR, which is
+// what the ₹ bars/totals read from since a mix of currencies only sums in one.
+
+export interface SettledCurrencyPoint {
+  month: string;
+  periodStart: string;
+  amount: number;
+  inrAmount: number;
+  count: number;
+}
+
+export interface SettledCurrencyTrendRow {
+  currency: string;
+  totalAmount: number;
+  totalInrAmount: number;
+  totalCount: number;
+  /** null when there's no prior period to compare against. */
+  changePercentage: number | null;
+  comparisonLabel: string;
+  points: SettledCurrencyPoint[];
+}
+
+export interface SettledCurrencyTrendData {
+  currencies: SettledCurrencyTrendRow[];
+}
+
+export interface SettledCurrencyTrendResponse {
+  data: SettledCurrencyTrendData;
+  message?: string;
+  errors?: unknown;
+}

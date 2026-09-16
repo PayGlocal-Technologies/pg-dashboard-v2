@@ -46,11 +46,11 @@ function MenuAction({
 
 interface SkuRowActionsProps {
   product: SkuProduct;
-  /** Archived rows swap Edit/Archive for Unarchive; Delete is on both. */
-  archived: boolean;
   onEdit: (product: SkuProduct) => void;
-  onArchive: (product: SkuProduct) => void;
-  onUnarchive: (product: SkuProduct) => void;
+  /** Server-side copy of the row (POST .../duplicate), which is where the
+   *  Archive/Unarchive pair used to sit. The catalogue API has no archive
+   *  concept, so there was nothing behind those two to wire. */
+  onDuplicate: (product: SkuProduct) => void;
   onDelete: (product: SkuProduct) => void;
   className?: string;
 }
@@ -75,10 +75,8 @@ interface SkuRowActionsProps {
  */
 export function SkuRowActions({
   product,
-  archived,
   onEdit,
-  onArchive,
-  onUnarchive,
+  onDuplicate,
   onDelete,
   className,
 }: SkuRowActionsProps) {
@@ -118,22 +116,12 @@ export function SkuRowActions({
           container's and the card's clipping, flips above the button near the
           bottom of the viewport, and shifts inward near the right edge. */}
       <PopoverContent align="end" collisionPadding={8} className="w-44 p-1">
-        {archived ? (
-          <MenuAction
-            icon="archive-restore"
-            label="Unarchive item"
-            onSelect={select(() => onUnarchive(product))}
-          />
-        ) : (
-          <>
-            <MenuAction icon="pencil" label="Edit item" onSelect={select(() => onEdit(product))} />
-            <MenuAction
-              icon="archive"
-              label="Archive item"
-              onSelect={select(() => onArchive(product))}
-            />
-          </>
-        )}
+        <MenuAction icon="pencil" label="Edit item" onSelect={select(() => onEdit(product))} />
+        <MenuAction
+          icon="copy"
+          label="Duplicate item"
+          onSelect={select(() => onDuplicate(product))}
+        />
 
         {/* Delete is fenced off from the reversible actions above it, so it
             can't be hit by momentum on the way down the list. */}

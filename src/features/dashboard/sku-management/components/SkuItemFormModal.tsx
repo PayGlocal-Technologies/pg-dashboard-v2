@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useForm } from "@tanstack/react-form";
 import {
   Button,
@@ -33,6 +33,7 @@ import {
   SKU_TAX_CODE_FALLBACK,
   SKU_TYPE_OPTIONS,
 } from "@/features/dashboard/sku-management/constants";
+import { useMcaCurrencies } from "@/features/dashboard/sku-management/hooks";
 import {
   emptySkuItemForm,
   validateCurrency,
@@ -45,11 +46,38 @@ import {
 import { SkuMediaUpload } from "@/features/dashboard/sku-management/components/SkuMediaUpload";
 import type { SkuItemFormValues, SkuProductType } from "@/features/dashboard/sku-management/types";
 
-/** Red asterisk before a required field's label — the same marker the Create
- *  MCA Link form uses, so required-ness reads identically across the product. */
+/**
+ * The currency select's options: `{ value, country }`, whichever source they
+ * came from.
+ *
+ * Fetched per merchant (useMcaCurrencies) because which rails a merchant holds
+ * is their configuration, not a constant. SKU_CURRENCY_OPTIONS is the fallback
+ * for the window before that call resolves and for the case where it fails, so
+ * the select is never empty — a merchant who can price in nothing at all cannot
+ * finish the form, which is worse than offering the seven common codes.
+ */
+function useCurrencyOptions(): { value: string; country: string }[] {
+  const { currencies } = useMcaCurrencies();
+
+  return useMemo(() => {
+    if (currencies.length === 0) {
+      return SKU_CURRENCY_OPTIONS.map((option) => ({
+        value: option.value as string,
+        country: option.country,
+      }));
+    }
+    return currencies.map((currency) => ({
+      value: currency.currencyCode,
+      country: currency.countryName,
+    }));
+  }, [currencies]);
+}
+
+/** Red asterisk after a required field's label — required-ness reads
+ *  identically across the product. */
 function RequiredMark() {
   return (
-    <span aria-hidden className="text-destructive">
+    <span aria-hidden className="-ml-1.5 text-destructive">
       *
     </span>
   );
@@ -156,6 +184,8 @@ function SkuItemFormBody({
   // be pointless.
   const keepOpenRef = useRef(false);
 
+  const currencyOptions = useCurrencyOptions();
+
   const form = useForm({
     defaultValues: initialValues ?? emptySkuItemForm(),
     onSubmit: ({ value, formApi }) => {
@@ -204,7 +234,7 @@ function SkuItemFormBody({
                 <FieldLabel htmlFor="sku-name">
                   {/* Names the field for both kinds of catalogue item; the
                       table still shows it under the Product column. */}
-                  <RequiredMark /> Product/Service Name
+                  Product/Service Name<RequiredMark />
                 </FieldLabel>
                 <Input
                   id="sku-name"
@@ -232,7 +262,7 @@ function SkuItemFormBody({
               {(field) => (
                 <Field>
                   <FieldLabel htmlFor="sku-type">
-                    <RequiredMark /> Type
+                    Type<RequiredMark />
                   </FieldLabel>
                   <Select
                     value={field.state.value}
@@ -283,7 +313,7 @@ function SkuItemFormBody({
                         <FieldLabel htmlFor="sku-hsn-sac">
                           {/* Named for the scheme that actually applies once a
                               type is chosen; the table column stays HSN/SAC. */}
-                          <RequiredMark /> {scheme.label}
+                          {scheme.label}<RequiredMark />
                         </FieldLabel>
                         <Input
                           id="sku-hsn-sac"
@@ -325,7 +355,7 @@ function SkuItemFormBody({
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="sku-currency">
-                          <RequiredMark /> Currency
+                          Currency<RequiredMark />
                         </FieldLabel>
                         <Select
                           value={field.state.value}
@@ -345,7 +375,7 @@ function SkuItemFormBody({
                             <SelectValue placeholder="Select" />
                           </SelectTrigger>
                           <SelectContent>
-                            {SKU_CURRENCY_OPTIONS.map((option) => (
+                            {currencyOptions.map((option) => (
                               <SelectItem key={option.value} value={option.value}>
                                 {/* The code never truncates and the country
                                     always does: whichever is dropped, the row
@@ -375,7 +405,7 @@ function SkuItemFormBody({
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="sku-selling-price">
-                          <RequiredMark /> Selling price
+                          Selling price<RequiredMark />
                         </FieldLabel>
                         <PriceInput id="sku-selling-price" symbol={symbol} field={field} />
                         <FieldError>{field.state.meta.errors[0]}</FieldError>
@@ -404,15 +434,20 @@ function SkuItemFormBody({
           </form.Subscribe>
         </div>
 
-        {/* ── Media ────────────────────────────────────────────────────── */}
+        {/* ── Media ──────────────────────────────────────────────────────
+            One image, matching what the catalogue stores. `savedImageUrl` is
+            read off the values the form opened with, so discarding a
+            replacement restores the picture the item already has rather than
+            emptying the slot. */}
         <div className="flex flex-col gap-2">
           <SectionLabel>Media</SectionLabel>
-          <form.Field name="images">
+          <form.Field name="image">
             {(field) => (
               <SkuMediaUpload
                 id="sku-media"
                 value={field.state.value}
                 onChange={(next) => field.handleChange(next)}
+                savedImageUrl={initialValues?.image?.url}
               />
             )}
           </form.Field>

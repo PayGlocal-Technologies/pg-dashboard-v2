@@ -12,7 +12,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { RollingNumber } from "@/components/common/RollingNumber";
+import { CompactAmount } from "@/components/common/CompactAmount";
+import { formatCurrency } from "@/lib/utils/format";
 import { TotalSettledCard } from "@/features/dashboard/settlement-reports/components/TotalSettledCard";
 import type { TotalSettledTimeframe } from "@/features/dashboard/settlement-reports/mock-data";
 import type { SparklinePoint } from "@/features/dashboard/settlement-reports/types";
@@ -78,20 +79,35 @@ function UtrCopyButton({ utrNumber }: UtrCopyButtonProps) {
 }
 
 interface SettlementStatCardsProps {
-  totalSettledLabel: string;
+  totalSettled: number;
   totalSettledTrendPct: number;
-  totalSettledChartsByTimeframe: Record<TotalSettledTimeframe, SparklinePoint[]>;
-  previousSettledLabel: string;
+  totalSettledComparisonLabel?: string;
+  totalSettledTimeframe: TotalSettledTimeframe;
+  onTotalSettledTimeframeChange: (timeframe: TotalSettledTimeframe) => void;
+  totalSettledChartData: SparklinePoint[];
+  previousSettledAmount: number;
   previousSettledDateLabel: string;
-  previousSettledTimeLabel: string;
   previousSettledTransactionCount: number;
-  previousSettledUtrNumber: string;
-  previousSettledGrossLabel: string;
-  previousSettledTaxLabel: string;
-  previousSettledFeeLabel: string;
+  // MOCK (hidden for now — no endpoint): rendered only when provided. index.tsx
+  // stops passing these; re-enable by un-commenting them there.
+  previousSettledTimeLabel?: string;
+  previousSettledUtrNumber?: string;
+  previousSettledGrossLabel?: string;
+  previousSettledTaxLabel?: string;
+  previousSettledFeeLabel?: string;
   onShowPreviousSettledInfo: () => void;
   onDownloadPreviousSettled: () => void;
-  upcomingSettlementLabel: string;
+  /** Whether there is a settlement to download a report for. False when the
+   * overview returned no previous settlement (a merchant who has never
+   * settled), in which case there is no settlement date to key the download
+   * endpoint on and the affordance is disabled rather than left clickable with
+   * nothing behind it. Defaults to true so the card is unchanged wherever the
+   * caller has not resolved this yet. */
+  canDownloadPreviousSettled?: boolean;
+  /** Amount due in the next settlement, live from the upcoming endpoint.
+   * null while it has not resolved (or is unsupported), which renders an em
+   * dash rather than a placeholder figure. */
+  upcomingSettlementAmount: number | null;
   upcomingSettlementTimeLabel: string;
   /** MCA only, count of transactions still waiting on an invoice upload
    * before they can be bundled into this upcoming settlement. */
@@ -100,10 +116,13 @@ interface SettlementStatCardsProps {
 }
 
 export function SettlementStatCards({
-  totalSettledLabel,
+  totalSettled,
   totalSettledTrendPct,
-  totalSettledChartsByTimeframe,
-  previousSettledLabel,
+  totalSettledComparisonLabel,
+  totalSettledTimeframe,
+  onTotalSettledTimeframeChange,
+  totalSettledChartData,
+  previousSettledAmount,
   previousSettledDateLabel,
   previousSettledTimeLabel,
   previousSettledTransactionCount,
@@ -113,7 +132,8 @@ export function SettlementStatCards({
   previousSettledFeeLabel,
   onShowPreviousSettledInfo,
   onDownloadPreviousSettled,
-  upcomingSettlementLabel,
+  canDownloadPreviousSettled = true,
+  upcomingSettlementAmount,
   upcomingSettlementTimeLabel,
   pendingInvoiceCount,
   onUploadInvoice,
@@ -122,9 +142,12 @@ export function SettlementStatCards({
     <div className="grid gap-3 lg:grid-cols-12 lg:items-stretch">
       <TotalSettledCard
         className="lg:col-span-8"
-        totalSettledLabel={totalSettledLabel}
+        totalSettled={totalSettled}
         totalSettledTrendPct={totalSettledTrendPct}
-        chartsByTimeframe={totalSettledChartsByTimeframe}
+        comparisonLabel={totalSettledComparisonLabel}
+        timeframe={totalSettledTimeframe}
+        onTimeframeChange={onTotalSettledTimeframeChange}
+        chartData={totalSettledChartData}
       />
 
       <div className="flex flex-col gap-3 lg:col-span-4">
@@ -137,6 +160,7 @@ export function SettlementStatCards({
               type="button"
               variant="ghost"
               onClick={onDownloadPreviousSettled}
+              disabled={!canDownloadPreviousSettled}
               aria-label="Download settlement report"
               className="h-7 w-7 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground hover:text-foreground"
             >
@@ -157,41 +181,48 @@ export function SettlementStatCards({
                 <Icon name="info" size={11} />
               </Button>
             </div>
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="link"
-                    className="h-auto w-fit justify-start p-0 text-xs font-semibold"
-                  >
-                    Settlement breakup
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="end" className="w-56 space-y-1.5 p-3">
-                  <SettlementBreakupRow label="Gross amount" value={previousSettledGrossLabel} />
-                  <SettlementBreakupRow label="Tax" value={`−${previousSettledTaxLabel}`} />
-                  <SettlementBreakupRow label="Fee" value={`−${previousSettledFeeLabel}`} />
-                  <div className="border-t border-border pt-1.5">
-                    <SettlementBreakupRow
-                      label="Net amount"
-                      value={previousSettledLabel}
-                      emphasis
-                    />
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {/* MOCK (hidden): the gross/tax/fee breakup has no endpoint — shown
+                only when index.tsx passes those props again. */}
+            {previousSettledGrossLabel && previousSettledTaxLabel && previousSettledFeeLabel && (
+              <TooltipProvider delayDuration={200}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="link"
+                      className="h-auto w-fit justify-start p-0 text-xs font-semibold"
+                    >
+                      Settlement breakup
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" align="end" className="w-56 space-y-1.5 p-3">
+                    <SettlementBreakupRow label="Gross amount" value={previousSettledGrossLabel} />
+                    <SettlementBreakupRow label="Tax" value={`−${previousSettledTaxLabel}`} />
+                    <SettlementBreakupRow label="Fee" value={`−${previousSettledFeeLabel}`} />
+                    <div className="border-t border-border pt-1.5">
+                      <SettlementBreakupRow
+                        label="Net amount"
+                        value={formatCurrency(previousSettledAmount, "INR")}
+                        emphasis
+                      />
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
           </div>
 
-          <RollingNumber
-            value={previousSettledLabel}
+          <CompactAmount
+            amount={previousSettledAmount}
+            currency="INR"
             className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
           <p className="text-xs text-muted-foreground">
-            {previousSettledDateLabel}, {previousSettledTimeLabel} ·{" "}
+            {previousSettledDateLabel}
+            {previousSettledTimeLabel ? `, ${previousSettledTimeLabel}` : ""} ·{" "}
             {previousSettledTransactionCount} transactions
           </p>
-          <UtrCopyButton utrNumber={previousSettledUtrNumber} />
+          {/* MOCK (hidden): UTR has no endpoint — shown only when passed. */}
+          {previousSettledUtrNumber && <UtrCopyButton utrNumber={previousSettledUtrNumber} />}
         </Card>
 
         <Card className="flex-1 gap-1.5 border-(--primary-border) bg-primary-light/20 p-5">
@@ -199,10 +230,17 @@ export function SettlementStatCards({
             <Icon name="arrow-up-right" size={14} aria-hidden />
           </span>
           <p className="text-[13px] font-medium text-primary">Upcoming settlement</p>
-          <RollingNumber
-            value={upcomingSettlementLabel}
-            className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-          />
+          {upcomingSettlementAmount !== null ? (
+            <CompactAmount
+              amount={upcomingSettlementAmount}
+              currency="INR"
+              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+            />
+          ) : (
+            <span className="block text-2xl font-bold tracking-tight text-foreground tabular-nums">
+              —
+            </span>
+          )}
           <p className="text-xs text-muted-foreground">{upcomingSettlementTimeLabel}</p>
 
           {!!pendingInvoiceCount && pendingInvoiceCount > 0 && (

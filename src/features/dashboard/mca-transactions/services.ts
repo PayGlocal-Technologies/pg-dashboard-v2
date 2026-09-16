@@ -115,6 +115,61 @@ export const mcaOverviewByMidApi = (mid: string) =>
 export const mcaOverviewByUcicApi = (ucicId: string) =>
   ucicId ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/getPacbOverview` : "";
 
+/** Invoice origins: per-country invoiced totals + trend headline figures, over
+ *  a date range (YYYY-MM-DD). Empty dates let the backend default the window
+ *  (~last 30 days). Backs McaInvoiceOriginsCard. */
+export const mcaInvoiceOriginsApi = (merchantId: string, startDate: string, endDate: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/mca/invoice-origins` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
+/** Currency split: per-currency amount + count shares over a date range. Drives
+ *  the currency-split donut's Volume (amountPct) and Count (countPct) toggle. */
+export const mcaCurrencySplitApi = (merchantId: string, startDate: string, endDate: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/mca/currency-split` +
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    : "";
+
+/** Settled by account: per-account settled amount + count for a timeframe
+ *  (today | week | month | ytd). Backs SettlementAnalyticsCard's per-account bars. */
+export const mcaSettledByAccountApi = (merchantId: string, timeframe: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settled-by-account` +
+      `?timeframe=${encodeURIComponent(timeframe)}`
+    : "";
+
+/** Settled currency trend: per-account (currency) settled totals + a monthly
+ *  series, in native currency and INR. Backs the Multi-Currency "Settled amount"
+ *  region breakdown. No query params. */
+export const mcaSettledCurrencyTrendApi = (merchantId: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/settled-currency-trend`
+    : "";
+
+/** Saved amount vs banks: an overall figure plus a per-timeframe breakdown
+ *  (today | week | month | ytd). Backs SavedAmountCard. No query params. */
+export const mcaSavedAmountApi = (merchantId: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/saved-amount`
+    : "";
+
+/** Documents pending amount + count for a timeframe (today | week | month |
+ *  ytd; backend defaults to today). Backs OutstandingAmountCard's headline. */
+export const mcaDocumentPendingApi = (merchantId: string, timeframe: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending` +
+      (timeframe ? `?timeframe=${encodeURIComponent(timeframe)}` : "")
+    : "";
+
+/** Documents pending broken down by currency — a live snapshot of everything
+ *  currently DOCUMENT_PENDING (no timeframe). Backs the per-currency breakdown. */
+export const mcaDocumentPendingByCurrencyApi = (merchantId: string) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-by-currency`
+    : "";
+
 /** Transactions export. POST the same OpenSearch body the table uses; the
  *  response is an xlsx blob, not JSON. */
 export const mcaTxnReportDownloadApi = (mid: string) =>

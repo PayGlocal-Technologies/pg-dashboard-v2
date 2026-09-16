@@ -60,10 +60,9 @@ export function RegionSelector({
 }: RegionSelectorProps) {
   if (variant === "cards") {
     return (
-      // p-1 (4px, uniform) for the same reason VirtualAccountList carries it:
-      // overflow-x-auto also clips the vertical axis per the CSS overflow
-      // spec, so without a small inset this would shave the selected tile's
-      // ring and every tile's rounded corners.
+      // p-1 (4px, uniform): overflow-x-auto also clips the vertical axis per
+      // the CSS overflow spec, so without a small inset this would shave the
+      // selected tile's ring and every tile's rounded corners.
       <div
         className={cn("scrollbar-none flex gap-3 overflow-x-auto p-1", className)}
         role="list"

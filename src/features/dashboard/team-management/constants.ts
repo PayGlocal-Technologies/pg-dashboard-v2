@@ -14,8 +14,9 @@ export const TEAM_STATUS_FILTERS: FilterOption[] = [
   { value: "All", label: "All" },
   { value: "ACTIVE", label: "Active" },
   { value: "NOT_REGISTERED", label: "Invite Sent" },
-  { value: "DEACTIVATED", label: "Inactive" },
-  { value: "LOCKED", label: "Locked" },
+  { value: "DEACTIVATED", label: "Deactivated" },
+  // LOCKED filter out of scope for now — locked members still surface under All.
+  // { value: "LOCKED", label: "Locked" },
 ];
 
 export interface RoleMeta {
