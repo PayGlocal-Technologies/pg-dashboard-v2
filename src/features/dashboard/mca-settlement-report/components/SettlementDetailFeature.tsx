@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import {
   Button,
   Card,
-  DataTable,
+  DataTableCard,
   Separator,
   Shimmer,
   StatusBadge,
@@ -626,19 +626,15 @@ export function SettlementDetailsContent({
         {/* No count line above the table: the heading already names it and
             the table's own footer already reports "Showing 1-3 of 3 results",
             so a third statement of the same fact only added noise. */}
-        <Card className="gap-0 overflow-hidden p-0">
-          <DataTable
-            columns={buildMcaPaymentColumns()}
-            data={payments}
-            // Clicking a payment opens it in the transactions drawer. Row-level
-            // rather than per-cell, so the whole row is the target.
-            onRowClick={(p) => setOpenPaymentGid(p.id)}
-            rowKey={(p) => p.id}
-            density="compact"
-            tableLayout="content"
-            className="rounded-none border-0"
-          />
-        </Card>
+        <DataTableCard
+          columns={buildMcaPaymentColumns()}
+          data={payments}
+          // Clicking a payment opens it in the transactions drawer. Row-level
+          // rather than per-cell, so the whole row is the target.
+          onRowClick={(p) => setOpenPaymentGid(p.id)}
+          rowKey={(p) => p.id}
+          maxBodyHeight="none"
+        />
       </section>
 
       {/* The transactions drawer, reused rather than rebuilt, so a remittance

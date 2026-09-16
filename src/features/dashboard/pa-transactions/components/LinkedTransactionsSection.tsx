@@ -36,7 +36,10 @@ export function LinkedTransactionsSection({
       rowKey={(row) => row.gid ?? ""}
       density="compact"
       tableLayout="content"
-      footerSummary="count"
+      pagination={{
+        mode: "client",
+        summary: "count",
+      }}
       rowAction={(row) => (
         <Button
           variant="outline"

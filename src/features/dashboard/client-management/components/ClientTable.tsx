@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Button, DataTable } from "@/components/ui";
+import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -9,12 +9,15 @@ import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import {
   CountryFilterChip,
+  FilterChipGroup,
   type CountryFilterOption,
 } from "@/components/common/filters/FilterChips";
-import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { reorderColumns } from "@/lib/utils/columns";
 import { buildClientColumns } from "@/features/dashboard/client-management/columns";
-import { ClientCardList } from "@/features/dashboard/client-management/components/ClientCardList";
+import {
+  ClientCard,
+  ClientCardSkeleton,
+} from "@/features/dashboard/client-management/components/ClientCardList";
 import { ClientDetailsDrawer } from "@/features/dashboard/client-management/components/ClientDetailsDrawer";
 import { ClientDetailsPage } from "@/features/dashboard/client-management/components/ClientDetailsPage";
 import { ClientFormModal } from "@/features/dashboard/client-management/components/ClientFormModal";
@@ -50,12 +53,12 @@ function restoreScrollTop(el: HTMLElement, value: number): void {
 }
 
 /**
- * The Country chip, with its popover state held per instance rather than lifted
- * to the table. Country is the only filter this list has (it is the only one
+ * The Country chip, in a `FilterChipGroup` of its own rather than one shared
+ * with the table. Country is the only filter this list has (it is the only one
  * pg-dashboard's own client list has besides its text search, which v2's search
  * box already is), so there is no second chip for a shared state to coordinate
- * with — and one open state shared across the two control rows is exactly what
- * stopped the chip working. See renderFilterChips below.
+ * with — and one open state shared across the two control rows, both of which
+ * are mounted at once, is exactly what stopped the chip working.
  */
 function ClientFilterChips({
   options,
@@ -66,16 +69,10 @@ function ClientFilterChips({
   value: string[];
   onChange: (next: string[]) => void;
 }) {
-  const [open, setOpen] = useState(false);
-
   return (
-    <CountryFilterChip
-      options={options}
-      value={value}
-      onChange={onChange}
-      open={open}
-      onOpenChange={setOpen}
-    />
+    <FilterChipGroup className="contents">
+      <CountryFilterChip options={options} value={value} onChange={onChange} />
+    </FilterChipGroup>
   );
 }
 
@@ -324,15 +321,16 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   }
 
   return (
-    // Search/filters and the table share one bordered surface, matching the
-    // Transactions and SKU pages: DataTable's own border/radius/background are
-    // neutralised below (rounded-none border-0) since this wrapper draws them,
-    // and a border-b under the control row stands in for the separator between
-    // the two. No tab bar on this page — clients have no view axis to split on.
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      {/* Desktop (lg+): search, filter chips, and Reorder Columns all share one
-          row, the reorder control pushed to the far right via ml-auto. */}
-      <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
+    // Two surfaces, one visible at a time: the table card from `lg` up, the
+    // card list below it. CSS decides, not a media-query hook — a hook has to
+    // guess on the server, so one cohort sees the wrong layout on first paint.
+    <>
+      {/* Desktop (lg+): search, filter chips, and the column manager share one
+          toolbar row, the manager pushed right via ml-auto. */}
+      <DataTableCard
+        className="hidden lg:block"
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
         <RotatingSearchInput
           value={search}
           onSearch={(v) => {
@@ -365,69 +363,45 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           >
             Refresh
           </Button>
-          <ReorderColumnsPopover
+          <ColumnManager
             columns={reorderableColumns}
             order={currentColumnOrder}
             onOrderChange={setColumnOrder}
             onReset={() => setColumnOrder(null)}
           />
         </div>
-      </div>
-
-      {/* Tablet + mobile (below lg): search on its own row, then the chips
-          beneath it on a single line that scrolls horizontally, since there's
-          no room to show all three next to search. Its scrollbar is hidden
-          (scrollbar-none, the same utility the multi-currency carousel uses)
-          so the chips read as a row of controls rather than a scroll region:
-          the gesture still works, there's just no persistent indicator.
-
-          No Reorder Columns at either width, matching the Transactions page:
-          there's no table to reorder columns on below lg, just the card
-          list. */}
-      <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
-        <RotatingSearchInput
-          value={search}
-          onSearch={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
-          words={CLIENT_SEARCH_HINTS}
-          ariaLabel="Search clients by business name, contact name, or email"
-          className="min-w-0 flex-1"
-        />
-        <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-          {renderFilterChips()}
-        </div>
-      </div>
-
-      {/* Desktop (lg+): the full table, columns and all. */}
-      {!isLoading && pageRows.length === 0 ? (
-        <PlaceholderState
-          variant="no-data"
-          title={emptyTitle}
-          description={emptyDescription}
-          className="hidden py-16 lg:flex"
-        />
-      ) : (
-        <DataTable
-          className="hidden rounded-none border-0 lg:block"
-          columns={columns}
-          data={pageRows}
-          emptyTitle={emptyTitle}
-          emptyDescription={emptyDescription}
-          rowKey={(row) => row.id}
-          // The whole row opens the details view, through DataTable's row-level
-          // handler rather than a wrapper inside every cell. Clicks on the
-          // row's own buttons and menus are skipped by it, so each still does
-          // only its own job.
-          onRowClick={openDetails}
-          pageSize={CLIENT_PAGE_LIMIT}
-          totalRows={totalCount}
-          page={page}
-          onPageChange={setPage}
-          tableLayout="content"
-          density="compact"
-          isLoading={isLoading}
+          </div>
+        }
+        columns={columns}
+        data={pageRows}
+        rowKey={(row) => row.id}
+        isLoading={isLoading}
+        // The whole row opens the details view, through DataTable's row-level
+        // handler rather than a wrapper inside every cell. Clicks on the row's
+        // own buttons and menus are skipped by it, so each still does only its
+        // own job.
+        onRowClick={openDetails}
+        // The drawn first-run state, kept from before the card.
+        emptyState={
+          <PlaceholderState
+            variant="no-data"
+            title={emptyTitle}
+            description={emptyDescription}
+            className="py-16"
+          />
+        }
+        emptyTitle={emptyTitle}
+        emptyDescription={emptyDescription}
+        pagination={{
+          mode: "page",
+          page,
+          pageSize: CLIENT_PAGE_LIMIT,
+          total: totalCount,
+          onPageChange: setPage,
+        }}
+        tableLayout="content"
+        // The page scrolls; this grid grows with its rows.
+        maxBodyHeight="none"
           // Edit rides the rowAction slot rather than a column of its own — the
           // same arrangement, and the same button treatment, as the Upload Invoice
           // action on the client's transactions table. Revealed on row hover and on
@@ -450,23 +424,52 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
               Edit
             </Button>
           )}
-        />
-      )}
-
-      {/* Tablet + mobile (below lg): the same page's rows as cards. */}
-      <ClientCardList
-        className="lg:hidden"
-        rows={pageRows}
-        isLoading={isLoading}
-        onOpenDetails={openDetails}
-        page={page}
-        onPageChange={setPage}
-        totalRows={totalCount}
-        pageSize={CLIENT_PAGE_LIMIT}
-        emptyTitle={emptyTitle}
-        emptyDescription={emptyDescription}
       />
 
+      {/* Tablet + mobile (below lg): the same page's rows as cards, in their
+          own copy of the same surface — its own toolbar, since a column
+          manager has no table to act on down here. */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+        <RotatingSearchInput
+          value={search}
+          onSearch={(v) => {
+            setSearch(v);
+            setPage(1);
+          }}
+          words={CLIENT_SEARCH_HINTS}
+          ariaLabel="Search clients by business name, contact name, or email"
+          className="min-w-0 flex-1"
+        />
+        <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+          {renderFilterChips()}
+        </div>
+        </div>
+
+        <DataCardList
+          bordered={false}
+          rows={pageRows}
+          rowKey={(row) => row.id}
+          renderCard={(row) => <ClientCard row={row} onOpenDetails={openDetails} />}
+          renderSkeleton={() => <ClientCardSkeleton />}
+          isLoading={isLoading}
+          emptyState={
+            <PlaceholderState
+              variant="no-data"
+              size="sm"
+              title={emptyTitle}
+              description={emptyDescription}
+            />
+          }
+          pagination={{
+            mode: "page",
+            page,
+            pageSize: CLIENT_PAGE_LIMIT,
+            total: totalCount,
+            onPageChange: setPage,
+          }}
+        />
+      </div>
       {/* Rendered alongside the table (not in place of it) so closing it leaves
           the table's search, filters, and page exactly as they were. */}
       <ClientDetailsDrawer
@@ -505,6 +508,6 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
             : undefined
         }
       />
-    </div>
+    </>
   );
 }

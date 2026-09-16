@@ -209,7 +209,7 @@ export function IssueDateChip({
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-auto p-2">
-        {/* bg-transparent: see the note in DateRangeCalendarPicker — flux's
+        {/* bg-transparent: see the note in flux's CalendarDateFilterChip — flux's
             Calendar cannot detect that it is inside a popover, so it paints the
             page background over the popover's own surface. */}
         <Calendar

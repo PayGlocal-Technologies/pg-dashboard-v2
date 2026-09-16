@@ -4,7 +4,7 @@ import { CopyableCell } from "@/components/common/CopyableCell";
 import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
 
 // Every reorderable/hideable data column lives here, keyed so
-// TransactionColumnsMenu (reused as-is from the transactions feature) can
+// ColumnManager can
 // toggle visibility and reorder independently of the trailing rowAction
 // space, which isn't a real column.
 /**

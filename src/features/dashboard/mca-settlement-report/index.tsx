@@ -11,9 +11,8 @@ import { useApp } from "@/stores/useApp";
 import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { Button, Card, DataTable, PageHeader } from "@/components/ui";
+import { ColumnManager, Button, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import type { TableReqBody } from "@/types/transactions";
 import { cn } from "@/lib/utils";
 import { formatDayMonth, formatWeekdayDate, formatWeekdayName } from "@/lib/utils/format";
@@ -405,120 +404,121 @@ export function McaSettlementReportFeature() {
               />
             </div>
 
-            <Card className="gap-0 overflow-hidden p-0">
-              {/* Same toolbar as the MCA transactions table: one flex row
-                  divided off by a bottom border, search left, filters beside
-                  it, actions pushed right, and every action on the same
-                  compact h-auto/py-1 height. */}
-              <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-                <RotatingSearchInput
-                  value={search}
-                  onSearch={onSearch}
-                  words={["Settlement date", "Merchant ID"]}
-                  className="w-40 sm:w-56"
-                />
-
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
-                </div>
-
-                <div className="ml-auto flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    leftIcon={
-                      <Icon
-                        name="refresh"
-                        className={cn("h-3.5 w-3.5", isListLoading && "animate-spin")}
-                      />
-                    }
-                    onClick={refetchList}
-                    disabled={isListLoading}
-                    className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-                  >
-                    Refresh
-                  </Button>
-                  <ReorderColumnsPopover
-                    columns={columnDefs}
-                    order={effectiveColumnOrder}
-                    onOrderChange={setColumnOrder}
-                    onReset={onResetColumns}
-                    hiddenKeys={hiddenColumns}
-                    onHiddenKeysChange={setHiddenColumns}
-                    fixedKeys={[SETTLEMENT_LOCKED_COLUMN]}
-                    fixedReason="Always shown. A settlement row is unreadable without its date."
+            <DataTableCard<SettlementRow>
+              /* Same toolbar as the MCA transactions table: one flex row
+                 divided off by a bottom border, search left, filters beside
+                 it, actions pushed right, and every action on the same
+                 compact h-auto/py-1 height. */
+              toolbar={
+                <div className="flex flex-wrap items-center gap-2">
+                  <RotatingSearchInput
+                    value={search}
+                    onSearch={onSearch}
+                    words={["Settlement date", "Merchant ID"]}
+                    className="w-40 sm:w-56"
                   />
-                </div>
-              </div>
 
-              {isListError ? (
-                <PlaceholderState
-                  variant="error"
-                  title="Couldn't load settlements"
-                  description="Something went wrong while fetching data."
-                  className="py-14"
-                  action={
-                    <Button variant="outline" size="sm" onClick={refetchList}>
-                      Retry
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
+                  </div>
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={
+                        <Icon
+                          name="refresh"
+                          className={cn("h-3.5 w-3.5", isListLoading && "animate-spin")}
+                        />
+                      }
+                      onClick={refetchList}
+                      disabled={isListLoading}
+                      className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                    >
+                      Refresh
                     </Button>
-                  }
-                />
-              ) : !isListLoading && filteredEnhancedRows.length === 0 ? (
+                    <ColumnManager
+                      columns={columnDefs}
+                      order={effectiveColumnOrder}
+                      onOrderChange={setColumnOrder}
+                      onReset={onResetColumns}
+                      hiddenKeys={hiddenColumns}
+                      onHiddenKeysChange={setHiddenColumns}
+                      fixedKeys={[SETTLEMENT_LOCKED_COLUMN]}
+                      fixedReason="Always shown. A settlement row is unreadable without its date."
+                    />
+                  </div>
+                </div>
+              }
+              errorState={
+                isListError ? (
+                  <PlaceholderState
+                    variant="error"
+                    title="Couldn't load settlements"
+                    description="Something went wrong while fetching data."
+                    className="py-14"
+                    action={
+                      <Button variant="outline" size="sm" onClick={refetchList}>
+                        Retry
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
+              emptyState={
                 <PlaceholderState
                   variant="no-settlements"
                   title="No settlements yet"
                   description="Settlement reports will appear here once transactions are processed."
                   className="py-14"
                 />
-              ) : (
-                <DataTable
-                  columns={buildSettlementColumns({
-                    columnOrder: effectiveColumnOrder,
-                    hiddenColumns,
-                    showMerchantId,
-                  })}
-                  // The whole row opens the drawer, via DataTable's own
-                  // row-level handler rather than a wrapper inside every cell.
-                  // Clicks on the row's buttons (Download, View details, the
-                  // Merchant ID copy control) are skipped by it, so each of
-                  // those still does only its own job.
-                  onRowClick={openDetailsDrawer}
-                  data={filteredEnhancedRows}
-                  isLoading={isListLoading}
-                  skeletonRows={8}
-                  emptyTitle="No settlements yet"
-                  emptyDescription="Settlement reports will appear here once transactions are processed"
-                  rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
-                  // Server-side: the endpoint pages, so the table is told the
-                  // filtered total rather than counting the page in hand.
-                  pageSize={SETTLEMENT_TABLE_PAGE_SIZE}
-                  page={page}
-                  onPageChange={setPage}
-                  totalRows={listTotalCount}
-                  density="compact"
-                  tableLayout="content"
-                  className="rounded-none border-0"
-                  // Download is the only hover-revealed row action. No "View
-                  // details" button beside it: the row itself opens the drawer
-                  // (see onRowClick above), so a button for the same thing was
-                  // a second affordance for the row's own default action.
-                  // Download does not need to stop propagation, since
-                  // onRowClick already ignores clicks landing inside a button.
-                  rowAction={(row) => (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => downloadRowReport(row)}
-                      leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
-                      className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                    >
-                      Download
-                    </Button>
-                  )}
-                />
+              }
+              columns={buildSettlementColumns({
+                columnOrder: effectiveColumnOrder,
+                hiddenColumns,
+                showMerchantId,
+              })}
+              // The whole row opens the drawer, via DataTable's own
+              // row-level handler rather than a wrapper inside every cell.
+              // Clicks on the row's buttons (Download, View details, the
+              // Merchant ID copy control) are skipped by it, so each of
+              // those still does only its own job.
+              onRowClick={openDetailsDrawer}
+              data={filteredEnhancedRows}
+              isLoading={isListLoading}
+              emptyTitle="No settlements yet"
+              emptyDescription="Settlement reports will appear here once transactions are processed"
+              rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
+              // Server-side: the endpoint pages, so the table is told the
+              // filtered total rather than counting the page in hand.
+              pagination={{
+                mode: "page",
+                page,
+                pageSize: SETTLEMENT_TABLE_PAGE_SIZE,
+                total: listTotalCount,
+                onPageChange: setPage,
+              }}
+              maxBodyHeight="none"
+              // Download is the only hover-revealed row action. No "View
+              // details" button beside it: the row itself opens the drawer
+              // (see onRowClick above), so a button for the same thing was
+              // a second affordance for the row's own default action.
+              // Download does not need to stop propagation, since
+              // onRowClick already ignores clicks landing inside a button.
+              rowAction={(row) => (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => downloadRowReport(row)}
+                  leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
+                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                >
+                  Download
+                </Button>
               )}
-            </Card>
+            />
           </div>
 
           {showCycleInfo && (

@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Button, Card, DataTable, PageHeader } from "@/components/ui";
+import { Button, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { FilterChipGroup } from "@/components/common/filters/FilterChips";
 import { formatCurrency } from "@/lib/utils";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -161,76 +162,66 @@ export function PaymentLinksFeature() {
        * sharing one border/rounded container, the table sits directly
        * beneath with only a top border, same hierarchy as the Settlement
        * Reports and Transactions tables. */}
-      <Card className="gap-0 overflow-hidden p-0">
-        <div className="pl-5 pr-3 pb-3 pt-5">
-          <div className="space-y-3">
-            <SegmentedTabs
-              options={PAYMENT_LINK_STATUS_FILTERS}
-              value={status}
-              onChange={onStatus}
+      <DataTableCard<PaymentLinkRow>
+        tabs={
+          <SegmentedTabs options={PAYMENT_LINK_STATUS_FILTERS} value={status} onChange={onStatus} />
+        }
+        toolbar={
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <RotatingSearchInput
+              value={search}
+              onSearch={onSearch}
+              words={["customer name", "email", "payment link"]}
+              className="min-w-40 max-w-xs flex-1"
             />
 
-            {/* Thin top divider separates the filter bar from the tabs
-             * above instead of its own bordered/boxed container. */}
-            <div className="border-t border-border pt-3 flex items-center gap-2.5 flex-wrap">
-              <RotatingSearchInput
-                value={search}
-                onSearch={onSearch}
-                words={["customer name", "email", "payment link"]}
-                className="min-w-40 max-w-xs flex-1"
+            <div className="hidden sm:block h-4 w-px bg-border" />
+
+            <FilterChipGroup className="flex items-center gap-2 flex-wrap">
+              <PaymentLinksDateFilter value={dateFilter} onChange={setDateFilter} />
+              <PaymentLinksAmountFilter value={amountRange} onChange={setAmountRange} />
+              <MultiSelectChipFilter
+                value={currency}
+                options={currencyOptions}
+                onChange={setCurrency}
+                placeholder="Currency"
               />
-
-              <div className="hidden sm:block h-4 w-px bg-border" />
-
-              <div className="flex items-center gap-2 flex-wrap">
-                <PaymentLinksDateFilter value={dateFilter} onChange={setDateFilter} />
-                <PaymentLinksAmountFilter value={amountRange} onChange={setAmountRange} />
-                <MultiSelectChipFilter
-                  value={currency}
-                  options={currencyOptions}
-                  onChange={setCurrency}
-                  placeholder="Currency"
-                />
-              </div>
-            </div>
+            </FilterChipGroup>
           </div>
-        </div>
-
-        {filteredRows.length === 0 ? (
+        }
+        emptyState={
           <PlaceholderState
             variant="no-payment-links"
             title="No payment links found"
             description="Try adjusting your filters or search query"
-            className="border-t border-border py-16"
+            className="py-16"
           />
-        ) : (
-          <DataTable
-            columns={paymentLinkColumns}
-            data={filteredRows}
-            emptyTitle="No payment links found"
-            emptyDescription="Try adjusting your filters or search query"
-            rowKey={(row) => row.id}
-            // The whole row opens the link's details, through DataTable's
-            // row-level handler rather than a wrapper around every cell.
-            onRowClick={openDetails}
-            pageSize={PAYMENT_LINKS_PAGE_LIMIT}
-            density="compact"
-            tableLayout="content"
-            className="rounded-none border-0 border-t border-border"
-            rowAction={(row) => (
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Icon name="eye" className="h-2.5 w-2.5" />}
-                onClick={() => openDetails(row)}
-                className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-              >
-                View details
-              </Button>
-            )}
-          />
+        }
+        columns={paymentLinkColumns}
+        data={filteredRows}
+        emptyTitle="No payment links found"
+        emptyDescription="Try adjusting your filters or search query"
+        rowKey={(row) => row.id}
+        // The whole row opens the link's details, through DataTable's
+        // row-level handler rather than a wrapper around every cell.
+        onRowClick={openDetails}
+        pagination={{
+          mode: "client",
+          pageSize: PAYMENT_LINKS_PAGE_LIMIT,
+        }}
+        maxBodyHeight="none"
+        rowAction={(row) => (
+          <Button
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="eye" className="h-2.5 w-2.5" />}
+            onClick={() => openDetails(row)}
+            className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+          >
+            View details
+          </Button>
         )}
-      </Card>
+      />
 
       <PaymentLinkDetailsModal row={detailsRow} open={detailsOpen} onOpenChange={setDetailsOpen} />
       <CreatePaymentLinkModal

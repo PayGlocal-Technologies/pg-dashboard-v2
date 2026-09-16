@@ -6,6 +6,7 @@ import {
   MonthRangeFilterChip,
   type AmountRangeValue,
   type MonthRange,
+  FilterChipGroup,
 } from "@/components/common/filters/FilterChips";
 import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/mca-receipts/constants";
 
@@ -36,7 +37,6 @@ import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/mca-receipts/constants
  * carries the same note for the same reason.)
  */
 export function ReceiptFilterChips({
-  idPrefix,
   amountRange,
   onAmountRangeChange,
   periodBounds,
@@ -45,13 +45,6 @@ export function ReceiptFilterChips({
   defaultPeriod,
   onPeriodChange,
 }: {
-  /**
-   * Distinguishes the Amount popover's min/max input ids between the two mounted
-   * copies of this row. Both are in the DOM at once (only CSS hides one), so a
-   * shared prefix would put duplicate ids on the page and point each `<label>` at
-   * whichever input happened to come first — the hidden one.
-   */
-  idPrefix: string;
   amountRange: AmountRangeValue;
   onAmountRangeChange: (next: AmountRangeValue) => void;
   /** The outer limits the Period grid can navigate within. */
@@ -63,16 +56,13 @@ export function ReceiptFilterChips({
   defaultPeriod: MonthRange;
   onPeriodChange: (next: MonthRange) => void;
 }) {
-  const [openChip, setOpenChip] = useState<"amount" | "period" | null>(null);
-
   return (
-    <>
+    // `contents` so the group adds no box of its own — the chips stay direct
+    // children of the toolbar row that renders this.
+    <FilterChipGroup className="contents">
       <AmountFilterChip
         value={amountRange}
         onChange={onAmountRangeChange}
-        open={openChip === "amount"}
-        onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
-        idPrefix={idPrefix}
         hint={RECEIPT_AMOUNT_HINT}
       />
       <MonthRangeFilterChip
@@ -81,9 +71,7 @@ export function ReceiptFilterChips({
         defaultRange={defaultPeriod}
         monthsWithData={monthsWithData}
         onChange={onPeriodChange}
-        open={openChip === "period"}
-        onOpenChange={(next) => setOpenChip(next ? "period" : null)}
       />
-    </>
+    </FilterChipGroup>
   );
 }

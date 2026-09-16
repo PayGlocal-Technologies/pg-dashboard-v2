@@ -3,13 +3,13 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Button, DataTable } from "@/components/ui";
+import { ColumnManager, Button, DataCardList,
+  DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import {
@@ -19,6 +19,7 @@ import {
   hasRelativeRange,
   relativeRangeToEpochMs,
   type RelativeRangeValue,
+  FilterChipGroup,
 } from "@/components/common/filters/FilterChips";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDelete, usePost, usePostQuery } from "@/lib/api/hooks";
@@ -51,7 +52,10 @@ import {
   TAB_STATUS_FILTERS,
   type InvoiceViewTab,
 } from "@/features/dashboard/mca-invoices/constants";
-import { InvoiceCardList } from "@/features/dashboard/mca-invoices/components/InvoiceCardList";
+import {
+  InvoiceCard,
+  InvoiceCardSkeleton,
+} from "@/features/dashboard/mca-invoices/components/InvoiceCardList";
 import { MarkAsPaidDialog } from "@/features/dashboard/mca-invoices/components/MarkAsPaidDialog";
 import { ConfirmActionDialog } from "@/features/dashboard/mca-invoices/components/ConfirmActionDialog";
 import { LinkTransactionModal } from "@/features/dashboard/mca-invoices/components/LinkTransactionModal";
@@ -95,26 +99,22 @@ function InvoiceFilterChips({
   statusFilters: string[];
   onStatusFiltersChange: (next: string[]) => void;
 }) {
-  const [openChip, setOpenChip] = useState<"date" | "status" | null>(null);
-
   return (
-    <>
+    // `contents` so the group adds no box of its own — the chips stay direct
+    // children of the toolbar row that renders this.
+    <FilterChipGroup className="contents">
       <DateFilterChip
         value={dateRange}
         onChange={onDateRangeChange}
         relativeValue={relativeRange}
         onRelativeChange={onRelativeRangeChange}
-        open={openChip === "date"}
-        onOpenChange={(next) => setOpenChip(next ? "date" : null)}
       />
       <StatusFilterChip
         options={INVOICE_STATUS_FILTERS}
         selected={statusFilters}
         onChange={onStatusFiltersChange}
-        open={openChip === "status"}
-        onOpenChange={(next) => setOpenChip(next ? "status" : null)}
       />
-    </>
+    </FilterChipGroup>
   );
 }
 
@@ -418,15 +418,7 @@ export function McaInvoiceTable({
     />
   );
 
-  return (
-    <div className="flex flex-col gap-4">
-      {summarySection && <div className="mb-4 lg:mb-0">{summarySection}</div>}
-
-      {/* Tab bar, controls and the table share one bordered surface; DataTable's
-          own border/radius are neutralised below since this wrapper provides
-          them. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        <div className="border-b border-border px-4 pt-3">
+  const tabBar = (
           <UnderlineTabs
             tabs={INVOICE_VIEW_TABS}
             value={activeTab}
@@ -437,10 +429,10 @@ export function McaInvoiceTable({
               setPage(1);
             }}
           />
-        </div>
+  );
 
-        {/* Desktop (lg+): search, filter chips, then actions pushed right. */}
-        <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
+  const desktopControls = (
+    <>
           <RotatingSearchInput
             value={search}
             onSearch={onSearch}
@@ -452,7 +444,7 @@ export function McaInvoiceTable({
           <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
 
           <div className="ml-auto flex items-center gap-2">
-            <ReorderColumnsPopover
+            <ColumnManager
               columns={reorderableColumns}
               order={currentColumnOrder}
               onOrderChange={setColumnOrder}
@@ -488,10 +480,11 @@ export function McaInvoiceTable({
               onRun={openInvoiceEditor}
             />
           </div>
-        </div>
+    </>
+  );
 
-        {/* Tablet + mobile: search and Create on one row, chips beneath. */}
-        <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
+  const mobileControls = (
+    <>
           <div className="flex flex-nowrap items-center gap-2">
             <RotatingSearchInput
               value={search}
@@ -514,9 +507,11 @@ export function McaInvoiceTable({
           <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
             {renderFilterChips()}
           </div>
-        </div>
+    </>
+  );
 
-        {isError ? (
+  /** The same panel on both surfaces, so a failure reads the same either way. */
+  const errorPanel = (
           <div className="flex flex-col items-center gap-3 p-10 text-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
               <Icon name="alert-circle" size={22} />
@@ -531,53 +526,77 @@ export function McaInvoiceTable({
               Retry
             </Button>
           </div>
-        ) : (
-          <>
-            {!isPending && rows.length === 0 ? (
-              <PlaceholderState
-                variant="no-invoices"
-                title={emptyCopy.title}
-                description={emptyCopy.description}
-                className="hidden py-16 lg:flex"
-              />
-            ) : (
-              <DataTable
-                className="hidden rounded-none border-0 lg:block"
-                columns={columns}
-                data={rows}
-                isLoading={isPending}
-                skeletonRows={8}
-                emptyTitle={emptyCopy.title}
-                emptyDescription={emptyCopy.description}
-                rowKey={(row) => row.id}
-                // The whole row opens the details view, through DataTable's
-                // row-level handler rather than a wrapper inside every cell.
-                // Clicks on the row's own buttons and menus are skipped by it,
-                // so each still does only its own job.
-                onRowClick={handlers.onOpenRow}
-                pageSize={INVOICES_PAGE_LIMIT}
-                totalRows={totalRows}
-                page={page}
-                onPageChange={setPage}
-                tableLayout="content"
-                density="compact"
-              />
-            )}
+  );
 
-            <InvoiceCardList
-              className="lg:hidden"
-              rows={rows}
-              isLoading={isPending}
-              handlers={handlers}
-              page={page}
-              onPageChange={setPage}
-              totalRows={totalRows}
-              pageSize={INVOICES_PAGE_LIMIT}
-              emptyTitle={emptyCopy.title}
-              emptyDescription={emptyCopy.description}
+  return (
+    <div className="flex flex-col gap-4">
+      {summarySection && <div className="mb-4 lg:mb-0">{summarySection}</div>}
+
+      {/* Two surfaces, one visible at a time: the table card from `lg` up, the
+          card list below it. Both carry the tab bar, since it is a view axis
+          rather than a table control. */}
+      <DataTableCard
+        className="hidden lg:block"
+        tabs={tabBar}
+        toolbar={<div className="flex flex-wrap items-center gap-2">{desktopControls}</div>}
+        columns={columns}
+        data={rows}
+        rowKey={(row) => row.id}
+        isLoading={isPending}
+        errorState={isError ? errorPanel : undefined}
+        emptyState={
+          <PlaceholderState
+            variant="no-invoices"
+            title={emptyCopy.title}
+            description={emptyCopy.description}
+            className="py-16"
+          />
+        }
+        emptyTitle={emptyCopy.title}
+        emptyDescription={emptyCopy.description}
+        // The whole row opens the details view, through DataTable's row-level
+        // handler rather than a wrapper inside every cell. Clicks on the row's
+        // own buttons and menus are skipped by it, so each still does only its
+        // own job.
+        onRowClick={handlers.onOpenRow}
+        pagination={{
+          mode: "page",
+          page,
+          pageSize: INVOICES_PAGE_LIMIT,
+          total: totalRows,
+          onPageChange: setPage,
+        }}
+        tableLayout="content"
+        maxBodyHeight="none"
+      />
+
+      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+        <div className="border-b border-border px-4 pt-3">{tabBar}</div>
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">{mobileControls}</div>
+        <DataCardList
+          bordered={false}
+          rows={rows}
+          rowKey={(row) => row.id}
+          renderCard={(row) => <InvoiceCard row={row} handlers={handlers} />}
+          renderSkeleton={() => <InvoiceCardSkeleton />}
+          isLoading={isPending}
+          errorState={isError ? errorPanel : undefined}
+          emptyState={
+            <PlaceholderState
+              variant="no-invoices"
+              size="sm"
+              title={emptyCopy.title}
+              description={emptyCopy.description}
             />
-          </>
-        )}
+          }
+          pagination={{
+            mode: "page",
+            page,
+            pageSize: INVOICES_PAGE_LIMIT,
+            total: totalRows,
+            onPageChange: setPage,
+          }}
+        />
       </div>
 
       <MarkAsPaidDialog

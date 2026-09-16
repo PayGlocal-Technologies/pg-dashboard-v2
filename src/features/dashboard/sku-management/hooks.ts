@@ -204,6 +204,8 @@ interface SkuCatalogueArgs {
   type?: SkuProductType;
   /** 1-based page, as the table holds it. */
   page: number;
+  /** Rows per page, chosen in the table footer. Defaults to SKU_PAGE_LIMIT. */
+  pageLimit?: number;
 }
 
 interface SkuCatalogue {
@@ -232,7 +234,12 @@ interface SkuCatalogue {
  * the backend happens to name it something else, a type tab returns no rows,
  * which is visible immediately rather than quietly wrong.
  */
-export function useSkuCatalogue({ search, type, page }: SkuCatalogueArgs): SkuCatalogue {
+export function useSkuCatalogue({
+  search,
+  type,
+  page,
+  pageLimit = SKU_PAGE_LIMIT,
+}: SkuCatalogueArgs): SkuCatalogue {
   const { mid, midFilter, isReady, guardState } = useSkuPathMid();
 
   // Stable across renders as long as its inputs are — usePostQuery folds the
@@ -253,10 +260,10 @@ export function useSkuCatalogue({ search, type, page }: SkuCatalogueArgs): SkuCa
       // team-management list body follows.
       searchFilterType: search ? "QUERY_FILTER_TYPE" : fieldSearch ? "FILTER_TYPE" : "DEFAULT",
       fieldSearch,
-      from: (page - 1) * SKU_PAGE_LIMIT,
-      pageLimit: SKU_PAGE_LIMIT,
+      from: (page - 1) * pageLimit,
+      pageLimit,
     };
-  }, [search, midFilter, type, page]);
+  }, [search, midFilter, type, page, pageLimit]);
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     SkuSearchResponse,

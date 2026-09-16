@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { DataTable } from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { DataCardList, DataTableCard } from "@/components/ui";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { type AmountRangeValue } from "@/components/common/filters/FilterChips";
@@ -12,7 +11,10 @@ import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { usePost } from "@/lib/api/hooks";
 import { buildReceiptColumns, ReceiptDownloadAction } from "@/features/dashboard/mca-receipts/columns";
-import { ReceiptCardList } from "@/features/dashboard/mca-receipts/components/ReceiptCardList";
+import {
+  ReceiptCard,
+  ReceiptCardSkeleton,
+} from "@/features/dashboard/mca-receipts/components/ReceiptCardList";
 import { ReceiptFilterChips } from "@/features/dashboard/mca-receipts/components/ReceiptFilterChips";
 import {
   merchantInvoiceDownloadApi,
@@ -179,9 +181,8 @@ export function McaReceiptTable() {
     );
   };
 
-  const renderFilterChips = (idPrefix: string) => (
+  const renderFilterChips = () => (
     <ReceiptFilterChips
-      idPrefix={idPrefix}
       amountRange={amountRange}
       onAmountRangeChange={(next) => {
         setAmountRange(next);
@@ -212,63 +213,81 @@ export function McaReceiptTable() {
   const emptyDescription = "Try adjusting your filters or search query";
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card">
-      <div className="hidden flex-wrap items-center gap-2 border-b border-border px-4 py-3 lg:flex">
-        {searchInput}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {renderFilterChips("receipt-amount-wide")}
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-2 border-b border-border px-4 py-3 lg:hidden">
-        {searchInput}
-        <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-          {renderFilterChips("receipt-amount-compact")}
-        </div>
-      </div>
-
-      {!isLoading && pageRows.length === 0 ? (
-        <PlaceholderState
-          variant="no-data"
-          title={emptyTitle}
-          description={emptyDescription}
-          className="hidden py-16 lg:flex"
-        />
-      ) : (
-        <DataTable
-          className={cn(
-            "hidden rounded-none border-0 lg:block",
-            "[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
-          )}
-          columns={columns}
-          data={pageRows}
-          isLoading={isLoading}
-          skeletonRows={8}
-          emptyTitle={emptyTitle}
-          emptyDescription={emptyDescription}
-          rowKey={(row) => row.gid}
-          pageSize={RECEIPTS_PAGE_LIMIT}
-          totalRows={totalCount}
-          page={page}
-          onPageChange={setPage}
-          rowAction={(row) => <ReceiptDownloadAction row={row} onDownload={onDownloadReceipt} />}
-          tableLayout="content"
-          density="compact"
-        />
-      )}
-
-      <ReceiptCardList
-        className="lg:hidden"
-        rows={pageRows}
+    // Two surfaces, one visible at a time: the table card from `lg` up, the
+    // card list below it. CSS decides, not a media-query hook.
+    <>
+      <DataTableCard
+        className="hidden lg:block [&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
+            {searchInput}
+            <div className="flex flex-wrap items-center gap-1.5">
+              {renderFilterChips()}
+            </div>
+          </div>
+        }
+        // The download action floats over the row; these lift it above the
+        // frozen cells and keep it opaque while they scroll under it.
+        columns={columns}
+        data={pageRows}
+        rowKey={(row) => row.gid}
         isLoading={isLoading}
-        onDownload={onDownloadReceipt}
-        page={page}
-        onPageChange={setPage}
-        totalRows={totalCount}
-        pageSize={RECEIPTS_PAGE_LIMIT}
+        emptyState={
+          <PlaceholderState
+            variant="no-data"
+            title={emptyTitle}
+            description={emptyDescription}
+            className="py-16"
+          />
+        }
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
+        pagination={{
+          mode: "page",
+          page,
+          pageSize: RECEIPTS_PAGE_LIMIT,
+          total: totalCount,
+          onPageChange: setPage,
+        }}
+        rowAction={(row) => <ReceiptDownloadAction row={row} onDownload={onDownloadReceipt} />}
+        tableLayout="content"
+        maxBodyHeight="none"
       />
-    </div>
+
+      {/* Tablet + mobile (below lg): the same page's rows as cards, in their
+          own copy of the surface with its own compact controls. */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+          {searchInput}
+          <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+            {renderFilterChips()}
+          </div>
+        </div>
+
+        <DataCardList
+          bordered={false}
+          rows={pageRows}
+          rowKey={(row) => row.gid}
+          renderCard={(row) => <ReceiptCard row={row} onDownload={onDownloadReceipt} />}
+          renderSkeleton={() => <ReceiptCardSkeleton />}
+          isLoading={isLoading}
+          emptyState={
+            <PlaceholderState
+              variant="no-data"
+              size="sm"
+              title={emptyTitle}
+              description={emptyDescription}
+            />
+          }
+          pagination={{
+            mode: "page",
+            page,
+            pageSize: RECEIPTS_PAGE_LIMIT,
+            total: totalCount,
+            onPageChange: setPage,
+          }}
+        />
+      </div>
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Button, DataTable } from "@/components/ui";
+import { Button, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -81,113 +81,116 @@ export function PaTransactionTable() {
   const columns = buildPaColumns(isPartnerUser);
 
   return (
-    <div className="space-y-3">
-      {/* Filter bar */}
-      <div className="bg-card rounded-xl px-4 py-2.5 flex items-center gap-2.5 flex-wrap border border-border">
-        <RotatingSearchInput
-          value={search}
-          onSearch={onSearch}
-          words={["email", "transaction ID", "order ID"]}
-          className="min-w-[160px] max-w-xs flex-1"
-        />
+    <DataTableCard<PaTransaction>
+      /* Search, the status pills and the method pills, on one row inside the
+         card rather than in a detached bar above it — the same toolbar every
+         other table on the app carries. */
+      toolbar={
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <RotatingSearchInput
+            value={search}
+            onSearch={onSearch}
+            words={["email", "transaction ID", "order ID"]}
+            className="min-w-[160px] max-w-xs flex-1"
+          />
 
-        <div className="hidden sm:block h-4 w-px bg-border" />
+          <div className="hidden sm:block h-4 w-px bg-border" />
 
-        <div className="flex items-center gap-1 flex-wrap">
-          {PA_STATUS_FILTERS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={status === opt.value ? "primary" : "outline"}
-              size="sm"
-              onClick={() => onStatus(opt.value)}
-              className={cn(
-                "h-auto rounded-full px-2.5 py-1",
-                status === opt.value
-                  ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
-
-        <div className="hidden sm:block h-4 w-px bg-border" />
-
-        <div className="flex items-center gap-1 flex-wrap">
-          {PA_METHOD_FILTERS.map((opt) => (
-            <Button
-              key={opt.value}
-              variant={method === opt.value ? "primary" : "outline"}
-              size="sm"
-              onClick={() => onMethod(opt.value)}
-              className={cn(
-                "h-auto rounded-full px-2.5 py-1",
-                method !== opt.value && "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {opt.label}
-            </Button>
-          ))}
-        </div>
-
-      </div>
-
-      {isError ? (
-        <div className="bg-card rounded-xl border border-border p-10 flex flex-col items-center gap-3 text-center">
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
-            <Icon name="alert-circle" size={22} />
-          </span>
-          <div>
-            <h3 className="text-sm font-semibold text-foreground">
-              Couldn&apos;t load transactions
-            </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Something went wrong while fetching data.
-            </p>
+          <div className="flex items-center gap-1 flex-wrap">
+            {PA_STATUS_FILTERS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={status === opt.value ? "primary" : "outline"}
+                size="sm"
+                onClick={() => onStatus(opt.value)}
+                className={cn(
+                  "h-auto rounded-full px-2.5 py-1",
+                  status === opt.value
+                    ? "bg-foreground text-background border-foreground hover:bg-foreground/90"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </Button>
+            ))}
           </div>
-          <Button variant="outline" size="sm" onClick={() => void refetch()}>
-            Retry
-          </Button>
+
+          <div className="hidden sm:block h-4 w-px bg-border" />
+
+          <div className="flex items-center gap-1 flex-wrap">
+            {PA_METHOD_FILTERS.map((opt) => (
+              <Button
+                key={opt.value}
+                variant={method === opt.value ? "primary" : "outline"}
+                size="sm"
+                onClick={() => onMethod(opt.value)}
+                className={cn(
+                  "h-auto rounded-full px-2.5 py-1",
+                  method !== opt.value && "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {opt.label}
+              </Button>
+            ))}
+          </div>
         </div>
-      ) : !isPending && rows.length === 0 ? (
+      }
+      errorState={
+        isError ? (
+          <div className="p-10 flex flex-col items-center gap-3 text-center">
+            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
+              <Icon name="alert-circle" size={22} />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">
+                Couldn&apos;t load transactions
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Something went wrong while fetching data.
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => void refetch()}>
+              Retry
+            </Button>
+          </div>
+        ) : undefined
+      }
+      emptyState={
         <PlaceholderState
           variant="no-transactions"
           title="No transactions found"
           description="Try adjusting your filters or search query"
           className="py-16"
         />
-      ) : (
-        <DataTable
-          columns={columns}
-          data={rows}
-          isLoading={isPending}
-          skeletonRows={8}
-          tableLayout="content"
-          emptyTitle="No transactions found"
-          emptyDescription="Try adjusting your filters or search query"
-          rowKey={(row) =>
-            row.gid ??
-            `${row.merchantId ?? ""}-${row.formattedCreationDateTime ?? ""}-${row.totalAmount ?? ""}`
-          }
-          pageSize={TRANSACTIONS_PAGE_LIMIT}
-          totalRows={totalCount}
-          page={page}
-          onPageChange={setPage}
-          rowAction={(row) => (
-            <Button
-              variant="outline"
-              size="sm"
-              rightIcon={<Icon name="chevron-right" className="w-2.5 h-2.5" />}
-              className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-              onClick={() => onViewDetails(row)}
-            >
-              View details
-            </Button>
-          )}
-          density="compact"
-        />
+      }
+      columns={columns}
+      data={rows}
+      isLoading={isPending}
+      emptyTitle="No transactions found"
+      emptyDescription="Try adjusting your filters or search query"
+      rowKey={(row) =>
+        row.gid ??
+        `${row.merchantId ?? ""}-${row.formattedCreationDateTime ?? ""}-${row.totalAmount ?? ""}`
+      }
+      pagination={{
+        mode: "page",
+        page,
+        pageSize: TRANSACTIONS_PAGE_LIMIT,
+        total: totalCount,
+        onPageChange: setPage,
+      }}
+      maxBodyHeight="none"
+      rowAction={(row) => (
+        <Button
+          variant="outline"
+          size="sm"
+          rightIcon={<Icon name="chevron-right" className="w-2.5 h-2.5" />}
+          className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+          onClick={() => onViewDetails(row)}
+        >
+          View details
+        </Button>
       )}
-    </div>
+    />
   );
 }

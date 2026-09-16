@@ -2,7 +2,6 @@
 
 import { Button, IconButton, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
 import {
@@ -10,10 +9,9 @@ import {
   isWaitingForInvoice,
   MdrOfferBadge,
 } from "@/features/dashboard/mca-transactions/columns";
-import { cn } from "@/lib/utils";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 
-function TransactionCardSkeleton() {
+export function TransactionCardSkeleton() {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center gap-2">
@@ -33,7 +31,7 @@ function TransactionCardSkeleton() {
 // whole card opens the drawer (see TransactionCardList's own role="button"
 // treatment below), while the View/Upload invoice action stops propagation
 // so it fires its own handler instead of also opening the drawer.
-function TransactionCard({
+export function TransactionCard({
   row,
   onOpenDetails,
 }: {
@@ -141,87 +139,6 @@ function TransactionCard({
           </Button>
         )}
       </div>
-    </div>
-  );
-}
-
-interface TransactionCardListProps {
-  rows: McaTransaction[];
-  isLoading: boolean;
-  skeletonCount?: number;
-  onOpenDetails: (row: McaTransaction) => void;
-  page: number;
-  onPageChange: (page: number) => void;
-  totalRows: number;
-  pageSize: number;
-  emptyTitle: string;
-  emptyDescription?: string;
-  className?: string;
-}
-
-/**
- * Mobile/tablet stand-in for DataTable: `rows` already reflects the current
- * server-paginated page (the same array McaTransactionTable hands to
- * DataTable's own controlled `page`/`data`), so this only lays it out as
- * cards and adds a compact pager, it doesn't re-slice or re-fetch anything.
- */
-export function TransactionCardList({
-  rows,
-  isLoading,
-  skeletonCount = 6,
-  onOpenDetails,
-  page,
-  onPageChange,
-  totalRows,
-  pageSize,
-  emptyTitle,
-  emptyDescription,
-  className,
-}: TransactionCardListProps) {
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-
-  return (
-    <div className={cn("flex flex-col gap-3 p-4", className)}>
-      {isLoading ? (
-        Array.from({ length: skeletonCount }).map((_, i) => <TransactionCardSkeleton key={i} />)
-      ) : rows.length === 0 ? (
-        <PlaceholderState
-          variant="no-transactions"
-          size="sm"
-          title={emptyTitle}
-          description={emptyDescription}
-        />
-      ) : (
-        rows.map((row) => <TransactionCard key={row.gid} row={row} onOpenDetails={onOpenDetails} />)
-      )}
-
-      {!isLoading && rows.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
-          >
-            Prev
-          </Button>
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            rightIcon={<Icon name="chevron-right" className="h-3.5 w-3.5" />}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

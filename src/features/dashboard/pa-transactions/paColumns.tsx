@@ -1,5 +1,6 @@
 "use client";
 
+import { formatTimestamp } from "@/lib/utils/format";
 import { type Column, StatusBadge } from "@/components/ui";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
 import { TransactionCustomerCell } from "@/features/dashboard/pa-transactions/components/TransactionCustomerCell";
@@ -142,33 +143,13 @@ export const STATUS_BUCKET_RAW_VALUES: Record<
 // ── Date & Time cell, reformats the API's "DD/MM/YYYY, HH:MM:SS" string into
 // a single-line "D MMM 'YY, hh:mm AM/PM" display, same font/color as every
 // other column. ────────────────────────────────────────────────────────────
-const MONTH_ABBR = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
 
 export function formatDisplayDateTime(value?: string): string | null {
-  if (!value) return null;
-  const [datePart, timePart] = value.split(",").map((s) => s.trim());
-  const [day, month, year] = (datePart ?? "").split("/").map(Number);
-  if (!day || !month || !year) return null;
-  const [hours = 0, minutes = 0] = (timePart ?? "").split(":").map(Number);
-  const period = hours >= 12 ? "PM" : "AM";
-  const hour12 = hours % 12 === 0 ? 12 : hours % 12;
-  const hh = String(hour12).padStart(2, "0");
-  const mm = String(minutes).padStart(2, "0");
-  const yy = String(year).slice(-2);
-  return `${day} ${MONTH_ABBR[month - 1]} '${yy}, ${hh}:${mm} ${period}`;
+  // A hand-rolled `DD/MM/YYYY, HH:mm` parser used to live here, with its own
+  // month table. It is the shared formatter now: same output, but it also reads
+  // the shapes this one could not (epoch millis, ISO, no-comma separators), so
+  // an endpoint that changes its form does not silently render "N/A".
+  return formatTimestamp(value, "") || null;
 }
 
 function DateTimeCell({ value }: { value?: string }) {
@@ -189,7 +170,7 @@ export function customerName(row: PaTransaction): string {
 
 // ── Column definitions ────────────────────────────────────────────────────────
 // Every reorderable/hideable data column lives here, keyed so
-// TransactionColumnsMenu can toggle visibility and reorder independently of
+// ColumnManager can toggle visibility and reorder independently of
 // Merchant ID (partner-only, fixed position) and Actions (a rowAction, not a
 // real column).
 export const PA_TRANSACTION_COLUMN_DEFS: { key: string; label: string }[] = [

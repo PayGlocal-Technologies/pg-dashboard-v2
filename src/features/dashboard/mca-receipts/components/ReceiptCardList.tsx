@@ -10,7 +10,7 @@ import { formatMonthLabel } from "@/lib/utils/format";
 import { RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/mca-receipts/constants";
 import type { Receipt } from "@/features/dashboard/mca-receipts/types";
 
-function ReceiptCardSkeleton() {
+export function ReceiptCardSkeleton() {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-start justify-between gap-2">
@@ -30,7 +30,7 @@ function ReceiptCardSkeleton() {
 // stacked card instead of cells — Invoice number, Invoice ID, Amount, Month,
 // Product type — with the row's own download action in the same place the table
 // pins it: the far right of the leading row.
-function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (row: Receipt) => void }) {
+export function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (row: Receipt) => void }) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-muted/40">
       {/* Invoice number leads and the download icon closes the row: what
@@ -76,87 +76,6 @@ function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (row: Rece
           </p>
         </div>
       </div>
-    </div>
-  );
-}
-
-interface ReceiptCardListProps {
-  rows: Receipt[];
-  isLoading: boolean;
-  onDownload: (row: Receipt) => void;
-  skeletonCount?: number;
-  page: number;
-  onPageChange: (page: number) => void;
-  totalRows: number;
-  pageSize: number;
-  emptyTitle: string;
-  emptyDescription?: string;
-  className?: string;
-}
-
-/**
- * Mobile/tablet stand-in for DataTable, the same arrangement the Transactions and
- * SKU management pages use (see TransactionCardList and SkuCardList): `rows` is
- * already the current page's slice, so this only lays it out as cards and adds
- * the compact pager.
- */
-export function ReceiptCardList({
-  rows,
-  isLoading,
-  onDownload,
-  skeletonCount = 6,
-  page,
-  onPageChange,
-  totalRows,
-  pageSize,
-  emptyTitle,
-  emptyDescription,
-  className,
-}: ReceiptCardListProps) {
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-
-  return (
-    <div className={cn("flex flex-col gap-3 p-4", className)}>
-      {isLoading ? (
-        Array.from({ length: skeletonCount }).map((_, i) => <ReceiptCardSkeleton key={i} />)
-      ) : rows.length === 0 ? (
-        <PlaceholderState
-          variant="no-data"
-          size="sm"
-          title={emptyTitle}
-          description={emptyDescription}
-        />
-      ) : (
-        rows.map((row) => <ReceiptCard key={row.gid} row={row} onDownload={onDownload} />)
-      )}
-
-      {!isLoading && rows.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
-          >
-            Prev
-          </Button>
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            rightIcon={<Icon name="chevron-right" className="h-3.5 w-3.5" />}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,59 +1,43 @@
 "use client";
 
-import { useState } from "react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui";
-import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
+import { CopyableCell as FluxCopyableCell } from "@/components/ui";
 
-interface CopyableCellProps {
+/**
+ * Compact table-cell value with a hover-revealed copy button.
+ *
+ * The implementation is flux's `CopyableCell` — this app and pg-internal-v2 had
+ * four separate takes on "a value with a copy button" between them, which is
+ * three too many for a control that appears in almost every grid.
+ *
+ * This stays as a named wrapper for one reason: the prop names are inverted.
+ * Here `value` is what is **shown** and `copyValue` is what reaches the
+ * clipboard; flux takes `value` as the real value and `display` as the elided
+ * form, so that the clipboard, the tooltip and the accessible name cannot
+ * accidentally carry the truncated string. Translating at the boundary keeps
+ * every existing call site working.
+ */
+export function CopyableCell({
+  value,
+  copyValue,
+  label,
+  monospace,
+  className,
+}: {
   value: string;
-  /** Text actually written to the clipboard, if different from the displayed `value` (e.g. a truncated display). */
+  /** Text actually written to the clipboard, if different from the displayed `value`. */
   copyValue?: string;
   /** Shown in the copy toast, e.g. "Username copied". */
   label: string;
   monospace?: boolean;
   className?: string;
-}
-
-/** Compact table-cell value with a hover-revealed copy button, relies on the
- * row's own `group` class (every DataTable `<tr>` already carries one for the
- * rowAction slot) so the icon only fades in on hover. Same interaction as
- * SettlementUtrCell, generalized for reuse across any table column. */
-export function CopyableCell({ value, copyValue, label, monospace, className }: CopyableCellProps) {
-  const [copied, setCopied] = useState(false);
-
-  async function handleCopy() {
-    try {
-      await navigator.clipboard.writeText(copyValue ?? value);
-      setCopied(true);
-      toast.success(`${label} copied`);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard access denied, fail silently, non-critical affordance.
-    }
-  }
-
+}) {
   return (
-    <div className="flex items-center gap-1">
-      <span
-        className={cn(
-          "whitespace-nowrap text-[13px] text-foreground",
-          monospace && "font-mono",
-          className
-        )}
-      >
-        {value}
-      </span>
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={handleCopy}
-        aria-label={copied ? "Copied" : `Copy ${label}`}
-        className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        <Icon name={copied ? "check" : "copy"} size={11} />
-      </Button>
-    </div>
+    <FluxCopyableCell
+      value={copyValue ?? value}
+      display={copyValue ? value : undefined}
+      label={label}
+      monospace={monospace}
+      className={className}
+    />
   );
 }

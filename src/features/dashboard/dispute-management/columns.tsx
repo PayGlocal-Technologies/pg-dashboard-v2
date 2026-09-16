@@ -73,7 +73,7 @@ function PhaseCell({ phase }: { phase?: DisputeRow["disputePhase"] }) {
   );
 }
 
-// Every reorderable/hideable data column, keyed so TransactionColumnsMenu
+// Every reorderable/hideable data column, keyed so ColumnManager
 // (reused as-is from the transactions feature) can toggle visibility and
 // reorder independently. "respondBy" is appended separately in
 // buildDisputeColumns, only when the active segment needs it.

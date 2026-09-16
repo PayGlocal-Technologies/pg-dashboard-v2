@@ -6,6 +6,7 @@ import {
   StatusFilterChip,
   type DateRangeValue,
   type FilterChipOption,
+  FilterChipGroup,
 } from "@/components/common/filters/FilterChips";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { EmptyState, Shimmer, StatusBadge } from "@/components/ui";
@@ -137,7 +138,6 @@ export function TicketList({
   onStatusFilterChange: (value: string[]) => void;
   onOpenTicket: (ticket: SupportTicket) => void;
 }) {
-  const [openChip, setOpenChip] = useState<ChipKey | null>(null);
 
   return (
     <>
@@ -152,30 +152,24 @@ export function TicketList({
           className="w-full sm:w-56"
         />
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <FilterChipGroup className="flex flex-wrap items-center gap-1.5">
           <DateFilterChip
             label="Duration"
             value={dateRange}
             onChange={onDateRangeChange}
-            open={openChip === "date"}
-            onOpenChange={(open) => setOpenChip(open ? "date" : null)}
           />
           <StatusFilterChip
             label="Topic"
             options={topicOptions}
             selected={topicFilter}
             onChange={onTopicFilterChange}
-            open={openChip === "topic"}
-            onOpenChange={(open) => setOpenChip(open ? "topic" : null)}
           />
           <StatusFilterChip
             options={STATUS_OPTIONS}
             selected={statusFilter}
             onChange={onStatusFilterChange}
-            open={openChip === "status"}
-            onOpenChange={(open) => setOpenChip(open ? "status" : null)}
           />
-        </div>
+        </FilterChipGroup>
       </div>
 
       <div className="max-h-[32rem] overflow-y-auto p-4">

@@ -1,16 +1,13 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Button, Shimmer, StatusBadge } from "@/components/ui";
-import { Icon } from "@/components/icon";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { Shimmer, StatusBadge } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils/format";
-import { cn } from "@/lib/utils";
 import { SKU_PRICE_LOCALE, SKU_TYPE_LABEL } from "@/features/dashboard/sku-management/constants";
 import { ProductThumbnail } from "@/features/dashboard/sku-management/components/ProductThumbnail";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
-function SkuCardSkeleton() {
+export function SkuCardSkeleton() {
   return (
     <div className="flex gap-3 rounded-xl border border-border bg-card px-4 py-3.5">
       <Shimmer className="h-[70px] w-[70px] shrink-0" rounded="lg" />
@@ -23,7 +20,7 @@ function SkuCardSkeleton() {
   );
 }
 
-function SkuCard({
+export function SkuCard({
   row,
   actions,
   onPreview,
@@ -91,94 +88,6 @@ function SkuCard({
 
         <p className="mt-2 line-clamp-2 text-[12px] text-muted-foreground">{row.description}</p>
       </div>
-    </div>
-  );
-}
-
-interface SkuCardListProps {
-  rows: SkuProduct[];
-  isLoading: boolean;
-  /** Per-row overflow menu, mirroring DataTable's own `rowAction` signature so
-   *  the table and the card list are fed by the same call site. */
-  rowAction?: (row: SkuProduct) => ReactNode;
-  /** Opens the read-only product preview — same handler the table's Product
-   *  cell uses, so a tap and a click land on the same modal. */
-  onPreview: (product: SkuProduct) => void;
-  skeletonCount?: number;
-  page: number;
-  onPageChange: (page: number) => void;
-  totalRows: number;
-  pageSize: number;
-  emptyTitle: string;
-  emptyDescription?: string;
-  className?: string;
-}
-
-/**
- * Mobile/tablet stand-in for DataTable, the same arrangement the Transactions
- * page uses (see TransactionCardList): `rows` is already the current page's
- * slice, so this only lays it out as cards and adds the compact pager.
- */
-export function SkuCardList({
-  rows,
-  isLoading,
-  rowAction,
-  onPreview,
-  skeletonCount = 6,
-  page,
-  onPageChange,
-  totalRows,
-  pageSize,
-  emptyTitle,
-  emptyDescription,
-  className,
-}: SkuCardListProps) {
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-
-  return (
-    <div className={cn("flex flex-col gap-3 p-4", className)}>
-      {isLoading ? (
-        Array.from({ length: skeletonCount }).map((_, i) => <SkuCardSkeleton key={i} />)
-      ) : rows.length === 0 ? (
-        <PlaceholderState
-          variant="no-data"
-          size="sm"
-          title={emptyTitle}
-          description={emptyDescription}
-        />
-      ) : (
-        rows.map((row) => (
-          <SkuCard key={row.id} row={row} actions={rowAction?.(row)} onPreview={onPreview} />
-        ))
-      )}
-
-      {!isLoading && rows.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
-          >
-            Prev
-          </Button>
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            rightIcon={<Icon name="chevron-right" className="h-3.5 w-3.5" />}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

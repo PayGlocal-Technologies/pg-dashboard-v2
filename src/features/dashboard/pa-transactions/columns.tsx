@@ -5,7 +5,7 @@ import { AppImage } from "@/components/common/AppImage";
 import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { cn } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils/format";
+import { formatCurrency, formatTimestamp } from "@/lib/utils/format";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
@@ -201,9 +201,11 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
       key: "formattedCreationDateTime",
       header: "Date and time",
       minWidth: 150,
+      // Sent as `DD/MM/YYYY HH:mm:ss`. Rendering it straight through left this
+      // one column reading in a form nothing else in either app uses.
       render: (row) => (
-        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
-          {row.formattedCreationDateTime ?? "—"}
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap tabular-nums">
+          {formatTimestamp(row.formattedCreationDateTime)}
         </span>
       ),
     },
