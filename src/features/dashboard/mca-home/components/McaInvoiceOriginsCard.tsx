@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { COUNTRIES } from "@payglocal_ui/flux-ui";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
 import { formatCurrencyShort } from "@/lib/utils/format";
@@ -81,6 +83,19 @@ const BAR_COLORS = [
   "var(--chart-4)",
 ];
 
+/** Adaptive precision so a small country never rounds to a dead "0%" — same
+ *  logic as SettlementAnalyticsCard's own formatSharePct (Currency
+ *  distribution bar on the Transactions page), which this card's own
+ *  distribution bar below now matches the look of. */
+function formatSharePct(fraction: number): string {
+  if (!(fraction > 0)) return "0%";
+  const pct = fraction * 100;
+  if (pct >= 0.1) return `${pct.toFixed(1)}%`;
+  if (pct >= 0.01) return `${pct.toFixed(2)}%`;
+  if (pct >= 0.001) return `${pct.toFixed(3)}%`;
+  return "<0.001%";
+}
+
 interface StatCellProps {
   label: string;
   valueLabel: string;
@@ -135,6 +150,51 @@ function buildTimeframeRanges(): Record<
   };
 }
 
+/** Fills the dead space the distribution bar/chip list leaves behind once
+ *  there's only 1-2 countries to show (the region below reserves room for a
+ *  typical multi-country result, see the min-h-[148px] wrapper) with a
+ *  promotional nudge instead of blank whitespace, linking through to Refer &
+ *  Earn like every other MDR-waiver/referral touchpoint in the app. */
+function MdrWaiverCallout() {
+  const router = useRouter();
+  return (
+    // Button always wraps its `children` in one auto-generated `<span>`
+    // (see DisputeRespondForm's upload dropzone for the same gotcha), and
+    // that span itself has no layout classes — nesting a `w-full flex`
+    // wrapper INSIDE it doesn't help, since a percentage width can't
+    // resolve against a shrink-to-fit ancestor, which is exactly what left
+    // the whole icon/text/chevron cluster shrink-wrapped and centered
+    // instead of spread edge-to-edge. Styling that exact span directly via
+    // `[&>span]` is what actually makes it a full-width flex row: leftIcon/
+    // rightIcon are left unused here (they'd render as extra siblings of
+    // that span, not inside it) so every visible child — icon, text block,
+    // chevron — passes through as plain `children` and lands inside the
+    // one span this selector targets.
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={() => router.push("/refer-and-earn")}
+      className="h-auto w-full rounded-2xl border border-blue-200 bg-linear-to-br from-blue-50 via-blue-100 to-indigo-100 p-4 text-left shadow-sm transition-shadow hover:shadow-md dark:border-blue-900/50 dark:from-blue-950/40 dark:via-blue-900/30 dark:to-indigo-950/30 [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-3"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400">
+        <Icon name="gift" size={18} aria-hidden />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] font-semibold text-foreground">
+          You&apos;re 1 transaction away from your MDR waiver
+        </span>
+        <span className="block text-xs text-muted-foreground">Tap to learn more</span>
+      </span>
+      <Icon
+        name="chevron-right"
+        size={16}
+        className="shrink-0 text-blue-600 dark:text-blue-400"
+        aria-hidden
+      />
+    </Button>
+  );
+}
+
 export function McaInvoiceOriginsCard() {
   const [timeframe, setTimeframe] = useState<InvoiceOriginTimeframe>("1M");
   const [ranges] = useState(buildTimeframeRanges);
@@ -173,7 +233,12 @@ export function McaInvoiceOriginsCard() {
   const rows = [...rowsByCode.values()].sort((a, b) => b.amount - a.amount);
   const totals = origins?.totals;
   const totalInvoiced = totals?.totalInvoiced ?? 0;
-  const maxAmount = Math.max(...rows.map((o) => o.amount), 1);
+  // Denominator for the distribution bar/chip shares below — the sum of
+  // these SAME rows, not totalInvoiced, so the stacked segments always add
+  // up to exactly 100% regardless of any rounding/reporting-currency drift
+  // between this list and the totals endpoint (see SettlementAnalyticsCard's
+  // own totalValue for the same reasoning).
+  const rowsAmountSum = rows.reduce((sum, o) => sum + o.amount, 0);
 
   const globeHighlights = rows.map((origin, i) => ({
     countryCode: origin.countryCode,
@@ -227,7 +292,14 @@ export function McaInvoiceOriginsCard() {
             </div>
           </div>
 
-          {/* Bar list — loading skeleton, error, empty, or the real rows.
+          {/* Country distribution — one stacked bar (every country's share of
+              the total) plus a compact chip breakdown, same pattern as
+              SettlementAnalyticsCard's own "Currency distribution" on the
+              Transactions page (a single bar there rather than one pill per
+              row, so the shape reads as one whole split into parts instead of
+              a row of unrelated progress bars) — rectangular with a slight
+              corner radius rather than that card's fully rounded pill, per
+              this card's own review.
               The region reserves the height of a full five-row list
               (min-h-[148px]) so the empty and error states, which render a
               single line, don't let the summary stats below slide up into the
@@ -235,14 +307,13 @@ export function McaInvoiceOriginsCard() {
               have put them. */}
           <div className="mt-5 min-h-[148px]">
             {isLoading ? (
-              <div className="flex flex-col gap-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <Shimmer className="h-4 w-36 shrink-0" />
-                    <Shimmer className="h-2 flex-1" />
-                    <Shimmer className="h-4 w-16 shrink-0" />
-                  </div>
-                ))}
+              <div className="flex flex-col gap-4">
+                <Shimmer className="h-2.5 w-full rounded-sm" />
+                <div className="flex flex-col gap-3">
+                  {Array.from({ length: 2 }).map((_, i) => (
+                    <Shimmer key={i} className="h-10 w-full" />
+                  ))}
+                </div>
               </div>
             ) : isError ? (
               <PlaceholderState
@@ -261,31 +332,72 @@ export function McaInvoiceOriginsCard() {
                 className="h-full py-2"
               />
             ) : (
-              <div className="flex flex-col gap-3">
-                {rows.map((origin, i) => (
-                  <div key={origin.countryCode} className="flex items-center gap-3">
-                    <div className="flex w-36 shrink-0 items-center gap-1.5">
-                      <span className="text-sm leading-none" aria-hidden>
-                        {origin.flag}
-                      </span>
-                      <span className="truncate text-[13px] font-medium text-foreground">
-                        {origin.countryName}
-                      </span>
-                    </div>
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${(origin.amount / maxAmount) * 100}%`,
-                          backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
-                        }}
+              <div className="flex flex-col gap-4">
+                {/* 10px tall, rectangular with a small corner radius (not the
+                    fully rounded "cylindrical" pill), no gap between
+                    segments so it reads as one continuous bar split into
+                    shares rather than a row of tiles. Purely decorative —
+                    every figure it represents is restated as real text in
+                    the chip list below. */}
+                <div
+                  className="flex h-2.5 w-full overflow-hidden rounded-sm bg-muted"
+                  aria-hidden="true"
+                >
+                  {rows.map((origin, i) => (
+                    <div
+                      key={origin.countryCode}
+                      className="h-full"
+                      style={{
+                        width: `${rowsAmountSum > 0 ? (origin.amount / rowsAmountSum) * 100 : 0}%`,
+                        backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Single column for one country (a two-column grid would
+                    leave it hugging the left half with dead space beside
+                    it); two columns from sm once there's a second entry to
+                    pair it with. */}
+                <ul
+                  className={cn(
+                    "grid grid-cols-1 gap-x-4",
+                    rows.length > 1 && "sm:grid-cols-2"
+                  )}
+                >
+                  {rows.map((origin, i) => (
+                    <li key={origin.countryCode} className="flex items-center gap-3 py-1">
+                      <span
+                        className="h-8 w-1 shrink-0 rounded-sm"
+                        style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
+                        aria-hidden="true"
                       />
-                    </div>
-                    <span className="w-24 shrink-0 text-right text-[13px] font-semibold tabular-nums text-foreground">
-                      {formatCurrencyShort(origin.amount, currency)}
-                    </span>
-                  </div>
-                ))}
+                      <CountryFlagAvatar
+                        iso2={origin.countryCode}
+                        countryName={origin.countryName}
+                        className="h-8 w-8 shrink-0"
+                      />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-foreground">
+                          {origin.countryName}
+                        </span>
+                        <span className="block text-[11px] tabular-nums text-muted-foreground">
+                          {formatSharePct(rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0)}{" "}
+                          of total
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                        {formatCurrencyShort(origin.amount, currency)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* 1-2 countries leaves this whole region much shorter than
+                    the reserved min-h-[148px], see that wrapper's own doc
+                    comment — a promotional nudge fills the space instead of
+                    leaving it blank. */}
+                {rows.length <= 2 && <MdrWaiverCallout />}
               </div>
             )}
           </div>

@@ -16,6 +16,7 @@ import {
   MCA_DASHBOARD_GUIDE_KEY,
   MCA_DASHBOARD_GUIDE_STEPS,
 } from "@/features/dashboard/mca-home/guide";
+import { McaPromoCarousel } from "@/features/dashboard/mca-home/components/McaPromoCarousel";
 import { McaRevenueCard } from "@/features/dashboard/mca-home/components/McaRevenueCard";
 import { McaClientAnalyticsCard } from "@/features/dashboard/mca-home/components/McaClientAnalyticsCard";
 import { McaNeedsAttentionCard } from "@/features/dashboard/mca-home/components/McaNeedsAttentionCard";
@@ -140,6 +141,9 @@ export function McaDashboardFeature() {
 
   return (
     <McaDashboardAurora contentClassName="space-y-4">
+      {/* ── Promo carousel ───────────────────────────────────────────── */}
+      <McaPromoCarousel />
+
       {/* ── Page header ──────────────────────────────────────────────── */}
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
         <div>
@@ -155,7 +159,7 @@ export function McaDashboardFeature() {
               className="h-3 w-3 shrink-0 text-muted-foreground"
               aria-hidden
             />
-            <span>Amount received at mid-market rate</span>
+            <span>Amount received at live FX rates</span>
           </div>
           <div className="hidden h-3.5 w-px bg-border sm:block" />
           <div data-guide="mca-create-invoice">

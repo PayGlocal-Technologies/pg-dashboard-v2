@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, Shimmer } from "@/components/ui";
+import { Card, Shimmer } from "@/components/ui";
 import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import { CompactAmount } from "@/components/common/CompactAmount";
@@ -44,49 +44,40 @@ export function SavedAmountCard({
     // it positions against this card, its negative z-index stays scoped to
     // it, and it's clipped to the card's own radius.
     <Card size="sm" className={cn("relative isolate min-h-64 w-full overflow-hidden", className)}>
-      {/* Decorative, so `alt=""`. This artwork is its own full-bleed
-          background (a soft wash filling its entire canvas, not an object
-          floating on transparency like the previous asset), so it fills the
-          whole card via `object-cover` rather than sitting contained in one
-          corner — there's no separate gradient layer underneath it any
-          more, this replaces that layer rather than sitting on top of it.
-          `object-top` because the card's own text (top-left) needs to land
-          on the image's paler upper region, not its busier lower-right
-          corner where the coin jar sits. */}
+      {/* Decorative, so `alt=""`. A voucher/ticket illustration — its blank
+          left half is the artwork's own designated text area (the same
+          shape Refer & Earn's own $30 voucher uses), so the KPI below is
+          positioned to land inside that blank half rather than floating
+          over the cash/sparkle imagery around it. object-cover object-center
+          because the asset is pre-cropped tight to its own content (no
+          transparent margin left to center within), at very nearly this
+          card's own aspect ratio, so cover crops minimally either way. */}
       <AppImage
-        src="/assets/saved-amount-bg-v2.png"
+        src="/assets/savedamount.png"
         alt=""
         fill
         sizes="(min-width: 1024px) 24rem, 100vw"
-        className="-z-10 object-cover object-top"
+        className="-z-10 object-cover object-center"
       />
 
-      {/* flex flex-1 flex-col: still needed even with the description gone,
-          so Card being stretched taller than its content (see the grow
-          className this component receives from TransactionsAnalyticsCarousel)
-          leaves the extra space below the KPI rather than centering it. */}
-      <CardContent className="flex flex-1 flex-col">
-        {/* No icon any more — the background artwork already carries its
-            own coin-jar imagery, so a piggy-bank glyph on top of it doubled
-            up on the same idea. Straight into the KPI stack instead.
-
-            Label light/regular rather than bold, amount a size up from
-            before (3xl → 4xl): a heavier label competed with the amount for
-            attention instead of introducing it, which is the label/KPI
-            hierarchy this was asked to match — a quiet caption, then one
-            clearly dominant figure. */}
+      {/* Positioned (not just padded) to the voucher's own blank rectangle —
+          left-[20%]/w-[43%] is that rectangle's measured span in the
+          artwork, top-[40%] where it starts below the ticket's rounded top
+          edge. flex-col justify-center centers the two-line KPI vertically
+          within that band rather than pinning it to the band's own top. */}
+      <div className="absolute inset-y-0 left-[20%] top-[40%] flex w-[43%] flex-col justify-center">
         <p className="text-sm font-normal text-muted-foreground">Saved amount</p>
 
         {isLoading ? (
-          <Shimmer className="mt-1 h-10 w-36" />
+          <Shimmer className="mt-1 h-9 w-28" />
         ) : (
           <CompactAmount
             amount={amount}
             currency={currency}
-            className="mt-1 block text-4xl font-bold tabular-nums tracking-tight text-foreground"
+            className="mt-1 block text-3xl font-bold tabular-nums tracking-tight text-foreground"
           />
         )}
-      </CardContent>
+      </div>
     </Card>
   );
 }

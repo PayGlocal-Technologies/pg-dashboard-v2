@@ -81,7 +81,7 @@
   --primary-text: #0047b0;
   --accent: #f3f4f6;
   --accent-foreground: #111827;
-  --sidebar: #e8eaee;
+  --sidebar: #fafcfe;
   --sidebar-border: #d8dce3;
   --sidebar-foreground: #374151;
   --header: #ffffff;
@@ -572,42 +572,6 @@ textarea:focus-visible {
 
 @media print {
   .intl-accounts-aurora-layer {
-    display: none;
-  }
-}
-
-/* ─── Platforms "Select platform" card aurora (card-scoped) ──────────────────
-   The same soft-wash idea as the International Accounts page, but applied to
-   one Card, not a page — see PlatformsFeature's desktop platform-list Card,
-   the only element that carries `.platform-select-aurora`. Its own tokens
-   (not the intl-accounts ones), so the two effects can be tuned
-   independently even though they share the same visual language.
-
-   Re-themed to match the Refer & Earn hero banner (see
-   ReferralHero.tsx/Refer&Earn.png) rather than carrying its own multi-hue
-   wash: a single blue fading top-to-bottom into the card's own light base,
-   the same top-to-white motif that banner uses, just far softer — that
-   artwork is full-bleed decoration with no text of its own sitting on it,
-   this card has real row labels and needs to stay legible at every alpha. */
-.platform-select-aurora {
-  --aurora-base: #eef3fc;
-  --aurora-top: rgba(37, 99, 235, 0.22);
-}
-
-.dark .platform-select-aurora {
-  --aurora-base: #0d1420;
-  --aurora-top: rgba(59, 130, 246, 0.18);
-}
-
-.platform-select-aurora-layer {
-  /* 0deg ("to top"): the blue starts at the card's bottom edge and fades to
-     transparent near the top, the opposite of the first pass (which had it
-     strongest at the top). */
-  background-image: linear-gradient(0deg, var(--aurora-top), transparent 70%);
-}
-
-@media print {
-  .platform-select-aurora-layer {
     display: none;
   }
 }

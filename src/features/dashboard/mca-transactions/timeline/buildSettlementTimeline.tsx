@@ -243,10 +243,11 @@ export function buildSettlementTimeline({
     }[approvalStatus];
 
     // The upload form itself no longer nests here while IN_PROGRESS — it
-    // renders directly in SettlementTimelineSection, in the banner's old
-    // spot, so it's the first thing visible rather than something to scroll
-    // down into the timeline to find. This step still exists and still
-    // carries its own status/date, just without the form as its child.
+    // renders in its own SettlementActionCard, above Settlement Timeline
+    // entirely (see TransactionDetailsPage.tsx), so it's the first thing
+    // visible rather than something to scroll down into the timeline to
+    // find. This step still exists and still carries its own status/date,
+    // just without the form as its child.
     let uploadChildren: ReactNode = null;
     if (uploadStatus === "SUCCESS" && displayFileName && downloadPath) {
       uploadChildren = (

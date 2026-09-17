@@ -284,7 +284,7 @@ export const mcaNavigation: NavGroup[] = [
       // /platforms, this app's existing Platforms page, rather than the
       // /connect-platforms route this tree was designed against, which was
       // never built.
-      { label: "Connect Platforms", href: "/platforms", icon: "link", permission: [] },
+      { label: "Platforms", href: "/platforms", icon: "link", permission: [] },
     ],
   },
   {

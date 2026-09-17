@@ -250,10 +250,11 @@ export function UploadInvoiceForm({
         )}
 
         {/* Only the standalone modal states the settlement-blocking rule up
-            front: inside the settlement timeline, the step this form is
-            nested under (see TransactionDetailsPage's uploadSlot) already
-            says "Invoice review"/"Upload invoice", so repeating why the
-            invoice is required here read as redundant in that context. */}
+            front: the inline variant sits in its own SettlementActionCard,
+            directly above Settlement Timeline's own "Upload invoice"/
+            "Invoice review" step (see TransactionDetailsPage.tsx), which
+            already says as much, so repeating it here read as redundant in
+            that context. */}
         {isModal && (
           <DialogDescription asChild>
             <Alert variant="neutral">

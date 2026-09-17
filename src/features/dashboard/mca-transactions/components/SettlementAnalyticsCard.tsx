@@ -200,7 +200,7 @@ function CurrencyChip({
   return (
     <li className="flex items-center gap-3 py-1">
       <span
-        className={cn("h-8 w-1 shrink-0 rounded-full", neutralClass)}
+        className={cn("h-8 w-1 shrink-0 rounded-sm", neutralClass)}
         style={
           neutralClass
             ? undefined
@@ -395,7 +395,7 @@ export function SettlementAnalyticsCard({
         {isLoading ? (
           <div className="space-y-4">
             <Shimmer className="h-3 w-36" />
-            <Shimmer className="h-2.5 w-full rounded-full" />
+            <Shimmer className="h-2.5 w-full rounded-sm" />
             <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
               {Array.from({ length: 2 }).map((_, i) => (
                 <Shimmer key={i} className="h-10 w-full" />
@@ -429,9 +429,12 @@ export function SettlementAnalyticsCard({
                   every figure it represents is restated as real text below,
                   which is what a screen reader (and per the brief, any
                   reader who needs more than relative proportions) actually
-                  reads. */}
+                  reads. Rectangular with a small corner radius, not the
+                  fully rounded pill this used to be — matches the same
+                  distribution bar on the dashboard's own Transactions card
+                  (see McaInvoiceOriginsCard). */}
               <div
-                className="flex h-2.5 w-full overflow-hidden rounded-full bg-muted"
+                className="flex h-2.5 w-full overflow-hidden rounded-sm bg-muted"
                 aria-hidden="true"
               >
                 {accountRows.map((row, index) => (

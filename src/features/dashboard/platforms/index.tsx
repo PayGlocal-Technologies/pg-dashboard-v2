@@ -220,8 +220,9 @@ function PlatformsContent() {
 
   return (
     <div className="mx-auto max-w-[1400px] page-enter">
-      {/* mb-8 widens PageHeader's own mb-6 to the 32px this page puts between
-          the page header and the two columns — same step as Virtual Accounts.
+      {/* PageHeader's own default mb-6 (24px) between the page header and the
+          two columns below — no override needed, tightened from the
+          wider 32px this page used to add on top of it.
 
           The action goes through PageHeader's own actions slot rather than a
           wrapper row, so the alignment and the header's spacing stay the
@@ -231,24 +232,16 @@ function PlatformsContent() {
       <PageHeader
         title="Platforms"
         subtitle="Connect your PayGlocal receiving account to the platforms that pay you."
-        className="mb-8"
         actions={
           <>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="plus" className="h-4 w-4" />}
-              onClick={() => setRequestPlatformOpen(true)}
-            >
-              Request a platform
-            </Button>
-
             {/* Which of the platform's receiving accounts the workflow below
-                is about. Sits to the right of Request a platform now, rather
-                than beside the "Connect your account" title further down —
-                the page header is what's on screen whatever step of the
-                workflow you've scrolled to, so the control that scopes
-                everything below it belongs up here, not buried mid-page. */}
+                is about. The page header is what's on screen whatever step of
+                the workflow you've scrolled to, so the control that scopes
+                everything below it belongs up here, not buried mid-page.
+                "Request a platform" used to sit beside this too, now reachable
+                inline at the bottom of the platform list itself instead (see
+                that list's own "+ Request a platform" row) — no need for it
+                to live in both places. */}
             {accounts.length > 0 && selectedAccount && (
               <Select value={selectedAccount.id} onValueChange={setSelectedAccountId}>
                 {/* h-9/text-xs match Request a platform's own Button
@@ -408,28 +401,13 @@ function PlatformsContent() {
                 horizontal padding, so the card only has to keep them clear of its
                 edge. Same treatment as the Virtual Accounts region card. */}
               <div className="hidden lg:block">
-                {/* The one card on this page carrying the aurora wash — see
-                  .platform-select-aurora/-layer in globals.css. Scoped to
-                  this Card alone (not the page background, unlike
-                  International Accounts): overflow-hidden clips the
-                  absolutely positioned layer to the card's own rounded-xl
-                  corners, and the row list is lifted to z-10 so the wash
-                  sits behind it, not on top — same reason as the page
-                  version: an absolutely positioned box paints after static
-                  in-flow content by default. */}
-                <Card
-                  size="sm"
-                  className="platform-select-aurora relative isolate mt-2 gap-0 overflow-hidden bg-(--aurora-base) p-3"
-                >
-                  <div
-                    aria-hidden="true"
-                    className="platform-select-aurora-layer pointer-events-none absolute inset-0 z-0"
-                  />
-                  <div
-                    className="relative z-10 space-y-1"
-                    role="list"
-                    aria-label="Select a platform"
-                  >
+                {/* Plain light-grey surface (was the .platform-select-aurora
+                  blue wash) — the selected row's own solid white/bg-card
+                  chip is still the thing carrying the emphasis here, so it
+                  doesn't need a tinted backdrop to stand apart from the
+                  rest of the list. */}
+                <Card size="sm" className="mt-2 gap-0 overflow-hidden bg-muted/40 p-3">
+                  <div className="space-y-1" role="list" aria-label="Select a platform">
                     {platforms.map((platform) => {
                       const isSelected = platform.id === selectedPlatform.id;
                       return (
@@ -497,6 +475,33 @@ function PlatformsContent() {
                         </Button>
                       );
                     })}
+
+                    {/* Same row shape as a platform (leftIcon/label), but a
+                        "+" glyph instead of a brand mark and no selected
+                        state of its own — clicking it opens the exact same
+                        dialog as the header's own "Request a platform"
+                        button (setRequestPlatformOpen is already in scope
+                        here), just reachable without scrolling back up. */}
+                    <Button
+                      type="button"
+                      role="listitem"
+                      variant="ghost"
+                      size="md"
+                      className="w-full justify-start gap-2.5 text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
+                      leftIcon={
+                        // justify-start, not -center: a platform's own logo
+                        // (object-contain in this same h-6 w-9 box) reads as
+                        // starting flush at the box's left edge, so centering
+                        // this glyph instead left it visibly adrift from
+                        // where every other row's icon/name gap actually is.
+                        <span className="flex h-6 w-9 shrink-0 items-center justify-start">
+                          <Icon name="plus" className="h-4 w-4" />
+                        </span>
+                      }
+                      onClick={() => setRequestPlatformOpen(true)}
+                    >
+                      <span className="truncate">Request a platform</span>
+                    </Button>
                   </div>
                 </Card>
               </div>
@@ -516,12 +521,13 @@ function PlatformsContent() {
             taller than the step it belongs to, so the column stops there rather
             than taking every pixel a wide viewport offers.
 
-            Not a plain space-y-10 any more — the gaps between Account
-            details, Documents you might need, and Connect your account are
-            each a Separator (own mt-8) rather than a bare margin, so none of
+            Not a plain space-y utility — the gaps between Account details,
+            Documents you might need, and Connect your account are each a
+            Separator (own margin, tightened from mt-8 to mt-6 to mt-4 for
+            the one before Documents) rather than a bare margin, so none of
             them reads as out of place when the account details card above
             grows taller for a given country/platform. Only the gap before
-            Steps keeps the wider 40px step. */}
+            Steps keeps a wider mt-8 step. */}
         <div key={selectedPlatform.id} className="page-enter max-w-4xl lg:col-start-2">
           {/* ─── 1. Account details ─────────────────────────────────────── */}
           {/* Always open, not a disclosure — this used to be a collapsed
@@ -568,7 +574,11 @@ function PlatformsContent() {
                   3-line address) never ends shorter than it. It can still
                   grow taller for a longer field set — there's no ceiling to
                   match against, only a floor. */}
-                <Card size="sm" className="mt-2 min-h-60" data-guide="mca-account-details">
+                <Card
+                  size="sm"
+                  className="mt-2 min-h-60 border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
+                  data-guide="mca-account-details"
+                >
                   {/* Proximity does the grouping, not rules: 4px holds a label
                     to its own value, the grid's own gaps separate one field
                     from the next, and no field carries padding of its own.
@@ -598,8 +608,8 @@ function PlatformsContent() {
               render at all. */}
           {documents.length > 0 && (
             <>
-              <Separator className="mt-8" />
-              <section className="mt-8">
+              <Separator className="mt-4" />
+              <section className="mt-4">
                 <h2 className={MODULE_TITLE}>Documents you might need</h2>
                 <p className={cn(MODULE_SUBTITLE, "mt-1")}>
                   Statements {selectedPlatform.name} may ask you for.
@@ -675,16 +685,16 @@ function PlatformsContent() {
               it stays on screen for the whole workflow rather than
               scrolling away with this one heading.
 
-              A Separator (own mt-8), same as the one above "Documents you
+              A Separator (own mt-6), same as the one above "Documents you
               might need": a fixed break between sections rather than a bare
               margin, so this heading's position never depends on how tall
               the content above it (the account details card, or the
               document count) happens to be. */}
-          <Separator className="mt-8" />
-          <section className="mt-8">
+          <Separator className="mt-6" />
+          <section className="mt-6">
             <h2 className={MODULE_TITLE}>Connect your account to {selectedPlatform.name}</h2>
             {/* mt-1 binds the description to the title it explains: the
-                tightest step on the page, against the 40px that separates
+                tightest step on the page, against the mt-8 that separates
                 this whole section from the next. */}
             <p className={cn(MODULE_SUBTITLE, "mt-1")}>
               Follow these steps in {selectedPlatform.name} to start receiving payouts.
@@ -696,19 +706,20 @@ function PlatformsContent() {
               carrying full-width art, which is what gives it the weight the
               compact sections above it deliberately don't have.
 
-              mt-10: the original space-y-10 step, kept here now that the gap
-              above ("Connect your account" → Steps) needed to be narrower —
-              see this column's own top-level comment. */}
-          <section className="mt-10">
+              mt-8 (tightened from mt-10): still the widest step on this
+              page, now that the gap above ("Connect your account" → Steps)
+              needed to be narrower — see this column's own top-level
+              comment. */}
+          <section className="mt-8">
             {/* Step number → instruction → screenshot, in that order, every step
                 the same shape so the sequence scans as one column. No "Steps"
                 heading — the numbered sequence reads as steps on its own.
 
-                space-y-8 between steps against the 4px and 12px inside one: a
+                space-y-6 between steps against the 4px and 12px inside one: a
                 step's own parts sit far closer to each other than any step does
                 to the next, which is what gives the sequence its rhythm rather
                 than reading as six evenly spaced blocks. */}
-            <ol className="space-y-8">
+            <ol className="space-y-6">
               {selectedPlatform.steps.map((step, index) => (
                 <li key={step.instruction}>
                   {/* The number is a marker, not a title: smallest size, muted,

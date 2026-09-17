@@ -7,11 +7,20 @@ import {
   CartesianGrid,
   Line,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { Button, Card, Separator, Shimmer } from "@/components/ui";
+import {
+  Button,
+  Card,
+  Separator,
+  Shimmer,
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -88,7 +97,7 @@ interface McaRevenueCardProps {
 }
 
 export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
-  const [timeframe, setTimeframe] = useState<RevenueTimeframe>("1M");
+  const [timeframe, setTimeframe] = useState<RevenueTimeframe>("3M");
   const [ranges] = useState(buildRevenueRanges);
 
   const { startDate, endDate } = ranges[timeframe];
@@ -110,8 +119,22 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
 
   return (
     <Card className="h-full gap-0 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <h2 className="text-sm font-semibold text-foreground">Revenue</h2>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="flex items-center gap-1.5">
+          <h2 className="text-sm font-semibold text-foreground">Total amount collected</h2>
+          <TooltipProvider delayDuration={200}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="flex items-center text-muted-foreground">
+                  <Icon name="info" className="h-3 w-3" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs">
+                Includes collections from all sources, including invoices.
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </span>
         <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
           {revenueTimeframes.map((opt) => (
             <Button
@@ -133,7 +156,7 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         </div>
       </div>
 
-      <div className="mt-3 flex items-baseline gap-2">
+      <div className="mt-2.5 flex items-baseline gap-2">
         {isLoading ? (
           <Shimmer className="h-8 w-32" />
         ) : (
@@ -178,29 +201,30 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         </div>
       ) : null}
 
-      <div className="mt-4 min-h-48 w-full flex-1">
+      <div className="mt-3 min-h-36 w-full flex-1">
         {isLoading ? (
-          <Shimmer className="h-full min-h-48 w-full" />
+          <Shimmer className="h-full min-h-36 w-full" />
         ) : isError ? (
           <PlaceholderState
             variant="error"
             title="Couldn't load"
             description="Revenue didn't load."
-            className="h-full min-h-48"
+            className="h-full min-h-36"
           />
         ) : !hasData ? (
           <PlaceholderState
             variant="no-analytics"
             title="No revenue"
             description="No revenue in this period."
-            className="h-full min-h-48"
+            className="h-full min-h-36"
           />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <defs>
                 <linearGradient id="mca-revenue-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.22} />
+                  <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.45} />
+                  <stop offset="60%" stopColor="var(--chart-1)" stopOpacity={0.12} />
                   <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
                 </linearGradient>
               </defs>
@@ -219,7 +243,7 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
                 tickFormatter={formatMoneyAxis}
                 tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
               />
-              <Tooltip content={<RevenueTooltip />} />
+              <RechartsTooltip content={<RevenueTooltip />} />
               <Area
                 type="monotone"
                 dataKey="current"
@@ -243,7 +267,7 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         )}
       </div>
 
-      <Separator className="my-4" />
+      <Separator className="my-3" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

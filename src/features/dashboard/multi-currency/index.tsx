@@ -1,24 +1,13 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "sonner";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatCurrencyShort } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useSettledCurrencyTrend } from "@/features/dashboard/mca-transactions/hooks";
 import { InternationalAccountsAurora } from "@/features/dashboard/multi-currency/components/InternationalAccountsAurora";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
@@ -112,12 +101,13 @@ function MultiCurrencyContent() {
 
   const selectAccount = (account: VirtualAccount) => setSelectedAccountId(account.id);
 
-  // Settled amount for the selected region only. The settled-currency-trend
-  // endpoint returns one entry per account (currency), each with an INR total
-  // and a monthly INR series; picking the row for the selected account's
-  // currency scopes the whole card — figure, count and chart — to that region.
-  // AED/SGD and the dollar/global rest-of-world buckets all resolve to the
-  // REST_OF_WORLD row the endpoint groups them under.
+  // Settled amount for the selected region only, for the small "Settled
+  // amount" card below the account details — the settled-currency-trend
+  // endpoint returns one entry per account (currency), each with an INR
+  // total; picking the row for the selected account's currency scopes the
+  // figure to that region. AED/SGD and the dollar/global rest-of-world
+  // buckets all resolve to the REST_OF_WORLD row the endpoint groups them
+  // under.
   const { currencies: settledCurrencies, isLoading: isSettledLoading } = useSettledCurrencyTrend();
   const selectedCurrencyKey = REST_OF_WORLD_CURRENCIES.has(selectedAccount?.currency ?? "")
     ? "REST_OF_WORLD"
@@ -125,11 +115,6 @@ function MultiCurrencyContent() {
   const selectedTrend = (settledCurrencies ?? []).find((c) => c.currency === selectedCurrencyKey);
   const settledAmount = selectedTrend?.totalInrAmount ?? 0;
   const settledTxnCount = selectedTrend?.totalCount ?? 0;
-  // Monthly series for the chart, in INR (a mix of currencies only sums in one).
-  const settledSeries = (selectedTrend?.points ?? []).map((p) => ({ x: p.month, y: p.inrAmount }));
-  // Unique per mount so the chart's fill gradient id can't collide with another
-  // <linearGradient> elsewhere on the page.
-  const settledGradientId = useId().replace(/:/g, "");
 
   const [shareModalOpen, setShareModalOpen] = useState(false);
   const [fxModalOpen, setFxModalOpen] = useState(false);
@@ -211,22 +196,34 @@ function MultiCurrencyContent() {
           The FX calculator goes through PageHeader's own actions slot: it
           answers what a foreign-currency invoice becomes in INR, which is about
           the page's subject as a whole rather than any one region, so it stays
-          with the title rather than moving into the region-scoped column below.
-          "How it works?" used to sit beside it and now sits on the account
-          card's own heading row instead — that dialog is per-currency, so it
-          belongs to the selection, not to the page. */}
+          with the title. "How it works?" sits beside it now too (left of Forex
+          calculator, same order/style as International Accounts 2), rather
+          than on the account card's own heading row — still gated on
+          selectedAccount since the dialog is per-currency. */}
       <PageHeader
         title="International accounts"
         subtitle="Receive international payments using your virtual accounts."
         actions={
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="calculator" className="h-4 w-4" />}
-            onClick={() => setFxModalOpen(true)}
-          >
-            Forex calculator
-          </Button>
+          <>
+            {selectedAccount && (
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Icon name="info" className="h-4 w-4" />}
+                onClick={() => setHowItWorksOpen(true)}
+              >
+                How it works?
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              leftIcon={<Icon name="calculator" className="h-4 w-4" />}
+              onClick={() => setFxModalOpen(true)}
+            >
+              Forex calculator
+            </Button>
+          </>
         }
       />
 
@@ -245,106 +242,105 @@ function MultiCurrencyContent() {
       )}
 
       {/* Both columns are titled modules of the same shape: a title block, then
-          the content it introduces — and both put their title in row 1 and
-          their content in row 2, so the two titles share one grid row (and
-          therefore one top edge) and the two content boxes (the region Card,
-          the account-details card) share the next one, regardless of how each
-          title's own text happens to wrap.
+          the content it introduces. Four separately-placed grid items (both
+          titles, both content blocks), not two wrapper divs each holding its
+          own heading — that's what actually pins both titles to row 1 and
+          both content blocks to row 2, so they share a top edge regardless of
+          how either title's text happens to wrap. No `grid-template-rows` is
+          declared: the grid still creates exactly two implicit rows, each
+          sized to its own tallest occupant, so this needs no hard-coded
+          height anywhere.
 
-          Explicit col-start/row-start rather than one wrapper div per column —
-          the same placement technique the Platforms page's own two-column grid
-          uses — is what lets row 1 and row 2 each size to the taller of their
-          two occupants without hard-coding either height.
+          `items-stretch` then makes row 2's shorter content block grow to
+          match the taller one — "Select client region" opts back out via
+          `lg:self-start` since its own height is what should set the row's
+          height, not something to stretch further, leaving the account-
+          details column (default stretch) to grow down and match it.
 
-          DOM order stays left title → left content → right title → right
+          DOM order stays left title → right title → left content → right
           content, so the stacked single-column layout below `lg` (where
           every explicit placement drops out) still reads in that order.
           gap-x-5 is the shared gutter, gap-y-3 the 12px title → container
-          step. Region and Account Details keep this same 288px/flexible-1fr
-          shape whether or not How it works is open — that panel is a flex
-          child *inside* the Account Details column below, not a third track
-          here, so it never resizes these two things. */}
-      <div className="grid gap-x-5 gap-y-6 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-start">
-        {/* Title and region list are one sticky unit, not two independently
-            placed grid items: the heading names the control directly below it,
-            so pinning the list while the heading scrolls away would leave an
-            unlabelled column of flags. Spanning both rows with `self-start`
-            keeps the wrapper content-height (so it has room to travel inside
-            its two-row area) and keeps its top edge on row 1 — level with the
-            right column's own title, the alignment this grid exists for.
-            space-y-3 reproduces the grid's own 12px title → container step
-            now that the two are no longer separated by gap-y-3. */}
+          step; the left content block's own 32px section-to-section spacing
+          lives directly on it (space-y-6), separate from this row gap. */}
+      <div className="grid gap-x-5 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-stretch">
+        <h2 className={cn(MODULE_TITLE, "lg:col-start-1 lg:row-start-1")}>
+          Select client region
+        </h2>
+
+        {selectedAccount && (
+          <h2 className={cn(MODULE_TITLE, "lg:col-start-2 lg:row-start-1")}>
+            Receive payments from {selectedAccount.countryName}
+          </h2>
+        )}
+
         {/* min-w-0 is load-bearing below `lg`, where this stack holds the
             horizontally scrolling region tiles (RegionSelector's `cards`
             variant). A grid item's default `min-width: auto` floors the track at
             the item's min-content width, and a nowrap flex row of tiles would
             otherwise grow the implicit column past the viewport, scrolling the
             whole page sideways instead of the tile row inside its own box. */}
-        <div className="min-w-0 space-y-6">
-          <div className="space-y-3">
-            <h2 className={MODULE_TITLE}>Select client region</h2>
+        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-2 lg:self-start">
+          {isLoading ? (
+            // The region list is this page's only navigation, so its loading
+            // state has to hold the column's footprint — otherwise the right
+            // column snaps sideways when the accounts land. Six rows is the
+            // typical account count; the Card and its p-3 are the same ones the
+            // loaded list sits in, so nothing moves but the row contents.
+            <Card size="sm" aria-busy className="hidden gap-0 p-3 lg:flex">
+              <div className="space-y-1">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-5 py-2.5">
+                    <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
+                    <Shimmer className="h-3.5 w-28" />
+                  </div>
+                ))}
+              </div>
+            </Card>
+          ) : (
+            <>
+              {/* Below `lg` the two columns collapse into one stack, where a full
+                vertical list of regions would push the account details most of
+                a screen down. The tiles scroll horizontally instead, so the
+                details stay near the fold. Each tile is its own surface, so
+                this variant needs no Card around it — unlike the list below.
 
-            {isLoading ? (
-              // The region list is this page's only navigation, so its loading
-              // state has to hold the column's footprint — otherwise the right
-              // column snaps sideways when the accounts land. Six rows is the
-              // typical account count; the Card and its p-3 are the same ones the
-              // loaded list sits in, so nothing moves but the row contents.
-              <Card size="sm" aria-busy className="hidden gap-0 p-3 lg:flex">
-                <div className="space-y-1">
-                  {Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="flex items-center gap-3 px-5 py-2.5">
-                      <Shimmer className="h-6 w-6 shrink-0 rounded-full" />
-                      <Shimmer className="h-3.5 w-28" />
-                    </div>
-                  ))}
-                </div>
+                Two renderings toggled by `hidden`, not one set of rows bent
+                into both shapes with responsive classes: the layouts differ in
+                direction, in what the selected state looks like, and in whether
+                there's a chevron at all. `display: none` also keeps whichever
+                one is inactive out of the tab order and the accessibility tree,
+                so there is never a second, invisible copy of these controls to
+                land on. */}
+              <div data-guide="mca-region-selector" className="-mx-1 lg:hidden">
+                <RegionSelector
+                  accounts={accounts}
+                  selectedAccountId={selectedAccount?.id ?? ""}
+                  onSelect={selectAccount}
+                  label="Select client region"
+                  variant="cards"
+                />
+              </div>
+
+              {/* p-3 rather than Card's own 28px inset: the rows carry their own
+                px-5, so the card's padding only has to keep them clear of its
+                edge — anything more and the region names sit adrift of the
+                title above the card. */}
+              <Card
+                size="sm"
+                className="hidden gap-0 p-3 lg:flex"
+                data-guide="mca-region-selector"
+              >
+                <RegionSelector
+                  accounts={accounts}
+                  selectedAccountId={selectedAccount?.id ?? ""}
+                  onSelect={selectAccount}
+                  label="Select client region"
+                  size="md"
+                />
               </Card>
-            ) : (
-              <>
-                {/* Below `lg` the two columns collapse into one stack, where a full
-                  vertical list of regions would push the account details most of
-                  a screen down. The tiles scroll horizontally instead, so the
-                  details stay near the fold. Each tile is its own surface, so
-                  this variant needs no Card around it — unlike the list below.
-
-                  Two renderings toggled by `hidden`, not one set of rows bent
-                  into both shapes with responsive classes: the layouts differ in
-                  direction, in what the selected state looks like, and in whether
-                  there's a chevron at all. `display: none` also keeps whichever
-                  one is inactive out of the tab order and the accessibility tree,
-                  so there is never a second, invisible copy of these controls to
-                  land on. */}
-                <div data-guide="mca-region-selector" className="-mx-1 lg:hidden">
-                  <RegionSelector
-                    accounts={accounts}
-                    selectedAccountId={selectedAccount?.id ?? ""}
-                    onSelect={selectAccount}
-                    label="Select client region"
-                    variant="cards"
-                  />
-                </div>
-
-                {/* p-3 rather than Card's own 28px inset: the rows carry their own
-                  px-5, so the card's padding only has to keep them clear of its
-                  edge — anything more and the region names sit adrift of the
-                  title above the card. */}
-                <Card
-                  size="sm"
-                  className="hidden gap-0 p-3 lg:flex"
-                  data-guide="mca-region-selector"
-                >
-                  <RegionSelector
-                    accounts={accounts}
-                    selectedAccountId={selectedAccount?.id ?? ""}
-                    onSelect={selectAccount}
-                    label="Select client region"
-                    size="md"
-                  />
-                </Card>
-              </>
-            )}
-          </div>
+            </>
+          )}
 
           {/* Currency caveat for the selected region — a pre-payment briefing
               (e.g. "don't convert to GBP"), so it sits directly under the
@@ -384,28 +380,23 @@ function MultiCurrencyContent() {
           )}
         </div>
 
-        {/* Right column: heading, then account details + metrics — one grid
-            item so `items-start` aligns its top edge with the left column's,
-            rather than relying on explicit row placement. space-y-3 is the 12px
-            title → content step; the content block below keeps its own 32px
-            section spacing. min-w-0 lets the account-details/metrics content
-            shrink instead of forcing the column past the viewport. */}
-        <div className="min-w-0 space-y-3">
+        {/* Right column content: just the account-details card now (its own
+            heading moved up to row 1, see above). min-w-0 lets it shrink
+            instead of forcing the column past the viewport; lg:flex
+            lg:flex-col carries the row's stretched height down to the card
+            itself. */}
+        <div className="min-w-0 lg:col-start-2 lg:row-start-2 lg:flex lg:flex-col">
           {/* AnimatePresence/mode="wait": switching regions used to swap the
-              heading and the whole card instantly — jarring given how much
-              detail changes at once (bank name, account number, address…).
-              `wait` makes the outgoing account's content fade+lift out
-              FIRST, and only once that finishes does the incoming one
-              fade+rise in — that hand-off is the "delay" itself, not an
-              artificial timer, and it reads as the page acknowledging a
-              real switch happened. Same easing/duration convention as the
-              settlement detail page and the dashboard's analytics tab
-              switch (see SettlementDetailFeature.tsx /
-              TodaysAnalyticsSection.tsx). Replaces the old bare `page-enter`
-              class, which only covered the account details card below, not
-              this heading or the Metrics section further down — so only
-              part of the column used to visibly change while the rest
-              snapped instantly. */}
+              whole card instantly — jarring given how much detail changes at
+              once (bank name, account number, address…). `wait` makes the
+              outgoing account's content fade+lift out FIRST, and only once
+              that finishes does the incoming one fade+rise in — that hand-off
+              is the "delay" itself, not an artificial timer, and it reads as
+              the page acknowledging a real switch happened. Same easing/
+              duration convention as the settlement detail page and the
+              dashboard's analytics tab switch (see SettlementDetailFeature.tsx
+              / TodaysAnalyticsSection.tsx). flex-1/flex-col is what carries
+              the column's stretched height down to the card itself. */}
           <AnimatePresence mode="wait">
             {selectedAccount && (
               <motion.div
@@ -414,257 +405,93 @@ function MultiCurrencyContent() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -5 }}
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-8"
+                className="flex flex-1 flex-col"
               >
-                {/* h2 as a plain block (not a flex item), so its top edge renders
-                    identically to the left column's plain-block heading and the two
-                    line up. "How it works?" is positioned absolutely to the top-right
-                    rather than sharing a flex line, which was nudging the heading
-                    down; pr-28 keeps a long region name clear of it. */}
-                <div className="relative pr-28">
-                  <h2 className={MODULE_TITLE}>
-                    Receive payments from {selectedAccount.countryName}
-                  </h2>
-                  <Button
-                    variant="link"
-                    className="absolute right-0 top-0 -mr-2 text-[13px] underline"
-                    onClick={() => setHowItWorksOpen(true)}
+                {/* Details and their currency's caveat as one stack: the notice is
+                    about the account whose details sit beside it, so it travels
+                    with them. Renders nothing for a currency that carries no
+                    caveat.
+
+                    The notice goes *before* the account details — every one of
+                    them is a pre-payment briefing (don't convert to GBP, expect
+                    your bank's verification prompt), so the client has to read it
+                    before, not after, the account number they're about to send a
+                    payment to.
+
+                    `inside` moves the flag/name/subtitle into the card — there's
+                    no carousel here naming the account any more, and the width
+                    override drops the card's default shrink-wrapping so it fills
+                    this column. Kept at its own natural height now (no more
+                    `h-full`) — the two small metric cards below absorb the
+                    leftover height instead, see their own doc comment. */}
+                <VirtualAccountDetails
+                  account={selectedAccount}
+                  onCopy={handleCopyFullAccount}
+                  onShare={() => setShareModalOpen(true)}
+                  headerPlacement="inside"
+                  className="w-full max-w-none border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
+                />
+
+                {/* Settled amount + Documents pending, side by side — the
+                    Metrics cards from before, now small and placed in the
+                    space this column has left over once account details
+                    settles at its own natural height. `mt-auto` pushes this
+                    row down to the column's own bottom edge (which the grid
+                    above already stretches to match "Documents you might
+                    need" on the left) rather than leaving it stranded right
+                    under the account card with a gap below it — same
+                    mt-auto-over-fixed-margin technique OutstandingAmountCard
+                    itself already uses to ground its own optional content. */}
+                <div className="mt-auto grid grid-cols-2 gap-4 pt-4">
+                  {/* Slightly smaller than before (p-3 vs p-4, text-xl vs
+                      text-2xl) — this and Documents pending beside it were
+                      each a touch taller than "Documents you might need" in
+                      the column opposite, which items-stretch on the outer
+                      grid was matching by growing THIS row rather than
+                      shrinking that one. Same diagonal wash treatment as the
+                      reference: a white-to-tint gradient corner rather than a
+                      flat tinted fill. */}
+                  <Card
+                    size="sm"
+                    className="gap-0 border-emerald-100 bg-linear-to-br from-white via-white to-emerald-100/70 p-3 dark:border-emerald-900/40 dark:from-card dark:via-card dark:to-emerald-950/40"
                   >
-                    How it works?
-                  </Button>
-                </div>
+                    <p className="text-sm font-normal text-muted-foreground">Settled amount</p>
+                    {isSettledLoading ? (
+                      <Shimmer className="mt-1 h-7 w-24" />
+                    ) : (
+                      <CompactAmount
+                        amount={settledAmount}
+                        currency="INR"
+                        className="mt-1 block whitespace-nowrap text-xl font-semibold tabular-nums tracking-tight text-foreground"
+                      />
+                    )}
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {settledTxnCount.toLocaleString("en-IN")} settled transaction
+                      {settledTxnCount === 1 ? "" : "s"} · Year to date
+                    </p>
+                  </Card>
 
-                {/* Account details come before the Metrics section below: a
-                    merchant opens this page to find the numbers to hand a client,
-                    and that has to be the first thing they see, not the
-                    settled/outstanding figures. */}
-                <div className="flex flex-wrap items-start gap-x-5 gap-y-8">
-                  <section className="flex-1">
-                    {/* Details and their currency's caveat as one stack: the notice is
-                        about the account whose details sit beside it, so it travels
-                        with them. Renders nothing for a currency that carries no
-                        caveat. space-y-3 keeps it bound to the card rather than
-                        reading as the section below it.
-
-                        The notice goes *before* the account details — every one of
-                        them is a pre-payment briefing (don't convert to GBP, expect
-                        your bank's verification prompt), so the client has to read it
-                        before, not after, the account number they're about to send a
-                        payment to.
-
-                        `inside` moves the flag/name/subtitle into the card — there's
-                        no carousel here naming the account any more — and the width
-                        override drops the card's default shrink-wrapping so it fills
-                        this column. */}
-                    <VirtualAccountDetails
-                      account={selectedAccount}
-                      onCopy={handleCopyFullAccount}
-                      onShare={() => setShareModalOpen(true)}
-                      headerPlacement="inside"
-                      className="w-full max-w-none"
-                    />
-                  </section>
-
-                  {/* Side-panel variant, kept for reference — superseded below
-                      by the modal.
-                  {howItWorksOpen && (
-                    <HowItWorksPanel
-                      currency={selectedAccount.currency}
-                      onClose={() => setHowItWorksOpen(false)}
-                      className="w-full shrink-0 sm:w-[340px]"
-                    />
-                  )}
-                  */}
+                  <OutstandingAmountCard
+                    className="w-full p-3"
+                    hideIcon
+                    badgePlacement="below-amount"
+                    dangerTint
+                    currency={
+                      selectedAccount.iso2 === "ROW" ? "REST_OF_WORLD" : selectedAccount.currency
+                    }
+                  />
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* space-y-8 is the 32px section → section step, the loosest on the
-              page. */}
-          <div className="space-y-8">
-            {selectedAccount && (
-              <HowItWorksDialog
-                open={howItWorksOpen}
-                onOpenChange={setHowItWorksOpen}
-                currency={selectedAccount.currency}
-              />
-            )}
-
-            <section>
-              {/* "Metrics", not "Analytics" — settled/outstanding figures, sitting
-                after account details for the reason noted above. Same heading
-                treatment (MODULE_TITLE, mb-3) as Documents below it, so all
-                three modules in this column read as peers. */}
-              <h2 className={cn(MODULE_TITLE, "mb-3")}>Metrics</h2>
-
-              {/* flex-wrap rather than a grid, because grid tracks cannot wrap.
-                Flexbox decides line breaks from each item's hypothetical main
-                size, which for `flex-1`-style items is their min-width — so the
-                row holds both cards while 470 + 300 + the gap fits, and drops
-                Outstanding onto its own full-width line the moment the settled
-                card would be squeezed below its 470px floor. Neither card ever
-                shrinks past the width its content needs.
-
-                No items-* override, so the default stretch gives both cards the
-                same height on a shared line, and therefore a shared top and
-                bottom edge.
-
-                AnimatePresence/mode="wait", same timing as the account
-                details block above: Settled amount is scoped to the
-                selected region too, so it cross-fades on the same beat
-                rather than updating instantly while the card above it is
-                still mid-transition. */}
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={selectedAccount?.id ?? "none"}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="flex flex-wrap gap-4"
-                >
-                  {/* Settled amount for the selected region: the KPI on the left, a
-                  month-by-month area chart on the right, both scoped to the
-                  selected account's currency via settled-currency-trend — pick
-                  US and it reads only USD settlements. flex-[1.6] gives this card
-                  the extra width; Outstanding beside it stays flex-1. */}
-                  <Card size="sm" className="min-w-[min(470px,100%)] flex-[1.6] gap-0">
-                    {isSettledLoading ? (
-                      <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
-                        <div className="flex-1 sm:basis-2/5">
-                          <p className="text-sm font-semibold text-foreground">Settled amount</p>
-                          <Shimmer className="mt-4 h-9 w-40" />
-                        </div>
-                        <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
-                          <Shimmer className="h-full min-h-36 w-full" />
-                        </div>
-                      </div>
-                    ) : settledTxnCount === 0 ? (
-                      /* No settlements for the selected region: the shared
-                     illustration + copy, the same empty state the Settlement
-                     Reports page shows, rather than a ₹0 figure beside a bare
-                     "No settlements yet" line. Boxed to the same height the
-                     KPI + chart layout occupies (min-h-36, sm illustration) so
-                     the card doesn't grow when it's empty. */
-                      <div className="flex min-h-36 flex-1 items-center justify-center">
-                        <PlaceholderState
-                          variant="no-settlements"
-                          size="xs"
-                          title="No settlements yet"
-                          description="Settlement reports will appear here once transactions are processed."
-                          className="gap-2 py-2"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex flex-1 flex-col gap-6 sm:flex-row sm:items-stretch">
-                        <div className="flex-1 sm:basis-2/5">
-                          <p className="text-sm font-semibold text-foreground">Settled amount</p>
-                          {/* Same size/weight as OutstandingAmountCard's figure so
-                          the pair carries equal visual weight. Compact ₹ (uat
-                          design) with the exact figure on hover. */}
-                          <CompactAmount
-                            amount={settledAmount}
-                            currency="INR"
-                            className="mt-4 block whitespace-nowrap text-3xl font-semibold tabular-nums tracking-tight text-foreground"
-                          />
-                          <p className="mt-2 text-sm text-muted-foreground">
-                            {settledTxnCount.toLocaleString("en-IN")} settled transaction
-                            {settledTxnCount === 1 ? "" : "s"} · Year to date
-                          </p>
-                        </div>
-
-                        <div className="min-h-36 min-w-0 flex-1 sm:basis-3/5">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart
-                              data={settledSeries}
-                              margin={{ top: 8, right: 12, left: 0, bottom: 0 }}
-                            >
-                              <defs>
-                                <linearGradient id={settledGradientId} x1="0" y1="0" x2="0" y2="1">
-                                  <stop offset="0%" stopColor="var(--chart-4)" stopOpacity={0.35} />
-                                  <stop
-                                    offset="100%"
-                                    stopColor="var(--chart-4)"
-                                    stopOpacity={0.02}
-                                  />
-                                </linearGradient>
-                              </defs>
-                              <CartesianGrid
-                                strokeDasharray="3 3"
-                                stroke="color-mix(in srgb, var(--border) 65%, transparent)"
-                                vertical={false}
-                              />
-                              <XAxis
-                                dataKey="x"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                interval="preserveStartEnd"
-                              />
-                              <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
-                                tickFormatter={(v: number) =>
-                                  v === 0 ? "₹0" : formatCurrencyShort(v, "INR")
-                                }
-                                width={48}
-                              />
-                              <Tooltip
-                                contentStyle={{
-                                  borderRadius: 10,
-                                  border: "1px solid var(--border)",
-                                  fontSize: 12,
-                                  background: "var(--popover)",
-                                  color: "var(--popover-foreground)",
-                                }}
-                                formatter={(v) => [
-                                  formatCurrency(Number(v), "INR", "en-IN"),
-                                  "Settled",
-                                ]}
-                              />
-                              <Area
-                                type="monotone"
-                                dataKey="y"
-                                stroke="var(--chart-4)"
-                                strokeWidth={2}
-                                fill={`url(#${settledGradientId})`}
-                              />
-                            </AreaChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    )}
-                  </Card>
-
-                  {/* The same Outstanding card the MCA Transactions page renders, not
-                a second take on it: title, amount, pending-count badge, INR
-                conversion, one-line explanation, all off the real MCA overview
-                endpoint. It takes no props — the figure spans every account
-                rather than the selected region, so it doesn't change as regions
-                are picked.
-
-                Its own min-width is the other half of the wrap rule: it's what
-                the flex line adds to the settled card's 470px to decide whether
-                both still fit. 300px is roughly what this card's content — the
-                amount beside its pending-count chip — needs before it starts
-                looking cramped, so the row breaks rather than letting it get
-                there. */}
-                  <OutstandingAmountCard
-                    className="min-w-[min(300px,100%)] flex-1"
-                    currency={
-                      selectedAccount
-                        ? selectedAccount.iso2 === "ROW"
-                          ? "REST_OF_WORLD"
-                          : selectedAccount.currency
-                        : undefined
-                    }
-                  />
-                </motion.div>
-              </AnimatePresence>
-            </section>
-          </div>
+          {selectedAccount && (
+            <HowItWorksDialog
+              open={howItWorksOpen}
+              onOpenChange={setHowItWorksOpen}
+              currency={selectedAccount.currency}
+            />
+          )}
         </div>
       </div>
 

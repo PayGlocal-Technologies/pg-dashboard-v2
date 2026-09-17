@@ -61,6 +61,12 @@ export function OutstandingAmountCard({
    *  International Accounts 2's Metrics rail only; every other placement
    *  keeps the plain Card default. */
   tint = false,
+  /** Same diagonal white-to-tint wash as the reference "Documents pending"
+   *  card, rose instead of blue, plus a smaller headline amount — the
+   *  International Accounts page's paired Settled amount/Documents pending
+   *  row only, sized to match "Documents you might need" beside it rather
+   *  than this card's usual larger KPI treatment. */
+  dangerTint = false,
 }: {
   className?: string;
   timeframe?: string;
@@ -68,6 +74,7 @@ export function OutstandingAmountCard({
   hideIcon?: boolean;
   badgePlacement?: "title" | "below-amount";
   tint?: boolean;
+  dangerTint?: boolean;
 }) {
   const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe);
   const { breakdown, isLoading: isBreakdownLoading } = useDocumentPendingByCurrency();
@@ -104,6 +111,8 @@ export function OutstandingAmountCard({
       className={cn(
         "w-full",
         tint && "border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-950/20",
+        dangerTint &&
+          "border-rose-100 bg-linear-to-br from-white via-white to-rose-100/70 dark:border-rose-900/40 dark:from-card dark:via-card dark:to-rose-950/40",
         className
       )}
     >
@@ -135,12 +144,15 @@ export function OutstandingAmountCard({
             {badgePlacement === "title" && badge}
           </div>
           {isLoading ? (
-            <Shimmer className="mt-1 h-9 w-32" />
+            <Shimmer className={dangerTint ? "mt-1 h-7 w-24" : "mt-1 h-9 w-32"} />
           ) : (
             <CompactAmount
               amount={amount}
               currency={displayCurrency}
-              className="mt-1 block text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+              className={cn(
+                "mt-1 block font-semibold tabular-nums tracking-tight text-foreground",
+                dangerTint ? "text-xl" : "text-3xl"
+              )}
             />
           )}
           {badgePlacement === "below-amount" && badge && <div className="mt-2">{badge}</div>}

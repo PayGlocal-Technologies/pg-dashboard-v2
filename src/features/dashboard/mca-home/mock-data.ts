@@ -127,7 +127,7 @@ export interface QuickAccessItem {
 export const mcaQuickAccessItems: QuickAccessItem[] = [
   { id: "invoice-links", label: "Create invoice", icon: "file-text" },
   { id: "international-accounts", label: "International accounts", icon: "globe-2" },
-  { id: "platform-withdrawal", label: "Platform withdrawal", icon: "download" },
+  { id: "platform-withdrawal", label: "Platforms", icon: "download" },
   { id: "client-management", label: "Client management", icon: "users" },
   { id: "forex-calculator", label: "Forex calculator", icon: "circle-dollar-sign" },
   // Hidden for now — the dashboard-customise entry point (kept in code):
