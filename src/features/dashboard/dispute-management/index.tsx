@@ -96,6 +96,7 @@ export function toPaTransaction(row: DisputeRow): PaTransaction {
         status: row.status,
         raisedOn: row.disputedOn,
         respondBy: row.respondBy,
+        documents: row.documents,
       },
     ],
   };

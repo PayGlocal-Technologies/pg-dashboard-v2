@@ -11,16 +11,12 @@ export const PA_PRODUCT_FLAGS = [
   "DOMESTIC_CARDS_UPI_AND_INB",
 ] as const;
 
-// ── PA status pills shown in the filter bar ──────────────────────────────────
-export const PA_STATUS_FILTERS: FilterOption[] = [
-  { value: "All", label: "All" },
-  { value: "SUCCESS", label: "Success" },
-  { value: "INPROGRESS", label: "In Progress" },
-  { value: "SENT_FOR_CAPTURE", label: "Sent for capture" },
-  { value: "ISSUER_DECLINE", label: "Failed" },
-];
-
-// ── PA payment method pills ──────────────────────────────────────────────────
+// ── PA payment method pills, the multi-select "Payment method" filter chip
+// (see PaTransactionTable) reads these too. The status segments/chip moved
+// to PaTransactionTable itself (STATUS_SEGMENTS/STATUS_FILTER_OPTIONS) once
+// the table switched to Dispute Management's SegmentedTabs +
+// FilterChipGroup shape, rather than staying a bare list of pill buttons
+// here. ──────────────────────────────────────────────────────────────────
 export const PA_METHOD_FILTERS: FilterOption[] = [
   { value: "All", label: "All Methods" },
   { value: "CARDS", label: "Card" },

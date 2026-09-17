@@ -22,6 +22,9 @@ import {
   SectionLabel,
 } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import { AmountBreakdownBody } from "@/features/dashboard/pa-transactions/components/AmountBreakdownBody";
+import { DisputeStatusCard } from "@/features/dashboard/pa-transactions/components/DisputeStatusCard";
+import { DisputeAcceptChoice } from "@/features/dashboard/pa-transactions/components/DisputeAcceptChoice";
+import { DisputeRespondForm } from "@/features/dashboard/pa-transactions/components/DisputeRespondForm";
 import {
   IssueRefundDialog,
   type RefundSubmission,
@@ -34,6 +37,7 @@ import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/compon
 import { validateRefund } from "@/features/dashboard/pa-transactions/financial/deriveFinancials";
 import { deriveTimelineSteps } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
 import { formatNow } from "@/features/dashboard/pa-transactions/formatNow";
+import { useDisputeResolutionFlow } from "@/features/dashboard/pa-transactions/useDisputeResolutionFlow";
 import type { RefundEvent } from "@/features/dashboard/pa-transactions/financial/types";
 import { useRefundEvents } from "@/stores/useRefundEvents";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
@@ -71,6 +75,28 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   const addRefundEvent = useRefundEvents((s) => s.addRefundEvent);
   const [refundOpen, setRefundOpen] = useState(false);
 
+  // Computed unconditionally (rules of hooks — useDisputeResolutionFlow
+  // below calls useState), using a fallback transaction on the not-found
+  // branch; deriveTransactionDetail already defaults every field it reads,
+  // so a mostly-empty fallback object is safe here and this doubles as the
+  // page's own `detail` after the not-found guard, no second call needed.
+  const detail = deriveTransactionDetail(
+    transaction ?? ({ gid: transactionId } as PaTransaction),
+    refundEvents
+  );
+  const activeDisputeEvent = detail.financials.disputeEvents[0];
+
+  // Same Accept/Contest workflow DisputeDetailFeature's own page runs (see
+  // useDisputeResolutionFlow's own doc comment) — contesting or accepting a
+  // dispute from THIS (parent) page must resolve it right here, never
+  // detour through the dispute's own page first.
+  const flow = useDisputeResolutionFlow({
+    transaction: transaction ?? ({ gid: transactionId } as PaTransaction),
+    disputeId: activeDisputeEvent?.id ?? "",
+    amount: activeDisputeEvent?.amount ?? 0,
+    currency: activeDisputeEvent?.currency || transaction?.txnCurrency || "INR",
+  });
+
   if (!transaction || transaction.gid !== transactionId) {
     return (
       <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
@@ -92,7 +118,6 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
     );
   }
 
-  const detail = deriveTransactionDetail(transaction, refundEvents);
   // The one combined status badge (see getDisplayStatus's own doc comment),
   // never the raw externalStatus directly, a refund/dispute on this same
   // transaction must be reflected here.
@@ -100,7 +125,8 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   const amount = parseFloat(transaction.totalAmount ?? "0");
   const currency = transaction.txnCurrency ?? "INR";
   const name = customerName(transaction) || "Unknown customer";
-  const showFeedback = getDisplayStatusBucket(transaction) === "success";
+  const statusBucket = getDisplayStatusBucket(transaction);
+  const showFeedback = statusBucket === "success";
   const formattedDateTime =
     formatDisplayDateTime(transaction.formattedCreationDateTime) ?? "Not available";
 
@@ -109,13 +135,43 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   // summed here, this is the single source of truth for what's already been
   // refunded and what's left to refund.
   const refundableAmount = detail.financials.remainingAmount;
-  const canRefund = showFeedback && refundableAmount > 0;
+  // Issue Refund belongs on this (parent) page whenever money actually
+  // reached the merchant and some of it is still unaccounted for — not just
+  // "success". A parent that's already Refunded and disputed (or Refund in
+  // progress, or Disputed) still has this same page as its own detail view
+  // (see this file's own top-of-file doc comment), and can still have
+  // remaining amount left to refund, so only "pending" (money never
+  // collected) and "failed" (payment never went through) buckets are
+  // excluded — those two never have anything real to refund.
+  const canRefund =
+    statusBucket !== "pending" && statusBucket !== "failed" && refundableAmount > 0;
   const linkedTransactions = detail.linkedTransactions;
-  // Only drives minor layout nuances on this (aggregate) page, e.g. hiding
-  // the promotional banner while a dispute is active, the actual dispute
-  // reason/actions/timeline live on DisputeDetailFeature's own page now, not
-  // here, see this file's own top-of-file doc comment.
+  // Hides the promotional banner while a dispute is active, and (below)
+  // shows the same Dispute status/action card DisputeDetailFeature's own
+  // page renders — a transaction that's Disputed, or Refunded and disputed,
+  // must tell the exact same story here as it does on the dispute's own
+  // page. Accepting/contesting runs right here too (see the `flow` hook
+  // above), never a detour through the dispute's own page first.
   const isDisputed = detail.dispute !== null;
+  const disputeAmount = activeDisputeEvent?.amount ?? 0;
+  const disputeCurrency = activeDisputeEvent?.currency || currency;
+
+  // Contesting/accepting swaps this whole page for the same
+  // DisputeRespondForm DisputeDetailFeature's own page uses, exactly like
+  // that page does — see useDisputeResolutionFlow's own doc comment.
+  if (flow.disputeScreen === "respond") {
+    return (
+      <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
+        <DisputeRespondForm
+          mode={flow.respondMode}
+          disputedAmount={disputeAmount}
+          currency={disputeCurrency}
+          onBack={flow.backToDetail}
+          onSubmit={flow.handleRespondSubmit}
+        />
+      </div>
+    );
+  }
 
   // Settlement Details sits in the big left column and Payment Details in
   // the narrower sticky right column for every transaction in this (Payments
@@ -292,7 +348,7 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
 
   return (
     <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
-      <div className="page-enter mx-auto max-w-[1400px] space-y-5">
+      <div className="page-enter mx-auto max-w-[1400px] space-y-5 overflow-x-hidden">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">{PAGE_TITLE}</h1>
 
         <Button
@@ -357,7 +413,20 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
 
         <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
           {/* Left column */}
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
+            {isDisputed && activeDisputeEvent && detail.dispute && (
+              <div className="flex flex-col gap-2">
+                <SectionLabel>Dispute</SectionLabel>
+                <DisputeStatusCard
+                  dispute={activeDisputeEvent}
+                  disputeDetail={detail.dispute}
+                  onAccept={flow.handleAcceptDispute}
+                  onContest={flow.handleContestDispute}
+                  submittedDocuments={flow.submittedDocuments}
+                />
+              </div>
+            )}
+
             {settlementDetailsSection}
 
             {!isDisputed && <ReferAndEarnBanner />}
@@ -376,7 +445,7 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
           </div>
 
           {/* Right column, sticky */}
-          <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+          <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
             {paymentDetailsSection}
 
             {customerDetailsSection}
@@ -403,6 +472,17 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
           refundableAmount={refundableAmount}
           onSubmit={handleIssueRefund}
         />
+
+        {isDisputed && activeDisputeEvent && (
+          <DisputeAcceptChoice
+            open={flow.acceptDialogOpen}
+            onOpenChange={flow.setAcceptDialogOpen}
+            amount={disputeAmount}
+            currency={disputeCurrency}
+            onAcceptFull={flow.handleConfirmAcceptFull}
+            onAcceptPartially={flow.handleAcceptPartially}
+          />
+        )}
       </div>
     </div>
   );

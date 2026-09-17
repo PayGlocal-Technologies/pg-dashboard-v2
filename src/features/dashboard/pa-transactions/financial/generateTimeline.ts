@@ -237,6 +237,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
             label: "Payment started",
             state: "current",
             timestamp: event.timestamp,
+            amount: event.amount,
+            currency: event.currency,
           });
         }
         break;
@@ -246,6 +248,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           label: "Payment captured",
           state: "complete",
           timestamp: event.timestamp,
+          amount: event.amount,
+          currency: event.currency,
         });
         break;
       case "PAYMENT_FAILED":
@@ -254,6 +258,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           label: "Payment failed",
           state: "danger",
           timestamp: event.timestamp,
+          amount: event.amount,
+          currency: event.currency,
         });
         break;
       case "PAYMENT_EXPIRED":
@@ -262,6 +268,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           label: "Payment expired",
           state: "danger",
           timestamp: event.timestamp,
+          amount: event.amount,
+          currency: event.currency,
         });
         break;
       case "PAYMENT_SETTLED": {
@@ -348,6 +356,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           label: "Dispute cleared",
           state: "complete",
           timestamp: event.timestamp,
+          amount: event.amount,
+          currency: event.currency,
         });
         break;
       case "DISPUTE_CHARGED_BACK":
@@ -356,6 +366,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           label: "Dispute charged back",
           state: "danger",
           timestamp: event.timestamp,
+          amount: event.amount,
+          currency: event.currency,
         });
         break;
       case "DISPUTE_ACCEPTED":
@@ -364,6 +376,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           label: "Dispute accepted",
           state: "danger",
           timestamp: event.timestamp,
+          amount: event.amount,
+          currency: event.currency,
         });
         break;
       case "DISPUTE_EXPIRED":
@@ -372,6 +386,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
           label: "Dispute expired",
           state: "danger",
           timestamp: event.timestamp,
+          amount: event.amount,
+          currency: event.currency,
         });
         break;
       case "FUNDS_WITHDRAWN":
@@ -408,7 +424,10 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
     } else if (activeDispute.status === "MORE_EVIDENCE_NEEDED") {
       steps.push({ id, label: "More evidence needed", state: "current" });
     } else if (activeDispute.status === "REOPENED") {
-      steps.push({ id, label: "Reopened", state: "current" });
+      // The bank came back on a previously cleared dispute — same
+      // respond-by-a-deadline shape as a fresh NEEDS_RESPONSE, just with its
+      // own label.
+      steps.push({ id, label: "Reopened", state: "current", respondBy: activeDispute.respondBy });
     } else {
       // NEEDS_RESPONSE: the clock is running, merchant must accept/contest.
       steps.push({

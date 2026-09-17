@@ -1,10 +1,12 @@
 import { Card } from "@/components/ui";
 import { formatCurrency } from "@/lib/utils";
+import { CopyableCell } from "@/components/common/CopyableCell";
 import {
   DetailRow,
   SectionLabel,
 } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { formatDisplayDateTime } from "@/features/dashboard/pa-transactions/paColumns";
 import type { DisputeDetail } from "@/features/dashboard/pa-transactions/deriveTransactionDetail";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
@@ -26,7 +28,18 @@ export function DisputeDetailsCard({ dispute, transaction, currency }: DisputeDe
       <SectionLabel>Dispute Details</SectionLabel>
       <Card className="gap-0 p-5">
         <div className="flex flex-col gap-5">
-          <DetailRow label="Dispute ID" value={dispute.disputeId} />
+          <div className="group">
+            <p className="text-xs text-muted-foreground">Dispute ID</p>
+            <div className="mt-0.5">
+              <CopyableCell
+                value={truncateId(dispute.disputeId)}
+                copyValue={dispute.disputeId}
+                label="Dispute ID"
+                monospace
+                className="font-semibold text-foreground/85"
+              />
+            </div>
+          </div>
           <DetailRow
             label="Disputed Amount"
             value={`${formatCurrency(dispute.amount, currency)} ${currency}`}

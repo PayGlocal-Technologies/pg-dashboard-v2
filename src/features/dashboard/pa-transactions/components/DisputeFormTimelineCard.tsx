@@ -18,8 +18,8 @@ function StepMarker({ state }: { state: DisputeFormStepState }) {
   return (
     <span
       className={cn(
-        "relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-        state === "complete" && "border-emerald-500 bg-emerald-500",
+        "relative flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
+        state === "complete" && "border-emerald-500 bg-card",
         state === "current" && "border-primary bg-card",
         state === "locked" && "border-border bg-muted"
       )}
@@ -32,7 +32,13 @@ function StepMarker({ state }: { state: DisputeFormStepState }) {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 500, damping: 22 }}
           >
-            <Icon name="check" size={13} strokeWidth={3} className="text-white" aria-hidden />
+            <Icon
+              name="check"
+              size={9}
+              strokeWidth={3}
+              className="text-emerald-500"
+              aria-hidden
+            />
           </motion.span>
         ) : state === "locked" ? (
           <motion.span
@@ -40,14 +46,14 @@ function StepMarker({ state }: { state: DisputeFormStepState }) {
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
           >
-            <Icon name="lock" size={11} className="text-muted-foreground/60" aria-hidden />
+            <Icon name="lock" size={8} className="text-muted-foreground/60" aria-hidden />
           </motion.span>
         ) : (
           <motion.span
             key="current"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="block h-2 w-2 rounded-full bg-primary"
+            className="block h-1.5 w-1.5 rounded-full bg-primary"
           />
         )}
       </AnimatePresence>

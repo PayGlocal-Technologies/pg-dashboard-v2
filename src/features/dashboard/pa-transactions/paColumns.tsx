@@ -8,7 +8,7 @@ import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/c
 import { TransactionAmount } from "@/features/dashboard/pa-transactions/components/TransactionAmount";
 import { TransactionId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { getRefundedAmount } from "@/features/dashboard/pa-transactions/financial/deriveFinancials";
-import { derivePaymentBucket } from "@/features/dashboard/pa-transactions/status/paymentBucket";
+import { derivePaymentOutcome } from "@/features/dashboard/pa-transactions/status/paymentBucket";
 import {
   deriveTransactionStatusChip,
   TRANSACTION_STATUS_META,
@@ -41,8 +41,15 @@ function lookupStatusMeta(raw: string | undefined, meta: Record<string, StatusMe
 export type TransactionStatusBucket = "success" | "refunded" | "failed" | "pending" | "disputed";
 
 const BUCKET_BY_STATUS_KEY: Record<TransactionStatusKey, TransactionStatusBucket> = {
-  IN_FLIGHT: "pending",
+  // The three "still going" chips group under the one "Pending" filter
+  // pill — each still gets its own distinct chip in the table itself (see
+  // TRANSACTION_STATUS_META), this is only the coarser segment used to
+  // filter by.
+  PROCESSING: "pending",
+  AUTHORISED: "pending",
+  SENT_FOR_CAPTURE: "pending",
   FAILED: "failed",
+  CANCELLED: "failed",
   EXPIRED: "failed",
   SUCCESS: "success",
   REFUND_IN_PROGRESS: "refunded",
@@ -66,7 +73,7 @@ export function getDisplayStatusBucket(transaction: PaTransaction): TransactionS
 
 function deriveStatusKey(transaction: PaTransaction): TransactionStatusKey {
   return deriveTransactionStatusChip({
-    paymentBucket: derivePaymentBucket(transaction.externalStatus),
+    paymentOutcome: derivePaymentOutcome(transaction.externalStatus),
     originalAmount: parseFloat(transaction.totalAmount ?? "0"),
     refundedAmount: getRefundedAmount(transaction.refunds ?? []),
     hasProcessingRefund: (transaction.refunds ?? []).some((r) => r.status === "PROCESSING"),
@@ -117,6 +124,7 @@ export const STATUS_BUCKET_RAW_VALUES: Record<
     "ISSUER_DECLINE",
     "GENERAL_DECLINE",
     "CUSTOMER_CANCELLED",
+    "CANCELLED",
     "AUTHENTICATION_TIMEOUT",
     "AUTHENTICATION_FAILED",
     "SYSTEM_ERROR",
@@ -267,6 +275,57 @@ function buildColumn(key: string): Column<PaTransaction> | null {
     default:
       return null;
   }
+}
+
+/** A cell holding the parent row's own child-event id(s) — the same
+ * copyable/truncated treatment TransactionId already gives the parent's own
+ * gid, reused here since it's really just an "id chip", not specific to a
+ * transaction id. Multiple events (e.g. two partial refunds) show the first
+ * plus a "+N" count rather than every id, matching the amount cell's own
+ * "one figure, not N line items" density. */
+function EventIdCell({ ids }: { ids: string[] }) {
+  if (ids.length === 0) {
+    return <span className="text-[12px] text-muted-foreground">—</span>;
+  }
+  return (
+    <div className="flex items-center gap-1.5">
+      <TransactionId id={ids[0] as string} />
+      {ids.length > 1 && (
+        <span className="whitespace-nowrap text-[11px] text-muted-foreground">
+          +{ids.length - 1}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** Refund ID column — only meaningful on the Refunded tab (see
+ * PaTransactionTable's rowsForSegment): every row there is a parent
+ * transaction that has at least one refund event, this is what shows
+ * which one(s), linked back to the SAME parent gid (Unified Transaction ID
+ * & Financial Event Logic — a refund is never its own transaction). Not
+ * part of PA_TRANSACTION_COLUMN_DEFS/buildColumn's general reorderable set:
+ * it only makes sense on one tab, so PaTransactionTable appends it directly
+ * rather than making every other tab's ColumnManager offer a column that
+ * would read "—" on almost every row there. */
+export function buildRefundIdColumn(): Column<PaTransaction> {
+  return {
+    key: "refundId",
+    header: "Refund ID",
+    minWidth: 160,
+    render: (row) => <EventIdCell ids={(row.refunds ?? []).map((r) => r.id)} />,
+  };
+}
+
+/** Dispute ID column — the Disputed tab's own counterpart to
+ * buildRefundIdColumn above, same reasoning. */
+export function buildDisputeIdColumn(): Column<PaTransaction> {
+  return {
+    key: "disputeId",
+    header: "Dispute ID",
+    minWidth: 160,
+    render: (row) => <EventIdCell ids={(row.disputes ?? []).map((d) => d.id)} />,
+  };
 }
 
 interface BuildPaColumnsOptions {

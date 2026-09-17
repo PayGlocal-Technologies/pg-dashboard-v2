@@ -150,7 +150,7 @@ export interface TimelineStepData {
   /** Only present on a successful-refund step that isn't the transaction's
    * first, see deriveTimelineSteps. */
   isAdditionalRefund?: boolean;
-  /** Only present on the trailing "Awaiting your response" step. */
+  /** Only present on the trailing "Needs response"/"Reopened" step. */
   respondBy?: string;
   /** Only present on the trailing "Settlement in progress" step. */
   expectedOnDate?: string;

@@ -42,13 +42,23 @@ function buildRefundOnlyTimelineSteps(refund: RefundEvent, currency: string): Ti
   if (refund.status === "COMPLETED") {
     return [
       initiated,
-      { id: "refund-completed", label: "Refund completed", description: when, state: "complete" },
+      {
+        id: "refund-completed",
+        label: "Refund completed",
+        description: `${amountLabel} · ${when}`,
+        state: "complete",
+      },
     ];
   }
   if (refund.status === "FAILED") {
     return [
       initiated,
-      { id: "refund-failed", label: "Refund failed", description: when, state: "danger" },
+      {
+        id: "refund-failed",
+        label: "Refund failed",
+        description: `${amountLabel} · ${when}`,
+        state: "danger",
+      },
     ];
   }
   return [initiated];
@@ -122,7 +132,7 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
 
   return (
     <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
-      <div className="page-enter mx-auto max-w-350 space-y-5">
+      <div className="page-enter mx-auto max-w-350 space-y-5 overflow-x-hidden">
         <h1 className="text-2xl font-bold tracking-tight text-foreground">Refund Details</h1>
 
         <Button
@@ -162,7 +172,7 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
-          <div className="flex flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-4">
             <div className="flex flex-col gap-2">
               <SectionLabel>Timeline</SectionLabel>
               <Card className="gap-0 p-5">
@@ -179,7 +189,7 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
             </div>
           </div>
 
-          <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+          <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
             <div className="flex flex-col gap-2">
               <SectionLabel>Refund Details</SectionLabel>
               <Card className="gap-0 p-5">

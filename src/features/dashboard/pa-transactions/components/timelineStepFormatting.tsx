@@ -21,6 +21,11 @@ function describeTimelineStep(
   onViewSettlement: (settlementId: string) => void
 ): TimelineStep["description"] {
   switch (step.label) {
+    case "Payment started":
+    case "Payment captured":
+    case "Payment failed":
+    case "Payment expired":
+      return amountLabel ? `${amountLabel} · ${when}` : when;
     case "Settled":
       return (
         <span className="flex flex-wrap items-center gap-x-1.5">
@@ -67,7 +72,15 @@ function describeTimelineStep(
           )}
         </span>
       );
-    case "Awaiting your response":
+    case "Evidence submitted":
+      return when;
+    case "Dispute cleared":
+    case "Dispute charged back":
+    case "Dispute accepted":
+    case "Dispute expired":
+      return amountLabel ? `${amountLabel} · ${when}` : when;
+    case "Needs response":
+    case "Reopened":
       return step.respondBy
         ? `Respond by ${formatDisplayDateTime(step.respondBy) ?? step.respondBy}`
         : undefined;
@@ -75,7 +88,7 @@ function describeTimelineStep(
       return "Evidence submitted, awaiting the card network's decision";
     case "Bank review":
       return "Bank is reviewing the evidence. We'll notify you when we have a decision from the bank.";
-    case "Insufficient documents":
+    case "More evidence needed":
       return "We need more information to investigate this dispute. Please upload additional documents to submit more supporting evidence.";
     default:
       return when;

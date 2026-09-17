@@ -3,10 +3,7 @@ import { TransactionAmount } from "@/features/dashboard/pa-transactions/componen
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { formatDisplayDateTime } from "@/features/dashboard/pa-transactions/paColumns";
 import { parseFormattedTimestamp } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
-import {
-  DISPUTE_PHASE_META,
-  DISPUTE_STATUS_META,
-} from "@/features/dashboard/pa-transactions/status/disputeStatus";
+import { DISPUTE_STATUS_META } from "@/features/dashboard/pa-transactions/status/disputeStatus";
 import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
 
 // Reuses DISPUTE_STATUS_META as-is, same chip labels/colors as the disputed
@@ -62,13 +59,33 @@ function DeadlineCell({ value, nowMs }: { value?: string; nowMs: number }) {
   );
 }
 
+const DISPUTE_ESCALATION_PHASE_LABEL: Record<
+  NonNullable<DisputeRow["disputePhase"]>,
+  string
+> = {
+  DISPUTE: "Dispute",
+  PRE_ARBITRATION: "Pre-arbitration",
+  ARBITRATION: "Arbitration",
+};
+
+// Plain text, not a badge, for both of these — Status is the only chip in
+// this table (see the "status" case below); Stage/Phase are supporting
+// detail, not a second status vocabulary competing with it.
+function StageCell({ value }: { value?: string }) {
+  return (
+    <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+      {value ?? "–"}
+    </span>
+  );
+}
+
 function PhaseCell({ phase }: { phase?: DisputeRow["disputePhase"] }) {
   if (!phase) {
     return <span className="text-[12px] text-muted-foreground">{"–"}</span>;
   }
   return (
     <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
-      {DISPUTE_PHASE_META[phase].label}
+      {DISPUTE_ESCALATION_PHASE_LABEL[phase]}
     </span>
   );
 }
@@ -76,10 +93,15 @@ function PhaseCell({ phase }: { phase?: DisputeRow["disputePhase"] }) {
 // Every reorderable/hideable data column, keyed so ColumnManager
 // (reused as-is from the transactions feature) can toggle visibility and
 // reorder independently. "respondBy" is appended separately in
-// buildDisputeColumns, only when the active segment needs it.
+// buildDisputeColumns, only when the active segment needs it. Status stays
+// the one 8-term vocabulary/chip (see the dispute-workflow PDF's own much
+// finer set of screens) — Stage and Phase carry that extra detail as plain
+// text columns instead of inventing more Status terms or stacking a second
+// badge into the Status cell.
 export const DISPUTE_COLUMN_DEFS: { key: string; label: string }[] = [
   { key: "amount", label: "Amount" },
   { key: "status", label: "Status" },
+  { key: "stage", label: "Stage" },
   { key: "disputePhase", label: "Phase" },
   { key: "reason", label: "Reason" },
   { key: "paymentMethod", label: "Payment method" },
@@ -110,6 +132,20 @@ function buildColumn(key: string): Column<DisputeRow> | null {
           const { label, variant, trailIcon } = statusMeta(row.status);
           return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
         },
+      };
+    case "stage":
+      return {
+        key: "stage",
+        header: "Stage",
+        minWidth: 200,
+        render: (row) => <StageCell value={row.stage} />,
+      };
+    case "disputePhase":
+      return {
+        key: "disputePhase",
+        header: "Phase",
+        minWidth: 130,
+        render: (row) => <PhaseCell phase={row.disputePhase} />,
       };
     case "reason":
       return {
@@ -146,13 +182,6 @@ function buildColumn(key: string): Column<DisputeRow> | null {
         header: "Disputed on",
         minWidth: 130,
         render: (row) => <DateTimeCell value={row.disputedOn} />,
-      };
-    case "disputePhase":
-      return {
-        key: "disputePhase",
-        header: "Phase",
-        minWidth: 130,
-        render: (row) => <PhaseCell phase={row.disputePhase} />,
       };
     default:
       return null;

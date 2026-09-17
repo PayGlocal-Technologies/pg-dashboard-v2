@@ -21,11 +21,21 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { AppImage } from "@/components/common/AppImage";
 import { cn, formatCurrency } from "@/lib/utils";
 import {
   DisputeFormTimelineCard,
   type DisputeFormStep,
 } from "@/features/dashboard/pa-transactions/components/DisputeFormTimelineCard";
+import type { SubmittedDocument } from "@/features/dashboard/pa-transactions/components/DisputeStatusNoticeCard";
+
+interface UploadedFile {
+  file: File;
+  /** Object URL for an image upload, shown as a small thumbnail (see the
+   * uploaded-files list below) — null for a non-image (e.g. a PDF), which
+   * falls back to a plain file icon since there's nothing to preview. */
+  previewUrl: string | null;
+}
 
 export type DisputeRespondMode = "partial" | "contest";
 type ContestReason = "withdrawn" | "refunded" | "not-fraudulent" | "other";
@@ -36,7 +46,8 @@ interface RecommendedDocument {
   description: string;
 }
 
-/** Matches the reference exactly, "Order details" starts pre-selected. */
+/** Reference-only guidance on what to upload, never a selection the
+ * merchant makes — see this component's own doc comment below. */
 const RECOMMENDED_DOCUMENTS: RecommendedDocument[] = [
   {
     key: "order-details",
@@ -72,32 +83,22 @@ const REASON_OPTIONS: { value: ContestReason; label: string }[] = [
   { value: "other", label: "Other reason" },
 ];
 
-/** Illustrative weighting only, not a real evidence-scoring model. Base 10 +
- * order-details (20) + authorization (20) = 50, matching "just 50%" for
- * those two alone, proof-of-delivery is weighted highest since it's the
- * single strongest evidence type for a "not authorised"/"not received"
- * dispute. */
+/** Illustrative scoring only, not a real evidence-scoring model. There's no
+ * per-document-type selection any more (see RECOMMENDED_DOCUMENTS' own doc
+ * comment) — the file picker has no way to know what evidence TYPE a given
+ * upload actually is, so the estimate scales with how many documents were
+ * uploaded overall, not which checklist items they correspond to. */
 const WIN_CHANCE_BASE = 10;
-const WIN_CHANCE_WEIGHTS: Record<string, number> = {
-  "order-details": 20,
-  authorization: 20,
-  "proof-of-delivery": 30,
-  "refund-policy": 15,
-  other: 5,
-};
+const WIN_CHANCE_PER_FILE = 20;
 const WIN_CHANCE_CAP = 95;
-/** Doc types that, once selected AND at least one file has actually been
- * uploaded, trigger the AI analysis (see the reference: uploading order
- * details or the authorization copy). */
-const ANALYSIS_TRIGGER_DOCS = ["order-details", "authorization"];
 const ANALYSIS_DURATION_MS = 1400;
+/** Always called out as the two most impactful evidence types, regardless
+ * of what's been uploaded so far — "other" is too generic to recommend by
+ * name. */
+const KEY_DOCUMENT_KEYS = ["proof-of-delivery", "order-details"];
 
-function winChancePct(selectedDocs: Set<string>): number {
-  const total = RECOMMENDED_DOCUMENTS.reduce(
-    (sum, doc) => sum + (selectedDocs.has(doc.key) ? (WIN_CHANCE_WEIGHTS[doc.key] ?? 0) : 0),
-    WIN_CHANCE_BASE
-  );
-  return Math.min(WIN_CHANCE_CAP, total);
+function winChancePct(filesCount: number): number {
+  return Math.min(WIN_CHANCE_CAP, WIN_CHANCE_BASE + filesCount * WIN_CHANCE_PER_FILE);
 }
 
 interface DisputeRespondFormProps {
@@ -105,10 +106,13 @@ interface DisputeRespondFormProps {
   disputedAmount: number;
   currency: string;
   onBack: () => void;
-  /** Receives the uploaded file names so the caller can show a submitted-
+  /** Receives the uploaded documents (name + preview URL, where there is
+   * one) so the caller can show the same thumbnails in the submitted-
    * documents summary once the screen returns to the main detail view (see
-   * TransactionDetailFeature's "Under review" notice). */
-  onSubmit: (documentNames: string[]) => void;
+   * TransactionDetailFeature's "Under review" notice). Object URLs handed
+   * off this way become the caller's to eventually revoke — this form
+   * itself only revokes ones that were never submitted. */
+  onSubmit: (documents: SubmittedDocument[]) => void;
 }
 
 /** Second screen for both "Accept partially" and "Contest dispute", same
@@ -124,30 +128,51 @@ export function DisputeRespondForm({
   const [contestAmount, setContestAmount] = useState("");
   const [reason, setReason] = useState<ContestReason | "">("");
   const [otherReason, setOtherReason] = useState("");
-  const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set(["order-details"]));
-  const [files, setFiles] = useState<File[]>([]);
-  // Whether the (simulated) analysis has finished for the current
-  // selection/upload state. `analyzing` is derived, not its own state, this
-  // is the only state the effect below needs to touch, and only ever from
-  // inside a setTimeout callback, never synchronously in the effect body,
-  // per the CLAUDE.md hooks-purity rule.
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  // Whether the (simulated) analysis has finished for the current upload
+  // state. `analyzing` is derived, not its own state, this is the only
+  // state the effect below needs to touch, and only ever from inside a
+  // setTimeout callback, never synchronously in the effect body, per the
+  // CLAUDE.md hooks-purity rule.
   const [analyzed, setAnalyzed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Mirrors `files` for the unmount-only cleanup effect below, so that
+  // effect's dependency array can stay empty (revoking on every `files`
+  // change would free a still-displayed thumbnail's URL the moment a
+  // second file is added).
+  const filesRef = useRef<UploadedFile[]>(files);
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+  // Set right before onSubmit hands the preview URLs off to the caller (see
+  // the Submit button below) — ownership of those URLs moves with them, so
+  // this form must not revoke what it just submitted, only whatever was
+  // uploaded and abandoned instead (e.g. the merchant navigated back
+  // without submitting).
+  const submittedRef = useRef(false);
+  // Object URLs otherwise leak for the life of the tab, revoke whatever's
+  // still outstanding — and unsubmitted — when this form unmounts
+  // (individual removals are handled in removeFile below).
+  useEffect(() => {
+    return () => {
+      if (submittedRef.current) return;
+      for (const uploaded of filesRef.current) {
+        if (uploaded.previewUrl) URL.revokeObjectURL(uploaded.previewUrl);
+      }
+    };
+  }, []);
 
-  const hasAnalysisTriggerDoc = ANALYSIS_TRIGGER_DOCS.some((key) => selectedDocs.has(key));
-  const selectedDocsCount = selectedDocs.size;
   const filesCount = files.length;
   // The AI recommendation only ever appears once a document has actually
-  // been uploaded, selecting a document-type chip alone is not enough.
-  const canAnalyze = hasAnalysisTriggerDoc && filesCount > 0;
+  // been uploaded.
+  const canAnalyze = filesCount > 0;
   const analyzing = canAnalyze && !analyzed;
 
-  // Re-runs the (simulated) AI analysis whenever a relevant document type is
-  // selected and a file has been uploaded for it, so the scanning animation
-  // plays again on every new upload rather than only once. Resetting
-  // `analyzed` to false (via a 0ms timeout, not synchronously) is what makes
-  // `analyzing` flip back on above for a re-run, then the second timeout
-  // flips it back to true once the "analysis" completes.
+  // Re-runs the (simulated) AI analysis on every new upload, so the
+  // scanning animation plays again each time rather than only once.
+  // Resetting `analyzed` to false (via a 0ms timeout, not synchronously) is
+  // what makes `analyzing` flip back on above for a re-run, then the second
+  // timeout flips it back to true once the "analysis" completes.
   useEffect(() => {
     const resetTimer = window.setTimeout(() => setAnalyzed(false), 0);
     if (!canAnalyze) {
@@ -158,26 +183,24 @@ export function DisputeRespondForm({
       window.clearTimeout(resetTimer);
       window.clearTimeout(finishTimer);
     };
-  }, [canAnalyze, selectedDocsCount, filesCount]);
-
-  function toggleDoc(key: string) {
-    setSelectedDocs((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
+  }, [canAnalyze, filesCount]);
 
   function addFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
-    const added = Array.from(fileList);
+    const added: UploadedFile[] = Array.from(fileList).map((file) => ({
+      file,
+      previewUrl: file.type.startsWith("image/") ? URL.createObjectURL(file) : null,
+    }));
     setFiles((prev) => [...prev, ...added]);
     toast.success(added.length === 1 ? "Document uploaded" : `${added.length} documents uploaded`);
   }
 
   function removeFile(index: number) {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    setFiles((prev) => {
+      const removed = prev[index];
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return prev.filter((_, i) => i !== index);
+    });
   }
 
   // Uploading a single document is enough to enable submission, the reason
@@ -238,14 +261,8 @@ export function DisputeRespondForm({
           },
         ];
 
-  const winChance = winChancePct(selectedDocs);
-  // Highest-impact missing documents first, "other" doesn't get suggested
-  // (too generic to recommend by name).
-  const suggestedDocs = RECOMMENDED_DOCUMENTS.filter(
-    (doc) => doc.key !== "other" && !selectedDocs.has(doc.key)
-  )
-    .sort((a, b) => (WIN_CHANCE_WEIGHTS[b.key] ?? 0) - (WIN_CHANCE_WEIGHTS[a.key] ?? 0))
-    .slice(0, 2);
+  const winChance = winChancePct(filesCount);
+  const suggestedDocs = RECOMMENDED_DOCUMENTS.filter((doc) => KEY_DOCUMENT_KEYS.includes(doc.key));
 
   return (
     <div className="page-enter space-y-4">
@@ -278,7 +295,10 @@ export function DisputeRespondForm({
           variant="primary"
           size="sm"
           disabled={!canSubmit}
-          onClick={() => onSubmit(files.map((f) => f.name))}
+          onClick={() => {
+            submittedRef.current = true;
+            onSubmit(files.map((f) => ({ name: f.file.name, previewUrl: f.previewUrl })));
+          }}
         >
           Submit documents
         </Button>
@@ -379,54 +399,42 @@ export function DisputeRespondForm({
               </div>
             )}
 
-            <div className="mt-4 flex flex-wrap gap-2.5">
-              {RECOMMENDED_DOCUMENTS.map((doc) => {
-                const selected = selectedDocs.has(doc.key);
-                return (
-                  <div
-                    key={doc.key}
-                    className={cn(
-                      "flex items-center gap-1 rounded-full border-2 py-1 pl-3.5 pr-1",
-                      selected ? "border-solid border-primary" : "border-dashed border-border"
-                    )}
-                  >
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => toggleDoc(doc.key)}
-                      className={cn(
-                        "h-auto min-h-0 gap-0 rounded-none border-0 bg-transparent p-0 text-[13px] font-medium",
-                        selected ? "text-primary" : "text-muted-foreground"
-                      )}
-                    >
-                      {doc.label}
-                    </Button>
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            aria-label={`About ${doc.label}`}
-                            className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground"
-                          >
-                            <Icon name="info" size={11} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-55 text-xs">
-                          {doc.description}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                );
-              })}
+            {/* Reference information, not a selection and not chips — no
+             * pill shape, no border, no background, nothing that reads as
+             * clickable. Plain labels in a row, separated by a middot, each
+             * with a small (i) for its description on hover, so this stays
+             * a single glance-able line instead of its own scrollable list. */}
+            <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Documents you can submit
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-1.5 gap-y-1.5 text-[13px] text-foreground/85">
+              {RECOMMENDED_DOCUMENTS.map((doc, index) => (
+                <span key={doc.key} className="inline-flex items-center gap-1.5">
+                  {index > 0 && (
+                    <span className="text-muted-foreground" aria-hidden="true">
+                      ·
+                    </span>
+                  )}
+                  <span className="font-medium">{doc.label}</span>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Icon
+                          name="info"
+                          size={11}
+                          className="shrink-0 cursor-default text-muted-foreground"
+                        />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-55 text-xs">{doc.description}</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </span>
+              ))}
             </div>
 
-            {/* AI evidence-strength feedback, only appears once a file has been
-             * uploaded for Order details or the Authorization copy (see
-             * ANALYSIS_TRIGGER_DOCS), a brief simulated "scanning" state then a
-             * win-chance estimate that re-runs on every new upload. */}
+            {/* AI evidence-strength feedback, only appears once at least one
+             * file has been uploaded, a brief simulated "scanning" state
+             * then a win-chance estimate that re-runs on every new upload. */}
             {canAnalyze && analyzing && (
               <Callout variant="neutral" className="mt-4">
                 <Icon
@@ -497,25 +505,38 @@ export function DisputeRespondForm({
              * down the page every time. */}
             {files.length > 0 && (
               <ul className="mt-4 flex flex-col gap-1.5">
-                {files.map((file, i) => (
+                {files.map((uploaded, i) => (
                   <li
-                    key={`${file.name}-${i}`}
+                    key={`${uploaded.file.name}-${i}`}
                     className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2"
                   >
                     <span className="flex min-w-0 items-center gap-2 text-[13px] text-foreground/85">
-                      <Icon
-                        name="file-text"
-                        size={14}
-                        className="shrink-0 text-muted-foreground"
-                        aria-hidden
-                      />
-                      <span className="truncate">{file.name}</span>
+                      {/* A small image thumbnail when the upload is an
+                       * image (see addFiles), matching how Google/Gmail
+                       * attachments preview — a non-image (a PDF) falls
+                       * back to a plain file icon since there's nothing to
+                       * render a preview from. */}
+                      {uploaded.previewUrl ? (
+                        <AppImage
+                          src={uploaded.previewUrl}
+                          alt=""
+                          width={28}
+                          height={28}
+                          unoptimized
+                          className="h-7 w-7 shrink-0 rounded-md border border-border object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+                          <Icon name="file-text" size={14} aria-hidden />
+                        </span>
+                      )}
+                      <span className="truncate">{uploaded.file.name}</span>
                     </span>
                     <Button
                       type="button"
                       variant="ghost"
                       onClick={() => removeFile(i)}
-                      aria-label={`Remove ${file.name}`}
+                      aria-label={`Remove ${uploaded.file.name}`}
                       className="h-6 w-6 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground"
                     >
                       <Icon name="x" size={12} />
