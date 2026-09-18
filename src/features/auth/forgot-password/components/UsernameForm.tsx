@@ -26,7 +26,7 @@ const usernameSchema = z.object({
     .regex(/^[a-z]/, "Username must start with a lowercase letter")
     .regex(/[a-z0-9]$/, "Username must end with a letter or number")
     .regex(/^[a-z0-9._-]+$/, "Only lowercase letters, numbers, ., _, - are allowed")
-    .refine((v) => !(/[._-]{2}/).test(v), "Consecutive special characters are not allowed"),
+    .refine((v) => !/[._-]{2}/.test(v), "Consecutive special characters are not allowed"),
 });
 
 /** Username disambiguation screen for the forgot-password flow. */
@@ -50,7 +50,8 @@ export function UsernameForm({ setScreen }: ForgotPasswordScreenProps) {
       mutate(encryptedPayload, {
         onSuccess: (res) => {
           if (res.status === "OTP_SENT") {
-            const data = res.data as { maskedEmail?: string; maskedPhoneNumber?: string } | undefined;
+            const data = res.data as
+              { maskedEmail?: string; maskedPhoneNumber?: string } | undefined;
             if (data?.maskedEmail) setMaskedEmail(data.maskedEmail);
             if (data?.maskedPhoneNumber) setMaskedPhoneNumber(data.maskedPhoneNumber);
             setOtpInitiateTimestamp(Date.now());

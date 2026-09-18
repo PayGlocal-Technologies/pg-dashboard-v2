@@ -52,9 +52,7 @@ export function AuthSplitScreen() {
         </ul>
       </div>
 
-      <p className="relative text-xs text-white/60">
-        © PayGlocal. All rights reserved.
-      </p>
+      <p className="relative text-xs text-white/60">© PayGlocal. All rights reserved.</p>
     </div>
   );
 }

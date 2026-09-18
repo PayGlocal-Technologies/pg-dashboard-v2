@@ -11,13 +11,13 @@ Two rules enforced by the React Compiler lint plugin. Violating either will prod
 ```ts
 // WRONG — both rules violated
 useEffect(() => {
-  setState(Date.now());          // synchronous setState AND impure Date.now in effect body
+  setState(Date.now()); // synchronous setState AND impure Date.now in effect body
 }, [dep]);
 
 // CORRECT — setState only inside the interval callback; Date.now only in that callback
 useEffect(() => {
   const id = setInterval(() => {
-    setState(Date.now());        // fine: inside an async callback, not the effect body
+    setState(Date.now()); // fine: inside an async callback, not the effect body
   }, 1000);
   return () => clearInterval(id);
 }, [dep]);
@@ -94,13 +94,11 @@ Every SVG asset — logos, wordmarks, brand illustrations, payment-method icons,
    ```tsx
    import { forwardRef, type SVGProps } from "react";
 
-   export const MyLogo = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>(
-     (props, ref) => (
-       <svg ref={ref} viewBox="..." fill="none" xmlns="..." {...props}>
-         {/* paths */}
-       </svg>
-     )
-   );
+   export const MyLogo = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>((props, ref) => (
+     <svg ref={ref} viewBox="..." fill="none" xmlns="..." {...props}>
+       {/* paths */}
+     </svg>
+   ));
    MyLogo.displayName = "MyLogo";
    ```
 
@@ -118,53 +116,103 @@ Every SVG asset — logos, wordmarks, brand illustrations, payment-method icons,
 3. Use it everywhere as `<Icon name="my-logo" />` — identical to any Lucide icon.
 
 **Rules:**
+
 - The `forwardRef` component file must only import from React (`forwardRef`, `SVGProps`) — never from `registry.ts` (circular dependency).
 - Use `as unknown as LucideIcon` when the `forwardRef` signature doesn't exactly satisfy `LucideIcon`. This is expected and correct.
 - Width/height should use `em` units so `font-size` / `className="text-[28px]"` on the parent controls rendered size.
 - `aria-label` and `role="img"` are required on decorative wordmarks.
 
 **Never:**
+
 - `<Image src="/some-logo.png" />` or `<img src="/some-logo.svg" />` for brand assets
 - `src/app/favicon.ico` re-exports or symlinks as a component workaround
 - Importing an SVG file path directly into a component
 
 **How to audit:**
+
 ```bash
 # Find any remaining static brand asset references
 grep -rn '\.png\|\.svg\|\.jpg\|\.webp\|<Image' pg-dashboard-v2/src --include="*.tsx" --include="*.ts"
 ```
-Every hit must be either a `next/image` used for dynamic/remote images (e.g. flag CDN URLs) or have a documented reason why the registry pattern doesn't apply.
+
+Every hit must be either an `<AppImage>` used for dynamic/remote images (e.g. flag CDN URLs) or have a documented reason why the registry pattern doesn't apply.
 
 ## UI components — COMPULSORY RULE
 
 **Always use flux-ui components from `@/components/ui` instead of bare HTML elements.** This rule has no exceptions for new code. Violations must be fixed before a PR is merged.
 
-| Need | Use | Never use |
-|------|-----|-----------|
-| Clickable action | `<Button>` | `<button>` |
-| Text input | `<Input>` | `<input type="text/email/…">` |
-| Password field | `<PasswordInput>` | `<input type="password">` |
-| OTP field | `<OtpInput>` | `<input>` sequences |
-| Dropdown / select | `<Select>` and friends | `<select>` / `<option>` |
-| Modal / overlay | `<Dialog>` and friends | `<dialog>` / hand-rolled overlays |
-| Data grid | `<DataTable>` | `<table>` / `<thead>` / `<tbody>` / `<tr>` / `<td>` |
-| Labelled field wrapper | `<Field>`, `<FieldLabel>`, `<FieldError>` | bare `<label>` + `<p>` error text |
-| Card surface | `<Card>` and friends | bare `<div>` with manual shadow/border |
-| Divider | `<Separator>` | `<hr>` |
-| Status chip | `<StatusBadge>` | hand-rolled `<span>` with colour classes |
-| Loading skeleton | `<Shimmer>`, `<StatCardSkeleton>`, etc. | `<div>` with `animate-pulse` |
-| Page title bar | `<PageHeader>` | hand-rolled heading + breadcrumb |
-| Images | `<Image>` from `next/image` | `<img>` |
+| Need                   | Use                                       | Never use                                           |
+| ---------------------- | ----------------------------------------- | --------------------------------------------------- |
+| Clickable action       | `<Button>`                                | `<button>`                                          |
+| Text input             | `<Input>`                                 | `<input type="text/email/…">`                       |
+| Password field         | `<PasswordInput>`                         | `<input type="password">`                           |
+| OTP field              | `<OtpInput>`                              | `<input>` sequences                                 |
+| Dropdown / select      | `<Select>` and friends                    | `<select>` / `<option>`                             |
+| Modal / overlay        | `<Dialog>` and friends                    | `<dialog>` / hand-rolled overlays                   |
+| Data grid              | `<DataTable>`                             | `<table>` / `<thead>` / `<tbody>` / `<tr>` / `<td>` |
+| Labelled field wrapper | `<Field>`, `<FieldLabel>`, `<FieldError>` | bare `<label>` + `<p>` error text                   |
+| Card surface           | `<Card>` and friends                      | bare `<div>` with manual shadow/border              |
+| Divider                | `<Separator>`                             | `<hr>`                                              |
+| Status chip            | `<StatusBadge>`                           | hand-rolled `<span>` with colour classes            |
+| Loading skeleton       | `<Shimmer>`, `<StatCardSkeleton>`, etc.   | `<div>` with `animate-pulse`                        |
+| Page title bar         | `<PageHeader>`                            | hand-rolled heading + breadcrumb                    |
+| Images                 | `<AppImage>` from `@/components/common/AppImage` | `<img>`, `next/image` directly                |
 
-**`<img>` is never allowed.** Always use `<Image>` from `next/image`. For blob URLs (e.g. `URL.createObjectURL`) or other sources that cannot be optimised, pass `unoptimized` and provide explicit `width`/`height` props:
+**`<img>` is never allowed, and neither is importing `next/image` directly.** Always use `<AppImage>`. For blob URLs (e.g. `URL.createObjectURL`) or other sources that cannot be optimised, pass `unoptimized` and provide explicit `width`/`height` props:
 
 ```tsx
 // CORRECT — blob URL from file upload
+import { AppImage } from "@/components/common/AppImage";
+<AppImage src={previewUrl} alt="Preview" width={64} height={64} unoptimized className="..." />
+
+// WRONG — renders broken under the app's base path
 import Image from "next/image";
-<Image src={previewUrl} alt="Preview" width={64} height={64} unoptimized className="..." />
+<Image src="/assets/logo.png" alt="Logo" width={64} height={64} />
 
 // WRONG
 <img src={previewUrl} alt="Preview" className="..." />
+```
+
+### Why AppImage and not `next/image` — COMPULSORY RULE
+
+The app is served from a base path (`/app-v2`, see `src/constants/basePath.ts`).
+Next applies that prefix to the image **optimizer route** but *not* to the `src`
+it points at, and for `unoptimized` images it does not touch the src at all. A
+`public/` file therefore fails **both** ways round:
+
+```
+optimized:   src="/app-v2/_next/image?url=%2Fassets%2Flogo.png"   → 400 "not a valid image"
+unoptimized: src="/assets/logo.png"                                → 404
+```
+
+`<AppImage>` is a thin `next/image` wrapper that runs `src` through
+`withBasePath()`, fixing both. It only touches root-relative paths — `blob:`,
+`data:` and absolute CDN URLs pass through untouched — so it is a safe drop-in
+everywhere.
+
+`src/components/common/AppImage.tsx` is the only file allowed to import
+`next/image`; an ESLint `no-restricted-imports` rule enforces this. **Never
+hardcode the base path into a src** (`src="/app-v2/assets/…"`) — that is what
+pg-dashboard does in 41 places, and it means every base-path change is a
+find-and-replace.
+
+**The one case the lint rule cannot catch** is a CSS background, because the
+path is a string inside a style object rather than an import. Wrap those by
+hand:
+
+```tsx
+// CORRECT
+style={{ backgroundImage: `url(${withBasePath("/assets/banner.png")})` }}
+
+// WRONG — 404s under the base path
+style={{ backgroundImage: "url(/assets/banner.png)" }}
+```
+
+**How to audit:**
+
+```bash
+grep -rn 'from "next/image"' src --include="*.tsx"   # must only match AppImage.tsx
+grep -rn 'url(/' src                                 # CSS backgrounds needing withBasePath
 ```
 
 ### When a bare element is acceptable

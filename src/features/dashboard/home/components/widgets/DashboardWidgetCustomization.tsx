@@ -12,26 +12,28 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { SortableContext, arrayMove, rectSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  arrayMove,
+  rectSortingStrategy,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { DashboardWidgetRenderer } from "@/features/dashboard/home/components/widgets/DashboardWidgetRenderer";
 import type { WidgetId } from "@/features/dashboard/home/widget-catalog";
-import { SortableDashboardWidget, REMOVE_ANIMATION_MS } from "@/features/dashboard/home/components/widgets/SortableDashboardWidget";
+import {
+  SortableDashboardWidget,
+  REMOVE_ANIMATION_MS,
+} from "@/features/dashboard/home/components/widgets/SortableDashboardWidget";
 import { WidgetLibraryModal } from "@/features/dashboard/home/components/widgets/WidgetLibraryModal";
 import { cn } from "@/lib/utils";
 
 export const DASHBOARD_DROP_ZONE_ID = "dashboard-drop-zone";
 
-function DropGridShell({
-  editMode,
-  children,
-}: {
-  editMode: boolean;
-  children: React.ReactNode;
-}) {
+function DropGridShell({ editMode, children }: { editMode: boolean; children: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({
     id: DASHBOARD_DROP_ZONE_ID,
     disabled: !editMode,
@@ -46,7 +48,8 @@ function DropGridShell({
           cn(
             "rounded-xl p-3 min-h-[120px] transition-[box-shadow,background-color] duration-150",
             "border-[1.5px] border-dashed border-[var(--primary-border)]",
-            isOver && "bg-primary-light/40 shadow-[inset_0_0_0_2px_rgba(0,97,227,0.12)] dark:shadow-[inset_0_0_0_2px_rgba(59,130,246,0.15)]"
+            isOver &&
+              "bg-primary-light/40 shadow-[inset_0_0_0_2px_rgba(0,97,227,0.12)] dark:shadow-[inset_0_0_0_2px_rgba(59,130,246,0.15)]"
           )
       )}
     >
@@ -151,8 +154,8 @@ export function DashboardWidgetCustomization({
           <div className="flex flex-col gap-3 rounded-xl border border-border bg-primary-light/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-foreground" role="status" aria-live="polite">
               Use <strong className="font-semibold">Add charts</strong> to pick widgets, then{" "}
-              <strong className="font-semibold">drag</strong> tiles on the dashboard to reorder (grab anywhere on the
-              dashed border).
+              <strong className="font-semibold">drag</strong> tiles on the dashboard to reorder
+              (grab anywhere on the dashed border).
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button
@@ -202,7 +205,10 @@ export function DashboardWidgetCustomization({
         onApplyLayout={handleApplyLibrary}
       />
 
-      <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }} style={{ zIndex: 200 }}>
+      <DragOverlay
+        dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0, 0, 1)" }}
+        style={{ zIndex: 200 }}
+      >
         {activeSort && (
           <div className="widget-dnd-overlay w-[min(100vw-2rem,300px)] cursor-grabbing rounded-xl border border-border bg-card p-2 shadow-2xl">
             <DashboardWidgetRenderer widgetId={activeSort} preview />

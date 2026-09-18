@@ -95,9 +95,27 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
       try {
         const isFormData = body instanceof FormData;
         const requestBody = isFormData ? body : (reqBody ?? restBody);
-        const headers = customHeaders ?? {
-          "Content-Type": isFormData ? "multipart/form-data" : "application/json",
-        };
+        // For FormData the Content-Type has to be actively DELETED, not merely
+        // left out, and `null` is how axios deletes one: AxiosHeaders keeps null
+        // through normalisation and then drops the entry when it serialises.
+        //
+        // Omitting it is not enough because `api` carries
+        // `Content-Type: application/json` as an *instance* default (see
+        // lib/api/axios.ts), which axios merges into every request. Worse, once
+        // axios sees a JSON content type on a FormData body it does not just send
+        // it wrong, it rewrites the body:
+        //
+        //     if (isFormData) return hasJSONContentType
+        //       ? JSON.stringify(formDataToJSON(data)) : data;   // axios/defaults
+        //
+        // so the parts were collapsed back into a JSON object and every File in
+        // it serialised to `{}` — the whole upload silently became
+        // `"attachments":[{},{}]`. With the header gone, the browser generates
+        // `multipart/form-data; boundary=...` itself, which is the only way the
+        // server can tell one part from the next.
+        const headers: Record<string, string | null> =
+          customHeaders ??
+          (isFormData ? { "Content-Type": null } : { "Content-Type": "application/json" });
 
         const res =
           method === "delete"
@@ -108,6 +126,7 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
               });
 
         useApp.getState().resetTimer();
+
         return res.data;
       } catch (error) {
         return handleApiError(error as AxiosError);
@@ -164,12 +183,22 @@ export function useGet<TData = unknown, TError = Error>(
   let dynamicUrl: string | null | undefined;
   let options: GetOptions<TData, TError> | undefined;
 
-  if (typeof dynamicUrlOrOptions === "string" || dynamicUrlOrOptions === null) {
+  // Only a non-null OBJECT in the third slot means the legacy 3-arg form. A
+  // string, null or undefined is a dynamicUrl, and the options are in the fourth.
+  //
+  // `undefined` has to fall through to the fourth argument. It used to take the
+  // legacy branch, where `options = undefined` silently discarded whatever was
+  // passed in the fourth slot — and `(key, url, undefined, { ... })` is the
+  // dominant call shape in this codebase, because it mirrors pg-dashboard's
+  // signature. Every one of those call sites was running with client defaults
+  // instead of its own options: `enabled: !!url` gates were dead, so queries
+  // fired against empty URLs; `enabled: false` queries meant for manual refetch
+  // fetched on mount anyway; and a per-query staleTime never applied.
+  if (dynamicUrlOrOptions !== null && typeof dynamicUrlOrOptions === "object") {
+    options = dynamicUrlOrOptions;
+  } else {
     dynamicUrl = dynamicUrlOrOptions;
     options = optionsMaybe;
-  } else {
-    dynamicUrl = undefined;
-    options = dynamicUrlOrOptions;
   }
 
   const { headers, ...queryOptions } = options ?? {};

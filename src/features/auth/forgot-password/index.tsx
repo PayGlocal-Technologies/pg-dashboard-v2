@@ -5,12 +5,12 @@ import { IdentifierForm } from "@/features/auth/forgot-password/components/Ident
 import { UsernameForm } from "@/features/auth/forgot-password/components/UsernameForm";
 import { OtpForm } from "@/features/auth/forgot-password/components/OtpForm";
 import { ResetPasswordForm } from "@/features/auth/forgot-password/components/ResetPasswordForm";
-import type { ForgotPasswordScreen, ForgotPasswordScreenProps } from "@/features/auth/forgot-password/types";
-
-const FORM_MAPPING: Record<
+import type {
   ForgotPasswordScreen,
-  React.ComponentType<ForgotPasswordScreenProps>
-> = {
+  ForgotPasswordScreenProps,
+} from "@/features/auth/forgot-password/types";
+
+const FORM_MAPPING: Record<ForgotPasswordScreen, React.ComponentType<ForgotPasswordScreenProps>> = {
   identifier: IdentifierForm,
   username: UsernameForm,
   resetOtp: OtpForm,

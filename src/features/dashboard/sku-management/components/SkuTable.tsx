@@ -1,0 +1,419 @@
+"use client";
+
+import { useState } from "react";
+import { toast } from "sonner";
+import { Button, DataCardList, DataTableCard, EmptyState } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { UnderlineTabs } from "@/components/common/UnderlineTabs";
+import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
+import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import {
+  SkuCard,
+  SkuCardSkeleton,
+} from "@/features/dashboard/sku-management/components/SkuCardList";
+import { ProductPreviewModal } from "@/features/dashboard/sku-management/components/ProductPreviewModal";
+import { SkuRowActions } from "@/features/dashboard/sku-management/components/SkuRowActions";
+import { DeleteSkuDialog } from "@/features/dashboard/sku-management/components/DeleteSkuDialog";
+import { DuplicateSkuDialog } from "@/features/dashboard/sku-management/components/DuplicateSkuDialog";
+import {
+  SKU_PAGE_LIMIT,
+  SKU_PAGE_SIZE_OPTIONS,
+  SKU_SEARCH_HINTS,
+  SKU_TAB_TYPE,
+  SKU_VIEW_TABS,
+  type SkuViewTab,
+} from "@/features/dashboard/sku-management/constants";
+import { SkuItemFormModal } from "@/features/dashboard/sku-management/components/SkuItemFormModal";
+import {
+  toSkuMutationPayload,
+  toSkuPayloadFromProduct,
+  useCreateSku,
+  useDeleteSku,
+  useDuplicateSku,
+  useSkuCatalogue,
+  useUpdateSku,
+} from "@/features/dashboard/sku-management/hooks";
+import type {
+  SkuItemFormValues,
+  SkuPriceField,
+  SkuProduct,
+} from "@/features/dashboard/sku-management/types";
+
+interface SkuTableProps {
+  /** Owned by the page, because the "Add item" button that opens it lives in
+   *  the page header while every row this creates lives down here. */
+  addItemOpen: boolean;
+  onAddItemOpenChange: (open: boolean) => void;
+  /** Opens the page's import modal. The first-run empty state offers it as a
+   *  second way in, so the button in the header isn't the only one. */
+  onImport: () => void;
+}
+
+/** Turns a saved product back into form values, so Edit opens pre-filled with
+ *  exactly what the row holds. The inverse of toSkuMutationPayload. */
+function toFormValues(product: SkuProduct): SkuItemFormValues {
+  return {
+    name: product.name,
+    // A row can arrive untyped, which the select shows as its unchosen state
+    // rather than guessing a type on the merchant's behalf.
+    type: product.type ?? "",
+    hsnSac: product.hsnSac,
+    currency: product.currency,
+    sellingPrice: String(product.sellingPrice),
+    productCost: String(product.productCost),
+    description: product.description,
+    // No `file`, which is the whole point: this is the picture the server
+    // already holds, shown so the merchant can see what a replacement would
+    // replace. Saving without touching it uploads nothing (see useUpdateSku).
+    image: product.imageUrl ? { url: product.imageUrl, name: "Current image" } : null,
+  };
+}
+
+export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTableProps) {
+  const [tab, setTab] = useState<SkuViewTab>("all");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(SKU_PAGE_LIMIT);
+
+  // The product being previewed, or null. Holds the product rather than an id
+  // so the modal can never render a stale row while it animates closed.
+  const [previewProduct, setPreviewProduct] = useState<SkuProduct | null>(null);
+
+  // The product awaiting delete confirmation. Delete never acts on the first
+  // click; it only ever sets this, and DeleteSkuDialog is what calls through.
+  const [pendingDelete, setPendingDelete] = useState<SkuProduct | null>(null);
+
+  // The product awaiting duplicate confirmation. Same shape as pendingDelete:
+  // the menu item only ever sets this, and the dialog is what calls through.
+  const [pendingDuplicate, setPendingDuplicate] = useState<SkuProduct | null>(null);
+
+  // The product being edited, or null when the form is in Add mode.
+  const [editing, setEditing] = useState<SkuProduct | null>(null);
+
+  // Search, the type tab and the page are all request inputs — every one of them
+  // is applied by the server (see useSkuCatalogue), so the rows that arrive are
+  // the rows to draw and the pager's count always describes the same set.
+  const { products, totalCount, isLoading, isFetching, refetch } = useSkuCatalogue({
+    search: search.trim(),
+    // All sends no type filter at all rather than both types, so the request says
+    // "don't narrow" instead of "narrow to everything".
+    type: tab === "goods" || tab === "services" ? SKU_TAB_TYPE[tab] : undefined,
+    page,
+    pageLimit: pageSize,
+  });
+
+  // Only true when several PACB MIDs are in play and none is selected — see
+  // usePacbMidScope. That is the one state where a row's own MID matters.
+  const { needsMidChoice } = usePacbMidScope();
+
+  const closeItemForm = (open: boolean) => {
+    if (!open) setEditing(null);
+    onAddItemOpenChange(open);
+  };
+
+  const { createSku } = useCreateSku();
+  const { updateSku } = useUpdateSku();
+  const { deleteSku } = useDeleteSku();
+  const { duplicateSku } = useDuplicateSku();
+
+  // Both prices are edited in place, and the endpoint replaces the row, so the
+  // whole record is resent with just this field changed.
+  const onPriceChange = (id: string, field: SkuPriceField, next: number) => {
+    const product = products.find((row) => row.id === id);
+    if (!product) return;
+
+    const payload = toSkuPayloadFromProduct(product, { [field]: next });
+    if (!payload) {
+      toast.error("Add a product type to this item before editing its price.");
+      return;
+    }
+
+    updateSku({ id, rowMid: product.mid, payload });
+  };
+
+  // Opens the same form the Add item button does, pre-filled from the row.
+  // Setting `editing` is what switches the modal into edit mode.
+  const onEditItem = (product: SkuProduct) => {
+    setEditing(product);
+    onAddItemOpenChange(true);
+  };
+
+  // Both Add item and Save and add another land here; `keepOpen` is the only
+  // difference between them, and the modal itself handles resetting the form.
+  const onSubmitItem = (values: SkuItemFormValues, keepOpen: boolean) => {
+    const payload = toSkuMutationPayload(values);
+    // Null means validation didn't pass. The form gates submission on the same
+    // check, so this is a guard rather than a path the UI can reach.
+    if (!payload) return;
+
+    // Only a newly picked file travels on: an untouched slot still holds the
+    // item's saved image, which has no `file` and needs no upload.
+    const image = values.image?.file ?? null;
+
+    if (editing) {
+      updateSku({ id: editing.id, rowMid: editing.mid, payload, image });
+      setEditing(null);
+      onAddItemOpenChange(false);
+      return;
+    }
+
+    createSku(payload, image);
+    // A new item lands at the top of the unfiltered list, so a merchant sitting
+    // on a type tab or a later page would otherwise watch the form close onto a
+    // list the item isn't in.
+    setTab("all");
+    setPage(1);
+    if (!keepOpen) onAddItemOpenChange(false);
+  };
+
+  const onConfirmDelete = (product: SkuProduct) => {
+    deleteSku(product);
+    setPendingDelete(null);
+  };
+
+  const onConfirmDuplicate = (product: SkuProduct) => {
+    duplicateSku(product);
+    setPendingDuplicate(null);
+    // The copy lands at the top of the unfiltered list, so show the merchant
+    // the view it is actually in — the same reason Add item resets these.
+    setTab("all");
+    setPage(1);
+  };
+
+  // One menu renderer feeding both the table's trailing actions column and
+  // the card list, so a row's actions are identical at every width.
+  const renderRowActions = (row: SkuProduct) => (
+    <SkuRowActions
+      product={row}
+      onEdit={onEditItem}
+      onDuplicate={setPendingDuplicate}
+      onDelete={setPendingDelete}
+    />
+  );
+
+  const columns = buildSkuColumns(onPriceChange, needsMidChoice);
+
+  const onSearch = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  // Switching tabs keeps the search query — a merchant looking for one product
+  // shouldn't retype it to check which type it filed under. Only paging resets.
+  const onTabChange = (value: string) => {
+    setTab(value as SkuViewTab);
+    setPage(1);
+  };
+
+  // Two different empty states, because they ask the merchant for two different
+  // things. A catalogue with nothing in it and no query typed is a first run, and
+  // wants the two ways to put something in it; anything else is a query or tab
+  // that matched nothing, and wants to be told to widen it. pg-dashboard draws
+  // the same distinction.
+  //
+  // `tab === "all"` is load-bearing now that the tabs filter server-side:
+  // totalCount describes the *filtered* set, so a merchant on Goods with no goods
+  // would otherwise be told their catalogue is empty and offered the import CTAs,
+  // when in fact they have items — just none of that type. First run means the
+  // whole catalogue is empty, which only an unfiltered, unsearched request can say.
+  const isFirstRun = !isLoading && totalCount === 0 && !search.trim() && tab === "all";
+  const emptyTitle = "No products found";
+  const emptyDescription = "Try a different search or switch tabs";
+
+  // Tabs and toolbar are written once and mounted on both surfaces: the card
+  // for lg+, and the bordered wrapper below it for narrower viewports. Only one
+  // is ever visible, so a merchant sees one tab bar and one search box.
+  const tabBar = <UnderlineTabs tabs={SKU_VIEW_TABS} value={tab} onValueChange={onTabChange} />;
+
+  // Search and refresh — no Report, no Reorder Columns, no filter chips.
+  const controls = (
+    <div className="flex items-center gap-2">
+      <RotatingSearchInput
+        value={search}
+        onSearch={onSearch}
+        words={SKU_SEARCH_HINTS}
+        ariaLabel="Search products by name or HSN/SAC"
+        className="w-full sm:w-56"
+      />
+
+      {/* Every mutation already invalidates the catalogue, so this is for
+          changes made elsewhere — another tab, or another member of the team.
+          Spinning the glyph on isFetching (not isLoading) is what makes a
+          press over existing rows visibly do something. */}
+      {/* Same outline treatment and compact height as the Refresh on every
+          other table toolbar (Transactions, Invoices, Settlements). It was a
+          ghost button here, which read as a different control. */}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        aria-label="Refresh products"
+        isLoading={false}
+        disabled={isFetching}
+        leftIcon={
+          <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+        }
+        onClick={refetch}
+        className="ml-auto h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+      >
+        Refresh
+      </Button>
+    </div>
+  );
+
+  // Two stand-ins for an empty grid. The first run offers the two ways to put
+  // something in the catalogue; every other empty result is a query or tab that
+  // matched nothing, and only wants to be told to widen it.
+  const emptyState = isFirstRun ? (
+    <EmptyState
+      title="No items yet"
+      description="Add items to your catalog to pull them into invoices."
+      action={
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+            onClick={onImport}
+          >
+            Import from a file
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+            onClick={() => onAddItemOpenChange(true)}
+          >
+            Add item
+          </Button>
+        </div>
+      }
+      className="py-12"
+    />
+  ) : (
+    <PlaceholderState
+      variant="no-data"
+      title={emptyTitle}
+      description={emptyDescription}
+      className="py-16"
+    />
+  );
+
+  const pagination = {
+    mode: "page",
+    page,
+    pageSize,
+    total: totalCount,
+    onPageChange: setPage,
+    pageSizeOptions: SKU_PAGE_SIZE_OPTIONS,
+    // Back to the first page on a size change: page 4 of a 10-per-page list is
+    // past the end of the same list at 20 per page, and the server would answer
+    // an offset beyond the data with nothing at all.
+    onPageSizeChange: (next: number) => {
+      setPageSize(next);
+      setPage(1);
+    },
+  } as const;
+
+  return (
+    <>
+      {/* Desktop (lg+): the full table. The overflow menu rides `rowAction`,
+          not a column — DataTable renders that slot in a zero-width cell stuck
+          to the right edge of the viewport. That's what keeps it pinned right
+          and reachable while the six data columns scroll horizontally under
+          it, out of their widths, and out of any future column reordering.
+          It floats over the row rather than sitting in the flow, so it can
+          overlap the trailing column's text; the secondary button's own fill
+          and border are what keep it legible there.
+
+          DataTable reveals that slot on row hover only (opacity-0 on a span
+          it owns). A child can't undo a parent's opacity, so the override is
+          applied here, scoped to this table's action cell — `td.sticky` is
+          that zero-width cell, and the descendant selector outranks the bare
+          `opacity-0` class without needing !important. z-[2] lifts it above
+          the row's own cells so it always paints on top. */}
+      <DataTableCard<SkuProduct>
+        className="hidden lg:block [&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+        tabs={tabBar}
+        toolbar={controls}
+        columns={columns}
+        data={products}
+        isLoading={isLoading}
+        rowKey={(row) => row.id}
+        emptyTitle={emptyTitle}
+        emptyDescription={emptyDescription}
+        emptyState={emptyState}
+        // The whole row opens the product preview, through DataTable's
+        // row-level handler rather than a wrapper inside every cell.
+        // Clicks on the row's own controls (the two price editors, the
+        // overflow menu) are skipped by it, so each still does only its
+        // own job.
+        onRowClick={setPreviewProduct}
+        rowAction={renderRowActions}
+        pagination={pagination}
+        maxBodyHeight="none"
+      />
+
+      {/* Tablet + mobile (below lg): the same page's rows as cards, on the same
+          bordered surface the card gives the table. */}
+      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+        <div className="border-b border-border px-4 pt-3">{tabBar}</div>
+        <div className="border-b border-border px-4 py-3">{controls}</div>
+        <DataCardList<SkuProduct>
+          bordered={false}
+          rows={products}
+          rowKey={(row) => row.id}
+          isLoading={isLoading}
+          renderCard={(row) => (
+            <SkuCard row={row} actions={renderRowActions(row)} onPreview={setPreviewProduct} />
+          )}
+          renderSkeleton={() => <SkuCardSkeleton />}
+          emptyTitle={emptyTitle}
+          emptyDescription={emptyDescription}
+          emptyState={emptyState}
+          pagination={pagination}
+        />
+      </div>
+
+      {/* Read-only. Deliberately carries no actions — Edit, Duplicate, and
+          Delete stay on the row's overflow menu, so there's one home for
+          them and this stays a look-don't-touch view. */}
+      <ProductPreviewModal
+        product={previewProduct}
+        onOpenChange={(open) => !open && setPreviewProduct(null)}
+      />
+
+      {/* Rendered once for the whole table rather than per row: only one
+          delete can be pending at a time, and `pendingDelete` is what both
+          opens it and tells it which product it's confirming. */}
+      <DeleteSkuDialog
+        product={pendingDelete}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        onConfirm={onConfirmDelete}
+      />
+
+      {/* Neutral twin of the delete dialog: Duplicate confirms too, because its
+          result lands somewhere the merchant may not be looking. */}
+      <DuplicateSkuDialog
+        product={pendingDuplicate}
+        onOpenChange={(open) => !open && setPendingDuplicate(null)}
+        onConfirm={onConfirmDuplicate}
+      />
+
+      {/* One form serving both Add and Edit — the field model is the same, so
+          `editing` is the only thing that distinguishes them. */}
+      <SkuItemFormModal
+        open={addItemOpen}
+        onOpenChange={closeItemForm}
+        mode={editing ? "edit" : "add"}
+        initialValues={editing ? toFormValues(editing) : undefined}
+        onSubmit={onSubmitItem}
+      />
+    </>
+  );
+}

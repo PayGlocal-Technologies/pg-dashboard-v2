@@ -1,0 +1,217 @@
+"use client";
+
+import { useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui";
+import { Icon } from "@/components/icon";
+import { useApp } from "@/stores/useApp";
+import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { useHasEcho } from "@/features/dashboard/echo/hooks";
+import {
+  MCA_DASHBOARD_GUIDE_ECHO_TARGET,
+  MCA_DASHBOARD_GUIDE_KEY,
+  MCA_DASHBOARD_GUIDE_STEPS,
+} from "@/features/dashboard/mca-home/guide";
+import { McaRevenueCard } from "@/features/dashboard/mca-home/components/McaRevenueCard";
+import { McaClientAnalyticsCard } from "@/features/dashboard/mca-home/components/McaClientAnalyticsCard";
+import { McaNeedsAttentionCard } from "@/features/dashboard/mca-home/components/McaNeedsAttentionCard";
+import { McaNeedsAttentionDrawer } from "@/features/dashboard/mca-home/components/McaNeedsAttentionDrawer";
+import { McaQuickAccess } from "@/features/dashboard/mca-home/components/McaQuickAccess";
+import { McaDashboardWidgetCustomization } from "@/features/dashboard/mca-home/components/widgets/McaDashboardWidgetCustomization";
+import {
+  readMcaDashboardLayout,
+  writeMcaDashboardLayout,
+  type McaWidgetId,
+} from "@/features/dashboard/mca-home/widget-catalog";
+
+/** Greeting bucket, computed once on mount (no impure Date in render), same
+ * pattern as home/index.tsx's useGreeting. */
+function useGreeting() {
+  const [greeting] = useState<string>(() => {
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 17) return "Good afternoon";
+    if (h < 21) return "Good evening";
+    return "Good night";
+  });
+  return greeting;
+}
+
+function useContextLine() {
+  const [line] = useState<string>(() => {
+    const h = new Date().getHours();
+    if (h >= 5 && h < 9) return "Early bird! Here's what's waiting for you ☕";
+    if (h >= 9 && h < 12) return "Here's your morning briefing 🌤️";
+    if (h >= 12 && h < 14) return "Midday check-in, things are moving along 📈";
+    if (h >= 14 && h < 17) return "Here's your overview for today";
+    if (h >= 17 && h < 20) return "End of day, here's how today shaped up";
+    if (h >= 20) return "Winding down, a quick look before you log off 🌙";
+    return "Your cross-border business overview 🚀";
+  });
+  return line;
+}
+
+export function McaDashboardFeature() {
+  const profile = useApp((s) => s.profile);
+  const greeting = useGreeting();
+  const contextLine = useContextLine();
+
+  const firstName = profile?.firstName ?? "";
+  const lastName = profile?.lastName ?? "";
+  const displayName =
+    [firstName, lastName].filter(Boolean).join(" ") || profile?.username || "there";
+
+  const router = useRouter();
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+
+  // The tour's Echo step points at the sidebar's Echo row, which only exists
+  // for accounts that have Echo. Dropped rather than left to Spotlight's
+  // onMissing, which waits ~6s before moving on — see the note on
+  // MCA_DASHBOARD_GUIDE_ECHO_TARGET.
+  const hasEcho = useHasEcho();
+  const guideSteps = hasEcho
+    ? MCA_DASHBOARD_GUIDE_STEPS
+    : MCA_DASHBOARD_GUIDE_STEPS.filter((step) => step.target !== MCA_DASHBOARD_GUIDE_ECHO_TARGET);
+  const [editMode, setEditMode] = useState(false);
+  const [needsAttentionOpen, setNeedsAttentionOpen] = useState(false);
+  const [layout, setLayout] = useState<McaWidgetId[]>(() => readMcaDashboardLayout());
+  const layoutSnapshot = useRef<McaWidgetId[]>(layout);
+
+  /**
+   * A new invoice is raised against exactly one MID, and the editor puts that
+   * MID in every request path — so with several PACB MIDs and none selected,
+   * the merchant is asked which before the editor opens rather than having the
+   * first one chosen for them. Same question pg-dashboard's own Quick Access
+   * asks (ChooseMidSelect), and `MidScopedAction` below is what asks it.
+   */
+  function handleInvoice(mid: string) {
+    if (mid) selectMid(mid);
+    router.push("/create-invoice");
+  }
+
+  function handleViewClients() {
+    router.push("/client-management");
+  }
+
+  function handleViewSettlements() {
+    router.push("/mca-settlement-report");
+  }
+
+  /**
+   * Both Needs attention actions — Remind on an overdue invoice, View on one
+   * still in its window — land on the invoice's details page. That page is
+   * where "Email / remind client" lives, so chasing an invoice is one hop from
+   * here rather than a separate action on the dashboard.
+   *
+   * The id is the invoice's own id, the same segment the invoice list pushes.
+   * Note the needs-attention payload carries no MID, so the details page
+   * resolves one itself (the selected MID, else the merchant's first PACB one).
+   * For a merchant with several PACB MIDs and none selected, this list spans
+   * them all and a row from another MID will not resolve — the payload needs a
+   * `mid` per row to fix properly.
+   */
+  function handleOpenInvoice(id: string) {
+    router.push(`/mca-invoices/${id}`);
+  }
+
+  function handleCustomise() {
+    layoutSnapshot.current = [...layout];
+    setEditMode(true);
+    toast.message("Customise your dashboard", {
+      description: "Add widgets, then drag tiles to reorder.",
+    });
+  }
+
+  function handleDoneCustomise() {
+    writeMcaDashboardLayout(layout);
+    layoutSnapshot.current = [...layout];
+    setEditMode(false);
+    toast.success("Dashboard updated", { description: "Changes saved and edit mode closed." });
+  }
+
+  function handleDiscardCustomise() {
+    setLayout([...layoutSnapshot.current]);
+    setEditMode(false);
+  }
+
+  return (
+    <div className="mx-auto max-w-[1400px] space-y-4">
+      {/* ── Page header ──────────────────────────────────────────────── */}
+      <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+        <div>
+          <h1 className="text-[1.35rem] font-bold leading-snug tracking-tight text-foreground">
+            {greeting}, {displayName}
+          </h1>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{contextLine}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="hidden items-center gap-1.5 text-[11px] text-muted-foreground sm:flex">
+            <Icon
+              name="check-circle"
+              className="h-3 w-3 shrink-0 text-muted-foreground"
+              aria-hidden
+            />
+            <span>Amount received at mid-market rate</span>
+          </div>
+          <div className="hidden h-3.5 w-px bg-border sm:block" />
+          <div data-guide="mca-create-invoice">
+            <MidScopedAction
+              label="Invoice"
+              icon="plus"
+              variant="primary"
+              needsMidChoice={needsMidChoice}
+              midOptions={midOptions}
+              onRun={handleInvoice}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Revenue + client analytics / needs attention ─────────────── */}
+      <div className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
+        <div className="lg:col-span-8">
+          <McaRevenueCard onViewSettlements={handleViewSettlements} />
+        </div>
+        <div className="flex flex-col gap-4 lg:col-span-4">
+          <McaClientAnalyticsCard onViewAll={handleViewClients} />
+          <div data-guide="mca-needs-attention">
+            <McaNeedsAttentionCard
+              onViewAll={() => setNeedsAttentionOpen(true)}
+              onAction={handleOpenInvoice}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div data-guide="mca-quick-access">
+        <McaQuickAccess editMode={editMode} onEditDashboard={handleCustomise} />
+      </div>
+
+      {/* ── Configurable widgets (Transactions/globe, stat cards, charts) ── */}
+      <McaDashboardWidgetCustomization
+        layout={layout}
+        onLayoutChange={setLayout}
+        editMode={editMode}
+        onDiscardEdit={handleDiscardCustomise}
+        onDoneEdit={handleDoneCustomise}
+      />
+
+      <McaNeedsAttentionDrawer
+        open={needsAttentionOpen}
+        onOpenChange={setNeedsAttentionOpen}
+        onOpenInvoice={handleOpenInvoice}
+      />
+
+      {/* Guide launcher — highlighted once here (the main dashboard), a plain
+          button on every other screen. */}
+      <GuideLauncher
+        steps={guideSteps}
+        storageKey={MCA_DASHBOARD_GUIDE_KEY}
+        highlightOnFirstVisit
+      />
+    </div>
+  );
+}

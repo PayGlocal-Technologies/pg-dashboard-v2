@@ -18,7 +18,8 @@ import {
   campaignTrackingApi,
 } from "@/features/auth/login/services";
 import { useGlobalTenant } from "@/features/auth/hooks";
-import { handleSingleSignOn } from "@/features/auth/helpers";
+import { handleSingleSignOn, DEFAULT_AUTHED_PATH } from "@/features/auth/helpers";
+import { withBasePath } from "@/constants/basePath";
 import { firebaseConfigProvider } from "@/features/auth/helpers";
 import { PROVIDERS } from "@/features/auth/login/single-sign-on/authProvider";
 import { getTrackingData } from "@/features/auth/login/helper";
@@ -148,7 +149,7 @@ export function IdentifierForm({ setScreen }: LoginScreenProps) {
             } else if (data?.responseType === "COUNTRY_QUESTIONNAIRE") {
               setScreen("countryQuestionnaire");
             } else {
-              window.location.href = "/transactions";
+              window.location.href = withBasePath(DEFAULT_AUTHED_PATH);
             }
           },
           onError: (err) => setApiError(err.message),

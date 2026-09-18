@@ -38,7 +38,8 @@ export function IdentifierForm({ setScreen }: ForgotPasswordScreenProps) {
         onSuccess: (res) => {
           if (res.status === "OTP_SENT") {
             setIdentifier(value.identifier);
-            const data = res.data as { maskedEmail?: string; maskedPhoneNumber?: string } | undefined;
+            const data = res.data as
+              { maskedEmail?: string; maskedPhoneNumber?: string } | undefined;
             if (data?.maskedEmail) setMaskedEmail(data.maskedEmail);
             if (data?.maskedPhoneNumber) setMaskedPhoneNumber(data.maskedPhoneNumber);
             setOtpInitiateTimestamp(Date.now());

@@ -30,4 +30,7 @@ export const PUBLIC_ROUTE_PREFIXES = [
   "/prt",
   "/ovd/validate",
   "/ovd/capture",
+  // A merchant's clients open this with nothing but the share token in the
+  // path — they have no PayGlocal account to log into.
+  "/multi-currency-accounts-shared",
 ] as const;

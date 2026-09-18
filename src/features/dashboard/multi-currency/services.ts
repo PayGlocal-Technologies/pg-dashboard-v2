@@ -1,0 +1,93 @@
+import { BASE_URL_V1, BASE_URL_V3 } from "@/api";
+
+// Endpoint URL builders only — no fetch/axios logic here. Every path below is
+// copied verbatim from pg-dashboard's src/features/multi-currency-accounts/
+// services.ts, which is the production source of truth for these contracts.
+//
+// Builders that take an id return "" when it is missing, so a disabled query
+// can never construct a half-formed URL.
+
+/** Authenticated merchant virtual accounts (FFMS). Response splits into
+ *  `general` and `amazon` buckets, each keyed by currency. */
+export const mcaVirtualAccountsApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/ffms/virtualAccounts` : "";
+
+/**
+ * Provisions (creates) the merchant's Amazon virtual account.
+ *
+ * A merchant who has no `amazon` bucket in the virtual-accounts response has
+ * never been issued Amazon payout accounts; this is the call that issues them.
+ * Verbatim from pg-dashboard's getMcaAmazonProvisionUrl.
+ */
+export const mcaAmazonProvisionApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/ffms/virtualAccounts/amazon/provision` : "";
+
+/** Real-time exchange rates for one currency and amount. */
+export const mcaExchangeRatesApi = (merchantId: string, currency: string, amount: number) =>
+  merchantId && currency
+    ? `${BASE_URL_V3}/merchants/${merchantId}/exchange-rates/${currency}/${amount}`
+    : "";
+
+/**
+ * Leg 1 of the proof-of-account-ownership download: asks the backend to start
+ * generating the PDF and returns the descriptor to poll with. `accountId` is
+ * the SHA-256 of the account number, not the account's own id — see
+ * accountDocumentId in @/features/dashboard/multi-currency/utils.
+ */
+export const mcaAccountConfirmationApi = (merchantId: string, accountId: string) =>
+  merchantId && accountId
+    ? `${BASE_URL_V1}/merchants/${merchantId}/account-confirmation/${accountId}`
+    : "";
+
+/**
+ * Leg 1 of the transaction report (bank settlement statement) download. Same
+ * two-leg shape and the same SHA-256 accountId as mcaAccountConfirmationApi
+ * above, but a POST: pg-dashboard now collects the merchant's registered name,
+ * address and a contact email in a drawer and sends them as the body (see
+ * TransactionReportDrawer / useTransactionReportDownload there), where this
+ * used to be a bare GET.
+ */
+export const mcaBankStatementApi = (merchantId: string, accountId: string) =>
+  merchantId && accountId
+    ? `${BASE_URL_V1}/merchants/${merchantId}/bank-statement/${accountId}`
+    : "";
+
+/** Leg 2, shared by both downloads: POST the descriptor from leg 1 until the
+ *  response carries a `url`. Generation is asynchronous, so this is polled. */
+export const mcaGeneratedFileApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/account-generated-file` : "";
+
+/**
+ * Merchant profile — read only for the registered name and address the
+ * transaction report drawer prefills. Same path pg-dashboard's
+ * TransactionReportDrawer reads (`/merchants/{mid}/profile`).
+ */
+export const mcaMerchantProfileApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/profile` : "";
+
+/** Public virtual accounts, addressed by share token instead of a MID. Backs
+ *  the unauthenticated page a shared link opens. */
+export const mcaSharedVirtualAccountsApi = (token: string) =>
+  token ? `${BASE_URL_V3}/merchants/${token}/virtualAccounts` : "";
+
+/** Generates a shareable link for one currency's account details. */
+export const mcaShareLinkApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/share-link` : "";
+
+/** Emails one account's details to a client. */
+export const mcaSendAccountEmailApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/send-account-email` : "";
+
+// ── Amazon account-detail statement ─────────────────────────────────────────
+// Two legs, same path, different verb — verbatim from pg-dashboard's
+// src/features/platform-withdrawals/services.ts.
+
+/** Leg 1: asks for the statement and returns the `requestTimestamp` to poll. */
+export const amzAccountStatementApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V1}/reports/amz/${merchantId}/account-detail` : "";
+
+/** Leg 2: polled until the response carries a `presignedUrl`. */
+export const amzAccountStatementPollApi = (merchantId: string, requestTimestamp: string) =>
+  merchantId && requestTimestamp
+    ? `${BASE_URL_V1}/reports/amz/${merchantId}/account-detail?requestTimestamp=${encodeURIComponent(requestTimestamp)}`
+    : "";

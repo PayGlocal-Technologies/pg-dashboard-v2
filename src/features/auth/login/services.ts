@@ -1,9 +1,7 @@
 import { BASE_URL_V3 } from "@/api";
 
 export const unifiedLoginApi = (isGlobal: boolean): string =>
-  isGlobal
-    ? `${BASE_URL_V3}/auth/unified/global/login`
-    : `${BASE_URL_V3}/auth/unified/login`;
+  isGlobal ? `${BASE_URL_V3}/auth/unified/global/login` : `${BASE_URL_V3}/auth/unified/login`;
 
 export const singleSignOnApi = `${BASE_URL_V3}/auth/sso/verify`;
 

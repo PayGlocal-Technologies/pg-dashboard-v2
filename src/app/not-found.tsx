@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Icon } from "@/components/icon/Icon";
+import { AppImage } from "@/components/common/AppImage";
 import { Button } from "@/components/ui";
 import { heartbeatApi } from "@/api";
 
@@ -40,10 +40,16 @@ export default function NotFound() {
 
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center text-center page-enter">
-        {/* Icon */}
-        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10 dark:bg-primary/15">
-          <Icon name="file-text" size={24} className="text-primary" />
-        </div>
+        {/* Illustration */}
+        <AppImage
+          src="/assets/404-error.svg"
+          alt=""
+          width={180}
+          height={180}
+          unoptimized
+          style={{ width: 180, height: 180 }}
+          className="mb-4"
+        />
 
         <h1 className="text-2xl font-semibold text-foreground">Page not found</h1>
         <p className="mt-2 max-w-xs text-sm leading-relaxed text-muted-foreground">

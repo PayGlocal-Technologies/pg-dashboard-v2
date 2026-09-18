@@ -29,6 +29,7 @@ Start by telling me your plan in a few bullet points before you write any code.
 ---
 
 ## Good things to say while you work
+
 - "Show me the empty state and the error state too."
 - "This spacing feels tight, use the next size up."
 - "Make the primary button match the one on the Transactions page."
@@ -36,5 +37,6 @@ Start by telling me your plan in a few bullet points before you write any code.
 - "Check this in dark mode and fix anything that looks off."
 
 ## If something looks wrong
+
 Just describe what you see: "the table is overflowing off the screen on mobile" or
 "the text is hard to read in dark mode." Claude will find and fix it.

@@ -26,14 +26,7 @@ export function SortableDashboardWidget({
   onRemove: (id: WidgetId) => void;
 }) {
   const meta = WIDGET_BY_ID[id];
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id,
     data: { type: "sortable" as const },
     disabled: !editMode,
@@ -133,11 +126,7 @@ export function SortableDashboardWidget({
     <div
       ref={setNodeRef}
       style={style}
-      className={cn(
-        colSpan,
-        "min-w-0 group touch-none",
-        isDragging && "opacity-[0.92]"
-      )}
+      className={cn(colSpan, "min-w-0 group touch-none", isDragging && "opacity-[0.92]")}
     >
       {editMode ? (
         <div

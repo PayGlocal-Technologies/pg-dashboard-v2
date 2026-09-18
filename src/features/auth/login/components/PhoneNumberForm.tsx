@@ -43,7 +43,10 @@ export function PhoneNumberForm({ setScreen }: LoginScreenProps) {
       const encryptedPayload = await encryptPayload(payload);
       mutate(encryptedPayload, {
         onSuccess: (res) => {
-          if ((res.status as string) === "OTP_SENT" || (res.status as string) === "PHONE_OTP_SENT") {
+          if (
+            (res.status as string) === "OTP_SENT" ||
+            (res.status as string) === "PHONE_OTP_SENT"
+          ) {
             setMaskedPhoneNumber(value.phoneNumber);
             setIsPhoneNumberOtpLogin(true);
             setSmsOtpInitiateTimestamp(Date.now());
@@ -135,7 +138,10 @@ export function NamePhoneNumberForm({ setScreen }: LoginScreenProps) {
       const encryptedPayload = await encryptPayload(payload);
       mutate(encryptedPayload, {
         onSuccess: (res) => {
-          if ((res.status as string) === "OTP_SENT" || (res.status as string) === "PHONE_OTP_SENT") {
+          if (
+            (res.status as string) === "OTP_SENT" ||
+            (res.status as string) === "PHONE_OTP_SENT"
+          ) {
             setMaskedPhoneNumber(value.phoneNumber);
             setIsPhoneNumberOtpLogin(true);
             setSmsOtpInitiateTimestamp(Date.now());

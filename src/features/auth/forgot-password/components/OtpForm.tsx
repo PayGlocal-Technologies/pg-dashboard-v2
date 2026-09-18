@@ -76,7 +76,7 @@ export function OtpForm({ setScreen }: ForgotPasswordScreenProps) {
       className="space-y-5"
       noValidate
     >
-      <AuthHeading title="We&apos;ve sent you OTPs">
+      <AuthHeading title="We've sent you OTPs">
         Enter the {OTP_LENGTH}-digit codes sent to{" "}
         {maskedPhoneNumber ? `${maskedPhoneNumber} and ` : ""}
         {maskedEmail || identifier}.
