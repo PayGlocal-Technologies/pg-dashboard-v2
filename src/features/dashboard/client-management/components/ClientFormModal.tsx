@@ -34,10 +34,7 @@ import {
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { CLIENT_BUSINESS_TYPES } from "@/features/dashboard/client-management/constants";
-import {
-  useClientStateCodes,
-  useClientTagOptions,
-} from "@/features/dashboard/client-management/hooks";
+import { useClientTagOptions } from "@/features/dashboard/client-management/hooks";
 import {
   dialCodeFor,
   emptyClientForm,
@@ -69,16 +66,6 @@ const countrySelectOptions = COUNTRIES.map((country) => ({
   value: country.code,
   label: `${country.flag} ${country.name}`,
 }));
-
-/** The state endpoint returns names in upper case ("KARNATAKA"). Title-cased for
- *  display only — the value submitted is the name exactly as it arrived. */
-function getStateLabel(name: string): string {
-  return name
-    .toLowerCase()
-    .split(" ")
-    .map((word) => (word ? word[0].toUpperCase() + word.slice(1) : word))
-    .join(" ");
-}
 
 function RequiredMark() {
   return (
@@ -297,24 +284,10 @@ function ClientFormBody({
   const keepOpenRef = useRef(false);
   // Cancel with typed-in values asks first; an untouched form just closes.
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
-  // The address country, which decides what the State select can offer. Held
-  // alongside the form (rather than read inside the field) because the state
-  // options have to change the moment the country does.
-  const [addressCountry, setAddressCountry] = useState(initialValues?.country ?? "");
-
-  // Tag suggestions and the state list are merchant/app configuration rather
-  // than constants, so both are fetched (see useClientTagOptions and
-  // useClientStateCodes).
+  // Tag suggestions are merchant configuration rather than constants, so they
+  // are fetched (see useClientTagOptions). The state reference list is not read
+  // at all any more — both State fields are free text, as production's are.
   const { tags: tagSuggestions } = useClientTagOptions(midOverride);
-  const { states } = useClientStateCodes();
-
-  // India has a state list; nothing else does, so every other country gets the
-  // single "Not Applicable" option — the value pg-dashboard's own form submits
-  // for a non-India address.
-  const stateOptions =
-    addressCountry === "IN"
-      ? states.map((name) => ({ value: name, label: getStateLabel(name) }))
-      : [{ value: "OTHER COUNTRY", label: "Not Applicable" }];
 
   const form = useForm({
     defaultValues: initialValues ?? emptyClientForm(),
@@ -639,10 +612,11 @@ function ClientFormBody({
                     options={countrySelectOptions}
                     onValueChange={(code) => {
                       field.handleChange(code);
-                      setAddressCountry(code);
-                      // The previously chosen state belongs to the old country's
-                      // list, so it is cleared rather than left showing a value
-                      // the select no longer offers.
+                      // Cleared on a country change, which is what production's
+                      // own country field does
+                      // (ADD_CLIENT_FIELDS_FORM_ADDRESS's onChange resets
+                      // address.state) — a state belongs to the country it was
+                      // typed for.
                       form.setFieldValue("state", "");
                       // A blank phone country is almost always the same country
                       // as the address, so the first country chosen seeds it —
@@ -742,25 +716,24 @@ function ClientFormBody({
                     <FieldLabel htmlFor="client-state">
                       <RequiredMark /> State
                     </FieldLabel>
-                    {/* Searchable, matching the Country field above it. The
-                        list is fetched (useClientStateCodes) and covers India
-                        only, which is why every other country collapses to the
-                        single "Not Applicable" option — exactly as
-                        pg-dashboard's own client form does, and why the search
-                        box hides itself below a handful of options.
+                    {/* Free text, the same control production uses — and the
+                        same one the shipping state below already is.
 
-                        A plain Select here meant the only way to reach Karnataka
-                        was scrolling or Radix's type-ahead, and type-ahead lands
-                        on the first DOM match: "k" gave Kerala. */}
-                    <SearchableSelect
+                        It was a select over the state reference list, which
+                        covers India and nothing else, so every foreign address
+                        collapsed to a single "Not Applicable" option. That is
+                        what pg-dashboard's form used to do too; its select is
+                        still there, commented out above the text field that
+                        replaced it (ADD_CLIENT_FIELDS_FORM_ADDRESS), because a
+                        client in California has a state and the list has no way
+                        to say so. */}
+                    <Input
                       id="client-state"
+                      placeholder="Enter state"
                       value={field.state.value}
-                      onValueChange={(value) => field.handleChange(value)}
-                      options={stateOptions}
-                      placeholder="Select state"
-                      searchPlaceholder="Search state…"
-                      emptyMessage="No state matches that search."
-                      invalid={field.state.meta.errors.length > 0}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      aria-invalid={field.state.meta.errors.length > 0}
                     />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>

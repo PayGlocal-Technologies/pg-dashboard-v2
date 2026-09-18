@@ -150,7 +150,7 @@ function EditBillerBody({
   onSave: (next: BillerDetails) => void;
 }) {
   const [values, setValues] = useState<BillerDetails>(() => ({ ...(billerDetails ?? {}) }));
-  const { countryOptions, stateOptionsFor } = useClientGeo(true);
+  const { countryOptions, stateOptions } = useClientGeo(true);
 
   const patch = (next: Partial<BillerDetails>) => setValues((prev) => ({ ...prev, ...next }));
 
@@ -161,8 +161,6 @@ function EditBillerBody({
     !!values.zipcode?.trim() &&
     !!values.email?.trim() &&
     !!values.phone?.trim();
-
-  const stateOptions = stateOptionsFor(values.country ?? "");
 
   return (
     <div className="mt-4 space-y-3">
@@ -216,9 +214,8 @@ function EditBillerBody({
           <SearchableSelect
             id="biller-country"
             value={values.country ?? ""}
-            onValueChange={(next) =>
-              patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })
-            }
+            // See AddAddressDialog's twin of this line.
+            onValueChange={(next) => patch({ country: next, state: "" })}
             options={countryOptions}
             placeholder="Select country"
             searchPlaceholder="Search country…"
@@ -228,16 +225,17 @@ function EditBillerBody({
 
         <Field>
           <FieldLabel htmlFor="biller-state">State</FieldLabel>
-          {/* Searchable: 36 states is past the point where scrolling a listbox
-              is reasonable. Hides its own search box for non-India countries,
-              whose only option is "Not Applicable". */}
+          {/* A select over the whole state list, which is what production's
+              biller form offers (EditBillerDetails maps every key of
+              stateCodes into its own select, ungated by country — its form has
+              no country field at all). Searchable because the list is long
+              enough that scrolling a listbox is not reasonable. */}
           <SearchableSelect
             id="biller-state"
             value={values.state ?? ""}
             onValueChange={(next) => patch({ state: next })}
             options={stateOptions}
-            disabled={!values.country}
-            placeholder={values.country ? "Select state" : "Pick a country first"}
+            placeholder="Select state"
             searchPlaceholder="Search state…"
             emptyMessage="No state matches that search."
           />
