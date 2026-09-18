@@ -39,7 +39,13 @@ export function InvoiceCardSkeleton() {
  * do, in the order that matters on a narrow screen: number and status first,
  * then who it bills, then the amount and dates.
  */
-export function InvoiceCard({ row, handlers }: { row: McaInvoiceRow; handlers: InvoiceRowHandlers }) {
+export function InvoiceCard({
+  row,
+  handlers,
+}: {
+  row: McaInvoiceRow;
+  handlers: InvoiceRowHandlers;
+}) {
   const { label, variant } = getInvoiceStatusMeta(row.status);
   const actions = buildInvoiceRowActions(row, handlers);
   const isDraft = row.status === "DRAFT";

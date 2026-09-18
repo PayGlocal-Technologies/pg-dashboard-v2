@@ -21,6 +21,9 @@ import {
 import { usePurposeCodes } from "@/features/dashboard/mca-transactions/hooks";
 import { merchantProfilePurposeCodeApi } from "@/features/dashboard/mca-transactions/services";
 import { usePut } from "@/lib/api/hooks";
+import { useRouter } from "next/navigation";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import useNewPermissions from "@/hooks/useNewPermissions";
 import { InvoiceDropzone } from "@/features/dashboard/mca-transactions/components/InvoiceDropzone";
 import { useInvoiceUpload } from "@/features/dashboard/mca-transactions/useInvoiceUpload";
 import {
@@ -52,6 +55,33 @@ export function UploadInvoiceForm({
   onSuccess,
 }: UploadInvoiceFormProps) {
   const isModal = variant === "modal";
+  const router = useRouter();
+  const { selectMid } = usePacbMidScope();
+  const checkPermissions = useNewPermissions();
+  // Same permission the row's own "Create Invoice" action is gated on, so the
+  // dropzone never offers a page the merchant would be turned away from.
+  const canManageInvoices = checkPermissions(["getAllMerchantInvoice"]);
+
+  /**
+   * "Don't have an invoice yet? Create new invoice".
+   *
+   * Opens the invoice editor for THIS transaction — the same entry point the
+   * transactions table's Create Invoice row action uses, so the draft is
+   * seeded from the transaction and carries the linked-transaction chip. The
+   * MID is scoped off the row first, because the editor puts one MID in every
+   * request path and a merchant with several PACB accounts would otherwise
+   * raise the invoice under their first one.
+   *
+   * Undefined without the permission, which is what hides the link entirely
+   * (see InvoiceDropzone's showCreateInvoiceLink).
+   */
+  const goToCreateInvoice = canManageInvoices
+    ? () => {
+        if (row.merchantId) selectMid(row.merchantId);
+        router.push(`/create-invoice?gid=${row.gid}`);
+      }
+    : undefined;
+
   const [saveError, setSaveError] = useState<string | null>(null);
   const [invoiceError, setInvoiceError] = useState<string | null>(null);
   const purposeCodeRef = useRef<PurposeCodeComboboxHandle>(null);
@@ -252,10 +282,7 @@ export function UploadInvoiceForm({
             onReset={upload.reset}
             invalid={!!invoiceError}
             errorId="invoice-error"
-            onCreateInvoice={() => {
-              // TODO: hand off to the /invoices/create flow and populate this
-              // field with the created invoice once that flow exists here.
-            }}
+            onCreateInvoice={goToCreateInvoice}
           />
           <FieldError id="invoice-error">{invoiceError}</FieldError>
         </Field>

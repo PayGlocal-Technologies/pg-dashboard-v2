@@ -108,3 +108,60 @@ export interface InvoiceDateFilter {
    *  is absolute (the range is converted at request time) or unset. */
   window: { startTime: number; endTime: number } | null;
 }
+
+// ── Upload invoice ──────────────────────────────────────────────────────────
+
+/** Leg 1's response: where to PUT the file, and the id extraction is keyed by. */
+export type UploadInvoicePresignResponse = BaseResponse<{
+  upload_url: string;
+  metaData: {
+    invoiceId: string;
+    maxSize: string;
+    merchantId: string;
+    fileExtension: string;
+  };
+}>;
+
+/**
+ * What extraction read off the uploaded PDF.
+ *
+ * A subset of production's InvoiceData — only the fields its confirm form
+ * actually seeds from (UPLOAD_INVOICE_FIELDS). Every one is optional because
+ * extraction is best-effort: a field it could not read comes back empty and the
+ * merchant types it in, which is the whole point of the confirm step.
+ */
+export interface ScannedInvoiceExtract {
+  invoiceDate?: string | null;
+  dueDate?: string | null;
+  currency?: string | null;
+  totalAmount?: string | number | null;
+  invoiceNumber?: string | null;
+}
+
+/**
+ * Leg 3's response. `data` is null while extraction is still running, which is
+ * what the poll waits on.
+ *
+ * `mcaClientList` is the merchant's existing clients PLUS, when extraction
+ * recognised a client that is not on file yet, one entry whose id is prefixed
+ * `NEW_`. Picking that one creates the client along with the invoice — see the
+ * new-client note in the confirm step.
+ */
+export type ScannedInvoiceResponse = BaseResponse<{
+  extractedData: ScannedInvoiceExtract;
+  mcaClientList: { name: string; id: string }[];
+} | null>;
+
+/** The body POSTed to add-client-invoice, field for field as pg-dashboard sends it. */
+export interface AddClientInvoicePayload {
+  clientId: string;
+  clientName: string;
+  currency: string;
+  totalAmount: string;
+  /** YYYY-MM-DD. */
+  invoiceDate: string;
+  /** YYYY-MM-DD. */
+  dueDate: string;
+  invoiceNumber: string;
+  userCreateConsent: boolean;
+}

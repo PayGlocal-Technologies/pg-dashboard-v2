@@ -4,6 +4,12 @@ import type { McaInvoiceRow } from "@/features/dashboard/mca-invoices/types";
 
 export const INVOICES_PAGE_LIMIT = 10;
 
+/** Ceiling for an uploaded invoice PDF, matching the 10MB pg-dashboard's
+ *  UploadInvoiceDrawer puts on its dragger. Deliberately not the 5MB the
+ *  transaction-side upload uses — that limit is the FFMS document's, this one
+ *  is the invoice service's. */
+export const UPLOADED_INVOICE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+
 // ── Query keys ──────────────────────────────────────────────────────────────
 // The prefixes the two reads on this page are cached under. Named here rather
 // than typed as literals at each mutation, because getting one character wrong

@@ -3,8 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { ColumnManager, Button, DataCardList,
-  DataTableCard } from "@/components/ui";
+import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -35,7 +34,7 @@ import {
 } from "@/features/dashboard/mca-invoices/services";
 import {
   buildInvoiceRequestBody,
-  dateFilterToEpochMs,
+  dateFilterToEpochSeconds,
   EMPTY_INVOICE_DATE_FILTER,
 } from "@/features/dashboard/mca-invoices/helpers";
 import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
@@ -59,6 +58,7 @@ import {
 import { MarkAsPaidDialog } from "@/features/dashboard/mca-invoices/components/MarkAsPaidDialog";
 import { ConfirmActionDialog } from "@/features/dashboard/mca-invoices/components/ConfirmActionDialog";
 import { LinkTransactionModal } from "@/features/dashboard/mca-invoices/components/LinkTransactionModal";
+import { UploadInvoiceDialog } from "@/features/dashboard/mca-invoices/components/UploadInvoiceDialog";
 import { toDateKey } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
 import type {
   InvoiceDateFilter,
@@ -176,6 +176,12 @@ export function McaInvoiceTable({
   const [duplicating, setDuplicating] = useState<McaInvoiceRow | null>(null);
   const [linking, setLinking] = useState<McaInvoiceRow | null>(null);
 
+  // "Upload invoice": the MID it is raised under, or "" while closed. Held as
+  // the MID rather than a boolean because a multi-MID merchant picks the
+  // account before the dialog opens, and the upload addresses that one MID in
+  // every request path.
+  const [uploadMid, setUploadMid] = useState("");
+
   // An explicit selection narrows to that MID; otherwise the merchant's whole
   // PACB set is queried, matching production.
   const mids = useMemo(() => (selectedMid ? [selectedMid] : paCbMids), [selectedMid, paCbMids]);
@@ -193,11 +199,27 @@ export function McaInvoiceTable({
     router.push("/create-invoice");
   };
 
+  /**
+   * "Upload invoice" — the second way an invoice gets onto this list, for a
+   * merchant who already has the document and should not have to re-key it
+   * into the editor. Ported from pg-dashboard, which offers it beside Create
+   * Invoice in this page's header.
+   *
+   * Scoped the same way the editor is: with several PACB MIDs and none
+   * selected, MidScopedAction asks which account first, and that pick is what
+   * the dialog is addressed to.
+   */
+  const openInvoiceUpload = (mid: string) => {
+    const target = mid || selectedMid || paCbMids[0] || "";
+    if (mid) selectMid(mid);
+    setUploadMid(target);
+  };
+
   const body = buildInvoiceRequestBody(
     {
       status: statusFilters.length ? statusFilters : undefined,
       type: typeFilter.length ? typeFilter : undefined,
-      ...dateFilterToEpochMs(dateFilter),
+      ...dateFilterToEpochSeconds(dateFilter),
     },
     {
       mids,
@@ -391,20 +413,45 @@ export function McaInvoiceTable({
   const renderFilterChips = () => (
     <InvoiceFilterChips
       dateRange={dateFilter.range}
+      /**
+       * Both handlers fire on EVERY apply, and each only clears the other mode
+       * when it has something of its own to put there.
+       *
+       * flux's chip commits with `onChange(range); onRelativeChange(relative)`
+       * — both, always, with the unused half empty. These two used to clobber
+       * each other on the strength of that: applying an absolute range set it,
+       * and the `onRelativeChange(EMPTY_RELATIVE_RANGE)` that followed
+       * microseconds later reset `range` straight back to `{from:"",to:""}`.
+       * The state ended up identical to what it was, so the request body never
+       * changed, so react-query's key never changed and NO request went out at
+       * all — the filter looked like it did nothing because it did nothing.
+       * The relative tab worked only because it happened to be the one that
+       * wrote last.
+       *
+       * Guarding each on its own value makes the pair order-independent:
+       * applying either mode replaces the other, and Clear (which sends both
+       * empty) still empties both.
+       */
       onDateRangeChange={(next) => {
-        // The chip's two modes are exclusive, so applying an absolute range
-        // drops the relative one and the window it had resolved to.
-        setDateFilter({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
+        setDateFilter((prev) =>
+          next.from || next.to
+            ? { range: next, relative: EMPTY_RELATIVE_RANGE, window: null }
+            : { ...prev, range: next }
+        );
         setPage(1);
       }}
       relativeRange={dateFilter.relative}
       onRelativeRangeChange={(next) => {
-        setDateFilter({
-          range: { from: "", to: "" },
-          relative: next,
-          // Clock reads belong in the handler, never in render.
-          window: hasRelativeRange(next) ? relativeRangeToEpochMs(next) : null,
-        });
+        setDateFilter((prev) =>
+          hasRelativeRange(next)
+            ? {
+                range: { from: "", to: "" },
+                relative: next,
+                // Clock reads belong in the handler, never in render.
+                window: relativeRangeToEpochMs(next),
+              }
+            : { ...prev, relative: EMPTY_RELATIVE_RANGE, window: null }
+        );
         setPage(1);
       }}
       statusFilters={statusFilters}
@@ -419,113 +466,131 @@ export function McaInvoiceTable({
   );
 
   const tabBar = (
-          <UnderlineTabs
-            tabs={INVOICE_VIEW_TABS}
-            value={activeTab}
-            onValueChange={(next) => {
-              const tab = next as InvoiceViewTab;
-              setTypeFilter(tab === "recurring" ? ["RECURRING"] : []);
-              onStatusFiltersChange(TAB_STATUS_FILTERS[tab]);
-              setPage(1);
-            }}
-          />
+    <UnderlineTabs
+      tabs={INVOICE_VIEW_TABS}
+      value={activeTab}
+      onValueChange={(next) => {
+        const tab = next as InvoiceViewTab;
+        setTypeFilter(tab === "recurring" ? ["RECURRING"] : []);
+        onStatusFiltersChange(TAB_STATUS_FILTERS[tab]);
+        setPage(1);
+      }}
+    />
   );
 
   const desktopControls = (
     <>
-          <RotatingSearchInput
-            value={search}
-            onSearch={onSearch}
-            words={SEARCH_WORDS}
-            ariaLabel="Search invoices"
-            className="w-40 sm:w-56"
-          />
+      <RotatingSearchInput
+        value={search}
+        onSearch={onSearch}
+        words={SEARCH_WORDS}
+        ariaLabel="Search invoices"
+        className="w-40 sm:w-56"
+      />
 
-          <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
+      <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
 
-          <div className="ml-auto flex items-center gap-2">
-            <ColumnManager
-              columns={reorderableColumns}
-              order={currentColumnOrder}
-              onOrderChange={setColumnOrder}
-              onReset={() => {
-                setColumnOrder(null);
-                setHiddenColumns([]);
-              }}
-              hiddenKeys={hiddenColumns}
-              onHiddenKeysChange={setHiddenColumns}
-              fixedKeys={FIXED_COLUMN_KEYS}
-              fixedReason="Always shown. An invoice row is unreadable without its number, amount and status."
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              leftIcon={
-                <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-              }
-              onClick={() => void handleRefresh()}
-              disabled={isFetching}
-              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-            >
-              Refresh
-            </Button>
-            <MidScopedAction
-              label="Create invoice"
-              icon="plus"
-              variant="primary"
-              className="h-auto min-h-0 shrink-0 py-1"
-              needsMidChoice={needsMidChoice}
-              midOptions={midOptions}
-              onRun={openInvoiceEditor}
-            />
-          </div>
+      <div className="ml-auto flex items-center gap-2">
+        <ColumnManager
+          columns={reorderableColumns}
+          order={currentColumnOrder}
+          onOrderChange={setColumnOrder}
+          onReset={() => {
+            setColumnOrder(null);
+            setHiddenColumns([]);
+          }}
+          hiddenKeys={hiddenColumns}
+          onHiddenKeysChange={setHiddenColumns}
+          fixedKeys={FIXED_COLUMN_KEYS}
+          fixedReason="Always shown. An invoice row is unreadable without its number, amount and status."
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          leftIcon={
+            <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+          }
+          onClick={() => void handleRefresh()}
+          disabled={isFetching}
+          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+        >
+          Refresh
+        </Button>
+        <MidScopedAction
+          label="Upload invoice"
+          icon="upload"
+          variant="outline"
+          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+          needsMidChoice={needsMidChoice}
+          midOptions={midOptions}
+          onRun={openInvoiceUpload}
+        />
+        <MidScopedAction
+          label="Create invoice"
+          icon="plus"
+          variant="primary"
+          className="h-auto min-h-0 shrink-0 py-1"
+          needsMidChoice={needsMidChoice}
+          midOptions={midOptions}
+          onRun={openInvoiceEditor}
+        />
+      </div>
     </>
   );
 
   const mobileControls = (
     <>
-          <div className="flex flex-nowrap items-center gap-2">
-            <RotatingSearchInput
-              value={search}
-              onSearch={onSearch}
-              words={SEARCH_WORDS}
-              ariaLabel="Search invoices"
-              className="min-w-0 flex-1"
-            />
-            <MidScopedAction
-              label="Create"
-              icon="plus"
-              variant="primary"
-              className="h-auto min-h-0 shrink-0 py-1"
-              needsMidChoice={needsMidChoice}
-              midOptions={midOptions}
-              onRun={openInvoiceEditor}
-            />
-          </div>
+      <div className="flex flex-nowrap items-center gap-2">
+        <RotatingSearchInput
+          value={search}
+          onSearch={onSearch}
+          words={SEARCH_WORDS}
+          ariaLabel="Search invoices"
+          className="min-w-0 flex-1"
+        />
+        <MidScopedAction
+          label="Upload"
+          icon="upload"
+          variant="outline"
+          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+          needsMidChoice={needsMidChoice}
+          midOptions={midOptions}
+          onRun={openInvoiceUpload}
+        />
+        <MidScopedAction
+          label="Create"
+          icon="plus"
+          variant="primary"
+          className="h-auto min-h-0 shrink-0 py-1"
+          needsMidChoice={needsMidChoice}
+          midOptions={midOptions}
+          onRun={openInvoiceEditor}
+        />
+      </div>
 
-          <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-            {renderFilterChips()}
-          </div>
+      <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+        {renderFilterChips()}
+      </div>
     </>
   );
 
   /** The same panel on both surfaces, so a failure reads the same either way. */
   const errorPanel = (
-          <div className="flex flex-col items-center gap-3 p-10 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
-              <Icon name="alert-circle" size={22} />
-            </span>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Couldn&apos;t load invoices</h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Something went wrong while fetching data.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => void refetch()}>
-              Retry
-            </Button>
-          </div>
+    <div className="flex flex-col items-center gap-3 p-10 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
+        <Icon name="alert-circle" size={22} />
+      </span>
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">Couldn&apos;t load invoices</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Something went wrong while fetching data.
+        </p>
+      </div>
+      <Button variant="outline" size="sm" onClick={() => void refetch()}>
+        Retry
+      </Button>
+    </div>
   );
 
   return (
@@ -639,6 +704,18 @@ export function McaInvoiceTable({
         confirmLabel="Duplicate"
         isPending={isDuplicating}
         onConfirm={confirmDuplicate}
+      />
+
+      {/* The upload creates a real invoice, so the list and the summary counts
+          both refetch — INVOICE_DATA_KEYS, invalidated by the dialog's own
+          mutation, and nothing here has to be told about it. */}
+      <UploadInvoiceDialog
+        mid={uploadMid}
+        open={!!uploadMid}
+        onOpenChange={(open) => {
+          if (!open) setUploadMid("");
+        }}
+        onUploaded={() => setUploadMid("")}
       />
 
       <LinkTransactionModal

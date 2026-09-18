@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Button,
-  Checkbox,
-  DataTable,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  type Column,
-} from "@/components/ui";
+import { DataTable, Dialog, DialogContent, DialogTitle, type Column } from "@/components/ui";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -19,6 +11,7 @@ import {
   linkableTransactionsApi,
 } from "@/features/dashboard/mca-invoices/services";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
+import { LinkConsentFooter } from "@/features/dashboard/mca-invoices/components/LinkConsentFooter";
 import type { InvoiceRef } from "@/features/dashboard/mca-invoices/types";
 import type { BaseResponse } from "@/types/common";
 
@@ -33,12 +26,6 @@ interface LinkableTransaction {
 }
 
 type LinkableTransactionsResponse = BaseResponse<{ data: LinkableTransaction[] }>;
-
-const CONSENT_TEXT = {
-  short:
-    "By proceeding with this action, you authorize the platform to attach the generated invoice to the selected transaction.",
-  more: "You acknowledge that the accuracy and suitability of this linkage are solely your responsibility. PayGlocal Technologies Private Limited does not review, validate, or assume any liability for incorrect, incomplete, or inappropriate linkage or for any disputes or consequences arising from it.",
-};
 
 /**
  * Attaches a finished invoice to a settled transaction.
@@ -96,7 +83,6 @@ function LinkTransactionBody({
 }) {
   const [selectedGid, setSelectedGid] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
-  const [showMore, setShowMore] = useState(false);
 
   const url = linkableTransactionsApi(invoice.mid, invoice.id);
   const { data, isLoading } = useGet<LinkableTransactionsResponse>(
@@ -139,6 +125,12 @@ function LinkTransactionBody({
       }
     );
   };
+
+  /** Why "Link transaction" cannot run yet — its tooltip, and what disables
+   *  it. Mirrors LinkInvoiceModal's, from the other end. */
+  let linkDisabledReason: string | null = null;
+  if (!selectedGid) linkDisabledReason = "Select the transaction you want to link this invoice to.";
+  else if (!consent) linkDisabledReason = "Please agree to the terms before linking a transaction.";
 
   const columns: Column<LinkableTransaction>[] = [
     {
@@ -238,47 +230,18 @@ function LinkTransactionBody({
           density="compact"
           tableLayout="content"
         />
-
-        <label className="mt-5 flex cursor-pointer items-start gap-3">
-          <Checkbox
-            checked={consent}
-            onCheckedChange={(next) => setConsent(next === true)}
-            className="mt-0.5"
-          />
-          <span className="text-[12.5px] text-muted-foreground">
-            {CONSENT_TEXT.short}
-            {showMore && <> {CONSENT_TEXT.more}</>}{" "}
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto p-0 align-baseline text-[12.5px]"
-              onClick={(e) => {
-                // The label wraps this, so a bare click would also toggle the box.
-                e.preventDefault();
-                setShowMore((v) => !v);
-              }}
-            >
-              {showMore ? "Show less" : "Show more"}
-            </Button>
-          </span>
-        </label>
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={!selectedGid || !consent || isPending}
-          onClick={handleLink}
-        >
-          {isPending ? "Linking…" : "Link transaction"}
-        </Button>
-      </div>
+      <LinkConsentFooter
+        consent={consent}
+        onConsentChange={setConsent}
+        disabledReason={linkDisabledReason}
+        isPending={isPending}
+        actionLabel="Link transaction"
+        pendingLabel="Linking…"
+        onCancel={onCancel}
+        onConfirm={handleLink}
+      />
     </>
   );
 }
