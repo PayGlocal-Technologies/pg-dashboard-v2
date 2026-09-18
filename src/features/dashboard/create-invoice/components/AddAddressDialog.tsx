@@ -132,7 +132,7 @@ function AddressBody({
   onCancel: () => void;
   onSaved: () => void;
 }) {
-  const { countryOptions, stateOptionsFor } = useClientGeo(true);
+  const { countryOptions } = useClientGeo(true);
 
   const { mutate: updateClient, isPending } = usePut<BaseResponse<null>, Client>(
     updateClientApi(merchantId, client.id),
@@ -166,8 +166,6 @@ function AddressBody({
       }
     );
   };
-
-  const stateOptions = stateOptionsFor(address.country);
 
   return (
     <>
@@ -203,9 +201,10 @@ function AddressBody({
             <SearchableSelect
               id="client-address-country"
               value={address.country}
-              onValueChange={(next) =>
-                patch({ country: next, state: next === "India" ? "" : "OTHER COUNTRY" })
-              }
+              // Clearing the state is what production's own country field
+              // does (ADD_CLIENT_FIELDS_FORM_ADDRESS resets address.state on
+              // change) — a state belongs to the country it was typed for.
+              onValueChange={(next) => patch({ country: next, state: "" })}
               options={countryOptions}
               placeholder="Select country"
               searchPlaceholder="Search country…"
@@ -215,18 +214,16 @@ function AddressBody({
 
           <Field>
             <FieldLabel htmlFor="client-address-state">State</FieldLabel>
-            {/* Searchable, like the country field above. India's list runs to 36
-                entries; the search box hides itself for every other country,
-                whose only option is "Not Applicable". */}
-            <SearchableSelect
+            {/* Free text, the control production uses here. The state
+                reference list covers India only, so as a select this field
+                offered a single "Not Applicable" option to every client outside
+                it — which is why pg-dashboard replaced its own select with this
+                input and left the select commented out beside it. */}
+            <Input
               id="client-address-state"
+              placeholder="Enter state"
               value={address.state}
-              onValueChange={(next) => patch({ state: next })}
-              options={stateOptions}
-              disabled={!address.country}
-              placeholder={address.country ? "Select state" : "Pick a country first"}
-              searchPlaceholder="Search state…"
-              emptyMessage="No state matches that search."
+              onChange={(e) => patch({ state: e.target.value })}
             />
           </Field>
         </div>

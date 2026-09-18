@@ -170,7 +170,18 @@ export const mcaDocumentPendingByCurrencyApi = (merchantId: string) =>
     ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-by-currency`
     : "";
 
-/** Transactions export. POST the same OpenSearch body the table uses; the
- *  response is an xlsx blob, not JSON. */
+/**
+ * Transactions export. POST the same OpenSearch body the table uses; the
+ * response is an xlsx blob, not JSON.
+ *
+ * Unlike the search above, this path will NOT tolerate an empty MID: the
+ * search endpoint answers on `/search/ffms/txn/` with the scope taken from the
+ * body, but `/search/ffms/txn//download` has an empty path segment and is a
+ * 404. pg-dashboard passes its own `merchantId` here (see TransactionModals),
+ * which resolves to the profile MID for a merchant user, so callers must pass
+ * a real MID and not the URL-scoping one that is blank for non-partner users.
+ * Empty in, empty out, so a caller can gate on it rather than fire a request
+ * that cannot succeed.
+ */
 export const mcaTxnReportDownloadApi = (mid: string) =>
-  `${BASE_URL_V1}/search/ffms/txn/${mid}/download`;
+  mid ? `${BASE_URL_V1}/search/ffms/txn/${mid}/download` : "";

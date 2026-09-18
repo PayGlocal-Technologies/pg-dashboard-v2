@@ -21,7 +21,6 @@ import {
   clientInvoiceSearchApi,
   clientInvoiceSummaryApi,
   clientSearchApi,
-  clientStateCodesApi,
   clientTagOptionsApi,
   clientUpdateApi,
   invoiceDeleteApi,
@@ -48,7 +47,6 @@ import type {
   ClientInvoiceSummaryResponse,
   ClientMutationPayload,
   ClientSearchResponse,
-  ClientStateCodesResponse,
   ClientTagOptionsResponse,
   InvoiceViewResponse,
 } from "@/features/dashboard/client-management/types";
@@ -501,29 +499,6 @@ export function useClientCountryMap(): ClientCountryMap & { isLoading: boolean }
   }, [raw]);
 
   return { ...normalised, isLoading: isPending };
-}
-
-/** Indian state names for the form's State field. Every non-India address
- *  collapses to "OTHER COUNTRY" in this map, which is how pg-dashboard's form
- *  treats one. */
-export function useClientStateCodes(): { states: string[]; isLoading: boolean } {
-  const { data, isPending } = useGet<ClientStateCodesResponse>(
-    ["client-state-codes"],
-    clientStateCodesApi
-  );
-
-  // Sorted, because the endpoint returns its map unordered and Select's
-  // type-ahead jumps to the first DOM match: unsorted, pressing "k" landed on
-  // Kerala rather than Karnataka.
-  const states = useMemo(
-    () =>
-      Object.keys(data?.data?.stateCodes ?? {})
-        .filter((name) => name !== "OTHER COUNTRY")
-        .sort((a, b) => a.localeCompare(b)),
-    [data]
-  );
-
-  return { states, isLoading: isPending };
 }
 
 /** Tags already in use for this merchant's clients, as suggestions in the form.

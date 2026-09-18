@@ -269,8 +269,9 @@ export interface GeoOption {
 
 export interface ClientGeo {
   countryOptions: GeoOption[];
-  /** Indian states when the country is India, "Not Applicable" otherwise. */
-  stateOptionsFor: (country: string) => GeoOption[];
+  /** Every state the reference list names, which is the list production's
+   *  biller form offers. Not scoped by country — see useClientGeo. */
+  stateOptions: GeoOption[];
   isLoading: boolean;
 }
 
@@ -284,12 +285,18 @@ function titleCase(value: string): string {
 }
 
 /**
- * Country and state options for a client address.
+ * Country and state options for an invoice address.
  *
  * Both endpoints return name→code maps and the address stores the NAME, so the
- * option value is the map key, not the code. Production special-cases non-India
- * countries to a single "OTHER COUNTRY" state; that behaviour is preserved
- * because the server validates against the same vocabulary.
+ * option value is the map key, not the code.
+ *
+ * `stateOptions` is the whole list, exactly as production's biller form builds
+ * it (EditBillerDetails maps every key of `stateCodes` straight into its
+ * select). It used to be a `stateOptionsFor(country)` that returned Indian
+ * states for India and a single synthesised "Not Applicable" for everywhere
+ * else — the client-side rule production itself abandoned; its version of that
+ * select is still in the repo, commented out above the free-text field that
+ * replaced it.
  */
 export function useClientGeo(enabled: boolean): ClientGeo {
   const { data: countryData, isLoading: countriesLoading } = useGet<CountryCodesResponse>(
@@ -315,25 +322,17 @@ export function useClientGeo(enabled: boolean): ClientGeo {
     [countryData]
   );
 
-  const stateOptionsFor = useCallback(
-    (country: string): GeoOption[] => {
-      const stateCodes = stateData?.data?.stateCodes;
-      if (!stateCodes) return [];
-      if (country !== "India") return [{ label: "Not Applicable", value: "OTHER COUNTRY" }];
-
-      return (
-        Object.keys(stateCodes)
-          .filter((name) => name !== "OTHER COUNTRY")
-          .map((name) => ({ label: titleCase(name), value: name }))
-          // The API returns its map unordered. Sorted on the *label*, which is
-          // what the user reads and what Select's type-ahead matches against.
-          .sort((a, b) => a.label.localeCompare(b.label))
-      );
-    },
+  const stateOptions = useMemo(
+    () =>
+      Object.keys(stateData?.data?.stateCodes ?? {})
+        .map((name) => ({ label: titleCase(name), value: name }))
+        // The API returns its map unordered. Sorted on the *label*, which is
+        // what the user reads and what Select's type-ahead matches against.
+        .sort((a, b) => a.label.localeCompare(b.label)),
     [stateData]
   );
 
-  return { countryOptions, stateOptionsFor, isLoading: countriesLoading || statesLoading };
+  return { countryOptions, stateOptions, isLoading: countriesLoading || statesLoading };
 }
 
 // ─── Line-item suggestions ────────────────────────────────────────────────────

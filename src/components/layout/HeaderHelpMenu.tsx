@@ -90,6 +90,11 @@ export function HeaderHelpMenu() {
           // surface, so the three read as one group of header actions.
           className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted transition-colors hover:bg-accent"
           aria-label="Help"
+          // Target of the dashboard tour's support step. Shared chrome rather
+          // than part of any one page, the same way the sidebar's Echo row is —
+          // Spotlight resolves `[data-guide]` at runtime, so a page's tour can
+          // point at it without threading a ref through the header.
+          data-guide="header-help"
         >
           <Icon name="help-circle" size={17} className="text-muted-foreground" />
         </Button>
