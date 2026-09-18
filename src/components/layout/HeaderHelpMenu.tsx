@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, Popover, PopoverContent, PopoverTrigger, Separator } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
@@ -65,8 +67,21 @@ function HelpContactRow({ icon, label, value }: { icon: IconName; label: string;
  * — Header renders `<HeaderHelpMenu />` and nothing else.
  */
 export function HeaderHelpMenu() {
+  const [helpOpen, setHelpOpen] = useState(false);
+  const router = useRouter();
+
+  // "My queries" (raise/track a support ticket) used to be a dialog opened
+  // straight from here. It moved to its own page — a search box, three
+  // filters and a multi-field form is enough surface to want room rather
+  // than a panel anchored to a header icon — so this now just navigates and
+  // closes the popover behind it, the same way any other nav link would.
+  const goToMyQueries = () => {
+    setHelpOpen(false);
+    router.push("/my-queries");
+  };
+
   return (
-    <Popover>
+    <Popover open={helpOpen} onOpenChange={setHelpOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -106,6 +121,36 @@ export function HeaderHelpMenu() {
         <div className="p-2">
           <HelpContactRow icon="phone" label="Call us" value={HELP_SUPPORT_PHONE} />
           <HelpContactRow icon="mail" label="Email us" value={HELP_SUPPORT_EMAIL} />
+        </div>
+
+        <Separator />
+
+        {/* Raise a ticket, or check on one already raised — see /my-queries
+            (MyQueriesFeature). */}
+        <div className="p-2">
+          <Button
+            type="button"
+            variant="ghost"
+            // flux's Button wraps every child in one plain <span>, so `flex`
+            // / `items-center` / `gap` set on the button itself never reach the
+            // icon and the label inside it — the icon circle is display:flex and
+            // therefore block-level, which pushed the text onto its own line
+            // below it. The `[&>span]` unwrap is the same trick AskEchoButton
+            // and Sidebar's ExpandableItem trigger use; padding moves onto the
+            // wrapper too so the row's hit area still fills the button.
+            className="h-auto w-full justify-start p-0 text-left font-normal [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-3 [&>span]:px-2 [&>span]:py-2"
+            onClick={goToMyQueries}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10">
+              <Icon name="inbox" className="h-3.5 w-3.5 text-primary" />
+            </span>
+            <span className="block min-w-0 flex-1">
+              <span className="block text-[13px] font-medium text-foreground">My queries</span>
+              <span className="block text-[11px] font-normal text-muted-foreground">
+                Raise a ticket or track one you&apos;ve already raised
+              </span>
+            </span>
+          </Button>
         </div>
 
         <Separator />

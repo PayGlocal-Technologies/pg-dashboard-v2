@@ -8,11 +8,15 @@ export function ZohoDisconnectDialog({
   onOpenChange,
   onDisconnect,
   isDisconnecting,
+  mid,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onDisconnect: () => void;
   isDisconnecting: boolean;
+  /** The connected MID, named in the title so a merchant holding several knows
+   *  which link is about to be torn down. */
+  mid?: string;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -21,7 +25,7 @@ export function ZohoDisconnectDialog({
           {/* An unlinking, so the joining glyph is swapped for a severed one. */}
           <ZohoConnectBadge centerIcon="x" />
           <DialogTitle className="mt-1 text-base font-bold tracking-tight">
-            Disconnect Zoho?
+            {mid ? `Disconnect Zoho for mid ${mid}?` : "Disconnect Zoho?"}
           </DialogTitle>
           <p className="max-w-[22rem] text-[13px] leading-relaxed text-muted-foreground">
             Invoice sync, reconciliation, and FIRA access in Zoho will all stop. You can reconnect

@@ -40,7 +40,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
     target: "invoice-dates",
     title: "Number it and set the dates",
     description:
-      "The number is generated for you and the issue date defaults to today, so the one to set is the due date — pick a term like Net 15, or a specific day. Nothing generates without it.",
+      "The number is generated for you and the issue date defaults to today, so the one to set is the due date. Pick a term like Net 15, or a specific day. Nothing generates without it.",
     side: "bottom",
     align: "start",
     required: true,
@@ -84,7 +84,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
     target: "invoice-consent",
     title: "Confirm the details are right",
     description:
-      "PayGlocal is the platform, not the auditor of what goes out — so you confirm the invoice is accurate before it is finalised. The tick is the last thing standing between a draft and a generated invoice.",
+      "PayGlocal is the platform, not the auditor of what goes out, so you confirm the invoice is accurate before it is finalised. The tick is the last thing standing between a draft and a generated invoice.",
     side: "top",
     align: "start",
     required: true,

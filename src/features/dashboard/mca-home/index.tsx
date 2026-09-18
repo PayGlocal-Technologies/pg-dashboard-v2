@@ -9,13 +9,16 @@ import { useApp } from "@/stores/useApp";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { useHasEcho } from "@/features/dashboard/echo/hooks";
 import {
+  MCA_DASHBOARD_GUIDE_ECHO_TARGET,
   MCA_DASHBOARD_GUIDE_KEY,
   MCA_DASHBOARD_GUIDE_STEPS,
 } from "@/features/dashboard/mca-home/guide";
 import { McaRevenueCard } from "@/features/dashboard/mca-home/components/McaRevenueCard";
 import { McaClientAnalyticsCard } from "@/features/dashboard/mca-home/components/McaClientAnalyticsCard";
 import { McaNeedsAttentionCard } from "@/features/dashboard/mca-home/components/McaNeedsAttentionCard";
+import { McaNeedsAttentionDrawer } from "@/features/dashboard/mca-home/components/McaNeedsAttentionDrawer";
 import { McaQuickAccess } from "@/features/dashboard/mca-home/components/McaQuickAccess";
 import { McaDashboardWidgetCustomization } from "@/features/dashboard/mca-home/components/widgets/McaDashboardWidgetCustomization";
 import {
@@ -63,7 +66,17 @@ export function McaDashboardFeature() {
 
   const router = useRouter();
   const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+
+  // The tour's Echo step points at the sidebar's Echo row, which only exists
+  // for accounts that have Echo. Dropped rather than left to Spotlight's
+  // onMissing, which waits ~6s before moving on — see the note on
+  // MCA_DASHBOARD_GUIDE_ECHO_TARGET.
+  const hasEcho = useHasEcho();
+  const guideSteps = hasEcho
+    ? MCA_DASHBOARD_GUIDE_STEPS
+    : MCA_DASHBOARD_GUIDE_STEPS.filter((step) => step.target !== MCA_DASHBOARD_GUIDE_ECHO_TARGET);
   const [editMode, setEditMode] = useState(false);
+  const [needsAttentionOpen, setNeedsAttentionOpen] = useState(false);
   const [layout, setLayout] = useState<McaWidgetId[]>(() => readMcaDashboardLayout());
   const layoutSnapshot = useRef<McaWidgetId[]>(layout);
 
@@ -87,12 +100,21 @@ export function McaDashboardFeature() {
     router.push("/mca-settlement-report");
   }
 
-  function handleViewAll(section: string) {
-    toast.message(section, { description: "This action isn't wired up yet." });
-  }
-
-  function handleNeedsAttentionAction(id: string) {
-    toast.message("Action queued", { description: `Follow-up started for ${id}.` });
+  /**
+   * Both Needs attention actions — Remind on an overdue invoice, View on one
+   * still in its window — land on the invoice's details page. That page is
+   * where "Email / remind client" lives, so chasing an invoice is one hop from
+   * here rather than a separate action on the dashboard.
+   *
+   * The id is the invoice's own id, the same segment the invoice list pushes.
+   * Note the needs-attention payload carries no MID, so the details page
+   * resolves one itself (the selected MID, else the merchant's first PACB one).
+   * For a merchant with several PACB MIDs and none selected, this list spans
+   * them all and a row from another MID will not resolve — the payload needs a
+   * `mid` per row to fix properly.
+   */
+  function handleOpenInvoice(id: string) {
+    router.push(`/mca-invoices/${id}`);
   }
 
   function handleCustomise() {
@@ -121,13 +143,7 @@ export function McaDashboardFeature() {
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-[1.35rem] font-bold leading-snug tracking-tight text-foreground">
-            {greeting}, {displayName}{" "}
-            <span
-              className="inline-block origin-bottom-right"
-              style={{ animation: "wave 2.4s ease-in-out infinite" }}
-            >
-              👋
-            </span>
+            {greeting}, {displayName}
           </h1>
           <p className="mt-0.5 text-[13px] text-muted-foreground">{contextLine}</p>
         </div>
@@ -163,8 +179,8 @@ export function McaDashboardFeature() {
           <McaClientAnalyticsCard onViewAll={handleViewClients} />
           <div data-guide="mca-needs-attention">
             <McaNeedsAttentionCard
-              onViewAll={() => handleViewAll("Needs attention")}
-              onAction={handleNeedsAttentionAction}
+              onViewAll={() => setNeedsAttentionOpen(true)}
+              onAction={handleOpenInvoice}
             />
           </div>
         </div>
@@ -183,10 +199,16 @@ export function McaDashboardFeature() {
         onDoneEdit={handleDoneCustomise}
       />
 
+      <McaNeedsAttentionDrawer
+        open={needsAttentionOpen}
+        onOpenChange={setNeedsAttentionOpen}
+        onOpenInvoice={handleOpenInvoice}
+      />
+
       {/* Guide launcher — highlighted once here (the main dashboard), a plain
           button on every other screen. */}
       <GuideLauncher
-        steps={MCA_DASHBOARD_GUIDE_STEPS}
+        steps={guideSteps}
         storageKey={MCA_DASHBOARD_GUIDE_KEY}
         highlightOnFirstVisit
       />

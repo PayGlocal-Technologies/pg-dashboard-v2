@@ -6,12 +6,12 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  EmptyState,
   IconButton,
   Shimmer,
   StatusBadge,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { getInvoiceStatusMeta } from "@/features/dashboard/mca-invoices/constants";
@@ -21,7 +21,7 @@ import {
 } from "@/features/dashboard/mca-invoices/columns";
 import type { McaInvoiceRow } from "@/features/dashboard/mca-invoices/types";
 
-function InvoiceCardSkeleton() {
+export function InvoiceCardSkeleton() {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center gap-2">
@@ -39,7 +39,7 @@ function InvoiceCardSkeleton() {
  * do, in the order that matters on a narrow screen: number and status first,
  * then who it bills, then the amount and dates.
  */
-function InvoiceCard({ row, handlers }: { row: McaInvoiceRow; handlers: InvoiceRowHandlers }) {
+export function InvoiceCard({ row, handlers }: { row: McaInvoiceRow; handlers: InvoiceRowHandlers }) {
   const { label, variant } = getInvoiceStatusMeta(row.status);
   const actions = buildInvoiceRowActions(row, handlers);
   const isDraft = row.status === "DRAFT";
@@ -125,7 +125,7 @@ function InvoiceCard({ row, handlers }: { row: McaInvoiceRow; handlers: InvoiceR
                   // No preventDefault: it suppresses Radix's own close, which
                   // left the menu open behind the confirmation dialog.
                   <DropdownMenuItem key={action.key} onSelect={() => action.onSelect()}>
-                    <Icon name={action.icon} className="mr-2 h-3.5 w-3.5" />
+                    <Icon name={action.icon} className="h-3.5 w-3.5" />
                     {action.label}
                   </DropdownMenuItem>
                 ))}
@@ -134,78 +134,6 @@ function InvoiceCard({ row, handlers }: { row: McaInvoiceRow; handlers: InvoiceR
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * Mobile/tablet stand-in for DataTable. `rows` is already the current
- * server-paginated page, so this only lays it out and adds a compact pager.
- */
-export function InvoiceCardList({
-  rows,
-  isLoading,
-  skeletonCount = 6,
-  handlers,
-  page,
-  onPageChange,
-  totalRows,
-  pageSize,
-  emptyTitle,
-  emptyDescription,
-  className,
-}: {
-  rows: McaInvoiceRow[];
-  isLoading: boolean;
-  skeletonCount?: number;
-  handlers: InvoiceRowHandlers;
-  page: number;
-  onPageChange: (page: number) => void;
-  totalRows: number;
-  pageSize: number;
-  emptyTitle: string;
-  emptyDescription?: string;
-  className?: string;
-}) {
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-
-  return (
-    <div className={cn("flex flex-col gap-3 p-4", className)}>
-      {isLoading ? (
-        Array.from({ length: skeletonCount }).map((_, i) => <InvoiceCardSkeleton key={i} />)
-      ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
-      ) : (
-        rows.map((row) => <InvoiceCard key={row.id} row={row} handlers={handlers} />)
-      )}
-
-      {!isLoading && rows.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
-          >
-            Prev
-          </Button>
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            rightIcon={<Icon name="chevron-right" className="h-3.5 w-3.5" />}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

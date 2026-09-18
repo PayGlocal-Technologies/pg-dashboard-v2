@@ -8,6 +8,9 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
+import { AskEchoHeaderButton } from "@/components/layout/AskEchoButton";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { SwitchToOldViewButton } from "@/components/layout/SwitchToOldViewButton";
 import { cn } from "@/lib/utils";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -166,8 +169,11 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           </nav>
         )}
 
-        {/* Spacer */}
-        <div className="flex-1" />
+        {/* Global search — takes the space the spacer used to hold, pushed
+            right by its own ml-auto so the product tabs keep their position.
+            Resolves entirely in the browser from the sidebar's nav trees, see
+            GlobalSearch. */}
+        <GlobalSearch />
 
         {/* Actions */}
         <div className="flex items-center gap-2">
@@ -183,10 +189,17 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 border-2 border-header" />
           </Button> */}
 
+          {/* Escape hatch to pg-dashboard (v1), with a two-question feedback
+              ask on the way out — see SwitchToOldViewButton. */}
+          <SwitchToOldViewButton />
+
           <ThemeToggle />
 
           {/* Help — support contacts and hours, see HeaderHelpMenu. */}
           <HeaderHelpMenu />
+
+          {/* Ask Echo — toggles the side panel, see AskEchoButton. */}
+          <AskEchoHeaderButton />
 
           {/* Create button */}
           {SHOW_CREATE_BUTTON && (

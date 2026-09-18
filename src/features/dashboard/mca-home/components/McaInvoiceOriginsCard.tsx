@@ -6,8 +6,10 @@ import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
+import { formatCurrencyShort } from "@/lib/utils/format";
 
 type InvoiceOriginTimeframe = "1W" | "1M" | "3M";
 
@@ -19,12 +21,37 @@ const TIMEFRAMES: { value: InvoiceOriginTimeframe; label: string }[] = [
 
 const TIMEFRAME_DAYS: Record<InvoiceOriginTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
 
-function countryFlag(countryCode: string): string {
-  return COUNTRIES.find((c) => c.code === countryCode)?.flag ?? "🌍";
-}
+/**
+ * Non-standard country codes the endpoint sends for a country it also sends
+ * under its real ISO code — folded onto the canonical alpha-2 so the two rows
+ * merge into one (see the row grouping in the component). "UK" is the same
+ * country as ISO "GB"; "FA" is a bad code for France, which also arrives as
+ * "FR"/"France".
+ */
+const COUNTRY_CODE_ALIASES: Record<string, string> = {
+  UK: "GB",
+  FA: "FR",
+};
 
-function countryName(countryCode: string): string {
-  return COUNTRIES.find((c) => c.code === countryCode)?.name ?? countryCode;
+/**
+ * Resolve an API country code to a canonical flux COUNTRIES entry.
+ *
+ * The invoice-origins endpoint isn't consistent: most rows carry the ISO alpha-2
+ * code ("US", "CA"), but some carry the country *name* ("India"), a non-ISO code
+ * ("UK", "FA") or another form. Aliases fold the known bad codes onto their real
+ * ISO code first; then matching on code OR name (case-insensitive) normalises
+ * every row back to a real alpha-2 code so the flag, label, globe highlight —
+ * and the row grouping that de-dupes them — all line up.
+ */
+function resolveCountry(input: string): { code: string; name: string; flag: string } {
+  const query = (input ?? "").trim();
+  const aliased = COUNTRY_CODE_ALIASES[query.toUpperCase()] ?? query;
+  const upper = aliased.toUpperCase();
+  const entry =
+    COUNTRIES.find((c) => c.code.toUpperCase() === upper) ??
+    COUNTRIES.find((c) => c.name.toLowerCase() === aliased.toLowerCase());
+  if (entry) return { code: entry.code, name: entry.name, flag: entry.flag };
+  return { code: aliased, name: aliased || "Unknown", flag: "🌍" };
 }
 
 /** Currency-aware — the invoice-origins API reports its own reportingCurrency. */
@@ -116,12 +143,34 @@ export function McaInvoiceOriginsCard() {
   const { origins, isLoading, isError } = useInvoiceOrigins(startDate, endDate);
 
   const currency = origins?.reportingCurrency ?? "USD";
-  const rows = (origins?.rows ?? []).map((r) => ({
-    countryCode: r.countryCode,
-    countryName: countryName(r.countryCode),
-    amount: r.amount,
-    invoiceCount: r.invoiceCount,
-  }));
+  // Group by canonical country code, so rows the endpoint splits across an ISO
+  // code and a non-ISO alias for the same country (GB + UK, FR + France + FA)
+  // collapse into one — their amounts and invoice counts summed — rather than
+  // showing as separate near-duplicate bars. Sorted by amount so the merged
+  // figures still rank correctly.
+  const rowsByCode = new Map<
+    string,
+    { countryCode: string; countryName: string; flag: string; amount: number; invoiceCount: number }
+  >();
+  for (const r of origins?.rows ?? []) {
+    const country = resolveCountry(r.countryCode);
+    const existing = rowsByCode.get(country.code);
+    if (existing) {
+      existing.amount += r.amount;
+      existing.invoiceCount += r.invoiceCount;
+    } else {
+      rowsByCode.set(country.code, {
+        // Normalised to the canonical alpha-2 code, so the flag and the globe
+        // highlight below both resolve for it.
+        countryCode: country.code,
+        countryName: country.name,
+        flag: country.flag,
+        amount: r.amount,
+        invoiceCount: r.invoiceCount,
+      });
+    }
+  }
+  const rows = [...rowsByCode.values()].sort((a, b) => b.amount - a.amount);
   const totals = origins?.totals;
   const totalInvoiced = totals?.totalInvoiced ?? 0;
   const maxAmount = Math.max(...rows.map((o) => o.amount), 1);
@@ -130,7 +179,7 @@ export function McaInvoiceOriginsCard() {
     countryCode: origin.countryCode,
     color: BAR_COLORS[i % BAR_COLORS.length]!,
     countryName: origin.countryName,
-    flag: countryFlag(origin.countryCode),
+    flag: origin.flag,
     amountLabel: formatAmount(origin.amount, currency),
     invoiceCountLabel: `${origin.invoiceCount} invoice${origin.invoiceCount === 1 ? "" : "s"}`,
     sharePct: Math.round((origin.amount / (totalInvoiced || 1)) * 100),
@@ -138,7 +187,7 @@ export function McaInvoiceOriginsCard() {
   }));
 
   const topCode = totals?.topCountry?.countryCode;
-  const topShareLabel = topCode ? `${countryName(topCode)} share` : "Top country share";
+  const topShareLabel = topCode ? `${resolveCountry(topCode).name} share` : "Top country share";
   const showData = !isLoading && !isError;
 
   return (
@@ -196,16 +245,28 @@ export function McaInvoiceOriginsCard() {
                 ))}
               </div>
             ) : isError ? (
-              <p className="text-sm text-muted-foreground">Couldn&apos;t load invoice origins.</p>
+              <PlaceholderState
+                variant="error"
+                size="sm"
+                title="Couldn't load"
+                description="Invoice origins didn't load."
+                className="h-full py-2"
+              />
             ) : rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No invoiced volume in this period.</p>
+              <PlaceholderState
+                variant="no-analytics"
+                size="sm"
+                title="No invoiced volume"
+                description="No invoiced volume in this period."
+                className="h-full py-2"
+              />
             ) : (
               <div className="flex flex-col gap-3">
                 {rows.map((origin, i) => (
                   <div key={origin.countryCode} className="flex items-center gap-3">
                     <div className="flex w-36 shrink-0 items-center gap-1.5">
                       <span className="text-sm leading-none" aria-hidden>
-                        {countryFlag(origin.countryCode)}
+                        {origin.flag}
                       </span>
                       <span className="truncate text-[13px] font-medium text-foreground">
                         {origin.countryName}
@@ -221,7 +282,7 @@ export function McaInvoiceOriginsCard() {
                       />
                     </div>
                     <span className="w-24 shrink-0 text-right text-[13px] font-semibold tabular-nums text-foreground">
-                      {formatAmount(origin.amount, currency)}
+                      {formatCurrencyShort(origin.amount, currency)}
                     </span>
                   </div>
                 ))}
@@ -239,20 +300,31 @@ export function McaInvoiceOriginsCard() {
               ))
             ) : (
               <>
+                {/* Trend passed as null (hidden) whenever the figure it sits
+                    beside is zero — a percentage change against nothing reads as
+                    broken. */}
                 <StatCell
                   label="Total invoiced"
-                  valueLabel={formatCompact(totalInvoiced, currency)}
-                  trendPct={totals?.totalInvoicedTrendPct ?? null}
+                  valueLabel={formatCurrencyShort(totalInvoiced, currency)}
+                  trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
                 <StatCell
                   label="Avg per country"
-                  valueLabel={formatCompact(totals?.avgPerCountry ?? 0, currency)}
-                  trendPct={totals?.avgPerCountryTrendPct ?? null}
+                  valueLabel={formatCurrencyShort(totals?.avgPerCountry ?? 0, currency)}
+                  trendPct={
+                    (totals?.avgPerCountry ?? 0) > 0
+                      ? (totals?.avgPerCountryTrendPct ?? null)
+                      : null
+                  }
                 />
                 <StatCell
                   label={topShareLabel}
                   valueLabel={totals?.topCountry ? `${totals.topCountry.sharePct}%` : "—"}
-                  trendPct={totals?.topCountry?.shareTrendPct ?? null}
+                  trendPct={
+                    totals?.topCountry && totals.topCountry.sharePct > 0
+                      ? (totals.topCountry.shareTrendPct ?? null)
+                      : null
+                  }
                 />
                 <div>
                   <p className="text-xs text-muted-foreground">Active markets</p>

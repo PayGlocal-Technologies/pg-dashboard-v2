@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, EmptyState, Shimmer } from "@/components/ui";
+import { DataCardList, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
@@ -8,10 +8,9 @@ import {
   clientAmountLocale,
   clientTotalReceived,
 } from "@/features/dashboard/client-management/constants";
-import { cn } from "@/lib/utils";
 import type { Client } from "@/features/dashboard/client-management/types";
 
-function ClientCardSkeleton() {
+export function ClientCardSkeleton() {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center gap-2">
@@ -32,7 +31,7 @@ function ClientCardSkeleton() {
 // client's details, exactly as the whole row does above lg. Any action added
 // inside later must stop propagation in its own onClick to stay independent
 // of that, the same rule the Transactions card follows.
-function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: Client) => void }) {
+export function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: Client) => void }) {
   // The card's form of the Total received column, from the same derivation:
   // the row's own server-side figures (see clientTotalReceived), the same
   // source the table's Total received column reads.
@@ -117,81 +116,6 @@ function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: 
           Created {formatTransactionDateOnly(row.createdAt)}
         </span>
       </div>
-    </div>
-  );
-}
-
-interface ClientCardListProps {
-  rows: Client[];
-  isLoading: boolean;
-  skeletonCount?: number;
-  onOpenDetails: (row: Client) => void;
-  page: number;
-  onPageChange: (page: number) => void;
-  totalRows: number;
-  pageSize: number;
-  emptyTitle: string;
-  emptyDescription?: string;
-  className?: string;
-}
-
-/**
- * Mobile/tablet stand-in for DataTable, the same arrangement the Transactions
- * and SKU pages use (see TransactionCardList): `rows` is already the current
- * page's slice, so this only lays it out as cards and adds the compact pager.
- */
-export function ClientCardList({
-  rows,
-  isLoading,
-  skeletonCount = 6,
-  onOpenDetails,
-  page,
-  onPageChange,
-  totalRows,
-  pageSize,
-  emptyTitle,
-  emptyDescription,
-  className,
-}: ClientCardListProps) {
-  const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
-
-  return (
-    <div className={cn("flex flex-col gap-3 p-4", className)}>
-      {isLoading ? (
-        Array.from({ length: skeletonCount }).map((_, i) => <ClientCardSkeleton key={i} />)
-      ) : rows.length === 0 ? (
-        <EmptyState title={emptyTitle} description={emptyDescription} />
-      ) : (
-        rows.map((row) => <ClientCard key={row.id} row={row} onOpenDetails={onOpenDetails} />)
-      )}
-
-      {!isLoading && rows.length > 0 && totalPages > 1 && (
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page <= 1}
-            onClick={() => onPageChange(page - 1)}
-            leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
-          >
-            Prev
-          </Button>
-          <span className="text-[12px] tabular-nums text-muted-foreground">
-            Page {page} of {totalPages}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={page >= totalPages}
-            onClick={() => onPageChange(page + 1)}
-            rightIcon={<Icon name="chevron-right" className="h-3.5 w-3.5" />}
-          >
-            Next
-          </Button>
-        </div>
-      )}
     </div>
   );
 }

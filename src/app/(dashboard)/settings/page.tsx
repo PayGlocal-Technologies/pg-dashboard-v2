@@ -1,8 +1,8 @@
-import { type Metadata } from "next";
-import { SettingsOverviewFeature } from "@/features/dashboard/settings/components/SettingsOverviewFeature";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Settings" };
-
+/** /settings has no landing page of its own: the section starts at the first
+ * page in the left nav. The route stays so existing links (the sidebar footer's
+ * gear icon, the Home nav's Settings item) keep working. */
 export default function SettingsPage() {
-  return <SettingsOverviewFeature />;
+  redirect("/settings/personal");
 }

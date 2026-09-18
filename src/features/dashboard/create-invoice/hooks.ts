@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useDelete, useGet, usePost, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
-import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import {
   fromApiTemplate,
   themeFor,
@@ -72,9 +72,7 @@ import type { BaseResponse } from "@/types/common";
  * MIDs, and none of these endpoints take a filter.
  */
 export function useInvoiceMerchantId(): string {
-  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
-  const fallbackMid = useApp((s) => s.paCbMids?.[0]) ?? "";
-  return selectedMid || fallbackMid;
+  return useScopeId("PACB").scopeId;
 }
 
 // ─── Currencies ───────────────────────────────────────────────────────────────

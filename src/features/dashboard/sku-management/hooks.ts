@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import {
@@ -162,19 +163,20 @@ export function toSkuPayloadFromProduct(
 
 /**
  * The catalogue's merchant id, which every one of its endpoints takes as a path
- * segment for every user — not just partners. `urlMid || midFilter[0]` resolves
- * to the same id pg-dashboard computes as
- * `selectedMid || pacbMids[0] || profile.mid`, because midFilter carries
- * [selectedMid] when a MID is picked and the full paCbMids list when none is,
- * falling back to the profile MID. Same pattern the settlement report uses.
+ * segment for every user — not just partners. Resolved by the shared
+ * useScopeId, so it matches every other path-scoped id in the app.
  *
  * `midFilter` is returned alongside it for the search body's own filter, whose
  * key is **`mid`**, not `merchantId` — see useSkuCatalogue.
  */
 export function useSkuPathMid() {
-  const { urlMid, midFilter, isReady, guardState } = useResolvedMids("PACB");
-  const mid = urlMid || midFilter?.value?.[0] || "";
-  return { mid, midFilter, isReady: isReady && !!mid, guardState };
+  const { midFilter, guardState } = useResolvedMids("PACB");
+  // The path id comes from the shared resolver: product MID, selected MID, or
+  // the UCIC id for a multi-MID account with nothing selected. midFilter and
+  // guardState still come from useResolvedMids, which answers the different
+  // question of which MIDs go in a search *body*.
+  const { scopeId: mid, isReady } = useScopeId("PACB");
+  return { mid, midFilter, isReady, guardState };
 }
 
 /**
@@ -202,6 +204,8 @@ interface SkuCatalogueArgs {
   type?: SkuProductType;
   /** 1-based page, as the table holds it. */
   page: number;
+  /** Rows per page, chosen in the table footer. Defaults to SKU_PAGE_LIMIT. */
+  pageLimit?: number;
 }
 
 interface SkuCatalogue {
@@ -230,7 +234,12 @@ interface SkuCatalogue {
  * the backend happens to name it something else, a type tab returns no rows,
  * which is visible immediately rather than quietly wrong.
  */
-export function useSkuCatalogue({ search, type, page }: SkuCatalogueArgs): SkuCatalogue {
+export function useSkuCatalogue({
+  search,
+  type,
+  page,
+  pageLimit = SKU_PAGE_LIMIT,
+}: SkuCatalogueArgs): SkuCatalogue {
   const { mid, midFilter, isReady, guardState } = useSkuPathMid();
 
   // Stable across renders as long as its inputs are — usePostQuery folds the
@@ -251,10 +260,10 @@ export function useSkuCatalogue({ search, type, page }: SkuCatalogueArgs): SkuCa
       // team-management list body follows.
       searchFilterType: search ? "QUERY_FILTER_TYPE" : fieldSearch ? "FILTER_TYPE" : "DEFAULT",
       fieldSearch,
-      from: (page - 1) * SKU_PAGE_LIMIT,
-      pageLimit: SKU_PAGE_LIMIT,
+      from: (page - 1) * pageLimit,
+      pageLimit,
     };
-  }, [search, midFilter, type, page]);
+  }, [search, midFilter, type, page, pageLimit]);
 
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     SkuSearchResponse,

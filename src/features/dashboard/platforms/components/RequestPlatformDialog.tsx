@@ -47,7 +47,7 @@ export function RequestPlatformDialog({
       { platformRequestMessage },
       {
         onSuccess: (response) => {
-          toast.success(response?.message || "Thanks — we've noted your request.");
+          toast.success(response?.message || "Thanks, we've noted your request.");
           setMessage("");
           onOpenChange(false);
         },

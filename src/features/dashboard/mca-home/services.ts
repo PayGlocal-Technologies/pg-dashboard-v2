@@ -70,10 +70,15 @@ export const mcaTopClientsByUcicApi = (
 /**
  * Invoices needing the merchant's attention — overdue, or due soon — for the
  * dashboard's Needs attention panel. Merchant-scoped in the path (unlike the
- * analytics endpoints above, which are session-scoped maps). `limit` caps how
- * many the panel shows.
+ * analytics endpoints above, which are session-scoped maps).
+ *
+ * `limit` caps how many come back and is optional because the app sends none:
+ * the card names the total and previews the first couple of rows, and its "View
+ * all" drawer lists them all, so both read one unlimited response. Kept in the
+ * signature because the endpoint takes it.
  */
-export const mcaNeedsAttentionApi = (merchantId: string, limit: number): string =>
-  merchantId
-    ? `${BASE_URL_V3}/mca-invoice/${encodeURIComponent(merchantId)}/needs-attention?limit=${limit}`
-    : "";
+export const mcaNeedsAttentionApi = (merchantId: string, limit?: number): string => {
+  if (!merchantId) return "";
+  const base = `${BASE_URL_V3}/mca-invoice/${encodeURIComponent(merchantId)}/needs-attention`;
+  return limit === undefined ? base : `${base}?limit=${limit}`;
+};

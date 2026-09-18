@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Button, DataTable } from "@/components/ui";
+import { ColumnManager, Button, DataTableCard } from "@/components/ui";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
@@ -13,8 +15,8 @@ import {
   StatusFilterChip,
   toEndOfDayMs,
   toStartOfDayMs,
+  FilterChipGroup,
 } from "@/components/common/filters/FilterChips";
-import { ReorderColumnsPopover } from "@/components/common/ReorderColumnsPopover";
 import { CURRENCY_FILTER_OPTIONS } from "@/features/dashboard/multi-currency/constants";
 import { reorderColumns } from "@/lib/utils/columns";
 import { parseApiDateTime } from "@/lib/utils/format";
@@ -56,7 +58,11 @@ function timestampMs(raw: string | null | undefined): number | null {
  * chips, tabs, and columns above and below it need no changes.
  */
 export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
-  const [search, setSearch] = useState("");
+  // Seeded from ?q= so the header's global search can hand an identifier
+  // straight to this table. Read once on mount; the URL is not kept in sync as
+  // the merchant edits filters afterwards.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
@@ -69,7 +75,6 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   // Which of the Date/Amount/Status/Currency filter chip popovers is open,
   // if any: shared so opening one closes whichever other one was open.
-  const [openChip, setOpenChip] = useState<"date" | "amount" | "status" | "currency" | null>(null);
   const [page, setPage] = useState(1);
 
   const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
@@ -150,7 +155,7 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
     }
   };
 
-  const baseColumns = buildMcaLinkColumns(openDetails, (row) => void copyLink(row));
+  const baseColumns = buildMcaLinkColumns((row) => void copyLink(row));
   const columns = reorderColumns(baseColumns, columnOrder);
   const reorderableColumns = baseColumns
     .filter((c) => c.key !== "action")
@@ -192,13 +197,18 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
         }
       />
 
-      {/* Controls container: search, then the filter chip group, sit
-          together on the left with tight spacing; the Reorder
-          Columns/Report action group is pushed to the far right (ml-auto
-          below) rather than spread apart via justify-between, so the chips
-          read as immediately following search instead of floating in the
-          middle of a wide gap. */}
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
+      {/* Controls: search, then the filter chip group, sit together on the
+          left with tight spacing; the Columns/Report action group is pushed to
+          the far right (ml-auto below) rather than spread apart via
+          justify-between, so the chips read as immediately following search
+          instead of floating in the middle of a wide gap.
+
+          These now sit INSIDE the table's card as DataTableCard's `toolbar`,
+          rather than in a detached card above it — the same single surface
+          every other grid in the app presents. */}
+      <DataTableCard
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
         <RotatingSearchInput
           value={search}
           onSearch={onSearch}
@@ -208,15 +218,13 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
 
         {/* Filter group: Date, Amount, Status, Currency read as one
             cohesive filtering control, so the gap within it is tight. */}
-        <div className="flex flex-wrap items-center gap-1.5">
+        <FilterChipGroup className="flex flex-wrap items-center gap-1.5">
           <DateFilterChip
             value={dateRange}
             onChange={(next) => {
               setDateRange(next);
               setPage(1);
             }}
-            open={openChip === "date"}
-            onOpenChange={(next) => setOpenChip(next ? "date" : null)}
           />
           <AmountFilterChip
             value={amountRange}
@@ -224,9 +232,6 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
               setAmountRange(next);
               setPage(1);
             }}
-            open={openChip === "amount"}
-            onOpenChange={(next) => setOpenChip(next ? "amount" : null)}
-            idPrefix="mca-link-amount"
             hint="Applies to the links currently loaded."
           />
           <StatusFilterChip
@@ -236,8 +241,6 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
               setStatusFilters(next);
               setPage(1);
             }}
-            open={openChip === "status"}
-            onOpenChange={(next) => setOpenChip(next ? "status" : null)}
           />
           <CurrencyFilterChip
             options={CURRENCY_FILTER_OPTIONS}
@@ -246,16 +249,14 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
               setCurrencyFilters(next);
               setPage(1);
             }}
-            open={openChip === "currency"}
-            onOpenChange={(next) => setOpenChip(next ? "currency" : null)}
           />
-        </div>
+        </FilterChipGroup>
 
         {/* Action group: Reorder Columns, then Report. ml-auto pushes this
             group all the way to the right regardless of how much space the
             search/filter groups take up. */}
         <div className="ml-auto flex items-center gap-2">
-          <ReorderColumnsPopover
+          <ColumnManager
             columns={reorderableColumns}
             order={currentColumnOrder}
             onOrderChange={setColumnOrder}
@@ -274,23 +275,43 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
           >
             Report
           </Button>
-        </div>
-      </div>
-
-      <DataTable
+            </div>
+          </div>
+        }
         columns={columns}
         data={tableRows}
         isLoading={isPending}
         skeletonRows={8}
+        rowKey={(row) => row.gid}
+        // The illustrated first-run state, kept from before the card: a
+        // merchant with no links yet gets artwork, not a header row over
+        // nothing. `emptyTitle` still covers the filtered-to-nothing case.
+        emptyState={
+          <PlaceholderState
+            variant="no-payment-links"
+            title="No payment links found"
+            description="Try adjusting your filters or search query"
+            className="py-16"
+          />
+        }
         emptyTitle="No payment links found"
         emptyDescription="Try adjusting your filters or search query"
-        rowKey={(row) => row.gid}
-        pageSize={MCA_LINKS_PAGE_LIMIT}
-        totalRows={totalCount}
-        page={page}
-        onPageChange={setPage}
+        // The whole row opens the details view, through DataTable's row-level
+        // handler rather than a wrapper inside every cell. Clicks on the
+        // row's own buttons and menus are skipped by it, so each still does
+        // only its own job.
+        onRowClick={openDetails}
+        pagination={{
+          mode: "page",
+          page,
+          pageSize: MCA_LINKS_PAGE_LIMIT,
+          total: totalCount,
+          onPageChange: setPage,
+        }}
         tableLayout="content"
-        density="compact"
+        // The page already scrolls; this grid should grow with its rows rather
+        // than scrolling inside a capped body.
+        maxBodyHeight="none"
       />
 
       {/* Rendered alongside the table (not in place of it) so closing it

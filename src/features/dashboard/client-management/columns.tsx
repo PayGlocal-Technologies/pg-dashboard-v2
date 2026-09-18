@@ -8,7 +8,6 @@ import {
   type Column,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { RowClick } from "@/components/common/table/RowClick";
 import { CopyableText } from "@/components/common/CopyableText";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { cn } from "@/lib/utils";
@@ -49,12 +48,13 @@ const COPY_CELL_VALUE_CLASS = "font-sans text-[13px] text-muted-foreground";
 
 // Column widths, typography (text-[13px] body, muted secondary text), and
 // alignment conventions mirror buildMcaColumns so the two tables read as one
-// system. Every cell is wrapped in RowClick, exactly as the Transactions
+// system. The row itself is the click target, via DataTable's onRowClick,
+// exactly as the Transactions
 // table's are, so the whole row — cell padding and whitespace included — opens
 // the client's details rather than just the text inside it. Any interactive
 // control added to a cell later must stop propagation in its own onClick to
 // stay independent of that row-level click.
-export function buildClientColumns(onOpenDetails: (row: Client) => void): Column<Client>[] {
+export function buildClientColumns(): Column<Client>[] {
   return [
     {
       key: "businessName",
@@ -66,7 +66,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       // for its Country cell.
       cellClassName: "overflow-visible",
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
+        <>
           {/* The row's primary piece of information: the only cell in
               foreground weight, and min-w-max so the column widens to the
               longest business name rather than truncating it.
@@ -92,7 +92,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
               {row.businessName}
             </span>
           </span>
-        </RowClick>
+        </>
       ),
     },
     {
@@ -100,11 +100,9 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       header: "Primary contact name",
       minWidth: 200,
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
-          <span className="block w-[170px] truncate text-[13px] text-foreground">
-            {row.primaryContactName}
-          </span>
-        </RowClick>
+        <span className="block w-[170px] truncate text-[13px] text-foreground">
+          {row.primaryContactName}
+        </span>
       ),
     },
     {
@@ -115,7 +113,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       // slightly proud of the text and would otherwise be cut at the boundary.
       cellClassName: "overflow-visible",
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
+        <>
           {/* An em-dash when there is no address, and no copy affordance with it:
               a copy button beside an empty cell offers to put nothing on the
               clipboard, which is what the bare icons in the table were. Same
@@ -135,7 +133,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
           ) : (
             <span className="text-[13px] text-muted-foreground">—</span>
           )}
-        </RowClick>
+        </>
       ),
     },
     {
@@ -144,7 +142,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       minWidth: 165,
       cellClassName: "overflow-visible",
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
+        <>
           {/* Shown in full — a formatted number is short enough to read from a
               table — but copyable on the same hover affordance as the email beside
               it. Nothing to copy means an em-dash and no button, as above.
@@ -161,7 +159,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
           ) : (
             <span className="text-[13px] text-muted-foreground">—</span>
           )}
-        </RowClick>
+        </>
       ),
     },
     {
@@ -173,7 +171,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       // min-w-max below is what actually grows the column.
       cellClassName: "overflow-visible",
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
+        <>
           {/* A record with no country renders an em-dash and no flag. Without this
               the flag fell back to an empty ISO2, which the CDN answers with
               nothing — a broken-image box beside a blank cell. Same `|| "-"`
@@ -193,7 +191,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
               </span>
             </div>
           )}
-        </RowClick>
+        </>
       ),
     },
     {
@@ -212,7 +210,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
         const totals = clientTotalReceived(row);
 
         return (
-          <RowClick onClick={() => onOpenDetails(row)} align="right">
+          <>
             {totals.length === 0 ? (
               // Nothing settled yet — an em-dash, not a formatted zero, since
               // "no invoices have settled" and "settled for nothing" are
@@ -243,7 +241,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
                 ))}
               </div>
             )}
-          </RowClick>
+          </>
         );
       },
     },
@@ -259,7 +257,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
         const owed = row.outstandingAmount;
 
         return (
-          <RowClick onClick={() => onOpenDetails(row)} align="right">
+          <>
             {owed === undefined ? (
               // Nothing to state: an em-dash rather than a formatted zero, since
               // "nothing owed" and "we don't know" are different facts.
@@ -283,7 +281,7 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
                 </span>
               </span>
             )}
-          </RowClick>
+          </>
         );
       },
     },
@@ -292,14 +290,14 @@ export function buildClientColumns(onOpenDetails: (row: Client) => void): Column
       header: "Created",
       minWidth: 130,
       render: (row) => (
-        <RowClick onClick={() => onOpenDetails(row)}>
+        <>
           {/* Date only — a client record's creation time of day is noise next
               to a transaction's, which is why this is the date-only formatter
               rather than formatTransactionTimestamp. */}
           <span className="text-[13px] whitespace-nowrap text-muted-foreground">
             {formatTransactionDateOnly(row.createdAt)}
           </span>
-        </RowClick>
+        </>
       ),
     },
   ];

@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { SETTINGS_NAV_GROUPS, type SettingsNavItem } from "@/features/dashboard/settings/constants";
 
 function isPathActive(pathname: string, href: string): boolean {
-  return href === "/settings" ? pathname === "/settings" : pathname.startsWith(href);
+  return pathname.startsWith(href);
 }
 
 function SettingsNavItemRow({ item, pathname }: { item: SettingsNavItem; pathname: string }) {

@@ -444,3 +444,72 @@ export interface SavedAmountResponse {
   message?: string;
   errors?: unknown;
 }
+
+// ── Documents pending ────────────────────────────────────────────────────────
+
+/** Amount + count of DOCUMENT_PENDING transactions for a timeframe. */
+export interface DocumentPendingData {
+  timeframe: string;
+  reportingCurrency: string;
+  amount: number;
+  count: number;
+}
+
+export interface DocumentPendingResponse {
+  data: DocumentPendingData;
+  message?: string;
+  errors?: unknown;
+}
+
+/** One currency's slice of the currently-pending snapshot. */
+export interface DocumentPendingCurrencyRow {
+  currency: string;
+  amount: number;
+  count: number;
+}
+
+export interface DocumentPendingByCurrencyData {
+  totalAmount: number;
+  totalCount: number;
+  currencies: DocumentPendingCurrencyRow[];
+}
+
+export interface DocumentPendingByCurrencyResponse {
+  data: DocumentPendingByCurrencyData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Settled currency trend ───────────────────────────────────────────────────
+// Per-account (currency) settled totals + a monthly series. `amount` is in the
+// account's own currency; `inrAmount` is that figure converted to INR, which is
+// what the ₹ bars/totals read from since a mix of currencies only sums in one.
+
+export interface SettledCurrencyPoint {
+  month: string;
+  periodStart: string;
+  amount: number;
+  inrAmount: number;
+  count: number;
+}
+
+export interface SettledCurrencyTrendRow {
+  currency: string;
+  totalAmount: number;
+  totalInrAmount: number;
+  totalCount: number;
+  /** null when there's no prior period to compare against. */
+  changePercentage: number | null;
+  comparisonLabel: string;
+  points: SettledCurrencyPoint[];
+}
+
+export interface SettledCurrencyTrendData {
+  currencies: SettledCurrencyTrendRow[];
+}
+
+export interface SettledCurrencyTrendResponse {
+  data: SettledCurrencyTrendData;
+  message?: string;
+  errors?: unknown;
+}

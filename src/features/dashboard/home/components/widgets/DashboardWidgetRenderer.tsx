@@ -652,7 +652,7 @@ export function DashboardWidgetRenderer({
       return (
         <BarChartCard
           title="UPI vs Card (weekly)"
-          subtitle="Rail mix — SMB India view"
+          subtitle="Rail mix · SMB India view"
           data={weeklyUpiVsCard}
           xKey="week"
           bars={[
@@ -764,7 +764,7 @@ export function DashboardWidgetRenderer({
       return (
         <ChartCardFrame
           title="Decline reasons"
-          subtitle="Top failure codes — last 30 days"
+          subtitle="Top failure codes · last 30 days"
           minHeight="min-h-[260px]"
         >
           <div className="h-[220px] w-full min-w-0">

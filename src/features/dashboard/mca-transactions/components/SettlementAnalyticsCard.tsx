@@ -13,7 +13,9 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatNextSettlementDate } from "@/lib/utils/format";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { formatNextSettlementDate } from "@/lib/utils/format";
+import { CompactAmount } from "@/components/common/CompactAmount";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { useMcaOverview, useSettledByAccount } from "@/features/dashboard/mca-transactions/hooks";
 import type { SettledAccountRow } from "@/features/dashboard/mca-transactions/types";
@@ -223,11 +225,17 @@ export function SettlementAnalyticsCard({
               <Shimmer className="h-9 w-40" />
             ) : (
               <>
-                <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                  {isAmountMode
-                    ? formatCurrency(settledValue, "INR", "en-IN")
-                    : settledCount.toLocaleString("en-IN")}
-                </p>
+                {isAmountMode ? (
+                  <CompactAmount
+                    amount={settledValue}
+                    currency="INR"
+                    className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                  />
+                ) : (
+                  <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+                    {settledCount.toLocaleString("en-IN")}
+                  </p>
+                )}
                 {/* Visually subordinate to the KPI (muted, smaller, on the
                     same baseline rather than its own row) and wraps beneath
                     it naturally on narrow widths via the flex-wrap above. */}
@@ -263,14 +271,25 @@ export function SettlementAnalyticsCard({
           up), CardHeader keeps its own intrinsic height and this region
           absorbs whatever's left. */}
       <CardContent className="flex flex-1 flex-col gap-3">
-        {/* Per-account graph. Still placeholder-fed, see the module comment
-            above and mock-data.ts's TODO. Capped at five rows on every
-            breakpoint; the rest sit behind Show more. */}
-        <ul className="space-y-3">
-          {firstFiveRows.map((row) => (
-            <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
-          ))}
-        </ul>
+        {/* Per-account graph, capped at five rows on every breakpoint; the rest
+            sit behind Show more. When the selected window has no settled
+            accounts at all, an illustration stands in for the empty bar list
+            rather than leaving the card body blank. */}
+        {!isLoading && accountRows.length === 0 ? (
+          <PlaceholderState
+            variant="no-settlements"
+            size="sm"
+            title={isAmountMode ? "No amount settled" : "No settled transactions"}
+            description="Nothing has settled in this period yet."
+            className="flex-1"
+          />
+        ) : (
+          <ul className="space-y-3">
+            {firstFiveRows.map((row) => (
+              <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
+            ))}
+          </ul>
+        )}
 
         {canExpand && (
           <>

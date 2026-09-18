@@ -12,7 +12,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { RollingNumber } from "@/components/common/RollingNumber";
+import { CompactAmount } from "@/components/common/CompactAmount";
+import { formatCurrency } from "@/lib/utils/format";
 import { TotalSettledCard } from "@/features/dashboard/settlement-reports/components/TotalSettledCard";
 import type { TotalSettledTimeframe } from "@/features/dashboard/settlement-reports/mock-data";
 import type { SparklinePoint } from "@/features/dashboard/settlement-reports/types";
@@ -78,13 +79,13 @@ function UtrCopyButton({ utrNumber }: UtrCopyButtonProps) {
 }
 
 interface SettlementStatCardsProps {
-  totalSettledLabel: string;
+  totalSettled: number;
   totalSettledTrendPct: number;
   totalSettledComparisonLabel?: string;
   totalSettledTimeframe: TotalSettledTimeframe;
   onTotalSettledTimeframeChange: (timeframe: TotalSettledTimeframe) => void;
   totalSettledChartData: SparklinePoint[];
-  previousSettledLabel: string;
+  previousSettledAmount: number;
   previousSettledDateLabel: string;
   previousSettledTransactionCount: number;
   // MOCK (hidden for now — no endpoint): rendered only when provided. index.tsx
@@ -96,7 +97,17 @@ interface SettlementStatCardsProps {
   previousSettledFeeLabel?: string;
   onShowPreviousSettledInfo: () => void;
   onDownloadPreviousSettled: () => void;
-  upcomingSettlementLabel: string;
+  /** Whether there is a settlement to download a report for. False when the
+   * overview returned no previous settlement (a merchant who has never
+   * settled), in which case there is no settlement date to key the download
+   * endpoint on and the affordance is disabled rather than left clickable with
+   * nothing behind it. Defaults to true so the card is unchanged wherever the
+   * caller has not resolved this yet. */
+  canDownloadPreviousSettled?: boolean;
+  /** Amount due in the next settlement, live from the upcoming endpoint.
+   * null while it has not resolved (or is unsupported), which renders an em
+   * dash rather than a placeholder figure. */
+  upcomingSettlementAmount: number | null;
   upcomingSettlementTimeLabel: string;
   /** MCA only, count of transactions still waiting on an invoice upload
    * before they can be bundled into this upcoming settlement. */
@@ -105,13 +116,13 @@ interface SettlementStatCardsProps {
 }
 
 export function SettlementStatCards({
-  totalSettledLabel,
+  totalSettled,
   totalSettledTrendPct,
   totalSettledComparisonLabel,
   totalSettledTimeframe,
   onTotalSettledTimeframeChange,
   totalSettledChartData,
-  previousSettledLabel,
+  previousSettledAmount,
   previousSettledDateLabel,
   previousSettledTimeLabel,
   previousSettledTransactionCount,
@@ -121,7 +132,8 @@ export function SettlementStatCards({
   previousSettledFeeLabel,
   onShowPreviousSettledInfo,
   onDownloadPreviousSettled,
-  upcomingSettlementLabel,
+  canDownloadPreviousSettled = true,
+  upcomingSettlementAmount,
   upcomingSettlementTimeLabel,
   pendingInvoiceCount,
   onUploadInvoice,
@@ -130,7 +142,7 @@ export function SettlementStatCards({
     <div className="grid gap-3 lg:grid-cols-12 lg:items-stretch">
       <TotalSettledCard
         className="lg:col-span-8"
-        totalSettledLabel={totalSettledLabel}
+        totalSettled={totalSettled}
         totalSettledTrendPct={totalSettledTrendPct}
         comparisonLabel={totalSettledComparisonLabel}
         timeframe={totalSettledTimeframe}
@@ -148,6 +160,7 @@ export function SettlementStatCards({
               type="button"
               variant="ghost"
               onClick={onDownloadPreviousSettled}
+              disabled={!canDownloadPreviousSettled}
               aria-label="Download settlement report"
               className="h-7 w-7 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground hover:text-foreground"
             >
@@ -188,7 +201,7 @@ export function SettlementStatCards({
                     <div className="border-t border-border pt-1.5">
                       <SettlementBreakupRow
                         label="Net amount"
-                        value={previousSettledLabel}
+                        value={formatCurrency(previousSettledAmount, "INR")}
                         emphasis
                       />
                     </div>
@@ -198,8 +211,9 @@ export function SettlementStatCards({
             )}
           </div>
 
-          <RollingNumber
-            value={previousSettledLabel}
+          <CompactAmount
+            amount={previousSettledAmount}
+            currency="INR"
             className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
           />
           <p className="text-xs text-muted-foreground">
@@ -216,10 +230,17 @@ export function SettlementStatCards({
             <Icon name="arrow-up-right" size={14} aria-hidden />
           </span>
           <p className="text-[13px] font-medium text-primary">Upcoming settlement</p>
-          <RollingNumber
-            value={upcomingSettlementLabel}
-            className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-          />
+          {upcomingSettlementAmount !== null ? (
+            <CompactAmount
+              amount={upcomingSettlementAmount}
+              currency="INR"
+              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+            />
+          ) : (
+            <span className="block text-2xl font-bold tracking-tight text-foreground tabular-nums">
+              —
+            </span>
+          )}
           <p className="text-xs text-muted-foreground">{upcomingSettlementTimeLabel}</p>
 
           {!!pendingInvoiceCount && pendingInvoiceCount > 0 && (

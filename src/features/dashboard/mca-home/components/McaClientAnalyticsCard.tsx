@@ -3,13 +3,10 @@
 import { useState } from "react";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import useNewPermissions from "@/hooks/useNewPermissions";
 import { useTopClients } from "@/features/dashboard/mca-home/hooks";
-
-function formatAmount(amount: number): string {
-  if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(2)}L`;
-  return `₹${(amount / 1_000).toFixed(1)}K`;
-}
+import { formatCurrencyShort } from "@/lib/utils/format";
 
 /** Last 30 days, once on mount (no `new Date()` in render). This card has no
  *  date picker, so the window is fixed. */
@@ -77,16 +74,28 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
             </div>
           ))
         ) : isError ? (
-          <p className="py-4 text-sm text-muted-foreground">Couldn&apos;t load client analytics.</p>
+          <PlaceholderState
+            variant="error"
+            size="sm"
+            title="Couldn't load"
+            description="Client analytics didn't load."
+            className="py-4"
+          />
         ) : !hasData ? (
-          <p className="py-4 text-sm text-muted-foreground">No client activity in this period.</p>
+          <PlaceholderState
+            variant="no-analytics"
+            size="sm"
+            title="No client activity"
+            description="No client activity in this period."
+            className="py-4"
+          />
         ) : (
           clients.map((client) => (
             <div key={client.client} className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-medium text-foreground">{client.client}</span>
                 <span className="text-[13px] font-semibold tabular-nums text-foreground">
-                  {formatAmount(client.amount)}
+                  {formatCurrencyShort(client.amount, "INR")}
                 </span>
               </div>
               <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">

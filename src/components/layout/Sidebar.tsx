@@ -10,12 +10,11 @@ import { cn } from "@/lib/utils";
 import { ViewPortal } from "@/components/layout/ViewPortal";
 import { MerchantSelector, useHasMultipleMids } from "@/components/layout/MerchantSelector";
 import { SidebarReferBanner } from "@/components/layout/SidebarReferBanner";
+import { AskEchoButton } from "@/components/layout/AskEchoButton";
+import { useHasEcho } from "@/features/dashboard/echo/hooks";
 import {
-  homeNavigation,
-  regularNavigation,
-  mcaNavigation,
-  partnerNavigation,
-  globalNavigation,
+  navigationForContext,
+  filterNavigation,
   type NavItem,
   type NavGroup,
 } from "@/lib/navigation";
@@ -145,8 +144,8 @@ function SidebarBody({
   pathname: string;
   onNavClick?: () => void;
   navigation: NavGroup[];
-  /** MCA-only: a compact "Refer & Earn" promo below the nav groups, above the
-   * fixed profile section, see SidebarReferBanner. */
+  /** MCA-only: a compact "Refer & Earn" promo pinned between the scrolling nav
+   * and the fixed profile section, see SidebarReferBanner. */
   showReferBanner?: boolean;
 }) {
   const profile = useApp((s) => s.profile);
@@ -156,13 +155,40 @@ function SidebarBody({
   // page uses, so it is fetched once and served from cache to both.
   const { businessProfile } = useMerchantBusinessProfile();
   const logoUrl = businessProfile?.merchantLogoPublicUrl ?? null;
+  // Gates the whole "Assistant" section, heading included — see below.
+  const hasEcho = useHasEcho();
 
   const displayName =
     [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || profile?.username || "";
 
   return (
     <>
-      <nav className="flex-1 overflow-y-auto py-3 px-2.5">
+      <nav className="flex-1 min-h-0 overflow-y-auto py-3 px-2.5">
+        {/* "Assistant" — a section of its own rather than folded into the
+            first nav group, so Echo reads as a distinct kind of entry (an AI
+            action, not a page to navigate to) the moment the sidebar loads.
+            Kept outside the permission-filtered `navigation` groups below
+            because it is not a nav destination: it opens the side panel.
+
+            The heading is gated on the same permission as the row it labels.
+            Letting the row hide itself while the heading rendered anyway left
+            accounts without Echo looking at an "ASSISTANT" label over an
+            empty gap. */}
+        {hasEcho ? (
+          <div className="mb-4">
+            {!collapsed ? (
+              <p className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground px-2 mb-1.5">
+                Assistant
+              </p>
+            ) : (
+              <div className="h-px bg-sidebar-border my-2 mx-1" />
+            )}
+            <div className={cn(collapsed && "flex justify-center")}>
+              <AskEchoButton collapsed={collapsed} onNavigate={onNavClick} />
+            </div>
+          </div>
+        ) : null}
+
         {navigation.map((group) => (
           <div key={group.label} className="mb-4">
             {!collapsed ? (
@@ -225,13 +251,15 @@ function SidebarBody({
             </div>
           </div>
         ))}
-
-        {showReferBanner && !collapsed && (
-          <div className="mt-1">
-            <SidebarReferBanner />
-          </div>
-        )}
       </nav>
+
+      {/* Refer & Earn — pinned outside the scrolling nav so it stays visible
+          however many nav items the account has. */}
+      {showReferBanner && !collapsed && (
+        <div className="flex-shrink-0 px-2.5 pb-2.5">
+          <SidebarReferBanner />
+        </div>
+      )}
 
       {/* ── Bottom profile section ── */}
       <div className="px-2.5 py-2.5 flex-shrink-0 border-t border-sidebar-border space-y-2">
@@ -360,48 +388,20 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
 
   const checkPermissions = useNewPermissions();
 
-  // "Home" gets its own short nav tree (see homeNavigation), "Multi-Currency
-  // Accounts" gets its own dedicated tree (see mcaNavigation), "Payments"
-  // uses the shared regularNavigation tree, filtered by product tag.
-  const baseNavigation = isPartnerUser
-    ? partnerNavigation
-    : isGlobalTenant
-      ? globalNavigation
-      : activeContext === "HOME"
-        ? homeNavigation
-        : activeContext === "PACB"
-          ? mcaNavigation
-          : regularNavigation;
+  // "Home" gets its own short nav tree, "Multi-Currency Accounts" its own
+  // dedicated one, "Payments" the shared tree filtered by product tag — see
+  // navigationForContext. The header's global search builds its index from
+  // these same two calls, so the two surfaces can never disagree about what
+  // this user can reach.
+  const baseNavigation = navigationForContext({ isPartnerUser, isGlobalTenant, activeContext });
 
   const showReferBanner = !isPartnerUser && !isGlobalTenant && activeContext === "PACB";
 
-  // Filter groups based on permissions, mirrors pg-dashboard formatMenuItems logic.
-  // An item or child tagged with `product` (e.g. the two "Dashboard" entries,
-  // "Payment Links" / "MCA Links") only shows while the Header's active
-  // product context matches, see useProductContext.ts, everything else in
-  // the sidebar is shared by both.
-  const filteredNavigation: NavGroup[] = baseNavigation
-    .map((group) => {
-      const visibleItems = group.items
-        .filter(
-          (item) =>
-            (!item.permission?.length || checkPermissions(item.permission)) &&
-            (!item.product || item.product === activeProduct)
-        )
-        .map((item) => ({
-          ...item,
-          children: item.children?.filter(
-            (c) =>
-              (!c.permission?.length || checkPermissions(c.permission)) &&
-              (!c.product || c.product === activeProduct)
-          ),
-        }))
-        // Drop parent items whose children have all been filtered away
-        .filter((item) => !item.children || item.children.length > 0);
-
-      return { ...group, items: visibleItems };
-    })
-    .filter((group) => group.items.length > 0);
+  const filteredNavigation: NavGroup[] = filterNavigation(
+    baseNavigation,
+    checkPermissions,
+    activeProduct
+  );
 
   return (
     <>
@@ -428,7 +428,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               alt="PayGlocal"
               width={160}
               height={28}
-              className="h-7 w-auto"
+              className="h-6 w-auto"
             />
           </div>
           <Button
@@ -490,7 +490,7 @@ export function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
               alt="PayGlocal"
               width={160}
               height={28}
-              className="h-7 w-auto"
+              className="h-6 w-auto"
             />
             <Button
               variant="ghost"

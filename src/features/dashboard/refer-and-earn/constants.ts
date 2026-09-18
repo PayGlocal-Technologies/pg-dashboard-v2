@@ -1,4 +1,5 @@
 import type { IconName } from "@/components/icon";
+import { dashboardOrigin } from "@/constants/environment";
 
 export const REFERRAL_PAGE_SIZE = 10;
 
@@ -64,20 +65,6 @@ export const REFERRAL_HERO_BANNER = {
 } as const;
 
 /**
- * Dashboard origin per environment, built the same way as the CDN URL in
- * `@/features/auth/helpers` — UAT has moved to pygcl.com, dev/test/prod stay
- * on payglocal.in. Derived from NEXT_PUBLIC_ENV rather than
- * `window.location.origin` so the server and client render the same string and
- * the link needs no effect to fill in after hydration.
- */
-function dashboardOrigin(): string {
-  const env = process.env.NEXT_PUBLIC_ENV;
-  if (env === "prod") return "https://dashboard.payglocal.in";
-  const domain = env === "uat" ? "pygcl.com" : "payglocal.in";
-  return `https://${env ?? "dev"}.dashboard.${domain}`;
-}
-
-/**
  * Builds the shareable referral URL.
  *
  * TODO(integration): `code` is the merchant's own referral code, which comes
@@ -87,6 +74,9 @@ function dashboardOrigin(): string {
  * the merchant shares with third parties.
  */
 export function buildReferralUrl(code?: string): string {
+  // dashboardOrigin() is keyed off NEXT_PUBLIC_ENV rather than
+  // `window.location.origin` so the server and client render the same string
+  // and the link needs no effect to fill in after hydration.
   const base = `${dashboardOrigin()}/app/referrals`;
   return code ? `${base}?ref=${encodeURIComponent(code)}` : base;
 }

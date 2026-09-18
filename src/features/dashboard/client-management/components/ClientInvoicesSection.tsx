@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   Button,
-  DataTable,
+  DataTableCard,
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -265,75 +265,74 @@ export function ClientInvoicesSection({
         Invoices
       </h3>
 
-      <div className="overflow-hidden rounded-xl border border-border bg-card">
-        {/* Status filter and refresh, the two controls production's own ledger
-            toolbar carries — in the row treatment every other table in the app
-            uses: the shared dashed filter chip on the left, then a borderless
-            ghost Refresh pushed right. The chip is the same StatusFilterChip
-            the Transactions and MCA Links toolbars render, rather than a
-            bordered pill built here, so this ledger's controls are literally
-            the same component as theirs and cannot drift from them. */}
-        <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <StatusFilterChip
-              options={INVOICE_STATUS_OPTIONS}
-              selected={statuses}
-              onChange={applyStatuses}
-              open={filterOpen}
-              onOpenChange={setFilterOpen}
-            />
+      <DataTableCard<ClientInvoice>
+        className="[&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
+        /* Status filter and refresh, the two controls production's own ledger
+           toolbar carries — in the row treatment every other table in the app
+           uses: the shared dashed filter chip on the left, then a borderless
+           ghost Refresh pushed right. The chip is the same StatusFilterChip
+           the Transactions and MCA Links toolbars render, rather than a
+           bordered pill built here, so this ledger's controls are literally
+           the same component as theirs and cannot drift from them. */
+        toolbar={
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusFilterChip
+                options={INVOICE_STATUS_OPTIONS}
+                selected={statuses}
+                onChange={applyStatuses}
+              />
+            </div>
+
+            {/* Every mutation already invalidates this ledger, so this is for
+                changes made elsewhere. Spinning on isFetching (not isLoading) is
+                what makes a press over existing rows visibly do something. */}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Refresh invoices"
+              disabled={isFetching}
+              leftIcon={
+                <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+              }
+              onClick={refetch}
+              className="ml-auto shrink-0"
+            >
+              Refresh
+            </Button>
           </div>
-
-          {/* Every mutation already invalidates this ledger, so this is for
-              changes made elsewhere. Spinning on isFetching (not isLoading) is
-              what makes a press over existing rows visibly do something. */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Refresh invoices"
-            disabled={isFetching}
-            leftIcon={
-              <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-            }
-            onClick={refetch}
-            className="ml-auto shrink-0"
-          >
-            Refresh
-          </Button>
-        </div>
-
-        <DataTable
-          className="rounded-none border-0 [&_td.sticky]:z-[2] [&_td.sticky>span]:opacity-100"
-          columns={columns}
-          data={invoices}
-          isLoading={isLoading}
-          // Matched to pageSize, so the loading block is exactly the height of
-          // the rows that replace it and the section doesn't jump on settle.
-          skeletonRows={5}
-          emptyTitle="No invoices yet"
-          emptyDescription={
-            activeCount > 0
-              ? "No invoices match the selected statuses"
-              : "Invoices raised against this client will appear here"
-          }
-          rowKey={(row) => row.id}
-          rowAction={(row) => (
-            <InvoiceRowActions
-              invoice={row}
-              onDuplicate={duplicateInvoice}
-              onDelete={deleteInvoice}
-              onDownload={downloadInvoice}
-            />
-          )}
-          pageSize={5}
-          totalRows={totalCount}
-          page={page}
-          onPageChange={setPage}
-          tableLayout="content"
-          density="compact"
-        />
-      </div>
+        }
+        columns={columns}
+        data={invoices}
+        isLoading={isLoading}
+        // Matched to pageSize, so the loading block is exactly the height of
+        // the rows that replace it and the section doesn't jump on settle.
+        skeletonRows={5}
+        emptyTitle="No invoices yet"
+        emptyDescription={
+          activeCount > 0
+            ? "No invoices match the selected statuses"
+            : "Invoices raised against this client will appear here"
+        }
+        rowKey={(row) => row.id}
+        rowAction={(row) => (
+          <InvoiceRowActions
+            invoice={row}
+            onDuplicate={duplicateInvoice}
+            onDelete={deleteInvoice}
+            onDownload={downloadInvoice}
+          />
+        )}
+        pagination={{
+          mode: "page",
+          page,
+          pageSize: 5,
+          total: totalCount,
+          onPageChange: setPage,
+        }}
+        maxBodyHeight="none"
+      />
     </section>
   );
 }

@@ -1,3 +1,31 @@
+import {
+  formatDateOnly,
+  formatDateStamp,
+  formatDateTime,
+  formatTimestamp,
+  parseApiDate,
+} from "@payglocal_ui/flux-ui";
+
+/**
+ * The canonical date/time formatters, re-exported from flux-ui so a feature
+ * imports them from the same place as every other formatter here rather than
+ * reaching into the design system directly.
+ *
+ * `formatTimestamp` is the one to reach for in a column renderer or a detail
+ * field: it takes whatever shape the endpoint sends — `DD/MM/YYYY HH:mm:ss`,
+ * ISO 8601, or epoch millis as a number or a string — and returns
+ * `27 Jul '26, 09:49 AM`, or an em dash when there is nothing to show.
+ */
+export {
+  formatDateTime,
+  formatDateOnly,
+  formatDateStamp,
+  formatTimestamp,
+  formatTime,
+  formatTimeStamp,
+  parseApiDate,
+} from "@payglocal_ui/flux-ui";
+
 // The app's month and day names, spelled out rather than read from Intl.
 //
 // Every date this app renders is built from these four tables, and none of them
@@ -197,6 +225,58 @@ export function formatCurrency(amount: number, currency: string = "INR", locale 
   })}`;
 }
 
+/**
+ * Always-compact currency, the single short form every dashboard figure uses so
+ * they read the same everywhere. For rupees it's the Indian scale — ₹8.5K,
+ * ₹9.95L, ₹6.91Cr (two decimals for lakh/crore, one for thousand); for any
+ * other reporting currency it's the Western scale — $8.5K, $1.20M, $2.00B —
+ * since lakh/crore only make sense against ₹. Below a thousand the exact grouped
+ * figure is shown, as there's nothing to shorten.
+ *
+ * This is for bar labels, axis ticks and inline stat cells. For a standalone
+ * headline KPI use formatCurrencyCompact (below) via the CompactAmount
+ * component, which keeps small figures exact and reveals the full number on
+ * hover.
+ */
+export function formatCurrencyShort(amount: number, currency: string = "INR"): string {
+  const symbol = CURRENCY_SYMBOLS[currency] ?? `${currency} `;
+  const abs = Math.abs(amount);
+  const sign = amount < 0 ? "-" : "";
+
+  if (currency !== "INR") {
+    // Western short scale — lakh/crore would be wrong against a non-rupee code.
+    if (abs >= 1_000_000_000) return `${sign}${symbol}${(abs / 1_000_000_000).toFixed(2)}B`;
+    if (abs >= 1_000_000) return `${sign}${symbol}${(abs / 1_000_000).toFixed(2)}M`;
+    if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`;
+    return `${sign}${symbol}${Math.round(abs).toLocaleString("en-US")}`;
+  }
+
+  if (abs >= 10_000_000) return `${sign}${symbol}${(abs / 10_000_000).toFixed(2)}Cr`;
+  if (abs >= 100_000) return `${sign}${symbol}${(abs / 100_000).toFixed(2)}L`;
+  if (abs >= 1_000) return `${sign}${symbol}${(abs / 1_000).toFixed(1)}K`;
+  return `${sign}${symbol}${Math.round(abs).toLocaleString("en-IN")}`;
+}
+
+/**
+ * Currency for a standalone headline KPI. The full grouped amount up to five
+ * digits (₹39,860.28), then the same compact short form as formatCurrencyShort
+ * once it reaches a lakh — ₹9.95L, ₹6.91Cr — so a big figure never runs past
+ * its card while a small one stays exact.
+ *
+ * Pair with the CompactAmount component, which shows the exact figure
+ * (formatCurrency) in a hover tooltip whenever this compacts.
+ */
+export function formatCurrencyCompact(
+  amount: number,
+  currency: string = "INR",
+  locale = "en-IN"
+): string {
+  // Five digits or fewer (under a lakh): the reader wants the exact figure and
+  // it fits, so nothing is compacted and no tooltip is warranted.
+  if (Math.abs(amount) < 100_000) return formatCurrency(amount, currency, locale);
+  return formatCurrencyShort(amount, currency);
+}
+
 /** Compact number formatting: 1_500 -> "1.5K", 2_400_000 -> "2.4M". */
 export function formatNumber(num: number): string {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
@@ -368,18 +448,14 @@ export function parseApiDateTime(display: string | null | undefined): Date | nul
 }
 
 /**
- * The single transaction timestamp format used across the Transactions
- * table and the Transaction Details page, e.g. "24 Jul '26, 03:32 PM".
+ * The app-wide date-and-time format, e.g. "27 Jul '26, 09:49 AM".
+ *
+ * The implementation lives in flux-ui, so this app, pg-internal-v2 and any
+ * future one print a timestamp identically — the two `format.ts` files used to
+ * carry a byte-identical copy each, which is a drift waiting to happen. The
+ * names here stay as they were, because they are what every call site imports.
  */
-export function formatTransactionDateTime(date: Date): string {
-  const hours24 = date.getHours();
-  const hours12 = hours24 % 12 || 12;
-  const ampm = hours24 >= 12 ? "PM" : "AM";
-  const yy = String(date.getFullYear() % 100).padStart(2, "0");
-  const hh = String(hours12).padStart(2, "0");
-  const min = String(date.getMinutes()).padStart(2, "0");
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}, ${hh}:${min} ${ampm}`;
-}
+export const formatTransactionDateTime = formatDateTime;
 
 /**
  * Reformats a transaction timestamp into formatTransactionDateTime's display
@@ -391,23 +467,16 @@ export function formatTransactionDateTime(date: Date): string {
  */
 export function formatTransactionTimestamp(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
-  return parsed ? formatTransactionDateTime(parsed) : raw;
-}
-
-function parseIsoDateTime(raw: string): Date | null {
-  const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
+  // Falls back to the raw string rather than an em dash: a shape the parser
+  // does not know is worth showing, because it is a bug report.
+  return parseApiDate(raw) ? formatTimestamp(raw) : raw;
 }
 
 /**
- * Date-only variant of formatTransactionDateTime, e.g. "24 Jul '26" — same
+ * Date-only variant of formatTransactionDateTime, e.g. "27 Jul '26" — same
  * day/month/year formatting, no time-of-day portion.
  */
-export function formatTransactionDate(date: Date): string {
-  const yy = String(date.getFullYear() % 100).padStart(2, "0");
-  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} '${yy}`;
-}
+export const formatTransactionDate = formatDateOnly;
 
 /**
  * Reformats a transaction timestamp into formatTransactionDate's date-only
@@ -417,8 +486,7 @@ export function formatTransactionDate(date: Date): string {
  */
 export function formatTransactionDateOnly(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
-  return parsed ? formatTransactionDate(parsed) : raw;
+  return parseApiDate(raw) ? formatDateStamp(raw) : raw;
 }
 
 /**
@@ -468,7 +536,7 @@ export function formatEpochDate(value: string | number | null | undefined, fallb
  */
 export function formatNextSettlementDate(raw: string | null | undefined): string {
   if (!raw) return "—";
-  const parsed = parseApiDateTime(raw) ?? parseIsoDateTime(raw);
+  const parsed = parseApiDate(raw);
   if (!parsed) return raw;
   const day = parsed.getDate();
   return `${DAYS_SHORT[parsed.getDay()]}, ${day}${ordinalSuffix(day)} ${MONTHS_SHORT[parsed.getMonth()]}`;

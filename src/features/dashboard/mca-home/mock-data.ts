@@ -7,6 +7,8 @@
 // Already migrated off this file, do not re-add:
 //   - Client analytics  -> GET /gcc/v3/analytics/getClientData  (see hooks.ts)
 //   - Saved amount      -> getPacbOverview.amountSaved          (useMcaOverview)
+//   - Needs attention   -> GET /gcc/v3/mca-invoice/{mid}/needs-attention
+//                                                              (useNeedsAttention)
 
 import type { McaStatWidgetId } from "@/features/dashboard/mca-home/widget-catalog";
 
@@ -114,44 +116,6 @@ export const revenueByTimeframe: Record<RevenueTimeframe, RevenueSeries> = {
 // upcomingSettlement mock removed — the Revenue card's Upcoming settlement now
 // uses the live settlement/upcoming endpoint (see McaRevenueCard +
 // useSettlementUpcoming).
-
-export interface NeedsAttentionRow {
-  id: string;
-  clientName: string;
-  /** ISO 3166-1 alpha-2, or "EU" for the supranational flag (not in COUNTRIES). */
-  countryCode: string;
-  currency: string;
-  amount: number;
-  invoiceId: string;
-  statusLabel: string;
-  statusTone: "danger" | "warning";
-  actionLabel: string;
-}
-
-export const needsAttention: NeedsAttentionRow[] = [
-  {
-    id: "att_1",
-    clientName: "Nordic Solutions",
-    countryCode: "EU",
-    currency: "EUR",
-    amount: 850,
-    invoiceId: "INV-2026-0087",
-    statusLabel: "Overdue",
-    statusTone: "danger",
-    actionLabel: "Remind",
-  },
-  {
-    id: "att_2",
-    clientName: "Acme Corp",
-    countryCode: "US",
-    currency: "USD",
-    amount: 1200,
-    invoiceId: "INV-2026-0091",
-    statusLabel: "Due in 2 days",
-    statusTone: "warning",
-    actionLabel: "View",
-  },
-];
 
 export interface QuickAccessItem {
   id: string;

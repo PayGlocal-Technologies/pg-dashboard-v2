@@ -424,6 +424,7 @@ export const toTemplateSnapshot = (
   previous?: InvoiceTemplateSnapshot
 ): InvoiceTemplateSnapshot => ({
   currency: form.currency,
+  accountNo: form.accountNo,
   lineItems: form.lineItems.map((item) => ({ ...item })),
   discountName: form.discountName,
   discountValue: form.discountValue,
@@ -469,6 +470,10 @@ export const applyTemplateSnapshot = (
 
   return {
     currency: snapshot.currency,
+    // Applied when the template carries one; an empty reference leaves the
+    // form's current selection alone rather than clearing it, since a template
+    // with no account was never meant to unset one.
+    ...(snapshot.accountNo ? { accountNo: snapshot.accountNo } : {}),
     // Fresh keys, derived from the template id and the row's position, so they
     // are unique and stable without reaching for Date.now() during a render.
     lineItems: snapshot.lineItems.map((item, index) => ({
@@ -533,6 +538,7 @@ export const toTemplateWriteBody = (
   return {
     name,
     currency: snapshot.currency,
+    bankAccountReference: snapshot.accountNo || null,
     lineItems: snapshot.lineItems.map((item) => ({
       name: item.description,
       description: item.description,
@@ -580,6 +586,7 @@ export const fromApiTemplate = (template: ApiInvoiceTemplate): InvoiceTemplate =
 
   const snapshot: InvoiceTemplateSnapshot = {
     currency: template.currency ?? "",
+    accountNo: template.bankAccountReference ?? "",
     lineItems: (template.lineItems ?? []).map((item, index) => ({
       // Keyed by the template so two invoices from one template never collide.
       key: `tpl_${template.templateId}_${index}`,

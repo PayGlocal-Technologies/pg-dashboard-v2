@@ -41,7 +41,7 @@ export function NotificationsFeature() {
     <div className="space-y-5">
       <PageHeader title="Notifications" subtitle="Choose what we notify you about." />
 
-      <BackendGapNotice message="No notification-preferences endpoint exists yet — toggles change local state only for this session." />
+      <BackendGapNotice message="No notification-preferences endpoint exists yet, so toggles change local state only for this session." />
 
       <Card className="gap-0 p-0">
         <div className="divide-y divide-border px-5">

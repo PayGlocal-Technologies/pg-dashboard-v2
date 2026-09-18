@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import { Button, Shimmer, SplitButton, SplitButtonItem, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/constants/basePath";
 import { useGet, usePost } from "@/lib/api/hooks";
+import { useQueryClient } from "@tanstack/react-query";
+import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
 import {
   billerDetailsApi,
   createInvoiceApi,
@@ -292,6 +295,20 @@ function CreateInvoiceBootstrap() {
   const clientIdParam = searchParams.get("clientId") ?? "";
   const status = searchParams.get("status") ?? "";
 
+  /**
+   * The template to apply, captured once on mount.
+   *
+   * "Edit" in the manage-templates dialog lands here on `?templateId=` with no
+   * `invoiceId`, so this mount creates a fresh draft and then `router.replace`s
+   * the address bar to `?invoiceId=…` — a URL rebuilt from the new id alone,
+   * which DROPS `templateId`. The editor only mounts after that replace, so by
+   * the time it could read the param it is already gone. Reading it here, in a
+   * lazy initializer that runs on the first render before any draft exists,
+   * keeps it stable and hands it down as a prop rather than a URL the replace
+   * is about to overwrite.
+   */
+  const [templateIdParam] = useState(() => searchParams.get("templateId") ?? "");
+
   // The hook-level mutation callbacks below outlive any single render, so they
   // read through refs rather than capturing stale values. Written in an effect,
   // never during render, and only ever read after a network round-trip.
@@ -328,9 +345,11 @@ function CreateInvoiceBootstrap() {
    *
    * The handlers live in the hook options, NOT on the `mutate()` call.
    * TanStack drops per-call callbacks if the component unmounts before the
-   * mutation settles; hook-level ones always run. `history.replaceState` then
-   * writes the id to the address bar without involving the router, so a
-   * remount can read it straight back off the URL.
+   * mutation settles; hook-level ones always run.
+   *
+   * `router.replace` syncs the id into the address bar so a refresh reopens
+   * this draft. Nothing waits on it: the id is read off the mutation response
+   * itself, see `createdInvoiceId` below.
    */
   const {
     mutate: createDraft,
@@ -353,7 +372,6 @@ function CreateInvoiceBootstrap() {
       if (gidRef.current) params.set("gid", gidRef.current);
       const nextUrl = `/create-invoice?${params.toString()}`;
 
-      if (typeof window !== "undefined") window.history.replaceState(null, "", nextUrl);
       routerRef.current.replace(nextUrl, { scroll: false });
     },
     onError: (error) => {
@@ -380,7 +398,23 @@ function CreateInvoiceBootstrap() {
    */
   const createdInvoiceId =
     createResponse?.data?.invoiceId ?? createResponse?.data?.invoice?.id ?? "";
-  const invoiceId = searchParams.get("invoiceId") || createdInvoiceId;
+  /** The id in the address bar, which is also what tells a fresh "create" entry
+   *  apart from resuming or reopening a specific invoice. */
+  const urlInvoiceId = searchParams.get("invoiceId") ?? "";
+  const invoiceId = urlInvoiceId || createdInvoiceId;
+
+  /**
+   * The invoice THIS mount generated, and nothing else.
+   *
+   * Component state on purpose: it cannot outlive the page, so entering the
+   * editor again always starts on a blank draft. The success view used to be
+   * derived from `?status=SUCCESS` plus "the details query says ACTIVE", both of
+   * which can still be true on a later visit — the query string can be restored
+   * with the route and the react-query entry for a finished invoice stays in
+   * cache — so "Create invoice" could land straight on the previous invoice's
+   * success screen instead of a new draft.
+   */
+  const [generatedId, setGeneratedId] = useState("");
 
   const detailsUrl = getInvoiceDetailsApi(merchantId, invoiceId);
   const {
@@ -495,7 +529,20 @@ function CreateInvoiceBootstrap() {
     return () => clearTimeout(timer);
   }, [isReady]);
 
-  if (status === "SUCCESS" || invoice?.status === "ACTIVE") {
+  /**
+   * Show the success screen when this mount generated the invoice, or when the
+   * URL names a specific invoice that is already finished (a refresh of the
+   * success URL, or a link straight to it).
+   *
+   * The `urlInvoiceId` guard is what makes "Create invoice" always start fresh:
+   * that entry point navigates to a bare /create-invoice, so there is no
+   * invoice for this branch to claim and the editor falls through to creating
+   * a new draft.
+   */
+  const showSuccess =
+    !!generatedId || (!!urlInvoiceId && (status === "SUCCESS" || invoice?.status === "ACTIVE"));
+
+  if (showSuccess) {
     return (
       <div className="h-full overflow-y-auto">
         <CreateInvoiceSuccess
@@ -628,6 +675,8 @@ function CreateInvoiceBootstrap() {
           gid={gid}
           clientIdParam={clientIdParam}
           today={today}
+          templateIdParam={templateIdParam}
+          onGenerated={setGeneratedId}
         />
       ) : (
         <EditorSkeleton onClose={() => router.push("/mca-invoices")} />
@@ -647,6 +696,8 @@ function InvoiceEditor({
   gid,
   clientIdParam,
   today,
+  templateIdParam,
+  onGenerated,
 }: {
   invoice: InvoiceData;
   biller: BillerDetails;
@@ -658,8 +709,16 @@ function InvoiceEditor({
   gid: string;
   clientIdParam: string;
   today: string;
+  /** The template to apply on open, captured by the bootstrap before the
+   *  draft-creation `router.replace` drops it from the URL. Empty when this
+   *  editor was not opened from "Edit template". */
+  templateIdParam: string;
+  /** Called with the invoice id once it has been generated, which is what
+   *  switches this page over to the success screen. */
+  onGenerated: (invoiceId: string) => void;
 }) {
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   /**
    * The form, derived rather than copied.
@@ -897,7 +956,7 @@ function InvoiceEditor({
     const followUp =
       next.isRecurring && !form.recurringStartDate
         ? "Set the recurring start date: a schedule cannot be reused from a template."
-        : "Client, invoice number, dates and receiving account are unchanged.";
+        : "Client, invoice number and dates are unchanged.";
 
     toast.success(`Applied "${template.name}"`, { description: followUp });
   };
@@ -954,6 +1013,63 @@ function InvoiceEditor({
     if (templateId === activeTemplateId) setTemplateLink(null);
     toast.success("Template deleted");
   };
+
+  /**
+   * "Edit" from the manage-templates list, on this editor or on the invoice
+   * list page: it always opens a brand new draft with the template applied,
+   * never the invoice already open here.
+   *
+   * A hard navigation, not `router.push` — a query-only change on this same
+   * route is exactly the case the id-resolution comment above (`invoiceId`)
+   * warns App Router doesn't reliably surface, and this editor's own
+   * `createDraft` mutation state would otherwise carry over from whatever was
+   * open before, resolving the new draft's id from the wrong response.
+   */
+  const handleEditTemplate = (templateId: string) => {
+    // withBasePath because a raw `window.location` navigation is handed to the
+    // browser as-is — Next only prefixes /app-v2 for framework navigation
+    // (router.push, next/link), not this. See src/constants/basePath.ts.
+    window.location.href = withBasePath(`/create-invoice?templateId=${templateId}`);
+  };
+
+  /**
+   * Applies a template requested via `?templateId=`, once.
+   *
+   * The only entry point today is "Edit" in the manage-templates dialog, which
+   * always sends a fresh draft here — so a blank invoice is exactly what this
+   * expects to find, and it applies without the picker's usual "replace what's
+   * on screen?" prompt, matching the picker's own bypass for an empty draft.
+   * `appliedFromQuery` guards it to a single run: `handleApplyTemplate` sets
+   * `templateLink`, and re-running on every render would fight a merchant who
+   * has since detached or applied something else.
+   */
+  const requestedTemplateId = templateIdParam;
+  const appliedFromQueryRef = useRef(false);
+  useEffect(() => {
+    if (appliedFromQueryRef.current || !requestedTemplateId || !templateStore.isReady) return;
+    // `isReady` is `!isLoading`, which is already true while the list query is
+    // merely disabled — on this fresh page load the merchant id (`scopeId`)
+    // resolves a tick after mount, so `listUrl` is empty and the query never
+    // ran, with `templates` still []. Consuming the one-shot then would apply an
+    // empty list, spend the ref, and the real templates arriving afterwards
+    // would never fill. Wait for the list to actually land first.
+    if (templateStore.templates.length === 0) return;
+    appliedFromQueryRef.current = true;
+    // `handleApplyTemplate` calls setState directly, which the React Compiler
+    // lint plugin rejects inside an effect body (see CLAUDE.md) — deferred into
+    // a timer callback like the amount debounce elsewhere in this codebase.
+    const id = setTimeout(() => {
+      const template = templateStore.templates.find((t) => t.id === requestedTemplateId);
+      if (template) handleApplyTemplate(template);
+      else toast.error("That template could not be found. It may have been deleted.");
+    }, 0);
+    return () => clearTimeout(id);
+    // `handleApplyTemplate` is recreated every render and reads `form`/`branding`
+    // fresh each time on purpose (see its own comment); the ref guard above is
+    // what makes this run exactly once, so it is deliberately left out here —
+    // adding it would just re-fire the effect on every keystroke.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedTemplateId, templateStore.isReady, templateStore.templates]);
 
   // ── Branding actions ───────────────────────────────────────────────────────
 
@@ -1063,7 +1179,7 @@ function InvoiceEditor({
       clientIssue.kind === "not-selected"
         ? "Pick who this invoice bills."
         : clientIssue.kind === "incomplete-address"
-          ? "Complete their billing address — it prints on the invoice."
+          ? "Complete their billing address. It prints on the invoice."
           : clientIssue.kind === "remitter-mismatch"
             ? "This client is not the remitter on the linked transaction."
             : null,
@@ -1195,7 +1311,30 @@ function InvoiceEditor({
           // in its create flow either.
           { isGstInvoice: false },
           {
-            onSuccess: () => {
+            /**
+             * Async on purpose: react-query awaits an onSuccess that returns a
+             * promise before settling the mutation, so `isGenerating` stays true
+             * across the refetch below and the button keeps its spinner.
+             *
+             * Generating rewrites the invoice server-side — it takes its number,
+             * its final totals and its ACTIVE status — and the details query
+             * still holds the draft as it was a moment ago. Nothing invalidated
+             * it, so the success screen rendered that stale copy and only showed
+             * the real figures after a manual refresh. pg-dashboard never hits
+             * this because its generate mutation omits `invalidateQueries`
+             * entirely, which invalidates every query in the cache; this does
+             * the same thing to the three keys that actually went stale.
+             */
+            onSuccess: async () => {
+              await queryClient.invalidateQueries({
+                queryKey: ["invoice-details", merchantId, invoiceId],
+              });
+              // A new ACTIVE invoice now exists, so the list and its counts are
+              // stale too, whichever way this flow exits.
+              for (const key of INVOICE_DATA_KEYS) {
+                void queryClient.invalidateQueries({ queryKey: key });
+              }
+
               if (linkedGid) {
                 toast.success("Invoice generated and linked", {
                   description: `Attached to transaction ****${linkedGid.slice(-6)}.`,
@@ -1203,6 +1342,9 @@ function InvoiceEditor({
                 router.push("/mca-transactions");
                 return;
               }
+              // The URL still records the outcome so a refresh comes back here,
+              // but it is no longer what decides to show it — see `generatedId`.
+              onGenerated(invoiceId);
               router.replace(`/create-invoice?invoiceId=${invoiceId}&status=SUCCESS`);
             },
             onError: (error) =>
@@ -1519,6 +1661,7 @@ function InvoiceEditor({
         isMutating={templateStore.isMutating}
         onRename={templateStore.rename}
         onDelete={handleDeleteTemplate}
+        onEdit={handleEditTemplate}
       />
 
       {/* Persistent launcher, bottom-right, replayable. Not auto-started: this

@@ -8,11 +8,13 @@ import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/create-invoice/co
 import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
 
 /**
- * Rename and delete saved templates.
+ * Edit, rename and delete saved templates.
  *
- * Delete confirms inline, on the row, rather than in a second dialog stacked on
- * this one: a template is cheap to lose but annoying to rebuild, and a nested
- * modal over a list makes it unclear which row is about to go.
+ * Edit hands off to the invoice workflow — this dialog only ever touches a
+ * template's name and its existence, never its content. Delete confirms
+ * inline, on the row, rather than in a second dialog stacked on this one: a
+ * template is cheap to lose but annoying to rebuild, and a nested modal over a
+ * list makes it unclear which row is about to go.
  */
 export function ManageTemplatesDialog({
   open,
@@ -21,6 +23,7 @@ export function ManageTemplatesDialog({
   isMutating,
   onRename,
   onDelete,
+  onEdit,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -35,6 +38,9 @@ export function ManageTemplatesDialog({
   isMutating: boolean;
   onRename: (templateId: string, name: string) => void;
   onDelete: (templateId: string) => void;
+  /** Opens the template's content in the invoice workflow so its items, notes
+   *  and branding can be edited. Rename above only ever touches the name. */
+  onEdit: (templateId: string) => void;
 }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -92,8 +98,8 @@ export function ManageTemplatesDialog({
         {templates.length === 0 ? (
           <EmptyState
             className="mt-4"
-            title="No templates yet"
-            description="Save an invoice as a template and it will appear here."
+            title="No templates available"
+            description="When you create an invoice, the template will be automatically added here."
           />
         ) : (
           <div className="mt-4 divide-y divide-border">
@@ -183,6 +189,17 @@ export function ManageTemplatesDialog({
                         </div>
                       ) : (
                         <div className="flex shrink-0 items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            aria-label={`Edit ${template.name}`}
+                            className="h-7 w-7 p-0"
+                            disabled={isMutating}
+                            onClick={() => onEdit(template.id)}
+                          >
+                            <Icon name="arrow-up-right" className="h-3.5 w-3.5" />
+                          </Button>
                           <Button
                             type="button"
                             variant="ghost"

@@ -14,14 +14,16 @@ import {
 import { Button, Card, Separator, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { RollingNumber } from "@/components/common/RollingNumber";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { CompactAmount } from "@/components/common/CompactAmount";
+import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   revenueTimeframes,
   type RevenuePoint,
   type RevenueTimeframe,
 } from "@/features/dashboard/mca-home/mock-data";
 import { useRevenueTrend } from "@/features/dashboard/mca-home/hooks";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { useSettlementUpcoming } from "@/features/dashboard/settlement-reports/hooks";
 
 /** Day window per timeframe. The revenue-trend endpoint is date-ranged, so each
@@ -54,18 +56,11 @@ function buildRevenueRanges(): Record<RevenueTimeframe, { startDate: string; end
  * thousands, above it in lakhs with one decimal until the whole-lakh figure is
  * unambiguous on its own.
  */
+/** Y-axis tick label. Delegates to the shared short form so the axis reads in
+ *  the same ₹K/₹L/₹Cr units as every headline and bar figure (an earlier
+ *  lakh-only version showed "10000L" instead of "₹1.00Cr"). */
 function formatMoneyAxis(value: number): string {
-  if (value === 0) return "₹0";
-  const abs = Math.abs(value);
-  if (abs >= 100_000) {
-    const lakh = value / 100_000;
-    return `₹${lakh < 10 ? lakh.toFixed(1) : lakh.toFixed(0)}L`;
-  }
-  return `₹${Math.round(value / 1000)}K`;
-}
-
-function formatLakhTotal(value: number): string {
-  return `₹${(value / 100_000).toFixed(2)}L`;
+  return value === 0 ? "₹0" : formatCurrencyShort(value, "INR");
 }
 
 function RevenueTooltip({
@@ -101,9 +96,8 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
 
   // Upcoming settlement — the same live endpoint the settlement-report screen
   // uses (useSettlementUpcoming). Merchant-scoped, so resolve the PACB MID here.
-  const { urlMid, midFilter } = useResolvedMids("PACB");
-  const settlementMid = urlMid || midFilter?.value?.[0] || "";
-  const { upcoming } = useSettlementUpcoming(settlementMid);
+  const { scopeId: settlementScopeId } = useScopeId("PACB");
+  const { upcoming } = useSettlementUpcoming(settlementScopeId);
 
   // API points → the chart's shape (label → x). Empty until the call resolves.
   const chartData: RevenuePoint[] = (trend?.points ?? []).map((p) => ({
@@ -144,10 +138,17 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
           <Shimmer className="h-8 w-32" />
         ) : (
           <>
-            <RollingNumber
-              value={trend ? formatLakhTotal(trend.total) : "—"}
-              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-            />
+            {trend ? (
+              <CompactAmount
+                amount={trend.total}
+                currency={trend.currency}
+                className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+              />
+            ) : (
+              <span className="block text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                —
+              </span>
+            )}
             {trend && (
               <span className="text-xs font-medium text-muted-foreground">{trend.currency}</span>
             )}
@@ -155,9 +156,12 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         )}
       </div>
 
+      {/* Trend is only meaningful against a non-zero figure — a "-100% vs
+          previous period" beside ₹0 reads as broken, so it's hidden when there's
+          nothing settled in the window. */}
       {isLoading ? (
         <Shimmer className="mt-1 h-4 w-40" />
-      ) : trend ? (
+      ) : trend && trend.total > 0 ? (
         <div
           className={cn(
             "mt-1 flex items-center gap-1 text-xs font-medium",
@@ -178,13 +182,19 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         {isLoading ? (
           <Shimmer className="h-full min-h-48 w-full" />
         ) : isError ? (
-          <p className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
-            Couldn&apos;t load revenue.
-          </p>
+          <PlaceholderState
+            variant="error"
+            title="Couldn't load"
+            description="Revenue didn't load."
+            className="h-full min-h-48"
+          />
         ) : !hasData ? (
-          <p className="flex h-full min-h-48 items-center justify-center text-sm text-muted-foreground">
-            No revenue in this period.
-          </p>
+          <PlaceholderState
+            variant="no-analytics"
+            title="No revenue"
+            description="No revenue in this period."
+            className="h-full min-h-48"
+          />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -238,10 +248,17 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-xs font-medium text-muted-foreground">Upcoming settlement</p>
-          <RollingNumber
-            value={upcoming ? `₹${upcoming.amount.toLocaleString("en-IN")}` : "—"}
-            className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-          />
+          {upcoming ? (
+            <CompactAmount
+              amount={upcoming.amount}
+              currency="INR"
+              className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+            />
+          ) : (
+            <span className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums">
+              —
+            </span>
+          )}
           {upcoming && upcoming.transactionCount > 0 && (
             <p className="mt-1 text-xs text-muted-foreground">
               {upcoming.transactionCount} transaction{upcoming.transactionCount === 1 ? "" : "s"}

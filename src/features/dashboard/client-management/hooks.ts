@@ -2,14 +2,11 @@
 
 import { useMemo } from "react";
 import { toast } from "sonner";
-import { zohoPullSyncApi, zohoStatusApi } from "@/features/dashboard/zoho-integration/services";
-import type {
-  ZohoPullSyncPayload,
-  ZohoStatusResponse,
-} from "@/features/dashboard/zoho-integration/types";
+import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
 import { COUNTRIES } from "@/components/ui";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
@@ -410,19 +407,21 @@ export function toClientFormValues(client: Client): ClientFormValues {
 
 /**
  * The client book's merchant id, which every one of its endpoints takes as a path
- * segment for every user — not just partners. `urlMid || midFilter[0]` resolves to
- * the same id pg-dashboard computes as `selectedMid || paCbMids[0] || profile.mid`.
- * Same pattern the SKU catalogue and the settlement report use.
+ * segment for every user — not just partners. Resolved by the shared useScopeId,
+ * so it matches every other path-scoped id in the app.
  *
  * `midFilter` comes back alongside it for the search body's own filter, whose key
  * is **`mid`**, not `merchantId` — see useClients.
  */
 export function useClientPathMid() {
-  const { urlMid, midFilter, isReady, guardState } = useResolvedMids("PACB");
-  const mid = urlMid || midFilter?.value?.[0] || "";
-  return { mid, midFilter, isReady: isReady && !!mid, guardState };
+  const { midFilter, guardState } = useResolvedMids("PACB");
+  // The path id comes from the shared resolver: product MID, selected MID, or
+  // the UCIC id for a multi-MID account with nothing selected. midFilter and
+  // guardState still come from useResolvedMids, which answers the different
+  // question of which MIDs go in a search *body*.
+  const { scopeId: mid, isReady } = useScopeId("PACB");
+  return { mid, midFilter, isReady, guardState };
 }
-
 
 // ── Reference data ──────────────────────────────────────────────────────────
 
@@ -1051,46 +1050,26 @@ export function useInvoiceRowActions(): {
  * Whether this merchant has a connected Zoho account, and the pull-sync that
  * imports clients from it.
  *
- * Gated on `status === "CONNECTED"` rather than the response's own `connected`
- * boolean, because that is what pg-dashboard checks — the two could disagree and
- * production's answer is the one that matters.
+ * A thin naming of the shared hook: the connection is an account-level fact
+ * (one Zoho account, on one PACB MID) and the only thing specific to this
+ * screen is that it pulls clients and not invoices, and which lists have to
+ * refetch afterwards. Gated on `status === "CONNECTED"` rather than the
+ * response's own `connected` boolean, because that is what pg-dashboard checks
+ * — the two could disagree and production's answer is the one that matters.
  */
 export function useZohoClientSync(): {
   isConnected: boolean;
   isSyncing: boolean;
-  syncClients: (mid?: string) => void;
+  connectedMid: string | null;
+  hasMultipleMids: boolean;
+  syncClients: () => void;
 } {
-  const { mid, isReady } = useClientPathMid();
-
-  const { data, refetch: refetchStatus } = useGet<ZohoStatusResponse>(
-    ["zoho-status", mid],
-    zohoStatusApi(mid),
-    { enabled: isReady }
+  const { isConnected, isSyncing, connectedMid, hasMultipleMids, sync } = useZohoPullSync(
+    // Clients only. The same call can pull invoices, and the client list
+    // deliberately doesn't ask it to.
+    { isClientSync: true, isInvoiceSync: false },
+    [CLIENTS_KEY, CLIENT_KEY]
   );
 
-  const { mutate, isPending } = usePost<unknown, ZohoPullSyncPayload & { dynamicUrl: string }>("", {
-    invalidateQueries: [CLIENTS_KEY, CLIENT_KEY],
-    onError: (error: Error) => toast.error(error.message || "Sync failed"),
-  });
-
-  return {
-    isConnected: data?.data?.status === "CONNECTED",
-    isSyncing: isPending,
-    syncClients: (syncMid) =>
-      mutate(
-        {
-          dynamicUrl: zohoPullSyncApi(syncMid || mid),
-          // Clients only. The same call can pull invoices, and the client list
-          // deliberately doesn't ask it to.
-          isClientSync: true,
-          isInvoiceSync: false,
-        },
-        {
-          onSuccess: () => {
-            void refetchStatus();
-            toast.success("Sync completed successfully");
-          },
-        }
-      ),
-  };
+  return { isConnected, isSyncing, connectedMid, hasMultipleMids, syncClients: sync };
 }

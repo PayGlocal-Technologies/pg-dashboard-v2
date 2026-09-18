@@ -22,6 +22,7 @@ export function ZohoIntegrationCard() {
   const {
     isEnabled,
     isConnected,
+    connectedMid,
     isFirstSync,
     lastSyncedTime,
     isStatusLoading,
@@ -38,7 +39,6 @@ export function ZohoIntegrationCard() {
     result,
     dismissResult,
     pacbMids,
-    selectedMid,
     handleConnect,
     handleDisconnect,
     handleRetryConnect,
@@ -103,13 +103,22 @@ export function ZohoIntegrationCard() {
               Auto-sync invoices and reconcile payments both ways.
             </p>
           ) : (
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="space-y-0.5">
+              {/* Which account the link hangs off. A merchant has one Zoho
+                  connection and exactly one MID carries it, so this is the
+                  card's answer to "connected as who". */}
               <p className="text-[13px] text-muted-foreground">
-                {isFirstSync
-                  ? "Ready to sync"
-                  : `Last synced ${lastSyncedTime ? formatEpochDateTime(lastSyncedTime, "") : "unknown"}`}
+                Connected to mid{" "}
+                <span className="font-semibold text-foreground tabular-nums">{connectedMid}</span>
               </p>
-              {syncNowButton}
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-[13px] text-muted-foreground">
+                  {isFirstSync
+                    ? "Ready to sync"
+                    : `Last synced ${lastSyncedTime ? formatEpochDateTime(lastSyncedTime, "") : "unknown"}`}
+                </p>
+                {syncNowButton}
+              </div>
             </div>
           )}
         </div>
@@ -140,20 +149,21 @@ export function ZohoIntegrationCard() {
         onOpenChange={setConnectOpen}
         onConnect={handleConnect}
         isConnecting={isConnecting}
+        pacbMids={pacbMids}
       />
       <ZohoDisconnectDialog
         open={disconnectOpen}
         onOpenChange={setDisconnectOpen}
         onDisconnect={handleDisconnect}
         isDisconnecting={isDisconnecting}
+        mid={connectedMid ?? undefined}
       />
       <ZohoSyncDialog
         open={syncOpen}
         onOpenChange={setSyncOpen}
         onSync={handleSync}
         isSyncing={isSyncing}
-        pacbMids={pacbMids}
-        selectedMid={selectedMid}
+        mid={connectedMid}
       />
       <ZohoResultDialog result={result} onClose={dismissResult} onRetry={handleRetryConnect} />
     </>

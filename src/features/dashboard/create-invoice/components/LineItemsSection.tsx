@@ -477,7 +477,7 @@ export function LineItemsSection({
       {linkedExpectedTotal && (
         <Callout variant="error" className="mt-3">
           <CalloutText>
-            Items total {currency} {total} — must match the linked transaction:{" "}
+            Items total {currency} {total}, which must match the linked transaction:{" "}
             {linkedCurrency || currency} {linkedExpectedTotal}.
           </CalloutText>
         </Callout>

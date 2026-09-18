@@ -12,6 +12,16 @@ import { BASE_URL_V1, BASE_URL_V3 } from "@/api";
 export const mcaVirtualAccountsApi = (merchantId: string) =>
   merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/ffms/virtualAccounts` : "";
 
+/**
+ * Provisions (creates) the merchant's Amazon virtual account.
+ *
+ * A merchant who has no `amazon` bucket in the virtual-accounts response has
+ * never been issued Amazon payout accounts; this is the call that issues them.
+ * Verbatim from pg-dashboard's getMcaAmazonProvisionUrl.
+ */
+export const mcaAmazonProvisionApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V3}/merchants/${merchantId}/ffms/virtualAccounts/amazon/provision` : "";
+
 /** Real-time exchange rates for one currency and amount. */
 export const mcaExchangeRatesApi = (merchantId: string, currency: string, amount: number) =>
   merchantId && currency
@@ -29,8 +39,14 @@ export const mcaAccountConfirmationApi = (merchantId: string, accountId: string)
     ? `${BASE_URL_V1}/merchants/${merchantId}/account-confirmation/${accountId}`
     : "";
 
-/** Leg 1 of the bank settlement statement download. Same two-leg shape as
- *  mcaAccountConfirmationApi above, and the same SHA-256 accountId. */
+/**
+ * Leg 1 of the transaction report (bank settlement statement) download. Same
+ * two-leg shape and the same SHA-256 accountId as mcaAccountConfirmationApi
+ * above, but a POST: pg-dashboard now collects the merchant's registered name,
+ * address and a contact email in a drawer and sends them as the body (see
+ * TransactionReportDrawer / useTransactionReportDownload there), where this
+ * used to be a bare GET.
+ */
 export const mcaBankStatementApi = (merchantId: string, accountId: string) =>
   merchantId && accountId
     ? `${BASE_URL_V1}/merchants/${merchantId}/bank-statement/${accountId}`
@@ -40,6 +56,14 @@ export const mcaBankStatementApi = (merchantId: string, accountId: string) =>
  *  response carries a `url`. Generation is asynchronous, so this is polled. */
 export const mcaGeneratedFileApi = (merchantId: string) =>
   merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/account-generated-file` : "";
+
+/**
+ * Merchant profile — read only for the registered name and address the
+ * transaction report drawer prefills. Same path pg-dashboard's
+ * TransactionReportDrawer reads (`/merchants/{mid}/profile`).
+ */
+export const mcaMerchantProfileApi = (merchantId: string) =>
+  merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/profile` : "";
 
 /** Public virtual accounts, addressed by share token instead of a MID. Backs
  *  the unauthenticated page a shared link opens. */

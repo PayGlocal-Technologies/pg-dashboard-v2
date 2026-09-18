@@ -95,9 +95,27 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
       try {
         const isFormData = body instanceof FormData;
         const requestBody = isFormData ? body : (reqBody ?? restBody);
-        const headers = customHeaders ?? {
-          "Content-Type": isFormData ? "multipart/form-data" : "application/json",
-        };
+        // For FormData the Content-Type has to be actively DELETED, not merely
+        // left out, and `null` is how axios deletes one: AxiosHeaders keeps null
+        // through normalisation and then drops the entry when it serialises.
+        //
+        // Omitting it is not enough because `api` carries
+        // `Content-Type: application/json` as an *instance* default (see
+        // lib/api/axios.ts), which axios merges into every request. Worse, once
+        // axios sees a JSON content type on a FormData body it does not just send
+        // it wrong, it rewrites the body:
+        //
+        //     if (isFormData) return hasJSONContentType
+        //       ? JSON.stringify(formDataToJSON(data)) : data;   // axios/defaults
+        //
+        // so the parts were collapsed back into a JSON object and every File in
+        // it serialised to `{}` — the whole upload silently became
+        // `"attachments":[{},{}]`. With the header gone, the browser generates
+        // `multipart/form-data; boundary=...` itself, which is the only way the
+        // server can tell one part from the next.
+        const headers: Record<string, string | null> =
+          customHeaders ??
+          (isFormData ? { "Content-Type": null } : { "Content-Type": "application/json" });
 
         const res =
           method === "delete"

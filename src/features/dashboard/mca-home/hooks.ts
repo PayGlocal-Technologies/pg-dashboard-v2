@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { useGet } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 import {
   clientAnalyticsApi,
   mcaNeedsAttentionApi,
@@ -132,21 +133,19 @@ export function useRevenueTrend(
   startDate: string,
   endDate: string
 ): { trend: RevenueTrendData | undefined; isLoading: boolean; isError: boolean } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const scopeId = urlMid || ucicId;
-  const url = urlMid
-    ? mcaRevenueTrendByMidApi(urlMid, startDate, endDate)
-    : mcaRevenueTrendByUcicApi(ucicId, startDate, endDate);
+  const { scopeId, scope, isReady } = useScopeId("PACB");
+  const url =
+    scope === "mid"
+      ? mcaRevenueTrendByMidApi(scopeId, startDate, endDate)
+      : mcaRevenueTrendByUcicApi(scopeId, startDate, endDate);
 
   const { data, isPending, isError } = useGet<RevenueTrendResponse>(
     ["mca-revenue-trend", scopeId, startDate, endDate],
     url,
-    { enabled: isReady && !!scopeId }
+    { enabled: isReady }
   );
 
-  return { trend: data?.data, isLoading: isReady && !!scopeId && isPending, isError };
+  return { trend: data?.data, isLoading: isReady && isPending, isError };
 }
 
 /**
@@ -164,24 +163,22 @@ export function useTopClients(
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const scopeId = urlMid || ucicId;
-  const url = urlMid
-    ? mcaTopClientsByMidApi(urlMid, startDate, endDate, limit)
-    : mcaTopClientsByUcicApi(ucicId, startDate, endDate, limit);
+  const { scopeId, scope, isReady } = useScopeId("PACB");
+  const url =
+    scope === "mid"
+      ? mcaTopClientsByMidApi(scopeId, startDate, endDate, limit)
+      : mcaTopClientsByUcicApi(scopeId, startDate, endDate, limit);
 
   const { data, isPending, isError } = useGet<TopClientsResponse>(
     ["mca-top-clients", scopeId, startDate, endDate, limit],
     url,
-    { enabled: isReady && !!scopeId }
+    { enabled: isReady }
   );
 
   return {
     clients: data?.data?.rows ?? [],
     reportingCurrency: data?.data?.reportingCurrency,
-    isLoading: isReady && !!scopeId && isPending,
+    isLoading: isReady && isPending,
     isError,
   };
 }
@@ -190,28 +187,34 @@ export function useTopClients(
  * Invoices needing attention (overdue / due soon) for the dashboard's Needs
  * attention panel. Merchant-scoped in the path — a selected MID, else the UCIC
  * roll-up — mirroring useRevenueTrend/useTopClients above.
+ *
+ * Asked for without a `limit`, deliberately: the card previews the first couple
+ * of rows but names the total, and a limited response cannot be trusted to
+ * report a total beyond what it returned. One unlimited query serves both the
+ * card and its "View all" drawer — same key, so they share a single request and
+ * the drawer opens against data already in hand rather than fetching again.
+ *
+ * Rows are returned in the order the endpoint gave them (overdue first, then
+ * due soon, each by due date). Nothing here re-sorts or regroups them.
  */
-export function useNeedsAttention(limit = 5): {
+export function useNeedsAttention(): {
   invoices: NeedsAttentionInvoice[];
   totalCount: number;
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, isReady } = useResolvedMids("PACB");
-  const profile = useApp((s) => s.profile);
-  const ucicId = profile?.ucicId ?? "";
-  const scopeId = urlMid || ucicId;
+  const { scopeId, isReady: enabled } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<NeedsAttentionResponse>(
-    ["mca-needs-attention", scopeId, limit],
-    mcaNeedsAttentionApi(scopeId, limit),
-    { enabled: isReady && !!scopeId }
+    ["mca-needs-attention", scopeId],
+    mcaNeedsAttentionApi(scopeId),
+    { enabled }
   );
 
   return {
     invoices: data?.data?.data ?? [],
     totalCount: data?.data?.totalCount ?? 0,
-    isLoading: isReady && !!scopeId && isPending,
+    isLoading: enabled && isPending,
     isError,
   };
 }

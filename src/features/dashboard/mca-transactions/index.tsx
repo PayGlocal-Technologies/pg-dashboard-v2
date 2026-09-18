@@ -33,14 +33,21 @@ export function McaTransactionsFeature() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
-      <PageHeader
-        title="Transactions"
-        actions={
-          isMCAEnabled && !detailsOpen ? (
-            <AnalyticsTimeRangeControl value={timeRange} onValueChange={setTimeRange} />
-          ) : undefined
-        }
-      />
+      <PageHeader title="Transactions" />
+
+      {/* "Summary" subheading on the left with the time-range tabs pushed to the
+          row's right edge (justify-between). Sits under the page title. Hidden
+          on the single-transaction details page, where the window means nothing.
+          -mt-2 tightens the gap to the title; gap-y-2 keeps them readable if
+          they wrap. */}
+      {isMCAEnabled && !detailsOpen && (
+        <div className="-mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Summary
+          </h2>
+          <AnalyticsTimeRangeControl value={timeRange} onValueChange={setTimeRange} />
+        </div>
+      )}
 
       {isMCAEnabled ? (
         <MidGuard productType="PACB">

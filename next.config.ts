@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { BASE_PATH } from "@/constants/basePath";
+import { dashboardOrigin } from "@/constants/environment";
 
 const env = process.env.NEXT_PUBLIC_ENV;
 
@@ -33,12 +34,12 @@ const nextConfig: NextConfig = {
 
   async rewrites() {
     if (env) {
-      // UAT has moved to pygcl.com; dev/test/prod stay on payglocal.in.
-      const gccDomain = env === "uat" ? "pygcl.com" : "payglocal.in";
       const rules: { source: string; destination: string; basePath?: false }[] = [
         {
           source: "/gcc/:path*",
-          destination: `https://gcc.${env}.${gccDomain}/gcc/:path*`,
+          // /gcc/* is served from behind the dashboard host now, not the old
+          // standalone `gcc.<env>.<domain>` hosts.
+          destination: `${dashboardOrigin()}/gcc/:path*`,
           basePath: false,
         },
       ];
