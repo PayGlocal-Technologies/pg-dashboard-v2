@@ -9,7 +9,13 @@ import type { GuideStep } from "@/components/common/guide/types";
  * means one interruption on first visit rather than two, and it points at the
  * real control the merchant will use rather than a dialog they dismiss.
  */
-export const MCA_DASHBOARD_GUIDE_KEY = "mca-dashboard-v4";
+/**
+ * v5 adds the support step: merchants were not finding the Help button in the
+ * header, so the tour now ends by naming it and what it holds — the support
+ * line, the support address and "My queries", where a ticket is raised and
+ * tracked.
+ */
+export const MCA_DASHBOARD_GUIDE_KEY = "mca-dashboard-v5";
 
 /**
  * First-visit coach-marks for the MCA dashboard home. `target` values match
@@ -62,5 +68,16 @@ export const MCA_DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     description: "Quickly find the tools and information you need to manage your virtual accounts.",
     side: "top",
     align: "start",
+  },
+  {
+    // Header chrome, not this page — see the note on the Echo step above. The
+    // attribute is on HeaderHelpMenu's trigger, which every dashboard screen
+    // renders, so this step resolves wherever the tour is replayed from.
+    target: "header-help",
+    title: "Need assistance?",
+    description:
+      "Help sits here in the top right: call or email merchant support, or open My queries to raise a ticket and track one you have already raised.",
+    side: "bottom",
+    align: "end",
   },
 ];

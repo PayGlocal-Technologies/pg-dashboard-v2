@@ -37,6 +37,7 @@ import { reorderColumns } from "@/lib/utils/columns";
 // Upload Invoice now opens the details page instead of this modal — import
 // kept commented out (not deleted) alongside the modal's usage below.
 // import { UploadInvoiceModal } from "@/features/dashboard/mca-transactions/components/UploadInvoiceModal";
+import { LinkInvoiceModal } from "@/features/dashboard/mca-transactions/components/LinkInvoiceModal";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
@@ -114,6 +115,10 @@ export function McaTransactionTable({
 }: McaTransactionTableProps) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
+  // The export path needs a real MID, and `urlMid` is deliberately blank for
+  // every non-partner merchant (the search endpoint scopes from the body
+  // instead). See reportMid below.
+  const profileMid = useApp((s) => s.profile?.mid) ?? "";
   const contentEl = useContentAreaElement();
   const queryClient = useQueryClient();
   const [scrollPosition, setScrollPosition] = useState(0);
@@ -178,6 +183,12 @@ export function McaTransactionTable({
   // takes precedence over the rows.find lookup so the details page can show
   // a transaction the table itself never fetched.
   const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
+
+  // The transaction whose "Link Invoice" action is open, or null. Stored as the
+  // row itself rather than its gid: the modal heads its table with the
+  // transaction's own amount, remitter and date, and a lookup by id would lose
+  // all of that the moment the list refetches underneath it.
+  const [linkingInvoiceFor, setLinkingInvoiceFor] = useState<McaTransaction | null>(null);
 
   const router = useRouter();
   const { selectMid } = usePacbMidScope();
@@ -333,8 +344,24 @@ export function McaTransactionTable({
   // endpoint, so the file matches exactly what is on screen — same filters,
   // same search, same MID scope. `from`/`pageLimit` are dropped: an export is
   // the whole result set, not the page being viewed.
+  // Which MID addresses the export.
+  //
+  // NOT `urlMid`: that is the *search* path's id, and useResolvedMids leaves it
+  // empty for every non-partner merchant because `/search/ffms/txn/` answers
+  // with the scope taken from the request body. The download route has no such
+  // tolerance — `/search/ffms/txn//download` has an empty path segment and 404s
+  // — so this mirrors pg-dashboard, which passes its own `merchantId` (the
+  // profile MID) into `/search/ffms/txn/${merchantId}/download` whatever the
+  // body says, and lets the body decide which MIDs the export covers.
+  //
+  // The profile MID rather than the selected one on purpose: production sends
+  // the profile MID even when a specific account is selected, and narrowing the
+  // path to one MID here would risk an export scoped to that account alone
+  // while the table on screen spans all of them.
+  const reportMid = urlMid || profileMid || midFilter?.value?.[0] || "";
+
   const { mutate: downloadReport, isPending: isReportPending } = usePost<Blob, TableReqBody>(
-    mcaTxnReportDownloadApi(urlMid),
+    mcaTxnReportDownloadApi(reportMid),
     {
       download: true,
       invalidateQueries: false,
@@ -348,6 +375,12 @@ export function McaTransactionTable({
   );
 
   const handleReport = () => {
+    if (!reportMid) {
+      toast.error("Couldn't generate the report", {
+        description: "No merchant account is available to export from.",
+      });
+      return;
+    }
     const { from: _from, ...exportBody } = body;
     downloadReport({ ...exportBody, pageLimit: REPORT_EXPORT_LIMIT, from: 0 } as TableReqBody);
   };
@@ -364,7 +397,11 @@ export function McaTransactionTable({
       if (row.merchantId) selectMid(row.merchantId);
       router.push(`/create-invoice?gid=${row.gid}`);
     },
-    onLinkInvoice: (row) => router.push(`/mca-invoices?linkTo=${row.gid}`),
+    // Opens the invoice picker over the table, the way pg-dashboard's drawer
+    // does. It used to navigate to `/mca-invoices?linkTo=<gid>`, a parameter
+    // the invoice list never read — so the action dropped the merchant on a
+    // plain list with no way back to what they were linking.
+    onLinkInvoice: (row) => setLinkingInvoiceFor(row),
     canManageInvoices,
   });
   const orderedColumns = reorderColumns(baseColumns, columnOrder);
@@ -694,6 +731,19 @@ export function McaTransactionTable({
           leaves the table exactly as it was. Shares the same handlers as the
           full page, so the invoice upload flow and Linked Transactions
           navigation behave identically in both. */}
+      {/* Linking changes the transaction's own invoice state, so the table is
+          refetched on success exactly as an upload is. */}
+      <LinkInvoiceModal
+        transaction={linkingInvoiceFor}
+        onOpenChange={(open) => {
+          if (!open) setLinkingInvoiceFor(null);
+        }}
+        onLinked={() => {
+          if (linkingInvoiceFor) handleInvoiceSubmitted(linkingInvoiceFor);
+          setLinkingInvoiceFor(null);
+        }}
+      />
+
       <TransactionDetailsDrawer
         row={detailsRow}
         open={drawerOpen}

@@ -34,7 +34,10 @@ interface LinkableTransaction {
 
 type LinkableTransactionsResponse = BaseResponse<{ data: LinkableTransaction[] }>;
 
-const CONSENT_TEXT = {
+/** Production's linkage consent, shown in both directions — the invoice-side
+ *  drawer here and the transaction-side one (LinkInvoiceModal), which imports
+ *  it rather than keeping a second copy that can drift. */
+export const CONSENT_TEXT = {
   short:
     "By proceeding with this action, you authorize the platform to attach the generated invoice to the selected transaction.",
   more: "You acknowledge that the accuracy and suitability of this linkage are solely your responsibility. PayGlocal Technologies Private Limited does not review, validate, or assume any liability for incorrect, incomplete, or inappropriate linkage or for any disputes or consequences arising from it.",

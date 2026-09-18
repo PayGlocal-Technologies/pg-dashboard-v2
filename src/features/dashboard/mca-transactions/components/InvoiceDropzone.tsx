@@ -249,7 +249,10 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
       if (dropped) handleFile(dropped);
     };
 
-    const showCreateInvoiceLink = phase !== "ready";
+    // Only worth offering while there is still no accepted invoice — and only
+    // when the caller gave it somewhere to go. It used to render regardless,
+    // wired to a handler that did nothing, so clicking it looked broken.
+    const showCreateInvoiceLink = phase !== "ready" && !!onCreateInvoice;
 
     const handleRemove = () => {
       setRejection(null);

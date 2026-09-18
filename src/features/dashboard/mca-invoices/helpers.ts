@@ -87,18 +87,34 @@ export function endOfDayMs(now: Date): number {
   return end.getTime();
 }
 
-/** The filter's bounds as the invoice search body wants them: epoch millis,
- *  or undefined when that end is open. */
-export function dateFilterToEpochMs(filter: InvoiceDateFilter): {
+/**
+ * The filter's bounds as the invoice search body wants them: epoch SECONDS,
+ * or undefined when that end is open.
+ *
+ * Seconds, not millis — this endpoint is the one place in the app where that
+ * differs. `mca-invoice/{mid}/search` reads the same unit its sibling
+ * `get-invoice-summary` takes on the query string (see invoiceSummaryApi), and
+ * the only time-filtered invoice search pg-dashboard actually performs — the
+ * summary card's "last N days", which goes through buildRequestBody's
+ * linearRange branch — computes `Date.now() / 1000`. The transactions search
+ * (FFMS) is the opposite and takes millis, which is why the shared chip
+ * helpers below produce millis and this is where they are divided down.
+ *
+ * Sending millis here is not a smaller window, it is a window starting in the
+ * year 56000: every date-range filter came back empty.
+ */
+export function dateFilterToEpochSeconds(filter: InvoiceDateFilter): {
   startTime?: number;
   endTime?: number;
 } {
+  const startMs =
+    filter.window?.startTime ?? (filter.range.from ? toStartOfDayMs(filter.range.from) : undefined);
+  const endMs =
+    filter.window?.endTime ?? (filter.range.to ? toEndOfDayMs(filter.range.to) : undefined);
+
   return {
-    startTime:
-      filter.window?.startTime ??
-      (filter.range.from ? toStartOfDayMs(filter.range.from) : undefined),
-    endTime:
-      filter.window?.endTime ?? (filter.range.to ? toEndOfDayMs(filter.range.to) : undefined),
+    startTime: startMs === undefined ? undefined : Math.floor(startMs / 1000),
+    endTime: endMs === undefined ? undefined : Math.floor(endMs / 1000),
   };
 }
 
