@@ -2,15 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Button,
-  Checkbox,
-  DataTable,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  type Column,
-} from "@/components/ui";
+import { DataTable, Dialog, DialogContent, DialogTitle, type Column } from "@/components/ui";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -19,7 +11,7 @@ import {
   linkableInvoicesApi,
 } from "@/features/dashboard/mca-invoices/services";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
-import { CONSENT_TEXT } from "@/features/dashboard/mca-invoices/components/LinkTransactionModal";
+import { LinkConsentFooter } from "@/features/dashboard/mca-invoices/components/LinkConsentFooter";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 import type { BaseResponse } from "@/types/common";
 
@@ -101,7 +93,6 @@ function LinkInvoiceBody({
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [consent, setConsent] = useState(false);
-  const [showMore, setShowMore] = useState(false);
 
   const url = linkableInvoicesApi(transaction.merchantId, transaction.gid);
   const { data, isLoading } = useGet<LinkableInvoicesResponse>(
@@ -150,6 +141,13 @@ function LinkInvoiceBody({
       }
     );
   };
+
+  /** Why "Link invoice" cannot run yet — shown as its tooltip, and what
+   *  disables it. Production tooltips the consent case; the selection case is
+   *  the same question asked one step earlier. */
+  let linkDisabledReason: string | null = null;
+  if (!selectedId) linkDisabledReason = "Select the invoice you want to link to this transaction.";
+  else if (!consent) linkDisabledReason = "Please agree to the terms before linking an invoice.";
 
   const columns: Column<LinkableInvoice>[] = [
     {
@@ -256,51 +254,21 @@ function LinkInvoiceBody({
           density="compact"
           tableLayout="content"
         />
-
-        <label className="mt-5 flex cursor-pointer items-start gap-3">
-          <Checkbox
-            checked={consent}
-            onCheckedChange={(next) => setConsent(next === true)}
-            className="mt-0.5"
-          />
-          <span className="text-[12.5px] text-muted-foreground">
-            {CONSENT_TEXT.short}
-            {showMore && <> {CONSENT_TEXT.more}</>}{" "}
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto p-0 align-baseline text-[12.5px]"
-              onClick={(e) => {
-                // The label wraps this, so a bare click would also toggle the box.
-                e.preventDefault();
-                setShowMore((v) => !v);
-              }}
-            >
-              {showMore ? "Show less" : "Show more"}
-            </Button>
-          </span>
-        </label>
       </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={!selectedId || !consent || isPending}
-          onClick={handleLink}
-        >
-          {isPending ? "Linking…" : "Link invoice"}
-        </Button>
-      </div>
+      <LinkConsentFooter
+        consent={consent}
+        onConsentChange={setConsent}
+        disabledReason={linkDisabledReason}
+        isPending={isPending}
+        actionLabel="Link invoice"
+        pendingLabel="Linking…"
+        onCancel={onCancel}
+        onConfirm={handleLink}
+      />
     </>
   );
 }
-
 /** One label/value pair in the transaction summary above the table. */
 function TransactionFact({
   label,

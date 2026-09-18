@@ -413,20 +413,45 @@ export function McaInvoiceTable({
   const renderFilterChips = () => (
     <InvoiceFilterChips
       dateRange={dateFilter.range}
+      /**
+       * Both handlers fire on EVERY apply, and each only clears the other mode
+       * when it has something of its own to put there.
+       *
+       * flux's chip commits with `onChange(range); onRelativeChange(relative)`
+       * — both, always, with the unused half empty. These two used to clobber
+       * each other on the strength of that: applying an absolute range set it,
+       * and the `onRelativeChange(EMPTY_RELATIVE_RANGE)` that followed
+       * microseconds later reset `range` straight back to `{from:"",to:""}`.
+       * The state ended up identical to what it was, so the request body never
+       * changed, so react-query's key never changed and NO request went out at
+       * all — the filter looked like it did nothing because it did nothing.
+       * The relative tab worked only because it happened to be the one that
+       * wrote last.
+       *
+       * Guarding each on its own value makes the pair order-independent:
+       * applying either mode replaces the other, and Clear (which sends both
+       * empty) still empties both.
+       */
       onDateRangeChange={(next) => {
-        // The chip's two modes are exclusive, so applying an absolute range
-        // drops the relative one and the window it had resolved to.
-        setDateFilter({ range: next, relative: EMPTY_RELATIVE_RANGE, window: null });
+        setDateFilter((prev) =>
+          next.from || next.to
+            ? { range: next, relative: EMPTY_RELATIVE_RANGE, window: null }
+            : { ...prev, range: next }
+        );
         setPage(1);
       }}
       relativeRange={dateFilter.relative}
       onRelativeRangeChange={(next) => {
-        setDateFilter({
-          range: { from: "", to: "" },
-          relative: next,
-          // Clock reads belong in the handler, never in render.
-          window: hasRelativeRange(next) ? relativeRangeToEpochMs(next) : null,
-        });
+        setDateFilter((prev) =>
+          hasRelativeRange(next)
+            ? {
+                range: { from: "", to: "" },
+                relative: next,
+                // Clock reads belong in the handler, never in render.
+                window: relativeRangeToEpochMs(next),
+              }
+            : { ...prev, relative: EMPTY_RELATIVE_RANGE, window: null }
+        );
         setPage(1);
       }}
       statusFilters={statusFilters}

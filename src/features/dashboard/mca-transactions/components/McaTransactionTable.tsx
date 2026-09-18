@@ -59,10 +59,19 @@ import type { TableReqBody } from "@/types/transactions";
 // The same rotating hints pg-dashboard's transactions search offers.
 const SEARCH_WORDS = ["Amount", "Customer name", "Transaction ID", "Email"];
 
-// An export is the whole filtered result set, not the visible page. Capped
-// rather than unbounded so a merchant with a very large history can't ask the
-// server for everything in one request.
-const REPORT_EXPORT_LIMIT = 5000;
+// What pg-dashboard's ReportDownload puts in the export body, and the reason it
+// is not the 5000 that used to be here.
+//
+// Production builds the report body from a date range and NOTHING ELSE:
+// `buildRequestBody({ date }, "")` with no feature and no propReqBody, which
+// yields exactly `{ pageLimit: 15, from: 0, fieldOrSearch: {}, startTime,
+// endTime, searchFilterType: "DEFAULT_TIME_RANGE" }`. The MID is in the path;
+// the row filters are not sent at all. Posting the table's own search body
+// instead — merchantId/status/currency in fieldSearch, a queryString, a
+// pageLimit three orders of magnitude larger — is what the download route was
+// answering with 400. The extent of the report is the server's to decide from
+// the window it is given, not this page size.
+const REPORT_PAGE_LIMIT = 15;
 
 // The columns the table is meaningless without, so they can't be hidden.
 // Same three pg-dashboard pins in its editColumns "Fixed Columns" group.
@@ -374,6 +383,16 @@ export function McaTransactionTable({
     }
   );
 
+  /**
+   * Export, built the way pg-dashboard builds it.
+   *
+   * The date window is the one piece of the table's state that travels: it is
+   * what production's report drawer carries across too (setReportRange seeds it
+   * from the table's own date filter). The rest of the filters deliberately do
+   * not go — see REPORT_PAGE_LIMIT. With no date filter set this sends a plain
+   * "DEFAULT" body, which is what production sends when its drawer is left on
+   * an empty range.
+   */
   const handleReport = () => {
     if (!reportMid) {
       toast.error("Couldn't generate the report", {
@@ -381,8 +400,22 @@ export function McaTransactionTable({
       });
       return;
     }
-    const { from: _from, ...exportBody } = body;
-    downloadReport({ ...exportBody, pageLimit: REPORT_EXPORT_LIMIT, from: 0 } as TableReqBody);
+
+    // Millis, as production's dateRange branch sends (formatEpochMillis), and
+    // as this table's own search body already does.
+    const startTime =
+      relativeWindow?.startTime ?? (dateRange.from ? toStartOfDayMs(dateRange.from) : undefined);
+    const endTime =
+      relativeWindow?.endTime ?? (dateRange.to ? toEndOfDayMs(dateRange.to) : undefined);
+    const hasTimeRange = !!(startTime && endTime);
+
+    downloadReport({
+      pageLimit: REPORT_PAGE_LIMIT,
+      from: 0,
+      fieldOrSearch: {},
+      ...(hasTimeRange && { startTime, endTime }),
+      searchFilterType: hasTimeRange ? "DEFAULT_TIME_RANGE" : "DEFAULT",
+    } as TableReqBody);
   };
 
   const baseColumns = buildMcaColumns(isPartnerUser, {
