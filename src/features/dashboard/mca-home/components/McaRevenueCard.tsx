@@ -214,8 +214,8 @@ export function McaRevenueCard({ onViewSettlements }: McaRevenueCardProps) {
         ) : !hasData ? (
           <PlaceholderState
             variant="no-analytics"
-            title="No revenue"
-            description="No revenue in this period."
+            title="No revenue in this period"
+            description="Revenue from settled payments is charted here as money reaches your account."
             className="h-full min-h-36"
           />
         ) : (

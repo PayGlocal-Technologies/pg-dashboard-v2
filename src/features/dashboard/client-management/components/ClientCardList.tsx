@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -133,6 +134,9 @@ interface ClientCardListProps {
   pageSize: number;
   emptyTitle: string;
   emptyDescription?: string;
+  /** Same node the desktop empty state renders, so the first-time CTA isn't a
+   *  desktop-only affordance. */
+  emptyAction?: ReactNode;
   className?: string;
 }
 
@@ -152,6 +156,7 @@ export function ClientCardList({
   pageSize,
   emptyTitle,
   emptyDescription,
+  emptyAction,
   className,
 }: ClientCardListProps) {
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -166,6 +171,7 @@ export function ClientCardList({
           size="sm"
           title={emptyTitle}
           description={emptyDescription}
+          action={emptyAction}
         />
       ) : (
         rows.map((row) => <ClientCard key={row.id} row={row} onOpenDetails={onOpenDetails} />)

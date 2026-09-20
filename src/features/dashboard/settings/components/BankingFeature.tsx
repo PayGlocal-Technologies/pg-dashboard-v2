@@ -73,10 +73,7 @@ export function BankingFeature() {
 
   return (
     <div className="space-y-5">
-      <PageHeader
-        title="Account details"
-        subtitle="Where we send settled funds by currency."
-      />
+      <PageHeader title="Account details" subtitle="Where we send settled funds by currency." />
 
       <Card className="w-full max-w-sm gap-3 p-4">
         <div className="flex items-start justify-between gap-3">

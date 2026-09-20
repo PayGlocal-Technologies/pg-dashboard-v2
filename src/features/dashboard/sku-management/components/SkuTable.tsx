@@ -214,8 +214,10 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   // when in fact they have items — just none of that type. First run means the
   // whole catalogue is empty, which only an unfiltered, unsearched request can say.
   const isFirstRun = !isLoading && totalCount === 0 && !search.trim() && tab === "all";
-  const emptyTitle = "No products found";
-  const emptyDescription = "Try a different search or switch tabs";
+  // Only ever the narrowed case — `isFirstRun` above carves out the genuinely
+  // empty catalogue and renders its own state with the Add/Import actions.
+  const emptyTitle = "No matching items";
+  const emptyDescription = "Try a different search, or switch tabs to widen the results.";
 
   return (
     // Tab bar, search, and the table share one bordered surface, matching the
@@ -277,8 +279,8 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
           the row's own cells so it always paints on top. */}
       {isFirstRun ? (
         <EmptyState
-          title="No items yet"
-          description="Add items to your catalog to pull them into invoices."
+          title="Save the items you bill for"
+          description="Add a product or service once, then reuse it on invoices with its price, code and tax details."
           action={
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button

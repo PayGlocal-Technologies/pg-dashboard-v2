@@ -1,10 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
 import { Button, Separator, Switch } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
 import { themeFor } from "@/features/dashboard/create-invoice/helpers";
 import { InvoiceThemePicker } from "@/features/dashboard/create-invoice/components/InvoiceThemePicker";
 import { InvoiceColorPicker } from "@/features/dashboard/create-invoice/components/InvoiceColorPicker";
@@ -29,7 +27,11 @@ function withSelected<T extends { name: string }>(options: T[], selected: T): T[
 }
 
 /**
- * Advanced branding options.
+ * Branding options — invoice theme, brand colours, logo and signature.
+ * Renders nothing until the preview sidebar's "Customise template" button
+ * opens it (see `expanded`); there is no tab or accordion header of its own
+ * any more, so once open this is just the details, directly under the
+ * Document/Email tabs it changes the look of.
  *
  * Nova's panel: invoice theme, brand colours, logo and signature. All four are
  * backed end to end — the assets upload to S3, the invoice carries logoEnabled /
@@ -56,6 +58,7 @@ export function BrandingSection({
   onBrandingChange,
   onResetColors,
   onOpenUpload,
+  expanded,
 }: {
   logoEnabled: boolean;
   signatureEnabled: boolean;
@@ -75,94 +78,75 @@ export function BrandingSection({
   /** Puts the colour pair back to the server's own default. */
   onResetColors: () => void;
   onOpenUpload: (type: "LOGO" | "SIGNATURE") => void;
+  /** Entirely controlled by the preview sidebar's "Customise template"
+   *  button now — there's no "Advanced branding options" tab/trigger of its
+   *  own any more, so this renders nothing at all until that button says
+   *  otherwise. */
+  expanded: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  if (!expanded) return null;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-      <Button
-        type="button"
-        variant="ghost"
-        className="h-auto w-full justify-between rounded-none px-4 py-3 text-left"
-        onClick={() => setExpanded((value) => !value)}
-        aria-expanded={expanded}
-        rightIcon={
-          <Icon
-            name="chevron-down"
-            className={cn(
-              "h-4 w-4 shrink-0 text-muted-foreground transition-transform",
-              expanded && "rotate-180"
-            )}
-            aria-hidden
-          />
-        }
-      >
-        <span className="block">
-          <span className="block text-[13px] font-semibold text-foreground">
-            Advanced branding options
-          </span>
-          <span className="block text-[11px] font-normal text-muted-foreground">
-            Logo, signature, theme and colours
-          </span>
-        </span>
-      </Button>
+    // bg-card: this panel opens inside the preview sidebar, whose own
+    // surface is the muted wash — without a fill of its own the customisation
+    // rows sat directly on that grey, so the panel read as part of the
+    // background rather than as a surface opened on top of it.
+    <div
+      id="invoice-branding-section"
+      className="overflow-hidden rounded-xl border border-border bg-card"
+    >
+      {/* Logo and signature first. They are what a merchant opens this panel
+          for, and the only two they come back to change — a theme and a
+          colour pair are set once and then left alone, so putting the grids
+          above the uploads buried the frequent job under the rare one. Each
+          asset keeps its own bottom border so the four blocks still read as
+          one list. */}
+      <AssetRow
+        label="Logo"
+        hint="Shown at the top of the invoice"
+        enabled={logoEnabled}
+        onEnabledChange={(next) => onChange({ logoEnabled: next })}
+        asset={logo}
+        onOpen={() => onOpenUpload("LOGO")}
+      />
+      <AssetRow
+        label="Signature"
+        hint="Authorised signatory image"
+        enabled={signatureEnabled}
+        onEnabledChange={(next) => onChange({ signatureEnabled: next })}
+        asset={signature}
+        onOpen={() => onOpenUpload("SIGNATURE")}
+      />
 
-      {expanded && (
-        <div className="border-t border-border">
-          {/* Logo and signature first. They are what a merchant opens this
-              panel for, and the only two they come back to change — a theme and
-              a colour pair are set once and then left alone, so putting the
-              grids above the uploads buried the frequent job under the rare
-              one. Each asset keeps its own bottom border so the four blocks
-              still read as one list. */}
-          <AssetRow
-            label="Logo"
-            hint="Shown at the top of the invoice"
-            enabled={logoEnabled}
-            onEnabledChange={(next) => onChange({ logoEnabled: next })}
-            asset={logo}
-            onOpen={() => onOpenUpload("LOGO")}
-          />
-          <AssetRow
-            label="Signature"
-            hint="Authorised signatory image"
-            enabled={signatureEnabled}
-            onEnabledChange={(next) => onChange({ signatureEnabled: next })}
-            asset={signature}
-            onOpen={() => onOpenUpload("SIGNATURE")}
-          />
+      <div className="border-b border-border p-4">
+        <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice theme</p>
+        <InvoiceThemePicker
+          themes={withSelected<InvoiceTheme>(palette.themes, themeFor(branding.theme))}
+          theme={branding.theme}
+          primaryHex={palette.colorHexFor(branding.color)}
+          accentHex={palette.accentHexFor(branding.accent)}
+          onChange={(theme) => onBrandingChange({ theme })}
+        />
+      </div>
 
-          <div className="border-b border-border p-4">
-            <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice theme</p>
-            <InvoiceThemePicker
-              themes={withSelected<InvoiceTheme>(palette.themes, themeFor(branding.theme))}
-              theme={branding.theme}
-              primaryHex={palette.colorHexFor(branding.color)}
-              accentHex={palette.accentHexFor(branding.accent)}
-              onChange={(theme) => onBrandingChange({ theme })}
-            />
-          </div>
-
-          <div className="p-4">
-            <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice colours</p>
-            <InvoiceColorPicker
-              color={branding.color}
-              accent={branding.accent}
-              colors={withSelected<ThemePaletteOption>(palette.colors, {
-                name: branding.color,
-                hex: palette.colorHexFor(branding.color),
-              })}
-              accents={withSelected<ThemePaletteOption>(palette.accents, {
-                name: branding.accent,
-                hex: palette.accentHexFor(branding.accent),
-              })}
-              onColorChange={(color) => onBrandingChange({ color })}
-              onAccentChange={(accent) => onBrandingChange({ accent })}
-              onReset={onResetColors}
-            />
-          </div>
-        </div>
-      )}
+      <div className="p-4">
+        <p className="mb-2.5 text-[13px] font-semibold text-foreground">Invoice colours</p>
+        <InvoiceColorPicker
+          color={branding.color}
+          accent={branding.accent}
+          colors={withSelected<ThemePaletteOption>(palette.colors, {
+            name: branding.color,
+            hex: palette.colorHexFor(branding.color),
+          })}
+          accents={withSelected<ThemePaletteOption>(palette.accents, {
+            name: branding.accent,
+            hex: palette.accentHexFor(branding.accent),
+          })}
+          onColorChange={(color) => onBrandingChange({ color })}
+          onAccentChange={(accent) => onBrandingChange({ accent })}
+          onReset={onResetColors}
+        />
+      </div>
     </div>
   );
 }

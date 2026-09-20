@@ -59,17 +59,12 @@ export function EchoHero({
           compact ? "mt-1 text-[12px]" : "mt-2 text-[15px]"
         )}
       >
-        Ask about transactions, settlements, disputes, accounts or payment
-        links — I&apos;ll skip the menus and get straight to it.
+        Ask about transactions, settlements, disputes, accounts or payment links — I&apos;ll skip
+        the menus and get straight to it.
       </p>
 
       {children ? (
-        <div
-          className={cn(
-            "w-full text-left",
-            compact ? "mt-4 max-w-full" : "mt-8 max-w-xl"
-          )}
-        >
+        <div className={cn("w-full text-left", compact ? "mt-4 max-w-full" : "mt-8 max-w-xl")}>
           <p
             className={cn(
               "mb-2 text-center font-semibold uppercase tracking-[0.08em] text-muted-foreground",

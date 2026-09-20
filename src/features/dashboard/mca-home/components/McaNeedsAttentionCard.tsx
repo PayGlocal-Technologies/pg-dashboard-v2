@@ -89,7 +89,7 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
           variant="no-overdue-invoices"
           size="sm"
           title="You're all caught up"
-          description="No invoices need your attention right now."
+          description="Invoices missing a document, or past their due date, will show up here."
           className="py-4"
         />
       ) : (

@@ -201,7 +201,7 @@ export function SettlementTimelineSection({ row }: SettlementTimelineSectionProp
           </Button>
         )}
       </div>
-      <Card size="sm">
+      <Card size="sm" className="shadow-none">
         <CardContent className="space-y-4">
           {isError ? (
             <div className="flex flex-col items-center gap-2 py-6 text-center">

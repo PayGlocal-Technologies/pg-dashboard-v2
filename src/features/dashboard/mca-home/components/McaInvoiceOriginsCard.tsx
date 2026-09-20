@@ -327,8 +327,8 @@ export function McaInvoiceOriginsCard() {
               <PlaceholderState
                 variant="no-analytics"
                 size="sm"
-                title="No invoiced volume"
-                description="No invoiced volume in this period."
+                title="Nothing invoiced in this period"
+                description="Once you raise invoices, this shows where your invoiced volume comes from."
                 className="h-full py-2"
               />
             ) : (
@@ -359,12 +359,7 @@ export function McaInvoiceOriginsCard() {
                     leave it hugging the left half with dead space beside
                     it); two columns from sm once there's a second entry to
                     pair it with. */}
-                <ul
-                  className={cn(
-                    "grid grid-cols-1 gap-x-4",
-                    rows.length > 1 && "sm:grid-cols-2"
-                  )}
-                >
+                <ul className={cn("grid grid-cols-1 gap-x-4", rows.length > 1 && "sm:grid-cols-2")}>
                   {rows.map((origin, i) => (
                     <li key={origin.countryCode} className="flex items-center gap-3 py-1">
                       <span
@@ -382,8 +377,8 @@ export function McaInvoiceOriginsCard() {
                           {origin.countryName}
                         </span>
                         <span className="block text-[11px] tabular-nums text-muted-foreground">
-                          {formatSharePct(rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0)}{" "}
-                          of total
+                          {formatSharePct(rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0)} of
+                          total
                         </span>
                       </span>
                       <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">

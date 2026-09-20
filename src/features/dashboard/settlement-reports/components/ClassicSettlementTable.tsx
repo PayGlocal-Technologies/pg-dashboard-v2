@@ -146,8 +146,18 @@ export function ClassicSettlementTable({
           data={pageRows}
           isLoading={isLoading}
           skeletonRows={8}
-          emptyTitle="No settlement reports yet"
-          emptyDescription="Settlement reports will appear here once transactions are processed"
+          // Split on the date filter this table already owns: a narrowed range
+          // that matched nothing is not the same as never having settled, and
+          // the old single line told both groups the second thing. Wording
+          // matches the enhanced view so the two toggle states read alike.
+          emptyTitle={
+            dateFilter ? "No settlements in this range" : "Your settlements will appear here"
+          }
+          emptyDescription={
+            dateFilter
+              ? "Try a wider date range, or clear the filter."
+              : "Once payouts begin, each one is listed here with its UTR and the amount that reached your account."
+          }
           rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
           pageSize={CLASSIC_PAGE_SIZE}
           totalRows={rows.length}

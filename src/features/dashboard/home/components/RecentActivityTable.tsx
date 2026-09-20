@@ -285,7 +285,8 @@ export function RecentActivityTable({
             <PlaceholderState
               variant="no-transactions"
               size="sm"
-              title="No recent transactions"
+              title="Your payments will appear here"
+              description="As customers start paying you, your most recent transactions show up in this list."
               className="border-t border-border py-12"
             />
           ) : (
@@ -296,7 +297,8 @@ export function RecentActivityTable({
               isLoading={isLoading}
               skeletonRows={7}
               className="rounded-none border-0 border-t border-border"
-              emptyTitle="No recent transactions"
+              emptyTitle="Your payments will appear here"
+              emptyDescription="As customers start paying you, your most recent transactions show up in this list."
               rowAction={rowActionButton("View details")}
             />
           )}
@@ -307,7 +309,8 @@ export function RecentActivityTable({
             <PlaceholderState
               variant="no-settlements"
               size="sm"
-              title="No recent settlements"
+              title="Your settlements will appear here"
+              description="Once payouts begin, the most recent ones are listed here with the amount that reached your account."
               className="border-t border-border py-12"
             />
           ) : (
@@ -318,7 +321,8 @@ export function RecentActivityTable({
               isLoading={isLoading}
               skeletonRows={4}
               className="rounded-none border-0 border-t border-border"
-              emptyTitle="No recent settlements"
+              emptyTitle="Your settlements will appear here"
+              emptyDescription="Once payouts begin, the most recent ones are listed here with the amount that reached your account."
               rowAction={rowActionButton("View report")}
             />
           )}

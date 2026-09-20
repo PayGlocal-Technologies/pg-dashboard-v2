@@ -23,9 +23,9 @@ import type { Referral, ReferralRedemption } from "@/features/dashboard/refer-an
 
 const EMPTY_STATE: Record<ReferralStatusTab, { title: string; description: string }> = {
   ALL: {
-    title: "No referrals yet",
+    title: "Refer a business and earn",
     description:
-      "Share your referral link to get started. Referrals appear here as soon as someone signs up with it.",
+      "Share your referral link — every business that signs up with it is listed here, along with what you've earned.",
   },
   REDEEMED: {
     title: "Nothing redeemed yet",

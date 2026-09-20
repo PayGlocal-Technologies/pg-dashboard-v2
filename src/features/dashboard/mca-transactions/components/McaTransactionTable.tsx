@@ -37,6 +37,10 @@ import { reorderColumns } from "@/lib/utils/columns";
 // import { UploadInvoiceModal } from "@/features/dashboard/mca-transactions/components/UploadInvoiceModal";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
+import {
+  LinkInvoiceDialog,
+  type LinkableTransactionRef,
+} from "@/features/dashboard/mca-invoices/components/LinkInvoiceDialog";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import { downloadBlob } from "@/lib/utils/format";
 import useNewPermissions from "@/hooks/useNewPermissions";
@@ -176,6 +180,8 @@ export function McaTransactionTable({
   // takes precedence over the rows.find lookup so the details page can show
   // a transaction the table itself never fetched.
   const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
+  // Row currently in the Link Invoice dialog; null closes it.
+  const [linkingTxn, setLinkingTxn] = useState<LinkableTransactionRef | null>(null);
 
   const router = useRouter();
   const { selectMid } = usePacbMidScope();
@@ -222,6 +228,40 @@ export function McaTransactionTable({
   // shows — no client-side narrowing, and pagination's totalCount always
   // describes the same set the rows came from.
   const tableRows = rows;
+
+  /**
+   * Whether the merchant has narrowed the list themselves, which decides
+   * which empty state they see: "nothing matched what you asked for" or
+   * "nothing has happened yet".
+   *
+   * `statusFilters` is deliberately excluded. The tab bar above writes it
+   * (see INVOICE_PENDING_STATUSES / SETTLED_STATUSES), and the page opens on
+   * the Invoice Pending tab, so treating it as a filter would tell a
+   * brand-new merchant their search came up empty before they had searched
+   * anything.
+   */
+  const hasNarrowingFilters =
+    !!search.trim() ||
+    currencyFilters.length > 0 ||
+    !!dateRange.from ||
+    !!dateRange.to ||
+    relativeWindow !== null;
+
+  /**
+   * Transactions aren't something a merchant creates here — they arrive as
+   * customers pay — so the first-time state explains what will land here
+   * rather than pushing an action this page doesn't own.
+   */
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No matching transactions",
+        description: "Try a different search, or clear a filter to widen the results.",
+      }
+    : {
+        title: "Your payments will appear here",
+        description:
+          "As customers pay you, each transaction lands here with its status, currency and settlement details.",
+      };
 
   // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
   const detailsRow = detailsOverrideRow ?? rows.find((r) => r.gid === detailsRowId) ?? null;
@@ -364,7 +404,13 @@ export function McaTransactionTable({
         if (row.merchantId) selectMid(row.merchantId);
         router.push(`/create-invoice?gid=${row.gid}`);
       },
-      onLinkInvoice: (row) => router.push(`/mca-invoices?linkTo=${row.gid}`),
+      onLinkInvoice: (row) =>
+        setLinkingTxn({
+          gid: row.gid,
+          merchantId: row.merchantId,
+          amount: row.amount,
+          currency: row.currency,
+        }),
       canManageInvoices,
     },
     // UTR Number only makes sense once a transaction has actually settled,
@@ -632,8 +678,8 @@ export function McaTransactionTable({
             {!isPending && tableRows.length === 0 ? (
               <PlaceholderState
                 variant="no-transactions"
-                title="No transactions found"
-                description="Try adjusting your filters or search query"
+                title={emptyCopy.title}
+                description={emptyCopy.description}
                 className="hidden py-16 lg:flex"
               />
             ) : (
@@ -643,8 +689,8 @@ export function McaTransactionTable({
                 data={tableRows}
                 isLoading={isPending}
                 skeletonRows={8}
-                emptyTitle="No transactions found"
-                emptyDescription="Try adjusting your filters or search query"
+                emptyTitle={emptyCopy.title}
+                emptyDescription={emptyCopy.description}
                 rowKey={(row) => row.gid}
                 // The whole row opens the details drawer, through DataTable's
                 // row-level handler rather than a wrapper inside every cell.
@@ -675,8 +721,8 @@ export function McaTransactionTable({
               onPageChange={setPage}
               totalRows={totalCount}
               pageSize={TRANSACTIONS_PAGE_LIMIT}
-              emptyTitle="No transactions found"
-              emptyDescription="Try adjusting your filters or search query"
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
             />
           </>
         )}
@@ -705,6 +751,16 @@ export function McaTransactionTable({
         onUploaded={handleInvoiceSubmitted}
         onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}
+      />
+
+      <LinkInvoiceDialog
+        transaction={linkingTxn}
+        onOpenChange={(open) => !open && setLinkingTxn(null)}
+        onLinked={() => {
+          void queryClient.invalidateQueries({ queryKey: ["mca-transactions"] });
+          void queryClient.invalidateQueries({ queryKey: ["mca-document-pending"] });
+          void queryClient.invalidateQueries({ queryKey: ["mca-document-pending-transactions"] });
+        }}
       />
     </div>
   );

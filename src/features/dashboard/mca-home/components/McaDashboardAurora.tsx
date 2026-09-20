@@ -73,7 +73,12 @@ export function McaDashboardAurora({
           }}
         >
           <filter id="mca-dashboard-grain">
-            <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves={1} stitchTiles="stitch" />
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.8"
+              numOctaves={1}
+              stitchTiles="stitch"
+            />
             <feColorMatrix type="saturate" values="0" />
           </filter>
           <rect width="100%" height="100%" filter="url(#mca-dashboard-grain)" />

@@ -196,10 +196,9 @@ function MultiCurrencyContent() {
           The FX calculator goes through PageHeader's own actions slot: it
           answers what a foreign-currency invoice becomes in INR, which is about
           the page's subject as a whole rather than any one region, so it stays
-          with the title. "How it works?" sits beside it now too (left of Forex
-          calculator, same order/style as International Accounts 2), rather
-          than on the account card's own heading row — still gated on
-          selectedAccount since the dialog is per-currency. */}
+          with the title. "How it works?" sits beside it too (left of Forex
+          calculator), rather than on the account card's own heading row —
+          still gated on selectedAccount since the dialog is per-currency. */}
       <PageHeader
         title="International accounts"
         subtitle="Receive international payments using your virtual accounts."
@@ -242,31 +241,46 @@ function MultiCurrencyContent() {
       )}
 
       {/* Both columns are titled modules of the same shape: a title block, then
-          the content it introduces. Four separately-placed grid items (both
-          titles, both content blocks), not two wrapper divs each holding its
-          own heading — that's what actually pins both titles to row 1 and
-          both content blocks to row 2, so they share a top edge regardless of
-          how either title's text happens to wrap. No `grid-template-rows` is
-          declared: the grid still creates exactly two implicit rows, each
-          sized to its own tallest occupant, so this needs no hard-coded
-          height anywhere.
+          the content it introduces. Row 2 holds exactly the two things meant
+          to be compared side by side — the region list and the account
+          card — placed as separately-placed grid items (both titles, both
+          row-2 content blocks) rather than two wrapper divs each holding its
+          own heading, so the titles share a top edge regardless of how
+          either one's text happens to wrap.
 
-          `items-stretch` then makes row 2's shorter content block grow to
-          match the taller one — "Select client region" opts back out via
-          `lg:self-start` since its own height is what should set the row's
-          height, not something to stretch further, leaving the account-
-          details column (default stretch) to grow down and match it.
+          `lg:items-stretch` makes row 2's shorter content grow to match the
+          taller one, and `fillHeight`/`lg:flex-1` on the region-list Card
+          and the account-details Card (not just their wrapping divs) is
+          what actually moves each card's own visible border to fill that
+          stretch — a block child doesn't grow to fill a taller ancestor on
+          its own, so without this the stretch only inflated an invisible
+          wrapper, leaving the two card borders exactly as mismatched as
+          their real content happened to be. Two natural heights are never
+          exactly equal, and an earlier version of this page opted both
+          columns out of the stretch entirely (`self-start`) rather than
+          fix where it landed, which traded a guaranteed-equal bottom edge
+          for a "ragged edge, off by whatever the two heights' real
+          difference happens to be" — a bug, not a design choice.
+
+          Same reasoning excludes two more things from row 2, each its own
+          auto-placed grid item below instead: the currency caveat
+          (`AccountCurrencyNotice`, `lg:col-start-1`) has no counterpart on
+          the account-details side, and "Documents you might need" + the
+          settled/pending metrics (`lg:col-start-2`) have none on the
+          region-list side. Left inside row 2, either one only ever widened
+          that row's mismatch instead of closing it — which is exactly what
+          showed up as dead space inside the shorter card once row 2
+          stretched to match. No `grid-template-rows` is declared anywhere
+          — the grid creates as many implicit rows as it needs, each sized
+          to its own tallest occupant.
 
           DOM order stays left title → right title → left content → right
-          content, so the stacked single-column layout below `lg` (where
-          every explicit placement drops out) still reads in that order.
-          gap-x-5 is the shared gutter, gap-y-3 the 12px title → container
-          step; the left content block's own 32px section-to-section spacing
-          lives directly on it (space-y-6), separate from this row gap. */}
+          content → left's extra content → right's extra content, so the
+          stacked single-column layout below `lg` (where every explicit
+          placement drops out) still reads in that order. gap-x-5 is the
+          shared gutter, gap-y-3 the 12px title → container step. */}
       <div className="grid gap-x-5 gap-y-3 lg:grid-cols-[288px_minmax(0,1fr)] lg:items-stretch">
-        <h2 className={cn(MODULE_TITLE, "lg:col-start-1 lg:row-start-1")}>
-          Select client region
-        </h2>
+        <h2 className={cn(MODULE_TITLE, "lg:col-start-1 lg:row-start-1")}>Select client region</h2>
 
         {selectedAccount && (
           <h2 className={cn(MODULE_TITLE, "lg:col-start-2 lg:row-start-1")}>
@@ -280,14 +294,14 @@ function MultiCurrencyContent() {
             the item's min-content width, and a nowrap flex row of tiles would
             otherwise grow the implicit column past the viewport, scrolling the
             whole page sideways instead of the tile row inside its own box. */}
-        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-2 lg:self-start">
+        <div className="min-w-0 space-y-6 lg:col-start-1 lg:row-start-2 lg:flex lg:flex-col">
           {isLoading ? (
             // The region list is this page's only navigation, so its loading
             // state has to hold the column's footprint — otherwise the right
             // column snaps sideways when the accounts land. Six rows is the
             // typical account count; the Card and its p-3 are the same ones the
             // loaded list sits in, so nothing moves but the row contents.
-            <Card size="sm" aria-busy className="hidden gap-0 p-3 lg:flex">
+            <Card size="sm" aria-busy className="hidden gap-0 p-3 lg:flex lg:flex-1">
               <div className="space-y-1">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <div key={i} className="flex items-center gap-3 px-5 py-2.5">
@@ -328,7 +342,7 @@ function MultiCurrencyContent() {
                 title above the card. */}
               <Card
                 size="sm"
-                className="hidden gap-0 p-3 lg:flex"
+                className="hidden gap-0 p-3 lg:flex lg:flex-1"
                 data-guide="mca-region-selector"
               >
                 <RegionSelector
@@ -341,50 +355,32 @@ function MultiCurrencyContent() {
               </Card>
             </>
           )}
-
-          {/* Currency caveat for the selected region — a pre-payment briefing
-              (e.g. "don't convert to GBP"), so it sits directly under the
-              region choice it belongs to rather than beside the account card.
-              Renders nothing for a currency that carries no caveat. */}
-          {selectedAccount && <AccountCurrencyNotice currency={selectedAccount.currency} />}
-
-          {/* Documents for the selected region, under the region + warning. */}
-          {selectedAccount && (
-            <section>
-              <h2 className={cn(MODULE_TITLE, "mb-3")}>Documents you might need</h2>
-
-              {/* Stacked (flex-col) rather than the wide row it used to be — this
-                  now lives in the narrow 288px left column, so the label and its
-                  download action sit one above the other. */}
-              <Card size="sm" className="flex-col items-start gap-4 py-6">
-                <div className="min-w-0 space-y-1">
-                  <p className="text-[14px] font-medium text-foreground">
-                    Need proof of account ownership?
-                  </p>
-                  <p className={MODULE_SUBTITLE}>
-                    An official document confirming this receiving account belongs to you, for
-                    clients or banks that ask.
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  className="w-full shrink-0"
-                  disabled={isDownloadingProof}
-                  leftIcon={<Icon name="download" className="h-4 w-4" />}
-                  onClick={() => void handleDownloadProof()}
-                >
-                  Download document
-                </Button>
-              </Card>
-            </section>
-          )}
         </div>
 
-        {/* Right column content: just the account-details card now (its own
-            heading moved up to row 1, see above). min-w-0 lets it shrink
-            instead of forcing the column past the viewport; lg:flex
-            lg:flex-col carries the row's stretched height down to the card
-            itself. */}
+        {/* Left column, row 3 — auto-placed (see the right column's own row
+            3 below for how/why): the currency caveat (e.g. "don't convert
+            to GBP") has no counterpart on the account-details side, so
+            keeping it inside row 2's region-list div — as it used to sit —
+            inflated that column past the account card whenever a caveat
+            rendered, which is exactly what showed up as dead space inside
+            the (shorter) account card once row 2 stretched to match.
+            Renders nothing for a currency that carries no caveat. */}
+        {selectedAccount && (
+          // mt-3 on top of the grid's own gap-y-3 restores the 24px step
+          // (space-y-6) this notice used to sit at under the region card,
+          // now that the grid's row gap alone only supplies half of it.
+          <div className="mt-3 lg:col-start-1">
+            <AccountCurrencyNotice currency={selectedAccount.currency} />
+          </div>
+        )}
+
+        {/* Right column, row 2: just the account-details card (its own
+            heading moved up to row 1, see above) — the one thing meant to be
+            compared/stretched against the region list beside it. min-w-0
+            lets it shrink instead of forcing the column past the viewport;
+            lg:flex lg:flex-col gives VirtualAccountDetails' `fillHeight`
+            Card somewhere to grow into (see the spacing-scale comment above
+            the grid). */}
         <div className="min-w-0 lg:col-start-2 lg:row-start-2 lg:flex lg:flex-col">
           {/* AnimatePresence/mode="wait": switching regions used to swap the
               whole card instantly — jarring given how much detail changes at
@@ -395,8 +391,7 @@ function MultiCurrencyContent() {
               the page acknowledging a real switch happened. Same easing/
               duration convention as the settlement detail page and the
               dashboard's analytics tab switch (see SettlementDetailFeature.tsx
-              / TodaysAnalyticsSection.tsx). flex-1/flex-col is what carries
-              the column's stretched height down to the card itself. */}
+              / TodaysAnalyticsSection.tsx). */}
           <AnimatePresence mode="wait">
             {selectedAccount && (
               <motion.div
@@ -407,50 +402,92 @@ function MultiCurrencyContent() {
                 transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 className="flex flex-1 flex-col"
               >
-                {/* Details and their currency's caveat as one stack: the notice is
-                    about the account whose details sit beside it, so it travels
-                    with them. Renders nothing for a currency that carries no
-                    caveat.
-
-                    The notice goes *before* the account details — every one of
-                    them is a pre-payment briefing (don't convert to GBP, expect
-                    your bank's verification prompt), so the client has to read it
-                    before, not after, the account number they're about to send a
-                    payment to.
-
-                    `inside` moves the flag/name/subtitle into the card — there's
-                    no carousel here naming the account any more, and the width
-                    override drops the card's default shrink-wrapping so it fills
-                    this column. Kept at its own natural height now (no more
-                    `h-full`) — the two small metric cards below absorb the
-                    leftover height instead, see their own doc comment. */}
+                {/* `inside` moves the flag/name/subtitle into the card —
+                    there's no carousel here naming the account any more,
+                    and the width override drops the card's default
+                    shrink-wrapping so it fills this column. `fillHeight`
+                    grows the card itself (not just this wrapping motion.div)
+                    to fill row 2's stretched height — see the prop's own
+                    doc comment and the spacing-scale comment above the
+                    grid. */}
                 <VirtualAccountDetails
                   account={selectedAccount}
                   onCopy={handleCopyFullAccount}
                   onShare={() => setShareModalOpen(true)}
                   headerPlacement="inside"
+                  actionsPlacement="header"
+                  dense
+                  fillHeight
                   className="w-full max-w-none border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
                 />
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-                {/* Settled amount + Documents pending, side by side — the
-                    Metrics cards from before, now small and placed in the
-                    space this column has left over once account details
-                    settles at its own natural height. `mt-auto` pushes this
-                    row down to the column's own bottom edge (which the grid
-                    above already stretches to match "Documents you might
-                    need" on the left) rather than leaving it stranded right
-                    under the account card with a gap below it — same
-                    mt-auto-over-fixed-margin technique OutstandingAmountCard
-                    itself already uses to ground its own optional content. */}
-                <div className="mt-auto grid grid-cols-2 gap-4 pt-4">
-                  {/* Slightly smaller than before (p-3 vs p-4, text-xl vs
-                      text-2xl) — this and Documents pending beside it were
-                      each a touch taller than "Documents you might need" in
-                      the column opposite, which items-stretch on the outer
-                      grid was matching by growing THIS row rather than
-                      shrinking that one. Same diagonal wash treatment as the
-                      reference: a white-to-tint gradient corner rather than a
-                      flat tinted fill. */}
+          {selectedAccount && (
+            <HowItWorksDialog
+              open={howItWorksOpen}
+              onOpenChange={setHowItWorksOpen}
+              currency={selectedAccount.currency}
+            />
+          )}
+        </div>
+
+        {/* Right column, row 3 — auto-placed: no `lg:row-start` is given, so
+            CSS Grid's auto-placement algorithm finds the next open cell in
+            column 2, which is row 3 (rows 1-2 there are already explicitly
+            taken by the title and the account card above). Deliberately
+            outside row 2's stretch/compare (see the spacing-scale comment
+            above the grid) — this content has no counterpart on the region
+            list side, so it can't help that comparison, only widen it. */}
+        {selectedAccount && (
+          <div className="min-w-0 lg:col-start-2">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={selectedAccount.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -5 }}
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
+                {/* Documents for the selected region — a merchant reaches
+                    for proof of ownership right after reading the account
+                    they'd share, so it sits directly under Account details
+                    rather than beside the region list. */}
+                <section className="mt-4">
+                  <h2 className={cn(MODULE_TITLE, "mb-3")}>Documents you might need</h2>
+                  <Card
+                    size="sm"
+                    className="flex-col items-start gap-4 py-6 sm:flex-row sm:items-center"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="text-[14px] font-medium text-foreground">
+                        Need proof of account ownership?
+                      </p>
+                      <p className={MODULE_SUBTITLE}>
+                        An official document confirming this receiving account belongs to you, for
+                        clients or banks that ask.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="w-full shrink-0 sm:w-auto"
+                      disabled={isDownloadingProof}
+                      leftIcon={<Icon name="download" className="h-4 w-4" />}
+                      onClick={() => void handleDownloadProof()}
+                    >
+                      Download document
+                    </Button>
+                  </Card>
+                </section>
+
+                {/* Settled amount + Documents pending, side by side — a
+                    compact companion pair under Account details rather than
+                    a full-size KPI of their own. */}
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  {/* Same diagonal wash treatment as the reference: a
+                      white-to-tint gradient corner rather than a flat
+                      tinted fill. */}
                   <Card
                     size="sm"
                     className="gap-0 border-emerald-100 bg-linear-to-br from-white via-white to-emerald-100/70 p-3 dark:border-emerald-900/40 dark:from-card dark:via-card dark:to-emerald-950/40"
@@ -482,17 +519,9 @@ function MultiCurrencyContent() {
                   />
                 </div>
               </motion.div>
-            )}
-          </AnimatePresence>
-
-          {selectedAccount && (
-            <HowItWorksDialog
-              open={howItWorksOpen}
-              onOpenChange={setHowItWorksOpen}
-              currency={selectedAccount.currency}
-            />
-          )}
-        </div>
+            </AnimatePresence>
+          </div>
+        )}
       </div>
 
       {/* Guide launcher for International Accounts. */}

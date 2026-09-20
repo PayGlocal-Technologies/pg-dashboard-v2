@@ -275,8 +275,29 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   }));
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
-  const emptyTitle = "No clients found";
-  const emptyDescription = "Try adjusting your filters or search query";
+  // Told apart rather than sharing one line: a merchant who has searched and
+  // matched nothing needs to widen the search, while one who has never added a
+  // client needs to know what this list is for. Telling the second to "adjust
+  // your filters" sent them looking for filters they had never set.
+  const hasNarrowingFilters = !!search.trim() || countryFilters.length > 0;
+  const emptyTitle = hasNarrowingFilters
+    ? "No matching clients"
+    : "Add your clients once, invoice them anytime";
+  const emptyDescription = hasNarrowingFilters
+    ? "Try a different search, or clear a filter to widen the results."
+    : "Save a client's details and address so every invoice to them is a few clicks, not a form.";
+  /** Only the first-time state gets the action — the fix for an empty search
+   *  is a different search, not a new client. */
+  const emptyAction = hasNarrowingFilters ? undefined : (
+    <Button
+      type="button"
+      variant="primary"
+      leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+      onClick={() => onAddClientOpenChange(true)}
+    >
+      Add client
+    </Button>
+  );
 
   // Shared verbatim between the desktop and tablet/mobile control rows below
   // so the two can never drift out of sync. Just the chip elements, not their
@@ -406,6 +427,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           variant="no-data"
           title={emptyTitle}
           description={emptyDescription}
+          action={emptyAction}
           className="hidden py-16 lg:flex"
         />
       ) : (
@@ -465,6 +487,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
         pageSize={CLIENT_PAGE_LIMIT}
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
+        emptyAction={emptyAction}
       />
 
       {/* Rendered alongside the table (not in place of it) so closing it leaves

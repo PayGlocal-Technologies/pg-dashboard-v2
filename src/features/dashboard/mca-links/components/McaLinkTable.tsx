@@ -87,6 +87,30 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   const isPending = false;
 
   const query = search.trim().toLowerCase();
+
+  // Which empty state applies: nothing matched the merchant's own narrowing,
+  // or they have not created a link yet. Telling the second group to adjust
+  // filters points them at controls they never touched.
+  const hasNarrowingFilters =
+    !!search.trim() ||
+    statusFilters.length > 0 ||
+    currencyFilters.length > 0 ||
+    !!dateRange.from ||
+    !!dateRange.to ||
+    !!amountRange.min ||
+    !!amountRange.max;
+
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No matching links",
+        description: "Try a different search, or clear a filter to widen the results.",
+      }
+    : {
+        title: "Create a link and start collecting",
+        description:
+          "Share a payment link with your customer and collect international payments without a checkout.",
+      };
+
   const minAmount = amountRange.min ? parseFloat(amountRange.min) : undefined;
   const maxAmount = amountRange.max ? parseFloat(amountRange.max) : undefined;
   const fromMs = dateRange.from ? toStartOfDayMs(dateRange.from) : undefined;
@@ -286,8 +310,20 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
       {!isPending && tableRows.length === 0 ? (
         <PlaceholderState
           variant="no-payment-links"
-          title="No payment links found"
-          description="Try adjusting your filters or search query"
+          title={emptyCopy.title}
+          description={emptyCopy.description}
+          action={
+            hasNarrowingFilters ? undefined : (
+              <Button
+                type="button"
+                variant="primary"
+                leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                onClick={onCreateLink}
+              >
+                Create MCA Link
+              </Button>
+            )
+          }
           className="py-16"
         />
       ) : (
@@ -296,8 +332,8 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
           data={tableRows}
           isLoading={isPending}
           skeletonRows={8}
-          emptyTitle="No payment links found"
-          emptyDescription="Try adjusting your filters or search query"
+          emptyTitle={emptyCopy.title}
+          emptyDescription={emptyCopy.description}
           rowKey={(row) => row.gid}
           // The whole row opens the details view, through DataTable's row-level
           // handler rather than a wrapper inside every cell. Clicks on the

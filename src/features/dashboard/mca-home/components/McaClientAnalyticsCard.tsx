@@ -85,8 +85,8 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
           <PlaceholderState
             variant="no-analytics"
             size="sm"
-            title="No client activity"
-            description="No client activity in this period."
+            title="No client activity yet"
+            description="As clients start paying, you'll see which of them contribute most to your revenue."
             className="py-4"
           />
         ) : (

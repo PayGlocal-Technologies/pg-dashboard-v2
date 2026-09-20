@@ -1,9 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Alert, AlertDescription, Button, Card, CardContent, StatusBadge } from "@/components/ui";
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Card,
+  CardContent,
+  Separator,
+  StatusBadge,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { AppImage } from "@/components/common/AppImage";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
 import {
@@ -47,17 +54,6 @@ interface TransactionDetailsPageProps {
 }
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
-
-// The full-page corner illustration, keyed by externalStatus — width/height
-// per asset's own aspect ratio (invoiceimg.png is square, success.png is
-// 1536×1024) so neither gets stretched. Statuses with no entry render none.
-const STATUS_HERO_IMAGE: Partial<
-  Record<McaTransaction["externalStatus"], { src: string; width: number; height: number }>
-> = {
-  DOCUMENT_PENDING: { src: "/assets/invoiceimg.png", width: 340, height: 340 },
-  SETTLED: { src: "/assets/success.png", width: 440, height: 293 },
-  FIRC_SETTLED: { src: "/assets/success.png", width: 440, height: 293 },
-};
 
 // Literal Tailwind row-start/row-span classes, looked up by number rather
 // than interpolated into a template string — Tailwind's build-time class
@@ -148,7 +144,7 @@ function PaymentDetailsSection({
       >
         Payment Details
       </h3>
-      <Card size="sm">
+      <Card size="sm" className="shadow-none">
         <CardContent className="space-y-4">
           <DetailRow
             label="Transaction date"
@@ -223,7 +219,7 @@ function SenderDetailsSection({
       <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         Sender Details
       </h3>
-      <Card size="sm">
+      <Card size="sm" className="shadow-none">
         <CardContent className="space-y-4">
           <DetailRow label="Remitter name" value={counterpartyName} />
           <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
@@ -254,28 +250,8 @@ export function TransactionDetailsPage({
   isPartnerUser,
   backLabel = "Back to Transactions",
 }: TransactionDetailsPageProps) {
-  const heroImage = STATUS_HERO_IMAGE[row.externalStatus];
-
   return (
     <div className="relative">
-      {/* Pinned to the page's own top-right corner rather than laid out
-          inline with the summary row — large enough that keeping it in
-          flow would push the amount/status block around, so instead it
-          overlaps upward over the Back/Collapse row. pointer-events-none
-          keeps it from stealing clicks off Back/Collapse where it
-          overlaps them. One status-keyed illustration at a time: the thing
-          still owed (upload an invoice) for DOCUMENT_PENDING, the payoff
-          once money has actually landed for SETTLED/FIRC_SETTLED. */}
-      {heroImage && (
-        <AppImage
-          src={heroImage.src}
-          width={heroImage.width}
-          height={heroImage.height}
-          alt=""
-          className="pointer-events-none absolute -top-20 -right-8 z-0 hidden sm:block"
-        />
-      )}
-
       {/* Back/Collapse only, both left-aligned and adjacent to each other.
           No Transaction ID here (unlike the drawer's Expand/Close row, see
           TransactionDetailsDrawer.tsx). The expanded page drops it entirely
@@ -287,7 +263,7 @@ export function TransactionDetailsPage({
           size="sm"
           leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
           onClick={onBack}
-          className="pl-0 text-muted-foreground hover:text-foreground"
+          className="pl-0 text-primary hover:text-primary-hover"
         >
           {backLabel}
         </Button>
@@ -383,7 +359,7 @@ export function TransactionDetailsContent({
   const isSampleTransaction = row.gid?.includes("mocked");
 
   const summary = (
-    <div className={layout === "drawer" ? undefined : "mb-9"}>
+    <div className={layout === "drawer" ? undefined : "mb-6"}>
       {isSampleTransaction && (
         <Alert variant="warning" className="mb-4">
           <AlertDescription>This is a sample transaction shown for preview only.</AlertDescription>
@@ -436,6 +412,12 @@ export function TransactionDetailsContent({
         )}
       </div>
 
+      {/* Full-width now — was scoped to the amount stack's own shrink-wrapped
+          column (max-w-70), which read as a short, oddly-truncated rule
+          rather than a section break. Sits outside that flex row so it
+          spans the summary's whole width, same as a Card's own divider. */}
+      <Separator className="my-4" />
+
       {isReversed && (
         <Alert variant="error" className="mt-6">
           <AlertDescription>
@@ -471,7 +453,7 @@ export function TransactionDetailsContent({
     // the drawer is meant to stay the lighter of the two views up to that
     // point.
     return (
-      <div className="space-y-5">
+      <div className="space-y-4">
         {summary}
         <SettlementActionCard row={row} onUploaded={onUploaded} />
         <SettlementTimelineSection row={row} />
@@ -524,21 +506,21 @@ export function TransactionDetailsContent({
           instead of always row 1. items-start keeps each section sized to
           its own content instead of stretching to match whichever column is
           taller in a shared row. */}
-      <div className="grid gap-x-10 gap-y-9 lg:grid-cols-[3fr_1fr] lg:items-start">
+      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[3fr_1fr] lg:items-start">
         {/* SettlementActionCard, then Settlement Timeline: the settlement
             money breakdown still renders nested inside the timeline card
             under the step it belongs to, not as a sibling row — only the
             invoice-upload/FIRC action moved out, into its own card above
-            it. space-y-9 matches the right column's own gap so the two
+            it. space-y-6 matches the right column's own gap so the two
             columns' internal rhythm reads the same. */}
-        <div className={cn("space-y-9 lg:col-start-1", ROW_START_CLASS[timelineRow])}>
+        <div className={cn("space-y-6 lg:col-start-1", ROW_START_CLASS[timelineRow])}>
           <SettlementActionCard row={row} onUploaded={onUploaded} />
           <SettlementTimelineSection row={row} />
         </div>
 
         {/* Right column: Payment Details then Sender Details, top-aligned
             with Settlement Timeline across from it. */}
-        <div className={cn("space-y-9 lg:col-start-2", ROW_START_CLASS[timelineRow])}>
+        <div className={cn("space-y-6 lg:col-start-2", ROW_START_CLASS[timelineRow])}>
           <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
           <SenderDetailsSection
             row={row}
@@ -553,7 +535,7 @@ export function TransactionDetailsContent({
           cards side by side from lg up (matching the standalone settlement
           page), which the narrow right column has no room for. */}
       {isSettled && (
-        <div className="mt-9">
+        <div className="mt-6">
           <SettlementBatchDetailsSection row={row} layout="page" />
         </div>
       )}

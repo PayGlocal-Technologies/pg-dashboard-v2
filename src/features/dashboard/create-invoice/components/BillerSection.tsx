@@ -51,26 +51,29 @@ export function BillerSection({
 }) {
   const [editOpen, setEditOpen] = useState(false);
 
+  // Legal name folds into the Address row's value rather than sitting under
+  // the heading as its own line or beside it inline — either of those grew
+  // the header, and the name is exactly the kind of thing that address row
+  // already exists to carry.
+  const addressValue = [billerDetails?.legalName, formatBillerAddress(billerDetails)]
+    .filter(Boolean)
+    .join(" · ");
+
   const rows = [
-    { label: "Address", value: formatBillerAddress(billerDetails) },
+    { label: "Address", value: addressValue },
     { label: "Phone", value: billerDetails?.phone },
     { label: "Email", value: billerDetails?.email },
     ...(billerDetails?.gstIn ? [{ label: "GSTIN", value: billerDetails.gstIn }] : []),
   ];
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <div className="rounded-xl border border-border p-5">
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
             <Icon name="receipt" className="h-4 w-4" />
           </span>
-          <div>
-            <h2 className="text-[15px] font-semibold text-foreground">Who it&apos;s from</h2>
-            {billerDetails?.legalName && (
-              <p className="text-[12px] text-muted-foreground">{billerDetails.legalName}</p>
-            )}
-          </div>
+          <h2 className="text-[15px] font-semibold text-foreground">Who it&apos;s from</h2>
         </div>
 
         <Button

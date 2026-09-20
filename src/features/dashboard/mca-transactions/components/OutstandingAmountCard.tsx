@@ -50,17 +50,13 @@ export function OutstandingAmountCard({
    *  "REST_OF_WORLD" for the Rest of the World region. */
   currency: scopedCurrency,
   /** Drops the amber clock icon row entirely. Off by default; International
-   *  Accounts 2's Metrics rail turns it on to get a denser card with nothing
-   *  above the title. */
+   *  Accounts' paired Settled amount/Documents pending row turns it on to get
+   *  a denser card with nothing above the title. */
   hideIcon = false,
   /** Where the pending-count chip sits: beside the title (default, every
    *  existing placement) or under the headline amount (International
-   *  Accounts 2's Metrics rail, which wants the amount to read first). */
+   *  Accounts' paired row, which wants the amount to read first). */
   badgePlacement = "title",
-  /** Swaps the card's neutral surface for a light blue fill + blue border —
-   *  International Accounts 2's Metrics rail only; every other placement
-   *  keeps the plain Card default. */
-  tint = false,
   /** Same diagonal white-to-tint wash as the reference "Documents pending"
    *  card, rose instead of blue, plus a smaller headline amount — the
    *  International Accounts page's paired Settled amount/Documents pending
@@ -73,7 +69,6 @@ export function OutstandingAmountCard({
   currency?: string;
   hideIcon?: boolean;
   badgePlacement?: "title" | "below-amount";
-  tint?: boolean;
   dangerTint?: boolean;
 }) {
   const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe);
@@ -110,7 +105,6 @@ export function OutstandingAmountCard({
       size="sm"
       className={cn(
         "w-full",
-        tint && "border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-950/20",
         dangerTint &&
           "border-rose-100 bg-linear-to-br from-white via-white to-rose-100/70 dark:border-rose-900/40 dark:from-card dark:via-card dark:to-rose-950/40",
         className

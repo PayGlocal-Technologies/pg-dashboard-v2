@@ -59,7 +59,10 @@ export function ChipField({
   fieldId,
   children,
 }: {
-  label: string;
+  /** Omit to render the field with no caption row — used for the due-date
+   *  field before it has a value, where a heading over a bare "+ Add" link
+   *  would name a field that isn't there yet. */
+  label?: string;
   /** Draws the asterisk and, more importantly, is what the checklist points at. */
   required?: boolean;
   /** `data-field` anchor, so the readiness checklist can scroll here. */
@@ -68,19 +71,30 @@ export function ChipField({
 }) {
   return (
     <div className="flex flex-col gap-1" data-field={fieldId}>
-      <span className="text-[11px] font-medium text-muted-foreground">
-        {label}
-        {required && (
-          <span className="text-destructive" aria-hidden>
-            {" "}
-            *
-          </span>
-        )}
-      </span>
+      {label && (
+        <span className="text-[11px] font-medium text-muted-foreground">
+          {label}
+          {required && (
+            <span className="text-destructive" aria-hidden>
+              {" "}
+              *
+            </span>
+          )}
+        </span>
+      )}
       {children}
     </div>
   );
 }
+
+/**
+ * Shared trigger style for the three date-row chips: no fill, no pill — just
+ * text and a pencil, so the row reads as inline editable fields rather than
+ * a strip of buttons. The negative margin keeps the hover affordance without
+ * shifting the text out of alignment with the caption above it.
+ */
+export const CHIP_TRIGGER_CLASS =
+  "flex items-center gap-1.5 -mx-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/60";
 
 function Chip({
   label,
@@ -94,13 +108,7 @@ function Chip({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/80",
-            className
-          )}
-        >
+        <button type="button" className={cn(CHIP_TRIGGER_CLASS, className)}>
           {label}
           <Icon name="pencil" className="h-3 w-3 text-muted-foreground" />
         </button>
@@ -202,7 +210,7 @@ export function IssueDateChip({
         <button
           type="button"
           aria-label={`Issue date${value ? `: ${label}` : ""}`}
-          className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/80"
+          className={CHIP_TRIGGER_CLASS}
         >
           {label}
           <Icon name="pencil" className="h-3 w-3 text-muted-foreground" />
@@ -228,7 +236,7 @@ export function IssueDateChip({
   );
 }
 
-function dueLabel(termId: string | null, dueDate: string): string {
+export function dueLabel(termId: string | null, dueDate: string): string {
   if (!termId) return "";
   if (termId === "custom") {
     return dueDate
@@ -269,24 +277,18 @@ export function DueDateChip({
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {label ? (
-          <button
-            type="button"
-            aria-label={`Due date: ${label}`}
-            className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1.5 text-[13px] font-medium text-foreground transition-colors hover:bg-muted/80"
-          >
+          <button type="button" aria-label={`Due date: ${label}`} className={CHIP_TRIGGER_CLASS}>
             {label}
             <Icon name="pencil" className="h-3 w-3 text-muted-foreground" />
           </button>
         ) : (
-          /* Same pill geometry as the two chips beside it, so an unset due date
-             reads as the third field of the row rather than as a footnote after
-             it. Dashed and primary-tinted rather than the siblings' solid muted
-             fill — the app's own "add a filter" chip affordance (see
-             FilterChipShell) — which is what marks it as still to do. */
+          /* Same trigger geometry as the two chips beside it, so an unset due
+             date still sits on the row's baseline — just primary-tinted, which
+             is what marks it as still to do. */
           <button
             type="button"
             aria-label="Set the due date"
-            className="flex items-center gap-1.5 rounded-full border border-dashed border-primary/50 bg-primary/5 px-3 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/10"
+            className="flex items-center gap-1.5 -mx-1.5 rounded-md px-1.5 py-1 text-[13px] font-medium text-primary transition-colors hover:bg-primary/5"
           >
             <Icon name="plus" className="h-3.5 w-3.5" />
             Add due date

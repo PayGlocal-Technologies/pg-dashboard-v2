@@ -41,7 +41,10 @@ export function SettlementBatchDetailsSection({
    *  own viewport never has the room a side-by-side pair needs. */
   layout?: "page" | "drawer";
 }) {
-  const { detail, isLoading, isError } = useSettlementDetail(row.merchantId, row.settlementDate ?? "");
+  const { detail, isLoading, isError } = useSettlementDetail(
+    row.merchantId,
+    row.settlementDate ?? ""
+  );
 
   // Silent, not an error state of its own: this section is supplementary to
   // the transaction's own details, which are already fully shown above it —

@@ -311,11 +311,16 @@ export function ClientInvoicesSection({
           // Matched to pageSize, so the loading block is exactly the height of
           // the rows that replace it and the section doesn't jump on settle.
           skeletonRows={5}
-          emptyTitle="No invoices yet"
+          // The title moves with the description: saying "No invoices yet"
+          // over a status-filtered list claimed this client had never been
+          // invoiced, when the merchant had simply narrowed the view.
+          emptyTitle={
+            activeCount > 0 ? "No invoices match these statuses" : "No invoices for this client yet"
+          }
           emptyDescription={
             activeCount > 0
-              ? "No invoices match the selected statuses"
-              : "Invoices raised against this client will appear here"
+              ? "Clear a status to see the rest of this client's invoices."
+              : "Invoices you raise against this client will be listed here with their status and amount."
           }
           rowKey={(row) => row.id}
           rowAction={(row) => (

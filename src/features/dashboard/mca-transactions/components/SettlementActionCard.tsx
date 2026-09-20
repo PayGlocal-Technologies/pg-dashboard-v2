@@ -41,7 +41,14 @@ export function SettlementActionCard({ row, onUploaded }: SettlementActionCardPr
         <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Upload invoice
         </h3>
-        <Card size="sm">
+        {/* Same diagonal white-to-blue wash as International Accounts' own
+            Account details card (see VirtualAccountDetails/platforms
+            index.tsx) — this is this page's equivalent "the thing you still
+            need to act on" card. */}
+        <Card
+          size="sm"
+          className="shadow-none border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
+        >
           <CardContent>
             <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
           </CardContent>

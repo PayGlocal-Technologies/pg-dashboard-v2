@@ -332,6 +332,24 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
 
+  /**
+   * Which empty state applies. The old copy said "No settlements yet"
+   * regardless, which told a merchant who had just searched or picked a date
+   * that they had none at all. Settlements aren't merchant-created, so neither
+   * branch carries a CTA.
+   */
+  const hasNarrowingFilters = !!search.trim() || !!dateFilter;
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No settlements in this range",
+        description: "Try a wider date range, or clear the search.",
+      }
+    : {
+        title: "Track your settlements in one place",
+        description:
+          "Each payout appears here with the transactions it covers and when the funds reached your account.",
+      };
+
   /** Row-scoped report download, shared by both views.
    *
    *  Keyed off `row.date`, the settlement date, which is also the row's id now
@@ -527,8 +545,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 ) : (enhancedIsMock || !isPending) && filteredEnhancedRows.length === 0 ? (
                   <PlaceholderState
                     variant="no-settlements"
-                    title="No settlements yet"
-                    description="Settlement reports will appear here once transactions are processed."
+                    title={emptyCopy.title}
+                    description={emptyCopy.description}
                     className="border-t border-border py-14"
                   />
                 ) : (
@@ -541,8 +559,8 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                     data={filteredEnhancedRows}
                     isLoading={!enhancedIsMock && isPending}
                     skeletonRows={8}
-                    emptyTitle="No settlements yet"
-                    emptyDescription="Settlement reports will appear here once transactions are processed"
+                    emptyTitle={emptyCopy.title}
+                    emptyDescription={emptyCopy.description}
                     rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
                     pageSize={10}
                     density="compact"

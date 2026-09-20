@@ -270,17 +270,6 @@ export const mcaNavigation: NavGroup[] = [
       // than the /international-accounts route this tree was designed
       // against, which was never built.
       { label: "International Accounts", href: "/multi-currency", icon: "globe-2", permission: [] },
-      // Layout experiment on the same page/data as International Accounts
-      // above (see InternationalAccounts2Feature) — a 70/30 split on the
-      // account details column instead of the original's single stack. Not
-      // meant to replace the entry above; both stay reachable so the two can
-      // be compared.
-      {
-        label: "International Accounts 2",
-        href: "/multi-currency-2",
-        icon: "globe-2",
-        permission: [],
-      },
       // /platforms, this app's existing Platforms page, rather than the
       // /connect-platforms route this tree was designed against, which was
       // never built.

@@ -260,6 +260,27 @@ export function McaSettlementReportFeature() {
     [enhancedRows, search]
   );
 
+  /**
+   * Which empty state applies. The previous copy said "No settlements yet"
+   * whatever the reason, which told a merchant who had just searched or
+   * narrowed the dates that they had no settlements at all — the opposite of
+   * what had happened.
+   *
+   * Settlements are not something a merchant creates, so neither branch
+   * carries a CTA: the first-time one explains what will land here.
+   */
+  const hasNarrowingFilters = !!search.trim() || !!dateFilter || !!dateFilterEnd;
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No settlements in this range",
+        description: "Try a wider date range, or clear the search.",
+      }
+    : {
+        title: "Track your settlements in one place",
+        description:
+          "Each payout appears here with the transactions it covers and when the funds reached your account.",
+      };
+
   /** Row-scoped report download, shared by both views.
    *
    *  Keyed off `row.date`, the settlement date, which is also the row's id now
@@ -467,8 +488,8 @@ export function McaSettlementReportFeature() {
               ) : !isListLoading && filteredEnhancedRows.length === 0 ? (
                 <PlaceholderState
                   variant="no-settlements"
-                  title="No settlements yet"
-                  description="Settlement reports will appear here once transactions are processed."
+                  title={emptyCopy.title}
+                  description={emptyCopy.description}
                   className="py-14"
                 />
               ) : (
@@ -487,8 +508,8 @@ export function McaSettlementReportFeature() {
                   data={filteredEnhancedRows}
                   isLoading={isListLoading}
                   skeletonRows={8}
-                  emptyTitle="No settlements yet"
-                  emptyDescription="Settlement reports will appear here once transactions are processed"
+                  emptyTitle={emptyCopy.title}
+                  emptyDescription={emptyCopy.description}
                   rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
                   // Server-side: the endpoint pages, so the table is told the
                   // filtered total rather than counting the page in hand.

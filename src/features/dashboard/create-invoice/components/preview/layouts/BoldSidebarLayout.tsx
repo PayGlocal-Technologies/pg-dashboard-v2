@@ -8,6 +8,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
+  PreviewSection,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -56,20 +57,27 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
               gstIn={model.billerGstIn}
               labelClassName={brandLabel}
               labelStyle={{ color: primary }}
+              fieldId="biller"
             />
           </div>
 
           <div className="min-w-0 flex-1 text-right text-[12px]">
-            <p style={{ color: primary }}>
-              {labels.invoiceNumber} {model.invoiceNumber}
-            </p>
-            <p style={{ color: primary }}>
-              {labels.issueDate} {model.issueDate}
-            </p>
-            {model.dueDate && (
+            <PreviewSection fieldId="invoice-number" label="Edit invoice number" className="text-right">
               <p style={{ color: primary }}>
-                {labels.dueBy} {model.dueDate}
+                {labels.invoiceNumber} {model.invoiceNumber}
               </p>
+            </PreviewSection>
+            <PreviewSection fieldId="issue-date" label="Edit issue date" className="text-right">
+              <p style={{ color: primary }}>
+                {labels.issueDate} {model.issueDate}
+              </p>
+            </PreviewSection>
+            {model.dueDate && (
+              <PreviewSection fieldId="due-date" label="Edit due date" className="text-right">
+                <p style={{ color: primary }}>
+                  {labels.dueBy} {model.dueDate}
+                </p>
+              </PreviewSection>
             )}
 
             <PartyBlock
@@ -80,6 +88,7 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
               className="mt-3"
               labelClassName={`${brandLabel} underline underline-offset-2`}
               labelStyle={{ color: primary }}
+              fieldId="client"
             />
           </div>
         </div>
@@ -98,7 +107,7 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
             <span>{labels.total}</span>
           </div>
 
-          <div className="space-y-2.5">
+          <PreviewSection fieldId="line-items" label="Edit line items" className="space-y-2.5">
             {items.map((item) => (
               <div key={item.key} className="flex items-baseline justify-between gap-4 text-[13px]">
                 <span className="min-w-0">
@@ -113,7 +122,7 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
                 </span>
               </div>
             ))}
-          </div>
+          </PreviewSection>
 
           <div className="mt-3 flex justify-end border-t pt-3" style={{ borderColor: primary }}>
             <div className="w-full max-w-[240px]">
@@ -146,8 +155,9 @@ export function BoldSidebarLayout({ model, onLogoClick }: LayoutProps) {
               columns={1}
               labelClassName={`${brandLabel} underline underline-offset-2`}
               labelStyle={{ color: accent }}
+              fieldId="payment-account"
             />
-            <NotesBlock notes={model.notes} lut={model.lut} className="mt-4" />
+            <NotesBlock notes={model.notes} lut={model.lut} className="mt-4" fieldId="notes-terms" />
           </div>
 
           <SignatureBlock url={model.signatureUrl} className="shrink-0" />

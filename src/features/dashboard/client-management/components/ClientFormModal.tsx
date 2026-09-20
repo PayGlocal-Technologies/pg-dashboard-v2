@@ -2,6 +2,7 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { SearchableSelect } from "@/components/common/SearchableSelect";
+import { Icon } from "@/components/icon";
 
 import { useForm } from "@tanstack/react-form";
 import {
@@ -54,7 +55,6 @@ import {
   validateWebsite,
   validateZipcode,
 } from "@/features/dashboard/client-management/schemas";
-import { ClientBusinessTypeChips } from "@/features/dashboard/client-management/components/ClientBusinessTypeChips";
 import { ClientTagsInput } from "@/features/dashboard/client-management/components/ClientTagsInput";
 import { ClientContractUpload } from "@/features/dashboard/client-management/components/ClientContractUpload";
 import type { ClientFormValues } from "@/features/dashboard/client-management/types";
@@ -85,6 +85,62 @@ function RequiredMark() {
     <span aria-hidden className="text-destructive">
       *
     </span>
+  );
+}
+
+/**
+ * "+ Add website", "+ Add tags", "+ Add shipping address"… — the trigger for
+ * an all-optional field or section that starts collapsed. Primary-tinted
+ * text with no fill or border of its own (same undecorated treatment
+ * Create Invoice's own "Add due date" chip uses for the same reason: it
+ * marks something still to do without drawing a whole second field style
+ * into the form).
+ */
+function AddOptionalTrigger({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-fit items-center gap-1.5 py-0.5 text-[13px] font-medium text-primary transition-colors hover:text-primary-hover"
+    >
+      <Icon name="plus" className="h-3.5 w-3.5" />
+      {label}
+    </button>
+  );
+}
+
+/**
+ * Wraps a revealed optional field or section: its own content, plus a
+ * delete affordance that only appears on hover (or focus, for keyboard
+ * users) rather than sitting on screen permanently — removing it clears the
+ * value(s) and collapses back to the field's own AddOptionalTrigger.
+ */
+function OptionalFieldSlot({
+  removeLabel,
+  onRemove,
+  children,
+}: {
+  removeLabel: string;
+  onRemove: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div className="group/optional relative">
+      {children}
+      <button
+        type="button"
+        onClick={onRemove}
+        aria-label={removeLabel}
+        className={cn(
+          "absolute right-0 top-0 flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground",
+          "opacity-0 transition-opacity hover:text-destructive focus-visible:opacity-100",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+          "group-hover/optional:opacity-100"
+        )}
+      >
+        <Icon name="x" className="h-3.5 w-3.5" />
+      </button>
+    </div>
   );
 }
 
@@ -302,6 +358,20 @@ function ClientFormBody({
   // options have to change the moment the country does.
   const [addressCountry, setAddressCountry] = useState(initialValues?.country ?? "");
 
+  // Whether each all-optional field/section is revealed. Lifted here (rather
+  // than useState inside a form.Field render prop, which would break the
+  // rules of hooks) and seeded from whatever the record already has, so
+  // editing a client with a website already filled in doesn't hide it
+  // behind an "+ Add website" the merchant would have to know to click.
+  const [websiteOpen, setWebsiteOpen] = useState(!!initialValues?.website);
+  const [tagsOpen, setTagsOpen] = useState(!!initialValues?.tags?.length);
+  const [shippingOpen, setShippingOpen] = useState(
+    !!initialValues && !initialValues.sameAsBillingAddress
+  );
+  const [gstOpen, setGstOpen] = useState(!!initialValues?.gstin);
+  const [notesOpen, setNotesOpen] = useState(!!initialValues?.notes);
+  const [contractOpen, setContractOpen] = useState(!!initialValues?.contract);
+
   // Tag suggestions and the state list are merchant/app configuration rather
   // than constants, so both are fetched (see useClientTagOptions and
   // useClientStateCodes).
@@ -389,15 +459,13 @@ function ClientFormBody({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
+                    className="shadow-none"
                   />
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
               )}
             </form.Field>
 
-            {/* Chips, not a dropdown: five short options are cheaper to read
-                on screen than behind a trigger, and the row folds onto a
-                second line at narrow widths rather than needing one. */}
             <form.Field
               name="businessType"
               validators={{
@@ -409,29 +477,34 @@ function ClientFormBody({
                 const invalid = field.state.meta.errors.length > 0;
                 return (
                   <Field invalid={invalid}>
-                    {/* No htmlFor: the control is a group of checkboxes rather
-                        than one input, so the group points back at this label
-                        with aria-labelledby instead. */}
-                    <FieldLabel id="client-business-type-label">
+                    <FieldLabel htmlFor="client-business-type">
                       <RequiredMark /> Business type
                     </FieldLabel>
-                    <ClientBusinessTypeChips
-                      id="client-business-type"
-                      labelledBy="client-business-type-label"
-                      options={CLIENT_BUSINESS_TYPES}
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      invalid={invalid}
-                    />
+                    <Select value={field.state.value} onValueChange={field.handleChange}>
+                      <SelectTrigger
+                        id="client-business-type"
+                        aria-invalid={invalid}
+                        className="shadow-none"
+                      >
+                        <SelectValue placeholder="Select business type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {CLIENT_BUSINESS_TYPES.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>
                 );
               }}
             </form.Field>
 
-            {/* Full width and on its own line, after the two fields that
-                identify the business — optional, and the least consequential
-                thing in the section. */}
+            {/* Optional, and the least consequential thing in the section —
+                starts as a plain "+ Add website" link rather than an empty
+                field, and only turns into one once clicked. */}
             <form.Field
               name="website"
               validators={{
@@ -439,35 +512,60 @@ function ClientFormBody({
                 onSubmit: ({ value }) => validateWebsite(value),
               }}
             >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-website">Website</FieldLabel>
-                  <Input
-                    id="client-website"
-                    inputMode="url"
-                    placeholder="https://example.com"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                  />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
+              {(field) =>
+                websiteOpen ? (
+                  <OptionalFieldSlot
+                    removeLabel="Remove website"
+                    onRemove={() => {
+                      field.handleChange("");
+                      setWebsiteOpen(false);
+                    }}
+                  >
+                    <Field>
+                      <FieldLabel htmlFor="client-website">Website</FieldLabel>
+                      <Input
+                        id="client-website"
+                        inputMode="url"
+                        placeholder="https://example.com"
+                        aria-invalid={field.state.meta.errors.length > 0}
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="shadow-none"
+                      />
+                      <FieldError>{field.state.meta.errors[0]}</FieldError>
+                    </Field>
+                  </OptionalFieldSlot>
+                ) : (
+                  <AddOptionalTrigger label="Add website" onClick={() => setWebsiteOpen(true)} />
+                )
+              }
             </form.Field>
 
             <form.Field name="tags">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-tags">Tags</FieldLabel>
-                  <ClientTagsInput
-                    id="client-tags"
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    suggestions={tagSuggestions}
-                  />
-                </Field>
-              )}
+              {(field) =>
+                tagsOpen ? (
+                  <OptionalFieldSlot
+                    removeLabel="Remove tags"
+                    onRemove={() => {
+                      field.handleChange([]);
+                      setTagsOpen(false);
+                    }}
+                  >
+                    <Field>
+                      <FieldLabel htmlFor="client-tags">Tags</FieldLabel>
+                      <ClientTagsInput
+                        id="client-tags"
+                        value={field.state.value}
+                        onChange={field.handleChange}
+                        suggestions={tagSuggestions}
+                      />
+                    </Field>
+                  </OptionalFieldSlot>
+                ) : (
+                  <AddOptionalTrigger label="Add tags" onClick={() => setTagsOpen(true)} />
+                )
+              }
             </form.Field>
           </FormSection>
 
@@ -513,6 +611,7 @@ function ClientFormBody({
                             value={field.state.value}
                             onChange={(e) => field.handleChange(e.target.value)}
                             onBlur={field.handleBlur}
+                            className="shadow-none"
                           />
                           <FieldError>{field.state.meta.errors[0]}</FieldError>
                         </Field>
@@ -542,6 +641,7 @@ function ClientFormBody({
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}
                       onBlur={field.handleBlur}
+                      className="shadow-none"
                     />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>
@@ -579,6 +679,7 @@ function ClientFormBody({
                           }}
                           showDialCode
                           placeholder="Code"
+                          className="shadow-none"
                         />
                       )}
                     </form.Field>
@@ -591,6 +692,7 @@ function ClientFormBody({
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}
                       onBlur={field.handleBlur}
+                      className="shadow-none"
                     />
                   </div>
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
@@ -655,6 +757,7 @@ function ClientFormBody({
                     searchPlaceholder="Search country…"
                     emptyMessage="No country matches that search."
                     invalid={field.state.meta.errors.length > 0}
+                    className="shadow-none"
                   />
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
@@ -681,6 +784,7 @@ function ClientFormBody({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
+                    className="shadow-none"
                   />
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
@@ -699,6 +803,7 @@ function ClientFormBody({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
+                    className="shadow-none"
                   />
                 </Field>
               )}
@@ -724,6 +829,7 @@ function ClientFormBody({
                       value={field.state.value}
                       onChange={(e) => field.handleChange(e.target.value)}
                       onBlur={field.handleBlur}
+                      className="shadow-none"
                     />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>
@@ -761,6 +867,7 @@ function ClientFormBody({
                       searchPlaceholder="Search state…"
                       emptyMessage="No state matches that search."
                       invalid={field.state.meta.errors.length > 0}
+                      className="shadow-none"
                     />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
                   </Field>
@@ -789,208 +896,264 @@ function ClientFormBody({
                     value={field.state.value}
                     onChange={(e) => field.handleChange(e.target.value)}
                     onBlur={field.handleBlur}
+                    className="shadow-none"
                   />
                   <FieldError>{field.state.meta.errors[0]}</FieldError>
                 </Field>
               )}
             </form.Field>
           </FormSection>
-
-          {/* ── Shipping address ─────────────────────────────────────────── */}
-          <FormSection value="shipping" title="Shipping address (Optional)">
-            {/* Ticked by default, because a client is usually shipped to where it
-                is billed — and ticked, the payload sends a copy of the billing
-                address, exactly as pg-dashboard does behind the same checkbox.
-                Unticked reveals the fields below rather than sending blanks. */}
-            <form.Field name="sameAsBillingAddress">
-              {(field) => (
-                <label className="flex w-fit items-center gap-2 text-[13px] text-muted-foreground">
-                  <Checkbox
-                    id="client-same-as-billing"
-                    checked={field.state.value}
-                    onCheckedChange={(checked) => field.handleChange(checked === true)}
-                  />
-                  Same as billing address
-                </label>
-              )}
-            </form.Field>
-
-            <form.Subscribe selector={(state) => state.values.sameAsBillingAddress}>
-              {(sameAsBilling) =>
-                sameAsBilling ? null : (
-                  <div className="mt-3 space-y-3">
-                    <form.Field name="shippingCountry">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="client-shipping-country">Country</FieldLabel>
-                          {/* The same country control the billing address uses,
-                              and independent of it: a client can be billed in one
-                              country and shipped to in another. */}
-                          <CountrySelect
-                            value={field.state.value}
-                            onValueChange={(code) => field.handleChange(code)}
-                            placeholder="Select country"
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-
-                    <form.Field name="shippingAddressLine">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="client-shipping-address">Address</FieldLabel>
-                          <Textarea
-                            id="client-shipping-address"
-                            rows={2}
-                            placeholder="Enter street address"
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            onBlur={field.handleBlur}
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-
-                    <form.Field name="shippingAddressLine2">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="client-shipping-address-2">
-                            Address line 2
-                          </FieldLabel>
-                          <Input
-                            id="client-shipping-address-2"
-                            placeholder="Apartment, suite, floor (optional)"
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            onBlur={field.handleBlur}
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <form.Field name="shippingCity">
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="client-shipping-city">City</FieldLabel>
-                            <Input
-                              id="client-shipping-city"
-                              placeholder="Enter city"
-                              value={field.state.value}
-                              onChange={(e) => field.handleChange(e.target.value)}
-                              onBlur={field.handleBlur}
-                            />
-                          </Field>
-                        )}
-                      </form.Field>
-
-                      <form.Field name="shippingState">
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="client-shipping-state">State</FieldLabel>
-                            {/* Free text, unlike the billing state's select: the
-                                state endpoint only covers India, and the shipping
-                                country is independent — so a select here would be
-                                empty for most of the countries this field exists
-                                to serve. */}
-                            <Input
-                              id="client-shipping-state"
-                              placeholder="Enter state"
-                              value={field.state.value}
-                              onChange={(e) => field.handleChange(e.target.value)}
-                              onBlur={field.handleBlur}
-                            />
-                          </Field>
-                        )}
-                      </form.Field>
-                    </div>
-
-                    <form.Field name="shippingZipcode">
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="client-shipping-zipcode">Zipcode</FieldLabel>
-                          <Input
-                            id="client-shipping-zipcode"
-                            placeholder="Enter zipcode"
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            onBlur={field.handleBlur}
-                          />
-                        </Field>
-                      )}
-                    </form.Field>
-                  </div>
-                )
-              }
-            </form.Subscribe>
-          </FormSection>
-
-          {/* ── Tax information ──────────────────────────────────────────── */}
-          <FormSection value="tax" title="GST (Optional)">
-            <form.Field name="gstin">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-gstin">GSTIN (Optional)</FieldLabel>
-                  <Input
-                    id="client-gstin"
-                    placeholder="Enter GSTIN"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                  />
-                </Field>
-              )}
-            </form.Field>
-          </FormSection>
-
-          {/* ── Additional information ───────────────────────────────────── */}
-          <FormSection value="notes" title="Additional information (Optional)">
-            <form.Field name="notes">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-notes">Notes (Optional)</FieldLabel>
-                  <Textarea
-                    id="client-notes"
-                    rows={3}
-                    placeholder="Add notes about this client"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                  />
-                </Field>
-              )}
-            </form.Field>
-          </FormSection>
-
-          {/* ── Contract ─────────────────────────────────────────────────── */}
-          <FormSection value="contract" title="Contract (Optional)">
-            <form.Field name="contract">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-contract">Contract (Optional)</FieldLabel>
-                  <ClientContractUpload
-                    id="client-contract"
-                    value={field.state.value}
-                    onChange={field.handleChange}
-                    // Only for a contract the server holds — a file picked in
-                    // this session has nothing to view and nothing to delete
-                    // remotely. `file` being absent is what distinguishes them.
-                    onViewStored={
-                      field.state.value && !field.state.value.file
-                        ? onViewStoredContract
-                        : undefined
-                    }
-                    onRemoveStored={
-                      field.state.value && !field.state.value.file
-                        ? onRemoveStoredContract
-                        : undefined
-                    }
-                  />
-                </Field>
-              )}
-            </form.Field>
-          </FormSection>
         </Accordion>
+
+        {/* ── The rest: all-optional, no card/accordion of their own ──────
+            Same "+ Add X" pattern as Website/Tags above — each starts as a
+            plain trigger and only becomes a field (or, for Shipping, a
+            group of them) once clicked, with the delete-on-hover affordance
+            taking the place of the accordion's own always-visible chevron
+            header. Plain space-y rhythm rather than each in its own bordered
+            container, now that there's no card left to draw a border
+            around. */}
+        <div className="space-y-4 py-3">
+          {/* ── Shipping address ───────────────────────────────────────── */}
+          {shippingOpen ? (
+            <OptionalFieldSlot
+              removeLabel="Remove shipping address"
+              onRemove={() => {
+                form.setFieldValue("sameAsBillingAddress", true);
+                form.setFieldValue("shippingCountry", "");
+                form.setFieldValue("shippingAddressLine", "");
+                form.setFieldValue("shippingAddressLine2", "");
+                form.setFieldValue("shippingCity", "");
+                form.setFieldValue("shippingState", "");
+                form.setFieldValue("shippingZipcode", "");
+                setShippingOpen(false);
+              }}
+            >
+              <div className="space-y-3">
+                <p className="text-[13px] font-semibold text-foreground">Shipping address</p>
+
+                <form.Field name="shippingCountry">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="client-shipping-country">Country</FieldLabel>
+                      {/* The same country control the billing address uses,
+                          and independent of it: a client can be billed in one
+                          country and shipped to in another. */}
+                      <CountrySelect
+                        value={field.state.value}
+                        onValueChange={(code) => field.handleChange(code)}
+                        placeholder="Select country"
+                        className="shadow-none"
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="shippingAddressLine">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="client-shipping-address">Address</FieldLabel>
+                      <Textarea
+                        id="client-shipping-address"
+                        rows={2}
+                        placeholder="Enter street address"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="shadow-none"
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <form.Field name="shippingAddressLine2">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="client-shipping-address-2">Address line 2</FieldLabel>
+                      <Input
+                        id="client-shipping-address-2"
+                        placeholder="Apartment, suite, floor (optional)"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="shadow-none"
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <form.Field name="shippingCity">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor="client-shipping-city">City</FieldLabel>
+                        <Input
+                          id="client-shipping-city"
+                          placeholder="Enter city"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          onBlur={field.handleBlur}
+                          className="shadow-none"
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+
+                  <form.Field name="shippingState">
+                    {(field) => (
+                      <Field>
+                        <FieldLabel htmlFor="client-shipping-state">State</FieldLabel>
+                        {/* Free text, unlike the billing state's select: the
+                            state endpoint only covers India, and the shipping
+                            country is independent — so a select here would be
+                            empty for most of the countries this field exists
+                            to serve. */}
+                        <Input
+                          id="client-shipping-state"
+                          placeholder="Enter state"
+                          value={field.state.value}
+                          onChange={(e) => field.handleChange(e.target.value)}
+                          onBlur={field.handleBlur}
+                          className="shadow-none"
+                        />
+                      </Field>
+                    )}
+                  </form.Field>
+                </div>
+
+                <form.Field name="shippingZipcode">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor="client-shipping-zipcode">Zipcode</FieldLabel>
+                      <Input
+                        id="client-shipping-zipcode"
+                        placeholder="Enter zipcode"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className="shadow-none"
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+              </div>
+            </OptionalFieldSlot>
+          ) : (
+            <AddOptionalTrigger
+              label="Add shipping address"
+              onClick={() => {
+                // Opening this is a deliberate "ship somewhere else" choice,
+                // so it un-ticks the billing-address copy the same way
+                // unchecking the old checkbox did — the fields below are
+                // about to hold a real, different address.
+                form.setFieldValue("sameAsBillingAddress", false);
+                setShippingOpen(true);
+              }}
+            />
+          )}
+
+          {/* ── GST ───────────────────────────────────────────────────── */}
+          <form.Field name="gstin">
+            {(field) =>
+              gstOpen ? (
+                <OptionalFieldSlot
+                  removeLabel="Remove GSTIN"
+                  onRemove={() => {
+                    field.handleChange("");
+                    setGstOpen(false);
+                  }}
+                >
+                  <Field>
+                    <FieldLabel htmlFor="client-gstin">GSTIN</FieldLabel>
+                    <Input
+                      id="client-gstin"
+                      placeholder="Enter GSTIN"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      className="shadow-none"
+                    />
+                  </Field>
+                </OptionalFieldSlot>
+              ) : (
+                <AddOptionalTrigger label="Add GST" onClick={() => setGstOpen(true)} />
+              )
+            }
+          </form.Field>
+
+          {/* ── Additional information ───────────────────────────────── */}
+          <form.Field name="notes">
+            {(field) =>
+              notesOpen ? (
+                <OptionalFieldSlot
+                  removeLabel="Remove notes"
+                  onRemove={() => {
+                    field.handleChange("");
+                    setNotesOpen(false);
+                  }}
+                >
+                  <Field>
+                    <FieldLabel htmlFor="client-notes">Notes</FieldLabel>
+                    <Textarea
+                      id="client-notes"
+                      rows={3}
+                      placeholder="Add notes about this client"
+                      value={field.state.value}
+                      onChange={(e) => field.handleChange(e.target.value)}
+                      onBlur={field.handleBlur}
+                      className="shadow-none"
+                    />
+                  </Field>
+                </OptionalFieldSlot>
+              ) : (
+                <AddOptionalTrigger label="Add notes" onClick={() => setNotesOpen(true)} />
+              )
+            }
+          </form.Field>
+
+          {/* ── Contract ──────────────────────────────────────────────── */}
+          <form.Field name="contract">
+            {(field) =>
+              contractOpen ? (
+                <OptionalFieldSlot
+                  removeLabel="Remove contract"
+                  onRemove={() => {
+                    // Only clears this session's local pick — a contract the
+                    // server already holds is removed through the component's
+                    // own "Remove" action (onRemoveStored below), which also
+                    // calls the API. This just collapses the section back.
+                    field.handleChange(null);
+                    setContractOpen(false);
+                  }}
+                >
+                  <Field>
+                    <FieldLabel htmlFor="client-contract">Contract</FieldLabel>
+                    <ClientContractUpload
+                      id="client-contract"
+                      value={field.state.value}
+                      onChange={field.handleChange}
+                      // Only for a contract the server holds — a file picked in
+                      // this session has nothing to view and nothing to delete
+                      // remotely. `file` being absent is what distinguishes them.
+                      onViewStored={
+                        field.state.value && !field.state.value.file
+                          ? onViewStoredContract
+                          : undefined
+                      }
+                      onRemoveStored={
+                        field.state.value && !field.state.value.file
+                          ? onRemoveStoredContract
+                          : undefined
+                      }
+                    />
+                  </Field>
+                </OptionalFieldSlot>
+              ) : (
+                <AddOptionalTrigger label="Add contract" onClick={() => setContractOpen(true)} />
+              )
+            }
+          </form.Field>
+        </div>
       </div>
 
       {/* ── Actions ──────────────────────────────────────────────────────

@@ -30,6 +30,7 @@ import { SelectMidView } from "@/components/common/SelectMidView";
 import { SettlementStatementDrawer } from "@/features/dashboard/platforms/components/SettlementStatementDrawer";
 import { TransactionReportDrawer } from "@/features/dashboard/platforms/components/TransactionReportDrawer";
 import { RequestPlatformDialog } from "@/features/dashboard/platforms/components/RequestPlatformDialog";
+import { ConnectStepsPage } from "@/features/dashboard/platforms/components/ConnectStepsPage";
 import type { PlatformDocument } from "@/features/dashboard/platforms/types";
 import { SUPPORTED_PLATFORMS, accountsForPlatform } from "@/features/dashboard/platforms/constants";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
@@ -157,6 +158,7 @@ function PlatformsContent() {
   const [settlementDrawerOpen, setSettlementDrawerOpen] = useState(false);
   const [transactionReportOpen, setTransactionReportOpen] = useState(false);
   const [requestPlatformOpen, setRequestPlatformOpen] = useState(false);
+  const [connectStepsOpen, setConnectStepsOpen] = useState(false);
 
   // Keeps the platform-selector card and the Account details card the same
   // height, whichever one actually has more content. A fixed min-height
@@ -174,7 +176,7 @@ function PlatformsContent() {
   // height) change with the platform/country selection, and the account
   // column remounts on every platform switch (see its `key` below).
   const platformGroupRef = useRef<HTMLDivElement>(null);
-  const accountGroupRef = useRef<HTMLDivElement>(null);
+  const accountGroupRef = useRef<HTMLDListElement>(null);
   const [matchedGroupHeight, setMatchedGroupHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
@@ -217,6 +219,27 @@ function PlatformsContent() {
   };
 
   if (!selectedPlatform) return null;
+
+  /**
+   * The walkthrough takes over the whole screen rather than opening beside the
+   * page, the same handoff the Transactions table makes to its own details
+   * page. Rendered here instead of behind a route of its own so the selected
+   * platform AND the header's chosen currency survive the transition — the
+   * Quick Access panel inside quotes that currency's identifiers, so a
+   * separate route would have to thread both through the URL and re-resolve
+   * the account just to show what was already on screen.
+   */
+  if (connectStepsOpen) {
+    return (
+      <div className="mx-auto max-w-[1400px] page-enter">
+        <ConnectStepsPage
+          platform={selectedPlatform}
+          account={selectedAccount}
+          onBack={() => setConnectStepsOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-[1400px] page-enter">
@@ -291,6 +314,22 @@ function PlatformsContent() {
                 </SelectContent>
               </Select>
             )}
+
+            {/* The walkthrough is one click away rather than laid out down the
+                page: it's followed once per platform, while the account
+                details beside it are read every time. Sits right of the
+                currency select because the steps quote that currency's own
+                identifiers in their Quick Access panel. */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="shrink-0"
+              leftIcon={<Icon name="list-checks" className="h-3.5 w-3.5" />}
+              onClick={() => setConnectStepsOpen(true)}
+            >
+              Steps to connect
+            </Button>
           </>
         }
       />
@@ -345,170 +384,181 @@ function PlatformsContent() {
               controls the width calls for — as one element, so the guide
               spotlights the platform choice rather than the workflow column
               beside it. */}
-          {/* style lives on this outer div, the ref on the inner one (below)
-              — measuring the same element the min-height is applied to would
-              be self-reinforcing: once inflated, its own offsetHeight never
-              reports smaller than the last imposed value, so switching to a
-              shorter platform/account pair could never shrink back down. A
-              plain block's own height is unaffected by its PARENT's
-              min-height, so the inner div always reports its true natural
-              content height regardless of what this wrapper is holding it
-              open to. */}
-          <div data-guide="mca-platform-selector" style={{ minHeight: matchedGroupHeight }}>
-            <div ref={platformGroupRef}>
-              {/* The smallest, muted, uppercase step: the navigation is how you
+          <div data-guide="mca-platform-selector">
+            {/* The smallest, muted, uppercase step: the navigation is how you
                 reach the content rather than content itself, so its caption stays
                 lighter than any title in the workflow beside it. The list's own
                 aria-label is what a screen reader announces here. */}
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Select platform
-              </div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Select platform
+            </div>
 
-              {/* Below `lg` the same choice is a dropdown: a five-row vertical list
+            {/* Below `lg` the same choice is a dropdown: a five-row vertical list
                 above the workflow would push the content it selects off the first
                 screen, where a collapsed trigger costs one row. Both controls are
                 driven by the same state, so which one is on screen is purely a
                 matter of width. */}
-              <div className="mt-2 lg:hidden">
-                <Select value={selectedPlatform.id} onValueChange={setSelectedPlatformId}>
-                  <SelectTrigger className="w-full" aria-label="Select platform">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {platforms.map((platform) => (
-                      <SelectItem key={platform.id} value={platform.id}>
-                        <span className="flex items-center gap-2.5">
-                          <Image
-                            src={platform.logoSrc}
-                            alt=""
-                            width={90}
-                            height={60}
-                            className="h-5 w-8 shrink-0 object-contain"
-                          />
-                          {platform.name}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="mt-2 lg:hidden">
+              <Select value={selectedPlatform.id} onValueChange={setSelectedPlatformId}>
+                <SelectTrigger className="w-full" aria-label="Select platform">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {platforms.map((platform) => (
+                    <SelectItem key={platform.id} value={platform.id}>
+                      <span className="flex items-center gap-2.5">
+                        <Image
+                          src={platform.logoSrc}
+                          alt=""
+                          width={90}
+                          height={60}
+                          className="h-5 w-8 shrink-0 object-contain"
+                        />
+                        {platform.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              {/* At `lg` and up, the vertical tab list. Wrapped rather than hiding
+            {/* At `lg` and up, the vertical tab list. Wrapped rather than hiding
                 the Card itself, so the Card keeps its own flex-column layout
                 instead of having it overridden by a display utility.
 
                 p-3 rather than Card's own 28px inset: the rows carry their own
                 horizontal padding, so the card only has to keep them clear of its
                 edge. Same treatment as the Virtual Accounts region card. */}
-              <div className="hidden lg:block">
-                {/* Plain light-grey surface (was the .platform-select-aurora
+            <div className="hidden lg:block">
+              {/* Plain light-grey surface (was the .platform-select-aurora
                   blue wash) — the selected row's own solid white/bg-card
                   chip is still the thing carrying the emphasis here, so it
                   doesn't need a tinted backdrop to stand apart from the
                   rest of the list. */}
-                <Card size="sm" className="mt-2 gap-0 overflow-hidden bg-muted/40 p-3">
-                  <div className="space-y-1" role="list" aria-label="Select a platform">
-                    {platforms.map((platform) => {
-                      const isSelected = platform.id === selectedPlatform.id;
-                      return (
-                        <Button
-                          key={platform.id}
-                          type="button"
-                          role="listitem"
-                          aria-current={isSelected}
-                          // "outline" (flux's solid bg-card fill), not
-                          // "secondary" (bg-muted): against this card's own
-                          // aurora tint, a muted-gray selected state blended
-                          // right into the wash instead of standing apart from
-                          // it. A solid white/card chip pops the same way the
-                          // Virtual Accounts region list's selected row does.
-                          variant={isSelected ? "outline" : "ghost"}
-                          size="md"
-                          // flux-ui's Button lays leftIcon / label / rightIcon out
-                          // as three direct flex children, so the chevron would
-                          // otherwise sit immediately after the platform name.
-                          // Letting the label span take the free space pushes it to
-                          // the far right of the row instead.
-                          className={cn(
-                            "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
-                            // The selected row is the only one at full emphasis:
-                            // the primary-tinted text on top of its solid white
-                            // fill is its accent. Unselected rows drop to the
-                            // muted token, which is what keeps the whole column
-                            // from out-weighing the workflow beside it.
-                            //
-                            // Explicit bg-white rather than relying on
-                            // "outline"'s own bg-card: a flat, unambiguous white
-                            // chip regardless of anything else in the cascade.
-                            // dark:bg-card keeps dark mode on its own real
-                            // surface token instead of forcing literal white
-                            // into a dark UI.
-                            isSelected
-                              ? "bg-white font-semibold text-primary dark:bg-card"
-                              : "text-muted-foreground"
-                          )}
-                          // The platform's own brand mark, sized by the box rather
-                          // than by the file so all five sit on the same optical
-                          // line whatever padding each PNG carries. object-contain
-                          // keeps every mark inside its footprint uncropped.
-                          leftIcon={
-                            <Image
-                              src={platform.logoSrc}
-                              alt=""
-                              width={90}
-                              height={60}
-                              className="h-6 w-9 shrink-0 object-contain"
-                            />
-                          }
-                          // Only on the selected row: it points at the workflow
-                          // that row is currently driving, so showing it on every
-                          // row would read as five affordances instead of one
-                          // pointer.
-                          rightIcon={
-                            isSelected ? (
-                              <Icon name="chevron-right" className="h-3.5 w-3.5" />
-                            ) : undefined
-                          }
-                          onClick={() => setSelectedPlatformId(platform.id)}
-                        >
-                          <span className="truncate">{platform.name}</span>
-                        </Button>
-                      );
-                    })}
+              {/* style + the ref that measures for it live on different
+                    elements: `style` is here, directly on the Card, since
+                    that's the box whose own visible border actually has to
+                    grow for the two columns to align — a min-height on some
+                    ancestor wrapping the Card only ever pads blank space
+                    below the Card, never touching its border, which was the
+                    original bug this replaced. `ref` sits one level down,
+                    on the rows themselves (not this Card) so the
+                    measurement stays immune to whatever height this Card's
+                    OWN min-height currently holds it open to — a taller Card
+                    doesn't change its child rows' natural rendered height,
+                    so switching to a shorter platform/account pair can still
+                    shrink the match back down instead of only ever growing. */}
+              <Card
+                size="sm"
+                className="mt-2 gap-0 overflow-hidden bg-muted/40 p-3"
+                style={{ minHeight: matchedGroupHeight }}
+              >
+                <div
+                  ref={platformGroupRef}
+                  className="space-y-1"
+                  role="list"
+                  aria-label="Select a platform"
+                >
+                  {platforms.map((platform) => {
+                    const isSelected = platform.id === selectedPlatform.id;
+                    return (
+                      <Button
+                        key={platform.id}
+                        type="button"
+                        role="listitem"
+                        aria-current={isSelected}
+                        // "outline" (flux's solid bg-card fill), not
+                        // "secondary" (bg-muted): against this card's own
+                        // aurora tint, a muted-gray selected state blended
+                        // right into the wash instead of standing apart from
+                        // it. A solid white/card chip pops the same way the
+                        // Virtual Accounts region list's selected row does.
+                        variant={isSelected ? "outline" : "ghost"}
+                        size="md"
+                        // flux-ui's Button lays leftIcon / label / rightIcon out
+                        // as three direct flex children, so the chevron would
+                        // otherwise sit immediately after the platform name.
+                        // Letting the label span take the free space pushes it to
+                        // the far right of the row instead.
+                        className={cn(
+                          "w-full justify-start gap-2.5 [&>span]:flex-1 [&>span]:text-left",
+                          // The selected row is the only one at full emphasis:
+                          // the primary-tinted text on top of its solid white
+                          // fill is its accent. Unselected rows drop to the
+                          // muted token, which is what keeps the whole column
+                          // from out-weighing the workflow beside it.
+                          //
+                          // Explicit bg-white rather than relying on
+                          // "outline"'s own bg-card: a flat, unambiguous white
+                          // chip regardless of anything else in the cascade.
+                          // dark:bg-card keeps dark mode on its own real
+                          // surface token instead of forcing literal white
+                          // into a dark UI.
+                          isSelected
+                            ? "bg-white font-semibold text-primary dark:bg-card"
+                            : "text-muted-foreground"
+                        )}
+                        // The platform's own brand mark, sized by the box rather
+                        // than by the file so all five sit on the same optical
+                        // line whatever padding each PNG carries. object-contain
+                        // keeps every mark inside its footprint uncropped.
+                        leftIcon={
+                          <Image
+                            src={platform.logoSrc}
+                            alt=""
+                            width={90}
+                            height={60}
+                            className="h-6 w-9 shrink-0 object-contain"
+                          />
+                        }
+                        // Only on the selected row: it points at the workflow
+                        // that row is currently driving, so showing it on every
+                        // row would read as five affordances instead of one
+                        // pointer.
+                        rightIcon={
+                          isSelected ? (
+                            <Icon name="chevron-right" className="h-3.5 w-3.5" />
+                          ) : undefined
+                        }
+                        onClick={() => setSelectedPlatformId(platform.id)}
+                      >
+                        <span className="truncate">{platform.name}</span>
+                      </Button>
+                    );
+                  })}
 
-                    {/* Same row shape as a platform (leftIcon/label), but a
+                  {/* Same row shape as a platform (leftIcon/label), but a
                         "+" glyph instead of a brand mark and no selected
                         state of its own — clicking it opens the exact same
                         dialog as the header's own "Request a platform"
                         button (setRequestPlatformOpen is already in scope
                         here), just reachable without scrolling back up. */}
-                    <Button
-                      type="button"
-                      role="listitem"
-                      variant="ghost"
-                      size="md"
-                      className="w-full justify-start gap-2.5 text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
-                      leftIcon={
-                        // justify-start, not -center: a platform's own logo
-                        // (object-contain in this same h-6 w-9 box) reads as
-                        // starting flush at the box's left edge, so centering
-                        // this glyph instead left it visibly adrift from
-                        // where every other row's icon/name gap actually is.
-                        <span className="flex h-6 w-9 shrink-0 items-center justify-start">
-                          <Icon name="plus" className="h-4 w-4" />
-                        </span>
-                      }
-                      onClick={() => setRequestPlatformOpen(true)}
-                    >
-                      <span className="truncate">Request a platform</span>
-                    </Button>
-                  </div>
-                </Card>
-              </div>
+                  <Button
+                    type="button"
+                    role="listitem"
+                    variant="ghost"
+                    size="md"
+                    className="w-full justify-start gap-2.5 text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
+                    leftIcon={
+                      // Not the platform rows' shared h-6 w-9 logo box: that
+                      // width exists to fit a brand mark, and the "+" glyph
+                      // is much narrower than that box, so matching it left
+                      // the plus sitting flush left with a dead gap before
+                      // the label. Sized to the glyph itself instead, so the
+                      // label sits right next to it.
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                        <Icon name="plus" className="h-4 w-4" />
+                      </span>
+                    }
+                    onClick={() => setRequestPlatformOpen(true)}
+                  >
+                    <span className="truncate">Request a platform</span>
+                  </Button>
+                </div>
+              </Card>
             </div>
           </div>
         </div>
-
         {/* ─── Workflow ────────────────────────────────────────────────── */}
         {/* key remounts the column on every platform change so the fade
             replays on each switch, not just the first render. Every heading,
@@ -546,13 +596,8 @@ function PlatformsContent() {
               the product shows, and they follow the platform and currency
               selections in the page header above. */}
           {selectedAccount && (
-            // style lives on this outer div, ref on the inner one — see the
-            // matching comment on the platform-selector column above for why
-            // measuring the styled element itself would be self-reinforcing
-            // (a stale min-height never shrinks back down once imposed).
-            <div style={{ minHeight: matchedGroupHeight }}>
-              <div ref={accountGroupRef}>
-                {/* Same caption treatment as the platform column's own "Select
+            <div>
+              {/* Same caption treatment as the platform column's own "Select
                   platform" label (size, weight, uppercase, tracking, muted
                   colour) — not just for consistency, but because the two
                   columns are `lg:items-start` siblings in one grid row: without
@@ -560,42 +605,58 @@ function PlatformsContent() {
                   grid's top edge while the platform card sat lower, under its
                   caption, so the two never lined up. Matching the caption
                   (and the same mt-2 gap before the card, plus the ResizeObserver
-                  min-height set on this group and the platform group above —
+                  min-height set on this Card and the platform Card above —
                   see where platformGroupRef/accountGroupRef are declared) is
                   what keeps their cards starting AND ending at the same
                   height, not just aligned at the top. */}
-                <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Account details
-                </div>
-                {/* min-h-60 floors this card at the platform card's own height
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Account details
+              </div>
+              {/* min-h-60 floors this card at the platform card's own height
                   (5 rows × h-10 + space-y-1 gaps + p-3 padding = 240px, see
                   the platform list's own markup) so a country/platform with
                   fewer fields (e.g. SEPA's 8 short fields vs. ACH's 7 plus a
-                  3-line address) never ends shorter than it. It can still
-                  grow taller for a longer field set — there's no ceiling to
-                  match against, only a floor. */}
-                <Card
-                  size="sm"
-                  className="mt-2 min-h-60 border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
-                  data-guide="mca-account-details"
-                >
-                  {/* Proximity does the grouping, not rules: 4px holds a label
+                  3-line address) never ends shorter than it before the
+                  ResizeObserver's own min-height (below) has measured
+                  anything yet — its `style` always wins once it has, min-h-60
+                  is only the pre-JS/SSR fallback.
+
+                  style + the ref that measures for it live on different
+                  elements, same reasoning as the platform Card: `style` goes
+                  directly on THIS Card, since that's the box whose own
+                  border has to grow for the two columns to align (an
+                  ancestor's min-height only pads blank space below the Card,
+                  never touches its border). `ref` sits on the field grid
+                  inside it instead, so measuring stays immune to whatever
+                  height this Card's own min-height currently holds it open
+                  to — a taller Card doesn't change its field grid's natural
+                  rendered height, so a shorter field set can still shrink
+                  the match back down. */}
+              <Card
+                size="sm"
+                className="mt-2 min-h-60 border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
+                style={{ minHeight: matchedGroupHeight }}
+                data-guide="mca-account-details"
+              >
+                {/* Proximity does the grouping, not rules: 4px holds a label
                     to its own value, the grid's own gaps separate one field
                     from the next, and no field carries padding of its own.
                     Three columns where the old 320px sidebar could only have
                     carried one — this column is wide enough to lay the fields
                     out the way the account card itself does, so the two read
                     as the same module. */}
-                  <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
-                    {accountFields.map((field) => (
-                      <div key={field.label} className="min-w-0 space-y-1">
-                        <dt className={FIELD_LABEL}>{field.label}</dt>
-                        <dd className={FIELD_VALUE}>{field.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </Card>
-              </div>
+                <dl
+                  ref={accountGroupRef}
+                  className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3"
+                >
+                  {accountFields.map((field) => (
+                    <div key={field.label} className="min-w-0 space-y-1">
+                      <dt className={FIELD_LABEL}>{field.label}</dt>
+                      <dd className={FIELD_VALUE}>{field.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </Card>
             </div>
           )}
 
@@ -679,135 +740,13 @@ function PlatformsContent() {
             </>
           )}
 
-          {/* ─── 3. Connect your account ──────────────────────────────── */}
-          {/* The currency control that used to share this title's row now
-              lives in the page header (see PageHeader's actions above) —
-              it stays on screen for the whole workflow rather than
-              scrolling away with this one heading.
-
-              A Separator (own mt-6), same as the one above "Documents you
-              might need": a fixed break between sections rather than a bare
-              margin, so this heading's position never depends on how tall
-              the content above it (the account details card, or the
-              document count) happens to be. */}
-          <Separator className="mt-6" />
-          <section className="mt-6">
-            <h2 className={MODULE_TITLE}>Connect your account to {selectedPlatform.name}</h2>
-            {/* mt-1 binds the description to the title it explains: the
-                tightest step on the page, against the mt-8 that separates
-                this whole section from the next. */}
-            <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-              Follow these steps in {selectedPlatform.name} to start receiving payouts.
-            </p>
-          </section>
-
-          {/* ─── 4. Steps ────────────────────────────────────────────── */}
-          {/* The page's primary instructional content, and the only section
-              carrying full-width art, which is what gives it the weight the
-              compact sections above it deliberately don't have.
-
-              mt-8 (tightened from mt-10): still the widest step on this
-              page, now that the gap above ("Connect your account" → Steps)
-              needed to be narrower — see this column's own top-level
-              comment. */}
-          <section className="mt-8">
-            {/* Step number → instruction → screenshot, in that order, every step
-                the same shape so the sequence scans as one column. No "Steps"
-                heading — the numbered sequence reads as steps on its own.
-
-                space-y-6 between steps against the 4px and 12px inside one: a
-                step's own parts sit far closer to each other than any step does
-                to the next, which is what gives the sequence its rhythm rather
-                than reading as six evenly spaced blocks. */}
-            <ol className="space-y-6">
-              {selectedPlatform.steps.map((step, index) => (
-                <li key={step.instruction}>
-                  {/* The number is a marker, not a title: smallest size, muted,
-                      medium weight so it still reads as a label. The instruction
-                      above it in both size and colour is what makes the
-                      instruction the step's own strongest element. */}
-                  <p className="text-[12px] font-medium text-muted-foreground">Step {index + 1}</p>
-                  <p className="mt-1 text-[15px] font-medium text-foreground">{step.instruction}</p>
-
-                  {/* Caveat, not instruction: muted and a size down so it reads
-                      as an aside rather than another thing to do. Same "Note:"
-                      prefix pg-dashboard's own step timeline uses. */}
-                  {step.note && (
-                    <p className="mt-1 text-[13px] text-muted-foreground">
-                      <span className="font-medium">Note:</span> {step.note}
-                    </p>
-                  )}
-
-                  {/* Quick Access — the identifiers this step asks the merchant
-                      to type into the platform, sat between the instruction that
-                      names them and the screenshot showing where they go, so
-                      they're on screen at the moment they're needed rather than
-                      in a panel elsewhere on the page.
-
-                      Which step carries it is data (`quickAccess` on the step),
-                      not a step index, so moving it is a constants change.
-
-                      The fields are the account's own `details` — the same two
-                      rows the account card shows, keeping their rail-specific
-                      labels ("Account Number"/"ACH Routing" on a US account,
-                      "IBAN"/"SEPA BIC" in Europe) rather than being flattened
-                      into generic ones that would be wrong on half the rails.
-                      They follow the currency selector above, so switching
-                      currency reprints these values. */}
-                  {step.quickAccess && selectedAccount && (
-                    <Card
-                      size="sm"
-                      className="mt-3 flex-row flex-wrap items-center justify-between gap-x-8 gap-y-4 p-6"
-                    >
-                      <p className="text-[15px] font-semibold text-foreground">Quick access</p>
-
-                      <dl className="flex flex-wrap items-start gap-x-6 gap-y-4">
-                        {selectedAccount.details.map((field) => (
-                          <div key={field.label} className="min-w-0 space-y-1.5">
-                            <dt className="text-[12px] text-muted-foreground">{field.label}:</dt>
-                            <dd>
-                              {/* The product's own copyable field, sat on a
-                                  bordered surface so it reads as an input-shaped
-                                  chip. */}
-                              <CopyableText
-                                value={field.value}
-                                className="rounded-lg border border-border px-3 py-1.5"
-                                valueClassName="font-medium"
-                              />
-                            </dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </Card>
-                  )}
-
-                  {/* pg-dashboard's own frame for these (StyledImageCard in its
-                      platform-withdrawals styles) minus the border: a fixed
-                      515x265 box with a 10px radius, clipped content and no
-                      padding, with the image filling it edge to edge.
-
-                      The fixed ratio is what makes the sequence read evenly —
-                      every asset is natively ~1.94 (516x265 for the SVGs,
-                      1562x808 for the JPGs), so filling this box costs no
-                      visible distortion. No border of our own, because eleven of
-                      these captures carry a frame in the artwork itself and one
-                      added here would double up on exactly those. overflow-hidden
-                      stays: it is what clips the image to the rounded corners. */}
-                  {step.screenshotSrc && (
-                    <div className="mt-3 aspect-[515/265] w-full overflow-hidden rounded-[10px]">
-                      <Image
-                        src={step.screenshotSrc}
-                        alt={step.screenshotAlt ?? ""}
-                        width={515}
-                        height={265}
-                        className="h-full w-full"
-                      />
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </section>
+          {/* The connect walkthrough used to run inline from here down: a
+              "Connect your account" heading followed by every numbered step
+              and its full-width screenshot. It now lives behind the header's
+              "Steps to connect" button (see ConnectStepsPage), because it is
+              read once per platform while the account details above are read
+              every time — leaving the page's own subject as the shortest thing
+              on it and pushing everything else past the fold. */}
         </div>
       </div>
 

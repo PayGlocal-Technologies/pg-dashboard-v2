@@ -10,6 +10,7 @@ import {
   Shimmer,
   StatusBadge,
 } from "@/components/ui";
+import type { ReactNode } from "react";
 import { Icon } from "@/components/icon";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { cn } from "@/lib/utils";
@@ -153,6 +154,7 @@ export function InvoiceCardList({
   pageSize,
   emptyTitle,
   emptyDescription,
+  emptyAction,
   className,
 }: {
   rows: McaInvoiceRow[];
@@ -165,6 +167,9 @@ export function InvoiceCardList({
   pageSize: number;
   emptyTitle: string;
   emptyDescription?: string;
+  /** Same node the desktop empty state renders, so the first-time CTA is not
+   *  a desktop-only affordance. */
+  emptyAction?: ReactNode;
   className?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
@@ -179,6 +184,7 @@ export function InvoiceCardList({
           size="sm"
           title={emptyTitle}
           description={emptyDescription}
+          action={emptyAction}
         />
       ) : (
         rows.map((row) => <InvoiceCard key={row.id} row={row} handlers={handlers} />)

@@ -10,6 +10,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
+  PreviewSection,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -55,6 +56,7 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
           labelClassName={headLabel}
           labelStyle={headStyle}
           bodyClassName="text-[11.5px] text-muted-foreground"
+          fieldId="biller"
         />
         <PartyBlock
           label={`${labels.invoiceTo}:`}
@@ -64,22 +66,29 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
           labelClassName={headLabel}
           labelStyle={headStyle}
           bodyClassName="text-[11.5px] text-muted-foreground"
+          fieldId="client"
         />
       </div>
 
       <div className="mb-4 flex flex-wrap justify-between gap-3 text-left text-[11.5px] text-muted-foreground">
-        <span>
-          {labels.invoiceNumber}{" "}
-          <span className="font-semibold text-foreground">{model.invoiceNumber}</span>
-        </span>
-        <span>
-          {labels.issueDate}{" "}
-          <span className="font-semibold text-foreground">{model.issueDate}</span>
-        </span>
-        <span>
-          {labels.dueDate}{" "}
-          <span className="font-semibold text-foreground">{model.dueDate || "-"}</span>
-        </span>
+        <PreviewSection fieldId="invoice-number" label="Edit invoice number" className="w-auto">
+          <span>
+            {labels.invoiceNumber}{" "}
+            <span className="font-semibold text-foreground">{model.invoiceNumber}</span>
+          </span>
+        </PreviewSection>
+        <PreviewSection fieldId="issue-date" label="Edit issue date" className="w-auto">
+          <span>
+            {labels.issueDate}{" "}
+            <span className="font-semibold text-foreground">{model.issueDate}</span>
+          </span>
+        </PreviewSection>
+        <PreviewSection fieldId="due-date" label="Edit due date" className="w-auto">
+          <span>
+            {labels.dueDate}{" "}
+            <span className="font-semibold text-foreground">{model.dueDate || "-"}</span>
+          </span>
+        </PreviewSection>
       </div>
 
       {/* Memo sits with the amount, not in the footer. It says what this
@@ -87,39 +96,41 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
           both at the bottom made the memo read as a second terms block. */}
       <MemoLine memo={model.memo} className="mb-4 text-left" />
 
-      <div
-        className="mb-2 grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b-2 pb-2 text-left text-[12px] font-extrabold uppercase tracking-wide text-foreground"
-        style={{ borderColor: primary }}
-      >
-        <span>{labels.description}</span>
-        <span className="text-center">{labels.qty}</span>
-        <span className="text-right">{labels.unitPrice}</span>
-        <span className="text-right">{labels.total}</span>
-      </div>
-
-      {items.map((item) => (
+      <PreviewSection fieldId="line-items" label="Edit line items">
         <div
-          key={item.key}
-          className="grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b py-2.5 text-left text-[12px] text-foreground"
-          style={{ borderColor: withAlpha(accent, 0.33) }}
+          className="mb-2 grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b-2 pb-2 text-left text-[12px] font-extrabold uppercase tracking-wide text-foreground"
+          style={{ borderColor: primary }}
         >
-          <span className="flex min-w-0 items-start gap-1.5">
-            <Icon
-              name="sparkles"
-              className="mt-0.5 h-3 w-3 shrink-0"
-              style={{ color: accent }}
-              aria-hidden
-            />
-            <span className="min-w-0">
-              <span className="block truncate uppercase">{item.name}</span>
-              <ItemMeta item={item} className="normal-case" />
-            </span>
-          </span>
-          <span className="text-center tabular-nums">{item.quantity}</span>
-          <span className="text-right tabular-nums">{item.unitPrice}</span>
-          <span className="text-right font-bold tabular-nums">{item.amount}</span>
+          <span>{labels.description}</span>
+          <span className="text-center">{labels.qty}</span>
+          <span className="text-right">{labels.unitPrice}</span>
+          <span className="text-right">{labels.total}</span>
         </div>
-      ))}
+
+        {items.map((item) => (
+          <div
+            key={item.key}
+            className="grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b py-2.5 text-left text-[12px] text-foreground"
+            style={{ borderColor: withAlpha(accent, 0.33) }}
+          >
+            <span className="flex min-w-0 items-start gap-1.5">
+              <Icon
+                name="sparkles"
+                className="mt-0.5 h-3 w-3 shrink-0"
+                style={{ color: accent }}
+                aria-hidden
+              />
+              <span className="min-w-0">
+                <span className="block truncate uppercase">{item.name}</span>
+                <ItemMeta item={item} className="normal-case" />
+              </span>
+            </span>
+            <span className="text-center tabular-nums">{item.quantity}</span>
+            <span className="text-right tabular-nums">{item.unitPrice}</span>
+            <span className="text-right font-bold tabular-nums">{item.amount}</span>
+          </div>
+        ))}
+      </PreviewSection>
 
       <div className="mt-4 flex justify-end">
         <div className="w-full max-w-[240px] text-left">
@@ -152,9 +163,15 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
         className="mt-8 text-left"
         labelClassName={headLabel}
         labelStyle={headStyle}
+        fieldId="payment-account"
       />
 
-      <NotesBlock notes={model.notes} lut={model.lut} className="mt-6 text-left" />
+      <NotesBlock
+        notes={model.notes}
+        lut={model.lut}
+        className="mt-6 text-left"
+        fieldId="notes-terms"
+      />
 
       <SignatureBlock url={model.signatureUrl} className="mt-6" />
     </div>

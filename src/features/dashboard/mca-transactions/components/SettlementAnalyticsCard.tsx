@@ -91,9 +91,53 @@ function foldRestOfWorld(accounts: SettledAccountRow[]): SettledAccountRow[] {
 /** Compact ₹ for the narrow bar-value column (amounts share one reporting
  *  currency — they sum to totalAmount). */
 function formatBarAmount(amount: number): string {
+  if (amount >= 10_000_000) return `₹${(amount / 10_000_000).toFixed(2)}Cr`;
   if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(1)}L`;
   if (amount >= 1_000) return `₹${(amount / 1_000).toFixed(1)}K`;
   return `₹${Math.round(amount)}`;
+}
+
+/**
+ * TODO(backend): the settled-by-account API only returns the INR-equivalent
+ * `amount`, not the native-currency amount. Until that's added to the
+ * contract, the native amount line ("$8,377,994") is approximated
+ * client-side from a placeholder FX rate table — remove this and read the
+ * real field off the row once the API carries it.
+ */
+const MOCK_FX_RATE: Record<string, number> = {
+  USD: 88.52,
+  GBP: 112.4,
+  EUR: 95.8,
+  CAD: 63.35,
+  AED: 24.1,
+  SGD: 65.9,
+  AUD: 58.1,
+  CNY: 12.3,
+};
+
+const CURRENCY_SYMBOL: Record<string, string> = {
+  USD: "$",
+  GBP: "£",
+  EUR: "€",
+  CAD: "C$",
+  AED: "AED ",
+  SGD: "S$",
+  AUD: "A$",
+  CNY: "¥",
+};
+
+/** "$8,377,994" for large native amounts, "A$308.09" for sub-thousand ones —
+ *  matches how the reference design varies decimal precision by magnitude. */
+function formatNativeAmount(currency: string, inrAmount: number): string | null {
+  const rate = MOCK_FX_RATE[currency];
+  const symbol = CURRENCY_SYMBOL[currency];
+  if (!rate || !symbol) return null;
+  const native = inrAmount / rate;
+  const formatted =
+    native >= 1_000
+      ? Math.round(native).toLocaleString("en-US")
+      : native.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${symbol}${formatted}`;
 }
 
 /** "USD Account" → "USD"; "Rest of world" is left as-is (it has no trailing
@@ -119,22 +163,6 @@ function formatSharePct(fraction: number): string {
 }
 
 /**
- * Neutral tones for every segment/chip after the first, cycling if there are
- * more currencies than tones. Opacity steps on `--foreground` rather than a
- * second hue: the brief calls for the smaller segments to stay "subtle,
- * using existing design-system neutrals" instead of a new colour per
- * currency, and the existing bar list already treats `--foreground` at
- * partial opacity as this app's neutral scale (its own track uses `bg-muted`
- * the same way).
- */
-const SEGMENT_NEUTRAL_CLASSES = ["bg-foreground/22", "bg-foreground/13", "bg-foreground/7"];
-
-function segmentColorClass(index: number): string | undefined {
-  if (index === 0) return undefined; // gradient, applied via inline style below
-  return SEGMENT_NEUTRAL_CLASSES[(index - 1) % SEGMENT_NEUTRAL_CLASSES.length];
-}
-
-/**
  * Settlement analytics for the Transactions page: a headline KPI beside the
  * amount/count toggle, over a ranked per-account bar list.
  *
@@ -154,61 +182,35 @@ interface AccountBarRowData {
   iso2: string;
   value: number;
   valueLabel: string;
+  /** Settled amount in INR, independent of `value`/`valueLabel` which switch
+   *  to a transaction count in count mode — the native-amount-at-rate
+   *  subtext always needs the amount, regardless of the selected mode. */
+  amount: number;
 }
 
-/**
- * One segment of the single stacked distribution bar. `widthPct` is the
- * account's raw share of the total (not the rounded display percentage), so
- * segments always sum to exactly 100% regardless of how their labels round —
- * see `formatSharePct` for the display side of that split.
- *
- * `aria-hidden` on the whole bar (set by the caller): the figures it renders
- * are decorative here — CurrencyChip below states the same amount and share
- * as real text, which is what a screen reader (and, per the brief, any
- * reader relying on more than the bar's proportions) actually needs.
- */
-function DistributionSegment({ index, widthPct }: { index: number; widthPct: number }) {
-  const neutralClass = segmentColorClass(index);
-  return (
-    <div
-      className={cn("h-full", neutralClass)}
-      style={{
-        width: `${widthPct}%`,
-        ...(neutralClass ? {} : { background: "linear-gradient(90deg, var(--chart-1), var(--chart-3))" }),
-      }}
-    />
-  );
-}
-
-/** One currency's entry in the compact breakdown grid: an accent bar tying it
- *  to its slice of the stacked bar above, flag, name + share, then the
- *  amount. A plain row rather than a bordered/filled box — boxing every
- *  entry was what read as dated and cluttered when the design was reviewed;
- *  the accent bar is what still gives each row its own identity without
- *  drawing a rectangle around it. Shared between the always-visible first
- *  five and the entries Show more reveals, so the two stay pixel-identical. */
+/** One currency's row in the full-width breakdown list: flag, bold currency
+ *  code with its share of total beneath it on the left; the INR amount with
+ *  its native-currency amount beneath it on the right. Rows are separated by
+ *  dividers (see `className`, set by the caller — a hairline `divide-y` when
+ *  stacked, or explicit `border-b`/`border-l` rules forming a grid once
+ *  currencies pair up two-to-a-line) rather than a bordered box. Shared
+ *  between the always-visible first five and the entries Show more reveals,
+ *  so the two stay pixel-identical. */
 function CurrencyChip({
   row,
-  index,
   sharePct,
+  isAmountMode,
+  className,
 }: {
   row: AccountBarRowData;
-  index: number;
   sharePct: number;
+  isAmountMode: boolean;
+  className?: string;
 }) {
-  const neutralClass = segmentColorClass(index);
+  const nativeLabel = isAmountMode ? formatNativeAmount(row.accountId, row.amount) : null;
   return (
-    <li className="flex items-center gap-3 py-1">
-      <span
-        className={cn("h-8 w-1 shrink-0 rounded-sm", neutralClass)}
-        style={
-          neutralClass
-            ? undefined
-            : { background: "linear-gradient(180deg, var(--chart-1), var(--chart-3))" }
-        }
-        aria-hidden="true"
-      />
-      <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-8 w-8 shrink-0" />
+    <li className={cn("flex items-center gap-2.5 py-2.5", className)}>
+      <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-7 w-7 shrink-0" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-foreground">
           {shortAccountLabel(row.label)}
@@ -217,11 +219,32 @@ function CurrencyChip({
           {formatSharePct(sharePct)} of total
         </span>
       </span>
-      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
-        {row.valueLabel}
+      <span className="shrink-0 text-right">
+        <span className="block text-sm font-semibold tabular-nums text-foreground">
+          {row.valueLabel}
+        </span>
+        {nativeLabel && (
+          <span className="block truncate text-[11px] text-muted-foreground">{nativeLabel}</span>
+        )}
       </span>
     </li>
   );
+}
+
+/** Divider classes for one cell of the paired (two-up) breakdown grid: a
+ *  hairline rule between rows (skipped on the last row, whichever column
+ *  it's in) and another between the two columns, via padding rather than
+ *  the grid's own `gap` — a `gap-x` leaves the vertical rule floating in
+ *  mid-gutter attached to neither column, while `pr-4`/`pl-4` on either
+ *  side of a shared column edge (no gap at all) puts it flush against both.
+ *  Kept as one small function rather than inlined at each call site since
+ *  both the always-visible list and the Show-more-revealed one need the
+ *  exact same rule against the exact same denominators (their own row
+ *  count). */
+function pairedCellClasses(index: number, count: number): string {
+  const isLastRow = index >= count - (count % 2 === 0 ? 2 : 1);
+  const isRightColumn = index % 2 === 1;
+  return cn("border-border", !isLastRow && "border-b", isRightColumn ? "border-l pl-4" : "pr-4");
 }
 
 export function SettlementAnalyticsCard({
@@ -251,17 +274,17 @@ export function SettlementAnalyticsCard({
         valueLabel: isAmountMode
           ? formatBarAmount(account.amount)
           : account.count.toLocaleString("en-IN"),
+        amount: account.amount,
       };
     })
     .sort((a, b) => b.value - a.value);
 
-  // Denominator for every segment/chip's share: the sum of the SAME rows the
-  // bar and grid render, not `settledValue`/`settledCount` below. Those come
-  // straight off the overview endpoint and can differ from the per-account
-  // total by whatever rounding or reporting-currency conversion sits between
-  // the two — a mismatch here would either leave the stacked bar short of
-  // 100% or push it past it. Summing the rows actually being drawn is what
-  // guarantees the segments add up to the whole bar.
+  // Denominator for every chip's share: the sum of the SAME rows the grid
+  // renders, not `settledValue`/`settledCount` below. Those come straight off
+  // the overview endpoint and can differ from the per-account total by
+  // whatever rounding or reporting-currency conversion sits between the two.
+  // Summing the rows actually being drawn is what keeps each row's "% of
+  // total" consistent with the others.
   const totalValue = accountRows.reduce((sum, row) => sum + row.value, 0);
   // Capped at five on every breakpoint, not just the mobile carousel: the
   // card grows to fit the rest once expanded (see the lg:h-full/grow wiring
@@ -271,6 +294,10 @@ export function SettlementAnalyticsCard({
   const firstFiveRows = accountRows.slice(0, VISIBLE_COUNT);
   const restRows = accountRows.slice(VISIBLE_COUNT);
   const canExpand = restRows.length > 0;
+  // 1-3 currencies read better stacked (each row's own width to fit the
+  // native-amount-at-rate subtext); past that, pairing two per line keeps
+  // the list from pushing the card too tall.
+  const isPairedLayout = accountRows.length > 3;
 
   const settledValue = settled?.totalAmount ?? 0;
   const settledCount = settled?.totalCount ?? 0;
@@ -353,121 +380,84 @@ export function SettlementAnalyticsCard({
           up), CardHeader keeps its own intrinsic height and this region
           absorbs whatever's left. */}
       <CardContent className="flex flex-1 flex-col gap-3">
-        {/* Currency distribution: one stacked bar (every account, always —
-            the bar does not collapse) plus a compact breakdown list capped
-            at five entries, the rest behind the same Show more this card
-            already used for its old one-row-per-account list. When the
-            selected window has no settled accounts at all, an illustration
-            stands in rather than leaving the card body blank.
+        {/* Currency breakdown: a compact list capped at five entries, the
+            rest behind Show more.
 
             Still no forced height matching against Total settled (see the
             history above — that cross-card coupling is what caused the
             "resizes dramatically on timeframe change" bug in the first
             place).
 
-            No blanket min-height across the three branches any more either
-            — an earlier version floored all three at min-h-70 (~280px,
-            sized for a worst-case 5 currency rows) so none of them could
-            ever look shorter than that. In practice most windows show 1-3
-            currencies, whose real content is closer to 100-160px, so that
-            floor sat as a large, permanent, and completely unjustified
-            block of blank space under almost every real result — reserving
-            room for a case ("5 currencies") that's the exception, not the
-            norm. Each branch now sizes to its own real content: the
-            loading skeleton mirrors a typical 2-row result rather than
-            padding out to 5, and the empty-state illustration and loaded
-            list are both left to their natural height. Some size
-            difference between "just loaded 1 currency" and "just loaded 4"
-            is real, current data — not a bug to paper over with reserved
-            space the other 90% of results never use.
-
-            The loading branch still has to render SOMETHING, though: the
-            original bug here wasn't "too little height reserved", it was
-            that `!isLoading && accountRows.length === 0` is false while
-            loading (accountRows is genuinely [] before the fetch resolves,
-            but `!isLoading` is also false) and `accountRows.length > 0` is
-            false too, so NEITHER branch rendered at all — the section
-            collapsed to a genuine 0px during every fetch, then snapped to
-            whatever the loaded content needed the instant data landed.
-            That 0-height gap, not the natural variation between loaded
-            states, is the defect; the skeleton below exists to close it
-            without reserving more than a realistic result actually needs. */}
-        {isLoading ? (
-          <div className="space-y-4">
-            <Shimmer className="h-3 w-36" />
-            <Shimmer className="h-2.5 w-full rounded-sm" />
-            <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-              {Array.from({ length: 2 }).map((_, i) => (
-                <Shimmer key={i} className="h-10 w-full" />
-              ))}
-            </div>
-          </div>
-        ) : accountRows.length === 0 ? (
-          <PlaceholderState
-            variant="no-settlements"
-            size="sm"
-            title={isAmountMode ? "No amount settled" : "No settled transactions"}
-            description="Nothing has settled in this period yet."
-          />
-        ) : (
-          accountRows.length > 0 && (
+            This section IS floored at a shared min-height (below), though —
+            unlike that removed Total-settled coupling, this floor doesn't
+            reach into another card. It exists because this card sits beside
+            Documents Pending in the same grid row (see
+            TransactionsAnalyticsCarousel's `lg:h-full` on both), which
+            stretches both to match whichever is taller. Left unfloored, the
+            empty-state illustration (~250px: icon + title + description)
+            ran noticeably taller than a loaded 1-4 currency breakdown
+            (~100-150px), so switching to a period with no settlements — or
+            back — visibly grew or shrank the whole row, not just this
+            card's own content. The floor is sized to the common loaded
+            case (a handful of currencies) so the illustration shrinks to
+            match it instead of the other way around; it doesn't reserve
+            room for some worst-case list the way the old min-h-70 floor
+            this replaced once did for a hypothetical 5-currency case. */}
+        <div className="min-h-32">
+          {isLoading ? (
             <div className="space-y-4">
-              {/* Same uppercase/tracked micro-label PaymentDetailsSection and
+              <Shimmer className="h-3 w-36" />
+              <Shimmer className="h-3 w-full" />
+              <div className="space-y-3">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Shimmer key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            </div>
+          ) : accountRows.length === 0 ? (
+            <PlaceholderState
+              variant="no-settlements"
+              size="xs"
+              className="h-full justify-center py-0"
+              title={isAmountMode ? "No amount settled" : "No settled transactions"}
+              description="Once payments settle, this breaks the total down by the currency each one arrived in."
+            />
+          ) : (
+            accountRows.length > 0 && (
+              <div className="space-y-3">
+                {/* Same uppercase/tracked micro-label PaymentDetailsSection and
                   every other section heading in this feature already uses
                   (see TransactionDetailsPage), rather than the plain small
                   label this had before — one more thing that read as
                   slightly off-house-style on review. */}
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Currency distribution
-              </p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Currency breakdown
+                </p>
 
-              {/* 10px tall, per the brief's "compact dashboard visualization"
-                  range (8–12px). No gap/hairline between segments any more —
-                  a seamless bar reads as one continuous gradient rather than
-                  a row of tiles, which was part of the same "boxy" feedback
-                  the chip-style breakdown below got. Purely decorative:
-                  every figure it represents is restated as real text below,
-                  which is what a screen reader (and per the brief, any
-                  reader who needs more than relative proportions) actually
-                  reads. Rectangular with a small corner radius, not the
-                  fully rounded pill this used to be — matches the same
-                  distribution bar on the dashboard's own Transactions card
-                  (see McaInvoiceOriginsCard). */}
-              <div
-                className="flex h-2.5 w-full overflow-hidden rounded-sm bg-muted"
-                aria-hidden="true"
-              >
-                {accountRows.map((row, index) => (
-                  <DistributionSegment
-                    key={row.accountId}
-                    index={index}
-                    widthPct={totalValue > 0 ? (row.value / totalValue) * 100 : 0}
-                  />
-                ))}
+                {/* Stacked, full-width rows with a hairline divider between
+                  them while there are three currencies or fewer — each row's
+                  extra text (native amount) needs the full width to read
+                  comfortably. Past three, pairing rows two-to-a-line keeps a
+                  long currency list from pushing the card too tall, with a
+                  full grid of dividers (see `pairedCellClasses`) between
+                  both rows and columns. */}
+                <ul className={isPairedLayout ? "grid grid-cols-2" : "divide-y divide-border"}>
+                  {firstFiveRows.map((row, index) => (
+                    <CurrencyChip
+                      key={row.accountId}
+                      row={row}
+                      isAmountMode={isAmountMode}
+                      sharePct={totalValue > 0 ? row.value / totalValue : 0}
+                      className={
+                        isPairedLayout ? pairedCellClasses(index, firstFiveRows.length) : undefined
+                      }
+                    />
+                  ))}
+                </ul>
               </div>
-
-              {/* Single column for one currency (a two-column grid would
-                  leave it hugging the left half with dead space beside it);
-                  two columns from sm once there is a second entry to pair it
-                  with. */}
-              <ul
-                className={cn(
-                  "grid grid-cols-1 gap-x-4",
-                  accountRows.length > 1 && "sm:grid-cols-2"
-                )}
-              >
-                {firstFiveRows.map((row, index) => (
-                  <CurrencyChip
-                    key={row.accountId}
-                    row={row}
-                    index={index}
-                    sharePct={totalValue > 0 ? row.value / totalValue : 0}
-                  />
-                ))}
-              </ul>
-            </div>
-          )
-        )}
+            )
+          )}
+        </div>
 
         {canExpand && (
           <>
@@ -482,13 +472,21 @@ export function SettlementAnalyticsCard({
                 expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
               )}
             >
-              <ul className="grid min-h-0 grid-cols-1 gap-x-4 overflow-hidden sm:grid-cols-2">
+              <ul
+                className={cn(
+                  "grid min-h-0 overflow-hidden",
+                  isPairedLayout ? "grid-cols-2" : "divide-y divide-border"
+                )}
+              >
                 {restRows.map((row, index) => (
                   <CurrencyChip
                     key={row.accountId}
                     row={row}
-                    index={VISIBLE_COUNT + index}
+                    isAmountMode={isAmountMode}
                     sharePct={totalValue > 0 ? row.value / totalValue : 0}
+                    className={
+                      isPairedLayout ? pairedCellClasses(index, restRows.length) : undefined
+                    }
                   />
                 ))}
               </ul>

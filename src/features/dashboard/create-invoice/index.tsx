@@ -3,7 +3,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { Button, Shimmer, SplitButton, SplitButtonItem, StatusBadge } from "@/components/ui";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  Shimmer,
+  SplitButton,
+  SplitButtonItem,
+  StatusBadge,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { withBasePath } from "@/constants/basePath";
@@ -45,6 +54,7 @@ import {
 } from "@/features/dashboard/create-invoice/constants";
 import {
   DueDateChip,
+  dueLabel,
   InvoiceNumberChip,
   IssueDateChip,
   ChipField,
@@ -182,10 +192,10 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
       <div
         aria-busy
         aria-label="Preparing your invoice"
-        className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]"
+        className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_46rem]"
       >
         <div className="min-h-0 overflow-y-auto">
-          <div className="mx-auto max-w-[860px] space-y-5 px-6 py-6 lg:px-10">
+          <div className="mx-auto max-w-250 space-y-5 px-6 py-6 lg:px-10">
             {/* The number / issue-date / due-date chip row. */}
             <div className="flex flex-wrap items-center gap-2">
               <Shimmer className="h-8 w-36 rounded-full" />
@@ -837,7 +847,52 @@ function InvoiceEditor({
   /** The readiness popover. Opened by the merchant, and by a Generate press that
    *  cannot go through — see handleGenerate. */
   const [checklistOpen, setChecklistOpen] = useState(false);
+  /**
+   * Whether the readiness chip is on screen at all.
+   *
+   * It isn't, until a Generate press has actually been turned away. A chip
+   * counting what's still missing is only an answer to a question the
+   * merchant has asked; sitting in the header from the first keystroke it was
+   * instead a running tally of everything not yet done on a form they had
+   * only just opened, which reads as a scold rather than as help. It stays
+   * put once revealed — including after it flips to "Ready" — because
+   * disappearing the moment the last field is filled would take away the
+   * confirmation that the press will now go through.
+   */
+  const [checklistRevealed, setChecklistRevealed] = useState(false);
+  /** The "save this as a template?" prompt shown before the FIRST generate on
+   *  an account that has no templates yet — see handleGenerate. */
+  const [templatePromptOpen, setTemplatePromptOpen] = useState(false);
+  /** Set once that prompt has been answered either way, so it asks once per
+   *  editor session rather than on every Generate press. */
+  const [templatePromptAnswered, setTemplatePromptAnswered] = useState(false);
+  /**
+   * Whether the save-template dialog was opened BY that prompt, in which case
+   * saving carries straight on into generating rather than stopping at the
+   * toast. A ref, not state: it's read inside the save mutation's own
+   * callback, and it exists only to route that one callback.
+   */
+  const generateAfterTemplateSave = useRef(false);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
+  /** BrandingSection's own collapse state, lifted here so the preview
+   *  sidebar's "Customise template" button can open it directly. */
+  const [brandingExpanded, setBrandingExpanded] = useState(false);
+
+  // BrandingSection renders nothing at all while collapsed (see its own
+  // early return), so its #invoice-branding-section element doesn't exist
+  // in the DOM until AFTER this state flips and React commits the render.
+  // Calling scrollIntoView synchronously inside the click handler that sets
+  // it ran against the still-stale DOM and found nothing — which is why the
+  // click appeared to do nothing (or scroll to whatever the browser fell
+  // back to) instead of revealing the section. A layout effect firing after
+  // that commit is what actually finds it.
+  useEffect(() => {
+    if (!brandingExpanded) return;
+    document
+      .getElementById("invoice-branding-section")
+      ?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [brandingExpanded]);
+
   /** Which asset the upload dialog is open for, or null when it is closed. */
   const [uploadingAsset, setUploadingAsset] = useState<"LOGO" | "SIGNATURE" | null>(null);
 
@@ -971,6 +1026,14 @@ function InvoiceEditor({
       setTemplateLink(templateId);
       setSaveTemplateOpen(false);
       toast.success("Template saved", { description: `"${name}" is ready to reuse.` });
+
+      // Opened from the pre-generate prompt: the merchant asked for a
+      // template on the way to generating, so finish the job they actually
+      // pressed rather than leaving them to press Generate a second time.
+      if (generateAfterTemplateSave.current) {
+        generateAfterTemplateSave.current = false;
+        runGenerate();
+      }
     });
   };
 
@@ -1266,15 +1329,12 @@ function InvoiceEditor({
 
   const outstanding = requirements.filter((r) => !r.done);
 
-  const handleGenerate = () => {
-    // The checklist beside the button is the message now: it names every
-    // outstanding item at once and each one is a control that scrolls to its own
-    // field, which a toast could be neither of.
-    if (outstanding.length > 0) {
-      setChecklistOpen(true);
-      return;
-    }
-
+  /**
+   * Everything a Generate press does once it has cleared the gates in
+   * handleGenerate below. Split out so the template prompt can hold the press,
+   * ask its question, and then run this — the press is deferred, not dropped.
+   */
+  const runGenerate = () => {
     saveInvoice(buildPayload(), {
       onSuccess: () => {
         // Production imports ticked items when leaving the items step; the flat
@@ -1356,6 +1416,38 @@ function InvoiceEditor({
     });
   };
 
+  const handleGenerate = () => {
+    // The checklist beside the button is the message now: it names every
+    // outstanding item at once and each one is a control that scrolls to its own
+    // field, which a toast could be neither of. This press is also what puts
+    // that chip on screen in the first place — see `checklistRevealed`.
+    if (outstanding.length > 0) {
+      setChecklistRevealed(true);
+      setChecklistOpen(true);
+      return;
+    }
+
+    /**
+     * One-time offer, on the last press where it's still worth anything: the
+     * merchant has a complete invoice on screen and no templates at all, and
+     * the moment it generates this arrangement stops being something they can
+     * name and reuse. Gated on `isReady` so an unresolved template query is
+     * never mistaken for an empty one, and on hasTemplatableContent so it
+     * never offers to save an invoice with nothing reusable in it.
+     */
+    if (
+      !templatePromptAnswered &&
+      templateStore.isReady &&
+      templateStore.templates.length === 0 &&
+      hasTemplatableContent
+    ) {
+      setTemplatePromptOpen(true);
+      return;
+    }
+
+    runGenerate();
+  };
+
   const handleClose = () => {
     router.push("/mca-invoices");
     if (form.invoiceNumber) {
@@ -1396,12 +1488,16 @@ function InvoiceEditor({
         </div>
 
         {/* Sits immediately left of Generate, because it is the answer to the
-            question that button raises. */}
-        <ReadinessChecklist
-          requirements={requirements}
-          open={checklistOpen}
-          onOpenChange={setChecklistOpen}
-        />
+            question that button raises — and only appears once that question
+            has actually been asked, i.e. after a press that couldn't go
+            through (see `checklistRevealed`). */}
+        {checklistRevealed && (
+          <ReadinessChecklist
+            requirements={requirements}
+            open={checklistOpen}
+            onOpenChange={setChecklistOpen}
+          />
+        )}
 
         {/* Nova's split button, restored. The menu offers exactly one of "Save
             as template" or "Update template" depending on whether this invoice
@@ -1495,18 +1591,15 @@ function InvoiceEditor({
         </SplitButton>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_46rem]">
         <div className="min-h-0 overflow-y-auto">
-          <div className="mx-auto max-w-[860px] space-y-5 px-6 py-6 lg:px-10">
+          <div className="mx-auto max-w-250 space-y-5 px-6 py-6 lg:px-10">
             {/* Three captioned fields, not a loose row of pills: the due date is
                 required and was the hardest thing on this page to find, because
                 nothing named any of the three and an unset one drew as a bare
                 link. items-end keeps the chips on one baseline under captions of
                 differing length. */}
-            <div
-              className="flex flex-wrap items-end gap-x-4 gap-y-3"
-              data-guide="invoice-dates"
-            >
+            <div className="flex flex-wrap items-end gap-x-4 gap-y-3" data-guide="invoice-dates">
               <ChipField label="Invoice number" fieldId="invoice-number">
                 <InvoiceNumberChip
                   value={form.invoiceNumber}
@@ -1523,7 +1616,11 @@ function InvoiceEditor({
                   }
                 />
               </ChipField>
-              <ChipField label="Due date" required fieldId="due-date">
+              <ChipField
+                label={dueLabel(form.dueTermId, form.dueDate) ? "Due date" : undefined}
+                required
+                fieldId="due-date"
+              >
                 <DueDateChip
                   termId={form.dueTermId}
                   dueDate={form.dueDate}
@@ -1545,15 +1642,16 @@ function InvoiceEditor({
                 onApply={handleApplyTemplate}
                 onDetach={handleDetachTemplate}
                 onManage={() => setManageTemplatesOpen(true)}
-                onSaveCurrent={() => setSaveTemplateOpen(true)}
               />
             </div>
 
-            <BillerSection
-              billerDetails={billerDetails}
-              isLoading={false}
-              onChange={setBillerDetails}
-            />
+            <div data-field="biller">
+              <BillerSection
+                billerDetails={billerDetails}
+                isLoading={false}
+                onChange={setBillerDetails}
+              />
+            </div>
 
             <div data-guide="invoice-client" data-field="client">
               <BillToSection
@@ -1587,17 +1685,20 @@ function InvoiceEditor({
               <PaymentDetailsSection
                 invoiceId={invoiceId}
                 currency={persistedCurrency}
+                currencies={currencies}
                 accountNo={form.accountNo}
                 onAccountNoChange={(accountNo) => patch({ accountNo })}
               />
             </div>
 
-            <NotesAndTermsSection
-              memo={form.memo}
-              notes={form.notes}
-              lut={form.lut}
-              onChange={patch}
-            />
+            <div data-field="notes-terms">
+              <NotesAndTermsSection
+                memo={form.memo}
+                notes={form.notes}
+                lut={form.lut}
+                onChange={patch}
+              />
+            </div>
 
             <div data-field="recurring">
               <RecurringSection
@@ -1624,7 +1725,11 @@ function InvoiceEditor({
             <InvoicePreviewSidebar
               source={previewSource}
               onLogoClick={() => setUploadingAsset("LOGO")}
+              onCustomiseClick={() => setBrandingExpanded((value) => !value)}
             />
+            {/* Directly under the Document/Email tabs, not off in its own
+                titled tab/accordion any more — "Customise template" is now
+                the only way in or out of it. */}
             <BrandingSection
               logoEnabled={form.logoEnabled}
               signatureEnabled={form.signatureEnabled}
@@ -1636,14 +1741,62 @@ function InvoiceEditor({
               onBrandingChange={patchBranding}
               onResetColors={handleResetColors}
               onOpenUpload={setUploadingAsset}
+              expanded={brandingExpanded}
             />
           </div>
         </div>
       </div>
 
+      {/* Asked once, immediately before the first generate on an account with
+          no templates — see handleGenerate. Both answers continue to the
+          generate the merchant already pressed; neither is a dead end. */}
+      <Dialog open={templatePromptOpen} onOpenChange={setTemplatePromptOpen}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>Save this as a template?</DialogTitle>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+            You don&apos;t have any templates yet. Saving this invoice&apos;s items, notes and
+            branding as one makes the next invoice a few clicks instead of the whole form. Your
+            client and the amounts stay with this invoice either way.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setTemplatePromptAnswered(true);
+                setTemplatePromptOpen(false);
+                runGenerate();
+              }}
+            >
+              Not now
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              leftIcon={<Icon name="layout-template" className="h-3.5 w-3.5" />}
+              onClick={() => {
+                setTemplatePromptAnswered(true);
+                setTemplatePromptOpen(false);
+                generateAfterTemplateSave.current = true;
+                setSaveTemplateOpen(true);
+              }}
+            >
+              Save as template
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <SaveAsTemplateDialog
         open={saveTemplateOpen}
-        onOpenChange={setSaveTemplateOpen}
+        onOpenChange={(open) => {
+          // Backed out of naming the template: the generate they pressed is
+          // abandoned with it, rather than firing behind a dialog they just
+          // dismissed. Pressing Generate again goes straight through, since
+          // the prompt is already marked answered.
+          if (!open) generateAfterTemplateSave.current = false;
+          setSaveTemplateOpen(open);
+        }}
         snapshot={
           hasTemplatableContent
             ? toTemplateSnapshot(form, branding, activeTemplate?.snapshot)

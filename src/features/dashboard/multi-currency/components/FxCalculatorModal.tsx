@@ -346,10 +346,7 @@ export function FxCalculatorModal({
             label={`PayGlocal fee${rates ? ` (${rates.payGlocalFeeRate}%)` : ""}`}
             value={showResults ? rates?.payGlocalFeeAmount : undefined}
           />
-          <DeductionRow
-            label="GST (18% of txn fee)"
-            value={showResults ? rates?.gst : undefined}
-          />
+          <DeductionRow label="GST (18% of txn fee)" value={showResults ? rates?.gst : undefined} />
         </div>
 
         <Separator className="my-5" />

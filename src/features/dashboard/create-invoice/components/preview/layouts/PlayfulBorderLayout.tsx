@@ -8,6 +8,7 @@ import {
   MemoLine,
   NotesBlock,
   PartyBlock,
+  PreviewSection,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -60,18 +61,24 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
           className="mb-5 grid grid-cols-3 gap-2 text-[11px] font-semibold"
           style={{ color: primary }}
         >
-          <p>
-            {labels.invoiceNumber}{" "}
-            <span className="font-normal text-foreground">{model.invoiceNumber}</span>
-          </p>
-          <p>
-            {labels.issueDate}{" "}
-            <span className="font-normal text-foreground">{model.issueDate}</span>
-          </p>
-          <p>
-            {labels.dueDate}{" "}
-            <span className="font-normal text-foreground">{model.dueDate || "-"}</span>
-          </p>
+          <PreviewSection fieldId="invoice-number" label="Edit invoice number">
+            <p>
+              {labels.invoiceNumber}{" "}
+              <span className="font-normal text-foreground">{model.invoiceNumber}</span>
+            </p>
+          </PreviewSection>
+          <PreviewSection fieldId="issue-date" label="Edit issue date">
+            <p>
+              {labels.issueDate}{" "}
+              <span className="font-normal text-foreground">{model.issueDate}</span>
+            </p>
+          </PreviewSection>
+          <PreviewSection fieldId="due-date" label="Edit due date">
+            <p>
+              {labels.dueDate}{" "}
+              <span className="font-normal text-foreground">{model.dueDate || "-"}</span>
+            </p>
+          </PreviewSection>
         </div>
 
         <div className="mb-5 grid grid-cols-2 gap-4">
@@ -82,6 +89,7 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
             gstIn={model.billerGstIn}
             labelClassName={brandLabel}
             labelStyle={{ color: primary }}
+            fieldId="biller"
           />
           <PartyBlock
             label={labels.billedTo}
@@ -90,6 +98,7 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
             lines={model.clientLines}
             labelClassName={brandLabel}
             labelStyle={{ color: primary }}
+            fieldId="client"
           />
         </div>
 
@@ -98,7 +107,7 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
             both at the bottom made the memo read as a second terms block. */}
         <MemoLine memo={model.memo} className="mb-4" />
 
-        <div className="overflow-hidden rounded-2xl">
+        <PreviewSection fieldId="line-items" label="Edit line items" className="overflow-hidden rounded-2xl">
           <div
             className="grid grid-cols-[minmax(0,1fr)_48px_72px_84px] gap-2 px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white"
             style={{ backgroundColor: primary }}
@@ -126,7 +135,7 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
               <span className="text-right font-semibold tabular-nums">{item.amount}</span>
             </div>
           ))}
-        </div>
+        </PreviewSection>
 
         <div className="mt-5 flex items-start justify-between gap-6">
           <AccountBlock
@@ -136,6 +145,7 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
             className="min-w-0"
             labelClassName={brandLabel}
             labelStyle={{ color: primary }}
+            fieldId="payment-account"
           />
 
           <div className="w-full max-w-[200px] shrink-0 overflow-hidden rounded-xl">
@@ -162,7 +172,12 @@ export function PlayfulBorderLayout({ model, onLogoClick }: LayoutProps) {
         </div>
 
         <div className="mt-5 flex items-end justify-between gap-6">
-          <NotesBlock notes={model.notes} lut={model.lut} className="max-w-[60%]" />
+          <NotesBlock
+            notes={model.notes}
+            lut={model.lut}
+            className="max-w-[60%]"
+            fieldId="notes-terms"
+          />
           <SignatureBlock url={model.signatureUrl} className="shrink-0" />
         </div>
       </div>

@@ -177,10 +177,21 @@ export function TotalSettledCard({
 
       <div className={cn("h-76 w-full", chartClassName)}>
         {!hasData ? (
+          // size="xs": the default md illustration's own natural footprint
+          // (~132px icon + its padding) ran well past this card's neighbor
+          // in the Transactions page's row (SavedAmountCard, floored at
+          // min-h-64/256px) — since that row is `items-stretch`, the
+          // larger of the two set the row height, stretching SavedAmountCard
+          // down to match and leaving visible dead space inside it. A
+          // smaller illustration keeps the empty state's own natural height
+          // close to what a loaded sparkline needs, so there's little left
+          // for the stretch to inflate either card with. Same fix already
+          // applied to SettlementAnalyticsCard's own empty state.
           <PlaceholderState
             variant="no-settlements"
-            title="No settlements yet"
-            description="Nothing has settled in this period yet."
+            size="xs"
+            title="No settlements in this period"
+            description="As payouts are made, this charts how much settled to your account over time."
             className="h-full"
           />
         ) : (

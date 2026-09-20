@@ -18,17 +18,15 @@ import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
 import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
 
 /**
- * "Start from a template".
+ * "Start from a template" — renders nothing once it's known there are none
+ * to start from (see the early return below), so saving the first one only
+ * happens through the header's own "Save as template" action.
  *
- * Nova's template card, above the first section of the form. Two departures,
- * both because this one is wired to a form that already has content in it:
- *
- *  - Applying a template over a part-filled invoice asks first. Nova overwrites
- *    silently, which is survivable in a mock and is not here: this editor
- *    autosaves 1.2s later, so a mis-click is persisted before it can be undone.
- *  - The empty state offers to save the current invoice, because a merchant with
- *    no templates yet has no reason to look in the header's dropdown for the one
- *    action that would give them one.
+ * Nova's template card, above the first section of the form. One departure,
+ * because this one is wired to a form that already has content in it:
+ * applying a template over a part-filled invoice asks first. Nova overwrites
+ * silently, which is survivable in a mock and is not here: this editor
+ * autosaves 1.2s later, so a mis-click is persisted before it can be undone.
  */
 export function InvoiceTemplatePicker({
   templates,
@@ -38,7 +36,6 @@ export function InvoiceTemplatePicker({
   onApply,
   onDetach,
   onManage,
-  onSaveCurrent,
 }: {
   templates: InvoiceTemplate[];
   isReady: boolean;
@@ -50,12 +47,21 @@ export function InvoiceTemplatePicker({
   /** Unlinks from the active template. Never touches the invoice's contents. */
   onDetach: () => void;
   onManage: () => void;
-  onSaveCurrent: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<InvoiceTemplate | null>(null);
 
   const active = templates.find((template) => template.id === activeTemplateId) ?? null;
+
+  // No card at all once it's known there's nothing to pick from — the
+  // "no templates yet, save one" empty state used to render here regardless,
+  // but a picker for a list that's empty isn't template *selection*, so it
+  // no longer earns a place in the section until there's an actual choice
+  // to make. Saving the current invoice as a template still lives in the
+  // header's own split button, so that path isn't lost, just not repeated
+  // here. Still shown while `isReady` is false: that's "not known yet", not
+  // "known empty".
+  if (isReady && templates.length === 0) return null;
 
   const choose = (template: InvoiceTemplate) => {
     setPickerOpen(false);
@@ -72,7 +78,7 @@ export function InvoiceTemplatePicker({
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <div className="rounded-xl border border-border p-5">
       <div className="mb-3 flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -89,24 +95,7 @@ export function InvoiceTemplatePicker({
       </div>
 
       {!isReady ? (
-        <Shimmer className="h-[3.25rem] w-full rounded-lg" />
-      ) : templates.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 rounded-lg border border-dashed border-border px-4 py-4">
-          <p className="text-[12.5px] text-muted-foreground">
-            No templates yet. Save an invoice&apos;s items, terms and branding once, then start from
-            it next time.
-          </p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={!hasContent}
-            leftIcon={<Icon name="bookmark" className="h-3.5 w-3.5" />}
-            onClick={onSaveCurrent}
-          >
-            {hasContent ? "Save this invoice as a template" : "Add items to save a template"}
-          </Button>
-        </div>
+        <Shimmer className="h-13 w-full rounded-lg" />
       ) : (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>

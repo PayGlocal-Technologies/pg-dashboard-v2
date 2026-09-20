@@ -37,7 +37,7 @@ import {
   dateFilterToEpochMs,
   EMPTY_INVOICE_DATE_FILTER,
 } from "@/features/dashboard/mca-invoices/helpers";
-import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
+import { buildInvoiceColumns, InvoiceRowAction } from "@/features/dashboard/mca-invoices/columns";
 import {
   FIXED_COLUMN_KEYS,
   INVOICES_PAGE_LIMIT,
@@ -258,13 +258,38 @@ export function McaInvoiceTable({
     : {
         title:
           activeTab === "all"
-            ? "No invoices yet"
+            ? "Create invoices and collect payments from your clients"
             : `No ${INVOICE_VIEW_TABS.find((tab) => tab.value === activeTab)?.label.toLowerCase() ?? ""} invoices`,
         description:
           activeTab === "all"
-            ? "Invoices you create will appear here."
+            ? "Send a professional invoice and let your client pay you from anywhere in the world."
             : "Nothing in this view yet. Other views may still have invoices.",
       };
+
+  /**
+   * The first-time state is the one place on this page worth offering the
+   * action from: a merchant looking at an empty "All" list has nothing to
+   * scan and one obvious next step. A narrowed search that matched nothing
+   * gets no button — the fix there is to change the search, not to create an
+   * invoice — and neither does an empty tab, where other views may well hold
+   * invoices already.
+   */
+  const showEmptyAction = !hasNarrowingFilters && activeTab === "all";
+
+  /** The same control the toolbar carries, so the empty state runs the real
+   *  flow (including the MID choice a multi-MID merchant needs) rather than a
+   *  second, parallel path to it. Shared by the desktop and mobile empties so
+   *  the two never drift. */
+  const emptyAction = showEmptyAction ? (
+    <MidScopedAction
+      label="Create invoice"
+      icon="plus"
+      variant="primary"
+      needsMidChoice={needsMidChoice}
+      midOptions={midOptions}
+      onRun={openInvoiceEditor}
+    />
+  ) : undefined;
 
   // Blank URLs: every call overrides them per row via `dynamicUrl`, because
   // the MID differs by row on a multi-MID merchant's list.
@@ -369,15 +394,16 @@ export function McaInvoiceTable({
     else toast.success("Invoices updated");
   };
 
-  const baseColumns = buildInvoiceColumns(handlers, {
+  const baseColumns = buildInvoiceColumns({
     showMid,
     showFrequency: activeTab === "recurring",
   });
   const orderedColumns = reorderColumns(baseColumns, columnOrder);
   const columns = orderedColumns.filter((col) => !hiddenColumns.includes(col.key));
-  const reorderableColumns = baseColumns
-    .filter((c) => c.key !== "action")
-    .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
+  const reorderableColumns = baseColumns.map((c) => ({
+    key: c.key,
+    label: typeof c.header === "string" ? c.header : c.key,
+  }));
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
   const onSearch = (value: string) => {
@@ -452,19 +478,6 @@ export function McaInvoiceTable({
           <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
 
           <div className="ml-auto flex items-center gap-2">
-            <ReorderColumnsPopover
-              columns={reorderableColumns}
-              order={currentColumnOrder}
-              onOrderChange={setColumnOrder}
-              onReset={() => {
-                setColumnOrder(null);
-                setHiddenColumns([]);
-              }}
-              hiddenKeys={hiddenColumns}
-              onHiddenKeysChange={setHiddenColumns}
-              fixedKeys={FIXED_COLUMN_KEYS}
-              fixedReason="Always shown. An invoice row is unreadable without its number, amount and status."
-            />
             <Button
               type="button"
               variant="outline"
@@ -478,14 +491,18 @@ export function McaInvoiceTable({
             >
               Refresh
             </Button>
-            <MidScopedAction
-              label="Create invoice"
-              icon="plus"
-              variant="primary"
-              className="h-auto min-h-0 shrink-0 py-1"
-              needsMidChoice={needsMidChoice}
-              midOptions={midOptions}
-              onRun={openInvoiceEditor}
+            <ReorderColumnsPopover
+              columns={reorderableColumns}
+              order={currentColumnOrder}
+              onOrderChange={setColumnOrder}
+              onReset={() => {
+                setColumnOrder(null);
+                setHiddenColumns([]);
+              }}
+              hiddenKeys={hiddenColumns}
+              onHiddenKeysChange={setHiddenColumns}
+              fixedKeys={FIXED_COLUMN_KEYS}
+              fixedReason="Always shown. An invoice row is unreadable without its number, amount and status."
             />
           </div>
         </div>
@@ -538,6 +555,7 @@ export function McaInvoiceTable({
                 variant="no-invoices"
                 title={emptyCopy.title}
                 description={emptyCopy.description}
+                action={emptyAction}
                 className="hidden py-16 lg:flex"
               />
             ) : (
@@ -561,6 +579,7 @@ export function McaInvoiceTable({
                 onPageChange={setPage}
                 tableLayout="content"
                 density="compact"
+                rowAction={(row) => <InvoiceRowAction row={row} handlers={handlers} />}
               />
             )}
 
@@ -575,6 +594,7 @@ export function McaInvoiceTable({
               pageSize={INVOICES_PAGE_LIMIT}
               emptyTitle={emptyCopy.title}
               emptyDescription={emptyCopy.description}
+              emptyAction={emptyAction}
             />
           </>
         )}

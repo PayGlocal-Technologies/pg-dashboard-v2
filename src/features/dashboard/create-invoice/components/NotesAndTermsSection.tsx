@@ -32,7 +32,7 @@ export function NotesAndTermsSection({
   const filled = [memo, notes, lut].filter((value) => value.trim()).length;
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border">
       <Button
         type="button"
         variant="ghost"
