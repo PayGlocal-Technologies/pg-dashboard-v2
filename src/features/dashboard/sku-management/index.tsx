@@ -47,7 +47,8 @@ export function SkuManagementFeature() {
   // the two entry points are one code path. Held back until the MID list has
   // loaded, and never fired while a choice is pending or the page is showing
   // its own MID picker instead of the catalogue.
-  const canRunUrlAction = guardState !== "not-applicable" && midOptions.length > 0 && !needsMidChoice;
+  const canRunUrlAction =
+    guardState !== "not-applicable" && midOptions.length > 0 && !needsMidChoice;
   useUrlAction("add-item", () => openAddItem(""), canRunUrlAction);
   useUrlAction("import", () => openImport(""), canRunUrlAction);
 

@@ -303,6 +303,24 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
 
+  /**
+   * Which empty state applies. The old copy said "No settlements yet"
+   * regardless, which told a merchant who had just searched or picked a date
+   * that they had none at all. Settlements aren't merchant-created, so neither
+   * branch carries a CTA.
+   */
+  const hasNarrowingFilters = !!search.trim() || !!dateFilter;
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No settlements in this range",
+        description: "Try a wider date range, or clear the search.",
+      }
+    : {
+        title: "Track your settlements in one place",
+        description:
+          "Each payout appears here with the transactions it covers and when the funds reached your account.",
+      };
+
   /** Row-scoped report download, shared by both views.
    *
    *  Keyed off `row.date`, the settlement date, which is also the row's id now
@@ -419,105 +437,105 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
               />
             </div>
 
-              <DataTableCard<SettlementRow>
-                toolbar={
-                  <div className="flex items-center gap-2.5 flex-wrap">
-                    <RotatingSearchInput
-                      value={search}
-                      onSearch={onSearch}
-                      words={["Settlement date", "Merchant ID"]}
-                      className="min-w-40 max-w-xs flex-1"
-                    />
-
-                    <div className="hidden sm:block h-4 w-px bg-border" />
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
-                    </div>
-
-                    <div className="ml-auto flex items-center gap-2">
-                      <ColumnManager
-                        columns={columnDefs}
-                        order={effectiveColumnOrder}
-                        onOrderChange={setColumnOrder}
-                        hiddenKeys={[...hiddenColumns]}
-                        onHiddenKeysChange={(next) => setHiddenColumns(new Set(next))}
-                        onReset={onResetColumns}
-                      />
-                    </div>
-                  </div>
-                }
-                errorState={
-                  isError && !enhancedIsMock ? (
-                    <PlaceholderState
-                      variant="error"
-                      title="Couldn't load settlements"
-                      description="Something went wrong while fetching data."
-                      className="py-14"
-                      action={
-                        <Button variant="outline" size="sm" onClick={() => void refetch()}>
-                          Retry
-                        </Button>
-                      }
-                    />
-                  ) : undefined
-                }
-                emptyState={
-                  <PlaceholderState
-                    variant="no-settlements"
-                    title="No settlements yet"
-                    description="Settlement reports will appear here once transactions are processed."
-                    className="py-14"
+            <DataTableCard<SettlementRow>
+              toolbar={
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <RotatingSearchInput
+                    value={search}
+                    onSearch={onSearch}
+                    words={["Settlement date", "Merchant ID"]}
+                    className="min-w-40 max-w-xs flex-1"
                   />
-                }
-                columns={buildSettlementColumns({
-                  columnOrder: effectiveColumnOrder,
-                  hiddenColumns,
-                  showMerchantId,
-                })}
-                data={filteredEnhancedRows}
-                isLoading={!enhancedIsMock && isPending}
-                emptyTitle="No settlements yet"
-                emptyDescription="Settlement reports will appear here once transactions are processed"
-                rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
-                pagination={{ mode: "client", pageSize: 10 }}
-                maxBodyHeight="none"
-                rowAction={(row) => (
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => downloadRowReport(row)}
-                      leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
-                      className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                    >
-                      Download
-                    </Button>
-                    {/* BACKEND GAP: detail route is mock-backed (no per-settlement
-                     * detail endpoint in the old API). */}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        router.push(
-                          settlementDetailPath(
-                            activeContext,
-                            // A live summary row does not name its merchant
-                            // yet, so the page's own scope stands in — see
-                            // downloadRowReport, which has the same fallback.
-                            row.merchantId || scopeId,
-                            row.id
-                          )
-                        )
-                      }
-                      rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-                      className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                    >
-                      View details
-                    </Button>
+
+                  <div className="hidden sm:block h-4 w-px bg-border" />
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
                   </div>
-                )}
-              />
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <ColumnManager
+                      columns={columnDefs}
+                      order={effectiveColumnOrder}
+                      onOrderChange={setColumnOrder}
+                      hiddenKeys={[...hiddenColumns]}
+                      onHiddenKeysChange={(next) => setHiddenColumns(new Set(next))}
+                      onReset={onResetColumns}
+                    />
+                  </div>
+                </div>
+              }
+              errorState={
+                isError && !enhancedIsMock ? (
+                  <PlaceholderState
+                    variant="error"
+                    title="Couldn't load settlements"
+                    description="Something went wrong while fetching data."
+                    className="py-14"
+                    action={
+                      <Button variant="outline" size="sm" onClick={() => void refetch()}>
+                        Retry
+                      </Button>
+                    }
+                  />
+                ) : undefined
+              }
+              emptyState={
+                <PlaceholderState
+                  variant="no-settlements"
+                  title={emptyCopy.title}
+                  description={emptyCopy.description}
+                  className="py-14"
+                />
+              }
+              columns={buildSettlementColumns({
+                columnOrder: effectiveColumnOrder,
+                hiddenColumns,
+                showMerchantId,
+              })}
+              data={filteredEnhancedRows}
+              isLoading={!enhancedIsMock && isPending}
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
+              rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
+              pagination={{ mode: "client", pageSize: 10 }}
+              maxBodyHeight="none"
+              rowAction={(row) => (
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadRowReport(row)}
+                    leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
+                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                  >
+                    Download
+                  </Button>
+                  {/* BACKEND GAP: detail route is mock-backed (no per-settlement
+                   * detail endpoint in the old API). */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      router.push(
+                        settlementDetailPath(
+                          activeContext,
+                          // A live summary row does not name its merchant
+                          // yet, so the page's own scope stands in — see
+                          // downloadRowReport, which has the same fallback.
+                          row.merchantId || scopeId,
+                          row.id
+                        )
+                      )
+                    }
+                    rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                  >
+                    View details
+                  </Button>
+                </div>
+              )}
+            />
           </div>
 
           {showCycleInfo && (

@@ -272,8 +272,29 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   }));
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
-  const emptyTitle = "No clients found";
-  const emptyDescription = "Try adjusting your filters or search query";
+  // Told apart rather than sharing one line: a merchant who has searched and
+  // matched nothing needs to widen the search, while one who has never added a
+  // client needs to know what this list is for. Telling the second to "adjust
+  // your filters" sent them looking for filters they had never set.
+  const hasNarrowingFilters = !!search.trim() || countryFilters.length > 0;
+  const emptyTitle = hasNarrowingFilters
+    ? "No matching clients"
+    : "Add your clients once, invoice them anytime";
+  const emptyDescription = hasNarrowingFilters
+    ? "Try a different search, or clear a filter to widen the results."
+    : "Save a client's details and address so every invoice to them is a few clicks, not a form.";
+  /** Only the first-time state gets the action — the fix for an empty search
+   *  is a different search, not a new client. */
+  const emptyAction = hasNarrowingFilters ? undefined : (
+    <Button
+      type="button"
+      variant="primary"
+      leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+      onClick={() => onAddClientOpenChange(true)}
+    >
+      Add client
+    </Button>
+  );
 
   // Shared verbatim between the desktop and tablet/mobile control rows below
   // so the two can never drift out of sync. Just the chip elements, not their
@@ -331,45 +352,48 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
         className="hidden lg:block"
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
-        <RotatingSearchInput
-          value={search}
-          onSearch={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
-          words={CLIENT_SEARCH_HINTS}
-          ariaLabel="Search clients by business name, contact name, or email"
-          className="w-40 sm:w-56"
-        />
+            <RotatingSearchInput
+              value={search}
+              onSearch={(v) => {
+                setSearch(v);
+                setPage(1);
+              }}
+              words={CLIENT_SEARCH_HINTS}
+              ariaLabel="Search clients by business name, contact name, or email"
+              className="w-40 sm:w-56"
+            />
 
-        <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
+            <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
 
-        <div className="ml-auto flex items-center gap-2">
-          {/* Every mutation already invalidates the client list, so this is for
+            <div className="ml-auto flex items-center gap-2">
+              {/* Every mutation already invalidates the client list, so this is for
               changes made elsewhere — another tab, or another member of the team.
               Spinning on isFetching (not isLoading) is what makes a press over
               existing rows visibly do something. */}
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Refresh clients"
-            disabled={isFetching}
-            leftIcon={
-              <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-            }
-            onClick={refetch}
-            className="shrink-0"
-          >
-            Refresh
-          </Button>
-          <ColumnManager
-            columns={reorderableColumns}
-            order={currentColumnOrder}
-            onOrderChange={setColumnOrder}
-            onReset={() => setColumnOrder(null)}
-          />
-        </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label="Refresh clients"
+                disabled={isFetching}
+                leftIcon={
+                  <Icon
+                    name="refresh"
+                    className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+                  />
+                }
+                onClick={refetch}
+                className="shrink-0"
+              >
+                Refresh
+              </Button>
+              <ColumnManager
+                columns={reorderableColumns}
+                order={currentColumnOrder}
+                onOrderChange={setColumnOrder}
+                onReset={() => setColumnOrder(null)}
+              />
+            </div>
           </div>
         }
         columns={columns}
@@ -387,6 +411,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
             variant="no-data"
             title={emptyTitle}
             description={emptyDescription}
+            action={emptyAction}
             className="py-16"
           />
         }
@@ -402,28 +427,28 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
         tableLayout="content"
         // The page scrolls; this grid grows with its rows.
         maxBodyHeight="none"
-          // Edit rides the rowAction slot rather than a column of its own — the
-          // same arrangement, and the same button treatment, as the Upload Invoice
-          // action on the client's transactions table. Revealed on row hover and on
-          // keyboard focus within the row, pinned right while the columns scroll
-          // under it, and out of the way of column reordering.
-          rowAction={(row) => (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="pencil" className="h-3 w-3" />}
-              onClick={(e) => {
-                // The action floats over the row, whose own click opens the
-                // details drawer — without this, editing would open both.
-                e.stopPropagation();
-                onEditClient(row);
-              }}
-              className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
-            >
-              Edit
-            </Button>
-          )}
+        // Edit rides the rowAction slot rather than a column of its own — the
+        // same arrangement, and the same button treatment, as the Upload Invoice
+        // action on the client's transactions table. Revealed on row hover and on
+        // keyboard focus within the row, pinned right while the columns scroll
+        // under it, and out of the way of column reordering.
+        rowAction={(row) => (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            leftIcon={<Icon name="pencil" className="h-3 w-3" />}
+            onClick={(e) => {
+              // The action floats over the row, whose own click opens the
+              // details drawer — without this, editing would open both.
+              e.stopPropagation();
+              onEditClient(row);
+            }}
+            className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
+          >
+            Edit
+          </Button>
+        )}
       />
 
       {/* Tablet + mobile (below lg): the same page's rows as cards, in their
@@ -431,19 +456,19 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           manager has no table to act on down here. */}
       <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
         <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
-        <RotatingSearchInput
-          value={search}
-          onSearch={(v) => {
-            setSearch(v);
-            setPage(1);
-          }}
-          words={CLIENT_SEARCH_HINTS}
-          ariaLabel="Search clients by business name, contact name, or email"
-          className="min-w-0 flex-1"
-        />
-        <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-          {renderFilterChips()}
-        </div>
+          <RotatingSearchInput
+            value={search}
+            onSearch={(v) => {
+              setSearch(v);
+              setPage(1);
+            }}
+            words={CLIENT_SEARCH_HINTS}
+            ariaLabel="Search clients by business name, contact name, or email"
+            className="min-w-0 flex-1"
+          />
+          <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+            {renderFilterChips()}
+          </div>
         </div>
 
         <DataCardList
@@ -459,6 +484,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
               size="sm"
               title={emptyTitle}
               description={emptyDescription}
+              action={emptyAction}
             />
           }
           pagination={{

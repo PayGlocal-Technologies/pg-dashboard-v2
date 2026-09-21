@@ -141,7 +141,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
         {/* Top-level category tabs */}
         {!isPartnerUser && (
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden shrink-0 items-center gap-1 md:flex">
             {visibleTabs.map((tab) => {
               // Home/Payments/MCA currently share the same feature routes, so
               // their highlight is driven by the active context, not the URL.
@@ -158,7 +158,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   href={tab.href}
                   onClick={() => tab.context && setActiveContext(tab.context)}
                   className={cn(
-                    "rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
+                    "whitespace-nowrap rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
                     isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -176,7 +176,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         <GlobalSearch />
 
         {/* Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
           {/* OUT OF SCOPE — Notification bell hidden for now (no notifications
               backend yet). Restore by un-commenting this block. */}
           {/* <Button
@@ -203,88 +203,88 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
           {/* Create button */}
           {SHOW_CREATE_BUTTON && (
-          <div ref={createRef} className="relative">
-            <AnimatePresence>
-              {createHover && !createOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 4 }}
-                  transition={{ duration: 0.12 }}
-                  className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white whitespace-nowrap pointer-events-none z-50"
-                  style={{ background: "#1a1a2e" }}
-                >
-                  Create
-                  <span
-                    className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45"
+            <div ref={createRef} className="relative">
+              <AnimatePresence>
+                {createHover && !createOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.12 }}
+                    className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2.5 py-1 rounded-lg text-[11px] font-medium text-white whitespace-nowrap pointer-events-none z-50"
                     style={{ background: "#1a1a2e" }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  >
+                    Create
+                    <span
+                      className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rotate-45"
+                      style={{ background: "#1a1a2e" }}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => {
-                setCreateOpen((o) => !o);
-                setCreateHover(false);
-              }}
-              onMouseEnter={() => setCreateHover(true)}
-              onMouseLeave={() => setCreateHover(false)}
-              aria-label="Create"
-              className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-              style={{ background: "#0061E3" }}
-            >
-              <Icon name="plus" size={18} className="text-white" />
-            </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => {
+                  setCreateOpen((o) => !o);
+                  setCreateHover(false);
+                }}
+                onMouseEnter={() => setCreateHover(true)}
+                onMouseLeave={() => setCreateHover(false)}
+                aria-label="Create"
+                className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
+                style={{ background: "#0061E3" }}
+              >
+                <Icon name="plus" size={18} className="text-white" />
+              </Button>
 
-            <AnimatePresence>
-              {createOpen && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95, y: -6 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95, y: -6 }}
-                  transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
-                  className="absolute right-0 top-11 z-50 bg-popover text-popover-foreground rounded-2xl overflow-hidden border border-border min-w-[200px]"
-                  style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06)" }}
-                >
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-4 pt-3.5 pb-2">
-                    Create new
-                  </p>
-                  <div className="pb-2">
-                    {CREATE_ITEMS.map((item) => (
-                      <div
-                        key={item.label}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() => {
-                          setCreateOpen(false);
-                          router.push(item.href);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
+              <AnimatePresence>
+                {createOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -6 }}
+                    transition={{ duration: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute right-0 top-11 z-50 bg-popover text-popover-foreground rounded-2xl overflow-hidden border border-border min-w-[200px]"
+                    style={{ boxShadow: "0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06)" }}
+                  >
+                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest px-4 pt-3.5 pb-2">
+                      Create new
+                    </p>
+                    <div className="pb-2">
+                      {CREATE_ITEMS.map((item) => (
+                        <div
+                          key={item.label}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
                             setCreateOpen(false);
                             router.push(item.href);
-                          }
-                        }}
-                        className="flex items-center gap-3 px-3 mx-2 py-2.5 rounded-xl hover:bg-muted/80 transition-colors group cursor-pointer"
-                        style={{ width: "calc(100% - 16px)" }}
-                      >
-                        <div className="w-8 h-8 rounded-xl bg-muted group-hover:bg-accent flex items-center justify-center flex-shrink-0 transition-colors">
-                          <Icon name={item.icon} size={15} className="text-muted-foreground" />
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              setCreateOpen(false);
+                              router.push(item.href);
+                            }
+                          }}
+                          className="flex items-center gap-3 px-3 mx-2 py-2.5 rounded-xl hover:bg-muted/80 transition-colors group cursor-pointer"
+                          style={{ width: "calc(100% - 16px)" }}
+                        >
+                          <div className="w-8 h-8 rounded-xl bg-muted group-hover:bg-accent flex items-center justify-center flex-shrink-0 transition-colors">
+                            <Icon name={item.icon} size={15} className="text-muted-foreground" />
+                          </div>
+                          <span className="text-[13.5px] font-medium text-foreground">
+                            {item.label}
+                          </span>
                         </div>
-                        <span className="text-[13.5px] font-medium text-foreground">
-                          {item.label}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           )}
         </div>
       </header>

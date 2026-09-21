@@ -17,8 +17,8 @@ export function DisputeReasonsCard({ breakdown }: DisputeReasonsCardProps) {
 
       {breakdown.length === 0 ? (
         <EmptyState
-          title="No dispute reasons yet"
-          description="There's nothing to break down for this period."
+          title="No disputes in this period"
+          description="When disputes come in, this breaks them down by the reason the customer gave."
           className="flex-1 justify-center py-0"
         />
       ) : (

@@ -225,8 +225,10 @@ function LinkTransactionBody({
           // target — including the radio in the first column, which carries no
           // handler of its own and is only the current selection made visible.
           onRowClick={(row) => setSelectedGid(row.gid)}
-          emptyTitle="No transactions available"
-          emptyDescription="There are no unlinked transactions for this invoice yet."
+          // Deliberately plain: the merchant is mid-task inside a dialog, so
+          // this explains why the list is empty rather than pitching a feature.
+          emptyTitle="No transactions to link"
+          emptyDescription="Every transaction in this currency is already linked to an invoice."
           density="compact"
           tableLayout="content"
         />

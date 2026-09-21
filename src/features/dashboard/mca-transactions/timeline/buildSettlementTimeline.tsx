@@ -8,7 +8,6 @@ import {
   DownloadFircButton,
 } from "@/features/dashboard/mca-transactions/components/SettlementBreakdown";
 import { VirtualAccountRow } from "@/features/dashboard/mca-transactions/components/VirtualAccountRow";
-import { getMockUtrNumber } from "@/features/dashboard/mca-transactions/mock-data";
 import { mcaTxnFilePath } from "@/features/dashboard/mca-transactions/services";
 import {
   fileNameFrom,
@@ -178,10 +177,6 @@ export interface BuildTimelineArgs {
   onDownloadDocument: (documentPath: string) => void;
   onDownloadFirc: () => void;
   isFircDownloading?: boolean;
-  /** Rendered under the invoice-upload step while it is awaiting the
-   *  merchant's file, so the upload form sits at the point in the timeline it
-   *  belongs to rather than beside it. */
-  uploadSlot?: ReactNode;
 }
 
 export function buildSettlementTimeline({
@@ -197,7 +192,6 @@ export function buildSettlementTimeline({
   onDownloadDocument,
   onDownloadFirc,
   isFircDownloading,
-  uploadSlot,
 }: BuildTimelineArgs): SettlementTimelineStep[] {
   // Transactions predating multipleTimelineEvents carry one upload/approval
   // pair on the root instead. Normalising to a list here means the loop below
@@ -247,6 +241,12 @@ export function buildSettlementTimeline({
       SUCCESS: "Invoice approved",
     }[approvalStatus];
 
+    // The upload form itself no longer nests here while IN_PROGRESS — it
+    // renders in its own SettlementActionCard, above Settlement Timeline
+    // entirely (see TransactionDetailsPage.tsx), so it's the first thing
+    // visible rather than something to scroll down into the timeline to
+    // find. This step still exists and still carries its own status/date,
+    // just without the form as its child.
     let uploadChildren: ReactNode = null;
     if (uploadStatus === "SUCCESS" && displayFileName && downloadPath) {
       uploadChildren = (
@@ -255,9 +255,6 @@ export function buildSettlementTimeline({
           onDownload={() => onDownloadDocument(downloadPath)}
         />
       );
-    }
-    if (uploadStatus === "IN_PROGRESS" && uploadSlot) {
-      uploadChildren = <div className="mt-3">{uploadSlot}</div>;
     }
 
     const approvalChildren =
@@ -313,13 +310,6 @@ export function buildSettlementTimeline({
   // Last 4 digits only, bullet-masked, same convention RecentActivityTable
   // already uses for card numbers elsewhere in the product.
   const maskedAccountSuffix = resolvedAccountNumber ? `••••${resolvedAccountNumber.slice(-4)}` : "";
-  // See getMockUtrNumber's own TODO (mock-data.ts): no per-transaction UTR
-  // field exists in the API yet, so this is a placeholder rather than the
-  // real thing. Kept truthy-checked below regardless, so the "don't show if
-  // no UTR exists" behaviour is already correct once a real, nullable field
-  // replaces this.
-  const utrNumber = getMockUtrNumber(row.gid);
-
   const pgHouseStatus = data?.PG_HOUSE_FUND_RECEIVED?.STATUS;
   const fircStatus = data?.FIRC_RECEIVED?.STATUS;
 
@@ -453,15 +443,9 @@ export function buildSettlementTimeline({
         fircStatus === "SUCCESS" ? (
           <>
             <DownloadFircButton onDownload={onDownloadFirc} isLoading={isFircDownloading} />
-            {/* Part of this same FIRC issuance step, not a separate section:
-                rendered right after the download action, visually secondary
-                (smaller, muted) the same way RejectionReason and other
-                children elsewhere in this timeline read as supporting detail
-                rather than a primary line. Omitted entirely when there's no
-                UTR to show, rather than rendering an empty "UTR:" line. */}
-            {utrNumber && (
-              <p className="mt-1.5 text-[11px] text-muted-foreground">UTR: {utrNumber}</p>
-            )}
+            {/* NO UTR LINE. It used to render a placeholder derived from the
+                gid; the API has no per-transaction UTR. When one lands, render
+                it here, guarded, so the line stays absent until settlement. */}
           </>
         ) : null,
         formatEventTime(data?.FIRC_RECEIVED?.FORMATTED_DATE_TIME, fircStatus === "SUCCESS")
@@ -494,18 +478,4 @@ export function hasTimelineReversal(
   ];
 
   return events.some((event) => isReversalDone(event?.STATUS));
-}
-
-/** The alert copy shown while a transaction sits in DOCUMENT_PENDING —
- *  which differs depending on whether an earlier invoice was rejected. */
-export function getDocumentPendingMessage(multipleTimelineEvents?: MultipleTimelineEvents): string {
-  const invoiceEvents = multipleTimelineEvents?.INVOICE ?? [];
-  const hasRejection = invoiceEvents.some((e) => e?.INVOICE_APPROVED?.STATUS === "ERROR");
-  const hasResubmission =
-    hasRejection && invoiceEvents.some((e) => e?.INVOICE_APPROVED?.STATUS === "IN_PROGRESS");
-
-  if (hasResubmission) return "Revised invoice received. Compliance review in progress.";
-  if (hasRejection)
-    return "Invoice does not match the payment, upload a corrected invoice to proceed";
-  return "Upload your invoice to proceed with settlement";
 }

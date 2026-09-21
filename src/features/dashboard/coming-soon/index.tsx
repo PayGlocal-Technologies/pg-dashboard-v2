@@ -2,7 +2,7 @@ import { EmptyState, PageHeader } from "@/components/ui";
 
 /**
  * Placeholder for the MCA nav entries whose pages have not been built yet
- * (International Accounts, Connect Platforms, eBRC, EDPMS, GST Invoices and
+ * (International Accounts, Platforms, eBRC, EDPMS, GST Invoices and
  * Settings). The MCA navigation tree ships the full intended information
  * architecture, so these routes exist purely to keep every sidebar item
  * clickable instead of 404-ing until the real feature lands.

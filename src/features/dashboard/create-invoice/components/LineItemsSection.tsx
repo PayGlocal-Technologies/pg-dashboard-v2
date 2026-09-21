@@ -1,11 +1,20 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Button,
   Callout,
   CalloutText,
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
   Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -14,6 +23,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
   getAmount,
   getDiscountAmount,
@@ -22,14 +32,19 @@ import {
   getTotalAmount,
 } from "@/features/dashboard/create-invoice/helpers";
 import { DISCOUNT_TYPE_OPTIONS } from "@/features/dashboard/create-invoice/constants";
+import { useLineItemSuggestions } from "@/features/dashboard/create-invoice/hooks";
 import {
   AddLineItemDialog,
   type LineItemValues,
 } from "@/features/dashboard/create-invoice/components/AddLineItemDialog";
-import type { CurrencyData, LineItemDraft } from "@/features/dashboard/create-invoice/types";
+import type {
+  CurrencyData,
+  LineItemDraft,
+  LineItemSuggestion,
+} from "@/features/dashboard/create-invoice/types";
 
 /** Grid template shared by the header, every row, and the add-row footer. */
-const GRID = "20px 1fr 64px 110px 96px 56px";
+const GRID = "20px minmax(160px,1fr) 56px 96px 88px 48px";
 
 function formatMoney(symbol: string, amount: number | string): string {
   const value = typeof amount === "string" ? Number(amount) : amount;
@@ -84,10 +99,14 @@ export function LineItemsSection({
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [discountOpen, setDiscountOpen] = useState(discountValue.length > 0);
   const [taxOpen, setTaxOpen] = useState(taxValue.length > 0);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addQuery, setAddQuery] = useState("");
 
   const dragFrom = useRef<number | null>(null);
   const dragTo = useRef<number | null>(null);
   const nextKey = useRef(0);
+
+  const suggestions = useLineItemSuggestions(currency);
 
   const symbol = symbolFor(currency);
   const editingItem = editingKey ? (lineItems.find((i) => i.key === editingKey) ?? null) : null;
@@ -110,18 +129,69 @@ export function LineItemsSection({
     onLineItemsChange([...lineItems, { key, ...values }]);
   };
 
-  const openAdd = () => {
-    setEditingKey(null);
-    setDialogOpen(true);
-  };
-
   const openEdit = (key: string) => {
     setEditingKey(key);
     setDialogOpen(true);
   };
 
+  /** Closes the dropdown and opens the full form — for a suggestion that
+   *  doesn't cover what's being billed, same escape hatch BillToSection's
+   *  own dropdown gives with "Add a new client". */
+  const openAddDialog = () => {
+    setAddOpen(false);
+    setEditingKey(null);
+    setDialogOpen(true);
+  };
+
+  /** Picking a suggestion adds it straight away — the whole point of a
+   *  catalogue entry is that it needs no further typing, same as choosing an
+   *  existing client rather than filling in one from scratch. Quantity
+   *  defaults to 1, same as a fresh item from the dialog; GST rate is left
+   *  blank since the suggestion carries none. */
+  const addFromSuggestion = (item: LineItemSuggestion) => {
+    const key = `li_${Date.now()}_${nextKey.current++}`;
+    onLineItemsChange([
+      ...lineItems,
+      {
+        key,
+        description: item.name,
+        type: item.type ?? "",
+        hsn: item.hsn ?? "",
+        gstRate: "",
+        unitPrice: item.unitPrice ?? "",
+        quantity: "1",
+        saveAsSku: false,
+      },
+    ]);
+    setAddOpen(false);
+    setAddQuery("");
+  };
+
+  // flux's Command does no filtering of its own — see BillToSection's client
+  // picker for the same pattern. An empty query lists the whole catalogue
+  // rather than nothing, matching production's own item-name autocomplete
+  // inside AddLineItemDialog.
+  const matchingSuggestions = useMemo(() => {
+    const needle = addQuery.trim().toLowerCase();
+    const seen = new Set<string>();
+    const unique: { item: LineItemSuggestion; key: string }[] = [];
+    for (const item of suggestions) {
+      if (!item.name) continue;
+      if (needle && !item.name.toLowerCase().includes(needle)) continue;
+      const dedupeKey = [item.name, item.unitPrice ?? "", item.hsn ?? "", item.type ?? ""].join(
+        "|"
+      );
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      unique.push({ item, key: dedupeKey });
+    }
+    return unique;
+  }, [suggestions, addQuery]);
+
+  const selectedCurrency = currencies.find((option) => option.currencyCode === currency);
+
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+    <div className="rounded-xl border border-border p-5">
       <div className="mb-4 flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2.5">
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -130,24 +200,39 @@ export function LineItemsSection({
           <h2 className="text-[15px] font-semibold text-foreground">What you sold</h2>
         </div>
 
-        {/* Currencies come from the merchant's own FFMS configuration, not a
-            hard-coded list, so an unsupported one cannot be chosen. */}
-        <Select value={currency} onValueChange={onCurrencyChange}>
-          {/* flux's Select defaults to h-11 / 15px, which is a full-size form
-              control. This one sits in a card header beside a 13px title and a
-              13px table, so it was reading a size too large — the DQA's
-              "dropdown text UI font size needs to be checked". */}
-          <SelectTrigger className="h-9 w-[7.5rem] px-3 text-[13px]" aria-label="Invoice currency">
-            <SelectValue placeholder="Currency" />
-          </SelectTrigger>
-          <SelectContent>
-            {currencies.map((option) => (
-              <SelectItem key={option.currencyCode} value={option.currencyCode}>
-                {option.currencyCode}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex shrink-0 items-center gap-3">
+          {/* Currencies come from the merchant's own FFMS configuration, not a
+              hard-coded list, so an unsupported one cannot be chosen. */}
+          <Select value={currency} onValueChange={onCurrencyChange}>
+            {/* flux's Select defaults to h-11 / 15px, which is a full-size form
+                control. This one sits in a card header beside a 13px title and a
+                13px table, so it was reading a size too large — the DQA's
+                "dropdown text UI font size needs to be checked". */}
+            <SelectTrigger
+              className="h-9 w-32 gap-1.5 px-3 text-[13px] shadow-none"
+              aria-label="Invoice currency"
+            >
+              <SelectValue placeholder="Currency">
+                {selectedCurrency && (
+                  <span className="flex items-center gap-1.5">
+                    <CountryFlag iso2={selectedCurrency.iso2CountryCode} />
+                    {selectedCurrency.currencyCode}
+                  </span>
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent side="bottom" avoidCollisions={false} className="shadow-none">
+              {currencies.map((option) => (
+                <SelectItem key={option.currencyCode} value={option.currencyCode}>
+                  <span className="flex items-center gap-2">
+                    <CountryFlag iso2={option.iso2CountryCode} />
+                    {option.currencyCode}
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {lineItems.length > 0 ? (
@@ -211,7 +296,7 @@ export function LineItemsSection({
                   className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground"
                 />
 
-                <div className="min-w-0 pr-2">
+                <div className="min-w-0 overflow-hidden pr-2">
                   <p className="truncate text-[13px] font-medium text-foreground">
                     {item.description || "Untitled item"}
                   </p>
@@ -290,20 +375,42 @@ export function LineItemsSection({
             ))}
           </div>
 
-          <div className="border-t border-border py-2 pl-3 pr-2">
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto p-0"
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={openAdd}
-            >
-              Add line item
-            </Button>
-          </div>
-
           <div className="space-y-2 border-t border-border bg-muted/20 px-3 py-4">
+            {/* Same dropdown-with-a-pinned-"add" pattern as BillToSection's
+                client picker: suggestions from the merchant's own catalogue,
+                searchable, picking one adds it straight away with no dialog —
+                "Add new item" is the one row that still opens the full form,
+                pinned so it's always reachable regardless of what's typed.
+                Sits right above Subtotal rather than up in the header, so
+                it's beside the very total it's about to change. */}
+            <Popover
+              open={addOpen}
+              onOpenChange={(next) => {
+                setAddOpen(next);
+                if (!next) setAddQuery("");
+              }}
+            >
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-haspopup="listbox"
+                  aria-controls="line-items-listbox"
+                  className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/5"
+                >
+                  <Icon name="plus" className="h-3.5 w-3.5" />
+                  Add line item
+                </button>
+              </PopoverTrigger>
+              <LineItemSuggestionsContent
+                query={addQuery}
+                onQueryChange={setAddQuery}
+                matches={matchingSuggestions}
+                symbol={symbol}
+                onSelect={addFromSuggestion}
+                onAddNew={openAddDialog}
+              />
+            </Popover>
+
             {/* Subtotal is GST-inclusive: production folds each line's GST into
                 it, then applies the invoice discount and tax on top. Labelled
                 plainly so the number is not mistaken for a net figure. */}
@@ -379,16 +486,22 @@ export function LineItemsSection({
                 </span>
               </div>
             ) : (
-              <Button
+              // `Button`'s own "link" variant is fixed at 15px regardless of
+              // `size` (see LineItemSuggestionsContent's trigger above for
+              // the same fix) — a plain button styled like Create Invoice's
+              // own "Add due date" chip instead. block, not the Button
+              // component's inline-flex default: two of these back to back
+              // with nothing between them were sharing one line instead of
+              // stacking, since space-y-2's margin has no effect between
+              // inline-level boxes.
+              <button
                 type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0"
-                leftIcon={<Icon name="plus" className="h-3 w-3" />}
                 onClick={() => setDiscountOpen(true)}
+                className="flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/5"
               >
+                <Icon name="plus" className="h-3.5 w-3.5" />
                 Add discount
-              </Button>
+              </button>
             )}
 
             {taxOpen ? (
@@ -434,16 +547,14 @@ export function LineItemsSection({
                 </span>
               </div>
             ) : (
-              <Button
+              <button
                 type="button"
-                variant="link"
-                size="sm"
-                className="h-auto p-0"
-                leftIcon={<Icon name="plus" className="h-3 w-3" />}
                 onClick={() => setTaxOpen(true)}
+                className="flex w-fit items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/5"
               >
+                <Icon name="plus" className="h-3.5 w-3.5" />
                 Add invoice tax
-              </Button>
+              </button>
             )}
 
             <div className="flex items-center justify-between border-t border-border pt-2 text-[15px] font-semibold text-foreground">
@@ -453,18 +564,51 @@ export function LineItemsSection({
           </div>
         </div>
       ) : (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-6 text-center">
-          <p className="text-[12.5px] text-muted-foreground">Nothing billed yet.</p>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-            onClick={openAdd}
-          >
-            Add line item
-          </Button>
-        </div>
+        // Same full-width dropdown trigger shape as BillToSection's own
+        // unselected "Choose a client" field — nothing billed yet, so
+        // nothing to protect from an accidental click either.
+        <Popover
+          open={addOpen}
+          onOpenChange={(next) => {
+            setAddOpen(next);
+            if (!next) setAddQuery("");
+          }}
+        >
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              role="combobox"
+              aria-expanded={addOpen}
+              aria-haspopup="listbox"
+              aria-controls="line-items-listbox"
+              className={cn(
+                "flex h-11 w-full items-center justify-between gap-2.5 rounded-lg border border-border bg-card px-3.5 text-left text-[13px] shadow-none",
+                "transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+              )}
+            >
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <Icon name="search" className="h-3.5 w-3.5 shrink-0" />
+                Add an item
+              </span>
+              <Icon
+                name="chevron-down"
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70 transition-transform",
+                  addOpen && "rotate-180"
+                )}
+              />
+            </button>
+          </PopoverTrigger>
+          <LineItemSuggestionsContent
+            query={addQuery}
+            onQueryChange={setAddQuery}
+            matches={matchingSuggestions}
+            symbol={symbol}
+            onSelect={addFromSuggestion}
+            onAddNew={openAddDialog}
+          />
+        </Popover>
       )}
 
       {/* The linked-transaction amount gate, raised here rather than only at
@@ -492,5 +636,97 @@ export function LineItemsSection({
         onSubmit={handleSubmitItem}
       />
     </div>
+  );
+}
+
+/**
+ * The dropdown's own content — shared between the header trigger (once
+ * there's at least one item) and the empty-state trigger, so the two never
+ * drift into different search behaviour or a different "Add new item" row.
+ * Same shape as BillToSection's client-picker popover: a search box, the
+ * matching catalogue entries, and "Add new item" pinned outside the
+ * scrollable list so it never scrolls away.
+ */
+function LineItemSuggestionsContent({
+  query,
+  onQueryChange,
+  matches,
+  symbol,
+  onSelect,
+  onAddNew,
+}: {
+  query: string;
+  onQueryChange: (value: string) => void;
+  matches: { item: LineItemSuggestion; key: string }[];
+  symbol: string;
+  onSelect: (item: LineItemSuggestion) => void;
+  onAddNew: () => void;
+}) {
+  // side="bottom" + avoidCollisions={false}: Radix flips a panel above its
+  // trigger when the viewport runs out of room below, which here meant the
+  // suggestions could land on top of the item row you were adding to. Pinned
+  // below, it always grows in the reading direction.
+  return (
+    <PopoverContent
+      side="bottom"
+      align="start"
+      avoidCollisions={false}
+      className="w-(--radix-popover-trigger-width) min-w-[min(22rem,calc(100vw-3rem))] p-0 shadow-none"
+      onOpenAutoFocus={(e) => e.preventDefault()}
+    >
+      <Command>
+        <CommandInput
+          placeholder="Search items…"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+        />
+        <CommandList id="line-items-listbox" aria-label="Items">
+          {matches.length === 0 && (
+            <CommandEmpty>
+              {query.trim() ? `No item matches “${query.trim()}”.` : "No items billed yet."}
+            </CommandEmpty>
+          )}
+          <CommandGroup>
+            {matches.map(({ item, key }) => {
+              const meta = [
+                item.type ? (item.type === "SERVICE" ? "Service" : "Good") : "",
+                item.hsn ? `${item.type === "SERVICE" ? "SAC" : "HSN"} ${item.hsn}` : "",
+                item.unitPrice ? `${symbol}${item.unitPrice}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ");
+
+              return (
+                <CommandItem key={key} onSelect={() => onSelect(item)} className="gap-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[13px] font-medium text-foreground">
+                      {item.name}
+                    </span>
+                    {meta && (
+                      <span className="block truncate text-[11.5px] text-muted-foreground">
+                        {meta}
+                      </span>
+                    )}
+                  </span>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+
+      <div className="border-t border-border p-3">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full"
+          leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+          onClick={onAddNew}
+        >
+          Add new item
+        </Button>
+      </div>
+    </PopoverContent>
   );
 }

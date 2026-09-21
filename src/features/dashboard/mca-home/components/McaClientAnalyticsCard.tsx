@@ -36,7 +36,7 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
   const hasData = !isLoading && !isError && clients.length > 0;
 
   return (
-    <Card className="gap-4 p-5">
+    <Card className="gap-3 p-5">
       {/* items-start and flex-wrap, as on the other cards with a subtitle: the
           title block is now two lines, and the action should sit against the
           first of them rather than centre on both. */}
@@ -60,12 +60,12 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
         )}
       </div>
 
-      <div className="flex flex-col gap-3.5">
+      <div className="flex flex-col gap-2.5">
         {isLoading ? (
           // Same row footprint as a real row (label line + bar), so the card
           // doesn't resize when the data lands.
           Array.from({ length: 5 }, (_, i) => (
-            <div key={`skeleton-${i}`} className="flex flex-col gap-1.5">
+            <div key={`skeleton-${i}`} className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <Shimmer className="h-4 w-28" />
                 <Shimmer className="h-4 w-12" />
@@ -85,13 +85,13 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
           <PlaceholderState
             variant="no-analytics"
             size="sm"
-            title="No client activity"
-            description="No client activity in this period."
+            title="No client activity yet"
+            description="As clients start paying, you'll see which of them contribute most to your revenue."
             className="py-4"
           />
         ) : (
           clients.map((client) => (
-            <div key={client.client} className="flex flex-col gap-1.5">
+            <div key={client.client} className="flex flex-col gap-1">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[13px] font-medium text-foreground">{client.client}</span>
                 <span className="text-[13px] font-semibold tabular-nums text-foreground">

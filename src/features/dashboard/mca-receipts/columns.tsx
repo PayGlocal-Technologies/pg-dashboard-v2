@@ -14,7 +14,10 @@ import { Icon } from "@/components/icon";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import { formatReceiptAmount } from "@/features/dashboard/mca-receipts/utils";
 import { formatMonthLabel } from "@/lib/utils/format";
-import { RECEIPT_MONTH_HINT, RECEIPT_PRODUCT_LABEL } from "@/features/dashboard/mca-receipts/constants";
+import {
+  RECEIPT_MONTH_HINT,
+  RECEIPT_PRODUCT_LABEL,
+} from "@/features/dashboard/mca-receipts/constants";
 import type { Receipt } from "@/features/dashboard/mca-receipts/types";
 
 /**

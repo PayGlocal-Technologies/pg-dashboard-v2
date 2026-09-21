@@ -234,7 +234,8 @@ function SkuItemFormBody({
                 <FieldLabel htmlFor="sku-name">
                   {/* Names the field for both kinds of catalogue item; the
                       table still shows it under the Product column. */}
-                  Product/Service Name<RequiredMark />
+                  Product/Service Name
+                  <RequiredMark />
                 </FieldLabel>
                 <Input
                   id="sku-name"
@@ -262,7 +263,8 @@ function SkuItemFormBody({
               {(field) => (
                 <Field>
                   <FieldLabel htmlFor="sku-type">
-                    Type<RequiredMark />
+                    Type
+                    <RequiredMark />
                   </FieldLabel>
                   <Select
                     value={field.state.value}
@@ -313,7 +315,8 @@ function SkuItemFormBody({
                         <FieldLabel htmlFor="sku-hsn-sac">
                           {/* Named for the scheme that actually applies once a
                               type is chosen; the table column stays HSN/SAC. */}
-                          {scheme.label}<RequiredMark />
+                          {scheme.label}
+                          <RequiredMark />
                         </FieldLabel>
                         <Input
                           id="sku-hsn-sac"
@@ -355,7 +358,8 @@ function SkuItemFormBody({
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="sku-currency">
-                          Currency<RequiredMark />
+                          Currency
+                          <RequiredMark />
                         </FieldLabel>
                         <Select
                           value={field.state.value}
@@ -405,7 +409,8 @@ function SkuItemFormBody({
                     {(field) => (
                       <Field>
                         <FieldLabel htmlFor="sku-selling-price">
-                          Selling price<RequiredMark />
+                          Selling price
+                          <RequiredMark />
                         </FieldLabel>
                         <PriceInput id="sku-selling-price" symbol={symbol} field={field} />
                         <FieldError>{field.state.meta.errors[0]}</FieldError>

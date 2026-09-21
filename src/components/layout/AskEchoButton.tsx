@@ -145,9 +145,23 @@ export function AskEchoHeaderButton() {
         aria-pressed={onEchoPage ? undefined : pressed}
         onClick={activate}
         className={cn(
-          "relative z-1 h-9 rounded-full border-0 px-3 text-[13px] font-medium shadow-sm backdrop-blur-sm transition-colors",
+          "relative z-1 h-9 rounded-lg border-0 px-3 text-[13px] font-medium shadow-sm backdrop-blur-sm transition-colors",
           "[&>span]:flex [&>span]:items-center [&>span]:gap-1.5",
-          pressed ? "bg-primary/10 text-primary" : "bg-muted text-foreground hover:bg-accent"
+          // The rotating gradient ring already carries this control's "active/
+          // focused" affordance, so the flux Button's own blue focus-visible
+          // ring is redundant here — worse, on a click it briefly shows as a
+          // stray blue glow filling the pill before the ring-wrap reasserts
+          // itself. Suppressing it keeps only the intentional ring.
+          "focus-visible:ring-0 focus-visible:ring-offset-0",
+          pressed
+            ? // Plain bg-primary/10 is translucent, so the wrapper's rotating
+              // conic-gradient ring — sitting directly behind this button at
+              // full opacity — showed straight through the whole face instead
+              // of staying confined to the 1px edge. Mixing the tint against
+              // an opaque --card base keeps the light "pressed" wash while
+              // actually hiding what's behind it.
+              "bg-[color-mix(in_srgb,var(--primary)_12%,var(--card))] text-primary"
+            : "bg-muted text-foreground hover:bg-accent"
         )}
       >
         <Icon name="echo-mark" className="h-4 w-4 shrink-0" />

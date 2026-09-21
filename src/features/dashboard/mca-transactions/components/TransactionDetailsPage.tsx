@@ -1,7 +1,15 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Alert, AlertDescription, Button, Card, CardContent, StatusBadge } from "@/components/ui";
+import {
+  Alert,
+  AlertDescription,
+  Button,
+  Card,
+  CardContent,
+  Separator,
+  StatusBadge,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableText } from "@/components/common/CopyableText";
 import { cn } from "@/lib/utils";
@@ -17,10 +25,10 @@ import {
   MdrOfferBadge,
 } from "@/features/dashboard/mca-transactions/columns";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { UploadInvoiceForm } from "@/features/dashboard/mca-transactions/components/UploadInvoiceForm";
+import { SettlementActionCard } from "@/features/dashboard/mca-transactions/components/SettlementActionCard";
 import { SettlementTimelineSection } from "@/features/dashboard/mca-transactions/components/SettlementTimelineSection";
+import { SettlementBatchDetailsSection } from "@/features/dashboard/mca-transactions/components/SettlementBatchDetailsSection";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
-import { getMockUtrNumber } from "@/features/dashboard/mca-transactions/mock-data";
 import { mcaTxnTimelineApi } from "@/features/dashboard/mca-transactions/services";
 import { useGet } from "@/lib/api/hooks";
 import type {
@@ -135,7 +143,7 @@ function PaymentDetailsSection({
       >
         Payment Details
       </h3>
-      <Card size="sm">
+      <Card size="sm" className="shadow-none">
         <CardContent className="space-y-4">
           <DetailRow
             label="Transaction date"
@@ -148,14 +156,12 @@ function PaymentDetailsSection({
             label="Settlement date"
             value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
           />
-          {/* Same "-" placeholder pattern as Settlement date above, gated on
-              the same field: a real UTR only exists once settlement has
-              actually happened. See mock-data.ts's getMockUtrNumber for why
-              this is still a placeholder. */}
-          <DetailRow
-            label="UTR number"
-            value={row.settlementDate ? getMockUtrNumber(row.gid) : "-"}
-          />
+          {/* NO UTR ROW. The API carries no per-transaction UTR — the only real
+              UTRs sit on batch-level settlement summary rows, with nothing
+              linking them back to a transaction. This row used to show a
+              placeholder derived from the gid, which read as a real banking
+              reference a merchant could quote. Re-add it reading a nullable
+              `settlementUtr` once the txn response carries one. */}
           {/* Names the account the funds landed in — its holder, or failing
               that the bank, or failing both the currency it is held in. */}
           <DetailRow
@@ -210,7 +216,7 @@ function SenderDetailsSection({
       <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
         Sender Details
       </h3>
-      <Card size="sm">
+      <Card size="sm" className="shadow-none">
         <CardContent className="space-y-4">
           <DetailRow label="Remitter name" value={counterpartyName} />
           <DetailRow label="Country" value={<CountryCell iso2={row.partnerCustomerCountry} />} />
@@ -242,19 +248,19 @@ export function TransactionDetailsPage({
   backLabel = "Back to Transactions",
 }: TransactionDetailsPageProps) {
   return (
-    <div>
+    <div className="relative">
       {/* Back/Collapse only, both left-aligned and adjacent to each other.
           No Transaction ID here (unlike the drawer's Expand/Close row, see
           TransactionDetailsDrawer.tsx). The expanded page drops it entirely
           rather than relocating it. */}
-      <div className="mb-2 flex items-center gap-1">
+      <div className="relative z-10 mb-2 flex items-center gap-1">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
           onClick={onBack}
-          className="pl-0 text-muted-foreground hover:text-foreground"
+          className="pl-0 text-primary hover:text-primary-hover"
         >
           {backLabel}
         </Button>
@@ -290,13 +296,13 @@ interface TransactionDetailsContentProps extends Omit<
   layout?: "page" | "drawer";
 }
 
-// Every section of the transaction detail view: summary, FIRA banner,
-// Settlement Timeline (which carries the invoice upload/download and the
-// settlement money breakdown inside its own steps), and Payment/Sender
-// Details. Rendered as-is by both TransactionDetailsPage (above) and
-// TransactionDetailsDrawer, so neither view can drift from the other in
-// conditional states or behaviour. Only the arrangement (layout prop)
-// differs between them.
+// Every section of the transaction detail view: summary, SettlementActionCard
+// (the invoice-upload form or the FIRC-ready banner, when there's one to
+// show), Settlement Timeline (the settlement money breakdown still renders
+// nested inside its own steps), and Payment/Sender Details. Rendered as-is by
+// both TransactionDetailsPage (above) and TransactionDetailsDrawer, so
+// neither view can drift from the other in conditional states or behaviour.
+// Only the arrangement (layout prop) differs between them.
 //
 // onOpenTransaction isn't destructured here (unlike the other props) since
 // Linked Transactions, its only consumer, no longer renders, it's left in
@@ -313,8 +319,14 @@ export function TransactionDetailsContent({
 }: TransactionDetailsContentProps) {
   const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
   const { label, variant, trailIcon } = getStatusMeta(row.externalStatus, isFrmPending);
-  const needsAction = isFrmPending || row.externalStatus === "DOCUMENT_PENDING";
   const isReversed = REVERSED_STATUSES.has(row.externalStatus);
+  // The two terminal "money has actually arrived" statuses — see
+  // columns.tsx's STATUS_META, which is the only other place these two are
+  // grouped together (both get the same green "success" badge there). Every
+  // other status is still some step short of that, so Payment/Sender
+  // Details — read date, UTR, receiving account — would mostly be showing
+  // "-" placeholders rather than real values.
+  const isSettled = row.externalStatus === "SETTLED" || row.externalStatus === "FIRC_SETTLED";
 
   const counterpartyName = row.partnerMaskedCustomerFullName ?? row.partnerCustomerFullName ?? "—";
   const amount = parseFloat(row.amount ?? "0");
@@ -330,14 +342,6 @@ export function TransactionDetailsContent({
       ? `Settled on ${formatTransactionDateOnly(row.settlementDate)}`
       : label;
 
-  // The invoice upload form is handed to the timeline, which nests it under
-  // whichever step is actually awaiting the file. It's offered only while the
-  // transaction genuinely needs merchant action.
-  const uploadSlot =
-    needsAction && !isReversed ? (
-      <UploadInvoiceForm row={row} variant="inline" onSuccess={() => onUploaded?.(row)} />
-    ) : undefined;
-
   // pg-dashboard shows "To be updated" rather than a date while the
   // transaction is still on hold or awaiting an invoice: a settlement date
   // exists on the record by then, but it isn't yet a commitment.
@@ -352,7 +356,7 @@ export function TransactionDetailsContent({
   const isSampleTransaction = row.gid?.includes("mocked");
 
   const summary = (
-    <div className={layout === "drawer" ? undefined : "mb-9"}>
+    <div className={layout === "drawer" ? undefined : "mb-6"}>
       {isSampleTransaction && (
         <Alert variant="warning" className="mb-4">
           <AlertDescription>This is a sample transaction shown for preview only.</AlertDescription>
@@ -405,6 +409,12 @@ export function TransactionDetailsContent({
         )}
       </div>
 
+      {/* Full-width now — was scoped to the amount stack's own shrink-wrapped
+          column (max-w-70), which read as a short, oddly-truncated rule
+          rather than a section break. Sits outside that flex row so it
+          spans the summary's whole width, same as a Card's own divider. */}
+      <Separator className="my-4" />
+
       {isReversed && (
         <Alert variant="error" className="mt-6">
           <AlertDescription>
@@ -417,37 +427,74 @@ export function TransactionDetailsContent({
 
   if (layout === "drawer") {
     // Single column, in document order: no grid, no row-start math, no
-    // floated titles. The drawer is deliberately a lighter view than the full
-    // page: Payment Details and Sender Details don't render here at all (see
-    // PaymentDetailsSection/SenderDetailsSection below, page-only).
+    // floated titles.
     //
-    // The invoice — whether still awaited (uploadSlot) or already uploaded
-    // (a download chip) — and the settlement money breakdown all live inside
-    // the timeline's own steps rather than as sibling sections, so each
-    // appears at the point of the settlement it belongs to. The full page's
-    // 2-column grid below nests them identically, just inside its own row.
+    // SettlementActionCard (the invoice-upload form, or the FIRC-ready
+    // banner) sits as its own card above Settlement Timeline now, rather
+    // than nested inside it — it renders nothing when there's no action, so
+    // it never leaves a stray gap when it doesn't apply. The settlement
+    // money breakdown still lives inside the timeline's own steps. The full
+    // page's 2-column grid below nests both identically, just inside its
+    // own column.
     //
+    // Payment Details and Sender Details, the same two sections the full
+    // page's right column shows, join the stack once settlement is actually
+    // done (isSettled) — not before. Both are read straight through the
+    // exact same PaymentDetailsSection/SenderDetailsSection the page uses
+    // (floatTitle={false} either way: floating only matters for sharing a
+    // grid row with a taller sibling, which a single-column stack never
+    // does), so there is nothing here that could drift from the page's own
+    // version of these two cards. Gating on isSettled rather than always
+    // showing them: before settlement, every field either of them displays
+    // is still a "-" placeholder (see DetailRow above), and
+    // the drawer is meant to stay the lighter of the two views up to that
+    // point.
     return (
-      <div className="space-y-9">
+      <div className="space-y-4">
         {summary}
-        <SettlementTimelineSection row={row} uploadSlot={uploadSlot} />
+        <SettlementActionCard row={row} onUploaded={onUploaded} />
+        <SettlementTimelineSection row={row} />
+        {isSettled && (
+          <>
+            <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
+            <SenderDetailsSection
+              row={row}
+              counterpartyName={counterpartyName}
+              isPartnerUser={isPartnerUser}
+            />
+            {/* The settlement BATCH's own Details/Amount Breakdown — a
+                different, wider question than Payment Details above answers
+                (that one is this one transaction's own record; this is the
+                whole settlement it landed in). See
+                SettlementBatchDetailsSection's own doc for the distinction
+                from SettlementBreakdown nested in the timeline above. */}
+            <SettlementBatchDetailsSection row={row} layout="drawer" />
+          </>
+        )}
       </div>
     );
   }
 
-  // The left column is Settlement Timeline alone, whatever the status: the
-  // invoice and the settlement breakdown take no rows of their own, since
-  // both nest inside the timeline's own steps (see SettlementTimelineSection).
-  // The right column (Payment Details + Sender Details) therefore starts on
-  // that same row.
+  // The left column starts with SettlementActionCard (when there's an
+  // action — it renders nothing otherwise) followed by Settlement Timeline,
+  // both stacked in the SAME row-1 grid cell rather than each claiming a
+  // row of their own — the settlement breakdown still takes no row of its
+  // own, since it nests inside the timeline's own steps (see
+  // SettlementTimelineSection). The right column (Payment Details + Sender
+  // Details) therefore still starts on that same row 1.
   const timelineRow = 1;
 
   return (
-    <div>
+    <div className="relative z-10">
       {/* Transaction summary — full-width page header, standalone, no card,
           sitting above the 2-column layout entirely (not part of either
           column). The primary focal point of the page. Transaction Date
-          lives in Payment Details — the header never shows a timestamp. */}
+          lives in Payment Details — the header never shows a timestamp.
+          z-10: a non-positioned element like this one would otherwise paint
+          BELOW the page's absolutely-positioned invoiceimg.png decoration
+          regardless of DOM order (static elements always sit under
+          positioned ones), which hid Payment Details' text under the
+          illustration — see TransactionDetailsPage's own root above. */}
       {summary}
 
       {/* 2-column layout, below the summary. Left column sections use
@@ -456,18 +503,21 @@ export function TransactionDetailsContent({
           instead of always row 1. items-start keeps each section sized to
           its own content instead of stretching to match whichever column is
           taller in a shared row. */}
-      <div className="grid gap-x-10 gap-y-9 lg:grid-cols-[3fr_1fr] lg:items-start">
-        {/* Settlement Timeline. The invoice — awaited (uploadSlot) or
-            already uploaded — and the settlement money breakdown all render
-            nested inside this card under the timeline step they belong to,
-            not as sibling rows. */}
-        <div className={cn("lg:col-start-1", ROW_START_CLASS[timelineRow])}>
-          <SettlementTimelineSection row={row} uploadSlot={uploadSlot} />
+      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[3fr_1fr] lg:items-start">
+        {/* SettlementActionCard, then Settlement Timeline: the settlement
+            money breakdown still renders nested inside the timeline card
+            under the step it belongs to, not as a sibling row — only the
+            invoice-upload/FIRC action moved out, into its own card above
+            it. space-y-6 matches the right column's own gap so the two
+            columns' internal rhythm reads the same. */}
+        <div className={cn("space-y-6 lg:col-start-1", ROW_START_CLASS[timelineRow])}>
+          <SettlementActionCard row={row} onUploaded={onUploaded} />
+          <SettlementTimelineSection row={row} />
         </div>
 
         {/* Right column: Payment Details then Sender Details, top-aligned
             with Settlement Timeline across from it. */}
-        <div className={cn("space-y-9 lg:col-start-2", ROW_START_CLASS[timelineRow])}>
+        <div className={cn("space-y-6 lg:col-start-2", ROW_START_CLASS[timelineRow])}>
           <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
           <SenderDetailsSection
             row={row}
@@ -476,6 +526,16 @@ export function TransactionDetailsContent({
           />
         </div>
       </div>
+
+      {/* Full width, below the 2-column grid rather than squeezed into the
+          1fr right column: SettlementBatchDetailsSection runs its own two
+          cards side by side from lg up (matching the standalone settlement
+          page), which the narrow right column has no room for. */}
+      {isSettled && (
+        <div className="mt-6">
+          <SettlementBatchDetailsSection row={row} layout="page" />
+        </div>
+      )}
     </div>
   );
 }

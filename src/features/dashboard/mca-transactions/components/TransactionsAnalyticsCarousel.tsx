@@ -9,6 +9,14 @@ import {
 } from "@/features/dashboard/mca-transactions/components/SettlementAnalyticsCard";
 import { OutstandingAmountCard } from "@/features/dashboard/mca-transactions/components/OutstandingAmountCard";
 import { SavedAmountCard } from "@/features/dashboard/mca-transactions/components/SavedAmountCard";
+// Reused from the settlement report feature rather than reimplemented: this is
+// the same card, on the same data, and a second copy would be free to drift
+// from it. Cross-feature imports are established here (SettlementAnalyticsCard
+// takes CountryFlagAvatar from multi-currency the same way).
+import { TotalSettledCard } from "@/features/dashboard/mca-settlement-report/components/TotalSettledCard";
+import type { TotalSettledTimeframe } from "@/features/dashboard/mca-settlement-report/constants";
+import { useSettlementOverview } from "@/features/dashboard/mca-settlement-report/hooks";
+import { useScopeId } from "@/lib/hooks/useScopeId";
 
 // One entry per carousel page, in DOM order. Doubles as the indicator's
 // accessible labels, so the two can't fall out of step with each other.
@@ -36,6 +44,24 @@ const PAGE_CLASSES = "w-full shrink-0 snap-start lg:w-auto";
  *  mapping the settled/saved cards use internally. */
 const TIMEFRAME_BY_RANGE: Record<TimeRange, string> = {
   today: "today",
+  week: "week",
+  month: "month",
+  year: "ytd",
+};
+
+/**
+ * Section TimeRange → the settlement overview's own timeframe vocabulary,
+ * now that Total settled follows the page's range control rather than
+ * carrying a switcher of its own.
+ *
+ * `today` is the one that does not map cleanly: the overview endpoint has no
+ * daily bucket, so Today falls back to the week. That is an approximation —
+ * with Today selected this card reports the week's settled total, not the
+ * day's — and the honest fix is a daily bucket on the endpoint rather than
+ * anything the client can do. Every other value is a direct rename.
+ */
+const SETTLED_TIMEFRAME_BY_RANGE: Record<TimeRange, TotalSettledTimeframe> = {
+  today: "week",
   week: "week",
   month: "month",
   year: "ytd",
@@ -70,10 +96,14 @@ function scrollToPage(el: HTMLDivElement, index: number): void {
  *   switch uses, so the analytics summary and the transaction list below it
  *   both flip to their mobile presentation together, not at two different
  *   widths.
- * - From lg up, the grid: Settlement Analytics as the wider card beside the
- *   Outstanding + Saved stack as a secondary column, both filling the same
- *   overall height. No carousel and no indicator there, so desktop layout is
- *   unchanged beyond that column split and height match.
+ * - From lg up, a single 2-column × 2-row grid: Total amount collected beside
+ *   Documents pending in row 1, Total settled beside Saved amount in row 2.
+ *   Each ROW is height-matched — the two cards in it always end at the same
+ *   bottom edge — but the two ROWS are NOT matched to each other, which is
+ *   the deliberate difference from an earlier version of this grid that used
+ *   `grid-rows-[1fr_1fr]` and matched everything to everything (see the
+ *   `lg:contents` comment below for why that coupling was a problem, and why
+ *   plain `auto` rows don't have it).
  *
  * The time-range control itself lives in the page header now (see
  * McaTransactionsFeature/AnalyticsTimeRangeControl), in line with the
@@ -89,6 +119,14 @@ function scrollToPage(el: HTMLDivElement, index: number): void {
 export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRange }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activePage, setActivePage] = useState(0);
+
+  const { scopeId } = useScopeId("PACB");
+  const { overview } = useSettlementOverview(scopeId, SETTLED_TIMEFRAME_BY_RANGE[timeRange]);
+  // No mock fallback, matching the settlement page: an overview that has not
+  // loaded shows zero and an empty chart, never an invented figure.
+  const settledChartData = overview
+    ? overview.series.map((point) => ({ x: point.label, y: point.value }))
+    : [];
 
   return (
     // gap-2 (8px) between the carousel and its indicator: deliberately much
@@ -106,35 +144,79 @@ export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRa
         // carousel's uniform p-1: horizontal padding would sit inside the
         // scrollport and widen the peek past the 16px PAGE_CLASSES budgets
         // for, and shadow-sm spreads too little sideways to need it.
+        //
+        // No `lg:grid-rows-[...]` here on purpose. Plain `auto` rows (the
+        // default when none is specified) already stretch the items WITHIN
+        // one row to match each other — that is ordinary CSS Grid behaviour,
+        // not something `1fr` is needed for — but an `auto` row's size does
+        // NOT get redistributed against its sibling rows the way `fr` tracks
+        // do. That distinction is exactly what an earlier version of this
+        // grid got backwards: it used `grid-rows-[1fr_1fr]` to try to match
+        // row 1 and row 2 to each other, which also, as an unwanted side
+        // effect, coupled every card's height to the OTHER row's tallest
+        // card. That's what made switching to "Today" look like cards were
+        // "expanding dramatically" — Total amount collected/Total settled go
+        // short in an empty window, Documents pending/Saved amount don't,
+        // and the `1fr` rows stretched the now-short row up to match the
+        // still-tall one. Plain `auto` rows give the within-row matching
+        // that's actually wanted (see the component doc comment) without
+        // that cross-row coupling.
         className="scrollbar-none -my-1 flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-smooth py-1
                    lg:my-0 lg:grid lg:grid-cols-[minmax(0,7fr)_minmax(0,3fr)] lg:overflow-visible lg:py-0"
         onScroll={(e: UIEvent<HTMLDivElement>) => setActivePage(pageFromScroll(e.currentTarget))}
       >
-        {/* lg:h-full only: from lg up the two page wrappers are grid items in
-            the same row, and CSS Grid's default align-items: stretch already
-            stretches both of them to that row's height (the taller of the
-            two sides' natural content) with no class needed for that part.
-            h-full then makes the Card itself, not just its invisible
-            wrapper, actually fill that stretched height, matching the same
-            fix on the right below. Below lg the wrapper is a plain carousel
-            page instead (see PAGE_CLASSES), where the card's own height is
-            left alone, unchanged from before. */}
-        <div className={PAGE_CLASSES}>
-          <SettlementAnalyticsCard className="lg:h-full" timeRange={timeRange} />
+        {/* `lg:contents` is what lets the two rows above align independently
+            of each other: below lg this stays a real element (a carousel
+            page holding its own flex-col stack), but from lg up
+            `display: contents` removes the wrapper box entirely, promoting
+            these two cards to be direct items of the grid above — in
+            columns 1/1, rows 1/2 via the explicit placement below — rather
+            than a nested box the grid can only size as one unit. Without
+            this, "column 1" would be a single grid cell exactly as tall as
+            its own two stacked cards, with no way for row 1 of it to align
+            with row 1 of column 2 independently of row 2. */}
+        <div className={cn("flex flex-col gap-4", PAGE_CLASSES, "lg:contents")}>
+          <SettlementAnalyticsCard
+            timeRange={timeRange}
+            className="lg:col-start-1 lg:row-start-1 lg:h-full"
+          />
+          {/* No `onTimeframeChange`, which is what hides this card's own
+              week/month/year switcher — the page header's range control
+              drives it instead, through SETTLED_TIMEFRAME_BY_RANGE above.
+
+              The chart keeps a fixed height only below lg, where this is a
+              carousel page and the card sizes to its own content. From lg up
+              it becomes a flex child that absorbs the card's leftover height
+              (`lg:flex-1`), which is what lets the card fill however tall
+              row 2 ends up being (row 2's height is set by whichever of this
+              card and Saved amount is naturally taller). `lg:min-h-0` is
+              the part that makes shrinking possible at all: a flex item's
+              default `min-height: auto` floors it at its content height, so
+              without this the chart could grow but never give height back. */}
+          <TotalSettledCard
+            totalSettled={overview?.totalSettled ?? 0}
+            totalSettledTrendPct={overview?.totalSettledTrendPct ?? 0}
+            comparisonLabel={overview?.comparisonLabel}
+            timeframe={SETTLED_TIMEFRAME_BY_RANGE[timeRange]}
+            chartData={settledChartData}
+            chartClassName="h-40 lg:h-auto lg:min-h-0 lg:flex-1"
+            className="lg:col-start-1 lg:row-start-2 lg:h-full"
+          />
         </div>
 
-        {/* grow (not flex-1, whose 0 basis would force both cards to the same
-            height as each other and clip the taller one) fills whatever
-            height this wrapper ends up stretched to, the same role h-full
-            plays on Settlement Analytics above, just expressed as a flex
-            child here since this wrapper's own two cards are a flex-col
-            stack rather than a single element. Together the two sides always
-            end up the same total height, whichever one is naturally taller:
-            below lg via the carousel's own row-direction flex (which
-            stretches by the same default), from lg up via the grid. */}
-        <div className={cn("flex flex-col gap-4", PAGE_CLASSES)}>
-          <OutstandingAmountCard className="grow" timeframe={TIMEFRAME_BY_RANGE[timeRange]} />
-          <SavedAmountCard className="grow" timeRange={timeRange} />
+        {/* `lg:contents` for the same reason as the column above. Auto
+            placement would fill row-wise and scatter these (the DOM here is
+            column-major: both left cards, then both right), so every card
+            names its own column and row explicitly. */}
+        <div className={cn("flex flex-col gap-4", PAGE_CLASSES, "lg:contents")}>
+          <OutstandingAmountCard
+            timeframe={TIMEFRAME_BY_RANGE[timeRange]}
+            className="lg:col-start-2 lg:row-start-1 lg:h-full"
+          />
+          <SavedAmountCard
+            timeRange={timeRange}
+            className="lg:col-start-2 lg:row-start-2 lg:h-full"
+          />
         </div>
       </div>
 

@@ -10,7 +10,10 @@ import { type AmountRangeValue } from "@/components/common/filters/FilterChips";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { usePost } from "@/lib/api/hooks";
-import { buildReceiptColumns, ReceiptDownloadAction } from "@/features/dashboard/mca-receipts/columns";
+import {
+  buildReceiptColumns,
+  ReceiptDownloadAction,
+} from "@/features/dashboard/mca-receipts/columns";
 import {
   ReceiptCard,
   ReceiptCardSkeleton,
@@ -209,8 +212,23 @@ export function McaReceiptTable() {
     />
   );
 
-  const emptyTitle = "No receipts found";
-  const emptyDescription = "Try adjusting your filters or search query";
+  // The period always has a value, so it only counts as narrowing once the
+  // merchant moves it off the default window. Receipts are issued by
+  // PayGlocal rather than created here, so the first-time state explains what
+  // will arrive instead of offering an action this page doesn't have.
+  const hasNarrowingFilters =
+    !!search.trim() ||
+    amountRange.min !== EMPTY_AMOUNT_RANGE.min ||
+    amountRange.max !== EMPTY_AMOUNT_RANGE.max ||
+    period.start !== defaultPeriod.start ||
+    period.end !== defaultPeriod.end;
+
+  const emptyTitle = hasNarrowingFilters
+    ? "No matching receipts"
+    : "Your receipts will appear here";
+  const emptyDescription = hasNarrowingFilters
+    ? "Try a different period, or clear a filter to widen the results."
+    : "As payments settle, each receipt is issued here as proof of inward remittance for your records.";
 
   return (
     // Two surfaces, one visible at a time: the table card from `lg` up, the
@@ -221,9 +239,7 @@ export function McaReceiptTable() {
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
             {searchInput}
-            <div className="flex flex-wrap items-center gap-1.5">
-              {renderFilterChips()}
-            </div>
+            <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
           </div>
         }
         // The download action floats over the row; these lift it above the

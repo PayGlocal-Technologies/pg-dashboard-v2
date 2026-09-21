@@ -22,10 +22,10 @@ export interface ClientAnalyticsResponse {
 }
 
 // ── Revenue trend ────────────────────────────────────────────────────────────
-// Backs McaRevenueCard's chart. Maps 1:1 onto the mock RevenueSeries in
-// mock-data.ts (currency/total/previousTotal/trendPct/comparisonLabel/points),
-// so wiring it up is a source swap. The mock RevenuePoint's `x` is this point's
-// `label`; periodStart/periodEnd have no mock equivalent (unused by the chart).
+// Backs McaRevenueCard's chart, and is now its only source — the placeholder
+// series this used to mirror has been deleted. `label` is what the chart plots
+// on its x-axis (RevenuePoint.x in mock-data.ts, still used for that shape);
+// periodStart/periodEnd are carried but unused by the chart.
 
 export interface RevenueTrendPoint {
   label: string;

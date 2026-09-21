@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { useGet } from "@/lib/api/hooks";
+import { useGet, usePostQuery } from "@/lib/api/hooks";
 import {
   mcaCurrencySplitApi,
   mcaDocumentPendingApi,
@@ -15,6 +15,7 @@ import {
   mcaSettledByAccountApi,
   mcaSettledCurrencyTrendApi,
   mcaTxnDocumentPresignApi,
+  mcaTxnSearchApi,
   merchantProfileApi,
   merchantPurposeCodesApi,
 } from "@/features/dashboard/mca-transactions/services";
@@ -23,6 +24,7 @@ import {
   toPurposeCodeOptions,
   type PurposeCodeOption,
 } from "@/lib/purposeCodes";
+import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { useScopeId } from "@/lib/hooks/useScopeId";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useApp } from "@/stores/useApp";
@@ -38,6 +40,8 @@ import type {
   InvoiceOriginsResponse,
   McaOverviewData,
   McaOverviewResponse,
+  McaTransaction,
+  McaTransactionsResponse,
   MerchantProfileResponse,
   PresignedUrlResponse,
   SavedAmountData,
@@ -48,6 +52,19 @@ import type {
   SettledCurrencyTrendRow,
   SuggestedPurposeCodesResponse,
 } from "@/features/dashboard/mca-transactions/types";
+
+// How many DOCUMENT_PENDING transactions to pull before ranking them locally.
+//
+// This is a ranking pool, not a page: InvoiceActionCard shows three rows and
+// the sort that picks them happens client-side (the OpenSearch body has no
+// working sortBy — see useDocumentPendingTransactions). At the old value of 25
+// the "highest amount first" claim was only true within the first 25 the API
+// happened to return, which on a merchant with ~200 pending meant the three
+// largest were almost never among them.
+//
+// 200 covers the pending counts seen in UAT outright. It is a ceiling, not a
+// guarantee: past 200 pending this is still the top three of the first 200.
+const DOCUMENT_PENDING_BATCH_SIZE = 200;
 
 // Both downloads below follow the same shape: the file itself is never served
 // by the API, only a short-lived presigned URL, so "download" is a GET whose
@@ -374,4 +391,52 @@ export function toMetricNumber(value: number | string | undefined): number {
   if (value === undefined || value === null || value === "") return 0;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/**
+ * Individual DOCUMENT_PENDING transactions, largest first — the rows
+ * InvoiceActionCard turns into "raise this one" actions, as opposed to
+ * useDocumentPending's aggregate count/amount above.
+ *
+ * Reuses the same OpenSearch endpoint and filter McaTransactionTable's
+ * "Invoice Pending" tab already uses (INVOICE_PENDING_STATUSES), scoped with
+ * useResolvedMids the same way that table is, since this is a transaction
+ * search rather than a path-scoped analytics call. `amount` is a string field
+ * on McaTransaction, so the sort has to happen client-side after the fetch —
+ * the OpenSearch body has no working sortBy anywhere in this codebase. See
+ * DOCUMENT_PENDING_BATCH_SIZE for how big a pool that sort runs over.
+ *
+ * KNOWN LIMITATION: the comparison is on the raw `amount` regardless of
+ * `currency`, so it ranks by digit count rather than by value — a ¥ or KRW
+ * transaction outranks a larger $ one. The record carries no common-basis
+ * figure to sort on instead (`inrAmount` exists on the type but is settlement
+ * arithmetic, so it is null on anything still awaiting documents). Fixing this
+ * properly needs either a server-side sort or a reporting-currency amount on
+ * the row.
+ */
+export function useDocumentPendingTransactions(): {
+  transactions: McaTransaction[];
+  isLoading: boolean;
+  isError: boolean;
+} {
+  const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
+
+  const body = buildTxnRequestBody(
+    { externalStatus: ["DOCUMENT_PENDING"] },
+    { selectedMid: midFilter, pageLimit: DOCUMENT_PENDING_BATCH_SIZE }
+  );
+
+  const { data, isPending, isError } = usePostQuery<McaTransactionsResponse, typeof body>(
+    ["mca-document-pending-transactions", urlMid, ...(midFilter?.value ?? [])],
+    mcaTxnSearchApi(urlMid),
+    body,
+    { staleTime: 0 },
+    isReady
+  );
+
+  const transactions = [...(data?.data?.data ?? [])].sort(
+    (a, b) => parseFloat(b.amount) - parseFloat(a.amount)
+  );
+
+  return { transactions, isLoading: isReady && isPending, isError };
 }

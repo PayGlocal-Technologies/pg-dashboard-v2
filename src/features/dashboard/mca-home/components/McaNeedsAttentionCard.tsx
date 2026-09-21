@@ -41,7 +41,7 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
   const showViewAll = isLoading || isError || count > 0;
 
   return (
-    <Card className="gap-4 p-5">
+    <Card className="gap-3 p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">Needs attention</h2>
         {showViewAll && (
@@ -58,16 +58,22 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col">
           {Array.from({ length: NEEDS_ATTENTION_PREVIEW_LIMIT }).map((_, i) => (
-            <Card key={i} className="flex-row items-center justify-between gap-3 p-3.5 shadow-none">
+            <div
+              key={i}
+              className={cn(
+                "flex items-center justify-between gap-3 py-2.5",
+                i > 0 && "border-t border-border"
+              )}
+            >
               <div className="min-w-0 space-y-1.5">
                 <Shimmer className="h-3.5 w-32" />
                 <Shimmer className="h-4 w-20" />
                 <Shimmer className="h-2.5 w-28" />
               </div>
               <Shimmer className="h-8 w-16 shrink-0" />
-            </Card>
+            </div>
           ))}
         </div>
       ) : isError ? (
@@ -83,17 +89,24 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
           variant="no-overdue-invoices"
           size="sm"
           title="You're all caught up"
-          description="No invoices need your attention right now."
+          description="Invoices missing a document, or past their due date, will show up here."
           className="py-4"
         />
       ) : (
-        <div className="flex flex-col gap-3">
-          {preview.map((invoice) => {
+        // A plain row list with a divider between rows, not each invoice
+        // boxed in its own nested Card — a card sitting inside another card
+        // read as a heavier, more boxed-in UI than this short preview list
+        // needs, see McaNeedsAttentionCard's own doc comment.
+        <div className="flex flex-col">
+          {preview.map((invoice, i) => {
             const meta = attentionMeta(invoice);
             return (
-              <Card
+              <div
                 key={invoice.id}
-                className="flex-row items-center justify-between gap-3 p-3.5 shadow-none"
+                className={cn(
+                  "flex items-center justify-between gap-3 py-2.5",
+                  i > 0 && "border-t border-border"
+                )}
               >
                 <div className="min-w-0">
                   <p className="truncate text-[13px] font-semibold text-foreground">
@@ -121,7 +134,7 @@ export function McaNeedsAttentionCard({ onViewAll, onAction }: McaNeedsAttention
                 >
                   {meta.actionLabel}
                 </Button>
-              </Card>
+              </div>
             );
           })}
         </div>

@@ -101,6 +101,59 @@ export function buildInvoiceRowActions(
   }
 }
 
+/**
+ * The row's hover CTA (Continue for a draft, View otherwise) plus its
+ * overflow menu, together.
+ *
+ * Rendered through DataTable's `rowAction` slot rather than as a column of
+ * its own — that slot floats pinned to the right edge of the viewport (see
+ * DataTableProps.rowAction), which is what keeps the "…" lined up under the
+ * toolbar's own right-aligned controls (Columns/Refresh) regardless of how
+ * wide the table's data columns render, instead of trailing wherever the
+ * Actions column happened to land.
+ */
+export function InvoiceRowAction({
+  row,
+  handlers,
+}: {
+  row: McaInvoiceRow;
+  handlers: InvoiceRowHandlers;
+}) {
+  const actions = buildInvoiceRowActions(row, handlers);
+  const isDraft = row.status === "DRAFT";
+
+  return (
+    <div className="flex items-center gap-2">
+      {/* Both the draft "Continue" CTA and the "View" CTA on every other
+          status are hover-only, so the column stays quiet while scanning
+          and only shows a next step on the row you're actually looking
+          at. */}
+      {isDraft ? (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handlers.onOpenRow(row)}
+          className="h-auto min-h-0 shrink-0 gap-1 whitespace-nowrap rounded-md bg-card px-2 py-1 text-[11px] shadow-sm"
+        >
+          Continue
+        </Button>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Icon name="eye" className="h-3 w-3" />}
+          onClick={() => handlers.onOpenRow(row)}
+          className="h-auto min-h-0 shrink-0 gap-1 whitespace-nowrap rounded-md bg-card px-2 py-1 text-[11px] shadow-sm"
+        >
+          View
+        </Button>
+      )}
+
+      <RowActionsMenu actions={actions} />
+    </div>
+  );
+}
+
 function RowActionsMenu({ actions }: { actions: RowAction[] }) {
   if (actions.length === 0) return null;
 
@@ -172,10 +225,10 @@ function RecurringMark() {
  * so the two read as one product (row-level click, 13px body text,
  * StatusBadge, a hover-revealed CTA plus an overflow menu in Actions).
  */
-export function buildInvoiceColumns(
-  handlers: InvoiceRowHandlers,
-  options: { showMid: boolean; showFrequency: boolean }
-): Column<McaInvoiceRow>[] {
+export function buildInvoiceColumns(options: {
+  showMid: boolean;
+  showFrequency: boolean;
+}): Column<McaInvoiceRow>[] {
   const { showMid, showFrequency } = options;
 
   const cols: Column<McaInvoiceRow>[] = [
@@ -263,62 +316,6 @@ export function buildInvoiceColumns(
             : "—"}
         </span>
       ),
-    },
-    {
-      key: "action",
-      header: "Actions",
-      minWidth: 175,
-      align: "left",
-      render: (row) => {
-        const actions = buildInvoiceRowActions(row, handlers);
-        const isDraft = row.status === "DRAFT";
-
-        return (
-          <div className="flex items-center gap-1">
-            {/* A draft's one obvious next step is finishing it, so that
-                  stays a labelled button rather than hiding behind "…" —
-                  the same treatment Upload Invoice gets on transactions.
-                  Everything else reveals a View button on hover only, so
-                  the column stays quiet while scanning.
-
-                  The CTA sits in a shared min-width slot: "Continue" is the
-                  wider of the two labels, and without a common footprint the
-                  overflow "…" landed at a different x on draft rows than on
-                  active/paid ones. min-w rather than w so an unexpectedly wide
-                  label pushes the menu out instead of overlapping it. */}
-            <span className="flex min-w-[84px] shrink-0 items-center">
-              {isDraft ? (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="pencil" className="h-3 w-3" />}
-                  onClick={() => handlers.onOpenRow(row)}
-                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                >
-                  Continue
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<Icon name="eye" className="h-3 w-3" />}
-                  onClick={() => handlers.onOpenRow(row)}
-                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px] opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100"
-                >
-                  View
-                </Button>
-              )}
-            </span>
-
-            {/* Fixed slot too: PAID_OUTSIDE/UPLOADED rows can end up with no
-                  menu items at all, and an absent trigger would otherwise pull
-                  the column's right edge in on those rows alone. */}
-            <span className="flex w-8 shrink-0 items-center justify-center">
-              <RowActionsMenu actions={actions} />
-            </span>
-          </div>
-        );
-      },
     },
   ];
 

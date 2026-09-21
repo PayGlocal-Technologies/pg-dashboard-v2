@@ -54,7 +54,8 @@ export function PricingSection({ form }: { form: SkuItemFormApi }) {
                 {(field) => (
                   <Field>
                     <FieldLabel htmlFor="sku-currency">
-                      Currency<RequiredMark />
+                      Currency
+                      <RequiredMark />
                     </FieldLabel>
                     <Select
                       value={field.state.value}
@@ -104,7 +105,8 @@ export function PricingSection({ form }: { form: SkuItemFormApi }) {
                 {(field) => (
                   <Field>
                     <FieldLabel htmlFor="sku-selling-price">
-                      Selling price<RequiredMark />
+                      Selling price
+                      <RequiredMark />
                     </FieldLabel>
                     <PriceInput id="sku-selling-price" symbol={symbol} field={field} />
                     <FieldError>{field.state.meta.errors[0]}</FieldError>
