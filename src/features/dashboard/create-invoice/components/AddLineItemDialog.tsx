@@ -42,10 +42,11 @@ const EMPTY: LineItemValues = {
   saveAsSku: false,
 };
 
-/** The four fields the API requires on a line item, in the order they appear in
- *  the form — which is also the order a failed submit walks to find the first
- *  one to focus. */
-const REQUIRED_FIELDS = ["type", "description", "unitPrice", "quantity"] as const;
+/** The fields a submit can be blocked on, in the order they appear in the form
+ *  — which is also the order a failed submit walks to find the first one to
+ *  focus. `hsn` is last because it is conditional: the invoice takes a line item
+ *  without a tax code, but the SKU catalogue does not. */
+const REQUIRED_FIELDS = ["type", "description", "unitPrice", "quantity", "hsn"] as const;
 
 type RequiredField = (typeof REQUIRED_FIELDS)[number];
 type FieldErrors = Partial<Record<RequiredField, string>>;
@@ -57,6 +58,7 @@ const FIELD_IDS: Record<RequiredField, string> = {
   description: "line-item-name",
   unitPrice: "line-item-rate",
   quantity: "line-item-qty",
+  hsn: "line-item-hsn",
 };
 
 /** Says what to do, not what went wrong: "Pick Good or Service" is actionable
@@ -67,6 +69,15 @@ function validate(values: LineItemValues): FieldErrors {
   if (!values.description.trim()) errors.description = "Give this item a name.";
   if (!values.unitPrice.trim()) errors.unitPrice = "Enter the rate you are charging.";
   if (!values.quantity.trim()) errors.quantity = "Enter a quantity.";
+  // The catalogue rejects an item with no tax code, and the import that would
+  // hit that rule runs after the invoice is already saved — so a blank one here
+  // surfaces as a failure nothing on this screen can still fix. Ask now.
+  if (values.saveAsSku && !values.hsn.trim()) {
+    errors.hsn =
+      values.type === "SERVICE"
+        ? "Enter a SAC code to save this to your catalogue."
+        : "Enter an HSN code to save this to your catalogue.";
+  }
   return errors;
 }
 
@@ -176,6 +187,9 @@ function LineItemBody({
       for (const key of Object.keys(next) as (keyof LineItemValues)[]) {
         if (key in cleared) delete cleared[key as RequiredField];
       }
+      // Switching the catalogue off retires the tax-code rule with it, so its
+      // message goes too rather than sitting under a field that is optional again.
+      if (next.saveAsSku === false) delete cleared.hsn;
       return cleared;
     });
   };
@@ -379,8 +393,13 @@ function LineItemBody({
 
       <Field>
         <FieldLabel htmlFor="line-item-hsn">
-          {isService ? "SAC code" : "HSN code"}{" "}
-          <span className="font-normal text-muted-foreground">(optional)</span>
+          {isService ? "SAC code" : "HSN code"}
+          {/* Dropped rather than swapped for a required marker: every other
+              required field in this dialog carries no marker, so the suffix
+              going away is what "required" looks like here. */}
+          {!values.saveAsSku && (
+            <span className="font-normal text-muted-foreground"> (optional)</span>
+          )}
         </FieldLabel>
         <Input
           id="line-item-hsn"
@@ -388,7 +407,9 @@ function LineItemBody({
           placeholder={isService ? "e.g. 998314" : "e.g. 8471"}
           value={values.hsn}
           onChange={(e) => patch({ hsn: e.target.value })}
+          aria-invalid={!!errors.hsn || undefined}
         />
+        {errors.hsn && <FieldError>{errors.hsn}</FieldError>}
       </Field>
 
       <div className="space-y-1">

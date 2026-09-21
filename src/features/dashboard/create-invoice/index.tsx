@@ -1344,7 +1344,7 @@ function InvoiceEditor({
           .map((item) => ({
             name: item.description,
             type: item.type || null,
-            hsnSac: item.hsn ?? "",
+            hsnSac: (item.hsn ?? "").trim(),
             unitPrice: item.unitPrice ?? "",
             currency: form.currency || null,
             description: null as null,
@@ -1358,9 +1358,12 @@ function InvoiceEditor({
                 toast.success(
                   `${skuItems.length} item${skuItems.length === 1 ? "" : "s"} saved to your SKU catalogue.`
                 ),
-              onError: () =>
+              onError: (error) =>
                 toast.error("Couldn't save items to the SKU catalogue", {
-                  description: "The invoice is unaffected; add them manually later.",
+                  // The server's reason, not a generic line: this import is
+                  // fire-and-forget, so its message is the only account of what
+                  // went wrong the merchant will ever get.
+                  description: error.message,
                 }),
             }
           );
