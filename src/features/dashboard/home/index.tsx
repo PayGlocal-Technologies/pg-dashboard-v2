@@ -129,7 +129,7 @@ export function DashboardHomeFeature() {
               className="h-3 w-3 shrink-0 text-muted-foreground"
               aria-hidden
             />
-            <span>Amount received at mid-market rate</span>
+            <span>Amount received at live FX rates</span>
           </div>
           <div className="hidden h-3.5 w-px bg-border sm:block" />
           <Button

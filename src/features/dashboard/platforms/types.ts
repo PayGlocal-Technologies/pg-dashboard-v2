@@ -81,6 +81,18 @@ export interface Platform {
   /** The numbered walkthrough, in order. */
   steps: PlatformStep[];
   /**
+   * One video walkthrough for connecting this platform, shown above the steps
+   * on the "Steps to connect" page.
+   *
+   * Undefined everywhere for now: that page renders a labelled placeholder of
+   * the same dimensions in its place, so supplying a real URL later is a data
+   * change rather than a layout one — the same arrangement `screenshotSrc` on
+   * a step already uses. One per platform, not one per step: the video covers
+   * the whole connection, and the per-step detail is what the screenshots and
+   * instructions below it are for.
+   */
+  tutorialVideoUrl?: string;
+  /**
    * Statements this platform may ask the merchant for, shown as an aside beside
    * the walkthrough. Optional, and in practice Amazon-only: pg-dashboard gates
    * the whole column on `resolvedSelectedPlatform === "amazon"` (Platforms.tsx),

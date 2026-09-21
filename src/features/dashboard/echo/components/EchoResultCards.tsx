@@ -14,16 +14,15 @@ import { cn } from "@/lib/utils";
  * The rich result cards Echo's design calls for: a KPI figure, a short table,
  * a breakdown donut, and a call-to-action.
  *
- * BACKEND GAP — nothing renders these yet. `POST /gcc/v1/echo/app` answers
- * only with `text` / `image` / `interactive` chunks (see `EchoChunk`), and
- * there is no field in a response to build an `EchoResult` from. This file is
- * the rendering half, kept ready so that wiring it up later is a mapping job
- * in `helper.ts` rather than a design job. See the BACKEND GAP note on
- * `EchoResult` in `types.ts`.
+ * The metric/donut/action cards are still a BACKEND GAP — nothing builds an
+ * `EchoResult` of those kinds today, since `POST /gcc/v1/echo/app` answers
+ * only with `text` / `image` / `interactive` chunks (see `EchoChunk`). See
+ * the BACKEND GAP note on `EchoResult` in `types.ts`.
  *
- * Deliberately NOT reachable from the transcript today: rendering an empty
- * card, or one filled with invented figures, would be worse than rendering
- * nothing.
+ * `TableResultCard` is the one kind that IS reachable: `EchoBody` runs every
+ * chunk's text through `parseRecordTable` (see `recordTable.ts`), which lifts
+ * repeated `Label: value` blocks — the server's only way to describe a list —
+ * into an `EchoTableResult` and renders it here instead of as a wall of text.
  */
 
 const POSITIVE_STATUS_WORDS = ["issued", "sent for capture", "success", "captured", "paid"];
@@ -79,14 +78,43 @@ function linkIsShareable(row: TableRow): boolean {
   return !UNSHAREABLE_STATUS_WORDS.some((w) => status.includes(w));
 }
 
+/** A "…id"/"…reference"/UTR-shaped column — the one kind of value in these
+ *  parsed records long and space-free enough (a raw gateway/transaction id)
+ *  to force the whole table wider than its bubble under `whitespace-nowrap`.
+ *  Every other parsed column (dates, statuses, amounts) is short by nature. */
+function isIdLikeColumn(key: string): boolean {
+  return /(^|-)(id|ref|reference|utr)($|-)/.test(key);
+}
+
 function TableResultCard({ result }: { result: Extract<EchoResult, { kind: "table" }> }) {
   // flux's DataTable rather than bare table markup, per CLAUDE.md. `snug`
   // + compact density is what keeps it card-sized inside a chat bubble
   // instead of reading as a full page grid.
-  const columns: Column<TableRow>[] = result.columns.map((col) => ({
+  //
+  // `tableLayout="content"`, not `"auto"`: `auto` forces a 920px table-wide
+  // minimum regardless of how few/narrow the columns are, which is what sent
+  // a plain 4-column result into horizontal scroll inside a ~700px bubble.
+  // `content` lets columns size to what they actually hold instead.
+  //
+  // The one column that can still overflow under `content` is an id-shaped
+  // one: `whitespace-nowrap` (the default for every column) keeps a raw
+  // "glm2e849bfe1a2e5c9d0" on one line, and a single unbroken token that long
+  // widens the table the same way the old fixed minimum did. Those columns
+  // get `wrap` + `break-all` so a long id folds inside its own cell instead,
+  // plus a `min-w-[160px]` floor (via `cellClassName`, since `width`/
+  // `minWidth` on `Column` only apply under `tableLayout="fixed"`) so the id
+  // still gets a reasonable column width instead of wrapping tightly.
+  const lastIndex = result.columns.length - 1;
+  const columns: Column<TableRow>[] = result.columns.map((col, index) => ({
     key: col.key,
     header: col.label,
     align: col.align ?? "left",
+    wrap: isIdLikeColumn(col.key) || undefined,
+    cellClassName: cn(
+      isIdLikeColumn(col.key) && "min-w-[160px] break-all",
+      index === 0 && "pl-3.5",
+      index === lastIndex && "pr-3.5"
+    ),
     render: (row) => {
       const value = row[col.key] ?? "";
 
@@ -127,8 +155,11 @@ function TableResultCard({ result }: { result: Extract<EchoResult, { kind: "tabl
       {result.title ? (
         <p className="px-3.5 pb-2 pt-3 text-[12px] font-semibold text-foreground">{result.title}</p>
       ) : null}
-      {/* Its own scroll container: a five-column table does not fit the 420px
-          side panel, and the page must never scroll sideways as a whole. */}
+      {/* Still its own scroll container, kept as a last resort: a table with
+          enough columns (five or more real fields, not just one id) can
+          still exceed the 420px side panel even at content width. The id
+          wrapping above is what keeps the common cases — a handful of
+          columns including one identifier — from ever reaching it. */}
       <div className="overflow-x-auto">
         <DataTable
           columns={columns}
@@ -136,7 +167,7 @@ function TableResultCard({ result }: { result: Extract<EchoResult, { kind: "tabl
           rowKey={(row) => Object.values(row).join("|")}
           density="compact"
           snug
-          tableLayout="auto"
+          tableLayout="content"
           className="border-0"
         />
       </div>

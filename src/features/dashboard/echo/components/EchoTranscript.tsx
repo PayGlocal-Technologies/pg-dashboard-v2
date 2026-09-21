@@ -212,7 +212,13 @@ export function EchoTranscript({
             EchoAgentSteps, and note the steps are a timed affordance rather
             than progress the server reports. */}
         {status !== "idle" && entries.length > 0 ? (
-          <div className="flex items-start gap-2.5">
+          // Extra bottom margin beyond the transcript's own space-y-5: this is
+          // always the last thing in the scroll container while a turn is in
+          // flight, sitting directly above the composer below it, so it reads
+          // the room's own bottom padding as its only gap from the input box
+          // — noticeably tighter than the breathing space between it and the
+          // turn above it.
+          <div className="mb-4 flex items-start gap-2.5">
             <Icon name="echo-mark" className="mt-0.5 shrink-0 text-[26px]" />
             <div className="min-w-0 flex-1">
               <EchoAgentSteps />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription, Button, Card, CardContent, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useGet } from "@/lib/api/hooks";
@@ -14,7 +14,6 @@ import { useDocumentDownload, useFircDownload } from "@/features/dashboard/mca-t
 import { useVirtualAccounts } from "@/features/dashboard/multi-currency/hooks";
 import {
   buildSettlementTimeline,
-  getDocumentPendingMessage,
   hasTimelineReversal,
 } from "@/features/dashboard/mca-transactions/timeline/buildSettlementTimeline";
 import { formatMoney } from "@/features/dashboard/mca-transactions/timeline/format";
@@ -33,9 +32,6 @@ import type {
 
 interface SettlementTimelineSectionProps {
   row: McaTransaction;
-  /** The invoice upload form, nested under the timeline's upload step while
-   *  that step is awaiting the merchant's file. */
-  uploadSlot?: ReactNode;
 }
 
 function TimelineSkeleton() {
@@ -64,7 +60,7 @@ function TimelineSkeleton() {
  * supporting calls are cheap and independent, so they run alongside the
  * timeline rather than waiting on it.
  */
-export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelineSectionProps) {
+export function SettlementTimelineSection({ row }: SettlementTimelineSectionProps) {
   const hasIds = !!row.merchantId && !!row.gid;
 
   const {
@@ -128,7 +124,6 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
         onDownloadDocument: downloadDocument,
         onDownloadFirc: () => downloadFirc(row.merchantId, row.gid),
         isFircDownloading,
-        uploadSlot,
       })
     : [];
 
@@ -155,13 +150,12 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
           </AlertDescription>
         </Alert>
       )}
-      {row.externalStatus === "DOCUMENT_PENDING" && (
-        <Alert variant="warning">
-          <AlertDescription>
-            {getDocumentPendingMessage(timeline?.multipleTimelineEvents)}
-          </AlertDescription>
-        </Alert>
-      )}
+      {/* The invoice-upload form and the "FIRC is ready" banner used to
+          render here too (DOCUMENT_PENDING / FIRC_SETTLED) — both now live
+          in their own SettlementActionCard, rendered as a sibling card by
+          TransactionDetailsContent rather than nested inside this one, so
+          the one actionable thing about a transaction doesn't get buried
+          among this card's purely informational banners. */}
       {row.externalStatus === "FUNDS_ON_HOLD" && (
         <Alert variant="info">
           <AlertDescription>
@@ -172,22 +166,6 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
       {row.externalStatus === "SENT_FOR_REVIEW" && !isFrmPending && (
         <Alert variant="info">
           <AlertDescription>We are reviewing your invoice, no action needed.</AlertDescription>
-        </Alert>
-      )}
-      {row.externalStatus === "FIRC_SETTLED" && (
-        <Alert variant="success">
-          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
-            Amount credited and FIRC is ready to download.
-            <Button
-              type="button"
-              size="sm"
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              onClick={() => downloadFirc(row.merchantId, row.gid)}
-              disabled={isFircDownloading}
-            >
-              Download FIRC
-            </Button>
-          </AlertDescription>
         </Alert>
       )}
     </>
@@ -223,7 +201,7 @@ export function SettlementTimelineSection({ row, uploadSlot }: SettlementTimelin
           </Button>
         )}
       </div>
-      <Card size="sm">
+      <Card size="sm" className="shadow-none">
         <CardContent className="space-y-4">
           {isError ? (
             <div className="flex flex-col items-center gap-2 py-6 text-center">

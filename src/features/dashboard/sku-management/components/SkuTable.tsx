@@ -220,8 +220,10 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   // when in fact they have items — just none of that type. First run means the
   // whole catalogue is empty, which only an unfiltered, unsearched request can say.
   const isFirstRun = !isLoading && totalCount === 0 && !search.trim() && tab === "all";
-  const emptyTitle = "No products found";
-  const emptyDescription = "Try a different search or switch tabs";
+  // Only ever the narrowed case — `isFirstRun` above carves out the genuinely
+  // empty catalogue and renders its own state with the Add/Import actions.
+  const emptyTitle = "No matching items";
+  const emptyDescription = "Try a different search, or switch tabs to widen the results.";
 
   // Tabs and toolbar are written once and mounted on both surfaces: the card
   // for lg+, and the bordered wrapper below it for narrower viewports. Only one
@@ -269,8 +271,8 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
   // matched nothing, and only wants to be told to widen it.
   const emptyState = isFirstRun ? (
     <EmptyState
-      title="No items yet"
-      description="Add items to your catalog to pull them into invoices."
+      title="Save the items you bill for"
+      description="Add a product or service once, then reuse it on invoices with its price, code and tax details."
       action={
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button

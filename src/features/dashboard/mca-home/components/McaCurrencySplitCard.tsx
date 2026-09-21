@@ -150,8 +150,8 @@ export function McaCurrencySplitCard() {
         <PlaceholderState
           variant="no-analytics"
           size="sm"
-          title="No transactions"
-          description="No transactions in this period."
+          title="No transactions in this period"
+          description="Once payments arrive, you'll see how they split across the currencies you collect in."
           className="flex-1 py-4"
         />
       ) : (

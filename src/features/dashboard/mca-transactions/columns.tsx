@@ -4,10 +4,6 @@ import {
   type Column,
   StatusBadge,
   Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
   IconButton,
   Tooltip,
   TooltipContent,
@@ -57,14 +53,26 @@ export function getStatusMeta(raw: string, isFrmPending: boolean): StatusMeta {
   return isFrmPending ? { ...meta, variant: "warning" } : meta;
 }
 
-// A transaction is "Invoice Pending" exactly when its Settlement Status
-// badge reads that label — i.e. not FRM-pending and externalStatus is
-// DOCUMENT_PENDING. Deriving it from the same inputs as getStatusMeta keeps
-// the Actions column's CTA choice in sync with what the Settlement Status
-// column actually displays.
+/**
+ * Whether this transaction is still waiting on the merchant to put an invoice
+ * against it — the state the "Take action" CTA and the card list's Upload
+ * button exist for.
+ *
+ * `externalStatus` alone, deliberately. This used to also require NOT being
+ * FRM-pending, so that it matched the Settlement Status badge's own label. But
+ * the two ask different questions: the badge asks "what do I call this row?",
+ * this asks "is there something for the merchant to do?", and an FRM-pending
+ * row very much has something to do — it is pending precisely because a
+ * document is owed. Excluding it dropped those rows out of the CTA branch and
+ * into the fallback, where they rendered the raw action list as bare icon
+ * buttons instead. pg-dashboard keys its own row menu off `externalStatus`
+ * alone for the same reason (track-transactions/columns.tsx statusActionMap),
+ * offering Upload Invoice on an FRM-pending row like any other. The FRM case
+ * stays distinguishable through FrmPendingBadge and the warning-tinted status
+ * badge, which is where that distinction belongs.
+ */
 export function isWaitingForInvoice(row: McaTransaction): boolean {
-  const isFrmPending = row.frmStatus === "PENDING_MERCHANT_UPLOAD";
-  return !isFrmPending && row.externalStatus === "DOCUMENT_PENDING";
+  return row.externalStatus === "DOCUMENT_PENDING";
 }
 
 /**
@@ -151,16 +159,12 @@ export function CountryCell({ iso2 }: { iso2?: string | null }) {
 }
 
 /** The per-status actions a row offers, beyond opening the details drawer.
- *  Mirrors pg-dashboard's statusActionMap: a status it doesn't name gets no
- *  menu at all. */
+ *  DOCUMENT_PENDING is not among them: that row gets the "Take action" CTA
+ *  into the drawer instead, where uploading, creating and linking all live
+ *  together (see InvoiceSourceOptions). */
 export interface RowActionHandlers {
   onOpenDetails: (row: McaTransaction) => void;
   onDownloadFirc: (row: McaTransaction) => void;
-  onCreateInvoice: (row: McaTransaction) => void;
-  onLinkInvoice: (row: McaTransaction) => void;
-  /** getAllMerchantInvoice — gates the two invoice-management actions, same
-   *  permission pg-dashboard checks. */
-  canManageInvoices: boolean;
 }
 
 interface RowAction {
@@ -172,31 +176,6 @@ interface RowAction {
 
 function buildRowActions(row: McaTransaction, handlers: RowActionHandlers): RowAction[] {
   switch (row.externalStatus) {
-    case "DOCUMENT_PENDING":
-      return [
-        {
-          key: "upload-invoice",
-          label: "Upload Invoice",
-          icon: "upload",
-          onSelect: () => handlers.onOpenDetails(row),
-        },
-        ...(handlers.canManageInvoices
-          ? ([
-              {
-                key: "create-invoice",
-                label: "Create Invoice",
-                icon: "file-text",
-                onSelect: () => handlers.onCreateInvoice(row),
-              },
-              {
-                key: "link-invoice",
-                label: "Link Invoice",
-                icon: "paperclip",
-                onSelect: () => handlers.onLinkInvoice(row),
-              },
-            ] as RowAction[])
-          : []),
-      ];
     case "FIRC_SETTLED":
       return [
         {
@@ -211,34 +190,37 @@ function buildRowActions(row: McaTransaction, handlers: RowActionHandlers): RowA
   }
 }
 
-function RowActionsMenu({ actions }: { actions: RowAction[] }) {
+/** One row's actions, direct icon buttons rather than a "…" menu — today
+ *  that's at most a single action (FIRC Download, on a FIRC_SETTLED row),
+ *  and hiding the one thing there is to do behind a dropdown cost an extra
+ *  click for no reason. Each action gets its own icon (a tooltip carries the
+ *  label, since there's no room for text beside several of these), laid out
+ *  left of the row's View details/Take action control rather than replacing
+ *  it. */
+function RowActionButtons({ actions }: { actions: RowAction[] }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <IconButton
-          aria-label="More actions"
-          variant="ghost"
-          size="sm"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <Icon name="more-horizontal" className="h-4 w-4" />
-        </IconButton>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        {actions.map((action) => (
-          <DropdownMenuItem
-            key={action.key}
-            onSelect={(e) => {
-              e.preventDefault();
-              action.onSelect();
-            }}
-          >
-            <Icon name={action.icon} className="h-3.5 w-3.5" />
-            {action.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      {actions.map((action) => (
+        <TooltipProvider key={action.key} delayDuration={200}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <IconButton
+                aria-label={action.label}
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  action.onSelect();
+                }}
+              >
+                <Icon name={action.icon} className="h-4 w-4" />
+              </IconButton>
+            </TooltipTrigger>
+            <TooltipContent side="top">{action.label}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+    </>
   );
 }
 
@@ -334,11 +316,22 @@ export function buildMcaColumns(
         const isPendingInvoice = isWaitingForInvoice(row);
 
         return (
-          <div className="flex items-center gap-1">
-            {/* Upload Invoice stays a labelled button rather than hiding in
-                  the menu: it is the one action the merchant is being asked
-                  to take, and burying it behind "…" would cost a click on the
-                  transactions that most need one. */}
+          // justify-end: this group sits flush with the right edge of the
+          // Actions column (the row's own trailing edge) rather than
+          // hugging the cell's left side — View details in particular is
+          // meant to read as a control anchored to the end of the row, not
+          // one more item drifting wherever the flex content happens to end.
+          <div className="flex items-center justify-end gap-1">
+            {/* "Take action" stays a labelled button rather than hiding in a
+                  menu: it is the one thing the merchant is being asked to do,
+                  and burying it behind "…" would cost a click on the
+                  transactions that most need one. No "…" menu on this row at
+                  all any more — Create Invoice/Link Invoice used to live
+                  there as a shortcut around the drawer, but both are now
+                  offered inside the drawer's own upload section (see
+                  UploadInvoiceForm), so there is nothing left for a menu on
+                  this row to hold, and one entry point to the same place is
+                  simpler than two. */}
             {isPendingInvoice ? (
               <span data-guide="mca-txn-upload-invoice" className="inline-flex">
                 <Button
@@ -351,33 +344,36 @@ export function buildMcaColumns(
                   }}
                   className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
                 >
-                  Upload Invoice
+                  Take action
                 </Button>
               </span>
             ) : (
-              /* Hidden until the row is hovered/focused, opacity-only (no
-                   display/width change) so revealing it never shifts the
-                   layout. Opens the same drawer a click anywhere else on the
-                   row does. */
-              <Button
-                variant="ghost"
-                size="sm"
-                leftIcon={<Icon name="eye" className="w-3 h-3" />}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlers.onOpenDetails(row);
-                }}
-                className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-              >
-                View details
-              </Button>
-            )}
+              <>
+                {/* Direct icon button(s) — FIRC Download today — ahead of
+                    View details rather than behind a "…" menu. Always
+                    visible, unlike View details below: this is the row's own
+                    distinct action, not a secondary way to reach the same
+                    drawer. */}
+                {actions.length > 0 && <RowActionButtons actions={actions} />}
 
-            {/* The status-specific extras. On an invoice-pending row Upload
-                  Invoice is already the button above, so it only appears here
-                  when there is something else alongside it. */}
-            {actions.length > (isPendingInvoice ? 1 : 0) && (
-              <RowActionsMenu actions={isPendingInvoice ? actions.slice(1) : actions} />
+                {/* Hidden until the row is hovered/focused, opacity-only (no
+                     display/width change) so revealing it never shifts the
+                     layout. Opens the same drawer a click anywhere else on the
+                     row does. Plain text, no icon — the eye glyph read as one
+                     more action alongside FIRC Download rather than what it
+                     actually is, the row's own "open" control. */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlers.onOpenDetails(row);
+                  }}
+                  className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+                >
+                  View details
+                </Button>
+              </>
             )}
           </div>
         );

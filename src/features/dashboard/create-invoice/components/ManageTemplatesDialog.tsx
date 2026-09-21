@@ -98,8 +98,8 @@ export function ManageTemplatesDialog({
         {templates.length === 0 ? (
           <EmptyState
             className="mt-4"
-            title="No templates available"
-            description="When you create an invoice, the template will be automatically added here."
+            title="No templates saved yet"
+            description="Save an invoice's layout, items and notes as a template and it will be listed here to reuse."
           />
         ) : (
           <div className="mt-4 divide-y divide-border">

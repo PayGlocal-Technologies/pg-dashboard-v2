@@ -91,9 +91,75 @@ function foldRestOfWorld(accounts: SettledAccountRow[]): SettledAccountRow[] {
 /** Compact ₹ for the narrow bar-value column (amounts share one reporting
  *  currency — they sum to totalAmount). */
 function formatBarAmount(amount: number): string {
+  if (amount >= 10_000_000) return `₹${(amount / 10_000_000).toFixed(2)}Cr`;
   if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(1)}L`;
   if (amount >= 1_000) return `₹${(amount / 1_000).toFixed(1)}K`;
   return `₹${Math.round(amount)}`;
+}
+
+/**
+ * TODO(backend): the settled-by-account API only returns the INR-equivalent
+ * `amount`, not the native-currency amount. Until that's added to the
+ * contract, the native amount line ("$8,377,994") is approximated
+ * client-side from a placeholder FX rate table — remove this and read the
+ * real field off the row once the API carries it.
+ */
+const MOCK_FX_RATE: Record<string, number> = {
+  USD: 88.52,
+  GBP: 112.4,
+  EUR: 95.8,
+  CAD: 63.35,
+  AED: 24.1,
+  SGD: 65.9,
+  AUD: 58.1,
+  CNY: 12.3,
+};
+
+const CURRENCY_SYMBOL: Record<string, string> = {
+  USD: "$",
+  GBP: "£",
+  EUR: "€",
+  CAD: "C$",
+  AED: "AED ",
+  SGD: "S$",
+  AUD: "A$",
+  CNY: "¥",
+};
+
+/** "$8,377,994" for large native amounts, "A$308.09" for sub-thousand ones —
+ *  matches how the reference design varies decimal precision by magnitude. */
+function formatNativeAmount(currency: string, inrAmount: number): string | null {
+  const rate = MOCK_FX_RATE[currency];
+  const symbol = CURRENCY_SYMBOL[currency];
+  if (!rate || !symbol) return null;
+  const native = inrAmount / rate;
+  const formatted =
+    native >= 1_000
+      ? Math.round(native).toLocaleString("en-US")
+      : native.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${symbol}${formatted}`;
+}
+
+/** "USD Account" → "USD"; "Rest of world" is left as-is (it has no trailing
+ *  " Account" to strip). The chip grid names the same account the full label
+ *  already does — this only shortens how it reads in a compact chip. */
+function shortAccountLabel(label: string): string {
+  return label.replace(/ Account$/, "");
+}
+
+/**
+ * Adaptive precision so a small currency never rounds to a dead "0%": each
+ * tier is just enough decimal places to keep a share in that range visibly
+ * nonzero. A currency small enough to still round to zero at three decimals
+ * gets "<0.001%" instead of a false zero.
+ */
+function formatSharePct(fraction: number): string {
+  if (!(fraction > 0)) return "0%";
+  const pct = fraction * 100;
+  if (pct >= 0.1) return `${pct.toFixed(1)}%`;
+  if (pct >= 0.01) return `${pct.toFixed(2)}%`;
+  if (pct >= 0.001) return `${pct.toFixed(3)}%`;
+  return "<0.001%";
 }
 
 /**
@@ -116,39 +182,69 @@ interface AccountBarRowData {
   iso2: string;
   value: number;
   valueLabel: string;
+  /** Settled amount in INR, independent of `value`/`valueLabel` which switch
+   *  to a transaction count in count mode — the native-amount-at-rate
+   *  subtext always needs the amount, regardless of the selected mode. */
+  amount: number;
 }
 
-/** One virtual account's row in the per-account graph: flag + name, a bar
- *  scaled against the ranked list's own top value, then the figure. Shared
- *  between the always-visible first five and the rows Show more reveals, so
- *  the two stay pixel-identical. */
-function AccountBarRow({ row, maxValue }: { row: AccountBarRowData; maxValue: number }) {
+/** One currency's row in the full-width breakdown list: flag, bold currency
+ *  code with its share of total beneath it on the left; the INR amount with
+ *  its native-currency amount beneath it on the right. Rows are separated by
+ *  dividers (see `className`, set by the caller — a hairline `divide-y` when
+ *  stacked, or explicit `border-b`/`border-l` rules forming a grid once
+ *  currencies pair up two-to-a-line) rather than a bordered box. Shared
+ *  between the always-visible first five and the entries Show more reveals,
+ *  so the two stay pixel-identical. */
+function CurrencyChip({
+  row,
+  sharePct,
+  isAmountMode,
+  className,
+}: {
+  row: AccountBarRowData;
+  sharePct: number;
+  isAmountMode: boolean;
+  className?: string;
+}) {
+  const nativeLabel = isAmountMode ? formatNativeAmount(row.accountId, row.amount) : null;
   return (
-    <li className="flex items-center gap-3 text-sm">
-      {/* w-24 below sm: as a carousel page the card is narrower than the
-          viewport, and the label column, the value column, and the card's
-          own padding are all fixed width, so a 144px label would leave the
-          bar (the only flexible element in the row) too narrow to read as a
-          bar at all. Account names are short enough to still fit, and
-          truncate covers the rest. */}
-      <div className="flex w-24 min-w-0 shrink-0 items-center gap-2 sm:w-36">
-        <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-6 w-6" />
-        <span className="truncate font-medium text-foreground">{row.label}</span>
-      </div>
-      <div className="relative h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          className="absolute inset-y-0 left-0 rounded-full"
-          style={{
-            width: `${maxValue > 0 ? Math.min(100, (row.value / maxValue) * 100) : 0}%`,
-            background: "linear-gradient(90deg, var(--chart-1), var(--chart-3))",
-          }}
-        />
-      </div>
-      <span className="w-16 shrink-0 text-left text-xs font-semibold tabular-nums text-foreground">
-        {row.valueLabel}
+    <li className={cn("flex items-center gap-2.5 py-2.5", className)}>
+      <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-7 w-7 shrink-0" />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold text-foreground">
+          {shortAccountLabel(row.label)}
+        </span>
+        <span className="block text-[11px] tabular-nums text-muted-foreground">
+          {formatSharePct(sharePct)} of total
+        </span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-sm font-semibold tabular-nums text-foreground">
+          {row.valueLabel}
+        </span>
+        {nativeLabel && (
+          <span className="block truncate text-[11px] text-muted-foreground">{nativeLabel}</span>
+        )}
       </span>
     </li>
   );
+}
+
+/** Divider classes for one cell of the paired (two-up) breakdown grid: a
+ *  hairline rule between rows (skipped on the last row, whichever column
+ *  it's in) and another between the two columns, via padding rather than
+ *  the grid's own `gap` — a `gap-x` leaves the vertical rule floating in
+ *  mid-gutter attached to neither column, while `pr-4`/`pl-4` on either
+ *  side of a shared column edge (no gap at all) puts it flush against both.
+ *  Kept as one small function rather than inlined at each call site since
+ *  both the always-visible list and the Show-more-revealed one need the
+ *  exact same rule against the exact same denominators (their own row
+ *  count). */
+function pairedCellClasses(index: number, count: number): string {
+  const isLastRow = index >= count - (count % 2 === 0 ? 2 : 1);
+  const isRightColumn = index % 2 === 1;
+  return cn("border-border", !isLastRow && "border-b", isRightColumn ? "border-l pl-4" : "pr-4");
 }
 
 export function SettlementAnalyticsCard({
@@ -178,11 +274,18 @@ export function SettlementAnalyticsCard({
         valueLabel: isAmountMode
           ? formatBarAmount(account.amount)
           : account.count.toLocaleString("en-IN"),
+        amount: account.amount,
       };
     })
     .sort((a, b) => b.value - a.value);
 
-  const maxValue = accountRows[0]?.value ?? 0;
+  // Denominator for every chip's share: the sum of the SAME rows the grid
+  // renders, not `settledValue`/`settledCount` below. Those come straight off
+  // the overview endpoint and can differ from the per-account total by
+  // whatever rounding or reporting-currency conversion sits between the two.
+  // Summing the rows actually being drawn is what keeps each row's "% of
+  // total" consistent with the others.
+  const totalValue = accountRows.reduce((sum, row) => sum + row.value, 0);
   // Capped at five on every breakpoint, not just the mobile carousel: the
   // card grows to fit the rest once expanded (see the lg:h-full/grow wiring
   // in TransactionsAnalyticsCarousel, which stretches Outstanding + Saved to
@@ -191,6 +294,10 @@ export function SettlementAnalyticsCard({
   const firstFiveRows = accountRows.slice(0, VISIBLE_COUNT);
   const restRows = accountRows.slice(VISIBLE_COUNT);
   const canExpand = restRows.length > 0;
+  // 1-3 currencies read better stacked (each row's own width to fit the
+  // native-amount-at-rate subtext); past that, pairing two per line keeps
+  // the list from pushing the card too tall.
+  const isPairedLayout = accountRows.length > 3;
 
   const settledValue = settled?.totalAmount ?? 0;
   const settledCount = settled?.totalCount ?? 0;
@@ -204,7 +311,7 @@ export function SettlementAnalyticsCard({
 
   return (
     <Card size="sm" className={cn("w-full", className)}>
-      {/* KPI (+ next settlement) on the left, Amount settled/No. of
+      {/* KPI (+ next settlement) on the left, Amount collected/No. of
           transactions on the right: stacked below sm (CardHeader's own
           default is two auto rows, so with no column override the toggle
           just falls onto its own row under the KPI, full width via the Tabs
@@ -216,8 +323,10 @@ export function SettlementAnalyticsCard({
           {/* Label belongs to the KPI beneath it, not the other way round:
               it introduces the number rather than captioning it after the
               fact, the same order OutstandingAmountCard and SavedAmountCard
-              both use for their own KPI blocks. */}
-          <p className="text-sm font-semibold text-foreground">
+              both use for their own KPI blocks. Light/regular weight, not
+              bold — matches SavedAmountCard's own label style, which every
+              KPI card header on this page was brought in line with. */}
+          <p className="text-sm font-normal text-muted-foreground">
             {isAmountMode ? "Total amount collected" : "Total transactions"}
           </p>
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
@@ -256,7 +365,7 @@ export function SettlementAnalyticsCard({
           <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
             <TabsList className="w-full">
               <TabsTrigger value="amount" className="flex-1">
-                Amount settled
+                Amount collected
               </TabsTrigger>
               <TabsTrigger value="count" className="flex-1">
                 No. of transactions
@@ -271,25 +380,84 @@ export function SettlementAnalyticsCard({
           up), CardHeader keeps its own intrinsic height and this region
           absorbs whatever's left. */}
       <CardContent className="flex flex-1 flex-col gap-3">
-        {/* Per-account graph, capped at five rows on every breakpoint; the rest
-            sit behind Show more. When the selected window has no settled
-            accounts at all, an illustration stands in for the empty bar list
-            rather than leaving the card body blank. */}
-        {!isLoading && accountRows.length === 0 ? (
-          <PlaceholderState
-            variant="no-settlements"
-            size="sm"
-            title={isAmountMode ? "No amount settled" : "No settled transactions"}
-            description="Nothing has settled in this period yet."
-            className="flex-1"
-          />
-        ) : (
-          <ul className="space-y-3">
-            {firstFiveRows.map((row) => (
-              <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
-            ))}
-          </ul>
-        )}
+        {/* Currency breakdown: a compact list capped at five entries, the
+            rest behind Show more.
+
+            Still no forced height matching against Total settled (see the
+            history above — that cross-card coupling is what caused the
+            "resizes dramatically on timeframe change" bug in the first
+            place).
+
+            This section IS floored at a shared min-height (below), though —
+            unlike that removed Total-settled coupling, this floor doesn't
+            reach into another card. It exists because this card sits beside
+            Documents Pending in the same grid row (see
+            TransactionsAnalyticsCarousel's `lg:h-full` on both), which
+            stretches both to match whichever is taller. Left unfloored, the
+            empty-state illustration (~250px: icon + title + description)
+            ran noticeably taller than a loaded 1-4 currency breakdown
+            (~100-150px), so switching to a period with no settlements — or
+            back — visibly grew or shrank the whole row, not just this
+            card's own content. The floor is sized to the common loaded
+            case (a handful of currencies) so the illustration shrinks to
+            match it instead of the other way around; it doesn't reserve
+            room for some worst-case list the way the old min-h-70 floor
+            this replaced once did for a hypothetical 5-currency case. */}
+        <div className="min-h-32">
+          {isLoading ? (
+            <div className="space-y-4">
+              <Shimmer className="h-3 w-36" />
+              <Shimmer className="h-3 w-full" />
+              <div className="space-y-3">
+                {Array.from({ length: 2 }).map((_, i) => (
+                  <Shimmer key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            </div>
+          ) : accountRows.length === 0 ? (
+            <PlaceholderState
+              variant="no-settlements"
+              size="xs"
+              className="h-full justify-center py-0"
+              title={isAmountMode ? "No amount settled" : "No settled transactions"}
+              description="Once payments settle, this breaks the total down by the currency each one arrived in."
+            />
+          ) : (
+            accountRows.length > 0 && (
+              <div className="space-y-3">
+                {/* Same uppercase/tracked micro-label PaymentDetailsSection and
+                  every other section heading in this feature already uses
+                  (see TransactionDetailsPage), rather than the plain small
+                  label this had before — one more thing that read as
+                  slightly off-house-style on review. */}
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Currency breakdown
+                </p>
+
+                {/* Stacked, full-width rows with a hairline divider between
+                  them while there are three currencies or fewer — each row's
+                  extra text (native amount) needs the full width to read
+                  comfortably. Past three, pairing rows two-to-a-line keeps a
+                  long currency list from pushing the card too tall, with a
+                  full grid of dividers (see `pairedCellClasses`) between
+                  both rows and columns. */}
+                <ul className={isPairedLayout ? "grid grid-cols-2" : "divide-y divide-border"}>
+                  {firstFiveRows.map((row, index) => (
+                    <CurrencyChip
+                      key={row.accountId}
+                      row={row}
+                      isAmountMode={isAmountMode}
+                      sharePct={totalValue > 0 ? row.value / totalValue : 0}
+                      className={
+                        isPairedLayout ? pairedCellClasses(index, firstFiveRows.length) : undefined
+                      }
+                    />
+                  ))}
+                </ul>
+              </div>
+            )
+          )}
+        </div>
 
         {canExpand && (
           <>
@@ -304,9 +472,22 @@ export function SettlementAnalyticsCard({
                 expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
               )}
             >
-              <ul className="min-h-0 space-y-3 overflow-hidden">
-                {restRows.map((row) => (
-                  <AccountBarRow key={row.accountId} row={row} maxValue={maxValue} />
+              <ul
+                className={cn(
+                  "grid min-h-0 overflow-hidden",
+                  isPairedLayout ? "grid-cols-2" : "divide-y divide-border"
+                )}
+              >
+                {restRows.map((row, index) => (
+                  <CurrencyChip
+                    key={row.accountId}
+                    row={row}
+                    isAmountMode={isAmountMode}
+                    sharePct={totalValue > 0 ? row.value / totalValue : 0}
+                    className={
+                      isPairedLayout ? pairedCellClasses(index, restRows.length) : undefined
+                    }
+                  />
                 ))}
               </ul>
             </div>

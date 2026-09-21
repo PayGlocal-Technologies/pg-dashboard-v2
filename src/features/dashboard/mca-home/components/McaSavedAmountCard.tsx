@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Card, Shimmer } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { useSavedAmount } from "@/features/dashboard/mca-transactions/hooks";
@@ -42,25 +42,34 @@ export function McaSavedAmountCard() {
   const currency = saved?.currency ?? "INR";
 
   return (
-    <Card className="h-full gap-3 p-5">
-      {/* Icon left, toggle right: the same top-row split OutstandingAmountCard
-          uses for its icon and pending chip, rather than a second row. */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10">
-          <Icon
-            name="piggy-bank"
-            className="h-5 w-5 text-emerald-600 dark:text-emerald-400"
-            aria-hidden
-          />
-        </div>
-        {/* Same segmented-toggle treatment as McaCurrencySplitCard's Volume /
-            Count switch, one step tighter because this card is a third the
-            width. The widget picker renders it pointer-events-none, so the
-            preview shows the control without it being operable there. */}
+    <Card className="relative isolate h-full min-h-56 w-full overflow-hidden p-5">
+      {/* Voucher/ticket illustration — see the Transactions page's own
+          SavedAmountCard for the full reasoning. Its blank left half is
+          this artwork's own designated text area, so the KPI below is
+          positioned into it rather than floating over the cash/sparkle
+          imagery around it. */}
+      <AppImage
+        src="/assets/savedamount.png"
+        alt=""
+        fill
+        sizes="(min-width: 1024px) 24rem, 100vw"
+        className="-z-10 object-cover object-center"
+      />
+
+      {/* Toggle stays a full-width row at the card's own top edge — the
+          voucher's blank rectangle isn't wide enough to hold a label AND a
+          two-option switch beside it, and the switch reads fine sitting on
+          the artwork's paler upper sky rather than needing the voucher's
+          paper behind it. */}
+      <div className="flex items-center justify-end gap-2">
+        {/* Same segmented-toggle treatment as McaCurrencySplitCard's Volume/
+            Count switch. The widget picker renders it pointer-events-none,
+            so the preview shows the control without it being operable
+            there. */}
         <div
           role="group"
           aria-label="Saved amount period"
-          className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted/50 p-0.5"
+          className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-card/90 p-0.5 shadow-sm backdrop-blur-sm"
         >
           {SAVED_AMOUNT_DURATIONS.map((opt) => (
             <Button
@@ -82,19 +91,30 @@ export function McaSavedAmountCard() {
           ))}
         </div>
       </div>
-      <div>
-        <p className="text-[13px] font-medium text-muted-foreground">Saved amount</p>
+
+      {/* Positioned to the voucher's own blank rectangle — see the
+          Transactions page's own SavedAmountCard for how these were
+          measured against the artwork. Narrower/lower and a touch more
+          conservative (22%/38%/45%) than that card's own box: this one's
+          min-h-56 sits inside a much wider dashboard grid column, so the
+          artwork crops less top-to-bottom and more side-to-side than in
+          the narrower Transactions placement, leaving less safe width
+          before the caption runs into the barcode stub. */}
+      <div className="absolute inset-y-0 left-[22%] top-[45%] flex w-[38%] flex-col justify-center gap-0.5 pr-1">
+        <p className="text-sm font-normal text-muted-foreground">Saved amount</p>
         {isLoading ? (
-          <Shimmer className="mt-1 h-8 w-32" />
+          <Shimmer className="h-9 w-28" />
         ) : (
           <CompactAmount
             amount={savedInr}
             currency={currency}
-            className="mt-1 block text-2xl font-bold tracking-tight text-foreground tabular-nums"
+            className="block text-3xl font-bold tracking-tight text-foreground tabular-nums"
           />
         )}
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          {DURATION_CAPTION[duration]}
+        </p>
       </div>
-      <p className="text-xs text-muted-foreground">{DURATION_CAPTION[duration]}</p>
     </Card>
   );
 }

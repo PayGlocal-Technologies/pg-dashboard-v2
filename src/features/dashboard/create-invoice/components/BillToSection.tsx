@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Callout,
@@ -11,9 +11,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  Dialog,
-  DialogContent,
-  DialogTitle,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ import {
   useClientCountryMap,
   useCreateClient,
 } from "@/features/dashboard/client-management/hooks";
+import { emptyClientForm } from "@/features/dashboard/client-management/schemas";
 import { AddAddressDialog } from "@/features/dashboard/create-invoice/components/AddAddressDialog";
 import type { Address, ClientData } from "@/features/dashboard/create-invoice/types";
 import type { ClientFormValues } from "@/features/dashboard/client-management/types";
@@ -110,7 +111,12 @@ export function BillToSection({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [addClientOpen, setAddClientOpen] = useState(false);
+  // Seeds the Add client modal's businessName when it's opened from "Add
+  // “{query}” as a new client" rather than the plain "Add a new client" row
+  // — null for the latter, so the form opens blank the way it always did.
+  const [addClientSeed, setAddClientSeed] = useState<string | null>(null);
   const [addressOpen, setAddressOpen] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const selected = useMemo(
     () => clients.find((client) => client.id === clientId),
@@ -137,129 +143,169 @@ export function BillToSection({
     setQuery("");
   };
 
+  const openAddClient = (seed: string | null) => {
+    setPickerOpen(false);
+    setAddClientSeed(seed);
+    setAddClientOpen(true);
+  };
+
+  // Focusing the search input only needs the DOM node, no state update — safe
+  // inside the effect body itself (no synchronous setState here). Same
+  // pattern PurposeCodeCombobox uses for its own Popover+Command dropdown.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const focusTimer = setTimeout(() => searchRef.current?.focus(), 0);
+    return () => clearTimeout(focusTimer);
+  }, [pickerOpen]);
+
   return (
-    <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <div className="mb-4 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-            <Icon name="users" className="h-4 w-4" />
-          </span>
-          <h2 className="text-[15px] font-semibold text-foreground">Who it&apos;s for</h2>
+    <div className="rounded-xl border border-border p-5">
+      {/* One Popover wraps the header's Edit trigger AND (when nothing is
+          selected yet) the dropdown trigger further down — both need to be
+          descendants of the same Popover, not siblings of it, for either
+          trigger to actually open it. Anchors to whichever of the two is on
+          screen. The list itself is identical either way: every client
+          directly, no extra click through a "Select client" button first,
+          and "Add a new client" pinned as its own row regardless of what's
+          been searched. */}
+      <Popover
+        open={pickerOpen}
+        onOpenChange={(next) => {
+          setPickerOpen(next);
+          if (!next) setQuery("");
+        }}
+      >
+        {/* Same header shape as BillerSection ("Who it's from") above it:
+            icon, plain title, an Edit button on the right. The selected
+            client's name used to run under the title as a subtitle, which
+            grew the card whenever one was picked and could crowd the pencil
+            beside it — it now folds into the Contact row below instead,
+            the same way BillerSection's legal name folds into its Address
+            row. */}
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Icon name="users" className="h-4 w-4" />
+            </span>
+            <h2 className="text-[15px] font-semibold text-foreground">Who it&apos;s for</h2>
+          </div>
+
+          {selected && (
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-haspopup="listbox"
+                aria-controls="bill-to-client-listbox"
+                leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
+              >
+                Edit
+              </Button>
+            </PopoverTrigger>
+          )}
         </div>
 
-        {selected && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
-            onClick={() => setPickerOpen(true)}
-          >
-            Change
-          </Button>
-        )}
-      </div>
-
-      {selected ? (
-        <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5">
-          <div className="flex items-center gap-3">
-            <ContactAvatar name={selected.businessName || selected.name} />
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[13.5px] font-medium text-foreground">
-                {selected.businessName || selected.name}
-              </p>
-              {selected.name && selected.businessName && (
-                <p className="truncate text-[12px] text-muted-foreground">{selected.name}</p>
+        {selected ? (
+          // Plain rows, no bordered box around them — this already sits
+          // inside the page's own flow (no card here to nest a second box
+          // inside of), same as BillerSection's address/phone/email rows.
+          selected.businessName || selected.name || formatAddress(selected.address) ? (
+            <dl className="space-y-2">
+              {(selected.businessName || selected.name) && (
+                <div className="flex gap-3">
+                  <dt className="w-20 shrink-0 text-[12px] text-muted-foreground">Contact</dt>
+                  <dd className="min-w-0 text-[13px] text-foreground">
+                    {selected.businessName || selected.name}
+                    {selected.businessName &&
+                      selected.name &&
+                      selected.name !== selected.businessName && (
+                        <span className="text-muted-foreground"> · {selected.name}</span>
+                      )}
+                  </dd>
+                </div>
               )}
               {formatAddress(selected.address) && (
-                <p className="truncate text-[11.5px] text-muted-foreground">
-                  {formatAddress(selected.address)}
-                </p>
+                <div className="flex gap-3">
+                  <dt className="w-20 shrink-0 text-[12px] text-muted-foreground">Address</dt>
+                  <dd className="min-w-0 text-[13px] text-foreground">
+                    {formatAddress(selected.address)}
+                  </dd>
+                </div>
               )}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border py-6 text-center">
-          <p className="text-[12.5px] text-muted-foreground">
-            {invoiceId
-              ? "No client selected yet. Pick who this invoice bills."
-              : "Preparing the draft…"}
-          </p>
-          {/* Two ways to answer the same question, so they are the same
-              control twice: same variant, same size, same icon treatment. They
-              used to be a filled button beside a ghost one, which read as a
-              primary action and an afterthought and left merchants unsure the
-              second one did anything — a DQA pass called them "completely
-              different UIs". Choosing between an existing client and a new one
-              is not a hierarchy. */}
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button
+            </dl>
+          ) : null
+        ) : (
+          <PopoverTrigger asChild>
+            <button
               type="button"
-              variant="secondary"
-              size="sm"
+              role="combobox"
+              aria-expanded={pickerOpen}
+              aria-haspopup="listbox"
+              aria-controls="bill-to-client-listbox"
               disabled={!invoiceId}
-              leftIcon={<Icon name="search" className="h-3.5 w-3.5" />}
-              onClick={() => setPickerOpen(true)}
+              className={cn(
+                "flex h-11 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-left text-[13px] shadow-none",
+                "transition-colors duration-150",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+                "disabled:cursor-not-allowed disabled:opacity-60",
+                "border-border"
+              )}
             >
-              Select client
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              disabled={!invoiceId}
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => setAddClientOpen(true)}
-            >
-              Add new client
-            </Button>
-          </div>
-        </div>
-      )}
+              <span className="flex items-center gap-2 text-muted-foreground">
+                <Icon name="search" className="h-3.5 w-3.5 shrink-0" />
+                {invoiceId ? "Choose a client" : "Preparing the draft…"}
+              </span>
+              <Icon
+                name="chevron-down"
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70 transition-transform",
+                  pickerOpen && "rotate-180"
+                )}
+              />
+            </button>
+          </PopoverTrigger>
+        )}
 
-      {/* Both gates production enforces, surfaced where the choice was made
-          rather than only at submit time. */}
-      {issue.kind === "incomplete-address" && (
-        <Callout variant="warning" className="mt-3">
-          <CalloutText>
-            This client&apos;s billing address is incomplete, so the invoice cannot be generated
-            yet.{" "}
-            <Button
-              type="button"
-              variant="link"
-              className="h-auto p-0 align-baseline text-sm"
-              onClick={() => setAddressOpen(true)}
-            >
-              Complete address
-            </Button>
-          </CalloutText>
-        </Callout>
-      )}
-
-      {issue.kind === "remitter-mismatch" && (
-        <Callout variant="error" className="mt-3">
-          <CalloutText>
-            {issue.clientName
-              ? `"${issue.clientName}" does not match the remitter on the linked transaction ("${issue.remitterName}").`
-              : `The selected client does not match the remitter on the linked transaction ("${issue.remitterName}").`}{" "}
-            Pick the matching client to continue.
-          </CalloutText>
-        </Callout>
-      )}
-
-      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
-        <DialogContent className="max-w-md p-0">
-          <DialogTitle className="px-4 pt-4">Select client</DialogTitle>
-          <Command className="mt-2">
+        {/* side="bottom" + avoidCollisions={false}: Radix's default is to
+            flip the panel above the trigger when the viewport runs out of
+            room below, which for a field this far down the form meant the
+            list could cover the very field you were filling in. Pinned
+            below, it always grows in the direction you're reading. */}
+        <PopoverContent
+          side="bottom"
+          align="start"
+          avoidCollisions={false}
+          className="w-(--radix-popover-trigger-width) min-w-[min(24rem,calc(100vw-3rem))] p-0 shadow-none"
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
+          <Command>
             <CommandInput
+              ref={searchRef}
               placeholder="Search clients…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <CommandList>
+            <CommandList id="bill-to-client-listbox" aria-label="Clients">
               {visibleClients.length === 0 && (
-                <CommandEmpty>No clients match that search.</CommandEmpty>
+                <CommandEmpty>
+                  <div className="flex flex-col items-center gap-2 py-1 text-center">
+                    <span>
+                      {query.trim() ? `No client matches “${query.trim()}”.` : "No clients yet."}
+                    </span>
+                    {query.trim() && (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto p-0"
+                        onClick={() => openAddClient(query.trim())}
+                      >
+                        Add &ldquo;{query.trim()}&rdquo; as a new client
+                      </Button>
+                    )}
+                  </div>
+                </CommandEmpty>
               )}
               <CommandGroup>
                 {visibleClients.map((client) => (
@@ -291,6 +337,10 @@ export function BillToSection({
             </CommandList>
           </Command>
 
+          {/* Pinned outside CommandList so it never scrolls out of view along
+              with the client list above it — "constantly present" the way a
+              regular row can't guarantee once there are enough clients to
+              scroll. */}
           <div className="border-t border-border p-3">
             <Button
               type="button"
@@ -298,21 +348,57 @@ export function BillToSection({
               size="sm"
               className="w-full"
               leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => {
-                setPickerOpen(false);
-                setAddClientOpen(true);
-              }}
+              onClick={() => openAddClient(null)}
             >
               Add a new client
             </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </PopoverContent>
+      </Popover>
+
+      {/* Both gates production enforces, surfaced where the choice was made
+          rather than only at submit time. */}
+      {issue.kind === "incomplete-address" && (
+        <Callout variant="warning" className="mt-3">
+          <CalloutText>
+            This client&apos;s billing address is incomplete, so the invoice cannot be generated
+            yet.{" "}
+            <Button
+              type="button"
+              variant="link"
+              className="h-auto p-0 align-baseline text-sm"
+              onClick={() => setAddressOpen(true)}
+            >
+              Complete address
+            </Button>
+          </CalloutText>
+        </Callout>
+      )}
+
+      {issue.kind === "remitter-mismatch" && (
+        <Callout variant="error" className="mt-3">
+          <CalloutText>
+            {issue.clientName
+              ? `"${issue.clientName}" does not match the remitter on the linked transaction ("${issue.remitterName}").`
+              : `The selected client does not match the remitter on the linked transaction ("${issue.remitterName}").`}{" "}
+            Pick the matching client to continue.
+          </CalloutText>
+        </Callout>
+      )}
 
       <ClientFormModal
         open={addClientOpen}
-        onOpenChange={setAddClientOpen}
+        onOpenChange={(next) => {
+          setAddClientOpen(next);
+          if (!next) setAddClientSeed(null);
+        }}
         mode="add"
+        // Seeded with whatever the merchant had already typed into the
+        // client search when they had no match for it — still an "add",
+        // still editable, just not starting from a blank businessName field.
+        initialValues={
+          addClientSeed ? { ...emptyClientForm(), businessName: addClientSeed } : undefined
+        }
         onSubmit={onSubmitClient}
         midOverride={merchantId}
       />

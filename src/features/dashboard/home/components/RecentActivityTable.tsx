@@ -293,12 +293,14 @@ export function RecentActivityTable({
       rowKey={(row) => row.id}
       isLoading={isLoading}
       skeletonRows={7}
-      emptyTitle="No recent transactions"
+      emptyTitle="Your payments will appear here"
+      emptyDescription="As customers start paying you, your most recent transactions show up in this list."
       emptyState={
         <PlaceholderState
           variant="no-transactions"
           size="sm"
-          title="No recent transactions"
+          title="Your payments will appear here"
+          description="As customers start paying you, your most recent transactions show up in this list."
           className="py-12"
         />
       }
@@ -312,12 +314,14 @@ export function RecentActivityTable({
       rowKey={(row) => row.id}
       isLoading={isLoading}
       skeletonRows={4}
-      emptyTitle="No recent settlements"
+      emptyTitle="Your settlements will appear here"
+      emptyDescription="Once payouts begin, the most recent ones are listed here with the amount that reached your account."
       emptyState={
         <PlaceholderState
           variant="no-settlements"
           size="sm"
-          title="No recent settlements"
+          title="Your settlements will appear here"
+          description="Once payouts begin, the most recent ones are listed here with the amount that reached your account."
           className="py-12"
         />
       }

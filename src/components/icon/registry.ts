@@ -85,6 +85,7 @@ import {
   Phone,
   PieChart,
   PiggyBank,
+  Play,
   Plus,
   Puzzle,
   Receipt,
@@ -105,6 +106,7 @@ import {
   Smile,
   Languages,
   LayoutTemplate,
+  ListChecks,
   Palette,
   Sparkles,
   Square,
@@ -129,6 +131,8 @@ import {
 import { AmazonLogo } from "@/components/icon/AmazonLogo";
 import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
+import { HdfcLogo } from "@/components/icon/HdfcLogo";
+import { IciciLogo } from "@/components/icon/IciciLogo";
 import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
 import { LinkGreenFilled } from "@/components/icon/LinkGreenFilled";
 import { EchoMark } from "@/components/icon/EchoMark";
@@ -194,6 +198,7 @@ export const ICONS = {
   "image-plus": ImagePlus,
   languages: Languages,
   "layout-template": LayoutTemplate,
+  "list-checks": ListChecks,
   inbox: Inbox,
   "indian-rupee": IndianRupee,
   info: Info,
@@ -229,6 +234,7 @@ export const ICONS = {
   phone: Phone,
   "pie-chart": PieChart,
   "piggy-bank": PiggyBank,
+  play: Play,
   plus: Plus,
   puzzle: Puzzle,
   receipt: Receipt,
@@ -275,6 +281,8 @@ export const ICONS = {
   "amazon-logo": AmazonLogo as unknown as LucideIcon,
   "deel-logo": DeelLogo as unknown as LucideIcon,
   "freelancer-logo": FreelancerLogo as unknown as LucideIcon,
+  "hdfc-logo": HdfcLogo as unknown as LucideIcon,
+  "icici-logo": IciciLogo as unknown as LucideIcon,
   "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
   "toptal-logo": ToptalLogo as unknown as LucideIcon,
   "upwork-logo": UpworkLogo as unknown as LucideIcon,

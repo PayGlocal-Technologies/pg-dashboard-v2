@@ -9,7 +9,9 @@ import { cn } from "@/lib/utils";
  *  rather than a full 8px away. */
 export function RequiredMark() {
   return (
-    <span aria-hidden className="-ml-1.5 text-destructive">*</span>
+    <span aria-hidden className="-ml-1.5 text-destructive">
+      *
+    </span>
   );
 }
 

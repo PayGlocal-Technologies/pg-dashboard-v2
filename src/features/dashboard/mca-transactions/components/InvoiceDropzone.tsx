@@ -39,7 +39,6 @@ interface InvoiceDropzoneProps {
   onReset: () => void;
   invalid?: boolean;
   errorId?: string;
-  onCreateInvoice?: () => void;
 }
 
 function ValidationGroup({ label, rows }: { label: string; rows: InvoiceComparisonRow[] }) {
@@ -189,10 +188,7 @@ function CbaNamePanel({
 }
 
 export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
-  (
-    { id, phase, file, matching, error, onSelectFile, onReset, invalid, errorId, onCreateInvoice },
-    ref
-  ) => {
+  ({ id, phase, file, matching, error, onSelectFile, onReset, invalid, errorId }, ref) => {
     const [isDragOver, setIsDragOver] = useState(false);
     // A file rejected on type or size never reaches the upload chain, so this
     // state is local rather than part of the hook's phase.
@@ -248,11 +244,6 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
       const dropped = e.dataTransfer.files?.[0];
       if (dropped) handleFile(dropped);
     };
-
-    // Only worth offering while there is still no accepted invoice — and only
-    // when the caller gave it somewhere to go. It used to render regardless,
-    // wired to a handler that did nothing, so clicking it looked broken.
-    const showCreateInvoiceLink = phase !== "ready" && !!onCreateInvoice;
 
     const handleRemove = () => {
       setRejection(null);
@@ -426,18 +417,6 @@ export const InvoiceDropzone = forwardRef<HTMLDivElement, InvoiceDropzoneProps>(
               PDF only, up to {formatFileSize(INVOICE_MAX_SIZE_BYTES)}
             </p>
           </div>
-        )}
-
-        {showCreateInvoiceLink && (
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="self-start px-0 py-0 text-[12px]"
-            onClick={onCreateInvoice}
-          >
-            Don&apos;t have an invoice yet? Create new invoice
-          </Button>
         )}
       </div>
     );
