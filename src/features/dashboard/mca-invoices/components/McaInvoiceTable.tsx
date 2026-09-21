@@ -37,7 +37,7 @@ import {
   dateFilterToEpochSeconds,
   EMPTY_INVOICE_DATE_FILTER,
 } from "@/features/dashboard/mca-invoices/helpers";
-import { buildInvoiceColumns } from "@/features/dashboard/mca-invoices/columns";
+import { buildInvoiceColumns, InvoiceRowAction } from "@/features/dashboard/mca-invoices/columns";
 import {
   FIXED_COLUMN_KEYS,
   INVOICES_PAGE_LIMIT,
@@ -280,13 +280,38 @@ export function McaInvoiceTable({
     : {
         title:
           activeTab === "all"
-            ? "No invoices yet"
+            ? "Create invoices and collect payments from your clients"
             : `No ${INVOICE_VIEW_TABS.find((tab) => tab.value === activeTab)?.label.toLowerCase() ?? ""} invoices`,
         description:
           activeTab === "all"
-            ? "Invoices you create will appear here."
+            ? "Send a professional invoice and let your client pay you from anywhere in the world."
             : "Nothing in this view yet. Other views may still have invoices.",
       };
+
+  /**
+   * The first-time state is the one place on this page worth offering the
+   * action from: a merchant looking at an empty "All" list has nothing to
+   * scan and one obvious next step. A narrowed search that matched nothing
+   * gets no button — the fix there is to change the search, not to create an
+   * invoice — and neither does an empty tab, where other views may well hold
+   * invoices already.
+   */
+  const showEmptyAction = !hasNarrowingFilters && activeTab === "all";
+
+  /** The same control the toolbar carries, so the empty state runs the real
+   *  flow (including the MID choice a multi-MID merchant needs) rather than a
+   *  second, parallel path to it. Shared by the desktop and mobile empties so
+   *  the two never drift. */
+  const emptyAction = showEmptyAction ? (
+    <MidScopedAction
+      label="Create invoice"
+      icon="plus"
+      variant="primary"
+      needsMidChoice={needsMidChoice}
+      midOptions={midOptions}
+      onRun={openInvoiceEditor}
+    />
+  ) : undefined;
 
   // Blank URLs: every call overrides them per row via `dynamicUrl`, because
   // the MID differs by row on a multi-MID merchant's list.
@@ -391,15 +416,16 @@ export function McaInvoiceTable({
     else toast.success("Invoices updated");
   };
 
-  const baseColumns = buildInvoiceColumns(handlers, {
+  const baseColumns = buildInvoiceColumns({
     showMid,
     showFrequency: activeTab === "recurring",
   });
   const orderedColumns = reorderColumns(baseColumns, columnOrder);
   const columns = orderedColumns.filter((col) => !hiddenColumns.includes(col.key));
-  const reorderableColumns = baseColumns
-    .filter((c) => c.key !== "action")
-    .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
+  const reorderableColumns = baseColumns.map((c) => ({
+    key: c.key,
+    label: typeof c.header === "string" ? c.header : c.key,
+  }));
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
   const onSearch = (value: string) => {
@@ -614,6 +640,7 @@ export function McaInvoiceTable({
             variant="no-invoices"
             title={emptyCopy.title}
             description={emptyCopy.description}
+            action={emptyAction}
             className="py-16"
           />
         }
@@ -624,6 +651,10 @@ export function McaInvoiceTable({
         // own buttons and menus are skipped by it, so each still does only its
         // own job.
         onRowClick={handlers.onOpenRow}
+        // The per-row menu is no longer a column — `buildInvoiceColumns` stopped
+        // emitting one — so it rides the `rowAction` slot instead, which keeps it
+        // pinned to the right edge while the data columns scroll under it.
+        rowAction={(row) => <InvoiceRowAction row={row} handlers={handlers} />}
         pagination={{
           mode: "page",
           page,
@@ -652,6 +683,7 @@ export function McaInvoiceTable({
               size="sm"
               title={emptyCopy.title}
               description={emptyCopy.description}
+              action={emptyAction}
             />
           }
           pagination={{

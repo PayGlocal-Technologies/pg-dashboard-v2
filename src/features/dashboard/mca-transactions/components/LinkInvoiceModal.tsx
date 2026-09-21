@@ -2,7 +2,18 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { DataTable, Dialog, DialogContent, DialogTitle, type Column } from "@/components/ui";
+import {
+  Badge,
+  Callout,
+  CalloutIcon,
+  CalloutText,
+  CalloutTitle,
+  DataTable,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  type Column,
+} from "@/components/ui";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
@@ -142,6 +153,17 @@ function LinkInvoiceBody({
     );
   };
 
+  /**
+   * The one signal cheap enough to surface without a recommendation endpoint:
+   * an invoice raised for exactly this amount, in this currency, is very
+   * likely the one this transaction is meant to settle. Flagged rather than
+   * auto-selected — it is a hint, not a decision made for the merchant.
+   */
+  const isLikelyMatch = (invoice: LinkableInvoice) =>
+    invoice.currency === transaction.currency &&
+    parseFloat(invoice.totalAmount ?? "0") === parseFloat(transaction.amount ?? "0");
+  const hasMatch = invoices.some(isLikelyMatch);
+
   /** Why "Link invoice" cannot run yet — shown as its tooltip, and what
    *  disables it. Production tooltips the consent case; the selection case is
    *  the same question asked one step earlier. */
@@ -171,9 +193,16 @@ function LinkInvoiceBody({
     {
       key: "invoiceNumber",
       header: "Invoice number",
-      minWidth: 160,
+      minWidth: 190,
       render: (row) => (
-        <span className="text-[13px] font-medium text-foreground">{row.invoiceNumber}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-[13px] font-medium text-foreground">{row.invoiceNumber}</span>
+          {isLikelyMatch(row) && (
+            <Badge variant="success" size="sm" className="shrink-0">
+              Matches transaction
+            </Badge>
+          )}
+        </span>
       ),
     },
     {
@@ -238,6 +267,19 @@ function LinkInvoiceBody({
             value={transaction.formattedTransactionCreationDateTime}
           />
         </div>
+
+        {hasMatch && (
+          <Callout variant="discovery" className="mb-4">
+            <CalloutIcon variant="discovery" />
+            <div>
+              <CalloutTitle>Smart insights</CalloutTitle>
+              <CalloutText>
+                We found an invoice for this transaction&apos;s exact amount and currency — look for
+                the &ldquo;Matches transaction&rdquo; tag below.
+              </CalloutText>
+            </div>
+          </Callout>
+        )}
 
         <DataTable
           columns={columns}

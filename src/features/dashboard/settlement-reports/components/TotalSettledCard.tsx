@@ -155,8 +155,8 @@ export function TotalSettledCard({
         {!hasData ? (
           <PlaceholderState
             variant="no-settlements"
-            title="No settlements yet"
-            description="Nothing has settled in this period yet."
+            title="No settlements in this period"
+            description="As payouts are made, this charts how much settled to your account over time."
             className="h-full"
           />
         ) : (

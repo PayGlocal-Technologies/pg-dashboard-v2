@@ -60,6 +60,24 @@ export function PaTransactionTable() {
   const rows = data?.data?.data ?? [];
   const totalCount = data?.data?.totalCount ?? 0;
 
+  // Which empty state applies: nothing matched what was asked for, or nothing
+  // has come in yet. Both controls default to "All", so neither counts as a
+  // filter until the merchant actually changes one.
+  const hasNarrowingFilters = !!search.trim() || status !== "All" || method !== "All";
+
+  /** Payments arrive rather than being created here, so the first-time state
+   *  says what will land here instead of pushing an action this page lacks. */
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No matching transactions",
+        description: "Try a different search, or clear a filter to widen the results.",
+      }
+    : {
+        title: "Your payments will appear here",
+        description:
+          "As customers pay you, each transaction lands here with its status, method and amount.",
+      };
+
   const onStatus = (v: string) => {
     setStatus(v);
     setPage(1);
@@ -158,16 +176,16 @@ export function PaTransactionTable() {
       emptyState={
         <PlaceholderState
           variant="no-transactions"
-          title="No transactions found"
-          description="Try adjusting your filters or search query"
+          title={emptyCopy.title}
+          description={emptyCopy.description}
           className="py-16"
         />
       }
       columns={columns}
       data={rows}
       isLoading={isPending}
-      emptyTitle="No transactions found"
-      emptyDescription="Try adjusting your filters or search query"
+      emptyTitle={emptyCopy.title}
+      emptyDescription={emptyCopy.description}
       rowKey={(row) =>
         row.gid ??
         `${row.merchantId ?? ""}-${row.formattedCreationDateTime ?? ""}-${row.totalAmount ?? ""}`

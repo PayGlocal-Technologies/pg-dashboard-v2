@@ -6,7 +6,6 @@ import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
-import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
@@ -37,13 +36,11 @@ import { reorderColumns } from "@/lib/utils/columns";
 // Upload Invoice now opens the details page instead of this modal — import
 // kept commented out (not deleted) alongside the modal's usage below.
 // import { UploadInvoiceModal } from "@/features/dashboard/mca-transactions/components/UploadInvoiceModal";
-import { LinkInvoiceModal } from "@/features/dashboard/mca-transactions/components/LinkInvoiceModal";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import { downloadBlob } from "@/lib/utils/format";
-import useNewPermissions from "@/hooks/useNewPermissions";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   MCA_CURRENCY_FILTERS,
@@ -192,17 +189,6 @@ export function McaTransactionTable({
   // takes precedence over the rows.find lookup so the details page can show
   // a transaction the table itself never fetched.
   const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
-
-  // The transaction whose "Link Invoice" action is open, or null. Stored as the
-  // row itself rather than its gid: the modal heads its table with the
-  // transaction's own amount, remitter and date, and a lookup by id would lose
-  // all of that the moment the list refetches underneath it.
-  const [linkingInvoiceFor, setLinkingInvoiceFor] = useState<McaTransaction | null>(null);
-
-  const router = useRouter();
-  const { selectMid } = usePacbMidScope();
-  const checkPermissions = useNewPermissions();
-  const canManageInvoices = checkPermissions(["getAllMerchantInvoice"]);
   const { downloadFirc } = useFircDownload();
 
   const body = buildTxnRequestBody(
@@ -244,6 +230,40 @@ export function McaTransactionTable({
   // shows — no client-side narrowing, and pagination's totalCount always
   // describes the same set the rows came from.
   const tableRows = rows;
+
+  /**
+   * Whether the merchant has narrowed the list themselves, which decides
+   * which empty state they see: "nothing matched what you asked for" or
+   * "nothing has happened yet".
+   *
+   * `statusFilters` is deliberately excluded. The tab bar above writes it
+   * (see INVOICE_PENDING_STATUSES / SETTLED_STATUSES), and the page opens on
+   * the Invoice Pending tab, so treating it as a filter would tell a
+   * brand-new merchant their search came up empty before they had searched
+   * anything.
+   */
+  const hasNarrowingFilters =
+    !!search.trim() ||
+    currencyFilters.length > 0 ||
+    !!dateRange.from ||
+    !!dateRange.to ||
+    relativeWindow !== null;
+
+  /**
+   * Transactions aren't something a merchant creates here — they arrive as
+   * customers pay — so the first-time state explains what will land here
+   * rather than pushing an action this page doesn't own.
+   */
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No matching transactions",
+        description: "Try a different search, or clear a filter to widen the results.",
+      }
+    : {
+        title: "Your payments will appear here",
+        description:
+          "As customers pay you, each transaction lands here with its status, currency and settlement details.",
+      };
 
   // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
   const detailsRow = detailsOverrideRow ?? rows.find((r) => r.gid === detailsRowId) ?? null;
@@ -421,21 +441,6 @@ export function McaTransactionTable({
   const baseColumns = buildMcaColumns(isPartnerUser, {
     onOpenDetails: openDetails,
     onDownloadFirc: (row) => downloadFirc(row.merchantId, row.gid),
-    // The row already answers "which MID?", so this never asks — it scopes the
-    // editor to the transaction's own merchant before opening it. Without that,
-    // a merchant with several PACB MIDs and none selected would raise the
-    // invoice under their first MID while linking it to a transaction on
-    // another. See usePacbMidScope for the entry points that do have to ask.
-    onCreateInvoice: (row) => {
-      if (row.merchantId) selectMid(row.merchantId);
-      router.push(`/create-invoice?gid=${row.gid}`);
-    },
-    // Opens the invoice picker over the table, the way pg-dashboard's drawer
-    // does. It used to navigate to `/mca-invoices?linkTo=<gid>`, a parameter
-    // the invoice list never read — so the action dropped the merchant on a
-    // plain list with no way back to what they were linking.
-    onLinkInvoice: (row) => setLinkingInvoiceFor(row),
-    canManageInvoices,
   });
   const orderedColumns = reorderColumns(baseColumns, columnOrder);
   // Actions is never listed as hideable (it holds the row's controls, not
@@ -662,8 +667,8 @@ export function McaTransactionTable({
   const emptyPanel = (
     <PlaceholderState
       variant="no-transactions"
-      title="No transactions found"
-      description="Try adjusting your filters or search query"
+      title={emptyCopy.title}
+      description={emptyCopy.description}
       className="py-16"
     />
   );
@@ -703,8 +708,8 @@ export function McaTransactionTable({
         data={tableRows}
         isLoading={isPending}
         rowKey={(row) => row.gid}
-        emptyTitle="No transactions found"
-        emptyDescription="Try adjusting your filters or search query"
+        emptyTitle={emptyCopy.title}
+        emptyDescription={emptyCopy.description}
         emptyState={emptyPanel}
         errorState={errorPanel}
         // The whole row opens the details drawer, through DataTable's
@@ -740,8 +745,8 @@ export function McaTransactionTable({
             <PlaceholderState
               variant="no-transactions"
               size="sm"
-              title="No transactions found"
-              description="Try adjusting your filters or search query"
+              title={emptyCopy.title}
+              description={emptyCopy.description}
             />
           }
           errorState={errorPanel}
@@ -759,23 +764,6 @@ export function McaTransactionTable({
         onUploaded={handleInvoiceSubmitted}
       />
       */}
-
-      {/* Rendered alongside the table (not in place of it) so closing it
-          leaves the table exactly as it was. Shares the same handlers as the
-          full page, so the invoice upload flow and Linked Transactions
-          navigation behave identically in both. */}
-      {/* Linking changes the transaction's own invoice state, so the table is
-          refetched on success exactly as an upload is. */}
-      <LinkInvoiceModal
-        transaction={linkingInvoiceFor}
-        onOpenChange={(open) => {
-          if (!open) setLinkingInvoiceFor(null);
-        }}
-        onLinked={() => {
-          if (linkingInvoiceFor) handleInvoiceSubmitted(linkingInvoiceFor);
-          setLinkingInvoiceFor(null);
-        }}
-      />
 
       <TransactionDetailsDrawer
         row={detailsRow}

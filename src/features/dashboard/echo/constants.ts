@@ -144,6 +144,99 @@ export const ECHO_MENU_ICONS: Record<string, IconName> = {
 };
 
 /**
+ * Display-only rewording of the welcome menu's row titles, keyed on the same
+ * server ids as `ECHO_MENU_ICONS`.
+ *
+ * The server's own titles for these rows are short category labels
+ * ("Transactions", "Settlements"), which read as a settings menu rather than
+ * something you'd ask an assistant. `EchoListOptions` shows this phrasing
+ * instead wherever a row's id is mapped, but the tap itself is unaffected:
+ * `onPick` still fires with the row's real `id`/`title` from the server, so
+ * nothing about what goes on the wire changes — an id missing from this map
+ * (any row the server can add without a client release, like a merchant's own
+ * account or currency list) just falls back to the server's own title.
+ */
+export const ECHO_MENU_PROMPTS: Record<string, string> = {
+  BTN_TRANSACTIONS: "Show my recent transactions",
+  BTN_SETTLEMENTS: "Check my settlement status",
+  BTN_RAISE_QUERY: "I have a query about a payment",
+  BTN_ACCOUNTS: "Show my account details",
+  BTN_DISPUTES: "Help me with a dispute",
+  BTN_PAYMENT_LINKS: "Show my payment links",
+  BTN_INVOICES: "Show my invoices",
+  BTN_RECEIPTS: "Show my receipts",
+  BTN_MAIN_MENU: "Take me to the main menu",
+  BTN_END_CHAT: "End this chat",
+};
+
+/**
+ * The main menu's own content categories — the ids `EchoListOptions` renders
+ * as the 3-per-row icon grid, rather than the vertical prompt-card list every
+ * other section (an account list, a currency picker, the ended-chat footer)
+ * still uses.
+ *
+ * Deliberately excludes `BTN_MAIN_MENU`/`BTN_END_CHAT`: those are navigation,
+ * not something to ask about, and never actually arrive inside this list
+ * (they are reply *buttons* on a separate chunk type — see `EchoChunk`'s
+ * `isButtonChunk` branch) — kept out here so a future server response that
+ * somehow mixed one in would not misfire the grid layout for two rows.
+ *
+ * A section only gets the grid when every one of its rows is in this set —
+ * matching the id-based, "purely cosmetic" convention `ECHO_MENU_ICONS`
+ * already uses, so a section the server extends with an unknown id falls
+ * back to the plain list rather than a lopsided grid.
+ */
+export const ECHO_MAIN_MENU_CONTENT_IDS: readonly string[] = [
+  "BTN_TRANSACTIONS",
+  "BTN_SETTLEMENTS",
+  "BTN_RAISE_QUERY",
+  "BTN_ACCOUNTS",
+  "BTN_DISPUTES",
+  "BTN_PAYMENT_LINKS",
+  "BTN_INVOICES",
+  "BTN_RECEIPTS",
+];
+
+/**
+ * One-line "what this means" copy for the main menu grid's tiles, keyed on
+ * the same ids as `ECHO_MENU_ICONS`. Same cosmetic-only contract as
+ * `ECHO_MENU_PROMPTS`: shown under the tile's title, never sent anywhere.
+ */
+export const ECHO_MENU_DESCRIPTIONS: Record<string, string> = {
+  BTN_TRANSACTIONS: "View your recent payment transactions",
+  BTN_SETTLEMENTS: "Check settlement status and payouts",
+  BTN_RAISE_QUERY: "Report an issue or ask for help",
+  BTN_ACCOUNTS: "Manage your linked bank accounts",
+  BTN_DISPUTES: "Review and respond to disputes",
+  BTN_PAYMENT_LINKS: "Create and share payment links",
+  BTN_INVOICES: "View and download your invoices",
+  BTN_RECEIPTS: "View and download your receipts",
+};
+
+/**
+ * The id `EchoChunk` filters off the reply-button trio ("Main Menu", "Raise
+ * a Query", "End Chat") when — and only when — the turn carrying those
+ * buttons is itself the "describe the issue" prompt that follows tapping
+ * Raise a Query. Offering it again on the very screen already raising one is
+ * circular, but every OTHER turn that trio appears on (the common
+ * "anything else?" follow-up after a real answer) still needs it, so this
+ * is scoped to one specific body rather than dropped from the id globally.
+ */
+export const ECHO_RAISE_QUERY_BUTTON_ID = "BTN_RAISE_QUERY";
+
+/**
+ * Heuristic match for that one body. Same caveat as `isEchoEndChat`: the
+ * protocol carries no flag for "this turn is the raise-a-query prompt", so
+ * this matches on the server's actual copy and stays conservative — a body
+ * that does not say this exact thing just keeps all three buttons.
+ */
+const RAISE_QUERY_PROMPT_BODY = /describe the issue/i;
+
+export function isRaiseQueryPromptBody(body: string): boolean {
+  return RAISE_QUERY_PROMPT_BODY.test(body);
+}
+
+/**
  * The stepped loader's lines, advanced on timers while a turn is in flight.
  *
  * Cosmetic: the protocol is one request/one response, so the client never

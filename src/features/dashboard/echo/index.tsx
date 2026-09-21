@@ -1,7 +1,9 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
 import { EchoTranscript } from "@/features/dashboard/echo/components/EchoTranscript";
 import { EchoComposer } from "@/features/dashboard/echo/components/EchoComposer";
 import { EchoHero } from "@/features/dashboard/echo/components/EchoHero";
@@ -18,39 +20,61 @@ import { useApp } from "@/stores/useApp";
  * conversation the server is still holding open — and arriving here from the
  * panel continues that same conversation rather than opening a second one.
  */
+
+/**
+ * Shared square for the three corner controls, matching the boxed-icon
+ * language already used for the header's theme toggle and "Switch to old
+ * view" — same light-gray/bordered square in light mode, same muted/border
+ * tokens in dark, so this corner reads as one more instance of that pattern
+ * rather than a one-off.
+ */
+const CORNER_BUTTON_CLASS =
+  "flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-gray-50 p-0 text-muted-foreground transition-colors hover:bg-gray-100 hover:text-foreground dark:border-border dark:bg-muted dark:hover:bg-accent";
+
 export function EchoFeature() {
   const { entries, status, busy, ended, start, sendText, sendButton, sendListRow, retry, restart } =
     useEchoSession();
   const profile = useApp((s) => s.profile);
+  const router = useRouter();
   useEchoAutoStart(true, start);
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <header className="flex shrink-0 items-center gap-2.5 border-b border-border pb-3">
-        <Icon name="echo-mark" className="shrink-0 text-[26px]" />
-        <div className="min-w-0 flex-1">
-          <h1 className="text-[15px] font-semibold leading-tight text-foreground">Echo</h1>
-          <p className="hidden text-[12.5px] text-muted-foreground sm:block">
-            Transactions, settlements, disputes, accounts and payment links, without the menus.
-          </p>
-        </div>
-
-        {/* BTN_RESTART_CHAT, an id the server never offers as a rendered
-            button: it discards the server session rather than walking back to
-            the main menu, which would keep it. See ECHO_RESTART_REQUEST. */}
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      {/* Corner toolbar, Claude/ChatGPT-style: a slim row of icon-only
+          controls floating over the top-right of the conversation rather
+          than a titled header bar taking a row of its own. It sits above the
+          transcript (z-10) and scrolls with nothing — the hero and messages
+          pass underneath it, same as those two apps' own corner controls. */}
+      <div className="absolute right-0 top-0 z-10 flex items-center gap-2">
+        {/* BTN_RESTART_CHAT — discards the server session and reopens the
+            welcome screen. See ECHO_RESTART_REQUEST. */}
         <Button
           type="button"
-          variant="outline"
-          size="sm"
+          variant="ghost"
           disabled={busy}
           onClick={restart}
-          leftIcon={<Icon name="rotate-ccw" size={13} />}
-          className="shrink-0 text-[13px] font-medium"
+          aria-label="New conversation"
+          title="New conversation"
+          className={CORNER_BUTTON_CLASS}
         >
-          <span className="hidden sm:inline">New conversation</span>
-          <span className="sm:hidden">New</span>
+          <Icon name="plus" size={16} />
         </Button>
-      </header>
+        {/* Re-fetches this route's server data. The conversation itself lives
+            in the useEcho store, not in anything this call would touch, so
+            this is a plain "refresh the screen" affordance rather than
+            anything that could interrupt or reset a chat in progress. */}
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => router.refresh()}
+          aria-label="Refresh"
+          title="Refresh"
+          className={CORNER_BUTTON_CLASS}
+        >
+          <Icon name="rotate-ccw" size={15} />
+        </Button>
+        <HeaderHelpMenu />
+      </div>
 
       <EchoTranscript
         entries={entries}
@@ -67,6 +91,10 @@ export function EchoFeature() {
         hero={(options) => (
           <EchoHero firstName={profile?.firstName || profile?.username || ""}>{options}</EchoHero>
         )}
+        // Clears the corner toolbar above: without it, the hero mark starts
+        // at the transcript's own py-4 (16px), less than the toolbar's own
+        // height, and scrolls in from directly underneath it.
+        className="pt-12"
       />
       <EchoComposer
         onSend={sendText}

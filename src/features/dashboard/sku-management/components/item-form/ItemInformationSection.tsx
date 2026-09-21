@@ -45,7 +45,8 @@ export function ItemInformationSection({ form }: { form: SkuItemFormApi }) {
             <FieldLabel htmlFor="sku-name">
               {/* Names the field for both kinds of catalogue item; the table
                   still shows it under the Product column. */}
-              Product/Service Name<RequiredMark />
+              Product/Service Name
+              <RequiredMark />
             </FieldLabel>
             <Input
               id="sku-name"
@@ -73,7 +74,8 @@ export function ItemInformationSection({ form }: { form: SkuItemFormApi }) {
           {(field) => (
             <Field>
               <FieldLabel htmlFor="sku-type">
-                Type<RequiredMark />
+                Type
+                <RequiredMark />
               </FieldLabel>
               <Select
                 value={field.state.value}
@@ -122,7 +124,8 @@ export function ItemInformationSection({ form }: { form: SkuItemFormApi }) {
                     <FieldLabel htmlFor="sku-hsn-sac">
                       {/* Named for the scheme that actually applies once a
                           type is chosen; the table column stays HSN/SAC. */}
-                      {scheme.label}<RequiredMark />
+                      {scheme.label}
+                      <RequiredMark />
                     </FieldLabel>
                     <Input
                       id="sku-hsn-sac"

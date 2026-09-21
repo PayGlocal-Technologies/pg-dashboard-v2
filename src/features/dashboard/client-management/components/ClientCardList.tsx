@@ -1,6 +1,6 @@
 "use client";
 
-import { DataCardList, Shimmer } from "@/components/ui";
+import { Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { formatCurrency, formatPhoneNumber, formatTransactionDateOnly } from "@/lib/utils/format";
@@ -31,7 +31,13 @@ export function ClientCardSkeleton() {
 // client's details, exactly as the whole row does above lg. Any action added
 // inside later must stop propagation in its own onClick to stay independent
 // of that, the same rule the Transactions card follows.
-export function ClientCard({ row, onOpenDetails }: { row: Client; onOpenDetails: (row: Client) => void }) {
+export function ClientCard({
+  row,
+  onOpenDetails,
+}: {
+  row: Client;
+  onOpenDetails: (row: Client) => void;
+}) {
   // The card's form of the Total received column, from the same derivation:
   // the row's own server-side figures (see clientTotalReceived), the same
   // source the table's Total received column reads.

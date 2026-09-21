@@ -3,41 +3,36 @@ import type { DisputeRawStatus } from "@/features/dashboard/dispute-management/t
 export const DISPUTE_STATUS_SEGMENTS = [
   { value: "action-required", label: "Action required" },
   { value: "under-review", label: "Under review" },
-  { value: "more-evidence-needed", label: "More evidence needed" },
-  { value: "reopened", label: "Reopened" },
   { value: "all", label: "All disputes" },
-  { value: "cleared", label: "Cleared" },
-  { value: "charged-back", label: "Charged back" },
   { value: "accepted", label: "Accepted" },
-  { value: "expired", label: "Expired" },
+  { value: "charged-back", label: "Charged back" },
 ] as const;
 
 export type DisputeStatusSegment = (typeof DISPUTE_STATUS_SEGMENTS)[number]["value"];
 
 /** Raw statuses behind each segment (mirrors STATUS_BUCKET_RAW_VALUES's
- * pattern in paColumns.tsx). "all" has no entry, it means no filter. */
+ * pattern in paColumns.tsx). "all" has no entry, it means no filter.
+ *
+ * MORE_EVIDENCE_NEEDED, REOPENED, CLEARED and EXPIRED no longer have their
+ * own tab (trimmed down from the original 9-segment set), but the raw
+ * statuses themselves still exist in the data — those rows just surface
+ * under "All disputes" rather than a dedicated segment. MORE_EVIDENCE_NEEDED
+ * and REOPENED fold into "action-required" (both still mean the merchant
+ * must act) so they aren't orphaned from every segment filter. */
 export const DISPUTE_SEGMENT_RAW_STATUSES: Record<
   Exclude<DisputeStatusSegment, "all">,
   DisputeRawStatus[]
 > = {
-  "action-required": ["NEEDS_RESPONSE"],
+  "action-required": ["NEEDS_RESPONSE", "MORE_EVIDENCE_NEEDED", "REOPENED"],
   "under-review": ["UNDER_REVIEW"],
-  "more-evidence-needed": ["MORE_EVIDENCE_NEEDED"],
-  reopened: ["REOPENED"],
-  cleared: ["CLEARED"],
   "charged-back": ["CHARGED_BACK"],
   accepted: ["ACCEPTED"],
-  expired: ["EXPIRED"],
 };
 
 /** Segments whose rows still need a merchant response, the only ones the
  * table's "Respond by" column applies to. Under review disputes already had
  * evidence submitted, so they have no response deadline left to show. */
-export const RESPOND_BY_SEGMENTS: DisputeStatusSegment[] = [
-  "action-required",
-  "more-evidence-needed",
-  "reopened",
-];
+export const RESPOND_BY_SEGMENTS: DisputeStatusSegment[] = ["action-required"];
 
 export const DISPUTE_REASONS = [
   "Fraudulent",

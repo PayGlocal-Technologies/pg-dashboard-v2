@@ -29,93 +29,14 @@ export const revenueTimeframes: { value: RevenueTimeframe; label: string }[] = [
   { value: "3M", label: "3M" },
 ];
 
-/**
- * One timeframe's revenue series and its headline figures.
- *
- * Shaped to mirror the revenue-trend endpoint one field at a time, so wiring it
- * up is a source swap rather than a component change: `points` is that
- * response's `points`, and the three figures are its `total`, `previousTotal`
- * and `trendPct`.
- */
-export interface RevenueSeries {
-  currency: string;
-  total: number;
-  previousTotal: number;
-  trendPct: number;
-  /** What `trendPct` compares against, as the caption says it. Per timeframe,
-   *  because "vs last month" is wrong on a one-week view. */
-  comparisonLabel: string;
-  points: RevenuePoint[];
-}
-
-/**
- * Placeholder revenue, one genuine dataset per timeframe.
- *
- * An earlier revision held a single seven-month series and multiplied every
- * point by a constant per timeframe (0.23 / 1 / 3.1). That was wrong twice over:
- * a uniform multiply is a pure vertical scale, so all three tabs drew the
- * identical curve, and the x-axis kept its month labels, so picking "1W" showed
- * a week's total spread across Feb to Aug. Each timeframe now carries its own
- * buckets and its own labels, which is also what the real endpoint will return.
- *
- * Internally consistent on purpose: each `total` is the sum of its own
- * `current` points and each `previousTotal` the sum of its `previous` points, so
- * the headline can never disagree with the chart under it. 1M's four weekly
- * buckets also sum to 3M's first monthly bucket, so switching tabs tells one
- * story rather than three.
- */
-export const revenueByTimeframe: Record<RevenueTimeframe, RevenueSeries> = {
-  // Seven days. Weekday labels rather than dates: the card is a glance, and a
-  // date axis at this width would either truncate or crowd.
-  "1W": {
-    currency: "INR",
-    total: 148_000,
-    previousTotal: 130_500,
-    trendPct: 13.4,
-    comparisonLabel: "vs last week",
-    points: [
-      { x: "Mon", current: 18_000, previous: 16_000 },
-      { x: "Tue", current: 24_500, previous: 21_000 },
-      { x: "Wed", current: 21_000, previous: 19_500 },
-      { x: "Thu", current: 32_000, previous: 27_000 },
-      { x: "Fri", current: 28_500, previous: 25_000 },
-      { x: "Sat", current: 15_000, previous: 13_500 },
-      { x: "Sun", current: 9_000, previous: 8_500 },
-    ],
-  },
-  // Four weekly buckets, labelled by the week's starting date. Fixed literals,
-  // not derived from today, so rendering stays pure (see CLAUDE.md).
-  "1M": {
-    currency: "INR",
-    total: 654_000,
-    previousTotal: 588_000,
-    trendPct: 11.2,
-    comparisonLabel: "vs last month",
-    points: [
-      { x: "28 Jul", current: 148_000, previous: 139_000 },
-      { x: "4 Aug", current: 176_000, previous: 151_000 },
-      { x: "11 Aug", current: 132_000, previous: 128_000 },
-      { x: "18 Aug", current: 198_000, previous: 170_000 },
-    ],
-  },
-  // Three monthly buckets. Jun is 1M's four weeks summed, so the two tabs agree.
-  "3M": {
-    currency: "INR",
-    total: 1_954_000,
-    previousTotal: 1_784_000,
-    trendPct: 9.5,
-    comparisonLabel: "vs previous 3 months",
-    points: [
-      { x: "Jun", current: 654_000, previous: 601_000 },
-      { x: "Jul", current: 588_000, previous: 545_000 },
-      { x: "Aug", current: 712_000, previous: 638_000 },
-    ],
-  },
-};
-
-// upcomingSettlement mock removed — the Revenue card's Upcoming settlement now
-// uses the live settlement/upcoming endpoint (see McaRevenueCard +
-// useSettlementUpcoming).
+// Already migrated off this file, do not re-add:
+//   - revenueByTimeframe / RevenueSeries -> GET .../mca/revenue-trend
+//     (useRevenueTrend; the live shape is RevenueTrendData in types.ts)
+//   - upcomingSettlement                 -> the settlement/upcoming endpoint
+//     (useSettlementUpcoming)
+// RevenuePoint / RevenueTimeframe / revenueTimeframes below are NOT mock data:
+// they are the chart's point shape and its 1W/1M/3M tab labels, both still read
+// by the live McaRevenueCard.
 
 export interface QuickAccessItem {
   id: string;
@@ -127,7 +48,7 @@ export interface QuickAccessItem {
 export const mcaQuickAccessItems: QuickAccessItem[] = [
   { id: "invoice-links", label: "Create invoice", icon: "file-text" },
   { id: "international-accounts", label: "International accounts", icon: "globe-2" },
-  { id: "platform-withdrawal", label: "Platform withdrawal", icon: "download" },
+  { id: "platform-withdrawal", label: "Platforms", icon: "download" },
   { id: "client-management", label: "Client management", icon: "users" },
   { id: "forex-calculator", label: "Forex calculator", icon: "circle-dollar-sign" },
   // Hidden for now — the dashboard-customise entry point (kept in code):

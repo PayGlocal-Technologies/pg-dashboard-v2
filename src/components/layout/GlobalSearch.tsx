@@ -207,7 +207,7 @@ export function GlobalSearch() {
   return (
     <div
       ref={rootRef}
-      className="relative ml-auto flex h-9 w-9 items-center justify-end md:w-full md:max-w-[380px]"
+      className="relative ml-auto flex h-9 w-9 min-w-0 items-center justify-end md:w-full md:max-w-[380px]"
     >
       {/* Below md the header has no room for a 380px field next to the product
           tabs, so it collapses to this button and expands over the tab row. */}

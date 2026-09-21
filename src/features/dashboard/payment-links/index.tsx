@@ -84,6 +84,27 @@ export function PaymentLinksFeature() {
     });
   }, [rows, search, status, currency, dateFilter, amountRange]);
 
+  // Which empty state applies. Status defaults to "All", so none of these
+  // count as a filter until the merchant changes one — a first-time merchant
+  // should be told what payment links are for, not to adjust filters.
+  const hasNarrowingFilters =
+    !!search.trim() ||
+    status !== "All" ||
+    !!dateFilter ||
+    !!amountRange ||
+    (currency?.length ?? 0) > 0;
+
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No matching payment links",
+        description: "Try a different search, or clear a filter to widen the results.",
+      }
+    : {
+        title: "Share a payment link and start collecting",
+        description:
+          "Create a link, send it to your customer, and collect payment without building a checkout.",
+      };
+
   // Metrics-section time period, deliberately independent of the table's own
   // search/status/amount/currency/dateFilter filters above (see mock-data.ts).
   const [metricsPeriod, setMetricsPeriod] = useState<MetricsPeriod>("today");
@@ -192,15 +213,27 @@ export function PaymentLinksFeature() {
         emptyState={
           <PlaceholderState
             variant="no-payment-links"
-            title="No payment links found"
-            description="Try adjusting your filters or search query"
+            title={emptyCopy.title}
+            description={emptyCopy.description}
+            action={
+              hasNarrowingFilters ? undefined : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                  onClick={() => setCreateOpen(true)}
+                >
+                  Create payment link
+                </Button>
+              )
+            }
             className="py-16"
           />
         }
         columns={paymentLinkColumns}
         data={filteredRows}
-        emptyTitle="No payment links found"
-        emptyDescription="Try adjusting your filters or search query"
+        emptyTitle={emptyCopy.title}
+        emptyDescription={emptyCopy.description}
         rowKey={(row) => row.id}
         // The whole row opens the link's details, through DataTable's
         // row-level handler rather than a wrapper around every cell.

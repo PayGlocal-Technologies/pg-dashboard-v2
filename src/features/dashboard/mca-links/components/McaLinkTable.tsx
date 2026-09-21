@@ -86,6 +86,30 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   const isPending = false;
 
   const query = search.trim().toLowerCase();
+
+  // Which empty state applies: nothing matched the merchant's own narrowing,
+  // or they have not created a link yet. Telling the second group to adjust
+  // filters points them at controls they never touched.
+  const hasNarrowingFilters =
+    !!search.trim() ||
+    statusFilters.length > 0 ||
+    currencyFilters.length > 0 ||
+    !!dateRange.from ||
+    !!dateRange.to ||
+    !!amountRange.min ||
+    !!amountRange.max;
+
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No matching links",
+        description: "Try a different search, or clear a filter to widen the results.",
+      }
+    : {
+        title: "Create a link and start collecting",
+        description:
+          "Share a payment link with your customer and collect international payments without a checkout.",
+      };
+
   const minAmount = amountRange.min ? parseFloat(amountRange.min) : undefined;
   const maxAmount = amountRange.max ? parseFloat(amountRange.max) : undefined;
   const fromMs = dateRange.from ? toStartOfDayMs(dateRange.from) : undefined;
@@ -209,72 +233,72 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
       <DataTableCard
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
-        <RotatingSearchInput
-          value={search}
-          onSearch={onSearch}
-          words={["invoice number", "description", "link"]}
-          className="w-40 sm:w-56"
-        />
+            <RotatingSearchInput
+              value={search}
+              onSearch={onSearch}
+              words={["invoice number", "description", "link"]}
+              className="w-40 sm:w-56"
+            />
 
-        {/* Filter group: Date, Amount, Status, Currency read as one
+            {/* Filter group: Date, Amount, Status, Currency read as one
             cohesive filtering control, so the gap within it is tight. */}
-        <FilterChipGroup className="flex flex-wrap items-center gap-1.5">
-          <DateFilterChip
-            value={dateRange}
-            onChange={(next) => {
-              setDateRange(next);
-              setPage(1);
-            }}
-          />
-          <AmountFilterChip
-            value={amountRange}
-            onChange={(next) => {
-              setAmountRange(next);
-              setPage(1);
-            }}
-            hint="Applies to the links currently loaded."
-          />
-          <StatusFilterChip
-            options={MCA_LINK_STATUS_FILTERS}
-            selected={statusFilters}
-            onChange={(next) => {
-              setStatusFilters(next);
-              setPage(1);
-            }}
-          />
-          <CurrencyFilterChip
-            options={CURRENCY_FILTER_OPTIONS}
-            value={currencyFilters}
-            onChange={(next) => {
-              setCurrencyFilters(next);
-              setPage(1);
-            }}
-          />
-        </FilterChipGroup>
+            <FilterChipGroup className="flex flex-wrap items-center gap-1.5">
+              <DateFilterChip
+                value={dateRange}
+                onChange={(next) => {
+                  setDateRange(next);
+                  setPage(1);
+                }}
+              />
+              <AmountFilterChip
+                value={amountRange}
+                onChange={(next) => {
+                  setAmountRange(next);
+                  setPage(1);
+                }}
+                hint="Applies to the links currently loaded."
+              />
+              <StatusFilterChip
+                options={MCA_LINK_STATUS_FILTERS}
+                selected={statusFilters}
+                onChange={(next) => {
+                  setStatusFilters(next);
+                  setPage(1);
+                }}
+              />
+              <CurrencyFilterChip
+                options={CURRENCY_FILTER_OPTIONS}
+                value={currencyFilters}
+                onChange={(next) => {
+                  setCurrencyFilters(next);
+                  setPage(1);
+                }}
+              />
+            </FilterChipGroup>
 
-        {/* Action group: Reorder Columns, then Report. ml-auto pushes this
+            {/* Action group: Reorder Columns, then Report. ml-auto pushes this
             group all the way to the right regardless of how much space the
             search/filter groups take up. */}
-        <div className="ml-auto flex items-center gap-2">
-          <ColumnManager
-            columns={reorderableColumns}
-            order={currentColumnOrder}
-            onOrderChange={setColumnOrder}
-            onReset={() => setColumnOrder(null)}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-            onClick={() => {
-              // TODO: wire up once an MCA links export endpoint exists —
-              // same gap as the Transactions table's own Report button.
-            }}
-            className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-          >
-            Report
-          </Button>
+            <div className="ml-auto flex items-center gap-2">
+              <ColumnManager
+                columns={reorderableColumns}
+                order={currentColumnOrder}
+                onOrderChange={setColumnOrder}
+                onReset={() => setColumnOrder(null)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+                onClick={() => {
+                  // TODO: wire up once an MCA links export endpoint exists —
+                  // same gap as the Transactions table's own Report button.
+                }}
+                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+              >
+                Report
+              </Button>
             </div>
           </div>
         }
@@ -289,13 +313,25 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
         emptyState={
           <PlaceholderState
             variant="no-payment-links"
-            title="No payment links found"
-            description="Try adjusting your filters or search query"
+            title={emptyCopy.title}
+            description={emptyCopy.description}
+            action={
+              hasNarrowingFilters ? undefined : (
+                <Button
+                  type="button"
+                  variant="primary"
+                  leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                  onClick={onCreateLink}
+                >
+                  Create MCA Link
+                </Button>
+              )
+            }
             className="py-16"
           />
         }
-        emptyTitle="No payment links found"
-        emptyDescription="Try adjusting your filters or search query"
+        emptyTitle={emptyCopy.title}
+        emptyDescription={emptyCopy.description}
         // The whole row opens the details view, through DataTable's row-level
         // handler rather than a wrapper inside every cell. Clicks on the
         // row's own buttons and menus are skipped by it, so each still does

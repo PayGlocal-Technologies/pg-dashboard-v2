@@ -5,6 +5,10 @@ import { AppImage } from "@/components/common/AppImage";
 import { EchoBody } from "@/features/dashboard/echo/components/EchoBody";
 import { EchoListOptions } from "@/features/dashboard/echo/components/EchoListOptions";
 import {
+  ECHO_RAISE_QUERY_BUTTON_ID,
+  isRaiseQueryPromptBody,
+} from "@/features/dashboard/echo/constants";
+import {
   buttonsOf,
   chunkBodyText,
   isButtonChunk,
@@ -56,7 +60,14 @@ export function EchoChunk({ chunk, interactive, onButton, onListRow }: Props) {
   }
 
   if (isButtonChunk(chunk)) {
-    const buttons = buttonsOf(chunk);
+    // This exact trio also follows Raise a Query's own "describe the issue"
+    // prompt — offering "Raise a Query" again on the turn already raising
+    // one is circular, so it drops out of just that one body. Every other
+    // turn this same button set appears on (the ordinary "anything else?"
+    // follow-up) keeps all three. See isRaiseQueryPromptBody.
+    const buttons = buttonsOf(chunk).filter(
+      ({ reply }) => !(isRaiseQueryPromptBody(body) && reply.id === ECHO_RAISE_QUERY_BUTTON_ID)
+    );
     return (
       <div className="space-y-2.5">
         {body ? <EchoBody text={body} /> : null}

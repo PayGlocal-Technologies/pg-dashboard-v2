@@ -145,6 +145,21 @@ export function TeamManagementFeature() {
     });
   }, [rows, search, statusFilter, roleFilter]);
 
+  // Status defaults to "All", so none of these count as narrowing until the
+  // merchant changes one. Without this split, an account that had never
+  // invited anyone was told to adjust filters it had never set.
+  const hasNarrowingFilters = !!search.trim() || statusFilter !== "All" || !!roleFilter?.length;
+  const emptyCopy = hasNarrowingFilters
+    ? {
+        title: "No matching team members",
+        description: "Try a different search, or clear a filter to widen the results.",
+      }
+    : {
+        title: "Invite your team to PayGlocal",
+        description:
+          "Add the people you work with and control what each of them can see and do in this account.",
+      };
+
   // ── Mutations ────────────────────────────────────────────────────────────────
   const { mutate: activateDeactivate } = usePut<unknown, { dynamicUrl: string }>("", {
     invalidateQueries: invalidateKey,
@@ -253,16 +268,30 @@ export function TeamManagementFeature() {
         emptyState={
           <PlaceholderState
             variant="no-data"
-            title="No team members found"
-            description="Try adjusting your filters or search query"
+            title={emptyCopy.title}
+            description={emptyCopy.description}
+            // Same guard the header's own button carries: a partner user, or
+            // an account with no MID resolved, cannot add members, so the
+            // empty state must not offer them an action that would fail.
+            action={
+              hasNarrowingFilters || !mid || isPartnerUser ? undefined : (
+                <Button
+                  variant="primary"
+                  leftIcon={<Icon name="user-plus" className="h-3.5 w-3.5" />}
+                  onClick={() => setAddOpen(true)}
+                >
+                  Add team member
+                </Button>
+              )
+            }
             className="py-16"
           />
         }
         columns={teamMemberColumns}
         data={filteredRows}
         isLoading={isPending}
-        emptyTitle="No team members found"
-        emptyDescription="Try adjusting your filters or search query"
+        emptyTitle={emptyCopy.title}
+        emptyDescription={emptyCopy.description}
         rowKey={(row) => row.id}
         pagination={{
           mode: "client",

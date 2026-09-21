@@ -103,8 +103,8 @@ export function DisputeOverviewCard({ disputes }: DisputeOverviewCardProps) {
 
       {isEmpty ? (
         <EmptyState
-          title="No disputes to display"
-          description="Disputed payments will appear here as they come in."
+          title="No disputes in this period"
+          description="If a customer disputes a payment, it will be counted here by status."
           className="flex-1 justify-center py-0"
         />
       ) : (

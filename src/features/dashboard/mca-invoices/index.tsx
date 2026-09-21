@@ -1,19 +1,25 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
+import { TimeRangeTabs } from "@/components/common/TimeRangeTabs";
 import { useScopeId } from "@/lib/hooks/useScopeId";
+import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { withBasePath } from "@/constants/basePath";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
+import { InvoiceActionCard } from "@/features/dashboard/mca-invoices/components/InvoiceActionCard";
 import { useZohoPullSync, zohoSyncLabel } from "@/features/dashboard/zoho-integration/hooks";
 import { useInvoiceTemplates } from "@/features/dashboard/create-invoice/hooks";
 import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
 import {
   ALL_TIME_RANGE_VALUE,
   INVOICE_DATA_KEYS,
+  SUMMARY_RANGE_OPTIONS,
   type SummaryRange,
 } from "@/features/dashboard/mca-invoices/constants";
 import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoices/helpers";
@@ -36,6 +42,7 @@ export function McaInvoicesFeature() {
           <>
             <ZohoSyncAction />
             <ManageTemplatesAction />
+            <CreateInvoiceAction />
           </>
         }
       />
@@ -130,6 +137,34 @@ function ManageTemplatesAction() {
   );
 }
 
+/**
+ * The page-level "Create invoice", same MID-scoping rule as the table's own
+ * toolbar button (see McaInvoiceTable's openInvoiceEditor): a multi-MID
+ * merchant with nothing selected has to choose which account the new invoice
+ * belongs to before the editor opens, since the editor puts one MID in every
+ * request path rather than falling back to the merchant's first one.
+ */
+function CreateInvoiceAction() {
+  const router = useRouter();
+  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+
+  const openInvoiceEditor = (mid: string) => {
+    if (mid) selectMid(mid);
+    router.push("/create-invoice");
+  };
+
+  return (
+    <MidScopedAction
+      label="Create invoice"
+      icon="plus"
+      variant="primary"
+      needsMidChoice={needsMidChoice}
+      midOptions={midOptions}
+      onRun={openInvoiceEditor}
+    />
+  );
+}
+
 function McaInvoicesContent() {
   // The summary endpoint takes a single id in its path: the product MID, the
   // selected MID, or the UCIC id for a multi-MID account with nothing selected
@@ -148,13 +183,42 @@ function McaInvoicesContent() {
   const [defaultEndMs] = useState(() => endOfDayMs(new Date()));
 
   const summary = (
-    <InvoiceSummaryCards
-      merchantId={summaryMid}
-      range={summaryRange}
-      onRangeChange={setSummaryRange}
-      windowSeconds={summaryWindowSeconds(summaryRange, defaultEndMs)}
-      onStatusFilter={setStatusFilters}
-    />
+    <div className="flex flex-col gap-3">
+      {/* "Summary" subheading + the period tabs sit above the card, not
+          inside it — the same placement Transactions uses for its own
+          "Summary" row above the analytics cards (see McaTransactionsFeature). */}
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Summary
+        </h2>
+        <TimeRangeTabs
+          options={SUMMARY_RANGE_OPTIONS}
+          value={summaryRange}
+          onValueChange={setSummaryRange}
+          label="Summary period"
+        />
+      </div>
+
+      {/* Even split: the action card now carries per-transaction rows with
+          two buttons each rather than a single CTA, so it reads better at
+          the same width as the donut card instead of the narrower 7fr/3fr
+          Transactions uses for its own analytics row (see
+          TransactionsAnalyticsCarousel). Stacked below `lg`, where there
+          isn't room for either to read at a glance side by side. The grid's
+          own default `items-stretch` matches the action card's height to
+          the donut card's — the slack that creates lands inside the action
+          card's own row list (see InvoiceActionCard's `mt-auto`/`flex-1`),
+          which reads as breathing room rather than the dead space an
+          earlier top-aligned version left stranded under the button. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <InvoiceSummaryCards
+          merchantId={summaryMid}
+          windowSeconds={summaryWindowSeconds(summaryRange, defaultEndMs)}
+          onStatusFilter={setStatusFilters}
+        />
+        <InvoiceActionCard />
+      </div>
+    </div>
   );
 
   return (

@@ -371,8 +371,18 @@ export function DisputeManagementFeature() {
           }
           columns={columns}
           data={sortedRows}
-          emptyTitle="No disputes yet"
-          emptyDescription="Disputed payments will appear here as they come in."
+          // Reuses `hasActive` — the same boolean the Clear button above is
+          // gated on — so a filtered-to-nothing result says so instead of
+          // claiming the merchant has never had a dispute. No CTA either
+          // way: disputes are raised by customers, not created here.
+          emptyTitle={
+            hasActive ? "No disputes match these filters" : "Keep track of disputes and chargebacks"
+          }
+          emptyDescription={
+            hasActive
+              ? "Try a wider date range, or clear a filter to see more."
+              : "If a customer disputes a payment, it appears here with the evidence to submit and the date it's due by."
+          }
           rowKey={(row) => row.disputeId}
           pagination={{
             mode: "client",
