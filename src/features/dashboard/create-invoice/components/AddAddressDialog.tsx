@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { SearchableSelect } from "@/components/common/SearchableSelect";
 import {
   Button,
   Dialog,
@@ -17,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
   Shimmer,
+  SingleSelect,
 } from "@/components/ui";
 import { useGet, usePut } from "@/lib/api/hooks";
 import { getClientByIdApi, updateClientApi } from "@/features/dashboard/create-invoice/services";
@@ -198,17 +198,17 @@ function AddressBody({
               here — it is hardwired to its internal COUNTRIES array, while these
               options come from the API and carry the country *names* the address
               is stored under. */}
-            <SearchableSelect
+            <SingleSelect
               id="client-address-country"
               value={address.country}
               // Clearing the state is what production's own country field
               // does (ADD_CLIENT_FIELDS_FORM_ADDRESS resets address.state on
               // change) — a state belongs to the country it was typed for.
-              onValueChange={(next) => patch({ country: next, state: "" })}
+              onChange={(next) => patch({ country: next, state: "" })}
               options={countryOptions}
               placeholder="Select country"
               searchPlaceholder="Search country…"
-              emptyMessage="No country matches that search."
+              emptyText="No country matches that search."
             />
           </Field>
 

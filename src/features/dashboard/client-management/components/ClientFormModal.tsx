@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState, type ReactNode } from "react";
-import { SearchableSelect } from "@/components/common/SearchableSelect";
 import { Icon } from "@/components/icon";
 
 import { useForm } from "@tanstack/react-form";
@@ -32,6 +31,7 @@ import {
   Shimmer,
   Textarea,
   useBreakpoint,
+  SingleSelect,
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { CLIENT_BUSINESS_TYPES } from "@/features/dashboard/client-management/constants";
@@ -59,7 +59,7 @@ import type { ClientFormValues } from "@/features/dashboard/client-management/ty
 /** Red asterisk before a required field's label — the same marker the Add item
  *  form uses, so required-ness reads identically across the product. */
 /**
- * flux's country list, shaped for SearchableSelect. Module scope because
+ * flux's country list, shaped for SingleSelect. Module scope because
  * COUNTRIES is a constant — there is nothing to recompute per render.
  */
 const countrySelectOptions = COUNTRIES.map((country) => ({
@@ -700,19 +700,19 @@ function ClientFormBody({
                   <FieldLabel htmlFor="client-country">
                     <RequiredMark /> Country
                   </FieldLabel>
-                  {/* SearchableSelect rather than flux's CountrySelect, for one
-                      reason: CountrySelect builds its own Radix Popover with no
-                      `modal` prop, and a non-modal popover portalled out of a
-                      modal Dialog cannot be scrolled — react-remove-scroll
-                      cancels the wheel. Options are built from flux's own
-                      exported COUNTRIES, so the values are the same ISO codes
-                      and the flag still shows; only the scroll behaviour
-                      changes. Revert this the day CountrySelect takes `modal`. */}
-                  <SearchableSelect
+                  {/* SingleSelect rather than flux's CountrySelect. The
+                      original reason — CountrySelect's popover could not be
+                      scrolled inside a modal Dialog — is fixed in flux 0.3.3,
+                      so CountrySelect is usable again; this stays on
+                      SingleSelect only because the options are built from
+                      COUNTRIES here and carry the same ISO codes, and swapping
+                      the control is a change to make deliberately rather than
+                      in passing. */}
+                  <SingleSelect
                     id="client-country"
                     value={field.state.value}
                     options={countrySelectOptions}
-                    onValueChange={(code) => {
+                    onChange={(code) => {
                       field.handleChange(code);
                       // Cleared on a country change, which is what production's
                       // own country field does
@@ -729,7 +729,7 @@ function ClientFormBody({
                     }}
                     placeholder="Select country"
                     searchPlaceholder="Search country…"
-                    emptyMessage="No country matches that search."
+                    emptyText="No country matches that search."
                     invalid={field.state.meta.errors.length > 0}
                     className="shadow-none"
                   />

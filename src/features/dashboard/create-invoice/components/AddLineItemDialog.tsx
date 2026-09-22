@@ -275,13 +275,13 @@ function LineItemBody({
         {errors.type && <FieldError>{errors.type}</FieldError>}
       </Field>
 
-      {/* `modal` for the same reason SearchableSelect needs it: this popover
-          lives inside a Dialog, and flux's PopoverContent always portals to
-          document.body — outside the Dialog's subtree. A modal Dialog mounts
-          react-remove-scroll and sets `pointer-events: none` on the body, so a
-          non-modal popover out there has its wheel events cancelled. Without
-          this the list rendered but would not scroll, which with the old
-          six-item cap is most of why this looked broken. */}
+      {/* `modal` was how this popover got a scrollable list: it lives inside a
+          Dialog, flux's PopoverContent portals to document.body — outside the
+          Dialog's subtree — and the Dialog's react-remove-scroll lock cancels
+          the wheel out there. flux 0.3.3 fixes that for every popover
+          (ScrollLockTakeover in PopoverContent), so `modal` is no longer needed
+          for scrolling. Kept because it also keeps the suggestion list as its
+          own layer; drop it if this should stop trapping focus. */}
       <Popover modal open={suggestionsOpen && matches.length > 0} onOpenChange={setSuggestionsOpen}>
         <PopoverAnchor asChild>
           <Field>
