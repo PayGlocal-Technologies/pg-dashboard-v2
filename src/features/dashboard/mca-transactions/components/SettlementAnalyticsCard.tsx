@@ -14,7 +14,7 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { formatNextSettlementDate } from "@/lib/utils/format";
+import { currencySymbol, formatNextSettlementDate, formatSharePct } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { useMcaOverview, useSettledByAccount } from "@/features/dashboard/mca-transactions/hooks";
@@ -84,6 +84,10 @@ function foldRestOfWorld(accounts: SettledAccountRow[]): SettledAccountRow[] {
     }
   }
 
+  // No `currencyAmount` on the bucket: it holds several currencies, and their
+  // native amounts are in different units — summing them would produce a
+  // number in no currency at all. The row shows its reporting-currency total
+  // only.
   if (hasRest) kept.push({ currency: "REST_OF_WORLD", amount: restAmount, count: restCount });
   return kept;
 }
@@ -97,47 +101,21 @@ function formatBarAmount(amount: number): string {
   return `₹${Math.round(amount)}`;
 }
 
-/**
- * TODO(backend): the settled-by-account API only returns the INR-equivalent
- * `amount`, not the native-currency amount. Until that's added to the
- * contract, the native amount line ("$8,377,994") is approximated
- * client-side from a placeholder FX rate table — remove this and read the
- * real field off the row once the API carries it.
- */
-const MOCK_FX_RATE: Record<string, number> = {
-  USD: 88.52,
-  GBP: 112.4,
-  EUR: 95.8,
-  CAD: 63.35,
-  AED: 24.1,
-  SGD: 65.9,
-  AUD: 58.1,
-  CNY: 12.3,
-};
-
-const CURRENCY_SYMBOL: Record<string, string> = {
-  USD: "$",
-  GBP: "£",
-  EUR: "€",
-  CAD: "C$",
-  AED: "AED ",
-  SGD: "S$",
-  AUD: "A$",
-  CNY: "¥",
-};
-
 /** "$8,377,994" for large native amounts, "A$308.09" for sub-thousand ones —
- *  matches how the reference design varies decimal precision by magnitude. */
-function formatNativeAmount(currency: string, inrAmount: number): string | null {
-  const rate = MOCK_FX_RATE[currency];
-  const symbol = CURRENCY_SYMBOL[currency];
-  if (!rate || !symbol) return null;
-  const native = inrAmount / rate;
+ *  matches how the reference design varies decimal precision by magnitude.
+ *  Null when the row carries no native figure, which is the rest-of-world
+ *  bucket: it folds several currencies together, so no single symbol or total
+ *  describes it. */
+function formatNativeAmount(currency: string, nativeAmount: number | undefined): string | null {
+  if (nativeAmount === undefined || !Number.isFinite(nativeAmount)) return null;
   const formatted =
-    native >= 1_000
-      ? Math.round(native).toLocaleString("en-US")
-      : native.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return `${symbol}${formatted}`;
+    nativeAmount >= 1_000
+      ? Math.round(nativeAmount).toLocaleString("en-US")
+      : nativeAmount.toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+  return `${currencySymbol(currency)}${formatted}`;
 }
 
 /** "USD Account" → "USD"; "Rest of world" is left as-is (it has no trailing
@@ -145,21 +123,6 @@ function formatNativeAmount(currency: string, inrAmount: number): string | null 
  *  already does — this only shortens how it reads in a compact chip. */
 function shortAccountLabel(label: string): string {
   return label.replace(/ Account$/, "");
-}
-
-/**
- * Adaptive precision so a small currency never rounds to a dead "0%": each
- * tier is just enough decimal places to keep a share in that range visibly
- * nonzero. A currency small enough to still round to zero at three decimals
- * gets "<0.001%" instead of a false zero.
- */
-function formatSharePct(fraction: number): string {
-  if (!(fraction > 0)) return "0%";
-  const pct = fraction * 100;
-  if (pct >= 0.1) return `${pct.toFixed(1)}%`;
-  if (pct >= 0.01) return `${pct.toFixed(2)}%`;
-  if (pct >= 0.001) return `${pct.toFixed(3)}%`;
-  return "<0.001%";
 }
 
 /**
@@ -182,10 +145,11 @@ interface AccountBarRowData {
   iso2: string;
   value: number;
   valueLabel: string;
-  /** Settled amount in INR, independent of `value`/`valueLabel` which switch
-   *  to a transaction count in count mode — the native-amount-at-rate
-   *  subtext always needs the amount, regardless of the selected mode. */
-  amount: number;
+  /** The settlement in this account's own currency, for the subtext under the
+   *  reporting-currency figure. Independent of `value`/`valueLabel`, which
+   *  switch to a transaction count in count mode. Absent on the rest-of-world
+   *  bucket, which has no single native currency. */
+  currencyAmount?: number;
 }
 
 /** One currency's row in the full-width breakdown list: flag, bold currency
@@ -207,7 +171,7 @@ function CurrencyChip({
   isAmountMode: boolean;
   className?: string;
 }) {
-  const nativeLabel = isAmountMode ? formatNativeAmount(row.accountId, row.amount) : null;
+  const nativeLabel = isAmountMode ? formatNativeAmount(row.accountId, row.currencyAmount) : null;
   return (
     <li className={cn("flex items-center gap-2.5 py-2.5", className)}>
       <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-7 w-7 shrink-0" />
@@ -274,7 +238,7 @@ export function SettlementAnalyticsCard({
         valueLabel: isAmountMode
           ? formatBarAmount(account.amount)
           : account.count.toLocaleString("en-IN"),
-        amount: account.amount,
+        currencyAmount: account.currencyAmount,
       };
     })
     .sort((a, b) => b.value - a.value);

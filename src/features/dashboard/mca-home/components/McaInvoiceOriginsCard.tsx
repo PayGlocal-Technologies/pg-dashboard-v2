@@ -11,7 +11,8 @@ import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
-import { formatCurrencyShort } from "@/lib/utils/format";
+import { useReferralWallet } from "@/features/dashboard/refer-and-earn/hooks";
+import { formatCurrencyShort, formatSharePct } from "@/lib/utils/format";
 
 type InvoiceOriginTimeframe = "1W" | "1M" | "3M";
 
@@ -83,19 +84,6 @@ const BAR_COLORS = [
   "var(--chart-4)",
 ];
 
-/** Adaptive precision so a small country never rounds to a dead "0%" — same
- *  logic as SettlementAnalyticsCard's own formatSharePct (Currency
- *  distribution bar on the Transactions page), which this card's own
- *  distribution bar below now matches the look of. */
-function formatSharePct(fraction: number): string {
-  if (!(fraction > 0)) return "0%";
-  const pct = fraction * 100;
-  if (pct >= 0.1) return `${pct.toFixed(1)}%`;
-  if (pct >= 0.01) return `${pct.toFixed(2)}%`;
-  if (pct >= 0.001) return `${pct.toFixed(3)}%`;
-  return "<0.001%";
-}
-
 interface StatCellProps {
   label: string;
   valueLabel: string;
@@ -154,9 +142,20 @@ function buildTimeframeRanges(): Record<
  *  there's only 1-2 countries to show (the region below reserves room for a
  *  typical multi-country result, see the min-h-[148px] wrapper) with a
  *  promotional nudge instead of blank whitespace, linking through to Refer &
- *  Earn like every other MDR-waiver/referral touchpoint in the app. */
+ *  Earn like every other MDR-waiver/referral touchpoint in the app.
+ *
+ *  The countdown is the wallet's own `mdrWaiver`, from the same get-wallet call
+ *  that backs the Refer & Earn page this taps through to. Renders nothing when
+ *  there is no waiver in progress: filling the space was the original reason
+ *  this exists, but not at the price of naming a number that isn't the
+ *  merchant's. */
 function MdrWaiverCallout() {
   const router = useRouter();
+  const { wallet } = useReferralWallet();
+  const remaining = wallet?.mdrWaiver ?? 0;
+
+  if (!(remaining > 0)) return null;
+
   return (
     // Button always wraps its `children` in one auto-generated `<span>`
     // (see DisputeRespondForm's upload dropzone for the same gotcha), and
@@ -181,7 +180,8 @@ function MdrWaiverCallout() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] font-semibold text-foreground">
-          You&apos;re 1 transaction away from your MDR waiver
+          You&apos;re {remaining.toLocaleString("en-IN")} transaction
+          {remaining === 1 ? "" : "s"} away from your MDR waiver
         </span>
         <span className="block text-xs text-muted-foreground">Tap to learn more</span>
       </span>

@@ -11,15 +11,30 @@ import {
 } from "@/features/dashboard/mca-transactions/hooks";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { LinkInvoiceModal } from "@/features/dashboard/mca-transactions/components/LinkInvoiceModal";
-import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
+import { formatTransactionTimestamp } from "@/lib/utils/format";
+import type {
+  DocumentPendingListRow,
+  LinkableTransaction,
+} from "@/features/dashboard/mca-transactions/types";
 
-/** Largest first, so the three rows this card has room for are the invoices
- *  unblocking the most money rather than whichever three the search returned
- *  first. The ranking runs client-side over the pool
- *  useDocumentPendingTransactions fetches, and compares raw amounts across
- *  currencies — see that hook's KNOWN LIMITATION before treating this list as
- *  a true "biggest three". */
+/** How many rows the card has room for, and so the page size it asks the API
+ *  for — the server ranks by amount descending, so these are the invoices
+ *  unblocking the most money rather than whichever the search returned first. */
 const MAX_ROWS = 3;
+
+/** document-pending-list carries only what a row needs, which is a different
+ *  shape from the OpenSearch record LinkInvoiceModal was originally written
+ *  against: `amount` arrives as a number and `createdTime` as raw ISO. */
+function toLinkable(row: DocumentPendingListRow): LinkableTransaction {
+  return {
+    gid: row.gid,
+    merchantId: row.merchantId,
+    amount: String(row.amount),
+    currency: row.currency,
+    partnerCustomerFullName: row.customerName,
+    formattedTransactionCreationDateTime: formatTransactionTimestamp(row.createdTime),
+  };
+}
 
 /**
  * Companion to InvoiceSummaryCards: the same "amount already collected but not
@@ -45,14 +60,16 @@ export function InvoiceActionCard({ className }: { className?: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { documentPending, isLoading } = useDocumentPending("ytd");
-  const { transactions, isLoading: rowsLoading } = useDocumentPendingTransactions();
+  const { transactions: rows, isLoading: rowsLoading } = useDocumentPendingTransactions({
+    sortBy: "AMOUNT",
+    limit: MAX_ROWS,
+  });
   const { selectMid } = usePacbMidScope();
-  const [linkingTxn, setLinkingTxn] = useState<McaTransaction | null>(null);
+  const [linkingTxn, setLinkingTxn] = useState<LinkableTransaction | null>(null);
 
   const amount = documentPending?.amount ?? 0;
   const displayCurrency = documentPending?.reportingCurrency ?? "INR";
   const pendingCount = documentPending?.count ?? 0;
-  const rows = transactions.slice(0, MAX_ROWS);
 
   const handleCreateInvoice = (merchantId: string, gid: string) => {
     if (merchantId) selectMid(merchantId);
@@ -123,10 +140,10 @@ export function InvoiceActionCard({ className }: { className?: string }) {
                 <li key={row.gid} className="flex flex-1 items-center justify-between gap-3 py-2.5">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {row.partnerMaskedCustomerFullName || row.gid}
+                      {row.customerName || row.gid}
                     </p>
                     <CompactAmount
-                      amount={parseFloat(row.amount)}
+                      amount={row.amount}
                       currency={row.currency}
                       className="text-sm tabular-nums text-muted-foreground"
                     />
@@ -153,7 +170,7 @@ export function InvoiceActionCard({ className }: { className?: string }) {
                       variant="outline"
                       size="sm"
                       className="h-7 rounded-md px-2.5 text-xs font-medium"
-                      onClick={() => setLinkingTxn(row)}
+                      onClick={() => setLinkingTxn(toLinkable(row))}
                     >
                       Link invoice
                     </Button>

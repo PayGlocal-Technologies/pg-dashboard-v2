@@ -7,6 +7,7 @@ import {
   mcaCurrencySplitApi,
   mcaDocumentPendingApi,
   mcaDocumentPendingByCurrencyApi,
+  mcaDocumentPendingListApi,
   mcaFircDownloadApi,
   mcaInvoiceOriginsApi,
   mcaOverviewByMidApi,
@@ -15,7 +16,6 @@ import {
   mcaSettledByAccountApi,
   mcaSettledCurrencyTrendApi,
   mcaTxnDocumentPresignApi,
-  mcaTxnSearchApi,
   merchantProfileApi,
   merchantPurposeCodesApi,
 } from "@/features/dashboard/mca-transactions/services";
@@ -24,9 +24,7 @@ import {
   toPurposeCodeOptions,
   type PurposeCodeOption,
 } from "@/lib/purposeCodes";
-import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { useScopeId } from "@/lib/hooks/useScopeId";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useApp } from "@/stores/useApp";
 import type {
   CurrencySplitData,
@@ -34,14 +32,15 @@ import type {
   DocumentPendingByCurrencyData,
   DocumentPendingByCurrencyResponse,
   DocumentPendingData,
+  DocumentPendingListResponse,
+  DocumentPendingListRow,
   DocumentPendingResponse,
+  DocumentPendingSortBy,
   FircDownloadResponse,
   InvoiceOriginsData,
   InvoiceOriginsResponse,
   McaOverviewData,
   McaOverviewResponse,
-  McaTransaction,
-  McaTransactionsResponse,
   MerchantProfileResponse,
   PresignedUrlResponse,
   SavedAmountData,
@@ -52,19 +51,6 @@ import type {
   SettledCurrencyTrendRow,
   SuggestedPurposeCodesResponse,
 } from "@/features/dashboard/mca-transactions/types";
-
-// How many DOCUMENT_PENDING transactions to pull before ranking them locally.
-//
-// This is a ranking pool, not a page: InvoiceActionCard shows three rows and
-// the sort that picks them happens client-side (the OpenSearch body has no
-// working sortBy — see useDocumentPendingTransactions). At the old value of 25
-// the "highest amount first" claim was only true within the first 25 the API
-// happened to return, which on a merchant with ~200 pending meant the three
-// largest were almost never among them.
-//
-// 200 covers the pending counts seen in UAT outright. It is a ceiling, not a
-// guarantee: past 200 pending this is still the top three of the first 200.
-const DOCUMENT_PENDING_BATCH_SIZE = 200;
 
 // Both downloads below follow the same shape: the file itself is never served
 // by the API, only a short-lived presigned URL, so "download" is a GET whose
@@ -394,49 +380,41 @@ export function toMetricNumber(value: number | string | undefined): number {
 }
 
 /**
- * Individual DOCUMENT_PENDING transactions, largest first — the rows
- * InvoiceActionCard turns into "raise this one" actions, as opposed to
- * useDocumentPending's aggregate count/amount above.
+ * Individual DOCUMENT_PENDING transactions — the rows InvoiceActionCard turns
+ * into "raise this one" actions, as opposed to useDocumentPending's aggregate
+ * count/amount above.
  *
- * Reuses the same OpenSearch endpoint and filter McaTransactionTable's
- * "Invoice Pending" tab already uses (INVOICE_PENDING_STATUSES), scoped with
- * useResolvedMids the same way that table is, since this is a transaction
- * search rather than a path-scoped analytics call. `amount` is a string field
- * on McaTransaction, so the sort has to happen client-side after the fetch —
- * the OpenSearch body has no working sortBy anywhere in this codebase. See
- * DOCUMENT_PENDING_BATCH_SIZE for how big a pool that sort runs over.
+ * A path-scoped analytics call like useDocumentPending, so it scopes with
+ * useScopeId rather than useResolvedMids, and the server does the ranking and
+ * paging. That server-side sort is the point of the endpoint: this used to be
+ * an OpenSearch search that pulled a 200-row pool and sorted it client-side on
+ * the raw `amount` string regardless of `currency`, which ranked by digit count
+ * rather than by value — a ¥ transaction outranking a larger $ one.
  *
- * KNOWN LIMITATION: the comparison is on the raw `amount` regardless of
- * `currency`, so it ranks by digit count rather than by value — a ¥ or KRW
- * transaction outranks a larger $ one. The record carries no common-basis
- * figure to sort on instead (`inrAmount` exists on the type but is settlement
- * arithmetic, so it is null on anything still awaiting documents). Fixing this
- * properly needs either a server-side sort or a reporting-currency amount on
- * the row.
+ * Takes no timeframe: like the by-currency snapshot, it reports what is
+ * awaiting documents right now.
  */
-export function useDocumentPendingTransactions(): {
-  transactions: McaTransaction[];
+export function useDocumentPendingTransactions(
+  options: { sortBy?: DocumentPendingSortBy; page?: number; limit?: number } = {}
+): {
+  transactions: DocumentPendingListRow[];
+  totalCount: number;
   isLoading: boolean;
   isError: boolean;
 } {
-  const { urlMid, midFilter, isReady } = useResolvedMids("PACB");
+  const { sortBy = "AMOUNT", page = 1, limit = 10 } = options;
+  const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
-  const body = buildTxnRequestBody(
-    { externalStatus: ["DOCUMENT_PENDING"] },
-    { selectedMid: midFilter, pageLimit: DOCUMENT_PENDING_BATCH_SIZE }
+  const { data, isPending, isError } = useGet<DocumentPendingListResponse>(
+    ["mca-document-pending-transactions", merchantId, sortBy, page, limit],
+    mcaDocumentPendingListApi(merchantId, sortBy, page, limit),
+    { enabled: isReady }
   );
 
-  const { data, isPending, isError } = usePostQuery<McaTransactionsResponse, typeof body>(
-    ["mca-document-pending-transactions", urlMid, ...(midFilter?.value ?? [])],
-    mcaTxnSearchApi(urlMid),
-    body,
-    { staleTime: 0 },
-    isReady
-  );
-
-  const transactions = [...(data?.data?.data ?? [])].sort(
-    (a, b) => parseFloat(b.amount) - parseFloat(a.amount)
-  );
-
-  return { transactions, isLoading: isReady && isPending, isError };
+  return {
+    transactions: data?.data?.transactions ?? [],
+    totalCount: data?.data?.totalCount ?? 0,
+    isLoading: isReady && isPending,
+    isError,
+  };
 }

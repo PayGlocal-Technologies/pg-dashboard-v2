@@ -45,6 +45,25 @@ export interface McaTransaction {
   note?: string | null;
 }
 
+/**
+ * What LinkInvoiceModal actually reads off the transaction it is linking.
+ *
+ * Narrower than McaTransaction on purpose: the modal opens both from the
+ * transactions table, which holds full OpenSearch records, and from
+ * InvoiceActionCard, whose rows come from document-pending-list and carry only
+ * these fields. McaTransaction satisfies this structurally, so the table's call
+ * sites are unaffected. Narrowing is what avoids the alternative — inventing an
+ * `externalStatus`/`frmStatus` for a record that never had one.
+ */
+export interface LinkableTransaction {
+  gid: string;
+  merchantId: string;
+  amount: string;
+  currency: string;
+  partnerCustomerFullName?: string | null;
+  formattedTransactionCreationDateTime: string;
+}
+
 export interface McaTransactionsResponse {
   status: string;
   message: string;
@@ -407,7 +426,13 @@ export type CurrencySplitResponse = {
 
 export interface SettledAccountRow {
   currency: string;
+  /** Settled amount converted to the merchant's reporting currency, which is
+   *  what every row's bar and share are measured in. */
   amount: number;
+  /** The same settlement in `currency`'s own units. Optional because the
+   *  rest-of-world bucket is a fold of several currencies, whose native amounts
+   *  cannot be summed into one figure — those rows carry no native total. */
+  currencyAmount?: number;
   count: number;
 }
 
@@ -476,6 +501,40 @@ export interface DocumentPendingByCurrencyData {
 
 export interface DocumentPendingByCurrencyResponse {
   data: DocumentPendingByCurrencyData;
+  message?: string;
+  errors?: unknown;
+}
+
+// ── Document pending list ────────────────────────────────────────────────────
+
+/** Both descending. Anything else the server treats as AMOUNT. */
+export type DocumentPendingSortBy = "AMOUNT" | "CREATED_TIME";
+
+/**
+ * One transaction awaiting documents, as document-pending-list returns it.
+ *
+ * Deliberately not an McaTransaction: this endpoint carries only what a "raise
+ * this one" row needs, and two fields differ in shape from the OpenSearch
+ * record — `amount` is a number here rather than a string, and `createdTime` is
+ * raw ISO 8601 rather than a pre-formatted display string.
+ */
+export interface DocumentPendingListRow {
+  gid: string;
+  merchantId: string;
+  amount: number;
+  currency: string;
+  createdTime: string;
+  customerName: string | null;
+  invoiceNumber: string | null;
+}
+
+export interface DocumentPendingListData {
+  transactions: DocumentPendingListRow[];
+  totalCount: number;
+}
+
+export interface DocumentPendingListResponse {
+  data: DocumentPendingListData;
   message?: string;
   errors?: unknown;
 }
