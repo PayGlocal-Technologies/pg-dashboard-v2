@@ -70,13 +70,27 @@ export function InvoiceActionCard({ className }: { className?: string }) {
   return (
     <Card size="sm" className={className}>
       <CardContent className="flex flex-1 flex-col">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-base font-semibold text-foreground">Waiting on documents from you</p>
-          {!isLoading && pendingCount > 0 && (
-            <Badge variant="secondary" size="sm" className="shrink-0">
-              {pendingCount.toLocaleString("en-IN")} transaction{pendingCount === 1 ? "" : "s"}
-            </Badge>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-base font-semibold text-foreground">Waiting on documents from you</p>
+            {!isLoading && pendingCount > 0 && (
+              <Badge variant="secondary" size="sm" className="shrink-0">
+                {pendingCount.toLocaleString("en-IN")} transaction{pendingCount === 1 ? "" : "s"}
+              </Badge>
+            )}
+          </div>
+          {/* Lands on /mca-transactions' own default: no `q` in the URL means
+              its status filter already starts on Invoice Pending, so nothing
+              extra needs passing through. */}
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto min-h-0 shrink-0 p-0 text-xs font-semibold"
+            onClick={() => router.push("/mca-transactions")}
+          >
+            View all
+          </Button>
         </div>
 
         {isLoading ? (

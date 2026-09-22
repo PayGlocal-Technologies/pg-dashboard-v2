@@ -5,15 +5,9 @@ import {
   Button,
   Callout,
   CalloutText,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
   Popover,
+  PopoverAnchor,
   PopoverContent,
-  PopoverTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -150,8 +144,7 @@ export function BillToSection({
   };
 
   // Focusing the search input only needs the DOM node, no state update — safe
-  // inside the effect body itself (no synchronous setState here). Same
-  // pattern PurposeCodeCombobox uses for its own Popover+Command dropdown.
+  // inside the effect body itself (no synchronous setState here).
   useEffect(() => {
     if (!pickerOpen) return;
     const focusTimer = setTimeout(() => searchRef.current?.focus(), 0);
@@ -160,14 +153,42 @@ export function BillToSection({
 
   return (
     <div className="rounded-xl border border-border p-5">
-      {/* One Popover wraps the header's Edit trigger AND (when nothing is
-          selected yet) the dropdown trigger further down — both need to be
-          descendants of the same Popover, not siblings of it, for either
-          trigger to actually open it. Anchors to whichever of the two is on
-          screen. The list itself is identical either way: every client
-          directly, no extra click through a "Select client" button first,
-          and "Add a new client" pinned as its own row regardless of what's
-          been searched. */}
+      {/* Same header shape as BillerSection ("Who it's from") above it:
+          icon, plain title, an Edit button on the right. The selected
+          client's name used to run under the title as a subtitle, which
+          grew the card whenever one was picked and could crowd the pencil
+          beside it — it now folds into the Contact row below instead, the
+          same way BillerSection's legal name folds into its Address row. */}
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Icon name="users" className="h-4 w-4" />
+          </span>
+          <h2 className="text-[15px] font-semibold text-foreground">Who it&apos;s for</h2>
+        </div>
+
+        {selected && !pickerOpen && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-haspopup="listbox"
+            aria-controls="bill-to-client-listbox"
+            leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
+            onClick={() => setPickerOpen(true)}
+          >
+            Edit
+          </Button>
+        )}
+      </div>
+
+      {/* The field itself is the search box — no separate "click to open,
+          then type into a second box inside the panel" step. Typing filters
+          the list below in place, same as AddLineItemDialog's own item-name
+          field (PopoverAnchor wrapping a real input, not a button that opens
+          a Command). Shown whenever there is no selection yet, or the
+          merchant is actively changing one; the read-only summary below
+          takes over once something is picked and the field is closed. */}
       <Popover
         open={pickerOpen}
         onOpenChange={(next) => {
@@ -175,42 +196,49 @@ export function BillToSection({
           if (!next) setQuery("");
         }}
       >
-        {/* Same header shape as BillerSection ("Who it's from") above it:
-            icon, plain title, an Edit button on the right. The selected
-            client's name used to run under the title as a subtitle, which
-            grew the card whenever one was picked and could crowd the pencil
-            beside it — it now folds into the Contact row below instead,
-            the same way BillerSection's legal name folds into its Address
-            row. */}
-        <div className="mb-4 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Icon name="users" className="h-4 w-4" />
-            </span>
-            <h2 className="text-[15px] font-semibold text-foreground">Who it&apos;s for</h2>
-          </div>
-
-          {selected && (
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
+        {!selected || pickerOpen ? (
+          <PopoverAnchor asChild>
+            <div className="relative">
+              <Icon
+                name="search"
+                className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                ref={searchRef}
+                type="text"
+                role="combobox"
+                aria-expanded={pickerOpen}
                 aria-haspopup="listbox"
                 aria-controls="bill-to-client-listbox"
-                leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
-              >
-                Edit
-              </Button>
-            </PopoverTrigger>
-          )}
-        </div>
-
-        {selected ? (
+                disabled={!invoiceId}
+                value={query}
+                onFocus={() => setPickerOpen(true)}
+                onChange={(e) => {
+                  setQuery(e.target.value);
+                  if (!pickerOpen) setPickerOpen(true);
+                }}
+                placeholder={invoiceId ? "Choose a client" : "Preparing the draft…"}
+                className={cn(
+                  "flex h-11 w-full items-center rounded-lg border border-border bg-card py-2 pl-9 pr-9 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground",
+                  "transition-colors duration-150",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
+                  "disabled:cursor-not-allowed disabled:opacity-60"
+                )}
+              />
+              <Icon
+                name="chevron-down"
+                className={cn(
+                  "pointer-events-none absolute right-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground opacity-70 transition-transform",
+                  pickerOpen && "rotate-180"
+                )}
+              />
+            </div>
+          </PopoverAnchor>
+        ) : (
           // Plain rows, no bordered box around them — this already sits
           // inside the page's own flow (no card here to nest a second box
           // inside of), same as BillerSection's address/phone/email rows.
-          selected.businessName || selected.name || formatAddress(selected.address) ? (
+          (selected.businessName || selected.name || formatAddress(selected.address)) && (
             <dl className="space-y-2">
               {(selected.businessName || selected.name) && (
                 <div className="flex gap-3">
@@ -234,37 +262,7 @@ export function BillToSection({
                 </div>
               )}
             </dl>
-          ) : null
-        ) : (
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              role="combobox"
-              aria-expanded={pickerOpen}
-              aria-haspopup="listbox"
-              aria-controls="bill-to-client-listbox"
-              disabled={!invoiceId}
-              className={cn(
-                "flex h-11 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-left text-[13px] shadow-none",
-                "transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
-                "disabled:cursor-not-allowed disabled:opacity-60",
-                "border-border"
-              )}
-            >
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <Icon name="search" className="h-3.5 w-3.5 shrink-0" />
-                {invoiceId ? "Choose a client" : "Preparing the draft…"}
-              </span>
-              <Icon
-                name="chevron-down"
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70 transition-transform",
-                  pickerOpen && "rotate-180"
-                )}
-              />
-            </button>
-          </PopoverTrigger>
+          )
         )}
 
         {/* side="bottom" + avoidCollisions={false}: Radix's default is to
@@ -279,41 +277,36 @@ export function BillToSection({
           className="w-(--radix-popover-trigger-width) min-w-[min(24rem,calc(100vw-3rem))] p-0 shadow-none"
           onOpenAutoFocus={(e) => e.preventDefault()}
         >
-          <Command>
-            <CommandInput
-              ref={searchRef}
-              placeholder="Search clients…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <CommandList id="bill-to-client-listbox" aria-label="Clients">
-              {visibleClients.length === 0 && (
-                <CommandEmpty>
-                  <div className="flex flex-col items-center gap-2 py-1 text-center">
-                    <span>
-                      {query.trim() ? `No client matches “${query.trim()}”.` : "No clients yet."}
-                    </span>
-                    {query.trim() && (
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="h-auto p-0"
-                        onClick={() => openAddClient(query.trim())}
-                      >
-                        Add &ldquo;{query.trim()}&rdquo; as a new client
-                      </Button>
-                    )}
-                  </div>
-                </CommandEmpty>
-              )}
-              <CommandGroup>
+          <div id="bill-to-client-listbox" role="listbox" aria-label="Clients" className="p-1">
+            {visibleClients.length === 0 ? (
+              query.trim() ? (
+                // The one prominent affordance for "nothing here matches what
+                // you typed" — filled, not a muted text link, so it reads as
+                // the obvious next step rather than an easy-to-miss caption.
+                <button
+                  type="button"
+                  onClick={() => openAddClient(query.trim())}
+                  className="flex w-full items-center gap-2 rounded-md bg-primary px-3 py-2.5 text-left text-[13px] font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+                >
+                  <Icon name="plus" className="h-3.5 w-3.5 shrink-0" />
+                  Add &ldquo;{query.trim()}&rdquo;
+                </button>
+              ) : (
+                <p className="px-2 py-3 text-center text-[13px] text-muted-foreground">
+                  No clients yet.
+                </p>
+              )
+            ) : (
+              <div className="max-h-72 overflow-y-auto">
                 {visibleClients.map((client) => (
-                  <CommandItem
+                  <Button
                     key={client.id}
-                    selected={client.id === clientId}
-                    onSelect={() => selectClient(client)}
-                    className="gap-3"
+                    type="button"
+                    variant="ghost"
+                    role="option"
+                    aria-selected={client.id === clientId}
+                    onClick={() => selectClient(client)}
+                    className="h-auto w-full justify-start rounded-md px-2 py-1.5 text-left [&>span]:flex [&>span]:w-full [&>span]:items-center [&>span]:gap-3"
                   >
                     <ContactAvatar name={client.businessName || client.name} />
                     <span className="min-w-0 flex-1">
@@ -331,28 +324,32 @@ export function BillToSection({
                         client.id === clientId ? "opacity-100" : "opacity-0"
                       )}
                     />
-                  </CommandItem>
+                  </Button>
                 ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-
-          {/* Pinned outside CommandList so it never scrolls out of view along
-              with the client list above it — "constantly present" the way a
-              regular row can't guarantee once there are enough clients to
-              scroll. */}
-          <div className="border-t border-border p-3">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => openAddClient(null)}
-            >
-              Add a new client
-            </Button>
+              </div>
+            )}
           </div>
+
+          {/* Fixed at the foot of the panel whenever it isn't a duplicate of
+              the blue "Add "…"" row above it (zero matches + a typed query
+              already offers that exact action) — same bg-card surface as the
+              rest of the dropdown (not a filled grey button), so it reads as
+              part of the panel's own chrome rather than a competing second
+              CTA. */}
+          {!(visibleClients.length === 0 && query.trim()) && (
+            <div className="border-t border-border p-3">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full shadow-none"
+                leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                onClick={() => openAddClient(null)}
+              >
+                Add a new client
+              </Button>
+            </div>
+          )}
         </PopoverContent>
       </Popover>
 

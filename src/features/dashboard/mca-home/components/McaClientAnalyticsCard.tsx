@@ -36,7 +36,7 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
   const hasData = !isLoading && !isError && clients.length > 0;
 
   return (
-    <Card className="gap-3 p-5">
+    <Card className="h-full gap-3 p-5">
       {/* items-start and flex-wrap, as on the other cards with a subtitle: the
           title block is now two lines, and the action should sit against the
           first of them rather than centre on both. */}
