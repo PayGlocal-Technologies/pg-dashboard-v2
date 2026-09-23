@@ -11,7 +11,7 @@ import { Icon } from "@/components/icon";
  * The invoice editor is a focused, document-shaped surface: it fills the
  * viewport with no sidebar and no page chrome, and its own header carries the
  * close action back to the invoice list. Mirrors Nova's (invoice-editor)
- * route group.
+ * route group. Create payment button (/payment-button/create) shares the shell.
  *
  * It still loads the same common data the dashboard shell does, because the
  * merchant profile is where the MID every mca-invoice endpoint is scoped to

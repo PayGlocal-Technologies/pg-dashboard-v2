@@ -34,6 +34,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/pa-dashboard",
   "/pa-transactions",
   "/payment-links",
+  "/payment-button",
   "/platforms",
   "/mca-receipts",
   "/refer-and-earn",
@@ -186,6 +187,15 @@ export interface ActionEntry {
  * Client management through their keywords.
  */
 export const ACTION_ENTRIES: readonly ActionEntry[] = [
+  {
+    label: "Create payment button",
+    parentPath: "/payment-button",
+    // Its own full-screen route, like Create invoice, so it is linked straight
+    // into rather than handed off through ?action=.
+    path: "/payment-button/create",
+    icon: "plus",
+    keywords: ["new payment button", "embed button", "pay now button"],
+  },
   {
     label: "Create invoice",
     parentPath: "/mca-invoices",
