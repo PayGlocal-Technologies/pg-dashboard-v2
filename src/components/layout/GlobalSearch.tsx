@@ -72,7 +72,11 @@ export function GlobalSearch() {
           toProductType(activeContext)
         ),
         SETTINGS_NAV_GROUPS,
-        { isPartnerUser, paymentProducts }
+        // context and checkPermissions gate the STANDALONE_PAGES, which have no
+        // nav tree to be filtered by and so carry their own equivalents of
+        // NavItem's `product` and `permission`. paymentProducts gates the
+        // actions that need a product enabled (requiresPaymentProduct).
+        { isPartnerUser, context: activeContext, checkPermissions, paymentProducts }
       ),
     [isPartnerUser, isGlobalTenant, activeContext, checkPermissions, paymentProducts]
   );

@@ -15,6 +15,7 @@ import { RaiseTicketForm } from "@/features/dashboard/support-tickets/components
 import { TicketDetailDrawer } from "@/features/dashboard/support-tickets/components/TicketDetailDrawer";
 import { TicketList } from "@/features/dashboard/support-tickets/components/TicketList";
 import { useSupportScope, useSupportTickets } from "@/features/dashboard/support-tickets/hooks";
+import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import type { SupportTicket } from "@/features/dashboard/support-tickets/types";
 
 type QueriesTab = "raise" | "tickets";
@@ -67,6 +68,13 @@ export function MyQueriesFeature() {
   // empty state names the other tab for a first-time merchant, and the
   // PageHeader's "Raise a ticket" button is on screen either way.
   const [tab, setTab] = useState<QueriesTab>("tickets");
+
+  // The header search's "Raise a ticket" row lands here (see ACTION_ENTRIES),
+  // and the fixed landing tab above is exactly why it needs a handoff: a
+  // merchant who searched for the *action* would otherwise arrive on the list.
+  // Unconditionally enabled — unlike the MID-scoped actions elsewhere, this
+  // only flips a tab, so there is nothing to wait for.
+  useUrlAction("raise-ticket", () => setTab("raise"));
 
   const [search, setSearch] = useState("");
   const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE);

@@ -1,5 +1,7 @@
 import type { IconName } from "@/components/icon";
 import type { NavGroup } from "@/lib/navigation";
+import type { NavContext } from "@/stores/useProductContext";
+import type { UseNewPermissionsFn } from "@/hooks/useNewPermissions";
 import type { SettingsNavGroup } from "@/features/dashboard/settings/constants";
 import {
   ACTION_ENTRIES,
@@ -46,8 +48,20 @@ export function buildSearchRegistry(
   settingsGroups: SettingsNavGroup[],
   {
     isPartnerUser = false,
+    context,
+    checkPermissions,
     paymentProducts = [],
-  }: { isPartnerUser?: boolean; paymentProducts?: string[] } = {}
+  }: {
+    isPartnerUser?: boolean;
+    /** The Header's active tab, for context-scoped STANDALONE_PAGES. */
+    context?: NavContext;
+    /** The same fn the Sidebar filters with, for permission-gated
+     *  STANDALONE_PAGES. Omitting it drops every gated standalone page. */
+    checkPermissions?: UseNewPermissionsFn;
+    /** merchantEnabledProducts.paymentProducts, for ACTION_ENTRIES that
+     *  declare requiresPaymentProduct. Omitting it drops those actions. */
+    paymentProducts?: string[];
+  } = {}
 ): SearchEntry[] {
   const entries: SearchEntry[] = [];
   // First occurrence of a path wins. /mca-receipts appears three times across the
@@ -65,11 +79,19 @@ export function buildSearchRegistry(
 
   for (const group of navigation) {
     for (const item of group.items) {
-      // A parent with children is a toggle, not a destination: the sidebar's
-      // ExpandableItem never navigates to item.href, and several of those
-      // hrefs (/payment-products, /configure) have no page at all. Emit the
-      // children and skip the parent.
+      // A parent with children is a toggle in the sidebar — ExpandableItem
+      // only opens and closes it, it never navigates to item.href — so the
+      // children are always emitted.
+      //
+      // The parent is emitted *too*, and only NAVIGABLE_ROUTES decides whether
+      // it survives. That allowlist is exactly the "does this href have a
+      // page" test, so the hrefs this used to guard against (/payment-products,
+      // /configure, /settings) are still dropped, while /ebrc — a real landing
+      // page that grew two children when eBRC Status and IRM Repository
+      // landed — is not. Skipping every parent outright would have made search
+      // silently lose a page the moment it gained a child.
       if (item.children?.length) {
+        push({ path: item.href, label: item.label, icon: item.icon });
         for (const child of item.children) {
           push({ path: child.href, label: child.label, parent: item.label, icon: item.icon });
         }
@@ -82,6 +104,7 @@ export function buildSearchRegistry(
   for (const group of settingsGroups) {
     for (const item of group.items) {
       if (item.children?.length) {
+        push({ path: item.href, label: item.label, parent: "Settings", icon: item.icon });
         for (const child of item.children) {
           push({ path: child.href, label: child.label, parent: item.label, icon: item.icon });
         }
@@ -91,11 +114,15 @@ export function buildSearchRegistry(
     }
   }
 
-  // Pages the sidebar has no entry for at all — currently just Refer & Earn,
-  // which is reached from the Header's tab row. Pushed through the same `push`
-  // so the route allowlist and dedupe still apply.
+  // Pages the sidebar has no entry for at all — Refer & Earn and Echo off the
+  // Header, My queries off its Help menu, and the MCA settlement list, which
+  // the MCA tree dropped. Pushed through the same `push`, so the route
+  // allowlist and the dedupe still apply, and each one's own gate mirrors what
+  // filterNavigation would have done for it had it been a NavItem.
   for (const page of STANDALONE_PAGES) {
     if (page.hiddenForPartner && isPartnerUser) continue;
+    if (page.context && page.context !== context) continue;
+    if (page.permission?.length && !checkPermissions?.(page.permission)) continue;
     push({ path: page.path, label: page.label, icon: page.icon });
   }
 
