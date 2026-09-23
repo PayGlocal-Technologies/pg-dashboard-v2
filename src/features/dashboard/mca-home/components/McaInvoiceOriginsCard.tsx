@@ -544,7 +544,7 @@ export function McaInvoiceOriginsCard() {
               // a typical one was worth.
               <>
                 <StatCell
-                  label="Total invoiced"
+                  label="Total volume"
                   valueLabel={formatCurrencyShort(rows[0]!.amount, currency)}
                   trendPct={rows[0]!.amount > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
@@ -575,7 +575,7 @@ export function McaInvoiceOriginsCard() {
                     beside is zero — a percentage change against nothing reads as
                     broken. */}
                 <StatCell
-                  label="Total invoiced"
+                  label="Total volume"
                   valueLabel={formatCurrencyShort(totalInvoiced, currency)}
                   trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
