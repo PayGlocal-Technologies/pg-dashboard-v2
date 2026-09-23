@@ -215,6 +215,7 @@ function McaInvoicesContent() {
           merchantId={summaryMid}
           windowSeconds={summaryWindowSeconds(summaryRange, defaultEndMs)}
           onStatusFilter={setStatusFilters}
+          currency="USD"
         />
         <InvoiceActionCard />
       </div>

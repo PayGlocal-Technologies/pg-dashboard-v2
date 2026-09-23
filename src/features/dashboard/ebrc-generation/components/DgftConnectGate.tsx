@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { EbrcBanner } from "@/features/dashboard/ebrc/components/EbrcBanner";
-import { DgftLoginPanel } from "@/features/dashboard/ebrc-generation/components/DgftLoginPanel";
+import { DgftLoginDialog } from "@/features/dashboard/ebrc-generation/components/DgftLoginDialog";
 import { useDgftLogin } from "@/features/dashboard/ebrc-generation/hooks";
 
 /**
@@ -10,13 +10,13 @@ import { useDgftLogin } from "@/features/dashboard/ebrc-generation/hooks";
  * linked. Reuses the same designed banner (EbrcBanner) as the "eBRC" parent
  * landing page (see ebrc/index.tsx) rather than a bare empty state, since a
  * merchant can land directly on eBRC Generation without passing through
- * that page first. "Sign in to DGFT" swaps that banner for DgftLoginPanel
- * inline, in the same bordered box footprint — not a dialog, not a
- * full-screen takeover.
+ * that page first. "Sign in to DGFT" opens DgftLoginDialog as a popup on
+ * top of the banner, which stays on screen underneath rather than being
+ * swapped out.
  *
  * The credentials go to `validate_customer` (useDgftLogin), which is what
  * establishes the DGFT session every other eBRC call then rides on. They are
- * held in local state for exactly as long as the form is open and cleared on
+ * held in local state for exactly as long as the dialog is open and cleared on
  * both cancel and success — never persisted, never logged.
  *
  * `onConnected` fires only after the backend confirms; the caller re-reads
@@ -43,17 +43,26 @@ export function DgftConnectGate({ onConnected }: { onConnected: () => void }) {
     });
   };
 
-  return loginOpen ? (
-    <DgftLoginPanel
-      username={username}
-      password={password}
-      onUsernameChange={setUsername}
-      onPasswordChange={setPassword}
-      onCancel={closeLogin}
-      onLogin={handleLogin}
-      isPending={isPending}
-    />
-  ) : (
-    <EbrcBanner ctaLabel="Sign in to DGFT" onCtaClick={() => setLoginOpen(true)} />
+  return (
+    <>
+      <EbrcBanner ctaLabel="Sign in to DGFT" onCtaClick={() => setLoginOpen(true)} />
+
+      <DgftLoginDialog
+        open={loginOpen}
+        username={username}
+        password={password}
+        onUsernameChange={setUsername}
+        onPasswordChange={setPassword}
+        // Dismissing mid-request would leave `validate_customer` resolving into
+        // a closed dialog and the credentials cleared out from under it, so the
+        // close is refused while one is in flight.
+        onOpenChange={(open) => {
+          if (open) setLoginOpen(true);
+          else if (!isPending) closeLogin();
+        }}
+        onLogin={handleLogin}
+        isPending={isPending}
+      />
+    </>
   );
 }

@@ -2,7 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge, Button, PageHeader, Shimmer } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  PageHeader,
+  Shimmer,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { SelectMidView } from "@/components/common/SelectMidView";
@@ -22,8 +31,12 @@ import { EbrcStatusTable } from "@/features/dashboard/ebrc-generation/components
  * Create Invoice uses for its own full-screen editor.
  *
  * Until DGFT is connected there's nothing real to show a status for, so the
- * connect gate is the landing content instead of an empty/fake table; once
- * connected, this page always shows the status table.
+ * connect gate is the landing content instead of an empty/fake table — and,
+ * per explicit ask, the page-level heading (title/badge/subtitle) doesn't
+ * show at all in that state either: the onboarding hero (DgftConnectGate) is
+ * the page's whole content, not a section under a heading that would just
+ * repeat "not connected" back at the merchant. The heading only appears once
+ * connected, alongside the real status table it describes.
  *
  * Whether DGFT is connected comes from `fetch_customer_status`, not from
  * client state: the session lives on the backend, so a reload (or a second
@@ -56,6 +69,35 @@ export function EbrcGenerationFeature() {
     );
   }
 
+  // The connection check is a request, so there is a moment before the answer
+  // where neither the gate nor the table is the honest thing to show. A
+  // skeleton beats flashing the onboarding hero at a merchant who is in fact
+  // already connected.
+  if (isStatusLoading) {
+    return (
+      <div className="mx-auto max-w-350 space-y-4 page-enter">
+        <Shimmer className="h-8 w-56" />
+        <div className="space-y-2 rounded-xl border border-border bg-card p-6">
+          <Shimmer className="h-5 w-48" />
+          <Shimmer className="h-40 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  if (!dgftConnected) {
+    return (
+      <MidGuard productType="PACB" feature={EBRC_FEATURE}>
+        <div className="mx-auto max-w-350 page-enter">
+          {/* `refetch` rather than a local flag: the DGFT session lives on the
+              backend, so the page re-asks it rather than assuming the login
+              took. */}
+          <DgftConnectGate onConnected={refetch} />
+        </div>
+      </MidGuard>
+    );
+  }
+
   return (
     <MidGuard productType="PACB" feature={EBRC_FEATURE}>
       <div className="mx-auto max-w-350 space-y-4 page-enter">
@@ -66,66 +108,46 @@ export function EbrcGenerationFeature() {
             // own wrapper.
             <>
               eBRC Status
-              {isStatusLoading ? (
-                <Shimmer className="h-5 w-32 rounded-full" />
-              ) : dgftConnected ? (
-                <Badge variant="success" size="sm">
-                  DGFT connected
-                </Badge>
-              ) : (
-                <Badge variant="secondary" size="sm">
-                  DGFT not connected
-                </Badge>
-              )}
+              <Badge variant="success" size="sm">
+                DGFT connected
+              </Badge>
             </>
           }
           titleAriaLabel="eBRC Status"
           subtitle="Check the status of your eBRC requests"
           actions={
-            // Nothing to generate or bulk-upload into until DGFT is
-            // connected — the banner below is already the call to action in
-            // that state, so the header stays free of a CTA that would only
-            // re-gate on the same thing.
-            !isStatusLoading &&
-            dgftConnected && (
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
-                  onClick={() => setBulkUploadOpen(true)}
-                >
-                  Bulk Upload
-                </Button>
+            // "Bulk Upload" no longer sits beside this as its own button —
+            // that same flow ("Upload a CSV" here) is now one of the two ways
+            // to generate, both reached from this one entry point instead of
+            // two separate ones.
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <Button
                   type="button"
                   variant="primary"
                   size="sm"
-                  onClick={() => router.push("/ebrc-generation/generate")}
+                  rightIcon={<Icon name="chevron-down" className="h-3.5 w-3.5" />}
                 >
                   Generate eBRC
                 </Button>
-              </div>
-            )
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setBulkUploadOpen(true)}>
+                  <Icon name="upload" className="h-3.5 w-3.5" />
+                  Upload a CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push("/ebrc-generation/generate")}>
+                  <Icon name="list-checks" className="h-3.5 w-3.5" />
+                  Select Individual
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           }
         />
 
         <BulkUploadDialog open={bulkUploadOpen} onOpenChange={setBulkUploadOpen} />
 
-        {/* The gate is the honest default while the status call is in flight:
-          showing the table first and yanking it back would be worse than a
-          brief skeleton. */}
-        {isStatusLoading ? (
-          <div className="space-y-2 rounded-xl border border-border bg-card p-6">
-            <Shimmer className="h-5 w-48" />
-            <Shimmer className="h-40 w-full" />
-          </div>
-        ) : dgftConnected ? (
-          <EbrcStatusTable />
-        ) : (
-          <DgftConnectGate onConnected={refetch} />
-        )}
+        <EbrcStatusTable />
       </div>
     </MidGuard>
   );

@@ -18,6 +18,7 @@ import { SelectIrmsStep } from "@/features/dashboard/ebrc-generation/components/
 import { MapShippingBillStep } from "@/features/dashboard/ebrc-generation/components/MapShippingBillStep";
 import { ReviewConfirmStep } from "@/features/dashboard/ebrc-generation/components/ReviewConfirmStep";
 import { toIrmMapping } from "@/features/dashboard/ebrc-generation/helpers";
+import { EbrcRequestReceivedOverlay } from "@/features/dashboard/ebrc-generation/components/EbrcRequestReceivedOverlay";
 import { emptyMapping, type IrmMapping } from "@/features/dashboard/ebrc-generation/types";
 
 const STEPS = [
@@ -120,6 +121,7 @@ export function EbrcGenerationWizard() {
   // What the server's shipping-bill record looked like the last time each IRM
   // was seeded into the form — see the seeding effect below.
   const seededRef = useRef<Map<string, string>>(new Map());
+  const [receivedOpen, setReceivedOpen] = useState(false);
 
   // This wizard only makes sense once DGFT is connected — that gate lives
   // on the eBRC Status landing page (DgftConnectGate there), not full-screen
@@ -238,7 +240,10 @@ export function EbrcGenerationWizard() {
     const dtos = selectedIds.map((id) => recordsByIrm.get(id)?.shippingBillData ?? null);
     push(dtos, () => {
       clearSelectedIrms();
-      router.push("/ebrc-generation");
+      // The overlay is the confirmation, not a toast — see
+      // EbrcRequestReceivedOverlay. Routing happens when it is dismissed, so
+      // the merchant reads the 4-hour expectation before leaving the wizard.
+      setReceivedOpen(true);
     });
   };
 
@@ -332,6 +337,11 @@ export function EbrcGenerationWizard() {
           </div>
         </div>
       )}
+
+      <EbrcRequestReceivedOverlay
+        open={receivedOpen}
+        onClose={() => router.push("/ebrc-generation")}
+      />
     </div>
   );
 }

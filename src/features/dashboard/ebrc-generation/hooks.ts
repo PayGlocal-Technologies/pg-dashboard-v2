@@ -722,7 +722,10 @@ export function usePushIrms(): {
         {
           onSuccess: (data) => {
             if (handleDgftError(data)) return;
-            toast.success("eBRC generation initiated successfully.");
+            // No success toast: the wizard answers this with
+            // EbrcRequestReceivedOverlay, which says the same thing and the
+            // 4-hour expectation with it. Two confirmations for one action is
+            // one too many.
             void queryClient.invalidateQueries({ queryKey: ["ebrc-request-search"] });
             void queryClient.invalidateQueries({ queryKey: ["ebrc-irm-search"] });
             onDone();

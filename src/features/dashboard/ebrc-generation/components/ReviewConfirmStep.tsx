@@ -1,6 +1,6 @@
 "use client";
 
-import { Checkbox } from "@/components/ui";
+import { Card, CardContent, Checkbox } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils/format";
 import {
@@ -82,96 +82,106 @@ export function ReviewConfirmStep({
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 items-center gap-3 sm:grid-cols-[1fr_auto_1fr_auto_1fr]">
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[11.5px] text-muted-foreground">Total IRM amount</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-foreground">
-            {formatCurrency(totalIrmAmount, currency)}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            {inProgressRecords.length} of {selectedIds.length} IRM
-            {selectedIds.length === 1 ? "" : "s"} ready
-          </p>
-        </div>
-        <Icon
-          name="chevron-right"
-          className="hidden h-4 w-4 shrink-0 text-muted-foreground sm:block"
-        />
-        <div className="rounded-lg border border-border p-3">
-          <p className="text-[11.5px] text-muted-foreground">Deductions &amp; charges</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-amber-700 dark:text-amber-400">
-            {formatCurrency(totalDeductions, currency)}
-          </p>
-          <p className="mt-0.5 text-[11px] text-muted-foreground">
-            From {formatCurrency(totalMappedAmount, currency)} mapped
-          </p>
-        </div>
-        <Icon
-          name="chevron-right"
-          className="hidden h-4 w-4 shrink-0 text-muted-foreground sm:block"
-        />
-        <div className="rounded-lg border border-primary/40 bg-primary/5 p-3">
-          <p className="text-[11.5px] text-muted-foreground">Final eBRC amount</p>
-          <p className="mt-1 text-lg font-bold tabular-nums text-foreground">
-            {formatCurrency(finalAmount, currency)}
-          </p>
-          <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">
-            Ready for generation
-          </p>
-        </div>
-      </div>
-
-      <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-[12.5px] text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
-        <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-        <p>
-          {allMapped
-            ? "100% of your IRM amount has been mapped. All selected remittances will be included in this eBRC."
-            : `${fullyMappedCount} of ${selectedIds.length} IRMs mapped so far. Go back to Map shipping bill to finish the rest.`}
-        </p>
-      </div>
-
-      <div>
-        <p className="text-[13px] font-semibold text-foreground">IRM mapping details</p>
-        <p className="text-[12px] text-muted-foreground">Review how each IRM is mapped</p>
-        <div className="mt-2 space-y-2">
-          {selectedRows.map((row) => {
-            const mapped = isMappingComplete(records.get(row.id));
-            return (
-              <div
-                key={row.id}
-                className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
-              >
-                <div className="flex items-center gap-2.5">
-                  <span
-                    className={
-                      mapped
-                        ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                        : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
-                    }
-                  >
-                    <Icon name={mapped ? "check" : "clock"} className="h-3 w-3" />
-                  </span>
-                  <div>
-                    <p className="font-mono text-[12.5px] font-semibold text-foreground">
-                      {row.irmNumber}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {mapped ? "Fully mapped" : "Not mapped yet"}
-                    </p>
-                  </div>
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-start">
+        <div>
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Amount breakdown
+          </h3>
+          <Card size="sm" className="shadow-none">
+            <CardContent className="divide-y divide-border p-0">
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="text-[13px] text-foreground">Total IRM amount</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    {inProgressRecords.length} of {selectedIds.length} IRM
+                    {selectedIds.length === 1 ? "" : "s"} ready
+                  </p>
                 </div>
-                <p className="text-[13px] font-semibold tabular-nums text-foreground">
-                  {formatCurrency(
-                    toAmount(
-                      records.get(row.id)?.shippingBillData?.mappedIRMAmountFCC ??
-                        row.remittanceAmount
-                    ),
-                    row.currencyCode
-                  )}
+                <p className="text-[13.5px] font-semibold tabular-nums text-foreground">
+                  {formatCurrency(totalIrmAmount, currency)}
                 </p>
               </div>
-            );
-          })}
+              <div className="flex items-center justify-between gap-3 px-4 py-3">
+                <div>
+                  <p className="text-[13px] text-foreground">Deductions &amp; charges</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">
+                    From {formatCurrency(totalMappedAmount, currency)} mapped
+                  </p>
+                </div>
+                <p className="text-[13.5px] font-semibold tabular-nums text-amber-700 dark:text-amber-400">
+                  − {formatCurrency(totalDeductions, currency)}
+                </p>
+              </div>
+              <div className="flex items-center justify-between gap-3 bg-primary/5 px-4 py-3">
+                <div>
+                  <p className="text-[13px] font-semibold text-foreground">Final eBRC amount</p>
+                  <p className="mt-0.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+                    Ready for generation
+                  </p>
+                </div>
+                <p className="text-[15px] font-bold tabular-nums text-foreground">
+                  {formatCurrency(finalAmount, currency)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-[12.5px] text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+            <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <p>
+              {allMapped
+                ? "100% of your IRM amount has been mapped. All selected remittances will be included in this eBRC."
+                : `${fullyMappedCount} of ${selectedIds.length} IRMs mapped so far. Go back to Map shipping bill to finish the rest.`}
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            IRM mapping details
+          </h3>
+          <Card size="sm" className="shadow-none">
+            <CardContent className="space-y-2">
+              {selectedRows.map((row) => {
+                const mapped = isMappingComplete(records.get(row.id));
+                return (
+                  <div
+                    key={row.id}
+                    className="flex items-center justify-between gap-3 rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={
+                          mapped
+                            ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
+                            : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                        }
+                      >
+                        <Icon name={mapped ? "check" : "clock"} className="h-3 w-3" />
+                      </span>
+                      <div>
+                        <p className="font-mono text-[12.5px] font-semibold text-foreground">
+                          {row.irmNumber}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {mapped ? "Fully mapped" : "Not mapped yet"}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[13px] font-semibold tabular-nums text-foreground">
+                      {formatCurrency(
+                        toAmount(
+                          records.get(row.id)?.shippingBillData?.mappedIRMAmountFCC ??
+                            row.remittanceAmount
+                        ),
+                        row.currencyCode
+                      )}
+                    </p>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
         </div>
       </div>
 

@@ -4,17 +4,14 @@ import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
 
-/** Shared with DgftLoginPanel's own info panel, so the "why connect DGFT"
- *  pitch reads identically everywhere it's made. */
 export const EBRC_WHY_ITEMS = [
   "Prove your export payments were received",
-  "Claim eligible export benefits and tax refunds",
-  "Keep your export realisations documented",
+  "Claim eligible export benefits and refunds",
+  "Keep your export transactions documented in one place",
 ];
 
-/** The "Why is it needed?" eyebrow + checklist, factored out so
- *  DgftLoginPanel's info panel can render the exact same block without
- *  duplicating the markup. */
+/** The "Why is it needed?" eyebrow + checklist, factored out of the banner's
+ *  own render for readability. */
 export function EbrcWhyList({ className }: { className?: string }) {
   return (
     <div className={className}>
@@ -43,7 +40,7 @@ export function EbrcWhyList({ className }: { className?: string }) {
  * account" moment, just from a different entry point (one navigates to the
  * generation flow, the other opens the sign-in dialog right there).
  *
- * public/assets/ebrc-banner-4.png reserves a blank left half for real
+ * public/assets/ebrc banner final.png reserves a blank left half for real
  * content rather than baking heading/copy into the artwork the way the
  * previous banner did — so all of it renders as actual text here (`alt=""`,
  * the image is decorative now that nothing meaningful only exists inside
@@ -60,7 +57,7 @@ export function EbrcBanner({
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border">
       <AppImage
-        src="/assets/ebrc-banner-4.png"
+        src="/assets/ebrc banner final.png"
         alt=""
         width={4680}
         height={2232}
@@ -74,16 +71,22 @@ export function EbrcBanner({
             Bring your eBRCs closer to your payments
           </h2>
           <p className="max-w-md text-[13px] leading-relaxed text-muted-foreground sm:text-sm">
-            Link your DGFT portal with PayGlocal to connect export transactions with eBRCs and
+            Link your DGFT portal with PayGlocal to connect export payments with eBRCs and
             simplify your compliance workflow.
           </p>
         </div>
 
         <EbrcWhyList className="space-y-2" />
 
-        <Button type="button" variant="primary" className="w-fit" onClick={onCtaClick}>
-          {ctaLabel}
-        </Button>
+        <div className="space-y-2">
+          <Button type="button" variant="primary" className="w-fit" onClick={onCtaClick}>
+            {ctaLabel}
+          </Button>
+          {/* No "Learn more about eBRC" link here: there's no existing
+              PayGlocal help/blog URL for eBRC in this codebase to point it
+              at, and inventing one isn't an option. */}
+          <p className="text-[11px] text-muted-foreground">Powered by DGFT &amp; PayGlocal</p>
+        </div>
       </div>
     </div>
   );
