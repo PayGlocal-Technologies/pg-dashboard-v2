@@ -2,11 +2,12 @@
 
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useStore } from "@tanstack/react-form";
 import {
   Accordion,
   Button,
+  Card,
   Checkbox,
   CountrySelect,
   Field,
@@ -45,7 +46,6 @@ import {
   validatePhone,
 } from "@/features/dashboard/client-management/schemas";
 import {
-  buildEmbedLines,
   buildLiveEmbedLines,
   copyEmbedCode,
   displayDomain,
@@ -56,8 +56,12 @@ import {
   PAYMENT_BUTTONS_QUERY_KEY,
   useMerchantCurrencies,
   useMerchantWebsite,
-  usePaymentButtonMid,
+  usePaymentButtonCreateScope,
+  usePaymentButtonsEnabled,
 } from "@/features/dashboard/payment-button/hooks";
+import { PaymentButtonNotEnabled } from "@/features/dashboard/payment-button/components/PaymentButtonNotEnabled";
+import { MidGuard } from "@/components/common/MidGuard";
+import { MidChoiceList } from "@/components/common/MidScopedAction";
 import {
   validateButtonAmount,
   validateButtonLabel,
@@ -65,12 +69,12 @@ import {
   validateCustomFieldLabel,
 } from "@/features/dashboard/payment-button/schemas";
 import {
-  BUTTON_ID_PLACEHOLDER,
   CUSTOM_FIELDS_HINT,
   DEFAULT_VALUE_HINT,
   EMPTY_PAYMENT_BUTTON_FORM,
   MAX_CUSTOM_FIELDS,
   PAYMENT_BUTTON_CUSTOM_FIELD_TYPES,
+  PAYMENT_BUTTONS_FEATURE,
   emptyCustomField,
   PAYMENT_BUTTON_AMOUNT_TYPES,
   PAYMENT_BUTTON_COLLECT_FIELDS,
@@ -172,13 +176,13 @@ function ContactRow({ icon, children }: { icon: IconName; children: ReactNode })
  * amount, name/billing address, custom fields, contact details and appearance
  * have no field in it yet, so they are collected and previewed but not sent.
  *
- * Get code shows the design's richer snippet with a placeholder id until the
- * button exists; once create returns, both it and the live dialog show the
- * real snippet built from the returned script (buildLiveEmbedLines).
+ * Get code and Copy code stay disabled until create returns the button's
+ * script: before that there is no working snippet to give (no button id, and
+ * the script URL comes from the response), and a merchant could paste a
+ * placeholder into their site. After create both use buildLiveEmbedLines.
  */
-export function CreatePaymentButtonFeature() {
+function CreatePaymentButtonEditor({ mid }: { mid: string }) {
   const router = useRouter();
-  const mid = usePaymentButtonMid();
   const { currencies } = useMerchantCurrencies(mid);
   const website = useMerchantWebsite(mid);
 
@@ -196,10 +200,6 @@ export function CreatePaymentButtonFeature() {
   const form = useForm({
     defaultValues: EMPTY_PAYMENT_BUTTON_FORM,
     onSubmit: ({ value }) => {
-      if (!mid) {
-        toast.error("No merchant account to create this button under");
-        return;
-      }
       createButton(toCreatePaymentButtonBody(value, website), {
         onSuccess: (res) => {
           if (res?.data) setCreated(res.data);
@@ -211,9 +211,7 @@ export function CreatePaymentButtonFeature() {
   });
   const values = useStore(form.store, (s) => s.values);
 
-  const embedLines = created
-    ? buildLiveEmbedLines(created)
-    : buildEmbedLines(values, BUTTON_ID_PLACEHOLDER);
+  const embedLines = created ? buildLiveEmbedLines(created) : [];
 
   const close = () => router.push("/payment-button");
 
@@ -727,24 +725,30 @@ export function CreatePaymentButtonFeature() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="code" className="h-3.5 w-3.5" />}
-                  onClick={() => setGetCodeOpen(true)}
-                >
-                  Get code
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
-                  onClick={() => void copyEmbedCode(embedLinesToText(embedLines))}
-                >
-                  Copy code
-                </Button>
+                <NeedsCreatedButton ready={!!created}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!created}
+                    leftIcon={<Icon name="code" className="h-3.5 w-3.5" />}
+                    onClick={() => setGetCodeOpen(true)}
+                  >
+                    Get code
+                  </Button>
+                </NeedsCreatedButton>
+                <NeedsCreatedButton ready={!!created}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!created}
+                    leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
+                    onClick={() => void copyEmbedCode(embedLinesToText(embedLines))}
+                  >
+                    Copy code
+                  </Button>
+                </NeedsCreatedButton>
               </div>
             </div>
 
@@ -777,5 +781,116 @@ export function CreatePaymentButtonFeature() {
         onDone={close}
       />
     </div>
+  );
+}
+
+/**
+ * Explains why a code action is unavailable while it is. A disabled button
+ * takes no pointer events, so the tip hangs off a focusable wrapper; once the
+ * button exists the wrapper steps aside and the button is used directly.
+ */
+function NeedsCreatedButton({ ready, children }: { ready: boolean; children: ReactNode }) {
+  if (ready) return <>{children}</>;
+  return (
+    <TooltipProvider delayDuration={200}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span tabIndex={0}>{children}</span>
+        </TooltipTrigger>
+        <TooltipContent>Available once the button is created</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/**
+ * The editor's header and a centred body, for the states that stop short of
+ * the form: product not enabled, MID not eligible, or an account to pick. Close
+ * works from all of them, as it does from the editor.
+ */
+function EditorGateShell({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  return (
+    <div className="flex h-full flex-col [&_*]:shadow-none">
+      <header className="flex shrink-0 items-center gap-4 border-b border-border px-5 py-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label="Close"
+          className="h-9 w-9 shrink-0 p-0"
+          onClick={() => router.push("/payment-button")}
+        >
+          <Icon name="x" className="h-4 w-4" />
+        </Button>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          Create a new payment button
+        </h1>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto bg-muted p-4 md:p-6">
+        <div className="mx-auto mt-6 max-w-xl">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Create a payment button, at /payment-button/create: the same gates as the
+ * list page, then the editor under a resolved MID.
+ *
+ *  1. The PAYMENT_BUTTONS product must be enabled (else the not-enabled state).
+ *  2. A MID selected in the header must be PA and carry the feature (MidGuard).
+ *  3. The MID to create under must be known: from `?mid=` (the list's picker),
+ *     the header's selection, or the only eligible MID. A merchant with several
+ *     and none chosen, arriving from the header search or a bare link, picks
+ *     here first, the way pg-dashboard's Create asks before opening its form.
+ */
+export function CreatePaymentButtonFeature() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const isEnabled = usePaymentButtonsEnabled();
+  const { mid, needsMidChoice, midOptions } = usePaymentButtonCreateScope(searchParams.get("mid"));
+
+  if (!isEnabled) {
+    return (
+      <EditorGateShell>
+        <PaymentButtonNotEnabled className="rounded-xl border border-border bg-card" />
+      </EditorGateShell>
+    );
+  }
+
+  if (needsMidChoice || !mid) {
+    return (
+      <EditorGateShell>
+        <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
+          <Card className="gap-3 p-5">
+            <div>
+              <h2 className="text-[15px] font-semibold text-foreground">Which account?</h2>
+              <p className="mt-0.5 text-[13px] text-muted-foreground">
+                {midOptions.length > 0
+                  ? "You hold more than one. Pick the one this payment button belongs to."
+                  : "None of your accounts can create payment buttons yet."}
+              </p>
+            </div>
+            {midOptions.length > 0 && (
+              <MidChoiceList
+                midOptions={midOptions}
+                onSelect={(choice) =>
+                  router.replace(`/payment-button/create?mid=${encodeURIComponent(choice)}`)
+                }
+              />
+            )}
+          </Card>
+        </MidGuard>
+      </EditorGateShell>
+    );
+  }
+
+  return (
+    <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
+      {/* Keyed by MID: switching accounts starts a fresh form, since
+          currencies and the website are per MID. */}
+      <CreatePaymentButtonEditor key={mid} mid={mid} />
+    </MidGuard>
   );
 }

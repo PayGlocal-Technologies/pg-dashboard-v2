@@ -163,24 +163,6 @@ export const PREVIEW_DEMO_PRODUCT = {
 /** Shown in the preview when no merchant website is on file. */
 export const PREVIEW_FALLBACK_DOMAIN = "yourwebsite.com";
 
-/**
- * The embed script the Get code snippet points at, as the design draws it.
- * UNVERIFIED: pg-dashboard never hardcodes this; it takes `pbScriptSrcUrl`
- * from the create/download response. Swap for that value once a button exists.
- */
-export const PAYMENT_BUTTON_SCRIPT_SRC = "https://checkout.payglocal.in/v1/payment-button.js";
-
-/** Stands in for the button id in the snippet until the create call issues one. */
-export const BUTTON_ID_PLACEHOLDER = "<assigned on create>";
-
-/** The `data-collect-fields` token for each payer detail. */
-export const COLLECT_FIELD_TOKEN: Record<keyof PaymentButtonCollectFields, string> = {
-  name: "name",
-  email: "email",
-  phone: "phone",
-  billingAddress: "billing_address",
-};
-
 export const EMBED_CODE_COPIED_MESSAGE = "Embed code copied";
 
 /**

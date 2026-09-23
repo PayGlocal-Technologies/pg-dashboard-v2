@@ -168,6 +168,13 @@ export interface ActionEntry {
   path: string;
   icon: IconName;
   keywords?: string[];
+  /**
+   * A `merchantEnabledProducts.paymentProducts` entry the action needs. The
+   * parent page can stay searchable (it explains the product when it is off),
+   * but offering to create one of something the merchant cannot have would
+   * land them on that explanation from a "Create" label.
+   */
+  requiresPaymentProduct?: string;
 }
 
 /**
@@ -194,6 +201,7 @@ export const ACTION_ENTRIES: readonly ActionEntry[] = [
     // into rather than handed off through ?action=.
     path: "/payment-button/create",
     icon: "plus",
+    requiresPaymentProduct: "PAYMENT_BUTTONS",
     keywords: ["new payment button", "embed button", "pay now button"],
   },
   {

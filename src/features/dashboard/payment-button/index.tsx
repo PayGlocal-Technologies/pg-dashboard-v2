@@ -1,15 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Button, EmptyState, PageHeader } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { PageHeader } from "@/components/ui";
 import { MidGuard } from "@/components/common/MidGuard";
 import { PaymentButtonTable } from "@/features/dashboard/payment-button/components/PaymentButtonTable";
-import { useApp } from "@/stores/useApp";
+import { PaymentButtonNotEnabled } from "@/features/dashboard/payment-button/components/PaymentButtonNotEnabled";
 import {
-  MERCHANT_SUPPORT_EMAIL,
-  PAYMENT_BUTTON_NOT_ENABLED,
+  usePaymentButtonCreateScope,
+  usePaymentButtonsEnabled,
+} from "@/features/dashboard/payment-button/hooks";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
+import {
   PAYMENT_BUTTON_PAGE_SUBTITLE,
   PAYMENT_BUTTONS_FEATURE,
 } from "@/features/dashboard/payment-button/constants";
@@ -29,11 +30,16 @@ import type { PaymentButton } from "@/features/dashboard/payment-button/types";
  */
 export function PaymentButtonFeature() {
   const router = useRouter();
-  const paymentProducts = useApp((s) => s.merchantEnabledProducts?.paymentProducts);
-  const isEnabled = !!paymentProducts?.includes(PAYMENT_BUTTONS_FEATURE);
+  const isEnabled = usePaymentButtonsEnabled();
 
   // Create is its own full-screen route (see (invoice-editor)/payment-button).
-  const openCreate = () => router.push("/payment-button/create");
+  // With several eligible MIDs and none selected, the button asks which one
+  // first (pg-dashboard's ChooseMidSelect) and the choice rides as ?mid=.
+  const { needsMidChoice, midOptions } = usePaymentButtonCreateScope();
+  const openCreate = (mid: string) =>
+    router.push(
+      mid ? `/payment-button/create?mid=${encodeURIComponent(mid)}` : "/payment-button/create"
+    );
 
   // TODO: Edit lands with its design.
   const openEdit = (_row: PaymentButton) => {};
@@ -42,27 +48,7 @@ export function PaymentButtonFeature() {
     return (
       <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
         <PageHeader title="Payment Button" subtitle={PAYMENT_BUTTON_PAGE_SUBTITLE} />
-        <EmptyState
-          title={PAYMENT_BUTTON_NOT_ENABLED.title}
-          description={PAYMENT_BUTTON_NOT_ENABLED.description}
-          action={
-            // Copies the support address, as pg-dashboard's button does.
-            <Button
-              type="button"
-              variant="primary"
-              size="sm"
-              onClick={() =>
-                void navigator.clipboard
-                  .writeText(MERCHANT_SUPPORT_EMAIL)
-                  .then(() => toast.success("Support email copied to clipboard"))
-                  .catch(() => toast.error("Couldn't copy to clipboard"))
-              }
-            >
-              Contact us
-            </Button>
-          }
-          className="rounded-xl border border-border bg-card"
-        />
+        <PaymentButtonNotEnabled className="rounded-xl border border-border bg-card" />
       </div>
     );
   }
@@ -73,15 +59,14 @@ export function PaymentButtonFeature() {
         title="Payment Button"
         subtitle={PAYMENT_BUTTON_PAGE_SUBTITLE}
         actions={
-          <Button
-            type="button"
+          <MidScopedAction
+            label="Create payment button"
+            icon="plus"
             variant="primary"
-            size="sm"
-            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-            onClick={openCreate}
-          >
-            Create payment button
-          </Button>
+            needsMidChoice={needsMidChoice}
+            midOptions={midOptions}
+            onRun={openCreate}
+          />
         }
       />
 

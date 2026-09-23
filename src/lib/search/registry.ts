@@ -44,7 +44,10 @@ export interface SearchEntry {
 export function buildSearchRegistry(
   navigation: NavGroup[],
   settingsGroups: SettingsNavGroup[],
-  { isPartnerUser = false }: { isPartnerUser?: boolean } = {}
+  {
+    isPartnerUser = false,
+    paymentProducts = [],
+  }: { isPartnerUser?: boolean; paymentProducts?: string[] } = {}
 ): SearchEntry[] {
   const entries: SearchEntry[] = [];
   // First occurrence of a path wins. /mca-receipts appears three times across the
@@ -101,6 +104,9 @@ export function buildSearchRegistry(
   for (const action of ACTION_ENTRIES) {
     const parent = entries.find((entry) => entry.path === action.parentPath);
     if (!parent || seen.has(action.path)) continue;
+    if (action.requiresPaymentProduct && !paymentProducts.includes(action.requiresPaymentProduct)) {
+      continue;
+    }
     seen.add(action.path);
     entries.push({
       path: action.path,

@@ -45,6 +45,7 @@ export function GlobalSearch() {
   const router = useRouter();
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGlobalTenant = useApp((s) => s.isGlobalTenant);
+  const paymentProducts = useApp((s) => s.merchantEnabledProducts?.paymentProducts);
   const activeContext = useProductContext((s) => s.activeContext);
   const checkPermissions = useNewPermissions();
 
@@ -71,9 +72,9 @@ export function GlobalSearch() {
           toProductType(activeContext)
         ),
         SETTINGS_NAV_GROUPS,
-        { isPartnerUser }
+        { isPartnerUser, paymentProducts }
       ),
-    [isPartnerUser, isGlobalTenant, activeContext, checkPermissions]
+    [isPartnerUser, isGlobalTenant, activeContext, checkPermissions, paymentProducts]
   );
 
   const trimmed = query.trim();

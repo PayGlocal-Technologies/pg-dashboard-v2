@@ -7,6 +7,7 @@ import type { AxiosError } from "axios";
 import { useGet, usePostQuery, usePut } from "@/lib/api/hooks";
 import { api } from "@/lib/api/axios";
 import { handleApiError } from "@/lib/api/handleApiError";
+import { isFeatureAvailableForMid } from "@/lib/hooks/useFeatureApplicable";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import {
@@ -22,7 +23,10 @@ import {
   embedLinesToText,
   mapWqrEntry,
 } from "@/features/dashboard/payment-button/helpers";
-import { DEFAULT_BUTTON_CURRENCY } from "@/features/dashboard/payment-button/constants";
+import {
+  DEFAULT_BUTTON_CURRENCY,
+  PAYMENT_BUTTONS_FEATURE,
+} from "@/features/dashboard/payment-button/constants";
 import type {
   CreatePaymentButtonResponse,
   CurrencyEnableResponse,
@@ -31,6 +35,16 @@ import type {
   PaymentButtonListRequest,
   PaymentButtonListResponse,
 } from "@/features/dashboard/payment-button/types";
+
+/**
+ * Whether the merchant has the payment buttons product at all:
+ * `merchantEnabledProducts.paymentProducts` includes PAYMENT_BUTTONS, the check
+ * pg-dashboard makes before rendering anything on this page.
+ */
+export function usePaymentButtonsEnabled(): boolean {
+  const paymentProducts = useApp((s) => s.merchantEnabledProducts?.paymentProducts);
+  return !!paymentProducts?.includes(PAYMENT_BUTTONS_FEATURE);
+}
 
 /** Query-key root for the list, which create and disable invalidate. */
 export const PAYMENT_BUTTONS_QUERY_KEY = ["payment-buttons"] as const;
@@ -79,23 +93,54 @@ export function usePaymentButtons(body: PaymentButtonListRequest | null): {
   };
 }
 
+export interface PaymentButtonCreateScope {
+  /** The MID the button is created under, once known. */
+  mid: string | null;
+  /** More than one eligible MID and nothing chose between them: ask first. */
+  needsMidChoice: boolean;
+  /** The MIDs a merchant may create a button under. */
+  midOptions: string[];
+}
+
 /**
- * The MID a new payment button is created under. Mirrors pg-dashboard's
- * `selectedMid || applicableMids[0] || paMids[0]`: an explicit header
- * selection wins when it is a PA MID, else the first PA MID, else the profile
- * MID.
+ * Which MID a new payment button is created under. pg-dashboard's rule,
+ * ported exactly (PaymentButtonTable + useApplicableMids):
  *
- * pg-dashboard asks a multi-MID merchant to pick one before Create opens
- * (ChooseMidSelect); that picker is not ported yet, so a multi-MID merchant
- * with nothing selected creates under their first PA MID.
+ *  - The eligible MIDs are every `tidsInfo` MID that is ACTIVE and carries
+ *    PAYMENT_BUTTONS in any of its feature lists. Taken from `tidsInfo` itself,
+ *    not intersected with `paMids`: the two come from different responses and
+ *    can disagree, and intersecting silently dropped eligible accounts. Only
+ *    multi-MID merchants have `tidsInfo`, so single-MID merchants have none.
+ *  - More than one eligible: always ask (pg-dashboard's ChooseMidSelect), even
+ *    with a MID selected in the header. The answer travels as `?mid=`.
+ *  - Otherwise: `selectedMid || eligible[0] || paMids[0]`, as pg-dashboard
+ *    resolves `currentMid`, then the profile MID for a single-MID merchant.
  */
-export function usePaymentButtonMid(): string {
+export function usePaymentButtonCreateScope(midParam?: string | null): PaymentButtonCreateScope {
   const paMids = useApp((s) => s.paMids);
   const profileMid = useApp((s) => s.profile?.mid ?? "");
+  const tidsInfo = useApp((s) => s.tidsInfo);
+  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
 
-  if (selectedMid && paMids.includes(selectedMid)) return selectedMid;
-  return paMids[0] ?? profileMid;
+  const midOptions = isMultiMidUser
+    ? (tidsInfo ?? [])
+        .filter((config) =>
+          isFeatureAvailableForMid(config.mid, PAYMENT_BUTTONS_FEATURE, true, tidsInfo)
+        )
+        .map((config) => config.mid)
+        .filter(Boolean)
+    : [];
+
+  const fallbackMid =
+    selectedMid || midOptions[0] || paMids[0] || (isMultiMidUser ? "" : profileMid);
+
+  // A pick from the picker, honoured only if it is one this merchant may use.
+  if (midParam && (midOptions.includes(midParam) || midParam === fallbackMid)) {
+    return { mid: midParam, needsMidChoice: false, midOptions };
+  }
+  if (midOptions.length > 1) return { mid: null, needsMidChoice: true, midOptions };
+  return { mid: fallbackMid || null, needsMidChoice: false, midOptions };
 }
 
 /** The currencies enabled on a MID, as ISO3 codes, for the Value field's picker. */

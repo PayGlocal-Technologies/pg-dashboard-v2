@@ -4,17 +4,14 @@ import type { BadgeVariant } from "@payglocal_ui/flux-ui";
 import { currencySymbol } from "@/lib/utils/format";
 import { toast } from "sonner";
 import {
-  COLLECT_FIELD_TOKEN,
   DEFAULT_BUTTON_COLOR,
   EMBED_CODE_COPIED_MESSAGE,
-  PAYMENT_BUTTON_SCRIPT_SRC,
   PAYMENT_BUTTON_STATUS_LABEL,
 } from "@/features/dashboard/payment-button/constants";
 import type {
   PaymentButton,
   PaymentButtonAppearance,
   PaymentButtonListRequest,
-  PaymentButtonCollectFields,
   CreatePaymentButtonBody,
   PaymentButtonFormValues,
   PaymentButtonScript,
@@ -233,45 +230,9 @@ function attrLine(name: string, value: string): EmbedLine {
 }
 
 /**
- * The embed snippet for a button, as structured lines. Built as tokens rather
- * than a string so the dialog can colour it without parsing HTML back out of
- * text; embedLinesToText flattens the same lines for the clipboard, so what is
- * copied is always exactly what is shown.
- *
- * Collect and custom-field attributes appear only when they carry something,
- * so an unticked section never leaves an empty attribute in the merchant's page.
- */
-export function buildEmbedLines(values: PaymentButtonFormValues, buttonId: string): EmbedLine[] {
-  const collect = (Object.keys(COLLECT_FIELD_TOKEN) as (keyof PaymentButtonCollectFields)[])
-    .filter((key) => values.collect[key])
-    .map((key) => COLLECT_FIELD_TOKEN[key]);
-  const customLabels = values.customFieldsEnabled
-    ? values.customFields.map((field) => field.label.trim()).filter(Boolean)
-    : [];
-
-  return [
-    { indent: 0, tokens: [{ kind: "tag", text: "<form>" }] },
-    {
-      indent: 0,
-      tokens: [
-        { kind: "tag", text: "<script" },
-        { kind: "text", text: " async" },
-      ],
-    },
-    attrLine("src", PAYMENT_BUTTON_SCRIPT_SRC),
-    attrLine("data-payment_button_id", buttonId),
-    ...(collect.length ? [attrLine("data-collect-fields", collect.join(","))] : []),
-    ...(customLabels.length ? [attrLine("data-custom-fields", customLabels.join(","))] : []),
-    { indent: 0, tokens: [{ kind: "tag", text: "></script>" }] },
-    { indent: 0, tokens: [{ kind: "tag", text: "</form>" }] },
-  ];
-}
-
-/**
  * The snippet for a button that exists, from the script coordinates the create
  * or download call returned. The attributes are pg-dashboard's, verbatim
- * (`src` + `data-pb-id`), since that is the markup the live script reads; the
- * richer design snippet above is only a preview until the script supports it.
+ * (`src` + `data-pb-id`), since that is the markup the live script reads.
  */
 export function buildLiveEmbedLines(script: PaymentButtonScript): EmbedLine[] {
   return [
