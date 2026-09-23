@@ -5,6 +5,8 @@ import {
   Button,
   Callout,
   CalloutText,
+  Card,
+  CardContent,
   DataTable,
   Drawer,
   DrawerContent,
@@ -254,7 +256,7 @@ export function EbrcStatusTable() {
   return (
     <div className="space-y-4">
       <Callout variant="info">
-        <CalloutText>To check the updated status, please wait 2 hours after submission.</CalloutText>
+        <CalloutText>To check the updated status, please wait 4 hours after submission.</CalloutText>
       </Callout>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">

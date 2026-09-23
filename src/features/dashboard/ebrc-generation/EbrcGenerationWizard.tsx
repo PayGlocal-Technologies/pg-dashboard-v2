@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
 import { Badge, Button, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -11,6 +10,7 @@ import { useEbrcDgft } from "@/stores/useEbrcDgft";
 import { SelectIrmsStep } from "@/features/dashboard/ebrc-generation/components/SelectIrmsStep";
 import { MapShippingBillStep } from "@/features/dashboard/ebrc-generation/components/MapShippingBillStep";
 import { ReviewConfirmStep } from "@/features/dashboard/ebrc-generation/components/ReviewConfirmStep";
+import { EbrcRequestReceivedOverlay } from "@/features/dashboard/ebrc-generation/components/EbrcRequestReceivedOverlay";
 import { emptyMapping, type IrmMapping } from "@/features/dashboard/ebrc-generation/types";
 
 const STEPS = [
@@ -97,6 +97,7 @@ export function EbrcGenerationWizard() {
   const [mappings, setMappings] = useState<Record<string, IrmMapping>>({});
   const [agreed, setAgreed] = useState(false);
   const [contentEl, setContentEl] = useState<HTMLElement | null>(null);
+  const [receivedOpen, setReceivedOpen] = useState(false);
 
   // This wizard only makes sense once DGFT is connected — that gate lives
   // on the eBRC Status landing page (DgftConnectGate there), not full-screen
@@ -130,10 +131,7 @@ export function EbrcGenerationWizard() {
   const handleConfirm = () => {
     // TODO(integration): POST to the eBRC generation endpoint once it
     // exists — payload shape must come from a real spec, not a guess.
-    toast.message("eBRC generation isn't connected to the backend yet", {
-      description: "Your request would normally be submitted to DGFT for validation here.",
-    });
-    router.push("/ebrc-generation");
+    setReceivedOpen(true);
   };
 
   return (
@@ -214,6 +212,11 @@ export function EbrcGenerationWizard() {
           </div>
         </div>
       )}
+
+      <EbrcRequestReceivedOverlay
+        open={receivedOpen}
+        onClose={() => router.push("/ebrc-generation")}
+      />
     </div>
   );
 }
