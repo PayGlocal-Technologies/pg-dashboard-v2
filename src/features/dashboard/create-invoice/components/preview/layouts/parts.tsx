@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
+import { revealInvoiceField } from "@/features/dashboard/create-invoice/components/ReadinessChecklist";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";
 import type { InvoiceLabels } from "@/features/dashboard/create-invoice/labels";
 import type { PreviewItem } from "@/features/dashboard/create-invoice/components/preview/previewModel";
@@ -73,6 +74,45 @@ function PartLabel({
 }
 
 /**
+ * Makes a block of the document preview clickable, scrolling the matching
+ * field into view on the editor side (and flashing it), via the same
+ * `revealInvoiceField` the readiness checklist uses.
+ *
+ * A bare `<button>`, not flux's `<Button>`: that component owns its own
+ * padding, `inline-flex` layout and icon slot, none of which this preview can
+ * afford to take on — the whole point of this sheet is to mirror the server's
+ * PDF typography exactly, so the click affordance has to sit invisibly around
+ * existing content rather than restyle it. `block w-full text-inherit`
+ * resets the button's own defaults so it disappears until hovered.
+ */
+export function PreviewSection({
+  fieldId,
+  label,
+  className,
+  children,
+}: {
+  fieldId: string;
+  /** aria-label for the click target, e.g. "Edit issue date". */
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={() => revealInvoiceField(fieldId)}
+      className={cn(
+        "block w-full rounded-sm text-inherit outline-none transition-colors hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring/40",
+        className
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
  * One party: who is billing, or who is being billed.
  *
  * Name, the contact under a business name, every address line, and GSTIN. The
@@ -89,15 +129,18 @@ export function PartyBlock({
   labelClassName,
   labelStyle,
   bodyClassName,
+  fieldId,
 }: Tone & {
   label: string;
   name: string;
   secondary?: string;
   lines: string[];
   gstIn?: string;
+  /** Wraps the block so clicking it scrolls to this field in the editor. */
+  fieldId?: string;
 }) {
-  return (
-    <div className={cn("min-w-0", className)}>
+  const content = (
+    <>
       <PartLabel className={labelClassName} style={labelStyle}>
         {label}
       </PartLabel>
@@ -120,8 +163,18 @@ export function PartyBlock({
           GSTIN {gstIn}
         </p>
       )}
-    </div>
+    </>
   );
+
+  if (fieldId) {
+    return (
+      <PreviewSection fieldId={fieldId} label={`Edit ${label.replace(/:$/, "")}`} className={cn("min-w-0", className)}>
+        {content}
+      </PreviewSection>
+    );
+  }
+
+  return <div className={cn("min-w-0", className)}>{content}</div>;
 }
 
 /**
@@ -199,11 +252,14 @@ export function AccountBlock({
   className,
   labelClassName,
   labelStyle,
+  fieldId,
 }: Tone & {
   labels: InvoiceLabels;
   account: BankAccountRow | undefined;
   /** 2 for a grid, 1 to stack in a narrow column. */
   columns?: 1 | 2;
+  /** Wraps the block so clicking it scrolls to this field in the editor. */
+  fieldId?: string;
 }) {
   if (!account) return null;
 
@@ -214,8 +270,8 @@ export function AccountBlock({
     { label: labels.ifscOrRouting, value: account.routing, mono: true },
   ];
 
-  return (
-    <div className={cn("min-w-0", className)}>
+  const content = (
+    <>
       <PartLabel className={labelClassName} style={labelStyle}>
         {labels.bankDetails}
       </PartLabel>
@@ -239,8 +295,18 @@ export function AccountBlock({
           </div>
         ))}
       </div>
-    </div>
+    </>
   );
+
+  if (fieldId) {
+    return (
+      <PreviewSection fieldId={fieldId} label={`Edit ${labels.bankDetails.toLowerCase()}`} className={cn("min-w-0", className)}>
+        {content}
+      </PreviewSection>
+    );
+  }
+
+  return <div className={cn("min-w-0", className)}>{content}</div>;
 }
 
 /** The memo, which sits with the amount rather than in the footer. */
@@ -267,16 +333,19 @@ export function NotesBlock({
   lut,
   className,
   textClassName,
+  fieldId,
 }: {
   notes: string;
   lut: string;
   className?: string;
   textClassName?: string;
+  /** Wraps the block so clicking it scrolls to this field in the editor. */
+  fieldId?: string;
 }) {
   if (!notes && !lut) return null;
 
-  return (
-    <div className={cn("min-w-0", className)}>
+  const content = (
+    <>
       {notes && (
         <p
           className={cn(
@@ -293,8 +362,18 @@ export function NotesBlock({
           LUT: {lut}
         </p>
       )}
-    </div>
+    </>
   );
+
+  if (fieldId) {
+    return (
+      <PreviewSection fieldId={fieldId} label="Edit notes and terms" className={cn("min-w-0", className)}>
+        {content}
+      </PreviewSection>
+    );
+  }
+
+  return <div className={cn("min-w-0", className)}>{content}</div>;
 }
 
 /**

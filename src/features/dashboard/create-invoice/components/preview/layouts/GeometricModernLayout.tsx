@@ -10,6 +10,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
+  PreviewSection,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -33,12 +34,14 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
     <div className={`flex min-h-full w-full min-w-0 flex-col bg-card ${PAGE_PADDING}`}>
       <div className="mb-7 flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <span
-            className="inline-block rounded-full border px-3 py-1 text-[10.5px] font-medium text-foreground"
-            style={{ borderColor: withAlpha(primary, 0.33) }}
-          >
-            {labels.invoiceNumber} {model.invoiceNumber}
-          </span>
+          <PreviewSection fieldId="invoice-number" label="Edit invoice number" className="w-auto">
+            <span
+              className="inline-block rounded-full border px-3 py-1 text-[10.5px] font-medium text-foreground"
+              style={{ borderColor: withAlpha(primary, 0.33) }}
+            >
+              {labels.invoiceNumber} {model.invoiceNumber}
+            </span>
+          </PreviewSection>
 
           <div className="mt-2 flex items-center gap-2">
             <LogoSlot url={model.logoUrl} onUpload={onLogoClick} size={32} tint={primary} />
@@ -69,14 +72,14 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
             merchant text, and the row wraps rather than overflowing if a long
             localised month leaves them no space. */}
         <div className="flex shrink-0 gap-8 text-[11.5px]">
-          <div>
+          <PreviewSection fieldId="issue-date" label="Edit issue date" className="w-auto">
             <p className="font-semibold text-foreground">{labels.issueDate}</p>
             <p className="text-muted-foreground">{model.issueDate}</p>
-          </div>
-          <div>
+          </PreviewSection>
+          <PreviewSection fieldId="due-date" label="Edit due date" className="w-auto">
             <p className="font-semibold text-foreground">{labels.dueDate}</p>
             <p className="text-muted-foreground">{model.dueDate || "-"}</p>
-          </div>
+          </PreviewSection>
         </div>
       </div>
 
@@ -98,6 +101,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
           gstIn={model.billerGstIn}
           labelClassName={brandLabel}
           bodyClassName="text-[11px]"
+          fieldId="biller"
         />
         <PartyBlock
           label={labels.billedTo}
@@ -106,6 +110,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
           lines={model.clientLines}
           labelClassName={brandLabel}
           bodyClassName="text-[11px]"
+          fieldId="client"
         />
       </div>
 
@@ -119,7 +124,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
         <span className="text-right">{labels.total}</span>
       </div>
 
-      <div className="divide-y divide-border">
+      <PreviewSection fieldId="line-items" label="Edit line items" className="divide-y divide-border">
         {items.map((item) => (
           <div
             key={item.key}
@@ -136,7 +141,7 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
             </span>
           </div>
         ))}
-      </div>
+      </PreviewSection>
 
       <div className="mt-5">
         <TotalsRows
@@ -180,8 +185,9 @@ export function GeometricModernLayout({ model, onLogoClick }: LayoutProps) {
           account={model.account}
           columns={2}
           labelClassName={brandLabel}
+          fieldId="payment-account"
         />
-        <NotesBlock notes={model.notes} lut={model.lut} className="mt-4" />
+        <NotesBlock notes={model.notes} lut={model.lut} className="mt-4" fieldId="notes-terms" />
       </div>
 
       <SignatureBlock url={model.signatureUrl} className="mt-6" />

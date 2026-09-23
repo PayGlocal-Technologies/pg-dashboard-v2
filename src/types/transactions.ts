@@ -39,6 +39,13 @@ export interface TxnFilterValues {
    * really is coded.
    */
   country?: string[];
+  /**
+   * eBRC's two IRM status filters. They go into `fieldSearch` under exactly
+   * these names — see pg-dashboard's tableRequestbodyBuilder, which reads
+   * `newFilters.irmMappingStatus` / `newFilters.irmProcessStatus` the same way.
+   */
+  irmMappingStatus?: string[];
+  irmProcessStatus?: string[];
   startTime?: number;
   endTime?: number;
 }

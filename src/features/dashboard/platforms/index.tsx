@@ -553,12 +553,13 @@ function PlatformsContent() {
                     size="md"
                     className="w-full justify-start gap-2.5 text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
                     leftIcon={
-                      // Same h-6 w-9 footprint as the platform rows' logo
-                      // box above, so the "+" glyph and every brand mark
-                      // share one left edge and "Request a platform" lines
-                      // up with "Amazon", "Freelancer", etc. instead of
-                      // sitting ~12px further right.
-                      <span className="flex h-6 w-9 shrink-0 items-center justify-center">
+                      // Not the platform rows' shared h-6 w-9 logo box: that
+                      // width exists to fit a brand mark, and the "+" glyph
+                      // is much narrower than that box, so matching it left
+                      // the plus sitting flush left with a dead gap before
+                      // the label. Sized to the glyph itself instead, so the
+                      // label sits right next to it.
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
                         <Icon name="plus" className="h-4 w-4" />
                       </span>
                     }

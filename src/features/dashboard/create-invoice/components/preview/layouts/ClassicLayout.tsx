@@ -8,6 +8,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
+  PreviewSection,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -38,18 +39,18 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
       </div>
 
       <div className="mb-7 flex flex-wrap items-start gap-8 text-[12px]">
-        <div>
+        <PreviewSection fieldId="invoice-number" label="Edit invoice number" className="w-auto">
           <p className="text-muted-foreground">{labels.invoiceNumber}</p>
           <p className="font-semibold text-foreground">{model.invoiceNumber}</p>
-        </div>
-        <div>
+        </PreviewSection>
+        <PreviewSection fieldId="issue-date" label="Edit issue date" className="w-auto">
           <p className="text-muted-foreground">{labels.issueDate}</p>
           <p className="font-semibold text-foreground">{model.issueDate}</p>
-        </div>
-        <div>
+        </PreviewSection>
+        <PreviewSection fieldId="due-date" label="Edit due date" className="w-auto">
           <p className="text-muted-foreground">{labels.dueDate}</p>
           <p className="font-semibold text-foreground">{model.dueDate || "-"}</p>
-        </div>
+        </PreviewSection>
       </div>
 
       <div className="mb-7 grid grid-cols-2 gap-4">
@@ -58,12 +59,14 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
           name={model.billerName}
           lines={model.billerLines}
           gstIn={model.billerGstIn}
+          fieldId="biller"
         />
         <PartyBlock
           label={labels.billedTo}
           name={model.clientName}
           secondary={model.clientSecondary}
           lines={model.clientLines}
+          fieldId="client"
         />
       </div>
 
@@ -73,45 +76,49 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
       </p>
       <MemoLine memo={model.memo} className="mt-1" />
 
-      <div className="mt-4 overflow-hidden border border-border">
-        <div className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-          <span>{labels.description}</span>
-          <span className="text-center">{labels.qty}</span>
-          <span className="text-right">{labels.unitPrice}</span>
-          <span className="text-right">{labels.tax}</span>
-          <span className="text-right">{labels.total}</span>
-        </div>
+      <PreviewSection fieldId="line-items" label="Edit line items" className="mt-4">
+        <div className="overflow-hidden border border-border">
+          <div className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+            <span>{labels.description}</span>
+            <span className="text-center">{labels.qty}</span>
+            <span className="text-right">{labels.unitPrice}</span>
+            <span className="text-right">{labels.tax}</span>
+            <span className="text-right">{labels.total}</span>
+          </div>
 
-        <div className="divide-y divide-border">
-          {items.length === 0 ? (
-            <p className="px-3 py-4 text-center text-[12px] text-muted-foreground">No items yet.</p>
-          ) : (
-            items.map((item) => (
-              <div
-                key={item.key}
-                className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 px-3 py-2.5 text-[12px]"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-foreground">{item.name}</span>
-                  <ItemMeta item={item} />
-                </span>
-                <span className="text-center tabular-nums text-muted-foreground">
-                  {item.quantity}
-                </span>
-                <span className="text-right tabular-nums text-muted-foreground">
-                  {item.unitPrice}
-                </span>
-                <span className="text-right tabular-nums text-muted-foreground">
-                  {item.gstLabel || "-"}
-                </span>
-                <span className="text-right font-medium tabular-nums text-foreground">
-                  {item.amount}
-                </span>
-              </div>
-            ))
-          )}
+          <div className="divide-y divide-border">
+            {items.length === 0 ? (
+              <p className="px-3 py-4 text-center text-[12px] text-muted-foreground">
+                No items yet.
+              </p>
+            ) : (
+              items.map((item) => (
+                <div
+                  key={item.key}
+                  className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 px-3 py-2.5 text-[12px]"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-foreground">{item.name}</span>
+                    <ItemMeta item={item} />
+                  </span>
+                  <span className="text-center tabular-nums text-muted-foreground">
+                    {item.quantity}
+                  </span>
+                  <span className="text-right tabular-nums text-muted-foreground">
+                    {item.unitPrice}
+                  </span>
+                  <span className="text-right tabular-nums text-muted-foreground">
+                    {item.gstLabel || "-"}
+                  </span>
+                  <span className="text-right font-medium tabular-nums text-foreground">
+                    {item.amount}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
         </div>
-      </div>
+      </PreviewSection>
 
       <div className="mt-2 flex justify-end">
         <div className="w-full max-w-[220px]">
@@ -140,12 +147,14 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
         columns={2}
         className="mt-6 border-t border-border pt-4"
         labelClassName="mb-2 font-semibold"
+        fieldId="payment-account"
       />
 
       <NotesBlock
         notes={model.notes}
         lut={model.lut}
         className="mt-6 border-t border-border pt-4"
+        fieldId="notes-terms"
       />
 
       <SignatureBlock url={model.signatureUrl} className="mt-6" />

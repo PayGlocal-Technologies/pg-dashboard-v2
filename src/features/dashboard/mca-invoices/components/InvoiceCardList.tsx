@@ -10,6 +10,7 @@ import {
   Shimmer,
   StatusBadge,
 } from "@/components/ui";
+import type { ReactNode } from "react";
 import { Icon } from "@/components/icon";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { getInvoiceStatusMeta } from "@/features/dashboard/mca-invoices/constants";

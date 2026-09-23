@@ -104,6 +104,7 @@ export function AddLineItemDialog({
   currency,
   currencySymbol,
   editingItem,
+  initialDescription,
   onSubmit,
 }: {
   open: boolean;
@@ -112,6 +113,10 @@ export function AddLineItemDialog({
   currencySymbol: string;
   /** null when adding. */
   editingItem: LineItemDraft | null;
+  /** Seeds the name field when opening fresh from a typed-but-unmatched
+   *  search, e.g. LineItemsSection's inline "Add "…"" row. Ignored once
+   *  editingItem is set. */
+  initialDescription?: string;
   onSubmit: (values: LineItemValues) => void;
 }) {
   return (
@@ -121,10 +126,11 @@ export function AddLineItemDialog({
         <LineItemBody
           // Remount per open/target so the fields start from the right values
           // and no stale validation carries over.
-          key={`${open ? "open" : "closed"}-${editingItem?.key ?? "new"}`}
+          key={`${open ? "open" : "closed"}-${editingItem?.key ?? initialDescription ?? "new"}`}
           currency={currency}
           currencySymbol={currencySymbol}
           editingItem={editingItem}
+          initialDescription={initialDescription}
           onCancel={() => onOpenChange(false)}
           onSubmit={(values) => {
             onSubmit(values);
@@ -140,12 +146,14 @@ function LineItemBody({
   currency,
   currencySymbol,
   editingItem,
+  initialDescription,
   onCancel,
   onSubmit,
 }: {
   currency: string;
   currencySymbol: string;
   editingItem: LineItemDraft | null;
+  initialDescription?: string;
   onCancel: () => void;
   onSubmit: (values: LineItemValues) => void;
 }) {
@@ -160,7 +168,7 @@ function LineItemBody({
           quantity: editingItem.quantity,
           saveAsSku: editingItem.saveAsSku ?? false,
         }
-      : EMPTY
+      : { ...EMPTY, description: initialDescription ?? EMPTY.description }
   );
   const [showGst, setShowGst] = useState(!!editingItem?.gstRate);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);

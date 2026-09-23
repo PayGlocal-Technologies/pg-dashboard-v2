@@ -563,6 +563,7 @@ function CreateInvoiceBootstrap() {
           total={String(invoice?.totalAmount ?? "0")}
           currency={invoice?.currency ?? ""}
           symbol={symbolFor(invoice?.currency ?? "")}
+          dueDate={invoice?.dueDate}
         />
       </div>
     );
