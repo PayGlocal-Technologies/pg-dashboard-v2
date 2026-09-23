@@ -53,6 +53,7 @@ import {
   toCreatePaymentButtonBody,
 } from "@/features/dashboard/payment-button/helpers";
 import {
+  PAYMENT_BUTTONS_QUERY_KEY,
   useMerchantCurrencies,
   useMerchantWebsite,
   usePaymentButtonMid,
@@ -185,12 +186,12 @@ export function CreatePaymentButtonFeature() {
   // Set once create succeeds; its presence is what opens the live dialog.
   const [created, setCreated] = useState<PaymentButtonScript | null>(null);
 
-  // Plain JSON, no encryption, exactly as pg-dashboard posts it. The list is
-  // still mock-driven, so there is no query to invalidate yet.
+  // Plain JSON, no encryption, exactly as pg-dashboard posts it. Refreshes the
+  // list on success, so the new button is there when Done returns to it.
   const { mutate: createButton, isPending: isCreating } = usePost<
     CreatePaymentButtonResponse,
     CreatePaymentButtonBody
-  >(createPaymentButtonApi(mid), { invalidateQueries: false });
+  >(createPaymentButtonApi(mid), { invalidateQueries: [[...PAYMENT_BUTTONS_QUERY_KEY]] });
 
   const form = useForm({
     defaultValues: EMPTY_PAYMENT_BUTTON_FORM,

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
-import { Button, Card, formatDateStamp } from "@/components/ui";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button, Card, Shimmer, formatDateStamp } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -14,9 +14,14 @@ import { PaymentButtonStatusBadge } from "@/features/dashboard/payment-button/co
 import {
   useCopyPaymentButtonCode,
   useDisablePaymentButton,
+  usePaymentButtonListMids,
+  usePaymentButtons,
 } from "@/features/dashboard/payment-button/hooks";
-import { CUSTOMER_DECIDES_LABEL } from "@/features/dashboard/payment-button/constants";
-import { MOCK_PAYMENT_BUTTONS } from "@/features/dashboard/payment-button/mock-data";
+import { buildPaymentButtonListBody } from "@/features/dashboard/payment-button/helpers";
+import {
+  CUSTOMER_DECIDES_LABEL,
+  PAYMENT_BUTTONS_FEATURE,
+} from "@/features/dashboard/payment-button/constants";
 import type { PaymentButton } from "@/features/dashboard/payment-button/types";
 
 /** One icon + text pair in the header's meta line. */
@@ -66,17 +71,49 @@ function BackToList() {
  * `selectedCurrentMid` + `searchQuery`), drawn on the MCA Transactions table's
  * layout (see PaymentButtonTransactionsTable).
  *
- * The button itself is read from MOCK_PAYMENT_BUTTONS, like the list. TODO:
- * GET paymentButtonApi(mid, productId) once it returns the fields shown here.
+ * The button is read through the list endpoint: pg-dashboard has no
+ * single-button endpoint that returns its status and dates (GET
+ * paymentButtonApi returns only its config), so this asks `/search/wqr` for
+ * the button id, under the `?mid=` the list linked with (or, for a pasted
+ * link without one, the merchant's PA MIDs), and takes the exact match.
+ * Label, amount, payments and revenue are not in that response and read "—".
  */
 export function PaymentButtonDetailFeature({ buttonId }: { buttonId: string }) {
-  const button = MOCK_PAYMENT_BUTTONS.find((row) => row.buttonId === buttonId) ?? null;
+  const searchParams = useSearchParams();
+  const midParam = searchParams.get("mid");
+  const listMids = usePaymentButtonListMids();
+  const mids = midParam ? [midParam] : listMids;
+
+  const { rows, isLoading, isError, refetch } = usePaymentButtons(
+    buildPaymentButtonListBody({ mids, statuses: [], search: buttonId, pageLimit: 15, from: 0 })
+  );
+  const button = rows.find((row) => row.buttonId === buttonId) ?? null;
 
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
       <BackToList />
-      <MidGuard productType="PA">
-        {button ? (
+      <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
+        {isLoading ? (
+          <Card className="gap-4 p-6">
+            <Shimmer className="h-7 w-64" />
+            <Shimmer className="h-4 w-48" />
+            <Shimmer className="h-16 w-full" />
+          </Card>
+        ) : isError ? (
+          <Card className="gap-0 p-0">
+            <PlaceholderState
+              variant="error"
+              title="Couldn't load this payment button"
+              description="Something went wrong while fetching it."
+              action={
+                <Button variant="outline" size="sm" onClick={refetch}>
+                  Retry
+                </Button>
+              }
+              className="py-16"
+            />
+          </Card>
+        ) : button ? (
           <PaymentButtonDetail button={button} />
         ) : (
           <Card className="gap-0 p-0">
@@ -104,7 +141,9 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
       ? CUSTOMER_DECIDES_LABEL
       : formatButtonAmount(button.amount, button.currency);
   const revenue =
-    button.revenue == null ? "—" : formatCurrency(parseFloat(button.revenue), button.currency);
+    button.revenue == null || !button.currency
+      ? "—"
+      : formatCurrency(parseFloat(button.revenue), button.currency);
 
   return (
     <>
@@ -122,7 +161,7 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
                 <PaymentButtonStatusBadge status={button.status} />
               </div>
               <p className="mt-1 text-[13px] text-muted-foreground">
-                Button label: &ldquo;{button.label}&rdquo;
+                Button label: {button.label ? <>&ldquo;{button.label}&rdquo;</> : "—"}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
                 <MetaItem icon="wallet">{amount}</MetaItem>
@@ -170,7 +209,10 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
         </div>
 
         <div className="grid grid-cols-1 divide-y divide-border border-t border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <Stat label="Total payments" value={String(button.successfulPayments ?? 0)} />
+          <Stat
+            label="Total payments"
+            value={button.successfulPayments == null ? "—" : String(button.successfulPayments)}
+          />
           <Stat label="Total revenue" value={revenue} />
         </div>
       </Card>

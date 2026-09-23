@@ -1,45 +1,61 @@
 /**
  * A payment button's lifecycle state, as the design names it.
  *
- * pg-dashboard's list endpoint (`/search/wqr`) only ever returns ACTIVE or
- * INACTIVE in `merchantProductDataStatus`. DRAFT has no backend equivalent yet,
- * and INACTIVE is what this page calls DISABLED — see mapWqrStatus when the
- * endpoint is wired.
+ * pg-dashboard's list endpoint (`/search/wqr`) returns ACTIVE or INACTIVE in
+ * `merchantProductDataStatus`; INACTIVE is what this page calls DISABLED (see
+ * mapWqrStatus). DRAFT has no backend equivalent yet. The design keeps its tab
+ * and chip option, which match nothing until the backend grows a draft state.
  */
 export type PaymentButtonStatus = "ACTIVE" | "DISABLED" | "DRAFT";
 
 /** Fixed: the button always charges `amount`. Customer: the payer types it. */
 export type PaymentButtonAmountType = "FIXED" | "CUSTOMER_DECIDES";
 
-/** One row of the Payment Button table. */
+/**
+ * One row of the Payment Button table, as the design draws it.
+ *
+ * Mapped from pg-dashboard's WqrProductEntry (see mapWqrEntry). The list API
+ * returns the id, MID, status and dates only; every field the design shows but
+ * the API does not carry is null and renders as "—" until the backend adds it.
+ */
 export interface PaymentButton {
-  /** Stable row id — mirrors the `gid` every other record on the dashboard is keyed by. */
+  /** Stable row key: MID + button id, unique across a multi-MID merchant. */
   gid: string;
   /** The MID the button belongs to; every per-button endpoint is addressed by it. */
   mid: string;
-  /** The button's public id (`productId` in the list response), e.g. `pl_TOIAYILU`. */
+  /** The button's public id (`productId` in the list response). */
   buttonId: string;
-  /** Merchant-given name. Not a column, but what the search box matches first. */
-  title: string;
-  /** The text on the button itself, e.g. "Pay Now". */
-  label: string;
-  amountType: PaymentButtonAmountType;
-  /** Decimal string. Null when `amountType` is CUSTOMER_DECIDES. */
-  amount: string | null;
-  currency: string;
   status: PaymentButtonStatus;
-  /** Null for a draft, which has never been live to take a payment. */
-  successfulPayments: number | null;
-  /** Total collected, in `currency`. Null for a draft, as above. */
-  revenue: string | null;
-  /** API timestamp, rendered through formatTimestamp. */
+  /** API timestamp (`formattedCreationTime`), rendered through formatTimestamp. */
   createdAt: string;
+  /** `formattedStartDate` / `formattedExpiryDate`, kept for the details page. */
+  startsOn: string | null;
+  expiresOn: string | null;
+  // ── Design fields the list API does not return yet (always null today) ──
+  /** The text on the button itself, e.g. "Pay Now". */
+  label: string | null;
+  amountType: PaymentButtonAmountType | null;
+  /** Decimal string. Null when customer-decided, or unknown. */
+  amount: string | null;
+  currency: string | null;
+  successfulPayments: number | null;
+  /** Total collected, in `currency`. */
+  revenue: string | null;
+}
+
+/** The list request body (pg-dashboard's TableReqBody, the fields this page sends). */
+export interface PaymentButtonListRequest {
+  pageLimit: number;
+  from: number;
+  searchFilterType: string;
+  fieldSearch: Record<string, string[]>;
+  queryString?: string;
+  startTime?: number;
+  endTime?: number;
 }
 
 /**
- * pg-dashboard's list row, verbatim (`WqrProductEntry`). Kept here so the
- * mapping to PaymentButton is written against the real contract once the
- * endpoint is wired.
+ * pg-dashboard's list row, verbatim (`WqrProductEntry`).
  */
 export interface WqrProductEntry {
   mid: string;

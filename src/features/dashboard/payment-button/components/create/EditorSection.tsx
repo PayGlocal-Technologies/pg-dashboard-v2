@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { AccordionContent, AccordionItem, AccordionTrigger, Card } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
+import { cn } from "@/lib/utils";
 
 /** Tinted icon tile + title + one supporting line — every section's heading. */
 function SectionHeading({
@@ -15,7 +16,9 @@ function SectionHeading({
   description?: string;
 }) {
   return (
-    <div className="flex items-start gap-3 text-left">
+    // A title with a supporting line top-aligns to the tile; a bare title
+    // (Advanced options) centres on it instead of riding its top edge.
+    <div className={cn("flex gap-3 text-left", description ? "items-start" : "items-center")}>
       {/* Same tile the invoice editor's sections lead with (BillerSection). */}
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
         <Icon name={icon} className="h-4 w-4" />

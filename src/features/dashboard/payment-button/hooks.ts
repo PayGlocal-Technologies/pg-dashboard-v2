@@ -4,7 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
-import { useGet, usePut } from "@/lib/api/hooks";
+import { useGet, usePostQuery, usePut } from "@/lib/api/hooks";
 import { api } from "@/lib/api/axios";
 import { handleApiError } from "@/lib/api/handleApiError";
 import { useApp } from "@/stores/useApp";
@@ -12,6 +12,7 @@ import { useAccountSetup } from "@/stores/useAccountSetup";
 import {
   deactivatePaymentButtonApi,
   downloadPaymentButtonApi,
+  paymentButtonSearchApi,
   merchantCurrencyApi,
   merchantProfileApi,
 } from "@/features/dashboard/payment-button/services";
@@ -19,6 +20,7 @@ import {
   buildLiveEmbedLines,
   copyEmbedCode,
   embedLinesToText,
+  mapWqrEntry,
 } from "@/features/dashboard/payment-button/helpers";
 import { DEFAULT_BUTTON_CURRENCY } from "@/features/dashboard/payment-button/constants";
 import type {
@@ -26,7 +28,56 @@ import type {
   CurrencyEnableResponse,
   MerchantProfileResponse,
   PaymentButton,
+  PaymentButtonListRequest,
+  PaymentButtonListResponse,
 } from "@/features/dashboard/payment-button/types";
+
+/** Query-key root for the list, which create and disable invalidate. */
+export const PAYMENT_BUTTONS_QUERY_KEY = ["payment-buttons"] as const;
+
+/**
+ * The MIDs the list is fetched across. pg-dashboard's resolvedMerchantIds,
+ * verbatim: the header's selected MID if there is one, else every PA MID. A
+ * guest (onboarding) user has none, so nothing is fetched for them.
+ */
+export function usePaymentButtonListMids(): string[] {
+  const paMids = useApp((s) => s.paMids);
+  const isGuestUser = useApp((s) => s.isGuestUser);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+
+  if (isGuestUser) return [];
+  if (selectedMid) return [selectedMid];
+  return paMids;
+}
+
+/**
+ * One page of payment buttons, from `POST /v1/search/wqr`. `body` is null when
+ * there is nothing to ask for (see buildPaymentButtonListBody), which leaves
+ * the query idle and the page empty.
+ */
+export function usePaymentButtons(body: PaymentButtonListRequest | null): {
+  rows: PaymentButton[];
+  totalCount: number;
+  isLoading: boolean;
+  isFetching: boolean;
+  isError: boolean;
+  refetch: () => void;
+} {
+  const { data, isPending, isFetching, isError, refetch } = usePostQuery<
+    PaymentButtonListResponse,
+    PaymentButtonListRequest | null
+  >([...PAYMENT_BUTTONS_QUERY_KEY], paymentButtonSearchApi, body, { staleTime: 0 }, !!body);
+
+  return {
+    rows: (data?.data?.data ?? []).map(mapWqrEntry),
+    totalCount: data?.data?.totalCount ?? 0,
+    // An idle (disabled) query is "pending" forever; only a live one loads.
+    isLoading: !!body && isPending,
+    isFetching,
+    isError,
+    refetch: () => void refetch(),
+  };
+}
 
 /**
  * The MID a new payment button is created under. Mirrors pg-dashboard's
@@ -118,13 +169,15 @@ export function useCopyPaymentButtonCode(): {
 
 /**
  * Disable a button. PUT, empty body, pg-dashboard's `disableLink` verbatim,
- * with its success copy. The list is mock-driven for now, so there is no list
- * query to invalidate yet.
+ * with its success copy. The list is refreshed 2s later, as pg-dashboard does:
+ * the search index lags the write, so an immediate refetch would still show
+ * the button as active.
  */
 export function useDisablePaymentButton(onDone?: () => void): {
   disable: (row: Pick<PaymentButton, "mid" | "buttonId">) => void;
   isDisabling: boolean;
 } {
+  const queryClient = useQueryClient();
   const { mutate, isPending } = usePut<unknown, { dynamicUrl: string }>("", {
     invalidateQueries: false,
   });
@@ -135,6 +188,10 @@ export function useDisablePaymentButton(onDone?: () => void): {
       {
         onSuccess: () => {
           toast.success("Payment Button disabled successfully");
+          window.setTimeout(
+            () => void queryClient.invalidateQueries({ queryKey: [...PAYMENT_BUTTONS_QUERY_KEY] }),
+            2000
+          );
           onDone?.();
         },
         onError: (error) => toast.error(error.message || "Failed to disable button"),

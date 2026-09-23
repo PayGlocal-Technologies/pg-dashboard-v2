@@ -182,3 +182,19 @@ export const COLLECT_FIELD_TOKEN: Record<keyof PaymentButtonCollectFields, strin
 };
 
 export const EMBED_CODE_COPIED_MESSAGE = "Embed code copied";
+
+/**
+ * The product / feature key pg-dashboard gates this page on, in both
+ * `merchantEnabledProducts.paymentProducts` and a MID's feature lists.
+ */
+export const PAYMENT_BUTTONS_FEATURE = "PAYMENT_BUTTONS";
+
+/** Shown when the product is not enabled: pg-dashboard's PRODUCT_MAPPING copy. */
+export const PAYMENT_BUTTON_NOT_ENABLED = {
+  title: "A Payment Button that works everywhere",
+  description:
+    "Enable your business to accept domestic and international card payments with one simple PayGlocal button. Fast setup, global reach, and seamless checkout, built for a borderless world.",
+};
+
+/** Where pg-dashboard's "Contact us" sends a merchant to have a product enabled. */
+export const MERCHANT_SUPPORT_EMAIL = "merchant.support@payglocal.in";

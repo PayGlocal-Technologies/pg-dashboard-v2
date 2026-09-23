@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { DataCardList, DataTableCard } from "@/components/ui";
+import { Button, DataCardList, DataTableCard } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import {
@@ -21,12 +22,13 @@ import { DisablePaymentButtonDialog } from "@/features/dashboard/payment-button/
 import {
   useCopyPaymentButtonCode,
   useDisablePaymentButton,
+  usePaymentButtonListMids,
+  usePaymentButtons,
 } from "@/features/dashboard/payment-button/hooks";
 import {
-  filterPaymentButtons,
+  buildPaymentButtonListBody,
   paymentButtonDetailsPath,
 } from "@/features/dashboard/payment-button/helpers";
-import { MOCK_PAYMENT_BUTTONS } from "@/features/dashboard/payment-button/mock-data";
 import {
   PAYMENT_BUTTON_PAGE_LIMIT,
   PAYMENT_BUTTON_SEARCH_ARIA_LABEL,
@@ -59,15 +61,16 @@ interface PaymentButtonTableProps {
  * The tabs are a shortcut onto the same status filter the Status chip drives
  * (as on MCA Links), so the two can never disagree.
  *
- * Rows come from MOCK_PAYMENT_BUTTONS: the list endpoint exists
- * (paymentButtonSearchApi) but does not return amount, payment count or
- * revenue, which this design is built around. Every filter and the paging are
- * therefore client-side for now; swapping `allRows` / `isLoading` for the
- * query's result is the only change the tabs, chips and columns need.
+ * Rows come from pg-dashboard's list endpoint (`POST /v1/search/wqr`), paged
+ * and filtered server-side: tabs and the Status chip send
+ * `merchantProductDataStatus`, the search box `queryString`, across the MIDs
+ * usePaymentButtonListMids resolves. The endpoint returns id, status and dates
+ * only, so Amount, Successful payments and Revenue render "—", and the Amount
+ * chip is kept for the design but filters nothing (no amount to filter by).
+ * The Draft tab has no API status and always comes back empty.
  *
- * A row opens the button's details page. Copy code and Disable are real calls
- * (download / deactivate, as pg-dashboard makes them), addressed by the row's
- * MID, so against the mock rows' placeholder MID they fail with a toast.
+ * A row opens the button's details page. Copy code and Disable are
+ * pg-dashboard's download / deactivate calls, addressed by the row's MID.
  */
 export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
   const router = useRouter();
@@ -83,18 +86,15 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
   const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
   const [page, setPage] = useState(1);
 
-  const allRows = MOCK_PAYMENT_BUTTONS;
-  const isLoading = false;
-
-  const filtered = useMemo(
-    () => filterPaymentButtons(allRows, { search, statuses, amountRange }),
-    [allRows, search, statuses, amountRange]
-  );
-  const totalCount = filtered.length;
-  const pageRows = useMemo(
-    () => filtered.slice((page - 1) * PAYMENT_BUTTON_PAGE_LIMIT, page * PAYMENT_BUTTON_PAGE_LIMIT),
-    [filtered, page]
-  );
+  const mids = usePaymentButtonListMids();
+  const body = buildPaymentButtonListBody({
+    mids,
+    statuses,
+    search,
+    pageLimit: PAYMENT_BUTTON_PAGE_LIMIT,
+    from: (page - 1) * PAYMENT_BUTTON_PAGE_LIMIT,
+  });
+  const { rows: pageRows, totalCount, isLoading, isError, refetch } = usePaymentButtons(body);
 
   // Every control that changes what matches also returns to page 1.
   const onSearch = (value: string) => {
@@ -117,7 +117,8 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
     ? "Try a different search, or clear a filter to widen the results."
     : "Create a payment button to start collecting payments from your website.";
 
-  const openDetails = (row: PaymentButton) => router.push(paymentButtonDetailsPath(row.buttonId));
+  const openDetails = (row: PaymentButton) =>
+    router.push(paymentButtonDetailsPath(row.buttonId, row.mid));
 
   const columns = useMemo(
     () => buildPaymentButtonColumns({ onCopyCode: copyCode, copyingId }),
@@ -174,6 +175,27 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
     </div>
   );
 
+  // Same failure panel the Transactions tables show: headers would imply the
+  // request succeeded and found nothing.
+  const errorState = isError ? (
+    <div className="flex flex-col items-center gap-3 p-10 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-red-500/10 text-red-600">
+        <Icon name="alert-circle" size={22} />
+      </span>
+      <div>
+        <h3 className="text-sm font-semibold text-foreground">
+          Couldn&apos;t load payment buttons
+        </h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Something went wrong while fetching data.
+        </p>
+      </div>
+      <Button variant="outline" size="sm" onClick={refetch}>
+        Retry
+      </Button>
+    </div>
+  ) : undefined;
+
   const pagination = {
     mode: "page",
     page,
@@ -200,6 +222,7 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
         // is what the design draws, and it keeps the column headers.
         emptyTitle={emptyTitle}
         emptyDescription={emptyDescription}
+        errorState={errorState}
         rowAction={(row) => renderRowActions(row)}
         onRowClick={openDetails}
         pagination={pagination}
@@ -228,6 +251,7 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
           renderSkeleton={() => <PaymentButtonCardSkeleton />}
           emptyTitle={emptyTitle}
           emptyDescription={emptyDescription}
+          errorState={errorState}
           pagination={pagination}
         />
       </div>

@@ -19,6 +19,10 @@ export function PaymentButtonAmount({
   row: PaymentButton;
   size?: "table" | "card";
 }) {
+  // Not in the list API yet (see PaymentButton): a bare dash, no stray code.
+  if (row.amountType === null || (row.amountType === "FIXED" && !row.currency)) {
+    return <span className="text-[13px] text-muted-foreground">—</span>;
+  }
   if (row.amountType === "CUSTOMER_DECIDES") {
     return (
       <span className="text-[13px] whitespace-nowrap text-muted-foreground">
@@ -58,13 +62,7 @@ export function PaymentButtonStatusBadge({ status }: { status: PaymentButton["st
   const content = (
     <>
       {label}
-      <Icon
-        name={icon}
-        size={11}
-        strokeWidth={2.5}
-        className="shrink-0"
-        aria-hidden
-      />
+      <Icon name={icon} size={11} strokeWidth={2.5} className="shrink-0" aria-hidden />
     </>
   );
   return <StatusBadge variant={variant} label={content as unknown as string} size="sm" />;

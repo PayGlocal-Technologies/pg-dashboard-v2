@@ -10,10 +10,10 @@ import {
   PAYMENT_BUTTON_SCRIPT_SRC,
   PAYMENT_BUTTON_STATUS_LABEL,
 } from "@/features/dashboard/payment-button/constants";
-import type { AmountRangeValue } from "@/components/common/filters/FilterChips";
 import type {
   PaymentButton,
   PaymentButtonAppearance,
+  PaymentButtonListRequest,
   PaymentButtonCollectFields,
   CreatePaymentButtonBody,
   PaymentButtonFormValues,
@@ -22,6 +22,7 @@ import type {
   PaymentButtonSize,
   PaymentButtonStatus,
   PaymentButtonTheme,
+  WqrProductEntry,
 } from "@/features/dashboard/payment-button/types";
 
 type StatusMeta = {
@@ -56,49 +57,114 @@ export function getPaymentButtonStatusMeta(status: PaymentButtonStatus): StatusM
  * which the design doesn't show for whole amounts; the symbol still comes from
  * the shared map so no currency is spelled differently here.
  */
-export function formatButtonAmount(amount: string | null, currency: string): string {
+export function formatButtonAmount(amount: string | null, currency: string | null): string {
   const value = parseFloat(amount ?? "");
-  if (Number.isNaN(value)) return "—";
+  if (Number.isNaN(value) || !currency) return "—";
   return `${currencySymbol(currency)}${value.toLocaleString("en-IN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
 }
 
-interface PaymentButtonFilters {
-  search: string;
-  statuses: string[];
-  amountRange: AmountRangeValue;
+/** The API's status → the design's. INACTIVE is Disabled; DRAFT is future-proofing. */
+export function mapWqrStatus(raw: string | null | undefined): PaymentButtonStatus {
+  switch ((raw ?? "").toUpperCase()) {
+    case "ACTIVE":
+      return "ACTIVE";
+    case "DRAFT":
+      return "DRAFT";
+    default:
+      return "DISABLED";
+  }
 }
 
-/** Every filter the table offers, applied client-side over the loaded rows. */
-export function filterPaymentButtons(
-  rows: PaymentButton[],
-  { search, statuses, amountRange }: PaymentButtonFilters
-): PaymentButton[] {
-  const query = search.trim().toLowerCase();
-  const min = amountRange.min ? parseFloat(amountRange.min) : undefined;
-  const max = amountRange.max ? parseFloat(amountRange.max) : undefined;
+/**
+ * The design's status → the API's `merchantProductDataStatus` values. DRAFT
+ * has none yet, so it is dropped from the request (see buildPaymentButtonListBody).
+ */
+const STATUS_API_VALUE: Partial<Record<PaymentButtonStatus, string>> = {
+  ACTIVE: "ACTIVE",
+  DISABLED: "INACTIVE",
+};
 
-  return rows.filter((row) => {
-    if (statuses.length && !statuses.includes(row.status)) return false;
+/** One list row → the table's row. Fields the API lacks stay null ("—"). */
+export function mapWqrEntry(entry: WqrProductEntry): PaymentButton {
+  return {
+    gid: `${entry.mid}-${entry.productId}`,
+    mid: entry.mid,
+    buttonId: entry.productId,
+    status: mapWqrStatus(entry.merchantProductDataStatus),
+    createdAt: entry.formattedCreationTime,
+    startsOn: entry.formattedStartDate || null,
+    expiresOn: entry.formattedExpiryDate || null,
+    label: null,
+    amountType: null,
+    amount: null,
+    currency: null,
+    successfulPayments: null,
+    revenue: null,
+  };
+}
 
-    if (query) {
-      const haystack = `${row.title} ${row.buttonId}`.toLowerCase();
-      if (!haystack.includes(query)) return false;
-    }
+/**
+ * The `/search/wqr` body, ported from pg-dashboard's
+ * `buildRequestBody(filters, "paymentButton", { selectedMid: { key: "mid" } })`
+ * for the fields this page uses: the PAYMENT_BUTTON sub-type and MID(s) always,
+ * `merchantProductDataStatus` from the tabs / Status chip, the search box as
+ * `queryString` (pg-dashboard's Button ID filter), and a date window. The
+ * searchFilterType ladder is the builder's own, trimmed to the branches these
+ * inputs can reach (fieldSearch is never empty here).
+ *
+ * Returns null when there is nothing the server could match: no MID, or a
+ * status selection of Draft alone, which has no API value.
+ */
+export function buildPaymentButtonListBody({
+  mids,
+  statuses,
+  search,
+  startTime,
+  endTime,
+  pageLimit,
+  from,
+}: {
+  mids: string[];
+  statuses: string[];
+  search: string;
+  startTime?: number;
+  endTime?: number;
+  pageLimit: number;
+  from: number;
+}): PaymentButtonListRequest | null {
+  if (mids.length === 0) return null;
+  const apiStatuses = statuses
+    .map((status) => STATUS_API_VALUE[status as PaymentButtonStatus])
+    .filter((value): value is string => !!value);
+  if (statuses.length > 0 && apiStatuses.length === 0) return null;
 
-    // A customer-decided button has no amount to compare, so any amount bound
-    // leaves it out rather than guessing which side of the range it falls.
-    if (min != null || max != null) {
-      if (row.amountType === "CUSTOMER_DECIDES") return false;
-      const amount = parseFloat(row.amount ?? "0");
-      if (min != null && amount < min) return false;
-      if (max != null && amount > max) return false;
-    }
+  const fieldSearch: Record<string, string[]> = {
+    merchantProductDataSubType: ["PAYMENT_BUTTON"],
+    mid: mids,
+    ...(apiStatuses.length > 0 && { merchantProductDataStatus: apiStatuses }),
+  };
+  const queryString = search.trim() || undefined;
+  const hasTimeRange = !!(startTime && endTime);
 
-    return true;
-  });
+  const searchFilterType = queryString
+    ? hasTimeRange
+      ? "QUERY_FILTER_TYPE_TIME_RANGE"
+      : "QUERY_FILTER_TYPE"
+    : hasTimeRange
+      ? "FILTER_TYPE_TIME_RANGE"
+      : "FILTER_TYPE";
+
+  return {
+    pageLimit,
+    from,
+    searchFilterType,
+    fieldSearch,
+    ...(queryString && { queryString }),
+    ...(hasTimeRange && { startTime, endTime }),
+  };
 }
 
 /** Strips the scheme and any trailing path, for display: "https://acme.com/" → "acme.com". */
@@ -249,7 +315,11 @@ export async function copyEmbedCode(code: string): Promise<void> {
   }
 }
 
-/** The details page for one button. */
-export function paymentButtonDetailsPath(buttonId: string): string {
-  return `/payment-button/${encodeURIComponent(buttonId)}`;
+/**
+ * The details page for one button. The MID rides along as `?mid=`: every
+ * per-button endpoint is addressed by MID + id, and a multi-MID merchant's
+ * button id alone does not say which account it lives under.
+ */
+export function paymentButtonDetailsPath(buttonId: string, mid: string): string {
+  return `/payment-button/${encodeURIComponent(buttonId)}?mid=${encodeURIComponent(mid)}`;
 }
