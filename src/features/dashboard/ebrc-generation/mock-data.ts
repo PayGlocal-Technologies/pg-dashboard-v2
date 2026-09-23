@@ -135,7 +135,7 @@ export const MOCK_EBRC_REQUESTS: EbrcRequestRow[] = [
         portCode: "INAPL6",
         billNumber: "3422102",
         shippingBillNumber: "SILA512223/00094",
-        ebrcNumber: null,
+        ebrcNumber: "EBRC2026081800001",
         fobValue: 95929.29,
         currencyCode: "INR",
       },

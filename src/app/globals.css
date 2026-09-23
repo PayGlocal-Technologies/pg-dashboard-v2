@@ -315,6 +315,32 @@ select {
   background-size: 200% 100%;
 }
 
+/* ─── Success tick ───────────────────────────────────────────────────────── */
+@keyframes success-tick-circle {
+  from {
+    stroke-dashoffset: 151;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes success-tick-check {
+  from {
+    stroke-dashoffset: 34;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.success-tick-circle {
+  stroke-dasharray: 151;
+  animation: success-tick-circle 0.5s ease-out forwards;
+}
+.success-tick-check {
+  stroke-dasharray: 34;
+  animation: success-tick-check 0.35s 0.4s ease-out forwards;
+}
+
 /* ─── Page enter ─────────────────────────────────────────────────────────── */
 @keyframes pageFade {
   from {

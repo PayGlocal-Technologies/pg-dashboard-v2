@@ -12,6 +12,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useGet } from "@/lib/api/hooks";
+import { formatCurrencyShort } from "@/lib/utils/format";
 import { invoiceSummaryApi } from "@/features/dashboard/mca-invoices/services";
 import type { McaInvoiceSummaryResponse } from "@/features/dashboard/mca-invoices/types";
 
@@ -40,15 +41,6 @@ const MOCK_AVG_INVOICE_VALUE: Record<string, number> = {
   paid: 42_000,
   outstanding: 210_000,
 };
-
-/** "₹1.2Cr"/"₹18.5L"/"₹4.2K" — compact enough for the donut's center hole
- *  and the legend's number column. */
-function formatCompactInr(amount: number): string {
-  if (amount >= 10_000_000) return `₹${(amount / 10_000_000).toFixed(1)}Cr`;
-  if (amount >= 100_000) return `₹${(amount / 100_000).toFixed(1)}L`;
-  if (amount >= 1_000) return `₹${(amount / 1_000).toFixed(1)}K`;
-  return `₹${Math.round(amount)}`;
-}
 
 /** Donut hover/tooltip readout — one row, matching the Flux popover surface
  *  the way WaivedDonut's own tooltip does (Recharts renders its tooltip
@@ -96,10 +88,12 @@ export function InvoiceSummaryCards({
   merchantId,
   windowSeconds,
   onStatusFilter,
+  currency = "INR",
 }: {
   merchantId: string;
   windowSeconds: { start: number; end: number };
   onStatusFilter: (statuses: string[]) => void;
+  currency?: string;
 }) {
   const url = invoiceSummaryApi(merchantId, windowSeconds.start, windowSeconds.end);
   // isPending, not isLoading: isPending is false the moment there is data to
@@ -184,7 +178,7 @@ export function InvoiceSummaryCards({
             glance answers "how many, what shape, and what it's worth". */}
         <div
           role="img"
-          aria-label={`${totalCount} invoices total (${formatCompactInr(totalAmount)}): ${cards
+          aria-label={`${totalCount} invoices total (${formatCurrencyShort(totalAmount, currency)}): ${cards
             .map((c) => `${c.label} ${c.value ?? 0}`)
             .join(", ")}`}
           className="relative size-48 shrink-0 self-center"
@@ -223,7 +217,7 @@ export function InvoiceSummaryCards({
                   {totalCount}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {formatCompactInr(totalAmount)}
+                  {formatCurrencyShort(totalAmount, currency)}
                 </span>
               </div>
             </>
@@ -300,7 +294,7 @@ export function InvoiceSummaryCards({
                         {card.value ?? 0}
                       </span>
                       <span className="text-right text-sm tabular-nums text-muted-foreground">
-                        {formatCompactInr(row?.amount ?? 0)}
+                        {formatCurrencyShort(row?.amount ?? 0, currency)}
                       </span>
                     </>
                   )}

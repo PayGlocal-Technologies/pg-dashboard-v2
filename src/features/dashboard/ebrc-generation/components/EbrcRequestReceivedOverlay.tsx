@@ -1,8 +1,8 @@
 "use client";
 
 import { Button, Card } from "@/components/ui";
-import { Icon } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
+import { SuccessTick } from "@/components/common/SuccessTick";
 import { ViewPortal } from "@/components/layout/ViewPortal";
 
 /**
@@ -40,23 +40,19 @@ export function EbrcRequestReceivedOverlay({
           className="-z-10 object-cover"
         />
 
-        <Card className="w-full max-w-md rounded-2xl p-8 text-center shadow-lg">
-          <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-success/10 text-success">
-            <Icon name="check-circle" className="h-6 w-6" />
-          </span>
+        <Card className="w-full max-w-sm rounded-2xl p-6 text-center shadow-lg">
+          <SuccessTick className="mx-auto h-20 w-20" />
 
-          <h2 className="mt-4 text-lg font-semibold text-foreground">
+          <h2 className="mt-1 text-base font-semibold text-foreground">
             Your request has been received
           </h2>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-            Check the eBRC Status screen in 4 hours to download your eBRC.
-          </p>
-          <p className="mt-2 text-[13.5px] leading-relaxed text-muted-foreground">
-            It will also be sent to your registered email address once generation is completed.
+          <p className="mt-2 text-[13px] leading-snug text-muted-foreground">
+            Check the eBRC Status screen in 4 hours to download your eBRC. It&apos;ll also be sent
+            to your registered email address once generation is completed.
           </p>
 
-          <Button type="button" variant="primary" className="mt-6 w-full" onClick={onClose}>
-            Done
+          <Button type="button" variant="primary" className="mt-5 w-full" onClick={onClose}>
+            Back to eBRC
           </Button>
         </Card>
       </div>

@@ -40,7 +40,7 @@ export function EbrcWhyList({ className }: { className?: string }) {
  * account" moment, just from a different entry point (one navigates to the
  * generation flow, the other opens the sign-in dialog right there).
  *
- * public/assets/ebrc-banner-4.png reserves a blank left half for real
+ * public/assets/ebrc banner final.png reserves a blank left half for real
  * content rather than baking heading/copy into the artwork the way the
  * previous banner did — so all of it renders as actual text here (`alt=""`,
  * the image is decorative now that nothing meaningful only exists inside
@@ -57,7 +57,7 @@ export function EbrcBanner({
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border">
       <AppImage
-        src="/assets/ebrc-banner-4.png"
+        src="/assets/ebrc banner final.png"
         alt=""
         width={4680}
         height={2232}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { toast } from "sonner";
 import {
   Button,
   Callout,
@@ -40,6 +41,19 @@ const STATUS_VARIANT: Record<EbrcRequestStatus, "warning" | "success" | "danger"
 
 const EMPTY_DATE_RANGE: DateRangeValue = { from: "", to: "" };
 
+/** Label-above-value row, matching the IRM Repository / Transactions detail
+ *  drawers' own DetailRow so every drawer in the app reads the same way. */
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-[12px] text-muted-foreground">{label}</span>
+      <div className="flex min-w-0 items-center gap-1.5 text-[13px] font-medium text-foreground">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function RequestDetailDrawer({
   request,
   onOpenChange,
@@ -78,92 +92,73 @@ function RequestDetailDrawer({
 
         {request && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
-            <div className="rounded-lg border border-border p-3">
-              <p className="text-[13px] font-semibold text-foreground">Request Summary</p>
-              <div className="mt-3 grid grid-cols-3 gap-3">
-                <div>
-                  <p className="text-[11px] text-muted-foreground">DGFT Ack. ID</p>
-                  <p className="font-mono text-[12.5px] font-semibold text-foreground">
-                    {request.dgftAckId}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Request ID</p>
-                  <p className="truncate font-mono text-[12.5px] font-semibold text-foreground">
-                    {request.requestId}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Total Records</p>
-                  <p className="text-[12.5px] font-semibold tabular-nums text-foreground">
-                    {request.totalIrms}
-                  </p>
-                </div>
-              </div>
+            <div>
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Request summary
+              </h3>
+              <Card size="sm" className="shadow-none">
+                <CardContent className="grid grid-cols-3 gap-4">
+                  <DetailRow label="DGFT Ack. ID" value={request.dgftAckId} />
+                  <DetailRow label="Request ID" value={request.requestId} />
+                  <DetailRow label="Total records" value={String(request.totalIrms)} />
+                </CardContent>
+              </Card>
             </div>
 
             {request.irms.length > 1 && (
-              <Tabs
-                value={String(activeIrm)}
-                onValueChange={(v) => setActiveIrm(Number(v))}
-              >
+              <Tabs value={String(activeIrm)} onValueChange={(v) => setActiveIrm(Number(v))}>
                 <TabsList>
                   {request.irms.map((row, i) => (
-                    <TabsTrigger key={row.irmNumber} value={String(i)} className="font-mono text-[12px]">
+                    <TabsTrigger
+                      key={row.irmNumber}
+                      value={String(i)}
+                      className="font-mono text-[12px]"
+                    >
                       IRM: {row.irmNumber}
                     </TabsTrigger>
                   ))}
                 </TabsList>
               </Tabs>
             )}
-            {request.irms.length === 1 && irm && (
-              <p className="font-mono text-[12.5px] font-semibold text-primary underline underline-offset-4">
-                IRM: {irm.irmNumber}
-              </p>
-            )}
 
             {irm && (
-              <div className="grid grid-cols-3 gap-x-3 gap-y-3 rounded-lg bg-muted/30 p-3">
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Serial No.</p>
-                  <p className="text-[12.5px] font-semibold text-foreground">{irm.serialNo}</p>
+              <div>
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h3 className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    IRM details
+                  </h3>
+                  {irm.ebrcNumber && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+                      className="h-auto min-h-0 py-1"
+                      onClick={() =>
+                        toast.message("eBRC download isn't connected to the backend yet", {
+                          description: `Once wired up, this will download the eBRC for ${irm.ebrcNumber}.`,
+                        })
+                      }
+                    >
+                      Download eBRC
+                    </Button>
+                  )}
                 </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">IEC Number</p>
-                  <p className="font-mono text-[12.5px] font-semibold text-foreground">
-                    {irm.iecNumber}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Port Code</p>
-                  <p className="text-[12.5px] font-semibold text-foreground">{irm.portCode}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Bill Number</p>
-                  <p className="text-[12.5px] font-semibold text-foreground">{irm.billNumber}</p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Shipping Bill No.</p>
-                  <p className="text-[12.5px] font-semibold text-foreground">
-                    {irm.shippingBillNumber}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">eBRC Number</p>
-                  <p className="text-[12.5px] font-semibold text-foreground">
-                    {irm.ebrcNumber ?? "-"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">FOB Value</p>
-                  <p className="text-[12.5px] font-semibold tabular-nums text-foreground">
-                    {formatCurrency(irm.fobValue, irm.currencyCode)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-muted-foreground">Currency</p>
-                  <p className="text-[12.5px] font-semibold text-foreground">{irm.currencyCode}</p>
-                </div>
+                <Card size="sm" className="shadow-none">
+                  <CardContent className="grid grid-cols-3 gap-4">
+                    <DetailRow label="Serial No." value={String(irm.serialNo)} />
+                    <DetailRow label="IEC Number" value={irm.iecNumber} />
+                    <DetailRow label="Port Code" value={irm.portCode} />
+                    <DetailRow label="Bill Number" value={irm.billNumber} />
+                    <DetailRow label="Shipping Bill No." value={irm.shippingBillNumber} />
+                    <DetailRow label="eBRC Number" value={irm.ebrcNumber ?? "-"} />
+                    <DetailRow
+                      label="FOB Value"
+                      value={formatCurrency(irm.fobValue, irm.currencyCode)}
+                    />
+                    <DetailRow label="Currency" value={irm.currencyCode} />
+                  </CardContent>
+                </Card>
               </div>
             )}
           </div>
