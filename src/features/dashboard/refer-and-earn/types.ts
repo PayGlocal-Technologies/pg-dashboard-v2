@@ -129,6 +129,16 @@ export interface ReferralWallet {
   // nothing read them, so the mismatch went unnoticed.
   creditTransactionCount: number;
   debitTransactionCount: number;
+  /**
+   * How many more transactions the merchant needs before their MDR waiver
+   * applies. Backs the gift callout on the Home page's Transactions card, which
+   * links here.
+   *
+   * Optional because a merchant with no waiver in progress has no countdown to
+   * report; zero and absent mean the same thing, and both hide the callout
+   * rather than promising a waiver that isn't coming.
+   */
+  mdrWaiver?: number | null;
   status: string;
   /** Epoch milliseconds. */
   creationTime: string;

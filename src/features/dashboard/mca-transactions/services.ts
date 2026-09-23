@@ -171,6 +171,25 @@ export const mcaDocumentPendingByCurrencyApi = (merchantId: string) =>
     : "";
 
 /**
+ * The individual transactions behind the document-pending figure, paged and
+ * ranked server-side. Backs InvoiceActionCard's row list.
+ *
+ * `sortBy` is AMOUNT or CREATED_TIME, both descending; anything else falls back
+ * to AMOUNT. Like document-pending-by-currency above it takes no timeframe — it
+ * reports what is awaiting documents right now, not over a window.
+ */
+export const mcaDocumentPendingListApi = (
+  merchantId: string,
+  sortBy: string,
+  page: number,
+  limit: number
+) =>
+  merchantId
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-list` +
+      `?sortBy=${encodeURIComponent(sortBy)}&page=${page}&limit=${limit}`
+    : "";
+
+/**
  * Transactions export. POST the same OpenSearch body the table uses; the
  * response is an xlsx blob, not JSON.
  *

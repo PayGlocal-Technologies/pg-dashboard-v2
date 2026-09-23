@@ -551,15 +551,14 @@ function PlatformsContent() {
                     role="listitem"
                     variant="ghost"
                     size="md"
-                    className="w-full justify-start gap-2.5 text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
+                    className="w-full justify-start gap-2.5 text-muted-foreground  [&>span]:text-left"
                     leftIcon={
-                      // Not the platform rows' shared h-6 w-9 logo box: that
-                      // width exists to fit a brand mark, and the "+" glyph
-                      // is much narrower than that box, so matching it left
-                      // the plus sitting flush left with a dead gap before
-                      // the label. Sized to the glyph itself instead, so the
-                      // label sits right next to it.
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                      // Same h-6 w-9 footprint as the platform rows' logo
+                      // box, so this row's label starts in the same column
+                      // as "Freelancer"/"Upwork"/etc. above it — sizing this
+                      // to the glyph itself (narrower than that box) left the
+                      // label starting further left than every row above it.
+                      <span className="flex flex-0 h-6 w-9 shrink-0 items-center justify-center">
                         <Icon name="plus" className="h-4 w-4" />
                       </span>
                     }

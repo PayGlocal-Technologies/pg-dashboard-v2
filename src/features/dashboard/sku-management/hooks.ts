@@ -6,8 +6,6 @@ import { toast } from "sonner";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useScopeId } from "@/lib/hooks/useScopeId";
-import { useApp } from "@/stores/useApp";
-import { useAccountSetup } from "@/stores/useAccountSetup";
 import {
   mcaCurrenciesApi,
   skuCreateApi,

@@ -83,6 +83,7 @@ import {
   type InvoiceRequirement,
 } from "@/features/dashboard/create-invoice/components/ReadinessChecklist";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { useMidFromUrl, withMidParam } from "@/lib/hooks/useMidFromUrl";
 import {
   CREATE_INVOICE_GUIDE_KEY,
   CREATE_INVOICE_GUIDE_STEPS,
@@ -245,6 +246,15 @@ export function CreateInvoiceFeature() {
   const router = useRouter();
   const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
 
+  // "Edit template" reaches this route by a full page load, which drops the
+  // in-memory MID selection, so it hands the MID over in `?mid=`. Applying it
+  // before the picker below is what makes that handover invisible.
+  const { isResolvingMid } = useMidFromUrl();
+
+  if (isResolvingMid) {
+    return <EditorSkeleton onClose={() => router.push("/mca-invoices")} />;
+  }
+
   /**
    * The editor cannot open without knowing which merchant the invoice is for:
    * every endpoint below puts a MID in its path, and `useInvoiceMerchantId`
@@ -261,6 +271,10 @@ export function CreateInvoiceFeature() {
    * The picker is rendered *in* the card rather than the usual "use the selector
    * in the sidebar": this route is the full-screen editor shell, which draws no
    * sidebar at all, so that instruction would point at nothing.
+   *
+   * A MID arriving in `?mid=` is the one case that answers the question before
+   * it is asked, so the handover is held above rather than flashing this picker
+   * on its way through.
    */
   if (needsMidChoice) {
     return (
@@ -1093,7 +1107,11 @@ function InvoiceEditor({
     // withBasePath because a raw `window.location` navigation is handed to the
     // browser as-is — Next only prefixes /app-v2 for framework navigation
     // (router.push, next/link), not this. See src/constants/basePath.ts.
-    window.location.href = withBasePath(`/create-invoice?templateId=${templateId}`);
+    // The MID rides along for the same reason the invoice list's copy does:
+    // the selection does not survive a full page load.
+    window.location.href = withBasePath(
+      withMidParam(`/create-invoice?templateId=${templateId}`, merchantId)
+    );
   };
 
   /**
