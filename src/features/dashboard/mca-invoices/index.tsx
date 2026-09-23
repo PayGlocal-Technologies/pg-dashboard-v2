@@ -10,6 +10,8 @@ import { TimeRangeTabs } from "@/components/common/TimeRangeTabs";
 import { useScopeId } from "@/lib/hooks/useScopeId";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { withBasePath } from "@/constants/basePath";
+import { withMidParam } from "@/lib/hooks/useMidFromUrl";
+import { useAccountSetup } from "@/stores/useAccountSetup";
 import { McaInvoiceTable } from "@/features/dashboard/mca-invoices/components/McaInvoiceTable";
 import { InvoiceSummaryCards } from "@/features/dashboard/mca-invoices/components/InvoiceSummaryCards";
 import { InvoiceActionCard } from "@/features/dashboard/mca-invoices/components/InvoiceActionCard";
@@ -98,6 +100,7 @@ function ZohoSyncAction() {
 function ManageTemplatesAction() {
   const [open, setOpen] = useState(false);
   const templateStore = useInvoiceTemplates();
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
 
   const handleDeleteTemplate = (templateId: string) => templateStore.remove(templateId);
 
@@ -108,8 +111,13 @@ function ManageTemplatesAction() {
   // template id was captured as empty and the draft opened blank. A full load
   // makes the URL synchronous, and withBasePath keeps the /app-v2 prefix a raw
   // window.location navigation would otherwise drop.
+  // The MID rides along because this is a full page load: the selection is
+  // in-memory (see useAccountSetup), so without it a multi-MID merchant lands
+  // on the editor's "which account?" picker instead of their template.
   const handleEditTemplate = (templateId: string) => {
-    window.location.href = withBasePath(`/create-invoice?templateId=${templateId}`);
+    window.location.href = withBasePath(
+      withMidParam(`/create-invoice?templateId=${templateId}`, selectedMid)
+    );
   };
 
   return (
@@ -215,6 +223,7 @@ function McaInvoicesContent() {
           merchantId={summaryMid}
           windowSeconds={summaryWindowSeconds(summaryRange, defaultEndMs)}
           onStatusFilter={setStatusFilters}
+          currency="USD"
         />
         <InvoiceActionCard />
       </div>

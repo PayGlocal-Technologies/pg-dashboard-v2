@@ -153,6 +153,7 @@ export function McaDashboardWidgetCustomization({
               <Button
                 variant="outline"
                 size="sm"
+                className="hidden"
                 leftIcon={<Icon name="layout-grid" className="h-3.5 w-3.5" />}
                 onClick={() => setLibraryOpen(true)}
               >

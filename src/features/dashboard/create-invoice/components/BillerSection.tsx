@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { SearchableSelect } from "@/components/common/SearchableSelect";
 import {
   Button,
   Dialog,
@@ -16,6 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
   Shimmer,
+  SingleSelect,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useClientGeo } from "@/features/dashboard/create-invoice/hooks";
@@ -214,15 +214,15 @@ function EditBillerBody({
               here — it is hardwired to its internal COUNTRIES array, while these
               options come from the API and carry the country *names* the address
               is stored under. */}
-          <SearchableSelect
+          <SingleSelect
             id="biller-country"
             value={values.country ?? ""}
             // See AddAddressDialog's twin of this line.
-            onValueChange={(next) => patch({ country: next, state: "" })}
+            onChange={(next) => patch({ country: next, state: "" })}
             options={countryOptions}
             placeholder="Select country"
             searchPlaceholder="Search country…"
-            emptyMessage="No country matches that search."
+            emptyText="No country matches that search."
           />
         </Field>
 
@@ -233,14 +233,14 @@ function EditBillerBody({
               stateCodes into its own select, ungated by country — its form has
               no country field at all). Searchable because the list is long
               enough that scrolling a listbox is not reasonable. */}
-          <SearchableSelect
+          <SingleSelect
             id="biller-state"
             value={values.state ?? ""}
-            onValueChange={(next) => patch({ state: next })}
+            onChange={(next) => patch({ state: next })}
             options={stateOptions}
             placeholder="Select state"
             searchPlaceholder="Search state…"
-            emptyMessage="No state matches that search."
+            emptyText="No state matches that search."
           />
         </Field>
       </div>

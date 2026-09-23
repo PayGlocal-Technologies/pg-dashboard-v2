@@ -10,6 +10,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
+  previewFieldProps,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -32,7 +33,13 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
   return (
     <div className={`flex min-h-full w-full min-w-0 flex-col bg-card text-center ${PAGE_PADDING}`}>
       <div className="mb-2 flex items-center justify-center gap-2">
-        <LogoSlot url={model.logoUrl} onUpload={onLogoClick} size={28} tint={primary} />
+        <LogoSlot
+          url={model.logoUrl}
+          onUpload={onLogoClick}
+          size={28}
+          tint={primary}
+          pending={model.logoPending}
+        />
         <span className="text-[13px] font-extrabold uppercase tracking-widest text-foreground">
           {model.billerName}
         </span>
@@ -55,6 +62,7 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
           labelClassName={headLabel}
           labelStyle={headStyle}
           bodyClassName="text-[11.5px] text-muted-foreground"
+          fieldId="biller"
         />
         <PartyBlock
           label={`${labels.invoiceTo}:`}
@@ -64,19 +72,20 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
           labelClassName={headLabel}
           labelStyle={headStyle}
           bodyClassName="text-[11.5px] text-muted-foreground"
+          fieldId="client"
         />
       </div>
 
       <div className="mb-4 flex flex-wrap justify-between gap-3 text-left text-[11.5px] text-muted-foreground">
-        <span>
+        <span {...previewFieldProps("invoice-number", "Edit invoice number")}>
           {labels.invoiceNumber}{" "}
           <span className="font-semibold text-foreground">{model.invoiceNumber}</span>
         </span>
-        <span>
+        <span {...previewFieldProps("issue-date", "Edit issue date")}>
           {labels.issueDate}{" "}
           <span className="font-semibold text-foreground">{model.issueDate}</span>
         </span>
-        <span>
+        <span {...previewFieldProps("due-date", "Edit due date")}>
           {labels.dueDate}{" "}
           <span className="font-semibold text-foreground">{model.dueDate || "-"}</span>
         </span>
@@ -97,10 +106,18 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
         <span className="text-right">{labels.total}</span>
       </div>
 
+      {/* Row by row, not one block: this theme prints the items as siblings of
+          the sheet with no container of their own, and giving them one purely to
+          hang a click target on would put a new box between the header rule and
+          the rows. */}
       {items.map((item) => (
         <div
           key={item.key}
-          className="grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b py-2.5 text-left text-[12px] text-foreground"
+          {...previewFieldProps(
+            "line-items",
+            "Edit line items",
+            "grid grid-cols-[minmax(0,1fr)_44px_72px_80px] gap-2 border-b py-2.5 text-left text-[12px] text-foreground"
+          )}
           style={{ borderColor: withAlpha(accent, 0.33) }}
         >
           <span className="flex min-w-0 items-start gap-1.5">
@@ -152,11 +169,17 @@ export function Y2kBoldLayout({ model, onLogoClick }: LayoutProps) {
         className="mt-8 text-left"
         labelClassName={headLabel}
         labelStyle={headStyle}
+        fieldId="payment-account"
       />
 
-      <NotesBlock notes={model.notes} lut={model.lut} className="mt-6 text-left" />
+      <NotesBlock
+        notes={model.notes}
+        lut={model.lut}
+        className="mt-6 text-left"
+        fieldId="notes-terms"
+      />
 
-      <SignatureBlock url={model.signatureUrl} className="mt-6" />
+      <SignatureBlock url={model.signatureUrl} className="mt-6" pending={model.signaturePending} />
     </div>
   );
 }

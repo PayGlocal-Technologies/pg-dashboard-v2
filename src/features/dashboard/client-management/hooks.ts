@@ -7,8 +7,6 @@ import { COUNTRIES } from "@/components/ui";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useScopeId } from "@/lib/hooks/useScopeId";
-import { useApp } from "@/stores/useApp";
-import { useAccountSetup } from "@/stores/useAccountSetup";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { buildS3Headers } from "@/features/dashboard/mca-transactions/useInvoiceUpload";
 import {

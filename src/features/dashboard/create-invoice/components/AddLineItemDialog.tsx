@@ -104,6 +104,7 @@ export function AddLineItemDialog({
   currency,
   currencySymbol,
   editingItem,
+  initialDescription,
   onSubmit,
 }: {
   open: boolean;
@@ -112,6 +113,10 @@ export function AddLineItemDialog({
   currencySymbol: string;
   /** null when adding. */
   editingItem: LineItemDraft | null;
+  /** Seeds the name field when opening fresh from a typed-but-unmatched
+   *  search, e.g. LineItemsSection's inline "Add "…"" row. Ignored once
+   *  editingItem is set. */
+  initialDescription?: string;
   onSubmit: (values: LineItemValues) => void;
 }) {
   return (
@@ -121,10 +126,11 @@ export function AddLineItemDialog({
         <LineItemBody
           // Remount per open/target so the fields start from the right values
           // and no stale validation carries over.
-          key={`${open ? "open" : "closed"}-${editingItem?.key ?? "new"}`}
+          key={`${open ? "open" : "closed"}-${editingItem?.key ?? initialDescription ?? "new"}`}
           currency={currency}
           currencySymbol={currencySymbol}
           editingItem={editingItem}
+          initialDescription={initialDescription}
           onCancel={() => onOpenChange(false)}
           onSubmit={(values) => {
             onSubmit(values);
@@ -140,12 +146,14 @@ function LineItemBody({
   currency,
   currencySymbol,
   editingItem,
+  initialDescription,
   onCancel,
   onSubmit,
 }: {
   currency: string;
   currencySymbol: string;
   editingItem: LineItemDraft | null;
+  initialDescription?: string;
   onCancel: () => void;
   onSubmit: (values: LineItemValues) => void;
 }) {
@@ -160,7 +168,7 @@ function LineItemBody({
           quantity: editingItem.quantity,
           saveAsSku: editingItem.saveAsSku ?? false,
         }
-      : EMPTY
+      : { ...EMPTY, description: initialDescription ?? EMPTY.description }
   );
   const [showGst, setShowGst] = useState(!!editingItem?.gstRate);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
@@ -275,13 +283,13 @@ function LineItemBody({
         {errors.type && <FieldError>{errors.type}</FieldError>}
       </Field>
 
-      {/* `modal` for the same reason SearchableSelect needs it: this popover
-          lives inside a Dialog, and flux's PopoverContent always portals to
-          document.body — outside the Dialog's subtree. A modal Dialog mounts
-          react-remove-scroll and sets `pointer-events: none` on the body, so a
-          non-modal popover out there has its wheel events cancelled. Without
-          this the list rendered but would not scroll, which with the old
-          six-item cap is most of why this looked broken. */}
+      {/* `modal` was how this popover got a scrollable list: it lives inside a
+          Dialog, flux's PopoverContent portals to document.body — outside the
+          Dialog's subtree — and the Dialog's react-remove-scroll lock cancels
+          the wheel out there. flux 0.3.3 fixes that for every popover
+          (ScrollLockTakeover in PopoverContent), so `modal` is no longer needed
+          for scrolling. Kept because it also keeps the suggestion list as its
+          own layer; drop it if this should stop trapping focus. */}
       <Popover modal open={suggestionsOpen && matches.length > 0} onOpenChange={setSuggestionsOpen}>
         <PopoverAnchor asChild>
           <Field>

@@ -23,7 +23,7 @@ import {
 } from "@/features/dashboard/mca-invoices/services";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
 import { LinkConsentFooter } from "@/features/dashboard/mca-invoices/components/LinkConsentFooter";
-import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
+import type { LinkableTransaction } from "@/features/dashboard/mca-transactions/types";
 import type { BaseResponse } from "@/types/common";
 
 /** The invoice shape pg-dashboard's LINK_INVOICE_COLUMNS reads. */
@@ -63,7 +63,7 @@ export function LinkInvoiceModal({
   onLinked,
 }: {
   /** null closes the modal. */
-  transaction: McaTransaction | null;
+  transaction: LinkableTransaction | null;
   onOpenChange: (open: boolean) => void;
   onLinked: () => void;
 }) {
@@ -98,7 +98,7 @@ function LinkInvoiceBody({
   onCancel,
   onLinked,
 }: {
-  transaction: McaTransaction;
+  transaction: LinkableTransaction;
   onCancel: () => void;
   onLinked: () => void;
 }) {

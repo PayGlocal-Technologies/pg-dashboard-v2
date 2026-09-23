@@ -1,6 +1,6 @@
 "use client";
 
-import { Button } from "@/components/ui";
+import { Button, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { AppImage as Image } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export function LogoSlot({
   shape = "rounded",
   /** Border and icon colour for the empty state. Defaults to the theme's. */
   tint,
+  pending = false,
   className,
 }: {
   url: string;
@@ -32,6 +33,8 @@ export function LogoSlot({
   size?: number;
   shape?: "rounded" | "circle";
   tint?: string;
+  /** A logo is coming: hold the space, draw nothing that invites a click. */
+  pending?: boolean;
   className?: string;
 }) {
   const radius = shape === "circle" ? "rounded-full" : "rounded-xl";
@@ -68,6 +71,26 @@ export function LogoSlot({
       >
         {image}
       </Button>
+    );
+  }
+
+  /**
+   * The logo is known to belong here but has not arrived.
+   *
+   * Reserving the box rather than collapsing it is what keeps the name beside
+   * it from sliding left and back again, and a shimmer rather than the dashed
+   * box is what stops the sheet inviting an upload for a logo the merchant
+   * already has. Sits below the `url` branch so a cached asset paints at once.
+   */
+  if (pending) {
+    return (
+      <div
+        className={cn("shrink-0 self-start overflow-hidden", radius, className)}
+        style={boxStyle}
+        aria-hidden
+      >
+        <Shimmer className="h-full w-full" rounded={shape === "circle" ? "full" : "lg"} />
+      </div>
     );
   }
 

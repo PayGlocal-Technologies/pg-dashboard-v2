@@ -1,8 +1,10 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import { AppImage as Image } from "@/components/common/AppImage";
+import { Shimmer } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { revealInvoiceField } from "@/features/dashboard/create-invoice/components/ReadinessChecklist";
 import type { BankAccountRow } from "@/features/dashboard/create-invoice/hooks";
 import type { InvoiceLabels } from "@/features/dashboard/create-invoice/labels";
 import type { PreviewItem } from "@/features/dashboard/create-invoice/components/preview/previewModel";
@@ -44,6 +46,68 @@ export const PAGE_PADDING = "p-10";
  * breaks mid-word as a last resort instead, so text can never set the page width.
  */
 const WRAPS = "[overflow-wrap:anywhere] break-words";
+
+/**
+ * The hover and focus affordance for a block that jumps to its editor field.
+ *
+ * Colour and rounding only — nothing here generates or resizes a box. That is
+ * the whole constraint: this sheet is a mirror of the PDF the server will
+ * render, so an affordance that adds padding, changes `display` or inserts a
+ * node would make the preview lie about the document. `ring` is a box-shadow
+ * and `rounded-sm` is inert, so both stay out of the flow. Listed first in the
+ * `cn` below so a theme's own radius (the pill in Geometric Modern, the 2xl
+ * frame in Playful Border) overrides it rather than the other way round.
+ */
+const PREVIEW_FIELD =
+  "cursor-pointer rounded-sm outline-none transition-colors hover:bg-primary/5 focus-visible:ring-2 focus-visible:ring-ring/40";
+
+/**
+ * Makes a block of the document preview a shortcut to the field that fills it:
+ * clicking scrolls the editor to that field and flashes it, through the same
+ * `revealInvoiceField` the readiness checklist uses.
+ *
+ * Returned as props to spread onto the element the layout *already* renders,
+ * rather than as a wrapper component. A wrapper — which is how this was first
+ * built — inserts a node into the sheet, and a `block w-full` node inside a
+ * `flex` row or around an `inline-block` pill re-flows the document: that is
+ * what shifted the layout of all six themes. Spreading onto the existing
+ * element cannot, because no element is added and no box-model class changes.
+ *
+ * `role="button"` in place of a real `<button>` for the same reason: flux's
+ * `Button` brings its own padding, `inline-flex` and icon slot, and even a bare
+ * `<button>` resets `display` and font. The keyboard contract a real button
+ * would give for free is paid for below, in `onKeyDown`.
+ *
+ * @param fieldId matches a `data-field` anchor in the editor.
+ * @param label   the accessible name, e.g. "Edit issue date".
+ * @param className the element's own classes, merged in so the call site keeps
+ *                  a single `className` source and cannot drop them.
+ */
+export function previewFieldProps(fieldId: string, label: string, className?: string) {
+  const reveal = () => revealInvoiceField(fieldId);
+
+  return {
+    role: "button" as const,
+    tabIndex: 0,
+    "aria-label": label,
+    className: cn(PREVIEW_FIELD, className),
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      // Reading an amount off the sheet usually means selecting it. Without
+      // this, the mouse-up that ends the drag also scrolls the editor away
+      // from what the merchant was in the middle of copying.
+      if (window.getSelection()?.toString()) return;
+      event.stopPropagation();
+      reveal();
+    },
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      // Space scrolls the preview column by default, which would fight the
+      // scroll this is about to perform on the other side of the page.
+      event.preventDefault();
+      reveal();
+    },
+  };
+}
 
 type Tone = {
   className?: string;
@@ -89,15 +153,26 @@ export function PartyBlock({
   labelClassName,
   labelStyle,
   bodyClassName,
+  fieldId,
 }: Tone & {
   label: string;
   name: string;
   secondary?: string;
   lines: string[];
   gstIn?: string;
+  /** Set to make the block jump to that field in the editor when clicked. */
+  fieldId?: string;
 }) {
+  const interactive = fieldId
+    ? previewFieldProps(
+        fieldId,
+        `Edit ${label.replace(/:$/, "").toLowerCase()}`,
+        cn("min-w-0", className)
+      )
+    : { className: cn("min-w-0", className) };
+
   return (
-    <div className={cn("min-w-0", className)}>
+    <div {...interactive}>
       <PartLabel className={labelClassName} style={labelStyle}>
         {label}
       </PartLabel>
@@ -199,11 +274,14 @@ export function AccountBlock({
   className,
   labelClassName,
   labelStyle,
+  fieldId,
 }: Tone & {
   labels: InvoiceLabels;
   account: BankAccountRow | undefined;
   /** 2 for a grid, 1 to stack in a narrow column. */
   columns?: 1 | 2;
+  /** Set to make the block jump to that field in the editor when clicked. */
+  fieldId?: string;
 }) {
   if (!account) return null;
 
@@ -214,8 +292,16 @@ export function AccountBlock({
     { label: labels.ifscOrRouting, value: account.routing, mono: true },
   ];
 
+  const interactive = fieldId
+    ? previewFieldProps(
+        fieldId,
+        `Edit ${labels.bankDetails.toLowerCase()}`,
+        cn("min-w-0", className)
+      )
+    : { className: cn("min-w-0", className) };
+
   return (
-    <div className={cn("min-w-0", className)}>
+    <div {...interactive}>
       <PartLabel className={labelClassName} style={labelStyle}>
         {labels.bankDetails}
       </PartLabel>
@@ -267,16 +353,23 @@ export function NotesBlock({
   lut,
   className,
   textClassName,
+  fieldId,
 }: {
   notes: string;
   lut: string;
   className?: string;
   textClassName?: string;
+  /** Set to make the block jump to that field in the editor when clicked. */
+  fieldId?: string;
 }) {
   if (!notes && !lut) return null;
 
+  const interactive = fieldId
+    ? previewFieldProps(fieldId, "Edit notes and terms", cn("min-w-0", className))
+    : { className: cn("min-w-0", className) };
+
   return (
-    <div className={cn("min-w-0", className)}>
+    <div {...interactive}>
       {notes && (
         <p
           className={cn(
@@ -309,27 +402,41 @@ export function SignatureBlock({
   align = "right",
   className,
   captionClassName,
+  pending = false,
 }: {
   url: string;
   align?: "left" | "right";
   className?: string;
   captionClassName?: string;
+  /** A signature is coming: hold its height rather than drawing the foot short. */
+  pending?: boolean;
 }) {
-  if (!url) return null;
+  if (!url && !pending) return null;
+
+  const caption = (
+    <p className={cn("mt-1 text-[11px] text-muted-foreground/80", captionClassName)}>
+      Authorised signatory
+    </p>
+  );
 
   return (
     <div className={cn("flex flex-col", align === "left" ? "items-start" : "items-end", className)}>
-      <Image
-        src={url}
-        alt="Authorised signature"
-        width={140}
-        height={56}
-        unoptimized
-        className="h-14 w-auto object-contain"
-      />
-      <p className={cn("mt-1 text-[11px] text-muted-foreground/80", captionClassName)}>
-        Authorised signatory
-      </p>
+      {url ? (
+        <Image
+          src={url}
+          alt="Authorised signature"
+          width={140}
+          height={56}
+          unoptimized
+          className="h-14 w-auto object-contain"
+        />
+      ) : (
+        // `h-14` is the image's own height, which is what the sheet's foot is
+        // measured by; the width is nominal because a signature is `w-auto` and
+        // the block is a column, so only its height moves anything else.
+        <Shimmer className="h-14 w-32" rounded="md" />
+      )}
+      {caption}
     </div>
   );
 }

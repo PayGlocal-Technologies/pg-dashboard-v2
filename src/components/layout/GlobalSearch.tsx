@@ -45,6 +45,7 @@ export function GlobalSearch() {
   const router = useRouter();
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const isGlobalTenant = useApp((s) => s.isGlobalTenant);
+  const paymentProducts = useApp((s) => s.merchantEnabledProducts?.paymentProducts);
   const activeContext = useProductContext((s) => s.activeContext);
   const checkPermissions = useNewPermissions();
 
@@ -71,9 +72,13 @@ export function GlobalSearch() {
           toProductType(activeContext)
         ),
         SETTINGS_NAV_GROUPS,
-        { isPartnerUser }
+        // context and checkPermissions gate the STANDALONE_PAGES, which have no
+        // nav tree to be filtered by and so carry their own equivalents of
+        // NavItem's `product` and `permission`. paymentProducts gates the
+        // actions that need a product enabled (requiresPaymentProduct).
+        { isPartnerUser, context: activeContext, checkPermissions, paymentProducts }
       ),
-    [isPartnerUser, isGlobalTenant, activeContext, checkPermissions]
+    [isPartnerUser, isGlobalTenant, activeContext, checkPermissions, paymentProducts]
   );
 
   const trimmed = query.trim();

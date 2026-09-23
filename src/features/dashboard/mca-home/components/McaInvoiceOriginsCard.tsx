@@ -11,7 +11,8 @@ import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
-import { formatCurrencyShort } from "@/lib/utils/format";
+import { useReferralWallet } from "@/features/dashboard/refer-and-earn/hooks";
+import { formatCurrencyShort, formatSharePct } from "@/lib/utils/format";
 
 type InvoiceOriginTimeframe = "1W" | "1M" | "3M";
 
@@ -65,15 +66,6 @@ function formatAmount(amount: number, currency: string): string {
   }).format(amount);
 }
 
-function formatCompact(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    notation: "compact",
-    maximumFractionDigits: 1,
-  }).format(amount);
-}
-
 const BAR_COLORS = [
   "var(--chart-1)",
   "var(--chart-1)",
@@ -83,17 +75,26 @@ const BAR_COLORS = [
   "var(--chart-4)",
 ];
 
-/** Adaptive precision so a small country never rounds to a dead "0%" — same
- *  logic as SettlementAnalyticsCard's own formatSharePct (Currency
- *  distribution bar on the Transactions page), which this card's own
- *  distribution bar below now matches the look of. */
-function formatSharePct(fraction: number): string {
-  if (!(fraction > 0)) return "0%";
-  const pct = fraction * 100;
-  if (pct >= 0.1) return `${pct.toFixed(1)}%`;
-  if (pct >= 0.01) return `${pct.toFixed(2)}%`;
-  if (pct >= 0.001) return `${pct.toFixed(3)}%`;
-  return "<0.001%";
+interface OriginRow {
+  countryCode: string;
+  countryName: string;
+  flag: string;
+  amount: number;
+  invoiceCount: number;
+}
+
+/**
+ * Median of the rows' amounts, swapped in for "Avg per country" once there's
+ * more than one market. A merchant's book is usually dominated by one market
+ * (see the 94%+ single-market share the stat cell beside this one reports),
+ * and a mean gets dragged toward that outlier — ₹10.60Cr describes no real
+ * market on a ten-country card, while the median describes a typical one.
+ */
+function medianAmount(rows: OriginRow[]): number {
+  if (rows.length === 0) return 0;
+  const sorted = [...rows].map((r) => r.amount).sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 1 ? sorted[mid]! : (sorted[mid - 1]! + sorted[mid]!) / 2;
 }
 
 interface StatCellProps {
@@ -154,9 +155,20 @@ function buildTimeframeRanges(): Record<
  *  there's only 1-2 countries to show (the region below reserves room for a
  *  typical multi-country result, see the min-h-[148px] wrapper) with a
  *  promotional nudge instead of blank whitespace, linking through to Refer &
- *  Earn like every other MDR-waiver/referral touchpoint in the app. */
+ *  Earn like every other MDR-waiver/referral touchpoint in the app.
+ *
+ *  The countdown is the wallet's own `mdrWaiver`, from the same get-wallet call
+ *  that backs the Refer & Earn page this taps through to. Renders nothing when
+ *  there is no waiver in progress: filling the space was the original reason
+ *  this exists, but not at the price of naming a number that isn't the
+ *  merchant's. */
 function MdrWaiverCallout() {
   const router = useRouter();
+  const { wallet } = useReferralWallet();
+  const remaining = wallet?.mdrWaiver ?? 0;
+
+  if (!(remaining > 0)) return null;
+
   return (
     // Button always wraps its `children` in one auto-generated `<span>`
     // (see DisputeRespondForm's upload dropzone for the same gotcha), and
@@ -181,7 +193,8 @@ function MdrWaiverCallout() {
       </span>
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] font-semibold text-foreground">
-          You&apos;re 1 transaction away from your MDR waiver
+          You&apos;re {remaining.toLocaleString("en-IN")} transaction
+          {remaining === 1 ? "" : "s"} away from your MDR waiver
         </span>
         <span className="block text-xs text-muted-foreground">Tap to learn more</span>
       </span>
@@ -192,6 +205,50 @@ function MdrWaiverCallout() {
         aria-hidden
       />
     </Button>
+  );
+}
+
+/**
+ * A trend flourish for the single-market view, replacing the MDR-waiver
+ * callout there. The invoice-origins endpoint returns one total for the
+ * whole selected period, not a day-by-day series, so this is deliberately
+ * NOT a chart of real numbers — no axis, no dates, no tooltip, nothing that
+ * claims a value it doesn't have. It's a fixed decorative shape (same
+ * gridlines/fill/line treatment as the real area charts elsewhere in the
+ * app) that fills the space a chart would, without asserting daily data
+ * that doesn't exist.
+ */
+function DecorativeTrendGlyph() {
+  return (
+    <svg
+      viewBox="0 0 400 96"
+      width="100%"
+      height="96"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <defs>
+        <linearGradient id="origin-trend-fill" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.35" />
+          <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <line x1="0" y1="32" x2="400" y2="32" stroke="var(--chart-grid)" strokeWidth="1" />
+      <line x1="0" y1="64" x2="400" y2="64" stroke="var(--chart-grid)" strokeWidth="1" />
+      <path
+        d="M4,80 C60,58 100,20 150,16 C200,12 220,52 270,68 C320,84 360,78 396,64 L396,92 L4,92 Z"
+        fill="url(#origin-trend-fill)"
+      />
+      <path
+        d="M4,80 C60,58 100,20 150,16 C200,12 220,52 270,68 C320,84 360,78 396,64"
+        fill="none"
+        stroke="var(--chart-1)"
+        strokeWidth="2.25"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -208,10 +265,7 @@ export function McaInvoiceOriginsCard() {
   // collapse into one — their amounts and invoice counts summed — rather than
   // showing as separate near-duplicate bars. Sorted by amount so the merged
   // figures still rank correctly.
-  const rowsByCode = new Map<
-    string,
-    { countryCode: string; countryName: string; flag: string; amount: number; invoiceCount: number }
-  >();
+  const rowsByCode = new Map<string, OriginRow>();
   for (const r of origins?.rows ?? []) {
     const country = resolveCountry(r.countryCode);
     const existing = rowsByCode.get(country.code);
@@ -292,14 +346,19 @@ export function McaInvoiceOriginsCard() {
             </div>
           </div>
 
-          {/* Country distribution — one stacked bar (every country's share of
-              the total) plus a compact chip breakdown, same pattern as
-              SettlementAnalyticsCard's own "Currency distribution" on the
-              Transactions page (a single bar there rather than one pill per
-              row, so the shape reads as one whole split into parts instead of
-              a row of unrelated progress bars) — rectangular with a slight
-              corner radius rather than that card's fully rounded pill, per
-              this card's own review.
+          {/* Four tiers by market count, not one layout stretched to fit all
+              of them:
+                - 1 market: nothing to compare, so no bar — a plain headline
+                  figure instead.
+                - 2 markets: two headline figures side by side. Still no bar;
+                  two numbers is a comparison read faster than two bars.
+                - 3-6 markets: ranked bars return, since comparison is now the
+                  job. Each bar keeps a minimum visible width so a dominant
+                  market (94%+ of volume is typical here) doesn't reduce its
+                  competitors to invisible slivers, and row spacing tightens
+                  as the list grows so it still fills the same height.
+                - 7+ markets: bars stop earning their space at this density,
+                  so it drops to the plain two-column list instead.
               The region reserves the height of a full five-row list
               (min-h-[148px]) so the empty and error states, which render a
               single line, don't let the summary stats below slide up into the
@@ -331,69 +390,141 @@ export function McaInvoiceOriginsCard() {
                 description="Once you raise invoices, this shows where your invoiced volume comes from."
                 className="h-full py-2"
               />
-            ) : (
-              <div className="flex flex-col gap-4">
-                {/* 10px tall, rectangular with a small corner radius (not the
-                    fully rounded "cylindrical" pill), no gap between
-                    segments so it reads as one continuous bar split into
-                    shares rather than a row of tiles. Purely decorative —
-                    every figure it represents is restated as real text in
-                    the chip list below. */}
-                <div
-                  className="flex h-2.5 w-full overflow-hidden rounded-sm bg-muted"
-                  aria-hidden="true"
-                >
-                  {rows.map((origin, i) => (
-                    <div
-                      key={origin.countryCode}
-                      className="h-full"
-                      style={{
-                        width: `${rowsAmountSum > 0 ? (origin.amount / rowsAmountSum) * 100 : 0}%`,
-                        backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
-                      }}
+            ) : rows.length === 1 ? (
+              <div className="flex h-full flex-col justify-center gap-4">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <CountryFlagAvatar
+                      iso2={rows[0]!.countryCode}
+                      countryName={rows[0]!.countryName}
+                      className="h-8 w-8 shrink-0"
                     />
-                  ))}
-                </div>
-
-                {/* Single column for one country (a two-column grid would
-                    leave it hugging the left half with dead space beside
-                    it); two columns from sm once there's a second entry to
-                    pair it with. */}
-                <ul className={cn("grid grid-cols-1 gap-x-4", rows.length > 1 && "sm:grid-cols-2")}>
-                  {rows.map((origin, i) => (
-                    <li key={origin.countryCode} className="flex items-center gap-3 py-1">
+                    <p className="text-sm text-muted-foreground">
+                      {rows[0]!.countryName}, your only active market
+                    </p>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-2.5">
+                    <span className="text-[2rem] font-bold leading-none tracking-tight text-foreground tabular-nums">
+                      {formatCurrencyShort(rows[0]!.amount, currency)}
+                    </span>
+                    {rows[0]!.amount > 0 && totals?.totalInvoicedTrendPct != null && (
                       <span
-                        className="h-8 w-1 shrink-0 rounded-sm"
-                        style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
-                        aria-hidden="true"
-                      />
-                      <CountryFlagAvatar
-                        iso2={origin.countryCode}
-                        countryName={origin.countryName}
-                        className="h-8 w-8 shrink-0"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold text-foreground">
+                        className={cn(
+                          "flex items-center gap-0.5 text-xs font-medium",
+                          totals.totalInvoicedTrendPct >= 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-red-600 dark:text-red-400"
+                        )}
+                      >
+                        <Icon
+                          name={totals.totalInvoicedTrendPct >= 0 ? "trending-up" : "trending-down"}
+                          size={12}
+                          aria-hidden
+                        />
+                        {totals.totalInvoicedTrendPct >= 0 ? "+" : ""}
+                        {totals.totalInvoicedTrendPct}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <DecorativeTrendGlyph />
+              </div>
+            ) : rows.length === 2 ? (
+              <div className="flex h-full flex-col justify-center gap-4">
+                <div className="grid grid-cols-2 gap-6">
+                  {rows.map((origin) => {
+                    const pct = rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0;
+                    return (
+                      <div key={origin.countryCode} className="min-w-0">
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <CountryFlagAvatar
+                            iso2={origin.countryCode}
+                            countryName={origin.countryName}
+                            className="h-6 w-6 shrink-0"
+                          />
+                          <span className="truncate">{origin.countryName}</span>
+                          <span className="ml-auto shrink-0 tabular-nums">
+                            {formatSharePct(pct)}
+                          </span>
+                        </div>
+                        <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground tabular-nums">
+                          {formatCurrencyShort(origin.amount, currency)}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                <MdrWaiverCallout />
+              </div>
+            ) : rows.length <= 6 ? (
+              <div className={cn("flex flex-col", rows.length <= 4 ? "gap-5" : "gap-3")}>
+                {rows.map((origin, i) => {
+                  const pct = rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0;
+                  // Every bar gets a visible stub, however small its share —
+                  // a market that's genuinely 0.01% of volume still ran real
+                  // transactions, and an empty-looking track reads as "no
+                  // data" rather than "very little".
+                  const widthPct = Math.max(pct * 100, 1.5);
+                  return (
+                    <div key={origin.countryCode} className="flex items-center gap-3">
+                      <span className="flex w-32 min-w-0 shrink-0 items-center gap-2">
+                        <CountryFlagAvatar
+                          iso2={origin.countryCode}
+                          countryName={origin.countryName}
+                          className="h-6 w-6 shrink-0"
+                        />
+                        <span className="truncate text-sm text-foreground">
                           {origin.countryName}
                         </span>
-                        <span className="block text-[11px] tabular-nums text-muted-foreground">
-                          {formatSharePct(rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0)} of
-                          total
-                        </span>
                       </span>
-                      <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                      <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+                        <span
+                          className="block h-full rounded-full"
+                          style={{
+                            width: `${widthPct}%`,
+                            backgroundColor: BAR_COLORS[i % BAR_COLORS.length],
+                          }}
+                        />
+                      </span>
+                      <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                        {formatSharePct(pct)}
+                      </span>
+                      <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
                         {formatCurrencyShort(origin.amount, currency)}
                       </span>
-                    </li>
-                  ))}
-                </ul>
-
-                {/* 1-2 countries leaves this whole region much shorter than
-                    the reserved min-h-[148px], see that wrapper's own doc
-                    comment — a promotional nudge fills the space instead of
-                    leaving it blank. */}
-                {rows.length <= 2 && <MdrWaiverCallout />}
+                    </div>
+                  );
+                })}
               </div>
+            ) : (
+              <ul className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+                {rows.map((origin, i) => (
+                  <li key={origin.countryCode} className="flex items-center gap-3 py-1">
+                    <span
+                      className="h-8 w-1 shrink-0 rounded-sm"
+                      style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
+                      aria-hidden="true"
+                    />
+                    <CountryFlagAvatar
+                      iso2={origin.countryCode}
+                      countryName={origin.countryName}
+                      className="h-8 w-8 shrink-0"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold text-foreground">
+                        {origin.countryName}
+                      </span>
+                      <span className="block text-[11px] tabular-nums text-muted-foreground">
+                        {formatSharePct(rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0)} of
+                        total
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+                      {formatCurrencyShort(origin.amount, currency)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
@@ -405,24 +536,53 @@ export function McaInvoiceOriginsCard() {
                   <Shimmer className="mt-2 h-6 w-16" />
                 </div>
               ))
+            ) : rows.length === 1 ? (
+              // One market: "avg per market" is meaningless and "median
+              // market" is the same figure as "total invoiced" restated, so
+              // both are replaced with the pair that's actually informative
+              // at n=1 — how many transactions made up that figure, and what
+              // a typical one was worth.
+              <>
+                <StatCell
+                  label="Total volume"
+                  valueLabel={formatCurrencyShort(rows[0]!.amount, currency)}
+                  trendPct={rows[0]!.amount > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
+                />
+                <StatCell
+                  label="Transactions"
+                  valueLabel={String(rows[0]!.invoiceCount)}
+                  trendPct={null}
+                />
+                <StatCell
+                  label="Average payment"
+                  valueLabel={formatCurrencyShort(
+                    rows[0]!.invoiceCount > 0 ? rows[0]!.amount / rows[0]!.invoiceCount : 0,
+                    currency
+                  )}
+                  trendPct={null}
+                />
+                <div>
+                  <p className="text-xs text-muted-foreground">Active markets</p>
+                  <RollingNumber
+                    value="1"
+                    className="mt-1 block text-xl font-bold tracking-tight text-foreground tabular-nums"
+                  />
+                </div>
+              </>
             ) : (
               <>
                 {/* Trend passed as null (hidden) whenever the figure it sits
                     beside is zero — a percentage change against nothing reads as
                     broken. */}
                 <StatCell
-                  label="Total invoiced"
+                  label="Total volume"
                   valueLabel={formatCurrencyShort(totalInvoiced, currency)}
                   trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
                 />
                 <StatCell
-                  label="Avg per country"
-                  valueLabel={formatCurrencyShort(totals?.avgPerCountry ?? 0, currency)}
-                  trendPct={
-                    (totals?.avgPerCountry ?? 0) > 0
-                      ? (totals?.avgPerCountryTrendPct ?? null)
-                      : null
-                  }
+                  label="Median market"
+                  valueLabel={formatCurrencyShort(medianAmount(rows), currency)}
+                  trendPct={null}
                 />
                 <StatCell
                   label={topShareLabel}
@@ -436,7 +596,7 @@ export function McaInvoiceOriginsCard() {
                 <div>
                   <p className="text-xs text-muted-foreground">Active markets</p>
                   <RollingNumber
-                    value={String(totals?.activeMarkets ?? 0)}
+                    value={String(totals?.activeMarkets ?? rows.length)}
                     className="mt-1 block text-xl font-bold tracking-tight text-foreground tabular-nums"
                   />
                 </div>

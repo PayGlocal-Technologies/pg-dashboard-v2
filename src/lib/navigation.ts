@@ -173,7 +173,7 @@ export const regularNavigation: NavGroup[] = [
         icon: "badge-check",
         permission: ["processEbrcRequest"],
         children: [
-          { label: "eBRC Generation", href: "/ebrc-generation", permission: [] },
+          { label: "eBRC Status", href: "/ebrc-generation", permission: [] },
           { label: "IRM Repository", href: "/irm-repository", permission: [] },
         ],
       },
@@ -279,7 +279,21 @@ export const mcaNavigation: NavGroup[] = [
   {
     label: "Compliance Center",
     items: [
-      { label: "eBRC", href: "/ebrc", icon: "badge-check", permission: [] },
+      {
+        label: "eBRC",
+        href: "/ebrc",
+        icon: "badge-check",
+        // Same gate production puts on its own eBRC menu entry (see
+        // pg-dashboard's Sidebar/constants.ts). The children inherit it by
+        // sitting under this parent; the per-MID "EBRC" entitlement is checked
+        // separately, on the pages themselves (MidGuard's `feature` prop),
+        // which is also where production checks it.
+        permission: ["processEbrcRequest"],
+        children: [
+          { label: "eBRC Status", href: "/ebrc-generation", permission: [] },
+          { label: "IRM Repository", href: "/irm-repository", permission: [] },
+        ],
+      },
       { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
       // Same /mca-receipts page the Payments tree reaches under Payment Products and
       // Finance, labelled for what an MCA merchant comes here for: the GST
