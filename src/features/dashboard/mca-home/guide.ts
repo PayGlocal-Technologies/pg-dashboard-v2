@@ -56,17 +56,23 @@ export const MCA_DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     align: "end",
   },
   {
+    // Reordered ahead of "Invoice status" — Quick actions now sits directly
+    // under the greeting, above the performance cards (see
+    // McaDashboardFeature's own ordering comment), so the tour follows the
+    // page's new top-to-bottom order instead of jumping back up the page.
+    // The Invoice step above it is the page header, which sits higher still,
+    // so the three together read straight down the screen.
+    target: "mca-quick-access",
+    title: "Quick actions",
+    description: "Quickly find the tools and information you need to manage your virtual accounts.",
+    side: "bottom",
+    align: "start",
+  },
+  {
     target: "mca-needs-attention",
     title: "Invoice status",
     description: "See anything that needs your attention, so you know what to take care of.",
     side: "left",
-    align: "start",
-  },
-  {
-    target: "mca-quick-access",
-    title: "Quick access",
-    description: "Quickly find the tools and information you need to manage your virtual accounts.",
-    side: "top",
     align: "start",
   },
   {

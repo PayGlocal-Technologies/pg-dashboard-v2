@@ -40,6 +40,16 @@ export function buildTxnRequestBody(
     fieldSearch.paymentInstrument = filters.paymentInstrument;
   }
 
+  // eBRC IRM statuses (mapping / process), same fieldSearch keys pg-dashboard
+  // writes for its own eBRC and IRM Repository tables.
+  if (filters.irmMappingStatus?.length) {
+    fieldSearch.irmMappingStatus = filters.irmMappingStatus;
+  }
+
+  if (filters.irmProcessStatus?.length) {
+    fieldSearch.irmProcessStatus = filters.irmProcessStatus;
+  }
+
   // Currency filter (MCA)
   if (filters.currency?.length) {
     fieldSearch.currency = filters.currency;

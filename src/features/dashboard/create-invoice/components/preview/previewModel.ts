@@ -26,7 +26,11 @@ export interface PreviewSource {
   client: ClientData | undefined;
   account: BankAccountRow | undefined;
   logoUrl: string | undefined;
+  /** True while the merchant's logo is still being read. See `logoPending`. */
+  logoAssetLoading?: boolean;
   signatureUrl: string | undefined;
+  /** True while the merchant's signature is still being read. */
+  signatureAssetLoading?: boolean;
   symbol: string;
   /**
    * The effective theme name, and the hexes for its colour pair.
@@ -94,7 +98,27 @@ export interface PreviewModel {
   lut: string;
 
   logoUrl: string;
+  /**
+   * The logo belongs on this invoice but its url has not arrived yet, so the
+   * slot holds its place and prints nothing.
+   *
+   * Only ever true when the toggle is on, which is the one case where the
+   * answer is already known: a logo *is* going to be drawn here. With the
+   * toggle off, whether the slot appears at all depends on the asset that is
+   * still loading, and the preview declines to guess — see
+   * InvoiceDocumentPreview.
+   */
+  logoPending: boolean;
   signatureUrl: string;
+  /**
+   * The signature belongs on this invoice but its url has not arrived yet.
+   *
+   * Same rule as `logoPending`, and it exists for the sign-off's height rather
+   * than for a false invitation: an empty signature block is nothing at all, so
+   * without this the foot of the sheet is drawn short and then grows by the
+   * height of a signature once the asset lands.
+   */
+  signaturePending: boolean;
 }
 
 const longDate = (value: string): string =>
@@ -168,6 +192,8 @@ export function buildPreviewModel(source: PreviewSource): PreviewModel {
     // The toggles are per invoice, the assets are per merchant, so both have to
     // agree before anything is drawn.
     logoUrl: form.logoEnabled && logoUrl ? logoUrl : "",
+    logoPending: !!form.logoEnabled && !logoUrl && !!source.logoAssetLoading,
     signatureUrl: form.signatureEnabled && signatureUrl ? signatureUrl : "",
+    signaturePending: !!form.signatureEnabled && !signatureUrl && !!source.signatureAssetLoading,
   };
 }

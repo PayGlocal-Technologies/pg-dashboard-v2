@@ -8,6 +8,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
+  previewFieldProps,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -31,22 +32,27 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
   return (
     <div className={`flex min-h-full w-full min-w-0 flex-col bg-card ${PAGE_PADDING}`}>
       <div className="mb-5 flex items-center gap-4">
-        <LogoSlot url={model.logoUrl} onUpload={onLogoClick} tint={primary} />
+        <LogoSlot
+          url={model.logoUrl}
+          onUpload={onLogoClick}
+          tint={primary}
+          pending={model.logoPending}
+        />
         <span className="text-[22px] font-bold tracking-tight text-foreground">
           {labels.invoice}
         </span>
       </div>
 
       <div className="mb-7 flex flex-wrap items-start gap-8 text-[12px]">
-        <div>
+        <div {...previewFieldProps("invoice-number", "Edit invoice number")}>
           <p className="text-muted-foreground">{labels.invoiceNumber}</p>
           <p className="font-semibold text-foreground">{model.invoiceNumber}</p>
         </div>
-        <div>
+        <div {...previewFieldProps("issue-date", "Edit issue date")}>
           <p className="text-muted-foreground">{labels.issueDate}</p>
           <p className="font-semibold text-foreground">{model.issueDate}</p>
         </div>
-        <div>
+        <div {...previewFieldProps("due-date", "Edit due date")}>
           <p className="text-muted-foreground">{labels.dueDate}</p>
           <p className="font-semibold text-foreground">{model.dueDate || "-"}</p>
         </div>
@@ -58,12 +64,14 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
           name={model.billerName}
           lines={model.billerLines}
           gstIn={model.billerGstIn}
+          fieldId="biller"
         />
         <PartyBlock
           label={labels.billedTo}
           name={model.clientName}
           secondary={model.clientSecondary}
           lines={model.clientLines}
+          fieldId="client"
         />
       </div>
 
@@ -73,7 +81,13 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
       </p>
       <MemoLine memo={model.memo} className="mt-1" />
 
-      <div className="mt-4 overflow-hidden border border-border">
+      <div
+        {...previewFieldProps(
+          "line-items",
+          "Edit line items",
+          "mt-4 overflow-hidden border border-border"
+        )}
+      >
         <div className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
           <span>{labels.description}</span>
           <span className="text-center">{labels.qty}</span>
@@ -140,15 +154,17 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
         columns={2}
         className="mt-6 border-t border-border pt-4"
         labelClassName="mb-2 font-semibold"
+        fieldId="payment-account"
       />
 
       <NotesBlock
         notes={model.notes}
         lut={model.lut}
         className="mt-6 border-t border-border pt-4"
+        fieldId="notes-terms"
       />
 
-      <SignatureBlock url={model.signatureUrl} className="mt-6" />
+      <SignatureBlock url={model.signatureUrl} className="mt-6" pending={model.signaturePending} />
     </div>
   );
 }

@@ -18,8 +18,8 @@ import {
 } from "@/features/dashboard/mca-home/guide";
 import { McaPromoCarousel } from "@/features/dashboard/mca-home/components/McaPromoCarousel";
 import { McaRevenueCard } from "@/features/dashboard/mca-home/components/McaRevenueCard";
-import { McaClientAnalyticsCard } from "@/features/dashboard/mca-home/components/McaClientAnalyticsCard";
 import { McaNeedsAttentionCard } from "@/features/dashboard/mca-home/components/McaNeedsAttentionCard";
+import { McaUpcomingSettlementCard } from "@/features/dashboard/mca-home/components/McaUpcomingSettlementCard";
 import { McaNeedsAttentionDrawer } from "@/features/dashboard/mca-home/components/McaNeedsAttentionDrawer";
 import { McaQuickAccess } from "@/features/dashboard/mca-home/components/McaQuickAccess";
 import { McaDashboardWidgetCustomization } from "@/features/dashboard/mca-home/components/widgets/McaDashboardWidgetCustomization";
@@ -83,26 +83,6 @@ export function McaDashboardFeature() {
   const layoutSnapshot = useRef<McaWidgetId[]>(layout);
 
   /**
-   * A new invoice is raised against exactly one MID, and the editor puts that
-   * MID in every request path — so with several PACB MIDs and none selected,
-   * the merchant is asked which before the editor opens rather than having the
-   * first one chosen for them. Same question pg-dashboard's own Quick Access
-   * asks (ChooseMidSelect), and `MidScopedAction` below is what asks it.
-   */
-  function handleInvoice(mid: string) {
-    if (mid) selectMid(mid);
-    router.push("/create-invoice");
-  }
-
-  function handleViewClients() {
-    router.push("/client-management");
-  }
-
-  function handleViewSettlements() {
-    router.push("/mca-settlement-report");
-  }
-
-  /**
    * Both Needs attention actions — Remind on an overdue invoice, View on one
    * still in its window — land on the invoice's details page. That page is
    * where "Email / remind client" lives, so chasing an invoice is one hop from
@@ -117,6 +97,18 @@ export function McaDashboardFeature() {
    */
   function handleOpenInvoice(id: string) {
     router.push(`/mca-invoices/${id}`);
+  }
+
+  /**
+   * A new invoice is raised against exactly one MID, and the editor puts that
+   * MID in every request path — so with several PACB MIDs and none selected,
+   * the merchant is asked which before the editor opens rather than having the
+   * first one chosen for them. Same question pg-dashboard's own Quick Access
+   * asks (ChooseMidSelect), and `MidScopedAction` below is what asks it.
+   */
+  function handleInvoice(mid: string) {
+    if (mid) selectMid(mid);
+    router.push("/create-invoice");
   }
 
   function handleCustomise() {
@@ -140,11 +132,8 @@ export function McaDashboardFeature() {
   }
 
   return (
-    <McaDashboardAurora contentClassName="space-y-4">
-      {/* ── Promo carousel ───────────────────────────────────────────── */}
-      <McaPromoCarousel />
-
-      {/* ── Page header ──────────────────────────────────────────────── */}
+    <McaDashboardAurora contentClassName="space-y-5">
+      {/* ── 1. Greeting ──────────────────────────────────────────────── */}
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-[1.35rem] font-bold leading-snug tracking-tight text-foreground">
@@ -175,34 +164,68 @@ export function McaDashboardFeature() {
         </div>
       </div>
 
-      {/* ── Revenue + client analytics / needs attention ─────────────── */}
+      {/* ── 2. Shortcuts ─────────────────────────────────────────────────
+          Directly under the greeting, above the performance cards — a
+          loose row of pills, not another dashboard card, so it reads as
+          part of the header area rather than a peer of what follows. */}
+      <div data-guide="mca-quick-access">
+        <McaQuickAccess editMode={editMode} onEditDashboard={handleCustomise} />
+      </div>
+
+      {/* ── 3. Primary business snapshot ────────────────────────────────
+          Performance, wider, beside Needs attention — items-stretch is
+          what keeps the narrower panel at the same height as the chart
+          card instead of shrinking to its own shorter content. */}
       <div className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
         <div className="lg:col-span-8">
-          <McaRevenueCard onViewSettlements={handleViewSettlements} />
+          <McaRevenueCard />
         </div>
+        {/* Needs attention grows to fill whatever height the performance
+            card sets; Upcoming settlement is fixed-height beneath it, so the
+            two together match that card rather than either one alone. */}
         <div className="flex flex-col gap-4 lg:col-span-4">
-          <McaClientAnalyticsCard onViewAll={handleViewClients} />
-          <div data-guide="mca-needs-attention">
+          <div className="min-h-0 flex-1" data-guide="mca-needs-attention">
             <McaNeedsAttentionCard
               onViewAll={() => setNeedsAttentionOpen(true)}
               onAction={handleOpenInvoice}
             />
           </div>
+          <McaUpcomingSettlementCard />
         </div>
       </div>
 
-      <div data-guide="mca-quick-access">
-        <McaQuickAccess editMode={editMode} onEditDashboard={handleCustomise} />
-      </div>
+      {/* ── 4. Promotional banners ───────────────────────────────────── */}
+      <McaPromoCarousel />
 
-      {/* ── Configurable widgets (Transactions/globe, stat cards, charts) ── */}
-      <McaDashboardWidgetCustomization
-        layout={layout}
-        onLayoutChange={setLayout}
-        editMode={editMode}
-        onDiscardEdit={handleDiscardCustomise}
-        onDoneEdit={handleDoneCustomise}
-      />
+      {/* ── 5–6. Deeper business insights ────────────────────────────── */}
+      <div className="space-y-4 pt-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+            Explore your business
+          </h2>
+          {!editMode && (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto min-h-0 p-0 text-xs font-semibold"
+              onClick={handleCustomise}
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+
+        {/* ── Configurable widgets (Transactions/globe, stat cards, charts,
+            Client Analytics) ── */}
+        <McaDashboardWidgetCustomization
+          layout={layout}
+          onLayoutChange={setLayout}
+          editMode={editMode}
+          onDiscardEdit={handleDiscardCustomise}
+          onDoneEdit={handleDoneCustomise}
+        />
+      </div>
 
       <McaNeedsAttentionDrawer
         open={needsAttentionOpen}
