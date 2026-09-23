@@ -551,14 +551,14 @@ function PlatformsContent() {
                     role="listitem"
                     variant="ghost"
                     size="md"
-                    className="w-full justify-start gap-2.5 text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
+                    className="w-full justify-start gap-2.5 text-muted-foreground  [&>span]:text-left"
                     leftIcon={
                       // Same h-6 w-9 footprint as the platform rows' logo
-                      // box above, so the "+" glyph and every brand mark
-                      // share one left edge and "Request a platform" lines
-                      // up with "Amazon", "Freelancer", etc. instead of
-                      // sitting ~12px further right.
-                      <span className="flex h-6 w-9 shrink-0 items-center justify-center">
+                      // box, so this row's label starts in the same column
+                      // as "Freelancer"/"Upwork"/etc. above it — sizing this
+                      // to the glyph itself (narrower than that box) left the
+                      // label starting further left than every row above it.
+                      <span className="flex flex-0 h-6 w-9 shrink-0 items-center justify-center">
                         <Icon name="plus" className="h-4 w-4" />
                       </span>
                     }

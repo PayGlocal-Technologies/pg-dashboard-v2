@@ -8,13 +8,15 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
   Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
   Popover,
+  PopoverAnchor,
   PopoverContent,
-  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -101,6 +103,10 @@ export function LineItemsSection({
   const [taxOpen, setTaxOpen] = useState(taxValue.length > 0);
   const [addOpen, setAddOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
+  // Seeds the full-form dialog's name field when it's opened from the inline
+  // "Add "…"" row rather than the always-present "Add new item" button —
+  // undefined for the latter, so the form still opens blank.
+  const [addSeed, setAddSeed] = useState<string | undefined>(undefined);
 
   const dragFrom = useRef<number | null>(null);
   const dragTo = useRef<number | null>(null);
@@ -136,10 +142,12 @@ export function LineItemsSection({
 
   /** Closes the dropdown and opens the full form — for a suggestion that
    *  doesn't cover what's being billed, same escape hatch BillToSection's
-   *  own dropdown gives with "Add a new client". */
-  const openAddDialog = () => {
+   *  own dropdown gives with "Add a new client". `name` seeds the form's own
+   *  item-name field when opened from a typed-but-unmatched search. */
+  const openAddDialog = (name?: string) => {
     setAddOpen(false);
     setEditingKey(null);
+    setAddSeed(name);
     setDialogOpen(true);
   };
 
@@ -167,8 +175,9 @@ export function LineItemsSection({
     setAddQuery("");
   };
 
-  // flux's Command does no filtering of its own — see BillToSection's client
-  // picker for the same pattern. An empty query lists the whole catalogue
+  // flux's Command is a presentational shell and does no filtering of its own,
+  // so the search is applied here — see BillToSection's client picker for the
+  // same pattern. An empty query lists the whole catalogue
   // rather than nothing, matching production's own item-name autocomplete
   // inside AddLineItemDialog.
   const matchingSuggestions = useMemo(() => {
@@ -382,7 +391,11 @@ export function LineItemsSection({
                 "Add new item" is the one row that still opens the full form,
                 pinned so it's always reachable regardless of what's typed.
                 Sits right above Subtotal rather than up in the header, so
-                it's beside the very total it's about to change. */}
+                it's beside the very total it's about to change.
+
+                The field is the search box itself, same as BillToSection's
+                client field — no separate "click to open, then type into a
+                second box inside the panel" step. */}
             <Popover
               open={addOpen}
               onOpenChange={(next) => {
@@ -390,20 +403,31 @@ export function LineItemsSection({
                 if (!next) setAddQuery("");
               }}
             >
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  aria-haspopup="listbox"
-                  aria-controls="line-items-listbox"
-                  className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-medium text-primary transition-colors hover:bg-primary/5"
-                >
-                  <Icon name="plus" className="h-3.5 w-3.5" />
-                  Add line item
-                </button>
-              </PopoverTrigger>
+              <PopoverAnchor asChild>
+                <div className="relative inline-flex w-56 shrink-0 items-center">
+                  <Icon
+                    name="plus"
+                    className="pointer-events-none absolute left-3 z-10 h-3.5 w-3.5 text-primary"
+                  />
+                  <Input
+                    role="combobox"
+                    autoComplete="off"
+                    aria-expanded={addOpen}
+                    aria-haspopup="listbox"
+                    aria-controls="line-items-listbox"
+                    value={addQuery}
+                    onFocus={() => setAddOpen(true)}
+                    onChange={(e) => {
+                      setAddQuery(e.target.value);
+                      if (!addOpen) setAddOpen(true);
+                    }}
+                    placeholder="Add line item"
+                    className="h-8 min-h-0 w-full rounded-full border-transparent bg-transparent py-1.5 pl-8 pr-2 text-[13px] font-medium shadow-none placeholder:font-medium placeholder:text-primary hover:bg-primary/5 focus-visible:border-border focus-visible:bg-card"
+                  />
+                </div>
+              </PopoverAnchor>
               <LineItemSuggestionsContent
                 query={addQuery}
-                onQueryChange={setAddQuery}
                 matches={matchingSuggestions}
                 symbol={symbol}
                 onSelect={addFromSuggestion}
@@ -564,7 +588,7 @@ export function LineItemsSection({
           </div>
         </div>
       ) : (
-        // Same full-width dropdown trigger shape as BillToSection's own
+        // Same full-width, directly-typable field as BillToSection's own
         // unselected "Choose a client" field — nothing billed yet, so
         // nothing to protect from an accidental click either.
         <Popover
@@ -574,35 +598,39 @@ export function LineItemsSection({
             if (!next) setAddQuery("");
           }}
         >
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              role="combobox"
-              aria-expanded={addOpen}
-              aria-haspopup="listbox"
-              aria-controls="line-items-listbox"
-              className={cn(
-                "flex h-11 w-full items-center justify-between gap-2.5 rounded-lg border border-border bg-card px-3.5 text-left text-[13px] shadow-none",
-                "transition-colors duration-150",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-              )}
-            >
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <Icon name="search" className="h-3.5 w-3.5 shrink-0" />
-                Add an item
-              </span>
-              <Icon
-                name="chevron-down"
-                className={cn(
-                  "h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-70 transition-transform",
-                  addOpen && "rotate-180"
-                )}
+          <PopoverAnchor asChild>
+            <InputGroup>
+              <InputGroupAddon align="inline-start">
+                <Icon name="search" className="h-3.5 w-3.5 text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                role="combobox"
+                autoComplete="off"
+                aria-expanded={addOpen}
+                aria-haspopup="listbox"
+                aria-controls="line-items-listbox"
+                value={addQuery}
+                onFocus={() => setAddOpen(true)}
+                onChange={(e) => {
+                  setAddQuery(e.target.value);
+                  if (!addOpen) setAddOpen(true);
+                }}
+                placeholder="Add an item"
+                className="text-[13px]"
               />
-            </button>
-          </PopoverTrigger>
+              <InputGroupAddon align="inline-end">
+                <Icon
+                  name="chevron-down"
+                  className={cn(
+                    "h-3.5 w-3.5 text-muted-foreground opacity-70 transition-transform",
+                    addOpen && "rotate-180"
+                  )}
+                />
+              </InputGroupAddon>
+            </InputGroup>
+          </PopoverAnchor>
           <LineItemSuggestionsContent
             query={addQuery}
-            onQueryChange={setAddQuery}
             matches={matchingSuggestions}
             symbol={symbol}
             onSelect={addFromSuggestion}
@@ -629,7 +657,11 @@ export function LineItemsSection({
 
       <AddLineItemDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={(next) => {
+          setDialogOpen(next);
+          if (!next) setAddSeed(undefined);
+        }}
+        initialDescription={addSeed}
         currency={currency}
         currencySymbol={symbol}
         editingItem={editingItem}
@@ -643,24 +675,22 @@ export function LineItemsSection({
  * The dropdown's own content — shared between the header trigger (once
  * there's at least one item) and the empty-state trigger, so the two never
  * drift into different search behaviour or a different "Add new item" row.
- * Same shape as BillToSection's client-picker popover: a search box, the
- * matching catalogue entries, and "Add new item" pinned outside the
- * scrollable list so it never scrolls away.
+ * Same shape as BillToSection's client-picker popover: the anchor field above
+ * is the search box, the matching catalogue entries are listed here, and "Add
+ * new item" is pinned outside the scrollable list so it never scrolls away.
  */
 function LineItemSuggestionsContent({
   query,
-  onQueryChange,
   matches,
   symbol,
   onSelect,
   onAddNew,
 }: {
   query: string;
-  onQueryChange: (value: string) => void;
   matches: { item: LineItemSuggestion; key: string }[];
   symbol: string;
   onSelect: (item: LineItemSuggestion) => void;
-  onAddNew: () => void;
+  onAddNew: (name?: string) => void;
 }) {
   // side="bottom" + avoidCollisions={false}: Radix flips a panel above its
   // trigger when the viewport runs out of room below, which here meant the
@@ -675,15 +705,27 @@ function LineItemSuggestionsContent({
       onOpenAutoFocus={(e) => e.preventDefault()}
     >
       <Command>
-        <CommandInput
-          placeholder="Search items…"
-          value={query}
-          onChange={(e) => onQueryChange(e.target.value)}
-        />
         <CommandList id="line-items-listbox" aria-label="Items">
           {matches.length === 0 && (
             <CommandEmpty>
-              {query.trim() ? `No item matches “${query.trim()}”.` : "No items billed yet."}
+              {query.trim() ? (
+                // The one prominent affordance for "nothing here matches what
+                // you typed" — a primary button, not a muted line of text, so
+                // it reads as the obvious next step. Carries the query through,
+                // so the form opens with the name already filled in.
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  className="w-full justify-start"
+                  leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                  onClick={() => onAddNew(query.trim())}
+                >
+                  Add &ldquo;{query.trim()}&rdquo;
+                </Button>
+              ) : (
+                "No items billed yet."
+              )}
             </CommandEmpty>
           )}
           <CommandGroup>
@@ -715,18 +757,23 @@ function LineItemSuggestionsContent({
         </CommandList>
       </Command>
 
-      <div className="border-t border-border p-3">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          className="w-full"
-          leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-          onClick={onAddNew}
-        >
-          Add new item
-        </Button>
-      </div>
+      {/* Hidden when the empty state above is already offering this exact
+          action for the typed query, so the panel never shows two "add an
+          item" buttons at once. */}
+      {!(matches.length === 0 && query.trim()) && (
+        <div className="border-t border-border p-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="w-full shadow-none"
+            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+            onClick={() => onAddNew()}
+          >
+            Add new item
+          </Button>
+        </div>
+      )}
     </PopoverContent>
   );
 }

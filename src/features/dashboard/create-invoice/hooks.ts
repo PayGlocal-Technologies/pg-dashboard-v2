@@ -459,6 +459,15 @@ export function useInvoiceBankAccounts(
 
 export interface InvoiceAsset {
   url: string | undefined;
+  /**
+   * True only while the first read of this merchant's asset is in flight.
+   *
+   * `url` is undefined both when the merchant has no logo and when nobody has
+   * asked yet, and the document preview has to tell those apart — see
+   * InvoiceDocumentPreview for what it draws in the meantime. False for a
+   * disabled query, so a missing merchant id settles rather than waiting.
+   */
+  isLoading: boolean;
   isUploading: boolean;
   upload: (file: File) => void;
 }
@@ -494,7 +503,7 @@ export function useInvoiceAsset(type: "LOGO" | "SIGNATURE"): InvoiceAsset {
   const [cacheStamp, setCacheStamp] = useState(() => Date.now());
 
   const readUrl = getAssetApi(merchantId, type);
-  const { data, refetch } = useGet<AssetResponse>(
+  const { data, refetch, isLoading } = useGet<AssetResponse>(
     [merchantId, "invoice-asset", type],
     readUrl,
     undefined,
@@ -569,6 +578,7 @@ export function useInvoiceAsset(type: "LOGO" | "SIGNATURE"): InvoiceAsset {
     url: storedUrl
       ? `${storedUrl}${storedUrl.includes("?") ? "&" : "?"}t=${cacheStamp}`
       : undefined,
+    isLoading,
     isUploading,
     upload,
   };

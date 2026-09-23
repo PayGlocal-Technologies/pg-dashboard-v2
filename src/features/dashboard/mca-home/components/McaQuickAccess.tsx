@@ -28,13 +28,32 @@ const QUICK_ACCESS_ROUTES: Record<string, string> = {
   "client-management": "/client-management",
 };
 
-// Mirrors home/components/QuickAccess.tsx's tile styling so both dashboards'
-// quick-access rows read as the same component even though the item lists
-// differ (this one is MCA-specific: invoices, international accounts, forex).
-const quickAccessCardClass = cn(
-  "group flex h-auto w-[11rem] shrink-0 flex-col items-start gap-2 rounded-xl border border-border bg-card text-left sm:w-[11.5rem]",
-  "px-3.5 pb-2.5 pt-3.5 shadow-sm transition-shadow duration-150",
-  "hover:bg-muted/40 hover:shadow"
+// A loose row of independent shortcut pills, not a shared dashboard card —
+// no enclosing border/background around the whole row, so the page's own
+// background shows straight through between (and around) them; each pill
+// carries its own stroke/fill instead (see quickAccessTileClass). Each pill
+// sizes to its own label (`inline-flex` + `w-fit`, no equal-width grid
+// column), so "Create invoice" stays visibly narrower than "International
+// accounts" instead of both stretching to match. Wraps naturally onto a
+// second line below `lg` rather than switching to a different layout —
+// still just shortcuts, at any width.
+const quickAccessRailClass = "flex flex-wrap items-center gap-1.5";
+
+// flux's Button wraps every child in one inner <span> of its own (see the
+// leftIcon note on ReadinessChecklist's Button usage) — without forcing that
+// wrapper to flex/w-fit itself, the icon and text stack on top of each
+// other instead of sitting side by side, and the pill would stretch full
+// width instead of hugging its own label.
+//
+// Matches the reference's own pill treatment: fully rounded, no shadow on
+// either variant (`shadow-none` overrides `secondary`'s default
+// `shadow-sm`). The ghost/secondary tiles additionally get a slight
+// `border-border` stroke (see the `!isPrimary` className below) — the
+// primary tile keeps its own `border-primary`, already the same colour as
+// its fill, so no override is needed there.
+const quickAccessTileClass = cn(
+  "h-auto min-h-0 w-fit justify-start rounded-full px-3.5 py-1.5 text-left shadow-none transition-colors duration-150",
+  "[&>span]:flex [&>span]:w-fit [&>span]:items-center [&>span]:gap-1.5"
 );
 
 interface McaQuickAccessProps {
@@ -44,6 +63,14 @@ interface McaQuickAccessProps {
   onEditDashboard?: () => void;
 }
 
+/**
+ * Shortcuts, not a card: one loose row of compact action pills sitting
+ * directly under the greeting, above the main performance cards — see
+ * McaDashboardFeature's own ordering comment for why this moved there.
+ * `aria-label` carries the section's name instead of a visible heading,
+ * since a "Quick actions" label above five short pills would outweigh the
+ * pills themselves.
+ */
 export function McaQuickAccess({ editMode = false, onEditDashboard }: McaQuickAccessProps) {
   const router = useRouter();
   const [fxModalOpen, setFxModalOpen] = useState(false);
@@ -70,28 +97,49 @@ export function McaQuickAccess({ editMode = false, onEditDashboard }: McaQuickAc
   }
 
   return (
-    <div className="w-full">
-      <h2 className="mb-3 text-[15px] font-semibold tracking-[-0.02em] text-foreground sm:text-base">
-        Quick access
-      </h2>
-
-      <div className="flex flex-wrap gap-2.5">
+    <nav aria-label="Quick actions" className="w-full">
+      <div className={quickAccessRailClass}>
         {mcaQuickAccessItems.map((item) => {
           if (item.id === "customise-dashboard" && editMode) return null;
 
-          // Identical tile either way — only what the press does differs, so the
-          // row reads as one set of tiles rather than one odd one out.
+          // "Create invoice" is the one shortcut that duplicates the header's
+          // own primary CTA, so it gets the primary (blue-filled) treatment
+          // to match; every other tile uses `ghost` with an explicit
+          // `bg-muted` fill — flux's own `secondary` variant carries a
+          // visible border and shadow (see quickAccessTileClass's note),
+          // neither of which the reference's flat grey pills have.
+          const isPrimary = item.id === "invoice-links";
+
+          // `title` carries the same description the old two-line layout
+          // showed — still there on hover, just not taking up permanent
+          // width/height.
           const tile = (
             <Button
               type="button"
-              variant="ghost"
-              className={quickAccessCardClass}
+              variant={isPrimary ? "primary" : "ghost"}
+              title={item.description}
+              className={cn(
+                quickAccessTileClass,
+                !isPrimary && "border-border bg-muted hover:bg-muted/70"
+              )}
               {...(item.id === "invoice-links" && needsMidChoice
                 ? {}
                 : { onClick: () => handleAction(item.id) })}
             >
-              <Icon name={item.icon} className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-              <span className="text-left text-[11px] font-medium leading-snug text-foreground sm:text-xs">
+              <Icon
+                name={item.icon}
+                className={cn(
+                  "h-3.5 w-3.5 shrink-0",
+                  isPrimary ? "text-primary-foreground" : "text-foreground"
+                )}
+                aria-hidden
+              />
+              <span
+                className={cn(
+                  "whitespace-nowrap text-[13px] font-medium",
+                  isPrimary ? "text-primary-foreground" : "text-foreground"
+                )}
+              >
                 {item.label}
               </span>
             </Button>
@@ -118,6 +166,6 @@ export function McaQuickAccess({ editMode = false, onEditDashboard }: McaQuickAc
       </div>
 
       <FxCalculatorModal open={fxModalOpen} onOpenChange={setFxModalOpen} />
-    </div>
+    </nav>
   );
 }

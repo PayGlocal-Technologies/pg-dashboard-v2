@@ -315,6 +315,43 @@ select {
   background-size: 200% 100%;
 }
 
+/* ─── Success tick ───────────────────────────────────────────────────────── */
+@keyframes success-tick-circle {
+  from {
+    stroke-dashoffset: 151;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes success-tick-check {
+  from {
+    stroke-dashoffset: 34;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.success-tick-circle {
+  stroke-dasharray: 151;
+  animation: success-tick-circle 0.5s ease-out forwards;
+}
+.success-tick-check {
+  stroke-dasharray: 34;
+  animation: success-tick-check 0.35s 0.4s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The tick is a confirmation, not decoration, so it still has to be drawn —
+     it just arrives complete instead of animating in. Same treatment the
+     other motion in this file takes under this setting. */
+  .success-tick-circle,
+  .success-tick-check {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
 /* ─── Page enter ─────────────────────────────────────────────────────────── */
 @keyframes pageFade {
   from {
@@ -663,7 +700,11 @@ textarea:focus-visible {
   --sweep-warm-low: rgba(252, 191, 73, 0.15);
   --sweep-blue: rgba(59, 130, 246, 0.18);
   --sweep-blue-far: rgba(96, 165, 250, 0.1);
-  --grain-opacity: 0.12;
+  /* Flat white per explicit request — was 0.12/0.09 (grain over the sweep,
+     see McaDashboardAurora's feTurbulence overlay). Zeroed rather than
+     removing the wrapper/effect entirely, so it's a one-line revert if the
+     sweep comes back later. */
+  --grain-opacity: 0;
 }
 
 .dark .mca-dashboard-aurora {
@@ -672,7 +713,7 @@ textarea:focus-visible {
   --sweep-warm-low: rgba(214, 156, 56, 0.09);
   --sweep-blue: rgba(45, 104, 210, 0.15);
   --sweep-blue-far: rgba(70, 126, 214, 0.08);
-  --grain-opacity: 0.09;
+  --grain-opacity: 0;
 }
 
 .mca-dashboard-aurora-layer {

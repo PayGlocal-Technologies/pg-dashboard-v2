@@ -22,14 +22,20 @@ export type McaWidgetId =
   | "fx-gain-loss"
   | "active-clients"
   | "new-clients"
-  | "client-concentration";
+  | "client-concentration"
+  | "client-analytics";
 
 /** Widget ids rendered via the generic McaStatCard (everything except the
- * dedicated chart/saved-amount/settlement-speed cards), see
+ * dedicated chart/saved-amount/settlement-speed/client-analytics cards), see
  * McaDashboardWidgetRenderer. */
 export type McaStatWidgetId = Exclude<
   McaWidgetId,
-  "transactions" | "invoice-trend" | "currency-split" | "saved-amount" | "avg-payment-time"
+  | "transactions"
+  | "invoice-trend"
+  | "currency-split"
+  | "saved-amount"
+  | "avg-payment-time"
+  | "client-analytics"
 >;
 
 export type McaWidgetCatalogEntry = {
@@ -55,6 +61,7 @@ export const MCA_WIDGET_CATALOG: McaWidgetCatalogEntry[] = [
   { id: "active-clients", name: "Active Clients", category: "Clients", lgColSpan: 4 },
   { id: "new-clients", name: "New Clients", category: "Clients", lgColSpan: 4 },
   { id: "client-concentration", name: "Client Concentration", category: "Clients", lgColSpan: 4 },
+  { id: "client-analytics", name: "Client Analytics", category: "Clients", lgColSpan: 4 },
   { id: "transactions", name: "Transactions (Globe)", category: "Charts", lgColSpan: 12 },
   { id: "invoice-trend", name: "Invoice Trend", category: "Charts", lgColSpan: 8 },
   { id: "currency-split", name: "Currency Split", category: "Charts", lgColSpan: 4 },
@@ -76,7 +83,9 @@ export const DEFAULT_MCA_DASHBOARD_LAYOUT: McaWidgetId[] = [
   // "outstanding-amount",
   "saved-amount",
   // "invoice-trend",
-  "currency-split",
+  // Swapped in for "currency-split", per explicit request — still in the
+  // catalog above, so it's still available from "Add widget".
+  "client-analytics",
 ];
 
 const ALL_MCA_WIDGET_IDS = new Set<string>(MCA_WIDGET_CATALOG.map((w) => w.id));

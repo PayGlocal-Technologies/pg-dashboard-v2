@@ -8,6 +8,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
+  previewFieldProps,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -37,6 +38,7 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
             size={44}
             shape="circle"
             tint={primary}
+            pending={model.logoPending}
           />
           <span className="min-w-0 leading-tight">
             {/* Wordmark only. GSTIN lives in the Issued-by block below, which is
@@ -62,6 +64,7 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
               lines={model.clientLines}
               labelClassName={LABEL}
               bodyClassName="text-[12.5px] text-muted-foreground"
+              fieldId="client"
             />
             <PartyBlock
               label={`${labels.issuedBy}:`}
@@ -70,20 +73,39 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
               gstIn={model.billerGstIn}
               labelClassName={LABEL}
               bodyClassName="text-[12.5px] text-muted-foreground"
+              fieldId="biller"
             />
           </div>
 
           <div className="min-w-0">
             <div className="text-right">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-foreground">
+              <p
+                {...previewFieldProps(
+                  "invoice-number",
+                  "Edit invoice number",
+                  "text-[11px] font-bold uppercase tracking-wide text-foreground"
+                )}
+              >
                 {labels.invoiceNumber}:{" "}
                 <span className="font-extrabold">{model.invoiceNumber}</span>
               </p>
-              <p className="mt-1.5 text-[12.5px] text-muted-foreground">
+              <p
+                {...previewFieldProps(
+                  "issue-date",
+                  "Edit issue date",
+                  "mt-1.5 text-[12.5px] text-muted-foreground"
+                )}
+              >
                 {labels.issueDate}:{" "}
                 <span className="font-medium text-foreground">{model.issueDate}</span>
               </p>
-              <p className="text-[12.5px] text-muted-foreground">
+              <p
+                {...previewFieldProps(
+                  "due-date",
+                  "Edit due date",
+                  "text-[12.5px] text-muted-foreground"
+                )}
+              >
                 {labels.dueDate}:{" "}
                 <span className="font-medium text-foreground">{model.dueDate || "-"}</span>
               </p>
@@ -95,6 +117,7 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
               columns={1}
               className="mt-5 text-right"
               labelClassName={LABEL}
+              fieldId="payment-account"
             />
           </div>
         </div>
@@ -108,7 +131,7 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
         <span className="text-center">{labels.qty}</span>
         <span className="text-right">{labels.total}</span>
       </div>
-      <div className="divide-y divide-border">
+      <div {...previewFieldProps("line-items", "Edit line items", "divide-y divide-border")}>
         {items.map((item) => (
           <div
             key={item.key}
@@ -153,13 +176,18 @@ export function MinimalMonoLayout({ model, onLogoClick }: LayoutProps) {
           Previously both shared a justify-between row, so with no notes the
           sign-off collapsed to the left edge while its own text stayed
           right-aligned — reading as neither one side nor the other. */}
-      <NotesBlock notes={model.notes} lut={model.lut} className="mt-8" />
+      <NotesBlock notes={model.notes} lut={model.lut} className="mt-8" fieldId="notes-terms" />
 
       <div className="mt-8">
         <p className="text-[12px] font-bold uppercase tracking-wide text-foreground">
           {labels.thankYou}
         </p>
-        <SignatureBlock url={model.signatureUrl} align="left" className="mt-1" />
+        <SignatureBlock
+          url={model.signatureUrl}
+          align="left"
+          className="mt-1"
+          pending={model.signaturePending}
+        />
       </div>
     </div>
   );

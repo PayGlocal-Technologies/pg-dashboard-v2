@@ -277,6 +277,30 @@ export function formatCurrencyCompact(
   return formatCurrencyShort(amount, currency);
 }
 
+/**
+ * One row's share of a total, as a percentage string, from a 0-1 fraction.
+ *
+ * Adaptive precision so a small share never rounds to a dead "0%": each tier is
+ * just enough decimal places to keep a share in that range visibly nonzero, and
+ * anything smaller still gets "<0.001%" rather than a false zero.
+ *
+ * The ">99.9%" tier is the mirror of that floor, and matters for the same
+ * reason. A row at 99.97% would otherwise print a flat "100.0%" while the rows
+ * beneath it are simultaneously showing shares of their own — a total that
+ * visibly does not add up, and a claim that the others round away to nothing.
+ * Only a share that really is the whole prints "100%".
+ */
+export function formatSharePct(fraction: number): string {
+  if (!(fraction > 0)) return "0%";
+  if (fraction >= 1) return "100%";
+  const pct = fraction * 100;
+  if (pct > 99.9) return ">99.9%";
+  if (pct >= 0.1) return `${pct.toFixed(1)}%`;
+  if (pct >= 0.01) return `${pct.toFixed(2)}%`;
+  if (pct >= 0.001) return `${pct.toFixed(3)}%`;
+  return "<0.001%";
+}
+
 /** Compact number formatting: 1_500 -> "1.5K", 2_400_000 -> "2.4M". */
 export function formatNumber(num: number): string {
   if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
