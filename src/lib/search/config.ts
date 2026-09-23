@@ -14,10 +14,10 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
 /**
  * Routes that actually have a page under src/app/(dashboard).
  *
- * navigation.ts still lists ~14 hrefs whose pages were never built in v2
- * (/configure, /payment-products, /invoice-links, /payment-button,
- * /manage-mandates, /invoice-download, /shipping-bill-regularisation,
- * /key-management-system, /scheduler, and the five partner routes). The
+ * navigation.ts still lists ~13 hrefs whose pages were never built in v2
+ * (/configure, /payment-products, /invoice-links, /manage-mandates,
+ * /invoice-download, /shipping-bill-regularisation, /key-management-system,
+ * /scheduler, and the five partner routes). The
  * sidebar links to them anyway, but a *search result* that 404s reads as a
  * broken feature rather than an unfinished one, so search filters against this
  * list. Add a route here in the same commit you add its page.tsx.
@@ -45,6 +45,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/pa-dashboard",
   "/pa-transactions",
   "/payment-links",
+  "/payment-button",
   "/platforms",
   "/mca-receipts",
   "/refer-and-earn",
@@ -258,6 +259,13 @@ export interface ActionEntry {
   path: string;
   icon: IconName;
   keywords?: string[];
+  /**
+   * A `merchantEnabledProducts.paymentProducts` entry the action needs. The
+   * parent page can stay searchable (it explains the product when it is off),
+   * but offering to create one of something the merchant cannot have would
+   * land them on that explanation from a "Create" label.
+   */
+  requiresPaymentProduct?: string;
 }
 
 /**
@@ -277,6 +285,16 @@ export interface ActionEntry {
  * Client management through their keywords.
  */
 export const ACTION_ENTRIES: readonly ActionEntry[] = [
+  {
+    label: "Create payment button",
+    parentPath: "/payment-button",
+    // Its own full-screen route, like Create invoice, so it is linked straight
+    // into rather than handed off through ?action=.
+    path: "/payment-button/create",
+    icon: "plus",
+    requiresPaymentProduct: "PAYMENT_BUTTONS",
+    keywords: ["new payment button", "embed button", "pay now button"],
+  },
   {
     label: "Create invoice",
     parentPath: "/mca-invoices",

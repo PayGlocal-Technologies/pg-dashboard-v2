@@ -23,7 +23,7 @@ import { useApp } from "@/stores/useApp";
  * belongs to, and eBRC sits on the PACB side for some merchants and PACBO for
  * others.
  */
-function isFeatureAvailableForMid(
+export function isFeatureAvailableForMid(
   mid: string,
   feature: string,
   isMultiMidUser: boolean,

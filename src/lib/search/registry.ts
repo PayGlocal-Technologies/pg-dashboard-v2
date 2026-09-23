@@ -50,6 +50,7 @@ export function buildSearchRegistry(
     isPartnerUser = false,
     context,
     checkPermissions,
+    paymentProducts = [],
   }: {
     isPartnerUser?: boolean;
     /** The Header's active tab, for context-scoped STANDALONE_PAGES. */
@@ -57,6 +58,9 @@ export function buildSearchRegistry(
     /** The same fn the Sidebar filters with, for permission-gated
      *  STANDALONE_PAGES. Omitting it drops every gated standalone page. */
     checkPermissions?: UseNewPermissionsFn;
+    /** merchantEnabledProducts.paymentProducts, for ACTION_ENTRIES that
+     *  declare requiresPaymentProduct. Omitting it drops those actions. */
+    paymentProducts?: string[];
   } = {}
 ): SearchEntry[] {
   const entries: SearchEntry[] = [];
@@ -127,6 +131,9 @@ export function buildSearchRegistry(
   for (const action of ACTION_ENTRIES) {
     const parent = entries.find((entry) => entry.path === action.parentPath);
     if (!parent || seen.has(action.path)) continue;
+    if (action.requiresPaymentProduct && !paymentProducts.includes(action.requiresPaymentProduct)) {
+      continue;
+    }
     seen.add(action.path);
     entries.push({
       path: action.path,
