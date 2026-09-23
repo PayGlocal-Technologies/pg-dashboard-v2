@@ -19,7 +19,11 @@ import { MapShippingBillStep } from "@/features/dashboard/ebrc-generation/compon
 import { ReviewConfirmStep } from "@/features/dashboard/ebrc-generation/components/ReviewConfirmStep";
 import { toIrmMapping } from "@/features/dashboard/ebrc-generation/helpers";
 import { EbrcRequestReceivedOverlay } from "@/features/dashboard/ebrc-generation/components/EbrcRequestReceivedOverlay";
-import { emptyMapping, type IrmMapping } from "@/features/dashboard/ebrc-generation/types";
+import {
+  emptyMapping,
+  isMappingComplete,
+  type IrmMapping,
+} from "@/features/dashboard/ebrc-generation/types";
 
 const STEPS = [
   { step: 1, label: "Select IRMs" },
@@ -153,6 +157,25 @@ export function EbrcGenerationWizard() {
     [selectedRecords]
   );
 
+  /**
+   * Whether every currently selected IRM has an accepted mapping — the same
+   * check Step 2's "Save & review" gate runs, recomputed live against
+   * whatever is selected *right now* rather than latched at the moment that
+   * gate last passed.
+   *
+   * `furthestStep` only ratchets forward (see `goToStep`), so on its own it
+   * would let someone who already reached Step 3 go back to Step 1, add a
+   * fresh IRM, and jump the step list straight to "Review & Confirm" —
+   * skipping Step 2 for that IRM entirely, since production's own sequential,
+   * route-based wizard has no equivalent free jump between steps. Clamping
+   * Step 3's reachability on this closes that gap without touching the ratchet
+   * itself: once the new IRM is mapped, `furthestStep` is still 3 and Step 3
+   * opens back up on its own.
+   */
+  const allSelectedMapped =
+    selectedIds.length > 0 && selectedIds.every((id) => isMappingComplete(recordsByIrm.get(id)));
+  const reachableStep = allSelectedMapped ? furthestStep : Math.min(furthestStep, 2);
+
   // Seed each mapping from whatever the server holds for that IRM, so
   // returning to step 2 (or reloading mid-flow) shows what was saved rather
   // than an empty form.
@@ -276,7 +299,7 @@ export function EbrcGenerationWizard() {
         </div>
       ) : (
         <div className="flex min-h-0 flex-1">
-          <StepList activeStep={activeStep} furthestStep={furthestStep} onJump={goToStep} />
+          <StepList activeStep={activeStep} furthestStep={reachableStep} onJump={goToStep} />
 
           <div ref={setContentEl} className="relative min-h-0 flex-1 overflow-y-auto">
             <ContentAreaProvider value={contentEl}>
@@ -323,7 +346,7 @@ export function EbrcGenerationWizard() {
                       <Button
                         type="button"
                         variant="primary"
-                        disabled={!agreed || isPushing}
+                        disabled={!agreed || !allSelectedMapped || isPushing}
                         isLoading={isPushing}
                         onClick={handleConfirm}
                       >

@@ -119,6 +119,15 @@ export function BillToSection({
   const [addClientSeed, setAddClientSeed] = useState<string | null>(null);
   const [addressOpen, setAddressOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  // The search field's own wrapper — the popover's anchor. Radix portals the
+  // panel to document.body, so the anchor is *outside* the dismissable layer's
+  // DOM subtree and every focus or pointer landing on it reads as an outside
+  // interaction. See the guards on PopoverContent below.
+  const anchorRef = useRef<HTMLDivElement>(null);
+
+  /** Whether an outside-interaction event actually landed on the search field. */
+  const isInsideAnchor = (target: EventTarget | null) =>
+    target instanceof Node && !!anchorRef.current?.contains(target);
 
   const selected = useMemo(
     () => clients.find((client) => client.id === clientId),
@@ -213,7 +222,7 @@ export function BillToSection({
             takes over once something is chosen and the field is closed. */}
         {!selected || pickerOpen ? (
           <PopoverAnchor asChild>
-            <InputGroup>
+            <InputGroup ref={anchorRef}>
               <InputGroupAddon align="inline-start">
                 <Icon name="search" className="h-3.5 w-3.5 text-muted-foreground" />
               </InputGroupAddon>
@@ -288,6 +297,21 @@ export function BillToSection({
           className="w-(--radix-popover-trigger-width) min-w-[min(24rem,calc(100vw-3rem))] p-0 shadow-none"
           // Focus stays in the field above, so typing keeps filtering.
           onOpenAutoFocus={(e) => e.preventDefault()}
+          // The search field is the anchor, not part of the portaled panel, so
+          // Radix counts focus landing on it as an interaction *outside* the
+          // popover and dismisses. That is what made "Edit" flash: it opens the
+          // panel and the effect below then focuses the field, which the
+          // freshly-mounted dismissable layer immediately read as a click-away.
+          // (Typing straight into the field never hit this — focus is already
+          // there before the layer mounts.) Both are prevented, so focusing or
+          // clicking the field keeps the list up; Escape, a real outside click
+          // and picking a client still close it.
+          onFocusOutside={(e) => {
+            if (isInsideAnchor(e.target)) e.preventDefault();
+          }}
+          onPointerDownOutside={(e) => {
+            if (isInsideAnchor(e.target)) e.preventDefault();
+          }}
         >
           <Command>
             <CommandList id="bill-to-client-listbox" aria-label="Clients">
