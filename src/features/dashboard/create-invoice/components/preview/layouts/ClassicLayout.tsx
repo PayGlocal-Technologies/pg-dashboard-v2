@@ -8,7 +8,7 @@ import {
   NotesBlock,
   PAGE_PADDING,
   PartyBlock,
-  PreviewSection,
+  previewFieldProps,
   SignatureBlock,
   TotalsRows,
 } from "@/features/dashboard/create-invoice/components/preview/layouts/parts";
@@ -32,25 +32,30 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
   return (
     <div className={`flex min-h-full w-full min-w-0 flex-col bg-card ${PAGE_PADDING}`}>
       <div className="mb-5 flex items-center gap-4">
-        <LogoSlot url={model.logoUrl} onUpload={onLogoClick} tint={primary} />
+        <LogoSlot
+          url={model.logoUrl}
+          onUpload={onLogoClick}
+          tint={primary}
+          pending={model.logoPending}
+        />
         <span className="text-[22px] font-bold tracking-tight text-foreground">
           {labels.invoice}
         </span>
       </div>
 
       <div className="mb-7 flex flex-wrap items-start gap-8 text-[12px]">
-        <PreviewSection fieldId="invoice-number" label="Edit invoice number" className="w-auto">
+        <div {...previewFieldProps("invoice-number", "Edit invoice number")}>
           <p className="text-muted-foreground">{labels.invoiceNumber}</p>
           <p className="font-semibold text-foreground">{model.invoiceNumber}</p>
-        </PreviewSection>
-        <PreviewSection fieldId="issue-date" label="Edit issue date" className="w-auto">
+        </div>
+        <div {...previewFieldProps("issue-date", "Edit issue date")}>
           <p className="text-muted-foreground">{labels.issueDate}</p>
           <p className="font-semibold text-foreground">{model.issueDate}</p>
-        </PreviewSection>
-        <PreviewSection fieldId="due-date" label="Edit due date" className="w-auto">
+        </div>
+        <div {...previewFieldProps("due-date", "Edit due date")}>
           <p className="text-muted-foreground">{labels.dueDate}</p>
           <p className="font-semibold text-foreground">{model.dueDate || "-"}</p>
-        </PreviewSection>
+        </div>
       </div>
 
       <div className="mb-7 grid grid-cols-2 gap-4">
@@ -76,49 +81,51 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
       </p>
       <MemoLine memo={model.memo} className="mt-1" />
 
-      <PreviewSection fieldId="line-items" label="Edit line items" className="mt-4">
-        <div className="overflow-hidden border border-border">
-          <div className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <span>{labels.description}</span>
-            <span className="text-center">{labels.qty}</span>
-            <span className="text-right">{labels.unitPrice}</span>
-            <span className="text-right">{labels.tax}</span>
-            <span className="text-right">{labels.total}</span>
-          </div>
-
-          <div className="divide-y divide-border">
-            {items.length === 0 ? (
-              <p className="px-3 py-4 text-center text-[12px] text-muted-foreground">
-                No items yet.
-              </p>
-            ) : (
-              items.map((item) => (
-                <div
-                  key={item.key}
-                  className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 px-3 py-2.5 text-[12px]"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-foreground">{item.name}</span>
-                    <ItemMeta item={item} />
-                  </span>
-                  <span className="text-center tabular-nums text-muted-foreground">
-                    {item.quantity}
-                  </span>
-                  <span className="text-right tabular-nums text-muted-foreground">
-                    {item.unitPrice}
-                  </span>
-                  <span className="text-right tabular-nums text-muted-foreground">
-                    {item.gstLabel || "-"}
-                  </span>
-                  <span className="text-right font-medium tabular-nums text-foreground">
-                    {item.amount}
-                  </span>
-                </div>
-              ))
-            )}
-          </div>
+      <div
+        {...previewFieldProps(
+          "line-items",
+          "Edit line items",
+          "mt-4 overflow-hidden border border-border"
+        )}
+      >
+        <div className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 border-b border-border bg-muted/30 px-3 py-2 text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span>{labels.description}</span>
+          <span className="text-center">{labels.qty}</span>
+          <span className="text-right">{labels.unitPrice}</span>
+          <span className="text-right">{labels.tax}</span>
+          <span className="text-right">{labels.total}</span>
         </div>
-      </PreviewSection>
+
+        <div className="divide-y divide-border">
+          {items.length === 0 ? (
+            <p className="px-3 py-4 text-center text-[12px] text-muted-foreground">No items yet.</p>
+          ) : (
+            items.map((item) => (
+              <div
+                key={item.key}
+                className="grid grid-cols-[minmax(0,1fr)_48px_80px_44px_84px] gap-2 px-3 py-2.5 text-[12px]"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-foreground">{item.name}</span>
+                  <ItemMeta item={item} />
+                </span>
+                <span className="text-center tabular-nums text-muted-foreground">
+                  {item.quantity}
+                </span>
+                <span className="text-right tabular-nums text-muted-foreground">
+                  {item.unitPrice}
+                </span>
+                <span className="text-right tabular-nums text-muted-foreground">
+                  {item.gstLabel || "-"}
+                </span>
+                <span className="text-right font-medium tabular-nums text-foreground">
+                  {item.amount}
+                </span>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
 
       <div className="mt-2 flex justify-end">
         <div className="w-full max-w-[220px]">
@@ -157,7 +164,7 @@ export function ClassicLayout({ model, onLogoClick }: LayoutProps) {
         fieldId="notes-terms"
       />
 
-      <SignatureBlock url={model.signatureUrl} className="mt-6" />
+      <SignatureBlock url={model.signatureUrl} className="mt-6" pending={model.signaturePending} />
     </div>
   );
 }

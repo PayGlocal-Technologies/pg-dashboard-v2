@@ -1203,7 +1203,9 @@ function InvoiceEditor({
     client: selectedClient,
     account: selectedAccount,
     logoUrl: logo.url,
+    logoAssetLoading: logo.isLoading,
     signatureUrl: signature.url,
+    signatureAssetLoading: signature.isLoading,
     symbol,
     // Names are what the invoice stores; the document has to be drawn in
     // something, so the hexes are resolved here and go no further than the paper.

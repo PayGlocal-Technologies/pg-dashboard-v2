@@ -58,8 +58,13 @@ export function InvoiceDocumentPreview({
    *  - An asset exists but the merchant switched it off → nothing. They made
    *    that choice on this invoice; re-offering the box here would read as the
    *    toggle not having worked.
+   *  - The asset read has not come back yet → nothing either, because the
+   *    answer is one of the two above and the preview does not know which.
+   *    Offering it on the guess that no asset exists is what made the dashed
+   *    box appear on every reload and then vanish a moment later, for every
+   *    merchant who has a logo with the toggle off — which is the default.
    */
-  const offerLogoSlot = !!model.logoUrl || !source.logoUrl;
+  const offerLogoSlot = !!model.logoUrl || (!source.logoUrl && !source.logoAssetLoading);
 
   return (
     // `grid` on the clipping wrapper is load-bearing, not decoration. A4

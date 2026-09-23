@@ -65,11 +65,7 @@ export function InvoicePreviewSidebar({
       </TabsList>
 
       <TabsContent value="pdf">
-        {/* Zoomed out a touch — mx-auto keeps it centred in the column
-            rather than pinned to the left edge as it shrinks. */}
-        <div className="mx-auto w-[88%]">
-          <InvoiceDocumentPreview source={source} onLogoClick={onLogoClick} />
-        </div>
+        <InvoiceDocumentPreview source={source} onLogoClick={onLogoClick} />
       </TabsContent>
 
       <TabsContent value="email">

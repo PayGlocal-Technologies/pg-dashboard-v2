@@ -122,9 +122,7 @@ export function CreateInvoiceSuccess({
         </div>
 
         <div className="mt-5 rounded-xl border border-border px-5 py-4 text-center">
-          <p className="text-[12.5px] text-muted-foreground">
-            Invoice to {clientName || "client"}
-          </p>
+          <p className="text-[12.5px] text-muted-foreground">Invoice to {clientName || "client"}</p>
           <p className="mt-1.5 text-[28px] font-bold tabular-nums text-foreground">
             {symbol}
             {Number(total).toLocaleString("en-IN", {
