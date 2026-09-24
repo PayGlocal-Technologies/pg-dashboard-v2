@@ -13,8 +13,8 @@ export type ReceiptProduct = "MCA" | "PA" | "FRAUD";
  * One month of one product's payment activity, as a receipt.
  *
  * `product` + `periodMonth` is the record's natural key: there is exactly one
- * receipt per product per month, never two (see MOCK_RECEIPTS, which holds that
- * invariant). That is what lets the row's Download action address a document by
+ * receipt per product per month, never two. That is what lets the row's
+ * Download action address a document by
  * product and month alone, and why the table needs no per-transaction breakdown —
  * a row already *is* the whole month.
  */

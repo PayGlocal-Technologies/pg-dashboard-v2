@@ -511,6 +511,18 @@ export interface DocumentPendingByCurrencyResponse {
 export type DocumentPendingSortBy = "AMOUNT" | "CREATED_TIME";
 
 /**
+ * document-pending-list's window vocabulary. Deliberately NOT the
+ * today/week/month/ytd set `document-pending` takes — the two endpoints name
+ * their windows differently, and sending one's values to the other silently
+ * falls back to that endpoint's default rather than erroring.
+ */
+export type DocumentPendingTimeframe =
+  | "all_time"
+  | "last_7_days"
+  | "last_30_days"
+  | "last_90_days";
+
+/**
  * One transaction awaiting documents, as document-pending-list returns it.
  *
  * Deliberately not an McaTransaction: this endpoint carries only what a "raise
@@ -528,7 +540,17 @@ export interface DocumentPendingListRow {
   invoiceNumber: string | null;
 }
 
+/**
+ * `amount` and `count` are the same aggregate document-pending reports, for the
+ * window `timeframe` names — returned here so one call answers both a card's
+ * headline and its rows. `totalCount` is how many rows match in all; it tracks
+ * `count`, and both are kept because the endpoint sends both.
+ */
 export interface DocumentPendingListData {
+  timeframe: string;
+  reportingCurrency: string;
+  amount: number;
+  count: number;
   transactions: DocumentPendingListRow[];
   totalCount: number;
 }

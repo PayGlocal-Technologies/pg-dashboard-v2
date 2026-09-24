@@ -7,7 +7,7 @@ import { Icon } from "@/components/icon";
 import { MidChoiceMenu } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { cn } from "@/lib/utils";
-import { mcaQuickAccessItems } from "@/features/dashboard/mca-home/mock-data";
+import { mcaQuickAccessItems } from "@/features/dashboard/mca-home/constants";
 import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
 
 /**

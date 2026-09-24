@@ -3,7 +3,7 @@ import { Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
-import type { McaStatCardData } from "@/features/dashboard/mca-home/mock-data";
+import type { McaStatCardData } from "@/features/dashboard/mca-home/types";
 
 interface McaStatCardProps {
   data: McaStatCardData;
