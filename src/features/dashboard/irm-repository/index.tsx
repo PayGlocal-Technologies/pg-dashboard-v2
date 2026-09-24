@@ -361,6 +361,21 @@ export function IrmRepositoryFeature() {
           columns={orderedColumns}
           data={rows}
           rowKey={(row) => row.id}
+          onRowClick={setOpenRow}
+          // Hidden until the row is hovered/focused — DataTable's own
+          // rowAction slot handles the opacity reveal, same treatment the
+          // Transactions table's row-level "View details" uses.
+          rowAction={(row) => (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenRow(row)}
+              className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+            >
+              View details
+            </Button>
+          )}
           emptyTitle="No IRMs found"
           emptyDescription="Try a different remitter name or clear the filters above."
           density="compact"

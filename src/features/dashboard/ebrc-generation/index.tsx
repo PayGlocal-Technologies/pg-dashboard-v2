@@ -86,7 +86,7 @@ export function EbrcGenerationFeature() {
             <DropdownMenuContent align="end">
               <DropdownMenuItem onSelect={() => setBulkUploadOpen(true)}>
                 <Icon name="upload" className="h-3.5 w-3.5" />
-                Upload a CSV
+                Upload Bulk
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => router.push("/ebrc-generation/generate")}>
                 <Icon name="list-checks" className="h-3.5 w-3.5" />

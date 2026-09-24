@@ -12,7 +12,11 @@ import { MapShippingBillStep } from "@/features/dashboard/ebrc-generation/compon
 import { ReviewConfirmStep } from "@/features/dashboard/ebrc-generation/components/ReviewConfirmStep";
 import { EbrcStepFooterBar } from "@/features/dashboard/ebrc-generation/components/EbrcStepFooterBar";
 import { EbrcRequestReceivedOverlay } from "@/features/dashboard/ebrc-generation/components/EbrcRequestReceivedOverlay";
-import { emptyMapping, type IrmMapping } from "@/features/dashboard/ebrc-generation/types";
+import {
+  EBRC_JUST_QUEUED_KEY,
+  emptyMapping,
+  type IrmMapping,
+} from "@/features/dashboard/ebrc-generation/types";
 
 const STEPS = [
   {
@@ -191,6 +195,7 @@ export function EbrcGenerationWizard() {
   const handleConfirm = () => {
     // TODO(integration): POST to the eBRC generation endpoint once it
     // exists — payload shape must come from a real spec, not a guess.
+    window.sessionStorage.setItem(EBRC_JUST_QUEUED_KEY, "1");
     setReceivedOpen(true);
   };
 

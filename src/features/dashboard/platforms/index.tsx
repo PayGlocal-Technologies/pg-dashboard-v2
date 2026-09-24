@@ -571,9 +571,17 @@ function PlatformsContent() {
                       // platform"'s label to the exact x-position every
                       // platform name above it starts at, per explicit ask,
                       // rather than the glyph's own (narrower) footprint.
-                      <span className="flex h-6 w-9 shrink-0 items-center justify-center">
+                      //
+                      // A <div>, not a <span>: the row's own
+                      // "[&>span]:flex-1" rule targets every direct <span>
+                      // child of the Button to push the label to the right —
+                      // it was also matching this icon wrapper (also a
+                      // span), stretching the fixed w-9 box into a flexible
+                      // one and shoving "Request a platform" far right of
+                      // where every platform name above it starts.
+                      <div className="flex h-6 w-9 shrink-0 items-center justify-center">
                         <Icon name="plus" className="h-4 w-4" />
-                      </span>
+                      </div>
                     }
                     onClick={() => setRequestPlatformOpen(true)}
                   >

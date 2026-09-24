@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Button,
@@ -26,6 +26,7 @@ import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { reorderColumns } from "@/lib/utils/columns";
 import { MOCK_EBRC_REQUESTS } from "@/features/dashboard/ebrc-generation/mock-data";
 import {
+  EBRC_JUST_QUEUED_KEY,
   EBRC_REQUEST_STATUS_LABELS,
   type EbrcRequestRow,
   type EbrcRequestStatus,
@@ -178,6 +179,17 @@ export function EbrcStatusTable() {
   const [dateChipOpen, setDateChipOpen] = useState(false);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [openRequest, setOpenRequest] = useState<EbrcRequestRow | null>(null);
+  const [justQueued, setJustQueued] = useState(false);
+
+  // The callout only means something the moment a request was actually just
+  // queued — reading it once on mount (and immediately clearing it) means a
+  // later, unrelated visit to this page never shows it again.
+  useEffect(() => {
+    if (window.sessionStorage.getItem(EBRC_JUST_QUEUED_KEY)) {
+      window.sessionStorage.removeItem(EBRC_JUST_QUEUED_KEY);
+      setJustQueued(true);
+    }
+  }, []);
 
   const rows = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -250,9 +262,11 @@ export function EbrcStatusTable() {
 
   return (
     <div className="space-y-4">
-      <Callout variant="info">
-        <CalloutText>To check the updated status, please wait 4 hours after submission.</CalloutText>
-      </Callout>
+      {justQueued && (
+        <Callout variant="info">
+          <CalloutText>To check the updated status, please wait 4 hours after submission.</CalloutText>
+        </Callout>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
@@ -304,6 +318,21 @@ export function EbrcStatusTable() {
           columns={orderedColumns}
           data={rows}
           rowKey={(row) => row.id}
+          onRowClick={setOpenRequest}
+          // Hidden until the row is hovered/focused — DataTable's own
+          // rowAction slot handles the opacity reveal, same treatment the
+          // Transactions table's row-level "View details" uses.
+          rowAction={(row) => (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenRequest(row)}
+              className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+            >
+              View details
+            </Button>
+          )}
           emptyTitle="No eBRC requests yet"
           emptyDescription="Generate your first eBRC to see it tracked here."
           density="compact"
