@@ -20,6 +20,9 @@ interface SummaryCard {
   key: string;
   label: string;
   value: number | undefined;
+  /** This status's share of the total, in USD — straight off the response's
+   *  `amountsInUsd` block, not derived from the count. */
+  amount: number;
   tooltip: string;
   /** A real color (not a Tailwind class): both the donut arc and the swatch
    *  dot need the same value, and the arc is drawn through Recharts' `fill`
@@ -27,20 +30,6 @@ interface SummaryCard {
   color: string;
   statuses: string[];
 }
-
-/**
- * TODO(backend): get-invoice-summary only returns a COUNT per status
- * (totalActive/totalPaid/totalOutstanding) — there's no real per-status
- * amount field for the legend's secondary "what it's worth" line. Until one
- * exists, each status's amount is approximated as count × a placeholder
- * average invoice value. Remove this and read the real field once the
- * endpoint carries it.
- */
-const MOCK_AVG_INVOICE_VALUE: Record<string, number> = {
-  active: 185_000,
-  paid: 42_000,
-  outstanding: 210_000,
-};
 
 /** Donut hover/tooltip readout — one row, matching the Flux popover surface
  *  the way WaivedDonut's own tooltip does (Recharts renders its tooltip
@@ -51,7 +40,7 @@ function SummaryDonutTooltip({
   payload,
 }: {
   active?: boolean;
-  payload?: readonly { payload: SummaryCard & { amount: number; percent: number } }[];
+  payload?: readonly { payload: SummaryCard & { percent: number } }[];
 }) {
   if (!active || !payload?.length) return null;
   const row = payload[0]?.payload;
@@ -70,7 +59,17 @@ function SummaryDonutTooltip({
 }
 
 /**
- * Invoice counts, from get-invoice-summary.
+ * The currency every figure on this card is stated in.
+ *
+ * Fixed, not a prop: the amounts come from the response's `amountsInUsd` block
+ * (the sibling `total*Amount` fields sum across whatever currencies the
+ * merchant billed in and so cannot carry a symbol), and a caller able to pass
+ * "INR" here would only mislabel dollars.
+ */
+const SUMMARY_CURRENCY = "USD";
+
+/**
+ * Invoice counts and amounts, from get-invoice-summary.
  *
  * A card is a shortcut, not just a readout: clicking one pins the table to that
  * status set, which is pg-dashboard's behaviour and not an invention.
@@ -88,12 +87,10 @@ export function InvoiceSummaryCards({
   merchantId,
   windowSeconds,
   onStatusFilter,
-  currency = "INR",
 }: {
   merchantId: string;
   windowSeconds: { start: number; end: number };
   onStatusFilter: (statuses: string[]) => void;
-  currency?: string;
 }) {
   const url = invoiceSummaryApi(merchantId, windowSeconds.start, windowSeconds.end);
   // isPending, not isLoading: isPending is false the moment there is data to
@@ -108,12 +105,14 @@ export function InvoiceSummaryCards({
 
   // Note the doubly-nested data: BaseResponse.data.data.
   const summary = data?.data?.data;
+  const usd = summary?.amountsInUsd;
 
   const cards: SummaryCard[] = [
     {
       key: "active",
       label: "Active invoices",
       value: summary?.totalActive,
+      amount: usd?.totalActiveAmount ?? 0,
       tooltip: "The total number of successfully generated invoices.",
       // Softened from the app's saturated status tokens (--chart-1/--success/
       // --destructive) specifically for this donut: those read as loud
@@ -127,6 +126,7 @@ export function InvoiceSummaryCards({
       key: "paid",
       label: "Paid invoices",
       value: summary?.totalPaid,
+      amount: usd?.totalPaidAmount ?? 0,
       tooltip: "The total number of invoices for which payments have been linked.",
       color: "#10b981",
       statuses: ["PAID", "PAID_OUTSIDE"],
@@ -135,6 +135,7 @@ export function InvoiceSummaryCards({
       key: "outstanding",
       label: "Outstanding invoices",
       value: summary?.totalOutstanding,
+      amount: usd?.totalOutstandingAmount ?? 0,
       tooltip: "The total number of unpaid invoices past due date.",
       color: "#ef4444",
       statuses: ["OUTSTANDING"],
@@ -145,20 +146,16 @@ export function InvoiceSummaryCards({
   // field also counts statuses this donut doesn't have a slice for (e.g.
   // drafts), which would leave the arcs short of a full circle.
   const totalCount = cards.reduce((sum, card) => sum + (card.value ?? 0), 0);
-  const totalAmount = cards.reduce(
-    (sum, card) => sum + (card.value ?? 0) * MOCK_AVG_INVOICE_VALUE[card.key],
-    0
-  );
+  // Likewise the three sliced amounts' own sum, not `amountsInUsd.totalAmount`
+  // — that one also carries drafts, so it would not match the ring drawn above
+  // it or the three figures listed beside it.
+  const totalAmount = cards.reduce((sum, card) => sum + card.amount, 0);
   // The donut's own arcs and its center total are by count; each legend row
-  // states its (mocked) amount too, as plain secondary text — see below.
-  const donutData = cards.map((card) => {
-    const amount = (card.value ?? 0) * MOCK_AVG_INVOICE_VALUE[card.key];
-    return {
-      ...card,
-      amount,
-      percent: totalCount > 0 ? Math.round(((card.value ?? 0) / totalCount) * 100) : 0,
-    };
-  });
+  // states its amount too, as plain secondary text — see below.
+  const donutData = cards.map((card) => ({
+    ...card,
+    percent: totalCount > 0 ? Math.round(((card.value ?? 0) / totalCount) * 100) : 0,
+  }));
   // Nothing to split means nothing to draw — a flat neutral ring rather than
   // a zero-value Pie (which Recharts renders as nothing at all).
   const hasData = totalCount > 0;
@@ -174,11 +171,11 @@ export function InvoiceSummaryCards({
           square and has nothing to do with extra height. */}
       <div className="flex flex-1 flex-col items-center gap-6 sm:flex-row sm:items-stretch">
         {/* Donut: each status's share of the total count, with the total
-            count AND its (mocked) total amount both in the hole — one
+            count AND its total amount both in the hole — one
             glance answers "how many, what shape, and what it's worth". */}
         <div
           role="img"
-          aria-label={`${totalCount} invoices total (${formatCurrencyShort(totalAmount, currency)}): ${cards
+          aria-label={`${totalCount} invoices total (${formatCurrencyShort(totalAmount, SUMMARY_CURRENCY)}): ${cards
             .map((c) => `${c.label} ${c.value ?? 0}`)
             .join(", ")}`}
           className="relative size-48 shrink-0 self-center"
@@ -217,7 +214,7 @@ export function InvoiceSummaryCards({
                   {totalCount}
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {formatCurrencyShort(totalAmount, currency)}
+                  {formatCurrencyShort(totalAmount, SUMMARY_CURRENCY)}
                 </span>
               </div>
             </>
@@ -247,8 +244,7 @@ export function InvoiceSummaryCards({
             tall the row it's matched to turns out to be — and the dividers
             land on those same even thirds. */}
         <ul className="flex w-full min-w-0 flex-1 flex-col divide-y divide-border">
-          {cards.map((card, index) => {
-            const row = donutData[index];
+          {cards.map((card) => {
             return (
               <li key={card.key} className="flex-1">
                 <Button
@@ -294,7 +290,7 @@ export function InvoiceSummaryCards({
                         {card.value ?? 0}
                       </span>
                       <span className="text-right text-sm tabular-nums text-muted-foreground">
-                        {formatCurrencyShort(row?.amount ?? 0, currency)}
+                        {formatCurrencyShort(card.amount, SUMMARY_CURRENCY)}
                       </span>
                     </>
                   )}

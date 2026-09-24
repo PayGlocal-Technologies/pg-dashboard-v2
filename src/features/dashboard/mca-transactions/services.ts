@@ -172,21 +172,30 @@ export const mcaDocumentPendingByCurrencyApi = (merchantId: string) =>
 
 /**
  * The individual transactions behind the document-pending figure, paged and
- * ranked server-side. Backs InvoiceActionCard's row list.
+ * ranked server-side — AND, alongside them, the aggregate amount/count for the
+ * same window. Backs InvoiceActionCard whole: its headline and its row list.
+ *
+ * That aggregate is why the card no longer also calls document-pending above.
+ * One request now answers both halves, so the figure and the rows under it can
+ * never disagree about which window they describe — which they could while the
+ * headline came from a `ytd` call and the rows from an unscoped one.
  *
  * `sortBy` is AMOUNT or CREATED_TIME, both descending; anything else falls back
- * to AMOUNT. Like document-pending-by-currency above it takes no timeframe — it
- * reports what is awaiting documents right now, not over a window.
+ * to AMOUNT. `timeframe` is the WIDE window vocabulary — all_time, last_7_days,
+ * last_30_days, last_90_days — not the today/week/month/ytd set
+ * document-pending takes; the two endpoints do not share it.
  */
 export const mcaDocumentPendingListApi = (
   merchantId: string,
   sortBy: string,
   page: number,
-  limit: number
+  limit: number,
+  timeframe: string
 ) =>
   merchantId
     ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-list` +
-      `?sortBy=${encodeURIComponent(sortBy)}&page=${page}&limit=${limit}`
+      `?sortBy=${encodeURIComponent(sortBy)}&page=${page}&limit=${limit}` +
+      (timeframe ? `&timeframe=${encodeURIComponent(timeframe)}` : "")
     : "";
 
 /**

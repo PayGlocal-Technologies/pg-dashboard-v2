@@ -1,6 +1,7 @@
 import type { BadgeVariant } from "@/components/ui";
 import type { FilterChipOption } from "@/components/common/filters/FilterChips";
 import type { McaInvoiceRow } from "@/features/dashboard/mca-invoices/types";
+import type { DocumentPendingTimeframe } from "@/features/dashboard/mca-transactions/types";
 
 export const INVOICES_PAGE_LIMIT = 10;
 
@@ -152,3 +153,19 @@ export const SUMMARY_RANGE_OPTIONS = [
 ] as const;
 
 export type SummaryRange = (typeof SUMMARY_RANGE_OPTIONS)[number]["value"];
+
+/**
+ * The same four periods as document-pending-list names them.
+ *
+ * get-invoice-summary takes an epoch window (see summaryWindowSeconds), the
+ * analytics endpoint takes a named one, and the tabs above the row drive both
+ * cards — so the one control has to be expressible in either vocabulary. This
+ * is the second translation; there is no third, because nothing outside
+ * SUMMARY_RANGE_OPTIONS can set the value.
+ */
+export const SUMMARY_RANGE_TIMEFRAME: Record<SummaryRange, DocumentPendingTimeframe> = {
+  [ALL_TIME_RANGE_VALUE]: "all_time",
+  "7": "last_7_days",
+  "30": "last_30_days",
+  "90": "last_90_days",
+};

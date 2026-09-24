@@ -5,15 +5,13 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { Badge, Button, Card, CardContent, Shimmer } from "@/components/ui";
 import { CompactAmount } from "@/components/common/CompactAmount";
-import {
-  useDocumentPending,
-  useDocumentPendingTransactions,
-} from "@/features/dashboard/mca-transactions/hooks";
+import { useDocumentPendingTransactions } from "@/features/dashboard/mca-transactions/hooks";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { LinkInvoiceModal } from "@/features/dashboard/mca-transactions/components/LinkInvoiceModal";
 import { formatTransactionTimestamp } from "@/lib/utils/format";
 import type {
   DocumentPendingListRow,
+  DocumentPendingTimeframe,
   LinkableTransaction,
 } from "@/features/dashboard/mca-transactions/types";
 
@@ -37,17 +35,20 @@ function toLinkable(row: DocumentPendingListRow): LinkableTransaction {
 }
 
 /**
- * Companion to InvoiceSummaryCards: the same "amount already collected but not
- * yet invoiced" figure OutstandingAmountCard shows on the Transactions page —
- * reusing its endpoint (`useDocumentPending`) rather than a second one — but
- * framed as a call to action on the Invoice Management page rather than a
+ * Companion to InvoiceSummaryCards: the "amount already collected but not yet
+ * invoiced" figure OutstandingAmountCard also shows on the Transactions page,
+ * but framed as a call to action on the Invoice Management page rather than a
  * passive KPI: "raise the invoices that unblock this" instead of just "here's
  * a number".
  *
- * "ytd" timeframe: this card isn't wired to the page's own period control
- * (InvoiceSummaryCards' TimeRangeTabs already scopes the counts beside it) —
- * document-pending is a current-balance figure, not something a historical
- * window applies to, matching how Outstanding Amount treats it elsewhere.
+ * Headline and rows come from ONE call — document-pending-list returns the
+ * aggregate amount/count for its window alongside the transactions in it — so
+ * the figure can never describe a different period from the rows beneath it.
+ * That is what it used to do: the headline was a separate, `ytd`-scoped
+ * document-pending call while the rows were unscoped.
+ *
+ * `timeframe` is the page's own period tabs, which therefore now scope both
+ * cards in this row rather than only the counts beside it.
  *
  * Below the headline, up to MAX_ROWS individual document-pending transactions
  * replace what used to be a single generic "Create invoices" button — each row
@@ -56,20 +57,26 @@ function toLinkable(row: DocumentPendingListRow): LinkableTransaction {
  * (flex-1 per row, same technique InvoiceSummaryCards' legend uses) so the
  * card's own height never depends on how many are waiting.
  */
-export function InvoiceActionCard({ className }: { className?: string }) {
+export function InvoiceActionCard({
+  timeframe,
+  className,
+}: {
+  timeframe: DocumentPendingTimeframe;
+  className?: string;
+}) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { documentPending, isLoading } = useDocumentPending("ytd");
-  const { transactions: rows, isLoading: rowsLoading } = useDocumentPendingTransactions({
-    sortBy: "AMOUNT",
-    limit: MAX_ROWS,
-  });
+  const {
+    transactions: rows,
+    amount,
+    count: pendingCount,
+    reportingCurrency,
+    isLoading,
+  } = useDocumentPendingTransactions({ sortBy: "AMOUNT", limit: MAX_ROWS, timeframe });
   const { selectMid } = usePacbMidScope();
   const [linkingTxn, setLinkingTxn] = useState<LinkableTransaction | null>(null);
 
-  const amount = documentPending?.amount ?? 0;
-  const displayCurrency = documentPending?.reportingCurrency ?? "INR";
-  const pendingCount = documentPending?.count ?? 0;
+  const displayCurrency = reportingCurrency ?? "INR";
 
   const handleCreateInvoice = (merchantId: string, gid: string) => {
     if (merchantId) selectMid(merchantId);
@@ -77,11 +84,10 @@ export function InvoiceActionCard({ className }: { className?: string }) {
   };
 
   const handleLinked = () => {
-    // Linking moves the transaction off DOCUMENT_PENDING, so both this
-    // card's own headline and its row list have to refetch — neither key
-    // is among LinkInvoiceModal's own INVOICE_DATA_KEYS invalidation,
-    // since those describe the invoice list, not this document-pending view.
-    queryClient.invalidateQueries({ queryKey: ["mca-document-pending"] });
+    // Linking moves the transaction off DOCUMENT_PENDING, so this card has to
+    // refetch — one key now, since the headline and the rows share a query.
+    // It is not among LinkInvoiceModal's own INVOICE_DATA_KEYS invalidation,
+    // which describes the invoice list rather than this document-pending view.
     queryClient.invalidateQueries({ queryKey: ["mca-document-pending-transactions"] });
   };
 
@@ -129,7 +135,7 @@ export function InvoiceActionCard({ className }: { className?: string }) {
             block. flex-1 on the list itself is what then lets fewer rows
             grow to fill that reserved space instead of shrinking the card. */}
         <div className="mt-auto flex flex-1 flex-col border-t border-border pt-3">
-          {rowsLoading ? (
+          {isLoading ? (
             <div className="flex flex-1 flex-col divide-y divide-border">
               {Array.from({ length: MAX_ROWS }).map((_, i) => (
                 <div key={i} className="flex flex-1 items-center justify-between gap-3 py-2.5">

@@ -22,6 +22,7 @@ import {
   ALL_TIME_RANGE_VALUE,
   INVOICE_DATA_KEYS,
   SUMMARY_RANGE_OPTIONS,
+  SUMMARY_RANGE_TIMEFRAME,
   type SummaryRange,
 } from "@/features/dashboard/mca-invoices/constants";
 import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoices/helpers";
@@ -181,7 +182,10 @@ function McaInvoicesContent() {
 
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
 
-  /** The summary's own period. The table's Date chip is its own, inside it. */
+  /** The period BOTH summary cards describe. The table's Date chip is its own,
+   *  inside it. The two cards read the same value through different
+   *  vocabularies — an epoch window for get-invoice-summary, a named timeframe
+   *  for document-pending-list (see SUMMARY_RANGE_TIMEFRAME). */
   const [summaryRange, setSummaryRange] = useState<SummaryRange>(ALL_TIME_RANGE_VALUE);
 
   // Read once, and bucketed to the end of the local day: this is the open end
@@ -223,9 +227,8 @@ function McaInvoicesContent() {
           merchantId={summaryMid}
           windowSeconds={summaryWindowSeconds(summaryRange, defaultEndMs)}
           onStatusFilter={setStatusFilters}
-          currency="USD"
         />
-        <InvoiceActionCard />
+        <InvoiceActionCard timeframe={SUMMARY_RANGE_TIMEFRAME[summaryRange]} />
       </div>
     </div>
   );
