@@ -22,6 +22,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { CURRENCY_OPTIONS, MOCK_IRM_ROWS } from "@/features/dashboard/ebrc-generation/mock-data";
+import { EbrcStepFooterBar } from "@/features/dashboard/ebrc-generation/components/EbrcStepFooterBar";
 import {
   DEDUCTION_TYPE_LABELS,
   isMappingComplete,
@@ -86,10 +87,7 @@ function IrmNavItem({
               : "text-amber-600 dark:text-amber-400"
         )}
       >
-        <Icon
-          name={complete ? "check" : started ? "clock" : "alert-circle"}
-          className="h-3 w-3"
-        />
+        <Icon name={complete ? "check" : started ? "clock" : "alert-circle"} className="h-3 w-3" />
         {complete ? "Complete" : started ? "In progress" : "Needs details"}
       </span>
     </button>
@@ -115,7 +113,10 @@ function MappingForm({
 
   return (
     <div>
-      <Tabs value={mapping.method} onValueChange={(v) => patch({ method: v as IrmMapping["method"] })}>
+      <Tabs
+        value={mapping.method}
+        onValueChange={(v) => patch({ method: v as IrmMapping["method"] })}
+      >
         <TabsList className="h-auto p-1">
           <TabsTrigger value="upload" className="gap-1.5 px-3 py-1.5">
             <Icon name="upload" className="h-3.5 w-3.5" />
@@ -414,7 +415,11 @@ export function MapShippingBillStep({
               <div className="shrink-0 border-b border-border px-4 py-3">
                 <p className="text-[14px] font-semibold tabular-nums text-foreground">
                   {formatCurrency(activeIrm.remittanceAmount, activeIrm.currencyCode)} ·{" "}
-                  {formatDate(activeIrm.irmDate, { day: "2-digit", month: "short", year: "2-digit" })}
+                  {formatDate(activeIrm.irmDate, {
+                    day: "2-digit",
+                    month: "short",
+                    year: "2-digit",
+                  })}
                 </p>
                 <p className="text-[12px] text-muted-foreground">Shipping documentation</p>
               </div>
@@ -426,21 +431,42 @@ export function MapShippingBillStep({
                   onChange={(next) => onMappingChange(activeId, next)}
                 />
               </div>
-
-              <div className="flex shrink-0 items-center justify-end border-t border-border bg-card px-4 py-3">
-                <Button
-                  type="button"
-                  variant="primary"
-                  rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
-                  onClick={handleSaveAndNext}
-                >
-                  {isLastByPosition ? "Save & review" : "Save & next"}
-                </Button>
-              </div>
             </>
           )}
         </div>
       </div>
+
+      {/* Same fixed bar SelectIrmsStep docks its own actions in, so "the
+          buttons" stay in one place as the merchant moves through the
+          wizard rather than each step growing a differently-placed footer. */}
+      <EbrcStepFooterBar
+        left={
+          <span className="text-[13px] text-muted-foreground">
+            {completedCount} of {selectedIds.length} IRMs mapped
+          </span>
+        }
+        right={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto min-h-0 p-0 text-[12.5px] text-muted-foreground hover:bg-transparent hover:text-foreground"
+              onClick={onBackToSelectIrms}
+            >
+              Back
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
+              onClick={handleSaveAndNext}
+            >
+              {isLastByPosition ? "Save & review" : "Save & next"}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

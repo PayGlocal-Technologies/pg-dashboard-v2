@@ -1168,41 +1168,22 @@ function ClientFormBody({
           the merchant did not ask for) or duplicate the client. Nothing to
           disable, so nothing is shown. justify-end then pulls the remaining pair
           to the right, where they sit in every other single-action footer. */}
-      <div
-        className={cn(
-          "flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border px-5 py-3.5",
-          isEdit ? "justify-end" : "justify-between"
-        )}
-      >
-        {!isEdit && (
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="px-0"
-            onClick={() => submitWith(true)}
-          >
-            Save and add another
-          </Button>
-        )}
-
-        <div className="flex items-center gap-2">
-          {/* Cancel turns into its own confirmation once the form has been
-              typed into: one more click discards, and moving away from it (or
-              typing again) is not needed to undo, since nothing has been
-              thrown away yet. */}
-          <Button
-            type="button"
-            variant={confirmingDiscard ? "danger" : "outline"}
-            size="sm"
-            onClick={handleCancel}
-          >
-            {confirmingDiscard ? "Discard changes?" : "Cancel"}
-          </Button>
-          <Button type="submit" variant="primary" size="sm">
-            {isEdit ? "Update client" : "Add client"}
-          </Button>
-        </div>
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3.5">
+        {/* Cancel turns into its own confirmation once the form has been
+            typed into: one more click discards, and moving away from it (or
+            typing again) is not needed to undo, since nothing has been
+            thrown away yet. */}
+        <Button
+          type="button"
+          variant={confirmingDiscard ? "danger" : "outline"}
+          size="sm"
+          onClick={handleCancel}
+        >
+          {confirmingDiscard ? "Discard changes?" : "Cancel"}
+        </Button>
+        <Button type="submit" variant="primary" size="sm">
+          {isEdit ? "Update client" : "Add client"}
+        </Button>
       </div>
     </form>
   );

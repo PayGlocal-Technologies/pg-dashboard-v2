@@ -8,28 +8,38 @@ import { cn } from "@/lib/utils";
 import type { SkuProduct } from "@/features/dashboard/sku-management/types";
 
 /** Rendered size of the square preview, in px — also the `next/image` intrinsic
- *  size, so the optimiser serves a thumbnail rather than the 2560px original. */
+ *  size, so the optimiser serves a thumbnail rather than the 2560px original.
+ *  This is the mobile card list's size (SkuCardList); the table row uses a
+ *  smaller `size` override (see the Product column in columns.tsx) to match
+ *  the transactions table's compact row scale. */
 const THUMBNAIL_SIZE = 70;
 
 /**
- * The 70x70 square preview in the Product column. flux-ui's Avatar supplies the
- * frame (border, muted fill, overflow clipping), squared off with `rounded-lg` —
- * its own `rounded-full` default is for people, not products, and `cn`'s
- * tailwind-merge is what lets that override land.
+ * The square preview in the Product column / card list. flux-ui's Avatar
+ * supplies the frame (border, muted fill, overflow clipping), squared off
+ * with `rounded-lg` — its own `rounded-full` default is for people, not
+ * products, and `cn`'s tailwind-merge is what lets that override land.
  *
  * The two branches are mutually exclusive rather than layered: AvatarFallback
  * keys off Radix's own image-loading state, which only advances when an
  * AvatarPrimitive.Image is present. Using `next/image` instead (per CLAUDE.md,
  * and to get the thumbnail resized rather than shipping a 2560px original into
- * a 70px box) means that state never leaves `idle`, so a fallback rendered
+ * a small box) means that state never leaves `idle`, so a fallback rendered
  * alongside it would show through the photo permanently.
  */
 export function ProductThumbnail({
   product,
   className,
+  iconClassName = "h-6 w-6",
 }: {
   product: SkuProduct;
+  /** Overrides the default 70px frame — pass a smaller `h-*`/`w-*` pair (and
+   *  matching `rounded-*`) for a denser context like a compact table row. */
   className?: string;
+  /** Scales the no-image fallback icon to match a `className` size override
+   *  — the two aren't linked automatically since `className` styles the
+   *  outer Avatar, not the icon nested inside its fallback branch. */
+  iconClassName?: string;
 }) {
   // The catalogue row's presigned S3 URL, good for about ten minutes.
   const imageUrl = product.imageUrl;
@@ -43,7 +53,7 @@ export function ProductThumbnail({
   const showImage = !!imageUrl && failedUrl !== imageUrl;
 
   return (
-    <Avatar className={cn("h-[70px] w-[70px] rounded-lg", className)}>
+    <Avatar className={cn("h-17.5 w-17.5 rounded-lg", className)}>
       {showImage ? (
         // object-cover: the photo fills the square edge to edge, cropping
         // whatever doesn't fit rather than letterboxing inside it. The white
@@ -65,7 +75,7 @@ export function ProductThumbnail({
         />
       ) : (
         <AvatarFallback className="rounded-lg bg-muted text-muted-foreground">
-          <Icon name={product.type === "SERVICES" ? "wrench" : "package"} className="h-6 w-6" />
+          <Icon name={product.type === "SERVICES" ? "wrench" : "package"} className={iconClassName} />
         </AvatarFallback>
       )}
     </Avatar>

@@ -374,7 +374,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
               existing rows visibly do something. */}
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             aria-label="Refresh clients"
             disabled={isFetching}
@@ -382,7 +382,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
               <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
             }
             onClick={refetch}
-            className="shrink-0"
+            className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
           >
             Refresh
           </Button>

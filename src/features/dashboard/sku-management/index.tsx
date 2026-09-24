@@ -70,7 +70,7 @@ export function SkuManagementFeature() {
             <MidScopedAction
               label="Import"
               icon="upload"
-              variant="ghost"
+              variant="outline"
               needsMidChoice={needsMidChoice}
               midOptions={midOptions}
               onRun={openImport}
