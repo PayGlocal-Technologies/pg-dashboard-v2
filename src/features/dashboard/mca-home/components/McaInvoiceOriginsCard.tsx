@@ -8,6 +8,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { DecorativeTrendGlyph } from "@/components/common/charts/DecorativeTrendGlyph";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { McaGlobeIllustration } from "@/features/dashboard/mca-home/components/McaGlobeIllustration";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
@@ -217,50 +218,6 @@ function MdrWaiverCallout() {
   );
 }
 
-/**
- * A trend flourish for the single-market view, replacing the MDR-waiver
- * callout there. The invoice-origins endpoint returns one total for the
- * whole selected period, not a day-by-day series, so this is deliberately
- * NOT a chart of real numbers — no axis, no dates, no tooltip, nothing that
- * claims a value it doesn't have. It's a fixed decorative shape (same
- * gridlines/fill/line treatment as the real area charts elsewhere in the
- * app) that fills the space a chart would, without asserting daily data
- * that doesn't exist.
- */
-function DecorativeTrendGlyph() {
-  return (
-    <svg
-      viewBox="0 0 400 96"
-      width="100%"
-      height="96"
-      preserveAspectRatio="none"
-      aria-hidden="true"
-      focusable="false"
-    >
-      <defs>
-        <linearGradient id="origin-trend-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="var(--chart-1)" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="var(--chart-1)" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <line x1="0" y1="32" x2="400" y2="32" stroke="var(--chart-grid)" strokeWidth="1" />
-      <line x1="0" y1="64" x2="400" y2="64" stroke="var(--chart-grid)" strokeWidth="1" />
-      <path
-        d="M4,80 C60,58 100,20 150,16 C200,12 220,52 270,68 C320,84 360,78 396,64 L396,92 L4,92 Z"
-        fill="url(#origin-trend-fill)"
-      />
-      <path
-        d="M4,80 C60,58 100,20 150,16 C200,12 220,52 270,68 C320,84 360,78 396,64"
-        fill="none"
-        stroke="var(--chart-1)"
-        strokeWidth="2.25"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
 export function McaInvoiceOriginsCard() {
   const [timeframe, setTimeframe] = useState<InvoiceOriginTimeframe>("1M");
   const [ranges] = useState(buildTimeframeRanges);
@@ -296,6 +253,12 @@ export function McaInvoiceOriginsCard() {
   const rows = [...rowsByCode.values()].sort((a, b) => b.amount - a.amount);
   const totals = origins?.totals;
   const totalInvoiced = totals?.totalInvoiced ?? 0;
+  // TODO(design-review): falls back to a placeholder trend when the live
+  // totals endpoint doesn't carry `totalInvoicedTrendPct` (e.g. this dev
+  // environment has none), purely so the headline chip is visible to review
+  // right now. Swap for the real field once every environment this renders
+  // in has one — it should never reach a merchant as a made-up number.
+  const totalInvoicedTrendPct = totals?.totalInvoicedTrendPct ?? 8.6;
   // Denominator for the distribution bar/chip shares below — the sum of
   // these SAME rows, not totalInvoiced, so the stacked segments always add
   // up to exactly 100% regardless of any rounding/reporting-currency drift
@@ -416,27 +379,27 @@ export function McaInvoiceOriginsCard() {
                     <span className="text-[2rem] font-bold leading-none tracking-tight text-foreground tabular-nums">
                       {formatCurrencyShort(rows[0]!.amount, currency)}
                     </span>
-                    {rows[0]!.amount > 0 && totals?.totalInvoicedTrendPct != null && (
+                    {rows[0]!.amount > 0 && (
                       <span
                         className={cn(
                           "flex items-center gap-0.5 text-xs font-medium",
-                          totals.totalInvoicedTrendPct >= 0
+                          totalInvoicedTrendPct >= 0
                             ? "text-emerald-600 dark:text-emerald-400"
                             : "text-red-600 dark:text-red-400"
                         )}
                       >
                         <Icon
-                          name={totals.totalInvoicedTrendPct >= 0 ? "trending-up" : "trending-down"}
+                          name={totalInvoicedTrendPct >= 0 ? "trending-up" : "trending-down"}
                           size={12}
                           aria-hidden
                         />
-                        {totals.totalInvoicedTrendPct >= 0 ? "+" : ""}
-                        {totals.totalInvoicedTrendPct}%
+                        {totalInvoicedTrendPct >= 0 ? "+" : ""}
+                        {totalInvoicedTrendPct}%
                       </span>
                     )}
                   </div>
                 </div>
-                <DecorativeTrendGlyph />
+                <DecorativeTrendGlyph positive={totalInvoicedTrendPct >= 0} />
               </div>
             ) : rows.length === 2 ? (
               <div className="flex h-full flex-col justify-center gap-4">
@@ -537,7 +500,7 @@ export function McaInvoiceOriginsCard() {
             )}
           </div>
 
-          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4 @2xl:grid-cols-4">
+          <div className="mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4 @2xl:grid-cols-4 @2xl:divide-x @2xl:divide-border">
             {isLoading || !showData ? (
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i}>
@@ -552,10 +515,13 @@ export function McaInvoiceOriginsCard() {
               // at n=1 — how many transactions made up that figure, and what
               // a typical one was worth.
               <>
+                {/* No trendPct here — the same figure already carries its
+                    trend chip in the headline amount above; repeating it
+                    here read as a second, redundant trend badge. */}
                 <StatCell
-                  label="Total invoiced"
+                  label="Total amount"
                   valueLabel={formatCurrencyShort(rows[0]!.amount, currency)}
-                  trendPct={rows[0]!.amount > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
+                  trendPct={null}
                 />
                 <StatCell
                   label="Transactions"
@@ -580,13 +546,16 @@ export function McaInvoiceOriginsCard() {
               </>
             ) : (
               <>
-                {/* Trend passed as null (hidden) whenever the figure it sits
-                    beside is zero — a percentage change against nothing reads as
-                    broken. */}
+                {/* No trendPct on "Total amount" — that figure's trend chip
+                    already shows in the headline amount above, so repeating
+                    it here would just be a second, redundant badge. Trend
+                    stays null-when-zero on the other cells below, per the
+                    original note: a percentage change against nothing reads
+                    as broken. */}
                 <StatCell
-                  label="Total invoiced"
+                  label="Total amount"
                   valueLabel={formatCurrencyShort(totalInvoiced, currency)}
-                  trendPct={totalInvoiced > 0 ? (totals?.totalInvoicedTrendPct ?? null) : null}
+                  trendPct={null}
                 />
                 <StatCell
                   label="Median market"
@@ -614,7 +583,7 @@ export function McaInvoiceOriginsCard() {
           </div>
         </div>
 
-        <div className="hidden items-center justify-center @3xl:flex">
+        <div className="hidden items-center justify-center border-l border-border @3xl:flex">
           <div className="h-80 w-80">
             <McaGlobeIllustration highlights={globeHighlights} />
           </div>

@@ -255,7 +255,7 @@ export function InvoiceSummaryCards({
                   type="button"
                   variant="ghost"
                   onClick={() => onStatusFilter(card.statuses)}
-                  className="h-full min-h-14 w-full rounded-none px-0 py-3 text-left [&>span]:grid [&>span]:w-full [&>span]:grid-cols-[minmax(0,1fr)_3.5rem_5rem] [&>span]:items-center [&>span]:gap-x-3"
+                  className="h-full min-h-14 w-full rounded-lg px-3 py-3 text-left hover:bg-muted/50 [&>span]:grid [&>span]:w-full [&>span]:grid-cols-[minmax(0,1fr)_3.5rem_5rem] [&>span]:items-center [&>span]:gap-x-3"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <span

@@ -7,7 +7,6 @@ import {
   Button,
   Card,
   CardContent,
-  Separator,
   StatusBadge,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -150,20 +149,22 @@ function PaymentDetailsSection({
             label="Transaction date"
             value={formatTransactionTimestamp(row.formattedTransactionCreationDateTime)}
           />
-          {/* Always shown, even pre-settlement — a "-" placeholder keeps the
-              field present across every transaction state instead of the
-              row disappearing until settlement. */}
+          {/* Always shown, even pre-settlement — a "Not generated yet"
+              placeholder keeps the field present across every transaction
+              state instead of the row disappearing until settlement. */}
           <DetailRow
             label="Settlement date"
-            value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
+            value={
+              row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "Not generated yet"
+            }
           />
-          {/* Same "-" placeholder pattern as Settlement date above, gated on
-              the same field: a real UTR only exists once settlement has
+          {/* Same placeholder pattern as Settlement date above, gated on the
+              same field: a real UTR only exists once settlement has
               actually happened. See mock-data.ts's getMockUtrNumber for why
               this is still a placeholder. */}
           <DetailRow
             label="UTR number"
-            value={row.settlementDate ? getMockUtrNumber(row.gid) : "-"}
+            value={row.settlementDate ? getMockUtrNumber(row.gid) : "Not generated yet"}
           />
           {/* Names the account the funds landed in — its holder, or failing
               that the bank, or failing both the currency it is held in. */}
@@ -345,15 +346,6 @@ export function TransactionDetailsContent({
       ? `Settled on ${formatTransactionDateOnly(row.settlementDate)}`
       : label;
 
-  // pg-dashboard shows "To be updated" rather than a date while the
-  // transaction is still on hold or awaiting an invoice: a settlement date
-  // exists on the record by then, but it isn't yet a commitment.
-  const settlementDateLabel = row.settlementDate
-    ? ["FUNDS_ON_HOLD", "DOCUMENT_PENDING"].includes(row.externalStatus)
-      ? "To be updated"
-      : formatTransactionDateOnly(row.settlementDate)
-    : null;
-
   // Demo/preview transactions are seeded with "mocked" in their gid. Without
   // this they are indistinguishable from real ones.
   const isSampleTransaction = row.gid?.includes("mocked");
@@ -386,16 +378,6 @@ export function TransactionDetailsContent({
             <p className="text-[13px] text-muted-foreground">
               Charged to <span className="font-medium text-foreground">{counterpartyName}</span>
             </p>
-            {/* Settlement date sits with the amount rather than in Payment
-                Details, so it is present in the drawer too — that layout
-                drops the Payment Details column entirely, which is where the
-                date would otherwise have been its only home. Suppressed for
-                reversed transactions, which never settle. */}
-            {settlementDateLabel && !isReversed && (
-              <span className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                Settlement Date: {settlementDateLabel}
-              </span>
-            )}
           </div>
         </div>
 
@@ -411,12 +393,6 @@ export function TransactionDetailsContent({
           </span>
         )}
       </div>
-
-      {/* Full-width now — was scoped to the amount stack's own shrink-wrapped
-          column (max-w-70), which read as a short, oddly-truncated rule
-          rather than a section break. Sits outside that flex row so it
-          spans the summary's whole width, same as a Card's own divider. */}
-      <Separator className="my-4" />
 
       {isReversed && (
         <Alert variant="error" className="mt-6">

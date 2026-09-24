@@ -313,7 +313,7 @@ export function IrmRepositoryFeature() {
               placeholder="Search by remitter name"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-2 pl-8 text-xs bg-muted/50"
+              className="h-2 min-h-9 pl-8 text-xs bg-muted/50 shadow-none"
             />
           </div>
 

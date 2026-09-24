@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Button,
   Card,
@@ -200,14 +201,27 @@ function CurrencyChip({
   row,
   sharePct,
   isAmountMode,
+  index,
   className,
 }: {
   row: AccountBarRowData;
   sharePct: number;
   isAmountMode: boolean;
+  /** Row position in its own list — staggers this chip's sweep-in a beat
+   *  after the one above it, so a mode switch reads as the whole list
+   *  resettling top-to-bottom rather than every value changing at once. */
+  index: number;
   className?: string;
 }) {
-  const nativeLabel = isAmountMode ? formatNativeAmount(row.accountId, row.amount) : null;
+  // Amount mode's subtext is the native-currency figure ("$8,377,993");
+  // count mode has no native-currency reading of its own (a transaction
+  // count has no currency), so it shows the same INR amount the amount-mode
+  // headline uses instead of leaving that line blank — same placement
+  // either way, just which figure fills it.
+  const subLabel = isAmountMode
+    ? formatNativeAmount(row.accountId, row.amount)
+    : formatBarAmount(row.amount);
+  const delay = Math.min(index, 8) * 0.04;
   return (
     <li className={cn("flex items-center gap-2.5 py-2.5", className)}>
       <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-7 w-7 shrink-0" />
@@ -219,12 +233,29 @@ function CurrencyChip({
           {formatSharePct(sharePct)} of total
         </span>
       </span>
-      <span className="shrink-0 text-right">
-        <span className="block text-sm font-semibold tabular-nums text-foreground">
-          {row.valueLabel}
-        </span>
-        {nativeLabel && (
-          <span className="block truncate text-[11px] text-muted-foreground">{nativeLabel}</span>
+      <span className="shrink-0 overflow-hidden text-right">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={isAmountMode ? "amount" : "count"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.3, delay, ease: "easeOut" }}
+            className="block text-sm font-semibold tabular-nums text-foreground"
+          >
+            {row.valueLabel}
+          </motion.span>
+        </AnimatePresence>
+        {subLabel && (
+          <motion.span
+            key={isAmountMode ? "native" : "inr"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: delay + 0.06, ease: "easeOut" }}
+            className="block truncate text-[11px] text-muted-foreground"
+          >
+            {subLabel}
+          </motion.span>
         )}
       </span>
     </li>
@@ -334,17 +365,34 @@ export function SettlementAnalyticsCard({
               <Shimmer className="h-9 w-40" />
             ) : (
               <>
-                {isAmountMode ? (
-                  <CompactAmount
-                    amount={settledValue}
-                    currency="INR"
-                    className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
-                  />
-                ) : (
-                  <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                    {settledCount.toLocaleString("en-IN")}
-                  </p>
-                )}
+                <AnimatePresence mode="wait" initial={false}>
+                  {isAmountMode ? (
+                    <motion.div
+                      key="amount"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.3, ease: "easeOut" }}
+                    >
+                      <CompactAmount
+                        amount={settledValue}
+                        currency="INR"
+                        className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.p
+                      key="count"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.3, ease: "easeOut" }}
+                      className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                    >
+                      {settledCount.toLocaleString("en-IN")}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
                 {/* Visually subordinate to the KPI (muted, smaller, on the
                     same baseline rather than its own row) and wraps beneath
                     it naturally on narrow widths via the flex-wrap above. */}
@@ -447,6 +495,7 @@ export function SettlementAnalyticsCard({
                       key={row.accountId}
                       row={row}
                       isAmountMode={isAmountMode}
+                      index={index}
                       sharePct={totalValue > 0 ? row.value / totalValue : 0}
                       className={
                         isPairedLayout ? pairedCellClasses(index, firstFiveRows.length) : undefined
@@ -483,6 +532,7 @@ export function SettlementAnalyticsCard({
                     key={row.accountId}
                     row={row}
                     isAmountMode={isAmountMode}
+                    index={index}
                     sharePct={totalValue > 0 ? row.value / totalValue : 0}
                     className={
                       isPairedLayout ? pairedCellClasses(index, restRows.length) : undefined

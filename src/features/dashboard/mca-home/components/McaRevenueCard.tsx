@@ -1,15 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   Area,
   AreaChart,
-  Bar,
-  BarChart,
   CartesianGrid,
-  Cell,
-  LabelList,
-  Line,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -32,6 +27,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { CompactAmount } from "@/components/common/CompactAmount";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   netVolumeByTimeframe,
@@ -42,12 +38,24 @@ import {
   type RevenueTimeframe,
 } from "@/features/dashboard/mca-home/mock-data";
 import { useRevenueTrend } from "@/features/dashboard/mca-home/hooks";
-import { useCurrencySplit } from "@/features/dashboard/mca-transactions/hooks";
 
 /** Day window per timeframe. The revenue-trend endpoint is date-ranged, so each
  *  tab asks for its own window and gets its own series — the chart is NOT one
  *  fixed curve. Computed once on mount (no `new Date()` in render). */
 const TIMEFRAME_DAYS: Record<RevenueTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
+
+/** What the trend line reads as for each tab — "vs last week" / "vs last
+ *  month" / "vs previous 3 months", the same wording mock-data.ts already
+ *  uses for Net volume/Number of payments. Applied here too rather than
+ *  trusting the live "collected" series' own `comparisonLabel`: that field
+ *  comes straight from the revenue-trend endpoint as a raw day count ("vs
+ *  previous 91 days" for the 3M tab), which doesn't match the 1W/1M/3M
+ *  labels above it and reads as a different scale than what was picked. */
+const TIMEFRAME_COMPARISON_LABEL: Record<RevenueTimeframe, string> = {
+  "1W": "vs last week",
+  "1M": "vs last month",
+  "3M": "vs previous 3 months",
+};
 
 function buildRevenueRanges(): Record<RevenueTimeframe, { startDate: string; endDate: string }> {
   const end = new Date();
@@ -67,7 +75,16 @@ function buildRevenueRanges(): Record<RevenueTimeframe, { startDate: string; end
 /** Y-axis tick label. Delegates to the shared short form so the axis reads in
  *  the same ₹K/₹L/₹Cr units as every headline and bar figure. */
 function formatMoneyAxis(value: number): string {
-  return value === 0 ? "₹0" : formatCurrencyShort(value, "INR");
+  if (value === 0) return "₹0";
+  // Whole units, not formatCurrencyShort's 2-decimal precision (₹100.00Cr) —
+  // axis ticks are round gridline values by construction, so the decimals
+  // never carry information, just clutter.
+  const abs = Math.abs(value);
+  const sign = value < 0 ? "-" : "";
+  if (abs >= 10_000_000) return `${sign}₹${Math.round(abs / 10_000_000)}Cr`;
+  if (abs >= 100_000) return `${sign}₹${Math.round(abs / 100_000)}L`;
+  if (abs >= 1_000) return `${sign}₹${Math.round(abs / 1_000)}K`;
+  return `${sign}₹${Math.round(abs)}`;
 }
 
 /** Plain-count axis label, for the "Number of payments" metric — there is no
@@ -100,110 +117,21 @@ function TrendTooltip({
 
 /**
  * What the dropdown beside the title switches between. One reusable card,
- * not four — every option renders through the same trend-chart layout below
- * (or, for "Common currency", the same ranked-share layout McaCurrencySplitCard
- * uses), so switching options never changes the card's height.
+ * not three — every option renders through the same trend-chart layout
+ * below, so switching options never changes the card's height.
  *
  * "Net volume" and "Number of payments" have no live trend endpoint for the
  * MCA scope yet, so they read from the mock series in mock-data.ts — the same
  * placeholder-dataset pattern `revenueByTimeframe` already established there —
- * rather than going empty. "Total amount collected" and "Common currency" are
- * both real, live data.
+ * rather than going empty. "Total amount collected" is real, live data.
  */
-type PerformanceMetric = "collected" | "net-volume" | "payments" | "common-currency";
+type PerformanceMetric = "collected" | "net-volume" | "payments";
 
 const METRIC_OPTIONS: { value: PerformanceMetric; label: string }[] = [
   { value: "collected", label: "Total amount collected" },
   { value: "net-volume", label: "Net volume" },
   { value: "payments", label: "Number of payments" },
-  { value: "common-currency", label: "Common currency" },
 ];
-
-/** The hue order currency/country bars take, most-significant first — same
- *  cycle McaInvoiceOriginsCard's own distribution bar uses. */
-const SHARE_BAR_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"];
-
-function ShareBarTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: readonly { payload: { currency: string; amountPct: number } }[];
-}) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0]?.payload;
-  if (!row) return null;
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
-      <p className="font-medium text-muted-foreground">{row.currency}</p>
-      <p className="font-semibold tabular-nums text-foreground">{row.amountPct}%</p>
-    </div>
-  );
-}
-
-/**
- * Ranked currency shares — the closest thing to a chart "Common currency"
- * has, since a single currency code has nothing to plot as a line over time.
- *
- * Three or fewer currencies read fine as actual bars, each one long enough
- * to compare at a glance. Past that a bar chart's rows get too thin to carry
- * a label, so it drops to the same plain ranked list McaInvoiceOriginsCard
- * switches to for more than a handful of countries — no bar at all there,
- * just the figures, since with this many rows the shape stops being the
- * point and the ranking is.
- */
-function CommonCurrencyBreakdown({
-  slices,
-}: {
-  slices: { currency: string; amountPct: number }[];
-}) {
-  if (slices.length <= 3) {
-    return (
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={slices}
-          margin={{ top: 20, right: 8, left: 8, bottom: 0 }}
-          barCategoryGap="28%"
-        >
-          <XAxis
-            type="category"
-            dataKey="currency"
-            axisLine={false}
-            tickLine={false}
-            tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
-          />
-          <YAxis type="number" domain={[0, 100]} hide />
-          <RechartsTooltip
-            content={<ShareBarTooltip />}
-            cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-          />
-          <Bar dataKey="amountPct" radius={[4, 4, 0, 0]} barSize={28} isAnimationActive={false}>
-            {slices.map((slice, i) => (
-              <Cell key={slice.currency} fill={SHARE_BAR_COLORS[i % SHARE_BAR_COLORS.length]} />
-            ))}
-            <LabelList
-              dataKey="amountPct"
-              position="top"
-              formatter={(v: unknown) => `${typeof v === "number" ? v : 0}%`}
-              style={{ fontSize: 12, fontWeight: 600, fill: "var(--foreground)" }}
-            />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    );
-  }
-
-  return (
-    <div className="flex h-full flex-col justify-center gap-2">
-      {slices.slice(0, 6).map((slice) => (
-        <div key={slice.currency} className="flex items-center justify-between gap-2 text-xs">
-          <span className="font-medium text-foreground">{slice.currency}</span>
-          <span className="font-semibold tabular-nums text-foreground">{slice.amountPct}%</span>
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export function McaRevenueCard() {
   const [timeframe, setTimeframe] = useState<RevenueTimeframe>("3M");
@@ -217,21 +145,12 @@ export function McaRevenueCard() {
     isError: trendError,
   } = useRevenueTrend(startDate, endDate);
 
-  // Common currency reuses the exact same per-currency split McaCurrencySplitCard
-  // reads — same hook, same endpoint, driven by this card's own timeframe rather
-  // than that card's fixed 30-day window.
-  const {
-    split,
-    isLoading: splitLoading,
-    isError: splitError,
-  } = useCurrencySplit(startDate, endDate);
-
   const metricLabel =
     METRIC_OPTIONS.find((m) => m.value === metric)?.label ?? METRIC_OPTIONS[0]!.label;
 
   // The 1W/1M/3M pills change every metric's series here — real for
-  // "collected"/"common currency", mock but still per-timeframe for the other
-  // two — so unlike an earlier version of this card, nothing needs it dimmed.
+  // "collected", mock but still per-timeframe for the other two — so unlike
+  // an earlier version of this card, nothing needs it dimmed.
   const isMoneyMetric = metric === "collected" || metric === "net-volume";
   const isTrendMetric = metric === "collected" || metric === "net-volume" || metric === "payments";
 
@@ -261,18 +180,6 @@ export function McaRevenueCard() {
   const activeError = metric === "collected" && trendError;
   const hasChartData = !activeLoading && !activeError && (activeSeries?.points.length ?? 0) > 0;
   const trendPositive = (activeSeries?.trendPct ?? 0) >= 0;
-
-  // ── "Common currency" ───────────────────────────────────────────────────
-  const currencySlices = useMemo(
-    () =>
-      (split?.slices ?? [])
-        .filter((s) => s.currency !== "OTHER")
-        .map((s) => ({ currency: s.currency, amountPct: s.amountPct }))
-        .sort((a, b) => b.amountPct - a.amountPct),
-    [split]
-  );
-  const topCurrency = currencySlices[0];
-  const hasCurrencyData = !splitLoading && !splitError && currencySlices.length > 0;
 
   return (
     <Card className="h-full gap-0 p-4">
@@ -336,7 +243,7 @@ export function McaRevenueCard() {
 
       {isTrendMetric && (
         <>
-          <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
+          <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
             <div className="flex items-baseline gap-2">
               {activeLoading ? (
                 <Shimmer className="h-8 w-32" />
@@ -363,23 +270,20 @@ export function McaRevenueCard() {
                 </span>
               )}
             </div>
-            {/* Small, muted, subordinate to the main figure — deliberately not
-                styled as a second KPI. */}
+            {/* Right beside the headline figure now, not floated to the far
+                edge of the row where it read as an orphaned label under the
+                1W/1M/3M toggle instead of a comparison to the number next to
+                it. Still small/muted — a footnote to the main figure, not a
+                second KPI. */}
             {!activeLoading && activeSeries && (
-              <div className="shrink-0 text-right">
-                <p className="text-[11px] font-medium text-muted-foreground">Previous</p>
-                {isMoneyMetric ? (
-                  <CompactAmount
-                    amount={activeSeries.previousTotal}
-                    currency={activeSeries.currency}
-                    className="mt-0.5 block text-sm font-semibold text-muted-foreground tabular-nums"
-                  />
-                ) : (
-                  <p className="mt-0.5 text-sm font-semibold text-muted-foreground tabular-nums">
-                    {formatCountAxis(activeSeries.previousTotal)}
-                  </p>
-                )}
-              </div>
+              <p className="text-xs text-muted-foreground">
+                Previous{" "}
+                <span className="font-semibold tabular-nums">
+                  {isMoneyMetric
+                    ? formatCurrencyShort(activeSeries.previousTotal, activeSeries.currency)
+                    : formatCountAxis(activeSeries.previousTotal)}
+                </span>
+              </p>
             )}
           </div>
 
@@ -395,23 +299,28 @@ export function McaRevenueCard() {
               <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
               <span>
                 {trendPositive ? "+" : ""}
-                {activeSeries.trendPct}% {activeSeries.comparisonLabel}
+                {activeSeries.trendPct}% {TIMEFRAME_COMPARISON_LABEL[timeframe]}
               </span>
             </div>
           ) : activeLoading ? (
             <Shimmer className="mt-1 h-4 w-40" />
           ) : null}
 
-          <div className="mt-2.5 min-h-32 w-full flex-1">
+          {/* mt-5, not mt-2.5: the card's own height is fixed (Card is a flex
+              column, this wrapper is flex-1), so growing this margin only
+              gives the amount/trend text some breathing room above the
+              chart — it comes out of the chart's own share of the
+              already-fixed card height, not the card growing. */}
+          <div className="mt-5 min-h-28 w-full flex-1">
             {activeLoading ? (
-              <Shimmer className="h-full min-h-32 w-full" />
+              <Shimmer className="h-full min-h-28 w-full" />
             ) : activeError ? (
               <PlaceholderState
                 variant="error"
                 size="sm"
                 title="Couldn't load"
                 description="Revenue didn't load."
-                className="h-full min-h-32"
+                className="h-full min-h-28"
               />
             ) : !hasChartData ? (
               <PlaceholderState
@@ -419,7 +328,7 @@ export function McaRevenueCard() {
                 size="sm"
                 title="No data in this period"
                 description="This metric is charted here as activity comes in."
-                className="h-full min-h-32"
+                className="h-full min-h-28"
               />
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -434,20 +343,16 @@ export function McaRevenueCard() {
                       <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid
-                    strokeDasharray="4 6"
-                    stroke="var(--chart-grid)"
-                    vertical={false}
-                  />
+                  <CartesianGrid horizontal={DotGridLine} vertical={false} />
                   <XAxis
                     dataKey="x"
-                    axisLine={false}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
                     tickLine={false}
                     tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
                     height={24}
                   />
                   <YAxis
-                    axisLine={false}
+                    axisLine={{ stroke: "var(--chart-grid)" }}
                     tickLine={false}
                     width={48}
                     tickFormatter={isMoneyMetric ? formatMoneyAxis : formatCountAxis}
@@ -463,60 +368,8 @@ export function McaRevenueCard() {
                     dot={false}
                     activeDot={{ r: 5, strokeWidth: 0, fill: "var(--chart-1)" }}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="previous"
-                    stroke="var(--muted-foreground)"
-                    strokeWidth={1.5}
-                    strokeDasharray="5 4"
-                    dot={false}
-                    activeDot={false}
-                  />
                 </AreaChart>
               </ResponsiveContainer>
-            )}
-          </div>
-        </>
-      )}
-
-      {metric === "common-currency" && (
-        <>
-          <div className="mt-2 flex items-baseline gap-2">
-            {splitLoading ? (
-              <Shimmer className="h-8 w-24" />
-            ) : (
-              <span className="block text-2xl font-bold tracking-tight text-foreground tabular-nums">
-                {topCurrency?.currency ?? "—"}
-              </span>
-            )}
-          </div>
-          {!splitLoading && topCurrency && (
-            <p className="mt-1 text-xs font-medium text-muted-foreground">
-              {topCurrency.amountPct}% of volume in this period
-            </p>
-          )}
-
-          <div className="mt-2.5 min-h-32 w-full flex-1">
-            {splitLoading ? (
-              <Shimmer className="h-full min-h-32 w-full" />
-            ) : splitError ? (
-              <PlaceholderState
-                variant="error"
-                size="sm"
-                title="Couldn't load"
-                description="Currency split didn't load."
-                className="h-full min-h-32"
-              />
-            ) : !hasCurrencyData ? (
-              <PlaceholderState
-                variant="no-analytics"
-                size="sm"
-                title="No transactions in this period"
-                description="Once payments arrive, the currency you collect most in will show up here."
-                className="h-full min-h-32"
-              />
-            ) : (
-              <CommonCurrencyBreakdown slices={currencySlices} />
             )}
           </div>
         </>

@@ -1,18 +1,11 @@
 "use client";
 
 import { useId } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import type { SparklinePoint } from "@/features/dashboard/payment-links/types";
 
@@ -94,7 +87,7 @@ export function PaymentLinkMetricCard({
                 <stop offset="100%" stopColor={accentColor} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid horizontal={DotGridLine} vertical={false} />
             <XAxis
               dataKey="x"
               axisLine={false}

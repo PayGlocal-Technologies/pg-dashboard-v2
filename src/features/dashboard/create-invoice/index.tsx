@@ -211,7 +211,18 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="min-h-0 overflow-y-auto bg-muted">
+        {/* Same background as the loaded preview column below, so the
+            skeleton doesn't flash a plain grey panel right before it. */}
+        <div
+          className="min-h-0 overflow-y-auto bg-cover bg-top bg-no-repeat"
+          // A flat white wash under the image (not `opacity` on this div)
+          // lightens the image itself without touching the foreground
+          // content's own opacity — background-image, not the whole div, is
+          // what needs to look faded.
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)), url("${withBasePath("/assets/bg image.png")}")`,
+          }}
+        >
           <div className="space-y-4 p-4 md:p-6">
             <div className="flex items-center justify-between">
               <Shimmer className="h-4 w-20" />
@@ -1721,7 +1732,20 @@ function InvoiceEditor({
           </div>
         </div>
 
-        <div className="min-h-0 overflow-y-auto bg-muted">
+        {/* The preview column only — bg-cover/bg-top rather than tiling,
+            since this is a decorative wash behind the document card, not a
+            repeating pattern; bg-top keeps the same crop visible however
+            tall the scrollable content ends up. */}
+        <div
+          className="min-h-0 overflow-y-auto bg-cover bg-top bg-no-repeat"
+          // A flat white wash under the image (not `opacity` on this div)
+          // lightens the image itself without touching the foreground
+          // content's own opacity — background-image, not the whole div, is
+          // what needs to look faded.
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.55), rgba(255,255,255,0.55)), url("${withBasePath("/assets/bg image.png")}")`,
+          }}
+        >
           <div className="space-y-4 p-4 md:p-6" data-guide="invoice-preview">
             <InvoicePreviewSidebar
               source={previewSource}

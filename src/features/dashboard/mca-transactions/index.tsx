@@ -33,7 +33,12 @@ export function McaTransactionsFeature() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
-      <PageHeader title="Transactions" />
+      {/* Hidden on the single-transaction details page, same as the
+          "Summary" row below it — TransactionDetailsPage's own Back/Collapse
+          row is the page's first element there instead, so removing this
+          doesn't leave a gap, it just lets that row take the space this
+          title used to occupy. */}
+      {!detailsOpen && <PageHeader title="Transactions" />}
 
       {/* "Summary" subheading on the left with the time-range tabs pushed to the
           row's right edge (justify-between). Sits under the page title. Hidden

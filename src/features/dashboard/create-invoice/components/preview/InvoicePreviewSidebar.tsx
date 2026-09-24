@@ -15,54 +15,45 @@ export function InvoicePreviewSidebar({
   source: PreviewSource;
   /** Passed to the document so its logo placeholder is the upload affordance. */
   onLogoClick?: () => void;
-  /** Opens BrandingSection below — the "Customise template" shortcut takes
-   *  the segmented tab switcher's old spot beside the heading, since that
-   *  switcher moved to its own row (see the line tabs below). */
+  /** Opens BrandingSection below — the shortcut now sits inline beside the
+   *  "Preview" heading, with the Document/Email switcher moved to the
+   *  heading row's other end (its old spot). */
   onCustomiseClick?: () => void;
 }) {
   return (
     <Tabs defaultValue="pdf" className="w-full">
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
-          Preview
-        </h2>
-        {/* "outline", not "ghost": this sits on the sidebar's own muted
-            wash, where a borderless ghost button read as plain text rather
-            than something to press. The outline variant's card fill plus
-            border gives it an edge against that surface. */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
-          onClick={onCustomiseClick}
-        >
-          Customise template
-        </Button>
-      </div>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Preview
+          </h2>
+          {/* Plain text-weight trigger, not a filled/outlined button — this
+              sits right beside the "Preview" label and only needs to read as
+              a secondary shortcut, not compete with it for visual weight. */}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={<Icon name="pencil" className="h-3 w-3" />}
+            onClick={onCustomiseClick}
+            className="h-auto min-h-0 shrink-0 gap-1 px-1.5 py-1 text-[12px] font-medium text-muted-foreground hover:bg-transparent hover:text-foreground hover:underline"
+          >
+            Customise template
+          </Button>
+        </div>
 
-      {/* Line tabs, not the segmented pill the design system defaults to —
-          an underline under the active label instead of a filled chip, so
-          this reads as a lighter, secondary switch under the heading rather
-          than competing with "Customise template" above it for weight. */}
-      {/* border-0 first: TabsList's own base class sets `border` (all four
-          sides), which border-b alone doesn't cancel — tailwind-merge treats
-          them as different utility groups, so without border-0 the other
-          three sides kept a stray stroke around the whole row. */}
-      <TabsList className="mb-3 h-auto gap-4 rounded-none border-0 border-b border-border bg-transparent p-0">
-        <TabsTrigger
-          value="pdf"
-          className="rounded-none border-b-2 border-transparent px-0.5 pb-2 pt-0 text-[13px] text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-        >
-          Document
-        </TabsTrigger>
-        <TabsTrigger
-          value="email"
-          className="rounded-none border-b-2 border-transparent px-0.5 pb-2 pt-0 text-[13px] text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
-        >
-          Email
-        </TabsTrigger>
-      </TabsList>
+        {/* Segmented pill switcher — flux's Tabs default (filled active chip
+            on a muted track) rather than the underline treatment, in the
+            "Customise template" button's old top-right spot. */}
+        <TabsList className="h-8 shrink-0 p-0.5">
+          <TabsTrigger value="pdf" className="px-2.5 py-1 text-[12px]">
+            Document
+          </TabsTrigger>
+          <TabsTrigger value="email" className="px-2.5 py-1 text-[12px]">
+            Email
+          </TabsTrigger>
+        </TabsList>
+      </div>
 
       <TabsContent value="pdf">
         {/* Zoomed out a touch — mx-auto keeps it centred in the column

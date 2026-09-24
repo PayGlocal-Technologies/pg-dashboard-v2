@@ -187,19 +187,40 @@ function PlatformsContent() {
     // The callback, not the effect body, is what calls setState — this is
     // the same "async callback" shape CLAUDE.md's purity rules carve out for
     // setInterval, just driven by layout instead of a timer.
-    const observer = new ResizeObserver(() => {
+    function measure() {
       const heights = [platformEl?.offsetHeight, accountEl?.offsetHeight].filter(
         (h): h is number => typeof h === "number" && h > 0
       );
       if (heights.length === 0) return;
       setMatchedGroupHeight(Math.max(...heights));
-    });
+    }
 
+    const observer = new ResizeObserver(measure);
     if (platformEl) observer.observe(platformEl);
     if (accountEl) observer.observe(accountEl);
 
-    return () => observer.disconnect();
-  }, [selectedPlatform?.id, selectedAccount]);
+    // Belt and suspenders: ResizeObserver is supposed to deliver an initial
+    // callback for every freshly-observed target on its own, but that first
+    // delivery was, in practice, either not landing or landing too late to
+    // matter for this pair — the account card kept rendering at its shorter
+    // natural height instead of growing to match. A rAF-deferred measurement
+    // (not the effect body itself, same rule as above) forces that first
+    // read explicitly instead of depending on it.
+    const rafId = requestAnimationFrame(measure);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(rafId);
+    };
+    // selectedAccount?.id, not selectedAccount itself: `accounts` (and so
+    // `selectedAccount`) is recomputed fresh every render rather than
+    // memoized, so the object's identity changes on every render even when
+    // the actual selection hasn't — depending on the object tore the
+    // observer down and recreated it on every render, which was starving it
+    // of the chance to ever deliver a resize notification, and is why the
+    // account card was stuck at its min-h-60 floor instead of growing to
+    // match the (taller) platform card.
+  }, [selectedPlatform?.id, selectedAccount?.id]);
 
   /**
    * What a document card does when it's activated — from the card, from its
@@ -320,15 +341,20 @@ function PlatformsContent() {
                 details beside it are read every time. Sits right of the
                 currency select because the steps quote that currency's own
                 identifiers in their Quick Access panel. */}
+            {/* Same soft-blue fill the dashboard's own "Create invoice"
+                quick-access tile uses (bg-primary-light/text-primary), plus
+                a visible blue stroke — variant="outline" is left as-is so
+                the button keeps its normal rounded-lg corners rather than
+                the tile's pill shape. */}
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="shrink-0"
-              leftIcon={<Icon name="list-checks" className="h-3.5 w-3.5" />}
+              className="shrink-0 border-primary/30 bg-primary-light text-primary hover:bg-primary-light/70"
+              leftIcon={<Icon name="help-circle" className="h-3.5 w-3.5" />}
               onClick={() => setConnectStepsOpen(true)}
             >
-              Steps to connect
+              How to connect
             </Button>
           </>
         }
@@ -540,13 +566,12 @@ function PlatformsContent() {
                     size="md"
                     className="w-full justify-start gap-2.5 text-muted-foreground [&>span]:flex-1 [&>span]:text-left"
                     leftIcon={
-                      // Not the platform rows' shared h-6 w-9 logo box: that
-                      // width exists to fit a brand mark, and the "+" glyph
-                      // is much narrower than that box, so matching it left
-                      // the plus sitting flush left with a dead gap before
-                      // the label. Sized to the glyph itself instead, so the
-                      // label sits right next to it.
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+                      // Same h-6 w-9 box the platform rows' brand marks sit
+                      // in, glyph centered inside it — matches "Request a
+                      // platform"'s label to the exact x-position every
+                      // platform name above it starts at, per explicit ask,
+                      // rather than the glyph's own (narrower) footprint.
+                      <span className="flex h-6 w-9 shrink-0 items-center justify-center">
                         <Icon name="plus" className="h-4 w-4" />
                       </span>
                     }
@@ -743,7 +768,7 @@ function PlatformsContent() {
           {/* The connect walkthrough used to run inline from here down: a
               "Connect your account" heading followed by every numbered step
               and its full-width screenshot. It now lives behind the header's
-              "Steps to connect" button (see ConnectStepsPage), because it is
+              "Guide to connect" button (see ConnectStepsPage), because it is
               read once per platform while the account details above are read
               every time — leaving the page's own subject as the shortest thing
               on it and pushing everything else past the fold. */}

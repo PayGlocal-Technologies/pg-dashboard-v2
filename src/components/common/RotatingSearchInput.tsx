@@ -131,7 +131,7 @@ export function RotatingSearchInput({
         value={internalValue}
         placeholder=""
         onChange={handleChange}
-        className="h-2 pl-8 text-xs bg-muted/50"
+        className="h-2 pl-8 text-xs bg-muted/50 shadow-none"
       />
     </div>
   );

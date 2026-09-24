@@ -284,6 +284,7 @@ function LineItemBody({
               id="line-item-name"
               autoFocus
               autoComplete="off"
+              className="shadow-none"
               placeholder="e.g. Logo design, Consulting fee…"
               value={values.description}
               onFocus={() => setSuggestionsOpen(true)}
@@ -356,7 +357,7 @@ function LineItemBody({
       <div className="grid grid-cols-2 gap-3">
         <Field>
           <FieldLabel htmlFor="line-item-rate">Rate</FieldLabel>
-          <InputGroup>
+          <InputGroup className="shadow-none">
             <InputGroupAddon>
               <InputGroupText>{currencySymbol}</InputGroupText>
             </InputGroupAddon>
@@ -377,6 +378,7 @@ function LineItemBody({
           <Input
             id="line-item-qty"
             inputMode="numeric"
+            className="shadow-none"
             value={values.quantity}
             onChange={(e) => patch({ quantity: e.target.value })}
             aria-invalid={!!errors.quantity || undefined}
@@ -393,6 +395,7 @@ function LineItemBody({
         <Input
           id="line-item-hsn"
           inputMode="numeric"
+          className="shadow-none"
           placeholder={isService ? "e.g. 998314" : "e.g. 8471"}
           value={values.hsn}
           onChange={(e) => patch({ hsn: e.target.value })}

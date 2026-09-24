@@ -57,8 +57,8 @@ export function FilterChipShell({ active, children }: { active: boolean; childre
   return (
     <div
       className={cn(
-        "inline-flex h-auto shrink-0 items-center rounded-full border border-dashed border-border bg-card shadow-sm",
-        active && "border-solid border-primary bg-primary/10 shadow-none ring-1 ring-primary/30"
+        "inline-flex h-auto shrink-0 items-center rounded-full border border-dashed border-border bg-card shadow-none",
+        active && "border-solid border-primary bg-primary/10 ring-1 ring-primary/30"
       )}
     >
       {children}
@@ -697,7 +697,7 @@ export function CountryFilterChip({
             that scrolling to one is slower than typing it. InputGroup puts the
             magnifier inside the field, the same treatment the app's other search
             inputs use. */}
-        <InputGroup className="mb-2">
+        <InputGroup className="mb-2 shadow-none">
           <InputGroupAddon>
             <Icon name="search" className="h-3.5 w-3.5 text-muted-foreground" />
           </InputGroupAddon>

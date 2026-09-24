@@ -2,6 +2,7 @@
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { invoiceTrend } from "@/features/dashboard/mca-home/mock-data";
 
 function InvoiceTrendTooltip({
@@ -46,7 +47,7 @@ export function McaInvoiceTrendCard() {
             barGap={2}
             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid horizontal={DotGridLine} vertical={false} />
             <XAxis
               dataKey="month"
               axisLine={false}

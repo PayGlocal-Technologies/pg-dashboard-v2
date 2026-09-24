@@ -134,7 +134,7 @@ export function OutstandingAmountCard({
             header on this page was brought in line with. */}
         <div className={hideIcon ? undefined : "mt-4"}>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-normal text-muted-foreground">Documents pending</p>
+            <p className="text-sm font-normal text-muted-foreground">Invoice required</p>
             {badgePlacement === "title" && badge}
           </div>
           {isLoading ? (
@@ -163,9 +163,15 @@ export function OutstandingAmountCard({
             already *is* "how many need an invoice before the next
             settlement" — no separate number to reconcile. */}
         {!isCurrencyScoped && !isLoading && pendingCount > 0 && (
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            {pendingCount === 1 ? "This transaction needs" : "These transactions need"} an invoice
-            before {pendingCount === 1 ? "it" : "they"} can be included in the next settlement.
+          // Same "N transaction(s) need an invoice uploaded before it/they
+          // can be included in <settlement>" line the settlement cards use
+          // (see SettlementStatCards) — one wording for the same fact
+          // wherever it shows up, rather than a differently-phrased version
+          // here.
+          <p className="mt-3 border-t border-border pt-2.5 text-xs leading-relaxed text-muted-foreground">
+            {pendingCount} transaction{pendingCount === 1 ? "" : "s"} need
+            {pendingCount === 1 ? "s" : ""} an invoice uploaded before{" "}
+            {pendingCount === 1 ? "it" : "they"} can be included in the next settlement.
           </p>
         )}
 

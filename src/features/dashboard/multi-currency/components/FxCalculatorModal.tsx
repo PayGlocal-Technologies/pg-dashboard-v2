@@ -315,7 +315,12 @@ export function FxCalculatorModal({
               focus ring, rather than borderless text sitting next to the
               currency dropdown. */}
           <InputGroup className="mt-3 h-14 border-primary/20 bg-background transition-colors focus-within:border-primary/50">
-            <InputGroupAddon className="pl-4 text-2xl leading-none font-semibold text-foreground">
+            {/* pl-0, not the addon's own default inset: this field's border
+                sits at the same x as "They will send" above it (both are
+                flush with the Card's own p-4), so any left padding here
+                pushes the $ sign in past where the label starts — flush
+                is what makes the two actually read as left-aligned. */}
+            <InputGroupAddon className="pl-0 text-2xl leading-none font-semibold text-foreground">
               {currencySymbol(currency)}
             </InputGroupAddon>
             <InputGroupInput

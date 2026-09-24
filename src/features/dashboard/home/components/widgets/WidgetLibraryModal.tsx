@@ -137,7 +137,7 @@ export function WidgetLibraryModal({
                   autoComplete="off"
                   autoCorrect="off"
                   spellCheck={false}
-                  className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-2.5 text-[13px] text-foreground shadow-sm placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-ring/30"
+                  className="w-full rounded-lg border border-border bg-card py-2 pl-9 pr-2.5 text-[13px] text-foreground shadow-none placeholder:text-muted-foreground focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-ring/30"
                   aria-label="Search charts"
                 />
               </div>
