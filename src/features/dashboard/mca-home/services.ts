@@ -23,21 +23,35 @@ export const clientAnalyticsApi = (days: string): string =>
  * plus the headline total/trend. Two scopes, as the backend spec gives: the
  * per-merchant path (with `/merchant`) and the UCIC roll-up (without it).
  * Empty dates let the backend default the window.
+ *
+ * `metric` selects which series comes back — revenue, net_volume or
+ * number_of_payments — in one identical response shape, which is what lets the
+ * card's dropdown be a query-key change rather than three code paths. It is
+ * optional on the wire and an unrecognised value falls back to `revenue`; the
+ * app always sends one explicitly rather than relying on that.
  */
-export const mcaRevenueTrendByMidApi = (mid: string, startDate: string, endDate: string): string =>
+export const mcaRevenueTrendByMidApi = (
+  mid: string,
+  startDate: string,
+  endDate: string,
+  metric: string
+): string =>
   mid
     ? `${BASE_URL_V3}/analytics/${encodeURIComponent(mid)}/merchant/mca/revenue-trend` +
-      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}` +
+      (metric ? `&metric=${encodeURIComponent(metric)}` : "")
     : "";
 
 export const mcaRevenueTrendByUcicApi = (
   ucicId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  metric: string
 ): string =>
   ucicId
     ? `${BASE_URL_V3}/analytics/${encodeURIComponent(ucicId)}/mca/revenue-trend` +
-      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+      `?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}` +
+      (metric ? `&metric=${encodeURIComponent(metric)}` : "")
     : "";
 
 /**

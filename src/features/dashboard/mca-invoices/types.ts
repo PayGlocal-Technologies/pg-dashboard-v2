@@ -39,13 +39,41 @@ export type McaInvoicesResponse = BaseResponse<{
   totalCount: number;
 }>;
 
-/** Counts behind the summary cards. Note the doubly-nested `data`. */
+/**
+ * The per-status amounts, converted to one common currency by the backend.
+ *
+ * The sibling `total*Amount` fields on McaInvoiceSummaryData are a SUM ACROSS
+ * CURRENCIES of whatever the merchant billed in, so they cannot be labelled
+ * with a symbol and cannot be compared between statuses. These can: every
+ * figure here is USD, which is why the summary card reads this block and not
+ * those, and why it prints `$` rather than the merchant's own currency.
+ */
+export interface McaInvoiceSummaryAmountsInUsd {
+  totalAmount: number;
+  totalActiveAmount: number;
+  totalDraftAmount: number;
+  totalOutstandingAmount: number;
+  totalCreatedAmount: number;
+  totalPaidAmount: number;
+}
+
+/** Counts and amounts behind the summary cards. Note the doubly-nested `data`. */
 export interface McaInvoiceSummaryData {
   totalNo: number;
   totalCreated: number;
   totalPaid: number;
   totalOutstanding: number;
   totalActive: number;
+  totalDraft: number;
+  /** Mixed-currency sums — see McaInvoiceSummaryAmountsInUsd on why nothing
+   *  renders these directly. */
+  totalAmount: number;
+  totalDraftAmount: number;
+  totalActiveAmount: number;
+  totalOutstandingAmount: number;
+  totalCreatedAmount: number;
+  totalPaidAmount: number;
+  amountsInUsd: McaInvoiceSummaryAmountsInUsd;
 }
 
 export type McaInvoiceSummaryResponse = BaseResponse<{ data: McaInvoiceSummaryData }>;

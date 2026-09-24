@@ -35,6 +35,7 @@ import type {
   DocumentPendingListRow,
   DocumentPendingResponse,
   DocumentPendingSortBy,
+  DocumentPendingTimeframe,
   FircDownloadResponse,
   InvoiceOriginsData,
   InvoiceOriginsResponse,
@@ -380,8 +381,13 @@ export function toMetricNumber(value: number | string | undefined): number {
 
 /**
  * Individual DOCUMENT_PENDING transactions — the rows InvoiceActionCard turns
- * into "raise this one" actions, as opposed to useDocumentPending's aggregate
- * count/amount above.
+ * into "raise this one" actions — together with the aggregate amount and count
+ * for the same window, which the endpoint returns alongside them.
+ *
+ * Those two figures are the reason a caller needs only this hook: the card's
+ * headline and its rows come from one response, so they always describe the
+ * same window. useDocumentPending remains for callers that want the aggregate
+ * WITHOUT rows, and on its own narrower today/week/month/ytd vocabulary.
  *
  * A path-scoped analytics call like useDocumentPending, so it scopes with
  * useScopeId rather than useResolvedMids, and the server does the ranking and
@@ -390,29 +396,41 @@ export function toMetricNumber(value: number | string | undefined): number {
  * the raw `amount` string regardless of `currency`, which ranked by digit count
  * rather than by value — a ¥ transaction outranking a larger $ one.
  *
- * Takes no timeframe: like the by-currency snapshot, it reports what is
- * awaiting documents right now.
+ * `timeframe` defaults to all_time, i.e. everything awaiting documents right
+ * now, which is what this hook reported before the parameter existed.
  */
 export function useDocumentPendingTransactions(
-  options: { sortBy?: DocumentPendingSortBy; page?: number; limit?: number } = {}
+  options: {
+    sortBy?: DocumentPendingSortBy;
+    page?: number;
+    limit?: number;
+    timeframe?: DocumentPendingTimeframe;
+  } = {}
 ): {
   transactions: DocumentPendingListRow[];
   totalCount: number;
+  /** Aggregate for the window, in `reportingCurrency`. */
+  amount: number;
+  count: number;
+  reportingCurrency: string | undefined;
   isLoading: boolean;
   isError: boolean;
 } {
-  const { sortBy = "AMOUNT", page = 1, limit = 10 } = options;
+  const { sortBy = "AMOUNT", page = 1, limit = 10, timeframe = "all_time" } = options;
   const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<DocumentPendingListResponse>(
-    ["mca-document-pending-transactions", merchantId, sortBy, page, limit],
-    mcaDocumentPendingListApi(merchantId, sortBy, page, limit),
+    ["mca-document-pending-transactions", merchantId, sortBy, page, limit, timeframe],
+    mcaDocumentPendingListApi(merchantId, sortBy, page, limit, timeframe),
     { enabled: isReady }
   );
 
   return {
     transactions: data?.data?.transactions ?? [],
     totalCount: data?.data?.totalCount ?? 0,
+    amount: data?.data?.amount ?? 0,
+    count: data?.data?.count ?? 0,
+    reportingCurrency: data?.data?.reportingCurrency,
     isLoading: isReady && isPending,
     isError,
   };

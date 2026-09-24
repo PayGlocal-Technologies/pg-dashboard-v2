@@ -33,15 +33,13 @@ import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { formatCurrencyShort } from "@/lib/utils/format";
-import {
-  netVolumeByTimeframe,
-  paymentsCountByTimeframe,
-  revenueTimeframes,
-  type RevenuePoint,
-  type RevenueSeries,
-  type RevenueTimeframe,
-} from "@/features/dashboard/mca-home/mock-data";
+import { revenueTimeframes } from "@/features/dashboard/mca-home/constants";
 import { useRevenueTrend } from "@/features/dashboard/mca-home/hooks";
+import type {
+  RevenueMetric,
+  RevenueTimeframe,
+  RevenueTrendPoint,
+} from "@/features/dashboard/mca-home/types";
 import { useCurrencySplit } from "@/features/dashboard/mca-transactions/hooks";
 
 /** Day window per timeframe. The revenue-trend endpoint is date-ranged, so each
@@ -82,7 +80,7 @@ function TrendTooltip({
   isMoney,
 }: {
   active?: boolean;
-  payload?: readonly { payload: RevenuePoint }[];
+  payload?: readonly { payload: RevenueTrendPoint }[];
   isMoney: boolean;
 }) {
   if (!active || !payload?.length) return null;
@@ -90,7 +88,7 @@ function TrendTooltip({
   if (!point) return null;
   return (
     <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
-      <p className="font-medium text-muted-foreground">{point.x}</p>
+      <p className="font-medium text-muted-foreground">{point.label}</p>
       <p className="font-semibold tabular-nums text-foreground">
         {isMoney ? formatMoneyAxis(point.current) : formatCountAxis(point.current)}
       </p>
@@ -104,18 +102,17 @@ function TrendTooltip({
  * (or, for "Common currency", the same ranked-share layout McaCurrencySplitCard
  * uses), so switching options never changes the card's height.
  *
- * "Net volume" and "Number of payments" have no live trend endpoint for the
- * MCA scope yet, so they read from the mock series in mock-data.ts, shaped
- * exactly like the live trend so each becomes a source swap rather than a
- * component change — rather than going empty. "Total amount collected" and "Common currency" are
- * both real, live data.
+ * All four are live. The first three are one endpoint with a different
+ * `metric`, named here by the value revenue-trend takes for each; "Common
+ * currency" is the only one that reads somewhere else, which is why it has no
+ * metric to send.
  */
 type PerformanceMetric = "collected" | "net-volume" | "payments" | "common-currency";
 
-const METRIC_OPTIONS: { value: PerformanceMetric; label: string }[] = [
-  { value: "collected", label: "Total amount collected" },
-  { value: "net-volume", label: "Net volume" },
-  { value: "payments", label: "Number of payments" },
+const METRIC_OPTIONS: { value: PerformanceMetric; label: string; metric?: RevenueMetric }[] = [
+  { value: "collected", label: "Total amount collected", metric: "revenue" },
+  { value: "net-volume", label: "Net volume", metric: "net_volume" },
+  { value: "payments", label: "Number of payments", metric: "number_of_payments" },
   { value: "common-currency", label: "Common currency" },
 ];
 
@@ -211,11 +208,16 @@ export function McaRevenueCard() {
   const [ranges] = useState(buildRevenueRanges);
 
   const { startDate, endDate } = ranges[timeframe];
+  const selectedOption = METRIC_OPTIONS.find((m) => m.value === metric) ?? METRIC_OPTIONS[0]!;
+  const isTrendMetric = !!selectedOption.metric;
+
+  // One call for all three trend metrics, keyed by the one asked for, and stood
+  // down entirely on "Common currency" — which charts a different endpoint.
   const {
     trend,
     isLoading: trendLoading,
     isError: trendError,
-  } = useRevenueTrend(startDate, endDate);
+  } = useRevenueTrend(startDate, endDate, selectedOption.metric ?? "revenue", isTrendMetric);
 
   // Common currency reuses the exact same per-currency split McaCurrencySplitCard
   // reads — same hook, same endpoint, driven by this card's own timeframe rather
@@ -226,39 +228,20 @@ export function McaRevenueCard() {
     isError: splitError,
   } = useCurrencySplit(startDate, endDate);
 
-  const metricLabel =
-    METRIC_OPTIONS.find((m) => m.value === metric)?.label ?? METRIC_OPTIONS[0]!.label;
+  const metricLabel = selectedOption.label;
 
-  // The 1W/1M/3M pills change every metric's series here — real for
-  // "collected"/"common currency", mock but still per-timeframe for the other
-  // two — so unlike an earlier version of this card, nothing needs it dimmed.
-  const isMoneyMetric = metric === "collected" || metric === "net-volume";
-  const isTrendMetric = metric === "collected" || metric === "net-volume" || metric === "payments";
+  // The 1W/1M/3M pills change every metric's series here, all of them live, so
+  // unlike an earlier version of this card nothing needs them dimmed.
+  //
+  // "Number of payments" is the one trend metric whose figures are counts, not
+  // money — the response still carries a `currency`, and it does not apply.
+  const isMoneyMetric = isTrendMetric && selectedOption.metric !== "number_of_payments";
 
-  // ── Trend metrics: "Total amount collected" (live), "Net volume" and
-  // "Number of payments" (mock) all render through the same chart below. ──
-  const liveSeries: RevenueSeries | null = trend
-    ? {
-        currency: trend.currency,
-        total: trend.total,
-        previousTotal: trend.previousTotal,
-        trendPct: trend.trendPct,
-        comparisonLabel: trend.comparisonLabel,
-        points: trend.points.map((p) => ({ x: p.label, current: p.current, previous: p.previous })),
-      }
-    : null;
-
-  const activeSeries: RevenueSeries | null =
-    metric === "collected"
-      ? liveSeries
-      : metric === "net-volume"
-        ? netVolumeByTimeframe[timeframe]
-        : metric === "payments"
-          ? paymentsCountByTimeframe[timeframe]
-          : null;
-
-  const activeLoading = metric === "collected" && trendLoading;
-  const activeError = metric === "collected" && trendError;
+  // ── Trend metrics: all three render through the same chart below, off the
+  // same response. ──
+  const activeSeries = isTrendMetric ? (trend ?? null) : null;
+  const activeLoading = isTrendMetric && trendLoading;
+  const activeError = isTrendMetric && trendError;
   const hasChartData = !activeLoading && !activeError && (activeSeries?.points.length ?? 0) > 0;
   const trendPositive = (activeSeries?.trendPct ?? 0) >= 0;
 
@@ -440,7 +423,7 @@ export function McaRevenueCard() {
                     vertical={false}
                   />
                   <XAxis
-                    dataKey="x"
+                    dataKey="label"
                     axisLine={false}
                     tickLine={false}
                     tick={{ fontSize: 11, fill: "var(--chart-tick)" }}

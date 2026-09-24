@@ -18,6 +18,7 @@ import type {
   ClientAnalyticsResponse,
   NeedsAttentionInvoice,
   NeedsAttentionResponse,
+  RevenueMetric,
   RevenueTrendData,
   RevenueTrendResponse,
   TopClientRow,
@@ -125,27 +126,35 @@ export function useMcaClientAnalytics(): {
  * Revenue trend behind McaRevenueCard. Scoped like useMcaOverview: a selected
  * MID uses the per-merchant endpoint, otherwise the UCIC roll-up.
  *
- * NOT consumed by the card yet — the card still renders mock. This is the wiring
- * kept ready so switching to live data is a one-line source swap once the mock
- * has been eyeballed. Empty dates default the window on the backend.
+ * `metric` picks the series — every one of the card's three trend options is
+ * this same call with a different value, since the response shape does not
+ * vary — and rides in the query key, so switching the dropdown reads from
+ * cache once a metric has been seen. Empty dates default the window on the
+ * backend.
+ *
+ * `enabled` is how the card stands the query down on "Common currency", which
+ * charts a different endpoint entirely and has no trend to fetch.
  */
 export function useRevenueTrend(
   startDate: string,
-  endDate: string
+  endDate: string,
+  metric: RevenueMetric,
+  enabled = true
 ): { trend: RevenueTrendData | undefined; isLoading: boolean; isError: boolean } {
   const { scopeId, scope, isReady } = useScopeId("PACB");
   const url =
     scope === "mid"
-      ? mcaRevenueTrendByMidApi(scopeId, startDate, endDate)
-      : mcaRevenueTrendByUcicApi(scopeId, startDate, endDate);
+      ? mcaRevenueTrendByMidApi(scopeId, startDate, endDate, metric)
+      : mcaRevenueTrendByUcicApi(scopeId, startDate, endDate, metric);
 
+  const active = isReady && enabled;
   const { data, isPending, isError } = useGet<RevenueTrendResponse>(
-    ["mca-revenue-trend", scopeId, startDate, endDate],
+    ["mca-revenue-trend", scopeId, startDate, endDate, metric],
     url,
-    { enabled: isReady }
+    { enabled: active }
   );
 
-  return { trend: data?.data, isLoading: isReady && isPending, isError };
+  return { trend: data?.data, isLoading: active && isPending, isError };
 }
 
 /**
