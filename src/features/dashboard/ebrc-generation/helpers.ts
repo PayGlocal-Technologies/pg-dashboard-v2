@@ -1,6 +1,7 @@
 import {
   DEDUCTION_FIELDS,
   emptyDeductions,
+  normalizePortCode,
   type DeductionsByType,
   type EBRCBulkDetails,
   type EbrcRequestRow,
@@ -229,7 +230,7 @@ export function toShippingBillData(mapping: IrmMapping, irm: IrmDetails): Shippi
     sbCumInvoiceNumber: mapping.shippingBillNumber,
     sbCumInvoiceFCC: mapping.shippingBillCurrency || (irm.remittanceFCC ?? ""),
     sbCumInvoiceDate: mapping.shippingBillDate,
-    portCode: mapping.portCode,
+    portCode: normalizePortCode(mapping.portCode),
     billNo: mapping.billInvoiceNumber,
   };
 

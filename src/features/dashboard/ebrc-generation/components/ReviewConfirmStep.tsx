@@ -77,8 +77,14 @@ export function ReviewConfirmStep({
   // reaches the certificate.
   const finalAmount = Math.max(0, totalMappedAmount - totalDeductions);
 
-  const fullyMappedCount = selectedIds.filter((id) => isMappingComplete(records.get(id))).length;
-  const allMapped = selectedIds.length > 0 && fullyMappedCount === selectedIds.length;
+  // Share of the remittance value actually mapped to shipping bills, by
+  // amount, exactly as production's ReviewSummaryCard computes it. Not a count
+  // of saved IRMs: every IRM can be saved and still map less than its full
+  // remittance (₹33,679.00 of ₹33,679.86, say), and the banner used to read
+  // "100%" whenever each IRM merely had a saved shipping bill.
+  const mappedPct = totalIrmAmount > 0 ? (totalMappedAmount / totalIrmAmount) * 100 : 0;
+  const savedCount = selectedIds.filter((id) => isMappingComplete(records.get(id))).length;
+  const allSaved = selectedIds.length > 0 && savedCount === selectedIds.length;
 
   return (
     <div className="space-y-5">
@@ -125,15 +131,6 @@ export function ReviewConfirmStep({
               </div>
             </CardContent>
           </Card>
-
-          <div className="mt-4 flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-[12.5px] text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
-            <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <p>
-              {allMapped
-                ? "100% of your IRM amount has been mapped. All selected remittances will be included in this eBRC."
-                : `${fullyMappedCount} of ${selectedIds.length} IRMs mapped so far. Go back to Map shipping bill to finish the rest.`}
-            </p>
-          </div>
         </div>
 
         <div>
@@ -143,7 +140,17 @@ export function ReviewConfirmStep({
           <Card size="sm" className="shadow-none">
             <CardContent className="space-y-2">
               {selectedRows.map((row) => {
-                const mapped = isMappingComplete(records.get(row.id));
+                // Named by amount: "Fully mapped" only when the mapped amount
+                // covers the whole remittance. A saved mapping for less is
+                // partial, and says how much.
+                const record = records.get(row.id);
+                const saved = isMappingComplete(record);
+                const mappedAmount = toAmount(record?.shippingBillData?.mappedIRMAmountFCC);
+                const coverage = !saved
+                  ? "none"
+                  : mappedAmount + 0.005 >= row.remittanceAmount
+                    ? "full"
+                    : "partial";
                 return (
                   <div
                     key={row.id}
@@ -152,19 +159,34 @@ export function ReviewConfirmStep({
                     <div className="flex items-center gap-2.5">
                       <span
                         className={
-                          mapped
+                          coverage === "full"
                             ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400"
-                            : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+                            : coverage === "partial"
+                              ? "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
+                              : "flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
                         }
                       >
-                        <Icon name={mapped ? "check" : "clock"} className="h-3 w-3" />
+                        <Icon
+                          name={
+                            coverage === "full"
+                              ? "check"
+                              : coverage === "partial"
+                                ? "pie-chart"
+                                : "clock"
+                          }
+                          className="h-3 w-3"
+                        />
                       </span>
                       <div>
                         <p className="font-mono text-[12.5px] font-semibold text-foreground">
                           {row.irmNumber}
                         </p>
                         <p className="text-[11px] text-muted-foreground">
-                          {mapped ? "Fully mapped" : "Not mapped yet"}
+                          {coverage === "full"
+                            ? "Fully mapped"
+                            : coverage === "partial"
+                              ? `Partially mapped · ${formatCurrency(row.remittanceAmount, row.currencyCode)} on the IRM`
+                              : "Not mapped yet"}
                         </p>
                       </div>
                     </div>
@@ -183,6 +205,18 @@ export function ReviewConfirmStep({
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Under both columns, since it describes the whole request rather than
+          the breakdown card it used to sit beneath, and only as wide as its
+          own message (w-fit) rather than a bar across the page. */}
+      <div className="flex w-fit max-w-full items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-3 text-[12.5px] text-sky-900 dark:border-sky-900/50 dark:bg-sky-950/20 dark:text-sky-200">
+        <Icon name="info" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <p>
+          {allSaved
+            ? `${mappedPct.toFixed(2)}% of your IRM amount has been mapped. All selected remittances will be included in this eBRC.`
+            : `${savedCount} of ${selectedIds.length} IRMs mapped so far. Go back to Map shipping bills to finish the rest.`}
+        </p>
       </div>
 
       <label className="flex cursor-pointer items-start gap-2.5">

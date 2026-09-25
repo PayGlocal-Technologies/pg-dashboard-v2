@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Badge, Button, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -25,6 +26,8 @@ import {
   EBRC_JUST_QUEUED_KEY,
   emptyMapping,
   isMappingComplete,
+  portCodeError,
+  type IrmDetails,
   type IrmMapping,
 } from "@/features/dashboard/ebrc-generation/types";
 
@@ -51,6 +54,12 @@ const STEPS = [
     headerDescription: "Double-check the details below before generating your eBRC.",
   },
 ] as const;
+
+/** Identity of the server's shipping-bill record for an IRM, which is what an
+ *  edit is stamped with. Empty while there is none. */
+function shippingBillSnapshot(record: IrmDetails | undefined): string {
+  return record?.shippingBillData ? JSON.stringify(record.shippingBillData) : "";
+}
 
 const STEP_TRANSITION = { duration: 0.25, ease: [0.33, 0.88, 0.22, 1] as const };
 
@@ -178,11 +187,11 @@ export function EbrcGenerationWizard() {
   // long enough that losing the selection to a refresh means redoing all of it.
   const selectedIds = useEbrcSelection((s) => s.selectedIrms);
   const setSelectedIds = useEbrcSelection((s) => s.setSelectedIrms);
-  const [mappings, setMappings] = useState<Record<string, IrmMapping>>({});
+  // Only what the merchant has typed, each edit stamped with the server
+  // record it was made against. The form's values are derived from this and
+  // the server records together, see `mappings` below.
+  const [edits, setEdits] = useState<Record<string, { value: IrmMapping; basedOn: string }>>({});
   const [agreed, setAgreed] = useState(false);
-  // What the server's shipping-bill record looked like the last time each IRM
-  // was seeded into the form — see the seeding effect below.
-  const seededRef = useRef<Map<string, string>>(new Map());
   const [receivedOpen, setReceivedOpen] = useState(false);
 
   // This wizard only makes sense once DGFT is connected — that gate lives
@@ -234,58 +243,43 @@ export function EbrcGenerationWizard() {
     selectedIds.length > 0 && selectedIds.every((id) => isMappingComplete(recordsByIrm.get(id)));
   const reachableStep = allSelectedMapped ? furthestStep : Math.min(furthestStep, 2);
 
-  // Seed each mapping from whatever the server holds for that IRM, so
-  // returning to step 2 (or reloading mid-flow) shows what was saved rather
-  // than an empty form.
+  // Each IRM's form values: the merchant's own edit while the server's
+  // shipping-bill record is still the one that edit was made against, and the
+  // server's record otherwise. So returning to step 2, or reloading mid-flow,
+  // shows what was saved rather than an empty form, and a record that
+  // *changes* wins over the edit, which is what makes the upload path work:
+  // `extract_shipping_data` fills the shipping-bill fields asynchronously, and
+  // the extracted values have to replace what is there (including the file
+  // name the upload itself patched in). A refetch that returns the same record
+  // changes nothing, so live typing is never clobbered.
   //
-  // Re-seeds whenever the server's own record *changes*, not just the first
-  // time — which is what makes the upload path work: `extract_shipping_data`
-  // fills the shipping-bill fields asynchronously, and the extracted values
-  // only reach the form if a later refetch is allowed to overwrite what is
-  // there. Comparing against the last-seeded snapshot is what keeps that from
-  // also clobbering live typing: a refetch that returns the same record as
-  // before seeds nothing.
+  // Derived during render, not seeded by an effect. The effect version tracked
+  // "already seeded" in a ref mutated inside a setState updater; React may run
+  // an updater twice (StrictMode always does in development), and the second
+  // run saw the record as seeded and discarded the extracted values.
   //
   // (An earlier version skipped any IRM the merchant had touched. That looked
   // safer and was not: attaching a PDF is itself an edit, so every uploaded
   // IRM was marked touched and its extracted fields were then permanently
   // ignored.)
-  //
-  // `setState` sits in the updater, not the effect body, and returns the same
-  // object when nothing changed, so this cannot loop.
-  useEffect(() => {
-    if (selectedRecords.length === 0) return;
-    setMappings((prev) => {
-      let changed = false;
-      const next = { ...prev };
-      for (const record of selectedRecords) {
-        const id = record.irmNumber ?? "";
-        if (!id) continue;
-
+  const mappings = useMemo(() => {
+    const out: Record<string, IrmMapping> = {};
+    for (const id of selectedIds) {
+      const record = recordsByIrm.get(id);
+      const edit = edits[id];
+      if (edit && edit.basedOn === shippingBillSnapshot(record)) {
+        out[id] = edit.value;
+      } else if (record?.shippingBillData) {
+        out[id] = toIrmMapping(id, record.shippingBillData, record.remittanceFCC);
+      } else {
         // No saved mapping yet: still seed the currency off the IRM, since
         // that field is read-only and comes from the remittance rather than
         // from anything the merchant types.
-        if (!record.shippingBillData) {
-          if (!prev[id]?.shippingBillCurrency && record.remittanceFCC) {
-            next[id] = {
-              ...(prev[id] ?? emptyMapping(id)),
-              shippingBillCurrency: record.remittanceFCC,
-            };
-            changed = true;
-          }
-          continue;
-        }
-
-        const snapshot = JSON.stringify(record.shippingBillData);
-        if (seededRef.current.get(id) === snapshot) continue;
-
-        seededRef.current.set(id, snapshot);
-        next[id] = toIrmMapping(id, record.shippingBillData, record.remittanceFCC);
-        changed = true;
+        out[id] = { ...emptyMapping(id), shippingBillCurrency: record?.remittanceFCC ?? "" };
       }
-      return changed ? next : prev;
-    });
-  }, [selectedRecords]);
+    }
+    return out;
+  }, [selectedIds, recordsByIrm, edits]);
 
   const { push, isPending: isPushing } = usePushIrms();
 
@@ -297,15 +291,18 @@ export function EbrcGenerationWizard() {
 
   const handleSelectedIdsChange = (ids: string[]) => {
     setSelectedIds(ids);
-    setMappings((prev) => {
-      const next: Record<string, IrmMapping> = {};
-      for (const id of ids) next[id] = prev[id] ?? emptyMapping(id);
+    // Deselecting an IRM drops its edit, so re-adding it starts from the
+    // server's record rather than a stale draft.
+    setEdits((prev) => {
+      const next: typeof prev = {};
+      for (const id of ids) if (prev[id]) next[id] = prev[id];
       return next;
     });
   };
 
   const handleMappingChange = (irmId: string, next: IrmMapping) => {
-    setMappings((prev) => ({ ...prev, [irmId]: next }));
+    const basedOn = shippingBillSnapshot(recordsByIrm.get(irmId));
+    setEdits((prev) => ({ ...prev, [irmId]: { value: next, basedOn } }));
   };
 
   const handleClose = () => router.push("/ebrc-generation");
@@ -320,6 +317,18 @@ export function EbrcGenerationWizard() {
    */
   const handleConfirm = () => {
     const dtos = selectedIds.map((id) => recordsByIrm.get(id)?.shippingBillData ?? null);
+    // The same port-code rule push_irm enforces, checked on what is about to
+    // be sent. Step 2 catches it at save time, but a record saved before that
+    // check existed can still carry a bad code, and DGFT then rejects the
+    // whole request for one field.
+    const badPort = dtos.find((dto) => dto && portCodeError(dto.portCode));
+    if (badPort) {
+      toast.error(
+        `IRM ${badPort.irmNumber ?? ""}: ${portCodeError(badPort.portCode)} Fix it in Map shipping bills.`
+      );
+      goToStep(2);
+      return;
+    }
     push(dtos, () => {
       clearSelectedIrms();
       // Read (and cleared) by EbrcStatusTable once the overlay routes back
