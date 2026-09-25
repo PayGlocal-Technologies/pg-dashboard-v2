@@ -7,7 +7,6 @@ import { useForm, useStore } from "@tanstack/react-form";
 import {
   Accordion,
   Button,
-  Card,
   Checkbox,
   CountrySelect,
   Field,
@@ -61,7 +60,7 @@ import {
 } from "@/features/dashboard/payment-button/hooks";
 import { PaymentButtonNotEnabled } from "@/features/dashboard/payment-button/components/PaymentButtonNotEnabled";
 import { MidGuard } from "@/components/common/MidGuard";
-import { MidChoiceList } from "@/components/common/MidScopedAction";
+import { SelectMidView } from "@/components/common/SelectMidView";
 import {
   validateButtonAmount,
   validateButtonLabel,
@@ -863,24 +862,14 @@ export function CreatePaymentButtonFeature() {
     return (
       <EditorGateShell>
         <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
-          <Card className="gap-3 p-5">
-            <div>
-              <h2 className="text-[15px] font-semibold text-foreground">Which account?</h2>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">
-                {midOptions.length > 0
-                  ? "You hold more than one. Pick the one this payment button belongs to."
-                  : "None of your accounts can create payment buttons yet."}
-              </p>
-            </div>
-            {midOptions.length > 0 && (
-              <MidChoiceList
-                midOptions={midOptions}
-                onSelect={(choice) =>
-                  router.replace(`/payment-button/create?mid=${encodeURIComponent(choice)}`)
-                }
-              />
-            )}
-          </Card>
+          <SelectMidView
+            midType="PA"
+            midOptions={midOptions}
+            onSelectMid={(choice) =>
+              router.replace(`/payment-button/create?mid=${encodeURIComponent(choice)}`)
+            }
+            showSidebarHint={false}
+          />
         </MidGuard>
       </EditorGateShell>
     );

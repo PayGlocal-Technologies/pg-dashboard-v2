@@ -34,7 +34,10 @@ const PICKED_MID_COLOR = "#E5B5FF";
  * a sidebar pass `showSidebarHint={false}` so that line never points at nothing.
  *
  * The options are read from the store for `midType` rather than passed in, so
- * every page that gates on a MID gets the picker without wiring it. Picking
+ * every page that gates on a MID gets the picker without wiring it. It is the
+ * app's one full-page MID picker, for Card Payments as well as Global Fund
+ * Transfer; the small popover on action buttons (MidChoiceMenu) is the only
+ * other way the app asks. Picking
  * writes the same selected-MID store the sidebar writes, which is what every
  * gate reads, so the page re-renders into its content on the spot.
  *
@@ -43,9 +46,17 @@ const PICKED_MID_COLOR = "#E5B5FF";
  */
 export function SelectMidView({
   midType,
+  midOptions: midOptionsOverride,
+  onSelectMid,
   showSidebarHint = true,
 }: {
   midType: MidType;
+  /** Narrows the list below every MID of `midType`, for a feature that only
+   *  some of them have (payment buttons). Defaults to all of them. */
+  midOptions?: string[];
+  /** Replaces the default "select this MID app-wide", for a route that carries
+   *  the pick in its URL instead (payment button create). */
+  onSelectMid?: (mid: string) => void;
   /** Off on full-screen routes that render no sidebar. */
   showSidebarHint?: boolean;
 }) {
@@ -56,17 +67,21 @@ export function SelectMidView({
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
 
-  const midOptions = midType === "PA" ? paMids : paCbMids;
+  const productMids = midType === "PA" ? paMids : paCbMids;
+  const midOptions = midOptionsOverride ?? productMids;
   const hasOptions = midOptions.length > 0;
 
   // Some pages land here because the merchant already chose a MID, just one of
   // the other product (a Card Payments MID on an eBRC page). Saying so is the
   // difference between "pick one" and "why is it asking me again".
-  const selectedIsOtherProduct = !!selectedMid && !midOptions.includes(selectedMid);
+  // Checked against the product's MIDs, not a narrowed list: a MID left out of
+  // that list is the right product, just without the feature.
+  const selectedIsOtherProduct = !!selectedMid && !productMids.includes(selectedMid);
   const selectedInfo = tidsInfo.find((t) => t.mid === selectedMid);
   const selectedName = selectedInfo?.displayTag || selectedInfo?.tradeName || selectedMid;
 
-  const select = (mid: string) => setSelectedMidDetails({ mid, color: PICKED_MID_COLOR });
+  const select =
+    onSelectMid ?? ((mid: string) => setSelectedMidDetails({ mid, color: PICKED_MID_COLOR }));
 
   const lead = selectedIsOtherProduct
     ? `${selectedName} is a ${copy.other} account, and this feature needs a ${copy.label}.`
