@@ -9,7 +9,6 @@ import {
   Separator,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -222,26 +221,21 @@ function ClientMetricCard({
         <div className="flex items-center gap-1">
           <p className="text-[12px] text-muted-foreground">{label}</p>
           {hint ? (
-            // There is no app-wide TooltipProvider in this app — every call site
-            // wraps its own (see SettlementStatCards, mca-transactions/columns).
-            // Without it Radix throws on mount, which is what was breaking the
-            // page the instant a client's details opened.
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/* A button, not a bare icon: it has to be focusable for the
-                    tooltip to be reachable without a pointer. */}
-                  <button
-                    type="button"
-                    aria-label={`About ${label.toLowerCase()}`}
-                    className="shrink-0 text-muted-foreground/70 hover:text-muted-foreground"
-                  >
-                    <Icon name="info" className="h-3 w-3" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{hint}</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            // The tooltip provider is mounted once in app/providers.tsx.
+            <Tooltip>
+              <TooltipTrigger asChild>
+                {/* A button, not a bare icon: it has to be focusable for the
+                  tooltip to be reachable without a pointer. */}
+                <button
+                  type="button"
+                  aria-label={`About ${label.toLowerCase()}`}
+                  className="shrink-0 text-muted-foreground/70 hover:text-muted-foreground"
+                >
+                  <Icon name="info" className="h-3 w-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{hint}</TooltipContent>
+            </Tooltip>
           ) : null}
         </div>
         {/* mt-auto pins the figure and its amount to the card's bottom edge, so

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 
 interface TransactionIdProps {
@@ -38,24 +38,22 @@ export function TransactionId({ id }: TransactionIdProps) {
       <span title={id} className="whitespace-nowrap text-[12px] font-medium text-foreground">
         {truncateId(id)}
       </span>
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={handleCopy}
-              aria-label="Copy transaction ID"
-              className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
-            >
-              <Icon name={copied ? "check" : "copy"} size={11} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="text-xs">
-            {copied ? "Copied" : "Copy transaction ID"}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleCopy}
+            aria-label="Copy transaction ID"
+            className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+          >
+            <Icon name={copied ? "check" : "copy"} size={11} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">
+          {copied ? "Copied" : "Copy transaction ID"}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

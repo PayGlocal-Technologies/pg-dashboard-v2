@@ -20,7 +20,6 @@ import {
   Shimmer,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -186,18 +185,16 @@ export function McaRevenueCard() {
         </DropdownMenu>
 
         {metric === "collected" && (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="-ml-2 flex items-center text-muted-foreground">
-                  <Icon name="info" className="h-3 w-3" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-xs">
-                Includes collections from all sources, including invoices.
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="-ml-2 flex items-center text-muted-foreground">
+                <Icon name="info" className="h-3 w-3" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs">
+              Includes collections from all sources, including invoices.
+            </TooltipContent>
+          </Tooltip>
         )}
 
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">

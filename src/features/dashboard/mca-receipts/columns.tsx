@@ -7,7 +7,6 @@ import {
   StatusBadge,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -44,21 +43,19 @@ function MonthHeader() {
   return (
     <span className="inline-flex items-center gap-1">
       Month
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label="What does the month cover?"
-              className="h-4 w-4 min-h-0 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-            >
-              <Icon name="info" className="h-3.5 w-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-[240px]">{RECEIPT_MONTH_HINT}</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="What does the month cover?"
+            className="h-4 w-4 min-h-0 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+          >
+            <Icon name="info" className="h-3.5 w-3.5" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-[240px]">{RECEIPT_MONTH_HINT}</TooltipContent>
+      </Tooltip>
     </span>
   );
 }

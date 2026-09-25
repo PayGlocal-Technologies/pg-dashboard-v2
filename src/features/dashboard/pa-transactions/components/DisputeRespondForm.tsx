@@ -17,7 +17,6 @@ import {
   Textarea,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -401,23 +400,21 @@ export function DisputeRespondForm({
                     >
                       {doc.label}
                     </Button>
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            aria-label={`About ${doc.label}`}
-                            className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground"
-                          >
-                            <Icon name="info" size={11} />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-55 text-xs">
-                          {doc.description}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          aria-label={`About ${doc.label}`}
+                          className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground"
+                        >
+                          <Icon name="info" size={11} />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-55 text-xs">
+                        {doc.description}
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 );
               })}

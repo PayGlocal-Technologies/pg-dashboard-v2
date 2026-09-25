@@ -3,7 +3,6 @@ import {
   StatusBadge,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -23,23 +22,21 @@ export function SettlementNotApplicableNote() {
   return (
     <div className="flex items-center gap-1.5 py-0.5">
       <p className="text-xs text-muted-foreground">Not applicable for this transaction.</p>
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label="Why isn't settlement applicable?"
-              className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
-            >
-              <Icon name="info" size={11} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-[220px] text-xs">
-            This payment was declined, so no funds were captured, there&apos;s nothing to settle.
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label="Why isn't settlement applicable?"
+            className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
+          >
+            <Icon name="info" size={11} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side="top" className="max-w-[220px] text-xs">
+          This payment was declined, so no funds were captured, there&apos;s nothing to settle.
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

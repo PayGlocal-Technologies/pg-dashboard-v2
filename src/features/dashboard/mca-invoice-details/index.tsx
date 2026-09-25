@@ -11,7 +11,6 @@ import {
   StatusBadge,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -154,16 +153,14 @@ function InvoiceDetails() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2.5">
                     {invoice?.type === "RECURRING" && (
-                      <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="flex items-center text-primary">
-                              <Icon name="recurring-outlined" className="h-5 w-5" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Recurring invoice</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex items-center text-primary">
+                            <Icon name="recurring-outlined" className="h-5 w-5" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Recurring invoice</TooltipContent>
+                      </Tooltip>
                     )}
 
                     <h1 className="text-[20px] font-semibold tracking-tight text-foreground">
@@ -179,19 +176,17 @@ function InvoiceDetails() {
                     )}
 
                     {invoice?.source === "ZOHO" && (
-                      <TooltipProvider delayDuration={200}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1">
-                              <Icon name="zoho-logo" className="h-3.5 w-3.5" />
-                              <span className="text-[11.5px] font-medium text-muted-foreground">
-                                Zoho
-                              </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1">
+                            <Icon name="zoho-logo" className="h-3.5 w-3.5" />
+                            <span className="text-[11.5px] font-medium text-muted-foreground">
+                              Zoho
                             </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Imported from Zoho</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Imported from Zoho</TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                 </div>

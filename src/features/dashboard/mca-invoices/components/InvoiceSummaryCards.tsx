@@ -7,7 +7,6 @@ import {
   Shimmer,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -261,16 +260,14 @@ export function InvoiceSummaryCards({
                       aria-hidden="true"
                     />
                     <span className="truncate text-sm text-foreground">{card.label}</span>
-                    <TooltipProvider delayDuration={200}>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="flex shrink-0 items-center text-muted-foreground">
-                            <Icon name="info" className="h-3.5 w-3.5" />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-xs">{card.tooltip}</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="flex shrink-0 items-center text-muted-foreground">
+                          <Icon name="info" className="h-3.5 w-3.5" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">{card.tooltip}</TooltipContent>
+                    </Tooltip>
                   </span>
 
                   {/* Two separate grid cells, not one nested flex: fixed

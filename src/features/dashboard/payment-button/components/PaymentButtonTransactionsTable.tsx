@@ -12,7 +12,6 @@ import {
   Shimmer,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
   hasRelativeRange,
   type RelativeRangeValue,
@@ -324,26 +323,24 @@ export function PaymentButtonTransactionsTable({
   );
 
   const reportButton = (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        {/* A disabled button takes no pointer events; the tip hangs off a wrapper. */}
-        <TooltipTrigger asChild>
-          <span tabIndex={0} className="shrink-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              className="h-auto min-h-0 py-1 text-muted-foreground"
-            >
-              Report
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Transaction reports are coming soon</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      {/* A disabled button takes no pointer events; the tip hangs off a wrapper. */}
+      <TooltipTrigger asChild>
+        <span tabIndex={0} className="shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled
+            leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+            className="h-auto min-h-0 py-1 text-muted-foreground"
+          >
+            Report
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Transaction reports are coming soon</TooltipContent>
+    </Tooltip>
   );
 
   const desktopControls = (

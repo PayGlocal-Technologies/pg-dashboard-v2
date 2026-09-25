@@ -17,7 +17,6 @@ import {
   Textarea,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -103,25 +102,23 @@ export function IssueRefundDialog({
         <div className="flex flex-col gap-5 p-6">
           <div className="flex items-center gap-1.5 pr-10">
             <DialogTitle className="pr-0">Refund payment</DialogTitle>
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    aria-label="About refunds"
-                    className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
-                  >
-                    <Icon name="info" size={13} />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="max-w-60 text-xs">
-                  Refunds can take 5 to 10 days to appear on the customer&apos;s statement. This
-                  transaction&apos;s status will update to reflect the refund, no new transaction is
-                  created for it.
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label="About refunds"
+                  className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
+                >
+                  <Icon name="info" size={13} />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="max-w-60 text-xs">
+                Refunds can take 5 to 10 days to appear on the customer&apos;s statement. This
+                transaction&apos;s status will update to reflect the refund, no new transaction is
+                created for it.
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           <Field className="gap-2">

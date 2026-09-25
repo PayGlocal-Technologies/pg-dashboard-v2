@@ -10,7 +10,6 @@ import {
   StatusBadge,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
   type Column,
 } from "@/components/ui";
@@ -189,31 +188,27 @@ function RowActionsMenu({ actions }: { actions: RowAction[] }) {
 /** "Imported from Zoho", production's own mark beside the invoice number. */
 function ZohoMark() {
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center">
-            <Icon name="zoho-logo" className="h-3.5 w-3.5" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Imported from Zoho</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center">
+          <Icon name="zoho-logo" className="h-3.5 w-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Imported from Zoho</TooltipContent>
+    </Tooltip>
   );
 }
 
 function RecurringMark() {
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center text-primary" aria-label="Recurring invoice">
-            <Icon name="recurring-outlined" className="h-3.5 w-3.5" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Recurring invoice</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center text-primary" aria-label="Recurring invoice">
+          <Icon name="recurring-outlined" className="h-3.5 w-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Recurring invoice</TooltipContent>
+    </Tooltip>
   );
 }
 

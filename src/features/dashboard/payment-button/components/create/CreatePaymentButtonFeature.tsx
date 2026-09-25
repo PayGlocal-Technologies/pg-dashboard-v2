@@ -24,7 +24,6 @@ import {
   StatusBadge,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
@@ -93,21 +92,19 @@ import type {
  */
 function InfoTip({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            aria-label={label}
-            className="h-4 w-4 min-h-0 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-          >
-            <Icon name="info" className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-[240px]">{children}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label={label}
+          className="h-4 w-4 min-h-0 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+        >
+          <Icon name="info" className="h-3.5 w-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[240px]">{children}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -791,14 +788,12 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
 function NeedsCreatedButton({ ready, children }: { ready: boolean; children: ReactNode }) {
   if (ready) return <>{children}</>;
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span tabIndex={0}>{children}</span>
-        </TooltipTrigger>
-        <TooltipContent>Available once the button is created</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0}>{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>Available once the button is created</TooltipContent>
+    </Tooltip>
   );
 }
 

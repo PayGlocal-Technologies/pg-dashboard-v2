@@ -6,7 +6,6 @@ import {
   Button,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
@@ -88,18 +87,16 @@ export function MdrOfferBadge({ totalMdrDiscount }: { totalMdrDiscount?: string 
   if (!discount) return null;
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center" aria-label="Offer applied">
-            <Icon name="mdr-offer" className="h-4 w-4" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          MDR Waiver: ₹{discount.toLocaleString("en-IN", { maximumFractionDigits: 2 })} INR applied
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center" aria-label="Offer applied">
+          <Icon name="mdr-offer" className="h-4 w-4" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        MDR Waiver: ₹{discount.toLocaleString("en-IN", { maximumFractionDigits: 2 })} INR applied
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -112,19 +109,17 @@ export function FrmPendingBadge({ frmStatus }: { frmStatus?: McaTransaction["frm
   if (frmStatus !== "PENDING_MERCHANT_UPLOAD") return null;
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center" aria-label="Documents required">
-            <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs">
-          We need some documents from you to process this transaction. Please upload the required
-          documents to avoid payment delays.
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center" aria-label="Documents required">
+          <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        We need some documents from you to process this transaction. Please upload the required
+        documents to avoid payment delays.
+      </TooltipContent>
+    </Tooltip>
   );
 }
 

@@ -3,7 +3,6 @@
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -40,13 +39,11 @@ export function CompactAmount({
   }
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className={cn("cursor-help", className)}>{compact}</span>
-        </TooltipTrigger>
-        <TooltipContent className="tabular-nums">{full}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className={cn("cursor-help", className)}>{compact}</span>
+      </TooltipTrigger>
+      <TooltipContent className="tabular-nums">{full}</TooltipContent>
+    </Tooltip>
   );
 }

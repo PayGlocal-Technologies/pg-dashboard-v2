@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
@@ -52,23 +52,21 @@ export function CopyableValue({
         {label}
       </p>
       {tooltip && (
-        <TooltipProvider delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                type="button"
-                variant="ghost"
-                className="h-4 w-4 min-h-0 min-w-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
-                aria-label={`About ${label}`}
-              >
-                <Icon name="info" size={11} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-[220px] text-xs">
-              {tooltip}
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-4 w-4 min-h-0 min-w-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
+              aria-label={`About ${label}`}
+            >
+              <Icon name="info" size={11} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[220px] text-xs">
+            {tooltip}
+          </TooltipContent>
+        </Tooltip>
       )}
     </div>
   );

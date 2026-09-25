@@ -9,7 +9,6 @@ import {
   Shimmer,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -204,39 +203,37 @@ export function OutstandingAmountCard({
           // beneath it — grounded to the bottom, not floating with a gap
           // under it.
           <div className="mt-auto border-t border-border pt-3">
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto min-h-0 w-auto p-0 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-                  >
-                    Currently pending by currency
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="start" className="w-64 max-w-none p-3">
-                  <ul className="space-y-2">
-                    {currencyRows.map((row) => (
-                      <li
-                        key={row.currency}
-                        className="flex items-center justify-between gap-3 text-[13px]"
-                      >
-                        <span className="min-w-0 truncate font-medium text-popover-foreground">
-                          {currencyLabel(row.currency)}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-auto min-h-0 w-auto p-0 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                >
+                  Currently pending by currency
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start" className="w-64 max-w-none p-3">
+                <ul className="space-y-2">
+                  {currencyRows.map((row) => (
+                    <li
+                      key={row.currency}
+                      className="flex items-center justify-between gap-3 text-[13px]"
+                    >
+                      <span className="min-w-0 truncate font-medium text-popover-foreground">
+                        {currencyLabel(row.currency)}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {formatCurrency(row.amount, displayCurrency, "en-IN")}
+                        <span className="ml-1.5 text-[11px]">
+                          · {row.count.toLocaleString("en-IN")}
                         </span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">
-                          {formatCurrency(row.amount, displayCurrency, "en-IN")}
-                          <span className="ml-1.5 text-[11px]">
-                            · {row.count.toLocaleString("en-IN")}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
       </CardContent>

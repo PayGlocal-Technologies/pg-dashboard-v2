@@ -10,7 +10,6 @@ import {
   Text,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -196,94 +195,92 @@ export function ReferralSummaryCards({ summary }: ReferralSummaryCardsProps) {
               <Text size="sm" color="subtle">
                 Total waived
               </Text>
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-4 w-4 min-h-0 min-w-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
-                      aria-label="About total waived"
-                    >
-                      <Icon name="info" size={11} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[340px] p-3">
-                    <div className="flex flex-col gap-1">
-                      <Text size="sm" className="font-semibold text-foreground">
-                        Referral earnings go towards MDR
-                      </Text>
-                      <Text size="xs" color="subtle" className="leading-relaxed">
-                        The amount you earn through Refer &amp; Earn is waived off your MDR charges
-                        on your next transactions.
-                      </Text>
-                    </div>
-
-                    {/* A worked example, built to the same rows the transaction
-                        details drawer shows for a real discounted settlement —
-                        see SettlementBreakdown: fee, the success badge against a
-                        green negative figure, GST, then the total on its own
-                        filled bar. A merchant who opens this and later opens a
-                        settlement in the drawer meets one arrangement, not two.
-
-                        It is a worked example rather than the merchant's own
-                        figures because their own figures cannot show the
-                        mechanic: the discount line alone has nothing to subtract
-                        from, and reads −$0.00 for anyone not yet waived. Hence
-                        the "Example" label — every number below is illustrative,
-                        and none of it is read from the wallet. */}
-                    <Text size="xs" color="subtle" className="mt-3 block font-medium">
-                      Example
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="h-4 w-4 min-h-0 min-w-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
+                    aria-label="About total waived"
+                  >
+                    <Icon name="info" size={11} />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-[340px] p-3">
+                  <div className="flex flex-col gap-1">
+                    <Text size="sm" className="font-semibold text-foreground">
+                      Referral earnings go towards MDR
                     </Text>
+                    <Text size="xs" color="subtle" className="leading-relaxed">
+                      The amount you earn through Refer &amp; Earn is waived off your MDR charges
+                      on your next transactions.
+                    </Text>
+                  </div>
 
-                    <div className="mt-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
-                      <div className="flex items-start justify-between gap-3 text-[12.5px]">
-                        <span className="text-muted-foreground">Transaction fee (MDR)</span>
-                        <span className="whitespace-nowrap tabular-nums text-foreground">
-                          {formatCurrency(example.fee, currency, "en-US")}
-                        </span>
-                      </div>
+                  {/* A worked example, built to the same rows the transaction
+                      details drawer shows for a real discounted settlement —
+                      see SettlementBreakdown: fee, the success badge against a
+                      green negative figure, GST, then the total on its own
+                      filled bar. A merchant who opens this and later opens a
+                      settlement in the drawer meets one arrangement, not two.
 
-                      {/* Always the referral label, never the offer or combined
-                          variants the drawer also carries: this wallet is funded
-                          by Refer & Earn alone, so a referral discount is the
-                          only thing its balance can ever be waived as. */}
-                      <div className="mt-2.5 flex items-start justify-between gap-3 text-[12.5px]">
-                        <Badge variant="success" size="sm">
-                          Referral discount · MDR waived
-                        </Badge>
-                        <span className="whitespace-nowrap tabular-nums text-green-600">
-                          −{formatCurrency(example.reward, currency, "en-US")}
-                        </span>
-                      </div>
+                      It is a worked example rather than the merchant's own
+                      figures because their own figures cannot show the
+                      mechanic: the discount line alone has nothing to subtract
+                      from, and reads −$0.00 for anyone not yet waived. Hence
+                      the "Example" label — every number below is illustrative,
+                      and none of it is read from the wallet. */}
+                  <Text size="xs" color="subtle" className="mt-3 block font-medium">
+                    Example
+                  </Text>
 
-                      {/* Charged on the fee that is left after the waiver, not
-                          on the fee before it — the same order SettlementBreakdown
-                          computes its GST in. Spelling the base out inline is
-                          what makes that visible rather than something the
-                          merchant has to infer from the total. */}
-                      <div className="mt-2.5 flex items-start justify-between gap-3 text-[12.5px]">
-                        <span className="text-muted-foreground">
-                          GST on transaction fee{" "}
-                          <span className="text-[11px]">
-                            (18% of {formatCurrency(example.netFee, currency, "en-US")})
-                          </span>
-                        </span>
-                        <span className="whitespace-nowrap tabular-nums text-foreground">
-                          {formatCurrency(example.gst, currency, "en-US")}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2.5">
-                      <span className="text-[12.5px] text-foreground">You pay</span>
-                      <span className="whitespace-nowrap text-[14px] font-semibold tabular-nums text-foreground">
-                        {formatCurrency(example.total, currency, "en-US")}
+                  <div className="mt-1.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5">
+                    <div className="flex items-start justify-between gap-3 text-[12.5px]">
+                      <span className="text-muted-foreground">Transaction fee (MDR)</span>
+                      <span className="whitespace-nowrap tabular-nums text-foreground">
+                        {formatCurrency(example.fee, currency, "en-US")}
                       </span>
                     </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+
+                    {/* Always the referral label, never the offer or combined
+                        variants the drawer also carries: this wallet is funded
+                        by Refer & Earn alone, so a referral discount is the
+                        only thing its balance can ever be waived as. */}
+                    <div className="mt-2.5 flex items-start justify-between gap-3 text-[12.5px]">
+                      <Badge variant="success" size="sm">
+                        Referral discount · MDR waived
+                      </Badge>
+                      <span className="whitespace-nowrap tabular-nums text-green-600">
+                        −{formatCurrency(example.reward, currency, "en-US")}
+                      </span>
+                    </div>
+
+                    {/* Charged on the fee that is left after the waiver, not
+                        on the fee before it — the same order SettlementBreakdown
+                        computes its GST in. Spelling the base out inline is
+                        what makes that visible rather than something the
+                        merchant has to infer from the total. */}
+                    <div className="mt-2.5 flex items-start justify-between gap-3 text-[12.5px]">
+                      <span className="text-muted-foreground">
+                        GST on transaction fee{" "}
+                        <span className="text-[11px]">
+                          (18% of {formatCurrency(example.netFee, currency, "en-US")})
+                        </span>
+                      </span>
+                      <span className="whitespace-nowrap tabular-nums text-foreground">
+                        {formatCurrency(example.gst, currency, "en-US")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 flex items-center justify-between gap-3 rounded-lg bg-muted px-3 py-2.5">
+                    <span className="text-[12.5px] text-foreground">You pay</span>
+                    <span className="whitespace-nowrap text-[14px] font-semibold tabular-nums text-foreground">
+                      {formatCurrency(example.total, currency, "en-US")}
+                    </span>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             </div>
             {/* Waived against eligible: the waived figure carries the card, the
             eligible total trails it in muted text at the same size. Wrapped in

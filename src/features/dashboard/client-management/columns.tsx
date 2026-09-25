@@ -3,7 +3,6 @@
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
   type Column,
 } from "@/components/ui";
@@ -77,16 +76,14 @@ export function buildClientColumns(): Column<Client>[] {
               own that would be empty for most rows. */}
           <span className="flex min-w-max items-center gap-1.5">
             {row.source === "ZOHO" ? (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="flex shrink-0 items-center">
-                      <Icon name="zoho-logo" className="h-3 w-3" aria-label="Imported from Zoho" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>Imported from Zoho</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex shrink-0 items-center">
+                    <Icon name="zoho-logo" className="h-3 w-3" aria-label="Imported from Zoho" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Imported from Zoho</TooltipContent>
+              </Tooltip>
             ) : null}
             <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
               {row.businessName}
