@@ -132,12 +132,7 @@ export interface QuickAccessItem {
   /** One short line under the label, e.g. "Create and send an invoice". */
   description: string;
   icon:
-    | "file-text"
-    | "globe-2"
-    | "download"
-    | "users"
-    | "circle-dollar-sign"
-    | "sliders-horizontal";
+    "file-text" | "globe-2" | "download" | "users" | "circle-dollar-sign" | "sliders-horizontal";
 }
 
 /** What the generic stat card renders. A prop shape, not a response: the
@@ -151,7 +146,10 @@ export interface McaStatCardData {
   /** Plain muted caption shown instead of the trend row, for stats that
    *  aren't a month-over-month comparison (e.g. "Settles Jul 3, 12:00AM IST"). */
   captionLabel?: string;
-  spark: number[];
+  /** Sparkline series. Optional: no endpoint returns one for the live stat
+   *  widgets yet, and a missing series draws nothing rather than a made-up
+   *  shape. */
+  spark?: number[];
   accentColor: string;
 }
 

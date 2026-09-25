@@ -4,39 +4,29 @@ export const MIN_MCA_DASHBOARD_WIDGETS = 2;
 
 export type McaWidgetCategory = "Invoices" | "Payments" | "FX & Currency" | "Clients" | "Charts";
 
+/**
+ * Only widgets backed by a live endpoint. Every one of them renders real data
+ * or its own empty/error state, never a mock figure.
+ *
+ * BACKEND GAP, deliberately not offered: Invoice Trend (McaInvoiceTrendCard,
+ * spec 4.2) and Settlement Speed (McaSettlementSpeedCard, spec 4.5) have their
+ * cards built but no endpoint anywhere; Avg Invoice Value, FX Rate Realized,
+ * Pending Conversion, FX Gain / Loss, Active Clients, New Clients and Client
+ * Concentration have none either (spec 4.6). Add an id back here, and its case
+ * to McaDashboardWidgetRenderer, once its endpoint exists. A stored layout
+ * that still names a dropped id simply loses it (see parseStoredMcaLayout).
+ */
 export type McaWidgetId =
   | "transactions"
-  | "invoice-trend"
   | "currency-split"
   | "total-invoiced"
   | "outstanding-amount"
   | "saved-amount"
   | "active-invoices"
   | "overdue-invoices"
-  | "avg-invoice-value"
-  | "avg-payment-time"
   | "next-settlement"
-  | "fx-rate-realized"
   | "top-currency"
-  | "pending-conversion"
-  | "fx-gain-loss"
-  | "active-clients"
-  | "new-clients"
-  | "client-concentration"
   | "client-analytics";
-
-/** Widget ids rendered via the generic McaStatCard (everything except the
- * dedicated chart/saved-amount/settlement-speed/client-analytics cards), see
- * McaDashboardWidgetRenderer. */
-export type McaStatWidgetId = Exclude<
-  McaWidgetId,
-  | "transactions"
-  | "invoice-trend"
-  | "currency-split"
-  | "saved-amount"
-  | "avg-payment-time"
-  | "client-analytics"
->;
 
 export type McaWidgetCatalogEntry = {
   id: McaWidgetId;
@@ -51,19 +41,10 @@ export const MCA_WIDGET_CATALOG: McaWidgetCatalogEntry[] = [
   { id: "saved-amount", name: "Saved Amount", category: "Invoices", lgColSpan: 4 },
   { id: "active-invoices", name: "Active Invoices", category: "Invoices", lgColSpan: 4 },
   { id: "overdue-invoices", name: "Overdue Invoices", category: "Invoices", lgColSpan: 4 },
-  { id: "avg-invoice-value", name: "Avg Invoice Value", category: "Invoices", lgColSpan: 4 },
-  { id: "avg-payment-time", name: "Settlement Speed", category: "Payments", lgColSpan: 4 },
   { id: "next-settlement", name: "Next Settlement", category: "Payments", lgColSpan: 4 },
-  { id: "fx-rate-realized", name: "FX Rate Realized", category: "FX & Currency", lgColSpan: 4 },
   { id: "top-currency", name: "Top Currency", category: "FX & Currency", lgColSpan: 4 },
-  { id: "pending-conversion", name: "Pending Conversion", category: "FX & Currency", lgColSpan: 4 },
-  { id: "fx-gain-loss", name: "FX Gain / Loss", category: "FX & Currency", lgColSpan: 4 },
-  { id: "active-clients", name: "Active Clients", category: "Clients", lgColSpan: 4 },
-  { id: "new-clients", name: "New Clients", category: "Clients", lgColSpan: 4 },
-  { id: "client-concentration", name: "Client Concentration", category: "Clients", lgColSpan: 4 },
   { id: "client-analytics", name: "Client Analytics", category: "Clients", lgColSpan: 4 },
   { id: "transactions", name: "Transactions (Globe)", category: "Charts", lgColSpan: 12 },
-  { id: "invoice-trend", name: "Invoice Trend", category: "Charts", lgColSpan: 8 },
   { id: "currency-split", name: "Currency Split", category: "Charts", lgColSpan: 4 },
 ];
 
@@ -82,7 +63,6 @@ export const DEFAULT_MCA_DASHBOARD_LAYOUT: McaWidgetId[] = [
   // Hidden from the default view for now (kept in the catalog / code):
   // "outstanding-amount",
   "saved-amount",
-  // "invoice-trend",
   // Swapped in for "currency-split", per explicit request — still in the
   // catalog above, so it's still available from "Add widget".
   "client-analytics",

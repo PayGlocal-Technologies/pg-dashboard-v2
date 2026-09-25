@@ -14,8 +14,7 @@ import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { FilterChipGroup, StatusFilterChip } from "@/components/common/filters/FilterChips";
-import { useContentAreaBounds } from "@/components/layout/ContentAreaContext";
-import { ViewPortal } from "@/components/layout/ViewPortal";
+import { EbrcStepFooterBar } from "@/features/dashboard/ebrc-generation/components/EbrcStepFooterBar";
 import {
   MAPPING_STATUS_LABELS,
   PROCESS_STATUS_LABELS,
@@ -86,7 +85,6 @@ export function SelectIrmsStep({
   onSelectedIdsChange,
   onProceed,
 }: SelectIrmsStepProps) {
-  const contentBounds = useContentAreaBounds();
   const [query, setQuery] = useState("");
   const [mappingFilter, setMappingFilter] = useState<MappingStatus[]>([]);
   const [processFilter, setProcessFilter] = useState<ProcessStatus[]>([]);
@@ -219,11 +217,7 @@ export function SelectIrmsStep({
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
   return (
-    // A genuinely `fixed` bar (see below) sits outside document flow, so
-    // unlike `sticky` it can't push the last row above itself for free —
-    // this reserves that space by hand once the bar is showing, roughly its
-    // ~64-72px height plus its bottom-5 (20px) gap and some breathing room.
-    <div className={cn("space-y-4", selectedIds.length > 0 && "pb-28")}>
+    <div className="space-y-4">
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
           <RotatingSearchInput
@@ -323,50 +317,42 @@ export function SelectIrmsStep({
       </div>
 
       {/* Docked selection bar — only takes up space once something's
-          selected, so browsing keeps the full table height. Portaled to
-          document.body (ViewPortal) and given true `position: fixed`, per
-          explicit ask: not `sticky`, which stays anchored to this page's own
-          scroll position rather than the viewport. `contentBounds` (from
-          ContentAreaContext) supplies the left/width of the actual content
-          column — everything right of the sidebar, left of the Echo panel —
-          so a viewport-fixed bar still lines up with the page instead of
-          spanning edge to edge over the sidebar. Nothing renders until it's
-          measured, avoiding a flash at the wrong width. */}
-      {selectedIds.length > 0 && contentBounds && (
-        <ViewPortal>
-          <div
-            style={{ left: contentBounds.left, width: contentBounds.width }}
-            className="fixed bottom-5 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-foreground px-4 py-3.5 text-background shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)] sm:px-6"
-          >
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="flex items-center gap-1.5 text-[14px] font-semibold">
-                <Icon name="check-circle" className="h-4 w-4 text-emerald-300" />
+          selected, so browsing keeps the full table height. Shared
+          EbrcStepFooterBar so this sits in the exact same fixed screen
+          position Steps 2 and 3 use for their own actions. */}
+      {selectedIds.length > 0 && (
+        <EbrcStepFooterBar
+          left={
+            <>
+              <span className="flex items-center gap-1.5 text-[14px] font-semibold text-foreground">
+                <Icon name="check-circle" className="h-4 w-4 text-primary" />
                 {selectedIds.length} IRM{selectedIds.length === 1 ? "" : "s"} selected
               </span>
-              <span className="hidden h-4 w-px bg-background/20 sm:block" />
-              <span className="text-[13px] tabular-nums text-background/75">
+              <span className="hidden h-4 w-px bg-border sm:block" />
+              <span className="text-[13px] tabular-nums text-muted-foreground">
                 {formatCurrency(totalAmount, currency)}
               </span>
-              <span className="hidden h-4 w-px bg-background/20 sm:block" />
+              <span className="hidden h-4 w-px bg-border sm:block" />
               {unmappedCount > 0 ? (
-                <span className="flex items-center gap-1 rounded-full bg-amber-400/15 px-2 py-0.5 text-[12px] font-medium text-amber-300">
+                <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[12px] font-medium text-amber-700 dark:text-amber-400">
                   <Icon name="alert-triangle" className="h-3 w-3" />
                   {unmappedCount} unmapped
                 </span>
               ) : (
-                <span className="flex items-center gap-1 rounded-full bg-emerald-400/15 px-2 py-0.5 text-[12px] font-medium text-emerald-300">
+                <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[12px] font-medium text-emerald-700 dark:text-emerald-400">
                   <Icon name="check" className="h-3 w-3" />
                   All mapped
                 </span>
               )}
-            </div>
-
-            <div className="flex items-center gap-3">
+            </>
+          }
+          right={
+            <>
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-auto min-h-0 p-0 text-[12.5px] text-background/75 hover:bg-transparent hover:text-background"
+                className="h-auto min-h-0 p-0 text-[12.5px] text-muted-foreground hover:bg-transparent hover:text-foreground"
                 onClick={() => onSelectedIdsChange([])}
               >
                 Clear
@@ -379,9 +365,9 @@ export function SelectIrmsStep({
               >
                 Map shipping bills
               </Button>
-            </div>
-          </div>
-        </ViewPortal>
+            </>
+          }
+        />
       )}
     </div>
   );

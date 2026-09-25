@@ -4,7 +4,6 @@ import {
   type Column,
   StatusBadge,
   Button,
-  IconButton,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -180,7 +179,7 @@ function buildRowActions(row: McaTransaction, handlers: RowActionHandlers): RowA
       return [
         {
           key: "firc-download",
-          label: "FIRC Download",
+          label: "Download FIRC",
           icon: "download",
           onSelect: () => handlers.onDownloadFirc(row),
         },
@@ -190,35 +189,31 @@ function buildRowActions(row: McaTransaction, handlers: RowActionHandlers): RowA
   }
 }
 
-/** One row's actions, direct icon buttons rather than a "…" menu — today
- *  that's at most a single action (FIRC Download, on a FIRC_SETTLED row),
+/** One row's actions, labelled buttons rather than a "…" menu — today
+ *  that's at most a single action (Download FIRC, on a FIRC_SETTLED row),
  *  and hiding the one thing there is to do behind a dropdown cost an extra
- *  click for no reason. Each action gets its own icon (a tooltip carries the
- *  label, since there's no room for text beside several of these), laid out
- *  left of the row's View details/Take action control rather than replacing
+ *  click for no reason. Same "Take action" treatment (outline, labelled,
+ *  always visible) the DOCUMENT_PENDING row's own button uses below, rather
+ *  than an icon-only button that only reveals its meaning on hover/tooltip —
+ *  laid out left of the row's View details control rather than replacing
  *  it. */
 function RowActionButtons({ actions }: { actions: RowAction[] }) {
   return (
     <>
       {actions.map((action) => (
-        <TooltipProvider key={action.key} delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <IconButton
-                aria-label={action.label}
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  action.onSelect();
-                }}
-              >
-                <Icon name={action.icon} className="h-4 w-4" />
-              </IconButton>
-            </TooltipTrigger>
-            <TooltipContent side="top">{action.label}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          key={action.key}
+          variant="outline"
+          size="sm"
+          leftIcon={<Icon name={action.icon} className="h-3 w-3" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            action.onSelect();
+          }}
+          className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+        >
+          {action.label}
+        </Button>
       ))}
     </>
   );
@@ -349,7 +344,7 @@ export function buildMcaColumns(
               </span>
             ) : (
               <>
-                {/* Direct icon button(s) — FIRC Download today — ahead of
+                {/* Labelled button(s) — Download FIRC today — ahead of
                     View details rather than behind a "…" menu. Always
                     visible, unlike View details below: this is the row's own
                     distinct action, not a secondary way to reach the same
@@ -360,7 +355,7 @@ export function buildMcaColumns(
                      display/width change) so revealing it never shifts the
                      layout. Opens the same drawer a click anywhere else on the
                      row does. Plain text, no icon — the eye glyph read as one
-                     more action alongside FIRC Download rather than what it
+                     more action alongside Download FIRC rather than what it
                      actually is, the row's own "open" control. */}
                 <Button
                   variant="outline"

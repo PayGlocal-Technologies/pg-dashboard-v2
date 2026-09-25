@@ -199,10 +199,11 @@ export function GlobalSearch() {
       <Icon name={result.icon} size={15} className="shrink-0 text-muted-foreground" />
       <span className="min-w-0 flex-1 truncate">{result.label}</span>
       {result.badge && (
-        // The reference's dark chip. bg-foreground/text-background rather than a
-        // fixed colour so it inverts correctly with the theme, and so it stays
-        // legible on the selected row's bg-muted.
-        <span className="shrink-0 rounded-md bg-foreground px-1.5 py-0.5 text-[11px] font-medium text-background">
+        // White fill + grey stroke, matching the Stripe-style filter chips
+        // reference — a card surface with a border reads correctly in both
+        // themes without a fixed colour, and stays legible on the selected
+        // row's bg-muted the same way the previous dark chip did.
+        <span className="shrink-0 rounded-md border border-border bg-card px-1.5 py-0.5 text-[11px] font-medium text-foreground">
           in: {result.badge}
         </span>
       )}
@@ -264,7 +265,12 @@ export function GlobalSearch() {
           }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
-          className="h-9 bg-muted/50 pl-8 pr-8 text-xs"
+          // flux-ui's base Input carries its own min-h-11 (44px) and
+          // shadow-sm — min-h-11 wins over this h-9 since min-height beats a
+          // smaller height, and the shadow read as a stray glow under the
+          // bar. min-h-9/shadow-none cancel both so this actually renders at
+          // the same 36px, flat, as its header neighbours.
+          className="h-9 min-h-9 bg-muted/50 pl-8 pr-8 text-xs shadow-none"
         />
         {query && (
           <Button

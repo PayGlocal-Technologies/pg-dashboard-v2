@@ -613,3 +613,10 @@ export interface EbrcRequestRow {
  *  currency is a merchant choice, and DGFT accepts any of these against an
  *  IRM. Lived in mock-data.ts before the endpoints landed. */
 export const CURRENCY_OPTIONS = ["INR", "USD", "EUR", "GBP", "AED"];
+/** Set by EbrcGenerationWizard right before it shows the "request received"
+ *  overlay, read (and cleared) by EbrcStatusTable on its next mount — the
+ *  "wait 4 hours" callout only means something the moment a request was
+ *  actually just queued, not on every visit to this page. sessionStorage,
+ *  not a store field: it only needs to survive the one navigation back from
+ *  the wizard, the same lifetime the earlier "just logged in" flag used. */
+export const EBRC_JUST_QUEUED_KEY = "ebrc_just_queued";

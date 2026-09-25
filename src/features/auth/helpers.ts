@@ -108,6 +108,7 @@ export function getRedirectionPath(userCreationType?: "NEW_FLOW" | "OLD_FLOW"): 
 
   const stored = window.sessionStorage.getItem(REDIRECT_KEY);
   window.sessionStorage.removeItem(REDIRECT_KEY);
+
   if (isSafePath(stored)) return withBasePath(stored);
 
   return withBasePath(DEFAULT_AUTHED_PATH);

@@ -325,7 +325,13 @@ export function BusinessDetailsFeature() {
               ) : (
                 <span className="text-sm font-semibold text-foreground">Not set</span>
               )}
-              <Button type="button" variant="outline" size="sm" onClick={startEditing}>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto min-h-0 p-0 text-[13px] font-medium"
+                onClick={startEditing}
+              >
                 Edit
               </Button>
             </div>

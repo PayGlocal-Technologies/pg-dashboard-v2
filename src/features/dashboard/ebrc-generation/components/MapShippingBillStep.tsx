@@ -26,6 +26,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { AppImage } from "@/components/common/AppImage";
+import { EbrcStepFooterBar } from "@/features/dashboard/ebrc-generation/components/EbrcStepFooterBar";
 import {
   DEDUCTION_FIELDS,
   EXTRACTION_STATUS_DONE,
@@ -898,24 +899,45 @@ export function MapShippingBillStep({
                     }}
                   />
                 </div>
-
-                <div className="flex shrink-0 items-center justify-end border-t border-border bg-card px-4 py-3">
-                  <Button
-                    type="button"
-                    variant="primary"
-                    rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
-                    disabled={isSaving}
-                    isLoading={isSaving}
-                    onClick={handleSaveAndNext}
-                  >
-                    {isLastByPosition ? "Save & review" : "Save & next"}
-                  </Button>
-                </div>
               </>
             )
           )}
         </div>
       </div>
+
+      {/* Same fixed bar SelectIrmsStep docks its own actions in, so "the
+          buttons" stay in one place as the merchant moves through the
+          wizard rather than each step growing a differently-placed footer. */}
+      <EbrcStepFooterBar
+        left={
+          <span className="text-[13px] text-muted-foreground">
+            {completedCount} of {selectedIds.length} IRMs mapped
+          </span>
+        }
+        right={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto min-h-0 p-0 text-[12.5px] text-muted-foreground hover:bg-transparent hover:text-foreground"
+              onClick={onBackToSelectIrms}
+            >
+              Back
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
+              disabled={isSaving || !activeRecord}
+              isLoading={isSaving}
+              onClick={handleSaveAndNext}
+            >
+              {isLastByPosition ? "Save & review" : "Save & next"}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

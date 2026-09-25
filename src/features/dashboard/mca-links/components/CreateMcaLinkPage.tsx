@@ -30,7 +30,7 @@ import { CountryFlag } from "@/features/dashboard/multi-currency/components/Coun
 import { CURRENCY_FILTER_OPTIONS } from "@/features/dashboard/multi-currency/constants";
 import { CustomerPreview } from "@/features/dashboard/mca-links/components/CustomerPreview";
 
-// Same seven receiving currencies the MCA filter chips offer, so a merchant
+// Same receiving currencies the MCA filter chips offer, so a merchant
 // can never build a link in a currency there's no account to receive it in.
 const CURRENCY_OPTIONS = CURRENCY_FILTER_OPTIONS;
 

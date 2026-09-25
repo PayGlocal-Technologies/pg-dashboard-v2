@@ -90,16 +90,31 @@ function titleClass(status: SettlementStepStatus): string {
 function StatusGlyph({ status }: { status: SettlementStepStatus }) {
   switch (status) {
     case "success":
-      return <Icon name="check" className="h-4 w-4 text-green-600" strokeWidth={3} />;
+      // bg-card behind the check breaks the connector line where it passes
+      // through the glyph's negative space — a bare check-mark path has no
+      // opaque backing, so without this the line visibly crosses the tick.
+      return (
+        <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-card">
+          <Icon name="check" className="h-4 w-4 text-green-600" strokeWidth={3} />
+        </span>
+      );
     case "inProgress":
-      return <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-primary" />;
+      return (
+        <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-card">
+          <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+        </span>
+      );
     case "error":
-      return <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />;
+      return (
+        <span aria-hidden className="flex h-5 w-5 items-center justify-center rounded-full bg-card">
+          <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+        </span>
+      );
     case "reversal":
       return (
         <span
           aria-hidden
-          className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-white"
+          className="flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white"
         >
           <Icon name="rotate-ccw" className="h-2.5 w-2.5" strokeWidth={3} />
         </span>

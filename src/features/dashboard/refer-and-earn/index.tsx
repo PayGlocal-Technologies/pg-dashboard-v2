@@ -18,7 +18,6 @@ import { ReferralHero } from "@/features/dashboard/refer-and-earn/components/Ref
 import { ReferralTotalsCard } from "@/features/dashboard/refer-and-earn/components/ReferralTotalsCard";
 import { ReferralJourneyCard } from "@/features/dashboard/refer-and-earn/components/ReferralJourneyCard";
 import { ReferralEarnings } from "@/features/dashboard/refer-and-earn/components/ReferralEarnings";
-import { buildReferralUrl } from "@/features/dashboard/refer-and-earn/constants";
 import {
   mapTransactionsToRedemptions,
   mapTransactionsToReferrals,
@@ -50,9 +49,12 @@ export function ReferAndEarnFeature() {
   const { transactions, isLoading: transactionsLoading } = useReferralTransactions();
   const { wallet } = useReferralWallet();
 
-  // Fall back to the bare referrals landing page until the merchant's link has
-  // loaded, so the hero never renders an empty field.
-  const referralUrl = link || buildReferralUrl();
+  // influencerURL from influencer/service/generate, the same call and field
+  // pg-dashboard's ReferralCard reads. No stand-in URL while it loads: the old
+  // fallback (/app/referrals) is not a path production's middleware treats as a
+  // referral (it expects /mca/{influencerId}), so a copy made before the link
+  // arrived shared a link that credited nobody.
+  const referralUrl = link;
 
   // The one transactions feed carries both halves of the programme: the referral
   // credits, one per referred merchant, and the debits where reward money has

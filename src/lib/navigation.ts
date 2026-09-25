@@ -44,7 +44,9 @@ export const homeNavigation: NavGroup[] = [
         href: "/settings",
         icon: "settings",
         permission: [],
-        children: [{ label: "Team Management", href: "/team-management", permission: [] }],
+        children: [
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
+        ],
       },
     ],
   },
@@ -210,9 +212,9 @@ export const regularNavigation: NavGroup[] = [
         label: "Configure",
         href: "/configure",
         icon: "settings",
-        permission: ["ucicSearchV3", "getListOfMerchantKeys"],
+        permission: ["ucicSearchV3", "getListOfMerchantKeys", "userSearchV3"],
         children: [
-          { label: "Team Management", href: "/team-management", permission: ["ucicSearchV3"] },
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
           {
             label: "Key Management System",
             href: "/key-management-system",
@@ -320,7 +322,14 @@ export const mcaNavigation: NavGroup[] = [
         permission: ["getAllMcaClient"],
       },
       { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
-      { label: "Team management", href: "/team-management", icon: "user-plus", permission: [] },
+      // userSearchV3, the permission pg-dashboard's sidebar gates Team
+      // Management on in every menu (the page lists users through it).
+      {
+        label: "Team management",
+        href: "/team-management",
+        icon: "user-plus",
+        permission: ["userSearchV3"],
+      },
     ],
   },
 ];
@@ -364,9 +373,9 @@ export const partnerNavigation: NavGroup[] = [
         label: "Account Management",
         href: "/configure",
         icon: "settings",
-        permission: ["ucicSearchV3", "getListOfMerchantKeys"],
+        permission: ["ucicSearchV3", "getListOfMerchantKeys", "userSearchV3"],
         children: [
-          { label: "Team Management", href: "/team-management", permission: ["ucicSearchV3"] },
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
           {
             label: "Key Management System",
             href: "/key-management-system",
@@ -439,9 +448,9 @@ export const globalNavigation: NavGroup[] = [
         label: "Configure",
         href: "/configure",
         icon: "settings",
-        permission: ["ucicSearchV3", "getListOfMerchantKeys"],
+        permission: ["ucicSearchV3", "getListOfMerchantKeys", "userSearchV3"],
         children: [
-          { label: "Team Management", href: "/team-management", permission: ["ucicSearchV3"] },
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
           {
             label: "Key Management System",
             href: "/key-management-system",

@@ -82,7 +82,7 @@ export interface Platform {
   steps: PlatformStep[];
   /**
    * One video walkthrough for connecting this platform, shown above the steps
-   * on the "Steps to connect" page.
+   * on the "Guide to connect" page.
    *
    * Undefined everywhere for now: that page renders a labelled placeholder of
    * the same dimensions in its place, so supplying a real URL later is a data

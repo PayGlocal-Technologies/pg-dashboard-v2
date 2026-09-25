@@ -4,6 +4,10 @@ import { Icon } from "@/components/icon";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { settlementSpeed } from "@/features/dashboard/mca-home/mock-data";
 
+// BACKEND GAP: Settlement Speed (spec 4.5) has no endpoint, so this card is kept ready but is
+// not in the widget catalog; it only ever renders mock-data.ts. Offer it again
+// (widget-catalog.ts + McaDashboardWidgetRenderer) once the endpoint exists.
+
 const ACCENT_COLOR = "var(--chart-2)";
 
 export function McaSettlementSpeedCard() {

@@ -171,6 +171,7 @@ function EditBillerBody({
         <FieldLabel htmlFor="biller-legal-name">Legal name</FieldLabel>
         <Input
           id="biller-legal-name"
+          className="shadow-none"
           value={values.legalName ?? ""}
           onChange={(e) => patch({ legalName: e.target.value })}
         />
@@ -180,7 +181,7 @@ function EditBillerBody({
         <FieldLabel htmlFor="biller-gstin">GSTIN</FieldLabel>
         <Input
           id="biller-gstin"
-          className="font-mono"
+          className="font-mono shadow-none"
           placeholder="Optional"
           value={values.gstIn ?? ""}
           onChange={(e) => patch({ gstIn: e.target.value.toUpperCase() })}
@@ -191,6 +192,7 @@ function EditBillerBody({
         <FieldLabel htmlFor="biller-street1">Address</FieldLabel>
         <Input
           id="biller-street1"
+          className="shadow-none"
           value={values.streetAddress1 ?? ""}
           onChange={(e) => patch({ streetAddress1: e.target.value })}
         />
@@ -200,6 +202,7 @@ function EditBillerBody({
         <FieldLabel htmlFor="biller-street2">Address line 2</FieldLabel>
         <Input
           id="biller-street2"
+          className="shadow-none"
           placeholder="Optional"
           value={values.streetAddress2 ?? ""}
           onChange={(e) => patch({ streetAddress2: e.target.value })}
@@ -250,6 +253,7 @@ function EditBillerBody({
           <FieldLabel htmlFor="biller-city">City</FieldLabel>
           <Input
             id="biller-city"
+            className="shadow-none"
             value={values.city ?? ""}
             onChange={(e) => patch({ city: e.target.value })}
           />
@@ -259,6 +263,7 @@ function EditBillerBody({
           <FieldLabel htmlFor="biller-zip">Zipcode</FieldLabel>
           <Input
             id="biller-zip"
+            className="shadow-none"
             value={values.zipcode ?? ""}
             onChange={(e) => patch({ zipcode: e.target.value })}
           />
@@ -271,6 +276,7 @@ function EditBillerBody({
           <Input
             id="biller-email"
             type="email"
+            className="shadow-none"
             value={values.email ?? ""}
             onChange={(e) => patch({ email: e.target.value })}
           />
@@ -281,6 +287,7 @@ function EditBillerBody({
           <Input
             id="biller-phone"
             inputMode="tel"
+            className="shadow-none"
             value={values.phone ?? ""}
             onChange={(e) => patch({ phone: e.target.value })}
           />

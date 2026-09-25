@@ -4,10 +4,10 @@ import type { ReactNode } from "react";
 import {
   Alert,
   AlertDescription,
+  Badge,
   Button,
   Card,
   CardContent,
-  Separator,
   StatusBadge,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -53,6 +53,11 @@ interface TransactionDetailsPageProps {
 }
 
 const REVERSED_STATUSES = new Set(["REVERSAL_FOR_RISK_REJECTED", "REVERSAL_FOR_NOT_SUPPORTED"]);
+
+// pg-dashboard (TxnHeaderCard) shows "To be updated" rather than a date while
+// the transaction is still on hold or awaiting an invoice: a settlement date
+// exists on the record by then, but it isn't yet a commitment.
+const SETTLEMENT_DATE_PENDING_STATUSES = new Set(["FUNDS_ON_HOLD", "DOCUMENT_PENDING"]);
 
 // Literal Tailwind row-start/row-span classes, looked up by number rather
 // than interpolated into a template string — Tailwind's build-time class
@@ -149,12 +154,18 @@ function PaymentDetailsSection({
             label="Transaction date"
             value={formatTransactionTimestamp(row.formattedTransactionCreationDateTime)}
           />
-          {/* Always shown, even pre-settlement — a "-" placeholder keeps the
-              field present across every transaction state instead of the
-              row disappearing until settlement. */}
+          {/* Always shown, even pre-settlement — a "Not generated yet"
+              placeholder keeps the field present across every transaction
+              state instead of the row disappearing until settlement. */}
           <DetailRow
             label="Settlement date"
-            value={row.settlementDate ? formatTransactionTimestamp(row.settlementDate) : "-"}
+            value={
+              !row.settlementDate
+                ? "Not generated yet"
+                : SETTLEMENT_DATE_PENDING_STATUSES.has(row.externalStatus)
+                  ? "To be updated"
+                  : formatTransactionTimestamp(row.settlementDate)
+            }
           />
           {/* NO UTR ROW. The API carries no per-transaction UTR — the only real
               UTRs sit on batch-level settlement summary rows, with nothing
@@ -342,15 +353,6 @@ export function TransactionDetailsContent({
       ? `Settled on ${formatTransactionDateOnly(row.settlementDate)}`
       : label;
 
-  // pg-dashboard shows "To be updated" rather than a date while the
-  // transaction is still on hold or awaiting an invoice: a settlement date
-  // exists on the record by then, but it isn't yet a commitment.
-  const settlementDateLabel = row.settlementDate
-    ? ["FUNDS_ON_HOLD", "DOCUMENT_PENDING"].includes(row.externalStatus)
-      ? "To be updated"
-      : formatTransactionDateOnly(row.settlementDate)
-    : null;
-
   // Demo/preview transactions are seeded with "mocked" in their gid. Without
   // this they are indistinguishable from real ones.
   const isSampleTransaction = row.gid?.includes("mocked");
@@ -383,15 +385,19 @@ export function TransactionDetailsContent({
             <p className="text-[13px] text-muted-foreground">
               Charged to <span className="font-medium text-foreground">{counterpartyName}</span>
             </p>
-            {/* Settlement date sits with the amount rather than in Payment
-                Details, so it is present in the drawer too — that layout
-                drops the Payment Details column entirely, which is where the
-                date would otherwise have been its only home. Suppressed for
-                reversed transactions, which never settle. */}
-            {settlementDateLabel && !isReversed && (
-              <span className="rounded-md border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
-                Settlement Date: {settlementDateLabel}
-              </span>
+            {/* Drawer only, and only until Payment Details joins the drawer's
+                stack at settlement: before that it is the one place the
+                drawer can say when this will settle. The full page always
+                shows Payment Details, which carries the same date. Mirrors
+                pg-dashboard's TxnHeaderCard tag, "To be updated" included.
+                Never for reversed transactions, which never settle. */}
+            {layout === "drawer" && !isSettled && !isReversed && row.settlementDate && (
+              <Badge variant="outline" size="sm">
+                Settlement date:{" "}
+                {SETTLEMENT_DATE_PENDING_STATUSES.has(row.externalStatus)
+                  ? "To be updated"
+                  : formatTransactionDateOnly(row.settlementDate)}
+              </Badge>
             )}
           </div>
         </div>
@@ -408,12 +414,6 @@ export function TransactionDetailsContent({
           </span>
         )}
       </div>
-
-      {/* Full-width now — was scoped to the amount stack's own shrink-wrapped
-          column (max-w-70), which read as a short, oddly-truncated rule
-          rather than a section break. Sits outside that flex row so it
-          spans the summary's whole width, same as a Card's own divider. */}
-      <Separator className="my-4" />
 
       {isReversed && (
         <Alert variant="error" className="mt-6">
