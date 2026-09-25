@@ -12,6 +12,7 @@ import {
 import { Button, Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -203,7 +204,7 @@ export function TotalSettledCard({
                   <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+              <CartesianGrid horizontal={DotGridLine} vertical={false} />
               <XAxis
                 dataKey="x"
                 axisLine={false}

@@ -92,7 +92,7 @@ export function BillToSection({
   const { createClient } = useCreateClient(merchantId);
   const { uploadContract } = useClientContractUpload(merchantId);
 
-  const onSubmitClient = (values: ClientFormValues, keepOpen: boolean) => {
+  const onSubmitClient = (values: ClientFormValues) => {
     const payload = toClientApiPayload(values, (iso2) =>
       iso2 ? (countryMap.iso2ToApiCountry[iso2.toUpperCase()] ?? iso2) : ""
     );
@@ -107,7 +107,7 @@ export function BillToSection({
       refetch();
     });
 
-    if (!keepOpen) setAddClientOpen(false);
+    setAddClientOpen(false);
   };
 
   const [pickerOpen, setPickerOpen] = useState(false);

@@ -168,9 +168,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   const { viewContract } = useClientContractView();
   const { deleteContract } = useClientContractDelete();
 
-  // Both Add client and Save and add another land here; `keepOpen` is the only
-  // difference between them, and the modal itself handles resetting the form.
-  const onSubmitClient = (values: ClientFormValues, keepOpen: boolean) => {
+  const onSubmitClient = (values: ClientFormValues) => {
     // The country string a write carries is the country map's own key for that
     // ISO2 — an "NZ", not a "New Zealand" — because that is what pg-dashboard's
     // select submits. Falls back to the ISO2 itself if the reference call has not
@@ -209,7 +207,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
     setSearch("");
     setCountryFilters([]);
     setPage(1);
-    if (!keepOpen) onAddClientOpenChange(false);
+    onAddClientOpenChange(false);
   };
 
   // Opens the same form the Add client button does, pre-filled from the client's
@@ -372,7 +370,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
               existing rows visibly do something. */}
               <Button
                 type="button"
-                variant="ghost"
+                variant="outline"
                 size="sm"
                 aria-label="Refresh clients"
                 disabled={isFetching}
@@ -383,7 +381,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
                   />
                 }
                 onClick={refetch}
-                className="shrink-0"
+                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
               >
                 Refresh
               </Button>

@@ -23,11 +23,13 @@ function MidRow({
   name,
   status,
   onSelect,
+  showChevron,
 }: {
   mid: string;
   name: string;
   status: string;
   onSelect: (mid: string) => void;
+  showChevron?: boolean;
 }) {
   const isDisabled = status === "DISABLED";
 
@@ -62,22 +64,28 @@ function MidRow({
           </span>
         )}
       </span>
+      {showChevron && !isDisabled && (
+        <Icon name="chevron-right" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+      )}
     </Button>
   );
 }
 
 /**
  * The list of accounts to pick from. Shared by the popover below and by
- * SelectMidView, which renders it inline on surfaces that have no sidebar to
- * point the merchant at.
+ * SelectMidView, which renders it inside its "select a Merchant ID" card.
  */
 export function MidChoiceList({
   midOptions,
   onSelect,
+  showChevron,
   className,
 }: {
   midOptions: string[];
   onSelect: (mid: string) => void;
+  /** A trailing chevron, for page-level lists where the row is the whole
+   *  call to action rather than one item in an open menu. */
+  showChevron?: boolean;
   className?: string;
 }) {
   // Read once for the whole list rather than once per row: the lookup is the
@@ -97,6 +105,7 @@ export function MidChoiceList({
             name={info?.displayTag || info?.tradeName || mid}
             status={info?.status ?? "ACTIVE"}
             onSelect={onSelect}
+            showChevron={showChevron}
           />
         );
       })}

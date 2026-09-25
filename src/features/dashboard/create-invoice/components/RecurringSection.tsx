@@ -80,7 +80,7 @@ export function RecurringSection({
               value={recurringType}
               onValueChange={(next) => onChange({ recurringType: next as RecurringType })}
             >
-              <SelectTrigger id="recurring-frequency" className="w-full">
+              <SelectTrigger id="recurring-frequency" className="w-full shadow-none">
                 <SelectValue placeholder="Select frequency" />
               </SelectTrigger>
               <SelectContent>
@@ -91,6 +91,9 @@ export function RecurringSection({
                 ))}
               </SelectContent>
             </Select>
+            <FieldDescription className="text-left text-[11px]">
+              The first repeat is issued on this date.
+            </FieldDescription>
           </Field>
 
           <Field>
@@ -100,7 +103,6 @@ export function RecurringSection({
               min={minStartDate}
               onChange={(next) => onChange({ recurringStartDate: next })}
             />
-            <FieldDescription>The first repeat is issued on this date.</FieldDescription>
           </Field>
         </div>
       )}

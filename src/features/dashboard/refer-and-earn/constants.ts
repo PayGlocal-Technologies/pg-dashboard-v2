@@ -1,5 +1,4 @@
 import type { IconName } from "@/components/icon";
-import { dashboardOrigin } from "@/constants/environment";
 
 export const REFERRAL_PAGE_SIZE = 10;
 
@@ -63,23 +62,6 @@ export const REFERRAL_HERO_BANNER = {
   width: 1660,
   height: 948,
 } as const;
-
-/**
- * Builds the shareable referral URL.
- *
- * TODO(integration): `code` is the merchant's own referral code, which comes
- * from the referral program endpoint. That contract does not exist yet, so the
- * screen calls this with no code and the link is the bare referrals landing
- * page. Do not substitute the MID for the code — it must not travel in a URL
- * the merchant shares with third parties.
- */
-export function buildReferralUrl(code?: string): string {
-  // dashboardOrigin() is keyed off NEXT_PUBLIC_ENV rather than
-  // `window.location.origin` so the server and client render the same string
-  // and the link needs no effect to fill in after hydration.
-  const base = `${dashboardOrigin()}/app/referrals`;
-  return code ? `${base}?ref=${encodeURIComponent(code)}` : base;
-}
 
 export interface ReferralStep {
   icon: IconName;

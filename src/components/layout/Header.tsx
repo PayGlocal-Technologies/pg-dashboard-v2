@@ -128,7 +128,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   return (
     <div className="sticky top-0 z-30 flex flex-col">
-      <header className="flex h-[57px] items-center gap-2 px-4 md:px-5 flex-shrink-0 bg-header border-b border-header-border">
+      <header className="flex h-[57px] items-center gap-2 px-4 md:px-5 flex-shrink-0 bg-header">
         {/* Hamburger (mobile only) */}
         <Button
           variant="ghost"
@@ -158,8 +158,18 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   href={tab.href}
                   onClick={() => tab.context && setActiveContext(tab.context)}
                   className={cn(
+                    // With the header's own bottom divider gone, the tab row
+                    // had nothing to anchor it — plain coloured text read as
+                    // barely-there next to the rest of the header's solid
+                    // controls. A quiet pill (existing --primary-light /
+                    // --muted tokens, the same "soft, not loud" treatment the
+                    // "Viewing as" ribbon already uses) gives the active tab
+                    // real presence and inactive ones a hover target, without
+                    // introducing a new colour or a heavier component.
                     "whitespace-nowrap rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
-                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    isActive
+                      ? "bg-primary-light text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   {tab.label}

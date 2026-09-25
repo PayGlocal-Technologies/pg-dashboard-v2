@@ -75,11 +75,17 @@ export function BankingFeature() {
     <div className="space-y-5">
       <PageHeader title="Account details" subtitle="Where we send settled funds by currency." />
 
-      <Card className="w-full max-w-sm gap-3 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-            <Icon name="landmark" size={18} />
-          </span>
+      <Card className="w-full max-w-md gap-4 p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Icon name="landmark" size={18} />
+            </span>
+            {/* No bank name here: the settlement endpoints return only the
+                account number and IFSC (same as pg-dashboard's Settlement
+                Details), so there is nothing to render it from. */}
+            <p className="text-sm font-bold text-foreground">Settlement account</p>
+          </div>
           {/* BACKEND GAP: settlement endpoint carries no primary/multi-account
               flag, so this label is not backed by real data yet. */}
           <Badge variant="default" size="sm">
@@ -88,11 +94,6 @@ export function BankingFeature() {
         </div>
 
         <div>
-          {/* No bank name here: the settlement endpoints return only the
-              account number and IFSC (same as pg-dashboard's Settlement
-              Details), so there is nothing to render it from. */}
-          <p className="text-sm font-bold text-foreground">Settlement account</p>
-
           {editing ? (
             <form
               className="mt-2 space-y-2.5"
@@ -176,36 +177,49 @@ export function BankingFeature() {
             </form>
           ) : (
             <>
-              {/* Account number, masked by default with an eye toggle to reveal —
-                  the real /settlement vs /settlement-details switch. */}
-              <div className="mt-1 flex items-center gap-2">
-                {isLoading ? (
-                  <Shimmer className="h-4 w-32" />
-                ) : (
-                  <span className="font-mono text-xs text-muted-foreground tabular-nums">
-                    {accountNumber}
-                  </span>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  aria-label={masked ? "Reveal account number" : "Hide account number"}
-                  onClick={() => setMasked((prev) => !prev)}
-                >
-                  <Icon name={masked ? "eye" : "eye-off"} className="h-3.5 w-3.5" />
-                </Button>
-              </div>
+              {/* Account number and IFSC grouped as one labelled pair, not two
+                  loose lines — the label-above-value pattern the rest of
+                  Settings uses (SettingsDetailRow), inside its own muted
+                  panel so the two facts read as one unit. */}
+              <div className="grid grid-cols-2 gap-4 rounded-lg bg-muted/40 p-3">
+                <div>
+                  <p className="text-[11px] text-muted-foreground">Account number</p>
+                  {/* Masked by default with an eye toggle to reveal — the
+                      real /settlement vs /settlement-details switch. */}
+                  <div className="mt-0.5 flex items-center gap-1">
+                    {isLoading ? (
+                      <Shimmer className="h-4 w-24" />
+                    ) : (
+                      <span className="font-mono text-xs font-semibold tabular-nums text-foreground">
+                        {accountNumber}
+                      </span>
+                    )}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={masked ? "Reveal account number" : "Hide account number"}
+                      className="h-6 min-h-0 w-6 shrink-0 p-0"
+                      onClick={() => setMasked((prev) => !prev)}
+                    >
+                      <Icon name={masked ? "eye" : "eye-off"} className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
 
-              <p className="mt-1 text-xs text-muted-foreground">
-                IFSC: <span className="font-mono tabular-nums">{ifscCode}</span>
-              </p>
+                <div>
+                  <p className="text-[11px] text-muted-foreground">IFSC code</p>
+                  <p className="mt-0.5 font-mono text-xs font-semibold text-foreground">
+                    {ifscCode}
+                  </p>
+                </div>
+              </div>
 
               <Button
                 type="button"
-                variant="outline"
+                variant="link"
                 size="sm"
-                className="mt-3"
+                className="mt-3 h-auto min-h-0 p-0 text-[13px] font-medium"
                 onClick={startEditing}
                 disabled={!canEdit}
               >

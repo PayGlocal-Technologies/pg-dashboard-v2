@@ -40,39 +40,33 @@ export function EbrcWhyList({ className }: { className?: string }) {
  * account" moment, just from a different entry point (one navigates to the
  * generation flow, the other opens the sign-in dialog right there).
  *
- * public/assets/ebrc banner final.png reserves a blank left half for real
+ * public/assets/ebrc banner final1.png reserves a blank left half for real
  * content rather than baking heading/copy into the artwork the way the
  * previous banner did — so all of it renders as actual text here (`alt=""`,
  * the image is decorative now that nothing meaningful only exists inside
  * it), positioned as a percentage of the image's own box so it stays over
  * that blank half as the banner scales with the viewport.
  */
-export function EbrcBanner({
-  ctaLabel,
-  onCtaClick,
-}: {
-  ctaLabel: string;
-  onCtaClick: () => void;
-}) {
+export function EbrcBanner({ ctaLabel, onCtaClick }: { ctaLabel: string; onCtaClick: () => void }) {
   return (
     <div className="relative overflow-hidden rounded-2xl border border-border">
       <AppImage
-        src="/assets/ebrc banner final.png"
+        src="/assets/ebrc banner final1.png"
         alt=""
         width={4680}
-        height={2232}
+        height={1980}
         priority
         className="block h-auto w-full"
       />
 
-      <div className="absolute inset-y-0 left-0 flex w-[46%] flex-col justify-center gap-5 px-[4%] py-[6%]">
+      <div className="absolute inset-y-0 left-0 flex w-[46%] flex-col justify-center gap-7 px-[4%] py-[6%]">
         <div className="space-y-2.5">
           <h2 className="text-lg font-semibold leading-tight tracking-tight text-foreground sm:text-xl lg:text-2xl">
             Bring your eBRCs closer to your payments
           </h2>
           <p className="max-w-md text-[13px] leading-relaxed text-muted-foreground sm:text-sm">
-            Link your DGFT portal with PayGlocal to connect export payments with eBRCs and
-            simplify your compliance workflow.
+            Link your DGFT portal with PayGlocal to connect export payments with eBRCs and simplify
+            your compliance workflow.
           </p>
         </div>
 

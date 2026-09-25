@@ -3,13 +3,14 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { GuideTour } from "@/components/common/guide/GuideTour";
 import { useHasEcho } from "@/features/dashboard/echo/hooks";
+import { WelcomeExperienceModal } from "@/features/dashboard/mca-home/components/WelcomeExperienceModal";
 import { McaDashboardAurora } from "@/features/dashboard/mca-home/components/McaDashboardAurora";
 import {
   MCA_DASHBOARD_GUIDE_ECHO_TARGET,
@@ -79,6 +80,7 @@ export function McaDashboardFeature() {
     : MCA_DASHBOARD_GUIDE_STEPS.filter((step) => step.target !== MCA_DASHBOARD_GUIDE_ECHO_TARGET);
   const [editMode, setEditMode] = useState(false);
   const [needsAttentionOpen, setNeedsAttentionOpen] = useState(false);
+  const [welcomeTourOpen, setWelcomeTourOpen] = useState(false);
   const [layout, setLayout] = useState<McaWidgetId[]>(() => readMcaDashboardLayout());
   const layoutSnapshot = useRef<McaWidgetId[]>(layout);
 
@@ -199,22 +201,14 @@ export function McaDashboardFeature() {
 
       {/* ── 5–6. Deeper business insights ────────────────────────────── */}
       <div className="space-y-4 pt-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
-            Explore your business
-          </h2>
-          {!editMode && (
-            <Button
-              type="button"
-              variant="link"
-              size="sm"
-              className="h-auto min-h-0 p-0 text-xs font-semibold"
-              onClick={handleCustomise}
-            >
-              Edit
-            </Button>
-          )}
-        </div>
+        {/* No Edit entry here, and the Quick access "Customise dashboard"
+            tile is off in constants.ts: dashboard customisation (edit mode,
+            "Add widgets") is not offered for now. The widget grid, library
+            and live stat widgets are all still wired, so offering it again is
+            an Edit button calling handleCustomise. */}
+        <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+          Explore your business
+        </h2>
 
         {/* ── Configurable widgets (Transactions/globe, stat cards, charts,
             Client Analytics) ── */}
@@ -239,6 +233,20 @@ export function McaDashboardFeature() {
         steps={guideSteps}
         storageKey={MCA_DASHBOARD_GUIDE_KEY}
         highlightOnFirstVisit
+      />
+
+      {/* Post-login welcome — a separate GuideTour instance from
+          GuideLauncher's own internal one, since GuideLauncher exposes no
+          imperative way to start its tour from outside itself. Both drive
+          the exact same `guideSteps`/MCA_DASHBOARD_GUIDE_STEPS, so "Start
+          tour" here and the floating Guide button run the identical
+          walkthrough — this is just a second, session-gated entry point
+          into it, not a second tour. */}
+      <WelcomeExperienceModal onStartTour={() => setWelcomeTourOpen(true)} />
+      <GuideTour
+        steps={guideSteps}
+        open={welcomeTourOpen}
+        onClose={() => setWelcomeTourOpen(false)}
       />
     </McaDashboardAurora>
   );

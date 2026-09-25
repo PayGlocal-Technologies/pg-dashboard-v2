@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Button, Card, Shimmer } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -178,7 +179,7 @@ export function McaCurrencySplitCard() {
             </ResponsiveContainer>
           </div>
           <ul className="min-w-35 flex-1 space-y-2.5 text-xs">
-            {slices.map((slice) => (
+            {slices.map((slice, i) => (
               <li key={slice.key} className="flex items-center justify-between gap-3">
                 <span className="flex items-center gap-2 text-muted-foreground">
                   <span
@@ -187,8 +188,26 @@ export function McaCurrencySplitCard() {
                   />
                   {slice.label}
                 </span>
-                <span className="font-semibold tabular-nums text-foreground">
-                  {metric === "volume" ? slice.volumePct : slice.countPct}%
+                {/* Same staggered sweep-in as SettlementAnalyticsCard's
+                    currency rows: each row's new value settles a beat after
+                    the one above it, top to bottom, on every metric switch. */}
+                <span className="overflow-hidden font-semibold tabular-nums text-foreground">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={metric}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{
+                        duration: 0.3,
+                        delay: Math.min(i, 8) * 0.04,
+                        ease: "easeOut",
+                      }}
+                      className="block"
+                    >
+                      {metric === "volume" ? slice.volumePct : slice.countPct}%
+                    </motion.span>
+                  </AnimatePresence>
                 </span>
               </li>
             ))}

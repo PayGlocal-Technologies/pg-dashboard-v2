@@ -238,7 +238,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
         onSearch={onSearch}
         words={SKU_SEARCH_HINTS}
         ariaLabel="Search products by name or HSN/SAC"
-        className="w-full sm:w-56"
+        className="w-40 sm:w-56"
       />
 
       {/* Every mutation already invalidates the catalogue, so this is for

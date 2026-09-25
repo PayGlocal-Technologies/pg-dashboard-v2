@@ -11,10 +11,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { useGet } from "@/lib/api/hooks";
 import { formatCurrencyShort } from "@/lib/utils/format";
-import { invoiceSummaryApi } from "@/features/dashboard/mca-invoices/services";
-import type { McaInvoiceSummaryResponse } from "@/features/dashboard/mca-invoices/types";
+import { useInvoiceSummary } from "@/features/dashboard/mca-invoices/hooks";
 
 interface SummaryCard {
   key: string;
@@ -92,19 +90,7 @@ export function InvoiceSummaryCards({
   windowSeconds: { start: number; end: number };
   onStatusFilter: (statuses: string[]) => void;
 }) {
-  const url = invoiceSummaryApi(merchantId, windowSeconds.start, windowSeconds.end);
-  // isPending, not isLoading: isPending is false the moment there is data to
-  // show, cached or fresh, so a revisit renders the previous counts instead of
-  // skeletons while the background revalidation runs.
-  const { data, isPending } = useGet<McaInvoiceSummaryResponse>(
-    ["invoice-summary", merchantId, windowSeconds.start, windowSeconds.end],
-    url,
-    undefined,
-    { enabled: !!url }
-  );
-
-  // Note the doubly-nested data: BaseResponse.data.data.
-  const summary = data?.data?.data;
+  const { summary, isLoading: isPending } = useInvoiceSummary(merchantId, windowSeconds);
   const usd = summary?.amountsInUsd;
 
   const cards: SummaryCard[] = [
@@ -186,7 +172,22 @@ export function InvoiceSummaryCards({
             <>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  {hasData && <ChartTooltip cursor={false} content={<SummaryDonutTooltip />} />}
+                  {hasData && (
+                    // allowEscapeViewBox: the chart's own box (size-48,
+                    // 192px) is too small to keep Recharts' default
+                    // in-container tooltip placement clear of the center
+                    // count/amount label below — without this the tooltip
+                    // renders right on top of it instead of outside the
+                    // donut. offset pushes it further from the cursor so it
+                    // clears the ring itself too, not just the center text.
+                    <ChartTooltip
+                      cursor={false}
+                      content={<SummaryDonutTooltip />}
+                      allowEscapeViewBox={{ x: true, y: true }}
+                      offset={16}
+                      wrapperStyle={{ zIndex: 20 }}
+                    />
+                  )}
                   <Pie
                     data={hasData ? donutData : [{ key: "empty", value: 1 }]}
                     dataKey="value"
@@ -251,7 +252,7 @@ export function InvoiceSummaryCards({
                   type="button"
                   variant="ghost"
                   onClick={() => onStatusFilter(card.statuses)}
-                  className="h-full min-h-14 w-full rounded-none px-0 py-3 text-left [&>span]:grid [&>span]:w-full [&>span]:grid-cols-[minmax(0,1fr)_3.5rem_5rem] [&>span]:items-center [&>span]:gap-x-3"
+                  className="h-full min-h-14 w-full rounded-lg px-3 py-3 text-left hover:bg-muted/50 [&>span]:grid [&>span]:w-full [&>span]:grid-cols-[minmax(0,1fr)_3.5rem_5rem] [&>span]:items-center [&>span]:gap-x-3"
                 >
                   <span className="flex min-w-0 items-center gap-2.5">
                     <span

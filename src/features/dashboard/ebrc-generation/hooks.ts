@@ -602,7 +602,10 @@ export const MAX_SHIPPING_BILL_MB = 10;
  *    asynchronously and is what the extraction-status poll waits on.
  */
 export function useShippingBillUpload(): {
-  upload: (irmNumber: string, file: File, onSettled: () => void) => void;
+  /** `onSettled(started)`: true once `extract_shipping_data` has accepted the
+   *  file (extraction is now running server-side), false if any step before
+   *  that failed, so the caller knows whether there is anything to wait on. */
+  upload: (irmNumber: string, file: File, onSettled: (started: boolean) => void) => void;
 } {
   const { mid } = useEbrcScope();
   const handleDgftError = useDgftErrorHandler();
@@ -622,12 +625,12 @@ export function useShippingBillUpload(): {
   >(ebrcGenerationApi(mid, "extract_shipping_data"), { invalidateQueries: false });
 
   const upload = useCallback(
-    (irmNumber: string, file: File, onSettled: () => void) => {
+    (irmNumber: string, file: File, onSettled: (started: boolean) => void) => {
       if (!mid || !irmNumber) return;
 
       if (file.size > MAX_SHIPPING_BILL_MB * 1024 * 1024) {
         toast.error(`File size exceeds the maximum limit of ${MAX_SHIPPING_BILL_MB} MB.`);
-        onSettled();
+        onSettled(false);
         return;
       }
 
@@ -636,13 +639,13 @@ export function useShippingBillUpload(): {
         {
           onSuccess: (res) => {
             if (handleDgftError(res)) {
-              onSettled();
+              onSettled(false);
               return;
             }
             const uploadUrl = res?.data?.upload_url;
             if (!uploadUrl) {
               toast.error("Couldn't get an upload URL.");
-              onSettled();
+              onSettled(false);
               return;
             }
 
@@ -661,20 +664,21 @@ export function useShippingBillUpload(): {
                       irmNumber,
                     },
                     {
+                      onSuccess: () => onSettled(true),
                       onError: (error) => {
+                        onSettled(false);
                         if (handleDgftError(error)) return;
                         toast.error(
                           error?.message ||
                             "Couldn't extract shipping bill data from the uploaded file."
                         );
                       },
-                      onSettled,
                     }
                   );
                 },
                 onError: (error) => {
                   toast.error(error?.message || "Couldn't upload the file.");
-                  onSettled();
+                  onSettled(false);
                 },
               }
             );
@@ -683,7 +687,7 @@ export function useShippingBillUpload(): {
             if (!handleDgftError(error)) {
               toast.error(error?.message || "Couldn't get an upload URL.");
             }
-            onSettled();
+            onSettled(false);
           },
         }
       );

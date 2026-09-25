@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   Button,
@@ -26,7 +26,10 @@ import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { reorderColumns } from "@/lib/utils/columns";
-import { type EbrcRequestRow } from "@/features/dashboard/ebrc-generation/types";
+import {
+  EBRC_JUST_QUEUED_KEY,
+  type EbrcRequestRow,
+} from "@/features/dashboard/ebrc-generation/types";
 import {
   EBRC_PAGE_SIZE,
   EBRC_PAGE_SIZE_OPTIONS,
@@ -208,6 +211,16 @@ export function EbrcStatusTable() {
   const [query, setQuery] = useState("");
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [openRequest, setOpenRequest] = useState<EbrcRequestRow | null>(null);
+  // The callout only means something the moment a request was actually just
+  // queued. Read once, in the initializer rather than a mount effect, so no
+  // setState runs in an effect body; the effect below only clears the flag,
+  // which is what keeps a later, unrelated visit from showing it again.
+  const [justQueued] = useState(
+    () => typeof window !== "undefined" && !!window.sessionStorage.getItem(EBRC_JUST_QUEUED_KEY)
+  );
+  useEffect(() => {
+    window.sessionStorage.removeItem(EBRC_JUST_QUEUED_KEY);
+  }, []);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(EBRC_PAGE_SIZE);
@@ -285,11 +298,13 @@ export function EbrcStatusTable() {
 
   return (
     <div className="space-y-4">
-      <Callout variant="info">
-        <CalloutText>
-          To check the updated status, please wait 4 hours after submission.
-        </CalloutText>
-      </Callout>
+      {justQueued && (
+        <Callout variant="info">
+          <CalloutText>
+            To check the updated status, please wait 4 hours after submission.
+          </CalloutText>
+        </Callout>
+      )}
 
       <div className="overflow-hidden rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
@@ -343,6 +358,21 @@ export function EbrcStatusTable() {
               ? "The request list didn't load. Try refreshing."
               : "Generate your first eBRC to see it tracked here."
           }
+          onRowClick={setOpenRequest}
+          // Hidden until the row is hovered/focused — DataTable's own
+          // rowAction slot handles the opacity reveal, same treatment the
+          // Transactions table's row-level "View details" uses.
+          rowAction={(row) => (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOpenRequest(row)}
+              className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+            >
+              View details
+            </Button>
+          )}
           density="compact"
           tableLayout="content"
           pagination={{

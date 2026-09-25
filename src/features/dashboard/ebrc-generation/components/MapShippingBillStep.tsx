@@ -26,6 +26,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { AppImage } from "@/components/common/AppImage";
+import { EbrcStepFooterBar } from "@/features/dashboard/ebrc-generation/components/EbrcStepFooterBar";
 import {
   DEDUCTION_FIELDS,
   EXTRACTION_STATUS_DONE,
@@ -63,17 +64,23 @@ function IrmNavItem({
   record,
   mapping,
   active,
+  blocked,
   onSelect,
 }: {
   irmId: string;
   record: IrmDetails | undefined;
   mapping: IrmMapping | undefined;
   active: boolean;
+  /** Named by the last "Save & review" as still unaccepted, until its record
+   *  says otherwise. Drawn as an error rather than the ordinary amber. */
+  blocked: boolean;
   onSelect: () => void;
 }) {
   const irm = record ? toIrmSelectionRow(record) : undefined;
-  const complete = isMappingComplete(record);
-  const started = !complete && isMappingStarted(mapping);
+  // `blocked` outranks "Complete": it comes from the server's own
+  // irmProcessStatus, which is what the save gate trusts.
+  const complete = !blocked && isMappingComplete(record);
+  const started = !complete && !blocked && isMappingStarted(mapping);
 
   return (
     // A bare `<button>`, not flux's `<Button>`: that component wraps its
@@ -86,7 +93,8 @@ function IrmNavItem({
       aria-current={active}
       className={cn(
         "flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left transition-colors",
-        active ? "bg-primary/5" : "hover:bg-muted/50"
+        active ? "bg-primary/5" : "hover:bg-muted/50",
+        blocked && "ring-1 ring-destructive/40"
       )}
     >
       <span
@@ -97,6 +105,11 @@ function IrmNavItem({
       >
         {irm ? formatCurrency(irm.remittanceAmount, irm.currencyCode) : irmId}
       </span>
+      {/* The IRM number is what every message about an IRM names (the save
+          gate's toast, DGFT, the merchant's own bank statement), so it is on
+          the row too: without it "CITIN…635 needs mapping" could not be
+          matched to anything in this list. */}
+      {irm && <span className="font-mono text-[11px] text-muted-foreground">{irmId}</span>}
       {irm && (
         <span className="truncate text-[11.5px] text-muted-foreground">
           {irm.remitterName} · {irm.country}
@@ -107,13 +120,24 @@ function IrmNavItem({
           "mt-0.5 flex items-center gap-1 text-[11px] font-medium",
           complete
             ? "text-emerald-600 dark:text-emerald-400"
-            : started
-              ? "text-primary"
-              : "text-amber-600 dark:text-amber-400"
+            : blocked
+              ? "text-destructive"
+              : started
+                ? "text-primary"
+                : "text-amber-600 dark:text-amber-400"
         )}
       >
-        <Icon name={complete ? "check" : started ? "clock" : "alert-circle"} className="h-3 w-3" />
-        {complete ? "Complete" : started ? "In progress" : "Needs details"}
+        <Icon
+          name={complete ? "check" : blocked ? "alert-circle" : started ? "clock" : "alert-circle"}
+          className="h-3 w-3"
+        />
+        {complete
+          ? "Complete"
+          : blocked
+            ? "Save its details to continue"
+            : started
+              ? "In progress"
+              : "Needs details"}
       </span>
     </button>
   );
@@ -252,8 +276,14 @@ function MappingForm({
                 // from the backend's own extraction, never guessed here.
                 patch({ fileName: file.name });
                 setIsUploading(true);
-                upload(irmId, file, () => {
+                upload(irmId, file, (started) => {
                   setIsUploading(false);
+                  // Hands the wait to the step's extraction poll, which then
+                  // refetches the record once the backend is done. Without
+                  // this, the poll only started if the server had already
+                  // flipped the record to STARTED by the refetch below, and
+                  // extract_shipping_data returns before it does.
+                  if (started) onExtracting(true);
                   onUploaded();
                 });
               }}
@@ -367,7 +397,13 @@ function MappingForm({
             <Input
               id={`port-code-${irmId}`}
               value={mapping.portCode}
-              onChange={(e) => patch({ portCode: e.target.value })}
+              // Upper-cased as typed and capped at the code's own 6 characters,
+              // so the field can only ever hold something shaped like one.
+              onChange={(e) => patch({ portCode: e.target.value.toUpperCase() })}
+              maxLength={6}
+              placeholder="e.g. INDEL4"
+              autoCapitalize="characters"
+              spellCheck={false}
               aria-invalid={!!errors.portCode || undefined}
             />
             {errors.portCode && <FieldError>{errors.portCode}</FieldError>}
@@ -612,6 +648,9 @@ export function MapShippingBillStep({
   // as that IRM is edited again — production's forms behave the same way:
   // validation surfaces on submit, not while typing.
   const [errorsByIrm, setErrorsByIrm] = useState<Record<string, MappingFieldErrors>>({});
+  // IRMs the last "Save & review" found unaccepted. Each one's flag lifts on
+  // its own once its record reports IN_PROGRESS (see `blocked` below).
+  const [blockedIds, setBlockedIds] = useState<string[]>([]);
   const { save, isSaving } = useSaveShippingData();
   const { fetchStatus } = useExtractionStatus();
 
@@ -744,11 +783,18 @@ export function MapShippingBillStep({
           .filter(Boolean);
 
         if (fresh && fresh.length > 0 && pending.length > 0) {
+          // Point at them rather than only list them: flag each in the IRM
+          // list, and open the first so the merchant lands on the form to fix.
+          setBlockedIds(pending as string[]);
+          setExplicitActiveId(pending[0] ?? null);
           toast.error(
-            `Please map and validate the following IRMs before proceeding: ${pending.join(", ")}`
+            pending.length === 1
+              ? `IRM ${pending[0]} still needs its shipping bill saved. It's open on the right.`
+              : `${pending.length} IRMs still need their shipping bills saved: ${pending.join(", ")}. They're flagged in the list.`
           );
           return;
         }
+        setBlockedIds([]);
 
         onProceed();
         return;
@@ -786,6 +832,9 @@ export function MapShippingBillStep({
                 key={id}
                 irmId={id}
                 record={records.get(id)}
+                blocked={
+                  blockedIds.includes(id) && records.get(id)?.irmProcessStatus !== "IN_PROGRESS"
+                }
                 mapping={mappings[id]}
                 active={id === activeId}
                 onSelect={() => setExplicitActiveId(id)}
@@ -852,14 +901,56 @@ export function MapShippingBillStep({
                   <p className="text-[12px] text-muted-foreground">Shipping documentation</p>
                 </div>
 
-                <div className="relative min-h-0 flex-1 overflow-y-auto p-4">
-                  {/* Covers the whole form, not just the upload tab: while the
-                      backend is reading the PDF it is about to overwrite these
-                      fields, so letting them be typed into invites losing the
-                      edit. Production spins the same region for the same
-                      reason. */}
+                {/* The overlay sits on this NON-scrolling wrapper, over the
+                    scroll area rather than inside it: `absolute inset-0` inside
+                    a scrolling box is only one screenful tall and scrolls away
+                    with the content, which left every field below the fold
+                    reachable mid-extraction. Here it always covers the visible
+                    panel, and it also swallows the wheel, so the form cannot be
+                    scrolled under it.
+
+                    `inert` on the scroll area is the real lock: it takes the
+                    form out of pointer, keyboard (Tab) and screen-reader reach
+                    together, which an overlay alone does not. The fields are
+                    locked because the backend is about to overwrite them, so an
+                    edit typed now would be lost. Production spins the same
+                    region for the same reason. */}
+                <div className="relative flex min-h-0 flex-1 flex-col">
+                  <div className="min-h-0 flex-1 overflow-y-auto p-4" inert={activeExtracting}>
+                    <MappingForm
+                      irmId={activeId}
+                      mapping={activeMapping}
+                      record={activeRecord}
+                      previewUrl={presignedUrls[activeId]}
+                      errors={errorsByIrm[activeId] ?? {}}
+                      onChange={(next) => {
+                        // Editing clears that field's complaint, so a corrected
+                        // value stops looking wrong before the next save.
+                        setErrorsByIrm((prev) =>
+                          prev[activeId] ? { ...prev, [activeId]: {} } : prev
+                        );
+                        onMappingChange(activeId, next);
+                      }}
+                      onUploaded={onRefetchIrms}
+                      onExtracting={(extracting) => {
+                        setIsExtracting((prev) => ({ ...prev, [activeId]: extracting }));
+                        // A fresh upload is a fresh extraction to wait on.
+                        if (extracting) {
+                          setResolved((prev) => {
+                            if (!prev[activeId]) return prev;
+                            const next = { ...prev };
+                            delete next[activeId];
+                            return next;
+                          });
+                        }
+                      }}
+                    />
+                  </div>
                   {activeExtracting && (
-                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/75 backdrop-blur-[1px]">
+                    <div
+                      role="status"
+                      className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-card/75 backdrop-blur-[1px]"
+                    >
                       <Icon name="loader" className="h-5 w-5 animate-spin text-primary" />
                       <p className="text-[12.5px] font-medium text-foreground">
                         Reading the shipping bill…
@@ -869,53 +960,46 @@ export function MapShippingBillStep({
                       </p>
                     </div>
                   )}
-                  <MappingForm
-                    irmId={activeId}
-                    mapping={activeMapping}
-                    record={activeRecord}
-                    previewUrl={presignedUrls[activeId]}
-                    errors={errorsByIrm[activeId] ?? {}}
-                    onChange={(next) => {
-                      // Editing clears that field's complaint, so a corrected
-                      // value stops looking wrong before the next save.
-                      setErrorsByIrm((prev) =>
-                        prev[activeId] ? { ...prev, [activeId]: {} } : prev
-                      );
-                      onMappingChange(activeId, next);
-                    }}
-                    onUploaded={onRefetchIrms}
-                    onExtracting={(extracting) => {
-                      setIsExtracting((prev) => ({ ...prev, [activeId]: extracting }));
-                      // A fresh upload is a fresh extraction to wait on.
-                      if (extracting) {
-                        setResolved((prev) => {
-                          if (!prev[activeId]) return prev;
-                          const next = { ...prev };
-                          delete next[activeId];
-                          return next;
-                        });
-                      }
-                    }}
-                  />
-                </div>
-
-                <div className="flex shrink-0 items-center justify-end border-t border-border bg-card px-4 py-3">
-                  <Button
-                    type="button"
-                    variant="primary"
-                    rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
-                    disabled={isSaving}
-                    isLoading={isSaving}
-                    onClick={handleSaveAndNext}
-                  >
-                    {isLastByPosition ? "Save & review" : "Save & next"}
-                  </Button>
                 </div>
               </>
             )
           )}
         </div>
       </div>
+
+      {/* Same fixed bar SelectIrmsStep docks its own actions in, so "the
+          buttons" stay in one place as the merchant moves through the
+          wizard rather than each step growing a differently-placed footer. */}
+      <EbrcStepFooterBar
+        left={
+          <span className="text-[13px] text-muted-foreground">
+            {completedCount} of {selectedIds.length} IRMs mapped
+          </span>
+        }
+        right={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-auto min-h-0 p-0 text-[12.5px] text-muted-foreground hover:bg-transparent hover:text-foreground"
+              onClick={onBackToSelectIrms}
+            >
+              Back
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
+              disabled={isSaving || !activeRecord || activeExtracting}
+              isLoading={isSaving}
+              onClick={handleSaveAndNext}
+            >
+              {isLastByPosition ? "Save & review" : "Save & next"}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }

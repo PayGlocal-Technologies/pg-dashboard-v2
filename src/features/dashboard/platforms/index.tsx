@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { AppImage as Image } from "@/components/common/AppImage";
 import {
   Button,
@@ -186,31 +187,58 @@ function PlatformsContent() {
   // ResizeObserver, not a one-time measurement: field counts (and therefore
   // height) change with the platform/country selection, and the account
   // column remounts on every platform switch (see its `key` below).
+  //
+  // The account side is a callback ref held in state, not a useRef: on a
+  // platform switch the old column animates out BEFORE the new one mounts
+  // (AnimatePresence mode="wait"), so the element to watch only exists some
+  // time after the render that changed the platform. Holding it in state is
+  // what re-runs the effect below the moment that new element arrives.
   const platformGroupRef = useRef<HTMLDivElement>(null);
-  const accountGroupRef = useRef<HTMLDListElement>(null);
+  const [accountGroupEl, setAccountGroupEl] = useState<HTMLDivElement | null>(null);
   const [matchedGroupHeight, setMatchedGroupHeight] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     const platformEl = platformGroupRef.current;
-    const accountEl = accountGroupRef.current;
+    const accountEl = accountGroupEl;
     if (!platformEl && !accountEl) return;
 
     // The callback, not the effect body, is what calls setState — this is
     // the same "async callback" shape CLAUDE.md's purity rules carve out for
     // setInterval, just driven by layout instead of a timer.
-    const observer = new ResizeObserver(() => {
+    function measure() {
       const heights = [platformEl?.offsetHeight, accountEl?.offsetHeight].filter(
         (h): h is number => typeof h === "number" && h > 0
       );
       if (heights.length === 0) return;
       setMatchedGroupHeight(Math.max(...heights));
-    });
+    }
 
+    const observer = new ResizeObserver(measure);
     if (platformEl) observer.observe(platformEl);
     if (accountEl) observer.observe(accountEl);
 
-    return () => observer.disconnect();
-  }, [selectedPlatform?.id, selectedAccount]);
+    // Belt and suspenders: ResizeObserver is supposed to deliver an initial
+    // callback for every freshly-observed target on its own, but that first
+    // delivery was, in practice, either not landing or landing too late to
+    // matter for this pair — the account card kept rendering at its shorter
+    // natural height instead of growing to match. A rAF-deferred measurement
+    // (not the effect body itself, same rule as above) forces that first
+    // read explicitly instead of depending on it.
+    const rafId = requestAnimationFrame(measure);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(rafId);
+    };
+    // selectedAccount?.id, not selectedAccount itself: `accounts` (and so
+    // `selectedAccount`) is recomputed fresh every render rather than
+    // memoized, so the object's identity changes on every render even when
+    // the actual selection hasn't — depending on the object tore the
+    // observer down and recreated it on every render, which was starving it
+    // of the chance to ever deliver a resize notification, and is why the
+    // account card was stuck at its min-h-60 floor instead of growing to
+    // match the (taller) platform card.
+  }, [accountGroupEl, selectedPlatform?.id, selectedAccount?.id]);
 
   /**
    * What a document card does when it's activated — from the card, from its
@@ -331,16 +359,21 @@ function PlatformsContent() {
                 details beside it are read every time. Sits right of the
                 currency select because the steps quote that currency's own
                 identifiers in their Quick Access panel. */}
+            {/* Same soft-blue fill the dashboard's own "Create invoice"
+                quick-access tile uses (bg-primary-light/text-primary), plus
+                a visible blue stroke — variant="outline" is left as-is so
+                the button keeps its normal rounded-lg corners rather than
+                the tile's pill shape. */}
             {!isAmazonProvisionable && (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                className="shrink-0"
-                leftIcon={<Icon name="list-checks" className="h-3.5 w-3.5" />}
+                className="shrink-0 border-primary/30 bg-primary-light text-primary hover:bg-primary-light/70"
+                leftIcon={<Icon name="help-circle" className="h-3.5 w-3.5" />}
                 onClick={() => setConnectStepsOpen(true)}
               >
-                Steps to connect
+                How to connect
               </Button>
             )}
           </>
@@ -553,14 +586,22 @@ function PlatformsContent() {
                     size="md"
                     className="w-full justify-start gap-2.5 text-muted-foreground  [&>span]:text-left"
                     leftIcon={
-                      // Same h-6 w-9 footprint as the platform rows' logo
-                      // box, so this row's label starts in the same column
-                      // as "Freelancer"/"Upwork"/etc. above it — sizing this
-                      // to the glyph itself (narrower than that box) left the
-                      // label starting further left than every row above it.
-                      <span className="flex flex-0 h-6 w-9 shrink-0 items-center justify-center">
+                      // Same h-6 w-9 box the platform rows' brand marks sit
+                      // in, glyph centered inside it — matches "Request a
+                      // platform"'s label to the exact x-position every
+                      // platform name above it starts at, per explicit ask,
+                      // rather than the glyph's own (narrower) footprint.
+                      //
+                      // A <div>, not a <span>: the row's own
+                      // "[&>span]:flex-1" rule targets every direct <span>
+                      // child of the Button to push the label to the right —
+                      // it was also matching this icon wrapper (also a
+                      // span), stretching the fixed w-9 box into a flexible
+                      // one and shoving "Request a platform" far right of
+                      // where every platform name above it starts.
+                      <div className="flex h-6 w-9 shrink-0 items-center justify-center">
                         <Icon name="plus" className="h-4 w-4" />
-                      </span>
+                      </div>
                     }
                     onClick={() => setRequestPlatformOpen(true)}
                   >
@@ -572,8 +613,10 @@ function PlatformsContent() {
           </div>
         </div>
         {/* ─── Workflow ────────────────────────────────────────────────── */}
-        {/* key remounts the column on every platform change so the fade
-            replays on each switch, not just the first render. Every heading,
+        {/* Keyed by platform, so each switch hands over the same way a
+            currency change does (and the Multi-currency accounts page's
+            account card): the outgoing column fades and lifts out, then the
+            incoming one rises in. Every heading,
             the currency control, the account fields and the steps below all
             read off the selected platform, so switching tabs reprints the whole
             column in place.
@@ -590,16 +633,24 @@ function PlatformsContent() {
             them reads as out of place when the account details card above
             grows taller for a given country/platform. Only the gap before
             Steps keeps a wider mt-8 step. */}
-        <div key={selectedPlatform.id} className="page-enter max-w-4xl lg:col-start-2">
-          {isAmazonProvisionable ? (
-            <AmazonProvisionCard
-              onProvision={() => provisionAmazonAccount(refetchAccounts)}
-              isProvisioning={isProvisioning}
-            />
-          ) : (
-            <>
-              {/* ─── 1. Account details ─────────────────────────────────────── */}
-              {/* Always open, not a disclosure — this used to be a collapsed
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={selectedPlatform.id}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="max-w-4xl lg:col-start-2"
+          >
+            {isAmazonProvisionable ? (
+              <AmazonProvisionCard
+                onProvision={() => provisionAmazonAccount(refetchAccounts)}
+                isProvisioning={isProvisioning}
+              />
+            ) : (
+              <>
+                {/* ─── 1. Account details ─────────────────────────────────────── */}
+                {/* Always open, not a disclosure — this used to be a collapsed
               Accordion (see git history for the reasoning that no longer
               applies), but a merchant lands on this page specifically to
               read these fields, so hiding them behind a click just cost an
@@ -614,9 +665,9 @@ function PlatformsContent() {
               render, so these fields can't drift from the ones the rest of
               the product shows, and they follow the platform and currency
               selections in the page header above. */}
-              {selectedAccount && (
-                <div>
-                  {/* Same caption treatment as the platform column's own "Select
+                {selectedAccount && (
+                  <div>
+                    {/* Same caption treatment as the platform column's own "Select
                   platform" label (size, weight, uppercase, tracking, muted
                   colour) — not just for consistency, but because the two
                   columns are `lg:items-start` siblings in one grid row: without
@@ -625,13 +676,13 @@ function PlatformsContent() {
                   caption, so the two never lined up. Matching the caption
                   (and the same mt-2 gap before the card, plus the ResizeObserver
                   min-height set on this Card and the platform Card above —
-                  see where platformGroupRef/accountGroupRef are declared) is
+                  see where platformGroupRef/accountGroupEl are declared) is
                   what keeps their cards starting AND ending at the same
                   height, not just aligned at the top. */}
-                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Account details
-                  </div>
-                  {/* min-h-60 floors this card at the platform card's own height
+                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      Account details
+                    </div>
+                    {/* min-h-60 floors this card at the platform card's own height
                   (5 rows × h-10 + space-y-1 gaps + p-3 padding = 240px, see
                   the platform list's own markup) so a country/platform with
                   fewer fields (e.g. SEPA's 8 short fields vs. ACH's 7 plus a
@@ -651,126 +702,142 @@ function PlatformsContent() {
                   to — a taller Card doesn't change its field grid's natural
                   rendered height, so a shorter field set can still shrink
                   the match back down. */}
-                  <Card
-                    size="sm"
-                    className="mt-2 min-h-60 border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
-                    style={{ minHeight: matchedGroupHeight }}
-                    data-guide="mca-account-details"
-                  >
-                    {/* Proximity does the grouping, not rules: 4px holds a label
+                    <Card
+                      size="sm"
+                      className="mt-2 min-h-60 border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40"
+                      style={{ minHeight: matchedGroupHeight }}
+                      data-guide="mca-account-details"
+                    >
+                      {/* Proximity does the grouping, not rules: 4px holds a label
                     to its own value, the grid's own gaps separate one field
                     from the next, and no field carries padding of its own.
                     Three columns where the old 320px sidebar could only have
                     carried one — this column is wide enough to lay the fields
                     out the way the account card itself does, so the two read
                     as the same module. */}
-                    <dl
-                      ref={accountGroupRef}
-                      className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3"
-                    >
-                      {accountFields.map((field) => (
-                        <div key={field.label} className="min-w-0 space-y-1">
-                          <dt className={FIELD_LABEL}>{field.label}</dt>
-                          <dd className={FIELD_VALUE}>{field.value}</dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </Card>
-                </div>
-              )}
+                      {/* Changing the currency swaps every value at once, so the
+                    fields hand over the same way the Multi-currency accounts
+                    page's account card does: the outgoing set fades and lifts
+                    out first, then the incoming one rises in (same timing and
+                    easing). The ref sits on this wrapper, not the <dl>, which
+                    remounts per account: the height-matching observer set up
+                    above has to keep watching one element across the switch. */}
+                      <div ref={setAccountGroupEl}>
+                        <AnimatePresence mode="wait" initial={false}>
+                          <motion.dl
+                            key={selectedAccount.id}
+                            initial={{ opacity: 0, y: 6 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                            className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3"
+                          >
+                            {accountFields.map((field) => (
+                              <div key={field.label} className="min-w-0 space-y-1">
+                                <dt className={FIELD_LABEL}>{field.label}</dt>
+                                <dd className={FIELD_VALUE}>{field.value}</dd>
+                              </div>
+                            ))}
+                          </motion.dl>
+                        </AnimatePresence>
+                      </div>
+                    </Card>
+                  </div>
+                )}
 
-              {/* ─── 2. Documents you might need ────────────────────────────── */}
-              {/* Moved here from the platform column (where it used to sit under
+                {/* ─── 2. Documents you might need ────────────────────────────── */}
+                {/* Moved here from the platform column (where it used to sit under
               the platform card) — the walkthrough right below is exactly
               where these get used, so gathering them belongs immediately
               before it rather than off in the sidebar. Only Amazon carries
               documents, so on every other platform this section doesn't
               render at all. */}
-              {documents.length > 0 && (
-                <>
-                  <Separator className="mt-4" />
-                  <section className="mt-4">
-                    <h2 className={MODULE_TITLE}>Documents you might need</h2>
-                    <p className={cn(MODULE_SUBTITLE, "mt-1")}>
-                      Statements {selectedPlatform.name} may ask you for.
-                    </p>
+                {documents.length > 0 && (
+                  <>
+                    <Separator className="mt-4" />
+                    <section className="mt-4">
+                      <h2 className={MODULE_TITLE}>Documents you might need</h2>
+                      <p className={cn(MODULE_SUBTITLE, "mt-1")}>
+                        Statements {selectedPlatform.name} may ask you for.
+                      </p>
 
-                    {/* Side by side now that this sits in the wide workflow
+                      {/* Side by side now that this sits in the wide workflow
                     column rather than the narrow 288px sidebar — two short
                     cards in a row reads better here than the sidebar's own
                     stacked treatment did. sm:grid-cols-2 rather than a fixed
                     two, in case a platform ever carries a third document:
                     it wraps to a new row instead of forcing a third narrow
                     column. */}
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      {documents.map((doc) => (
-                        // The whole card is the target, not just the icon: the card
-                        // carries one action, so anywhere on it should trigger it
-                        // rather than asking for a hit on a 32px button.
-                        // role/tabIndex and the Enter/Space handler are what make that
-                        // reachable by keyboard too; the accessible name comes from
-                        // the card's own caption and title text.
-                        //
-                        // No preventDefault on mousedown: the card should keep browser
-                        // focus after a click, so that closing the drawer returns
-                        // focus to the card that opened it.
-                        <Card
-                          key={doc.title}
-                          size="sm"
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => handleDocumentAction(doc)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleDocumentAction(doc);
-                            }
-                          }}
-                          className="min-w-0 cursor-pointer flex-row items-center justify-between gap-3 p-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md"
-                        >
-                          <div className="min-w-0">
-                            {/* Metadata above, title below — the caption qualifies the
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {documents.map((doc) => (
+                          // The whole card is the target, not just the icon: the card
+                          // carries one action, so anywhere on it should trigger it
+                          // rather than asking for a hit on a 32px button.
+                          // role/tabIndex and the Enter/Space handler are what make that
+                          // reachable by keyboard too; the accessible name comes from
+                          // the card's own caption and title text.
+                          //
+                          // No preventDefault on mousedown: the card should keep browser
+                          // focus after a click, so that closing the drawer returns
+                          // focus to the card that opened it.
+                          <Card
+                            key={doc.title}
+                            size="sm"
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => handleDocumentAction(doc)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleDocumentAction(doc);
+                              }
+                            }}
+                            className="min-w-0 cursor-pointer flex-row items-center justify-between gap-3 p-4 transition-[box-shadow,border-color] duration-150 hover:shadow-md"
+                          >
+                            <div className="min-w-0">
+                              {/* Metadata above, title below — the caption qualifies the
                           title, so it sits muted and a size smaller. */}
-                            <p className="truncate text-[12px] text-muted-foreground">
-                              {doc.caption}
-                            </p>
-                            <p className="truncate text-[13px] font-medium text-foreground">
-                              {doc.title}
-                            </p>
-                          </div>
-                          {/* Kept as an affordance — it says the card does something —
+                              <p className="truncate text-[12px] text-muted-foreground">
+                                {doc.caption}
+                              </p>
+                              <p className="truncate text-[13px] font-medium text-foreground">
+                                {doc.title}
+                              </p>
+                            </div>
+                            {/* Kept as an affordance — it says the card does something —
                         but it runs the same handler the card does.
                         stopPropagation so a click on the icon fires that handler
                         once, not twice. */}
-                          <IconButton
-                            aria-label={doc.actionLabel}
-                            variant="ghost"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDocumentAction(doc);
-                            }}
-                          >
-                            <Icon name={doc.actionIcon} className="h-4 w-4" />
-                          </IconButton>
-                        </Card>
-                      ))}
-                    </div>
-                  </section>
-                </>
-              )}
+                            <IconButton
+                              aria-label={doc.actionLabel}
+                              variant="ghost"
+                              size="sm"
+                              className="shrink-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDocumentAction(doc);
+                              }}
+                            >
+                              <Icon name={doc.actionIcon} className="h-4 w-4" />
+                            </IconButton>
+                          </Card>
+                        ))}
+                      </div>
+                    </section>
+                  </>
+                )}
 
-              {/* The connect walkthrough used to run inline from here down: a
+                {/* The connect walkthrough used to run inline from here down: a
               "Connect your account" heading followed by every numbered step
               and its full-width screenshot. It now lives behind the header's
-              "Steps to connect" button (see ConnectStepsPage), because it is
+              "How to connect" button (see ConnectStepsPage), because it is
               read once per platform while the account details above are read
               every time — leaving the page's own subject as the shortest thing
               on it and pushing everything else past the fold. */}
-            </>
-          )}
-        </div>
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Guide launcher for Connect Platforms. */}

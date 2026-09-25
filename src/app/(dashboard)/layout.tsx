@@ -9,7 +9,6 @@ import { ContentAreaProvider } from "@/components/layout/ContentAreaContext";
 import { Icon } from "@/components/icon";
 import { FeedbackSheet } from "@/features/dashboard/feedback/FeedbackSheet";
 import { EchoPanel } from "@/features/dashboard/echo/components/EchoPanel";
-import { McaV2AnnouncementModal } from "@/components/layout/McaV2AnnouncementModal";
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { isError } = useFetchCommonData();
@@ -47,12 +46,6 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           whole. Whether it actually appears is the server's call — see the
           eligibility check inside. */}
       <FeedbackSheet />
-
-      {/* One-time "MCA has a new look" announcement, gated on actually
-          having MCA access — see the component for why this is a plain
-          localStorage flag rather than something tied to the login action
-          itself. */}
-      <McaV2AnnouncementModal />
     </div>
   );
 }

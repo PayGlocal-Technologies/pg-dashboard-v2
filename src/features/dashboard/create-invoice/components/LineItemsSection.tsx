@@ -338,7 +338,7 @@ export function LineItemsSection({
                   aria-label={`Quantity for ${item.description || "item"}`}
                   value={item.quantity}
                   onChange={(e) => patchItem(item.key, { quantity: e.target.value })}
-                  className="h-7 px-2 text-center text-[13px]"
+                  className="h-7 px-2 text-center text-[13px] shadow-none"
                 />
 
                 <Input
@@ -346,7 +346,7 @@ export function LineItemsSection({
                   aria-label={`Rate for ${item.description || "item"}`}
                   value={item.unitPrice}
                   onChange={(e) => patchItem(item.key, { unitPrice: e.target.value })}
-                  className="h-7 px-2 text-[13px]"
+                  className="h-7 px-2 text-[13px] shadow-none"
                 />
 
                 <span className="text-right text-[13px] font-semibold tabular-nums text-foreground">

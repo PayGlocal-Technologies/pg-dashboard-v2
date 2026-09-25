@@ -17,6 +17,8 @@ import { REFERRAL_HERO_BANNER } from "@/features/dashboard/refer-and-earn/consta
 
 interface ReferralHeroProps {
   /** The full URL that gets copied and shared. */
+  /** The merchant's own influencerURL. Empty until it has been generated, and
+   *  then the field reads as loading and neither action is offered. */
   referralUrl: string;
 }
 
@@ -159,6 +161,7 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
             <InputGroupInput
               readOnly
               value={referralUrl}
+              placeholder="Generating your link…"
               aria-label="Your referral link"
               className="truncate text-[13px]"
             />
@@ -188,6 +191,7 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
                 type="button"
                 variant="primary"
                 size="sm"
+                disabled={!referralUrl}
                 onClick={() => void handleCopy()}
                 leftIcon={<Icon name={copied ? "check" : "copy"} size={13} />}
                 aria-label={copied ? "Referral link copied" : "Copy referral link"}
@@ -209,6 +213,7 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
             type="button"
             variant="secondary"
             size="sm"
+            disabled={!referralUrl}
             onClick={() => void handleShare()}
             leftIcon={<Icon name="share-2" size={13} />}
             className="h-8 min-h-8 w-full shrink-0 sm:w-auto"

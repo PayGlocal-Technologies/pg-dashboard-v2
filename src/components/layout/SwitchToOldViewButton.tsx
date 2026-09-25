@@ -10,7 +10,6 @@ import {
   PopoverTrigger,
   Textarea,
 } from "@/components/ui";
-import { Icon } from "@/components/icon";
 import { usePost } from "@/lib/api/hooks";
 import { feedbackApi } from "@/features/dashboard/feedback/services";
 import type {
@@ -79,7 +78,6 @@ export function SwitchToOldViewButton() {
           type="button"
           variant="ghost"
           size="sm"
-          leftIcon={<Icon name="history" size={15} className="text-muted-foreground" />}
           className="hidden h-9 shrink-0 whitespace-nowrap rounded-lg border border-gray-200 bg-gray-50 px-3 text-[13px] text-muted-foreground transition-colors hover:bg-gray-100 hover:text-foreground sm:inline-flex dark:border-border dark:bg-muted dark:hover:bg-accent"
         >
           Switch to old view
