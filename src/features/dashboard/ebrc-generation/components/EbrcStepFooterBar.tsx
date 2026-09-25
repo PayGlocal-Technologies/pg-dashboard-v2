@@ -15,16 +15,16 @@ import type { ReactNode } from "react";
  * normal flow when everything fits on screen, and only pins itself to the
  * scroll container's bottom edge once the content actually overflows — so
  * it sits high, right where the content ends, and only "detaches" when
- * scrolling makes that necessary. `-mx-6` cancels the content column's own
- * `px-6` so the bar still runs edge-to-edge across it.
+ * scrolling makes that necessary.
  *
- * No border, no shadow, no separate surface — just the CTAs sitting in this
- * one consistent spot. A bordered/shadowed bar (even a light one) still read
- * as its own distinct "section" of chrome; this is plain placement.
+ * A real card (rounded, bordered, its own side padding) — a flat, unbordered
+ * strip flush with the content column's own edges read as a stray sliver of
+ * background rather than a distinct control, especially over the page's own
+ * background wash.
  */
 export function EbrcStepFooterBar({ left, right }: { left?: ReactNode; right: ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 bg-card pt-4">
+    <div className="sticky bottom-0 z-10 mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card px-6 py-3.5">
       <div className="flex flex-wrap items-center gap-3">{left}</div>
       <div className="ml-auto flex items-center gap-3">{right}</div>
     </div>

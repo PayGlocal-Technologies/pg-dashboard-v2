@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Badge, Button, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { withBasePath } from "@/constants/basePath";
 import { useEbrcDgft } from "@/stores/useEbrcDgft";
 import { SelectIrmsStep } from "@/features/dashboard/ebrc-generation/components/SelectIrmsStep";
 import { MapShippingBillStep } from "@/features/dashboard/ebrc-generation/components/MapShippingBillStep";
@@ -227,7 +228,21 @@ export function EbrcGenerationWizard() {
         <div className="flex min-h-0 flex-1">
           <StepList activeStep={activeStep} furthestStep={furthestStep} onJump={goToStep} />
 
-          <div className="relative min-h-0 flex-1 overflow-y-auto">
+          <div
+            className="relative min-h-0 flex-1 overflow-y-auto bg-cover bg-top bg-no-repeat"
+            // Quoted url(): the filename has a space ("bg image.png"), and an
+            // unquoted CSS url() is terminated by the first whitespace,
+            // which silently drops the whole background-image declaration —
+            // this is the exact bug that made this image "not load" before.
+            //
+            // The white wash is layered on as a second background
+            // (multiple-backgrounds, not `opacity` on this div) — opacity
+            // would fade the step content sitting on top of it too, not
+            // just the image underneath.
+            style={{
+              backgroundImage: `linear-gradient(rgba(255,255,255,0.78), rgba(255,255,255,0.78)), url("${withBasePath("/assets/bg image.png")}")`,
+            }}
+          >
             <div className="px-6 py-6">
               {/* Header naming the current step's action in a few words —
                     the sidebar label says which step this is, this says what

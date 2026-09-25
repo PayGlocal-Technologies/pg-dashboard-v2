@@ -189,7 +189,22 @@ export function InvoiceSummaryCards({
             <>
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  {hasData && <ChartTooltip cursor={false} content={<SummaryDonutTooltip />} />}
+                  {hasData && (
+                    // allowEscapeViewBox: the chart's own box (size-48,
+                    // 192px) is too small to keep Recharts' default
+                    // in-container tooltip placement clear of the center
+                    // count/amount label below — without this the tooltip
+                    // renders right on top of it instead of outside the
+                    // donut. offset pushes it further from the cursor so it
+                    // clears the ring itself too, not just the center text.
+                    <ChartTooltip
+                      cursor={false}
+                      content={<SummaryDonutTooltip />}
+                      allowEscapeViewBox={{ x: true, y: true }}
+                      offset={16}
+                      wrapperStyle={{ zIndex: 20 }}
+                    />
+                  )}
                   <Pie
                     data={hasData ? donutData : [{ key: "empty", value: 1 }]}
                     dataKey="value"
