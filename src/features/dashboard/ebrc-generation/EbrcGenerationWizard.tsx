@@ -176,7 +176,7 @@ export function EbrcGenerationWizard() {
   // This route has no sidebar, so the picker goes in the card rather than
   // pointing at a control that isn't on screen — the same inline form the
   // invoice editor uses for exactly this situation.
-  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+  const { needsMidChoice } = usePacbMidScope();
   const clearSelectedIrms = useEbrcSelection((s) => s.clearSelectedIrms);
 
   const { isConnected: dgftConnected, isLoading: isStatusLoading } = useDgftCustomerStatus();
@@ -361,7 +361,7 @@ export function EbrcGenerationWizard() {
 
       {needsMidChoice ? (
         <div className="mx-auto w-full max-w-2xl px-6 py-16">
-          <SelectMidView midType="PACB" midOptions={midOptions} onSelectMid={selectMid} />
+          <SelectMidView midType="PACB" showSidebarHint={false} />
         </div>
       ) : isStatusLoading || !dgftConnected ? (
         // Either the status call is still in flight, or it came back

@@ -255,7 +255,7 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
  */
 export function CreateInvoiceFeature() {
   const router = useRouter();
-  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+  const { needsMidChoice } = usePacbMidScope();
 
   // "Edit template" reaches this route by a full page load, which drops the
   // in-memory MID selection, so it hands the MID over in `?mid=`. Applying it
@@ -279,9 +279,8 @@ export function CreateInvoiceFeature() {
    * which account is meant. Nothing has been created at this point, so leaving
    * costs the merchant nothing.
    *
-   * The picker is rendered *in* the card rather than the usual "use the selector
-   * in the sidebar": this route is the full-screen editor shell, which draws no
-   * sidebar at all, so that instruction would point at nothing.
+   * The sidebar hint is switched off: this route is the full-screen editor
+   * shell, which draws no sidebar at all, so that line would point at nothing.
    *
    * A MID arriving in `?mid=` is the one case that answers the question before
    * it is asked, so the handover is held above rather than flashing this picker
@@ -306,7 +305,7 @@ export function CreateInvoiceFeature() {
           </h1>
         </header>
         <div className="mx-auto w-full max-w-2xl px-6 py-16">
-          <SelectMidView midType="PACB" midOptions={midOptions} onSelectMid={selectMid} />
+          <SelectMidView midType="PACB" showSidebarHint={false} />
         </div>
       </>
     );

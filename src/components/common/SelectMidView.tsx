@@ -3,87 +3,120 @@
 import { Card, CardContent } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidChoiceList } from "@/components/common/MidScopedAction";
+import { useApp } from "@/stores/useApp";
+import { useAccountSetup } from "@/stores/useAccountSetup";
 
-const MID_TYPE_COPY: Record<"PACB" | "PA", { label: string; hint: string }> = {
-  PACB: {
-    label: "Global Fund Transfer Merchant ID",
-    hint: "This feature requires a Global Fund Transfer Merchant ID. Use the Merchant ID selector in the sidebar to choose the right account.",
-  },
-  PA: {
-    label: "Card Payments Merchant ID",
-    hint: "This feature requires a Card Payments Merchant ID. Use the Merchant ID selector in the sidebar to choose the right account.",
-  },
+type MidType = "PACB" | "PA";
+
+const MID_TYPE_COPY: Record<MidType, { label: string; other: string }> = {
+  PACB: { label: "Global Fund Transfer Merchant ID", other: "Card Payments" },
+  PA: { label: "Card Payments Merchant ID", other: "Global Fund Transfer" },
 };
 
-/** What to say when the picker is right here rather than in the sidebar. */
-const INLINE_HINT = "Pick the account this belongs to and you can carry on.";
+/** Same tint the other "pick for the merchant" paths use (usePacbMidScope,
+ *  useMidFromUrl), so the sidebar's chip is never blank after a pick here. */
+const PICKED_MID_COLOR = "#E5B5FF";
 
 /**
- * Asks a multi-MID merchant to pick which account they mean.
+ * Asks a multi-MID merchant to pick which account they mean, and lets them pick
+ * it right here.
  *
  * Ported from pg-dashboard's SelectMidView. It exists because these features
  * address a single MID in the request path rather than filtering across several:
  * with more than one to choose from, defaulting to the first silently shows one
  * account's data under another's name. Better to ask.
  *
- * Two forms, because two kinds of surface use it:
+ * It used to come in two forms: one that only pointed at the sidebar's selector,
+ * and one with the picker in the card for the full-screen routes that draw no
+ * sidebar. The pointer-only form made the merchant leave the page to answer a
+ * question the page had just asked, so the picker is now always in the card,
+ * and the sidebar is mentioned only as where to switch later. Surfaces without
+ * a sidebar pass `showSidebarHint={false}` so that line never points at nothing.
  *
- * - Inside the dashboard shell, it points at the sidebar's own merchant selector
- *   — the merchant is going to be switching accounts across pages, and the one
- *   control that does it should stay the one they learn.
- * - Given `midOptions`, it puts the picker in the card instead. The invoice
- *   editor is the case: it is a full-screen route with no sidebar rendered at
- *   all, so pointing at a control that is not on screen is an instruction the
- *   merchant cannot follow.
+ * The options are read from the store for `midType` rather than passed in, so
+ * every page that gates on a MID gets the picker without wiring it. Picking
+ * writes the same selected-MID store the sidebar writes, which is what every
+ * gate reads, so the page re-renders into its content on the spot.
  *
  * Distinct from NoFeatureView, which answers "this MID cannot do this"; this one
  * answers "which MID did you mean".
  */
 export function SelectMidView({
   midType,
-  midOptions,
-  onSelectMid,
+  showSidebarHint = true,
 }: {
-  midType?: "PACB" | "PA";
-  /** Renders the picker inline. Omit on surfaces that show the sidebar. */
-  midOptions?: string[];
-  onSelectMid?: (mid: string) => void;
+  midType: MidType;
+  /** Off on full-screen routes that render no sidebar. */
+  showSidebarHint?: boolean;
 }) {
-  const copy = midType ? MID_TYPE_COPY[midType] : null;
-  const isInline = !!midOptions?.length && !!onSelectMid;
+  const copy = MID_TYPE_COPY[midType];
+  const paMids = useApp((s) => s.paMids);
+  const paCbMids = useApp((s) => s.paCbMids);
+  const tidsInfo = useApp((s) => s.tidsInfo);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+
+  const midOptions = midType === "PA" ? paMids : paCbMids;
+  const hasOptions = midOptions.length > 0;
+
+  // Some pages land here because the merchant already chose a MID, just one of
+  // the other product (a Card Payments MID on an eBRC page). Saying so is the
+  // difference between "pick one" and "why is it asking me again".
+  const selectedIsOtherProduct = !!selectedMid && !midOptions.includes(selectedMid);
+  const selectedInfo = tidsInfo.find((t) => t.mid === selectedMid);
+  const selectedName = selectedInfo?.displayTag || selectedInfo?.tradeName || selectedMid;
+
+  const select = (mid: string) => setSelectedMidDetails({ mid, color: PICKED_MID_COLOR });
+
+  const lead = selectedIsOtherProduct
+    ? `${selectedName} is a ${copy.other} account, and this feature needs a ${copy.label}.`
+    : `This feature works on one ${copy.label} at a time.`;
+
+  const instruction = hasOptions
+    ? "Choose the account you want to continue with."
+    : showSidebarHint
+      ? "Use the Merchant ID selector in the sidebar to choose the right account."
+      : "None of your accounts can use this feature yet.";
 
   return (
-    <Card>
-      <CardContent
-        className={
-          isInline
-            ? "flex flex-col items-center gap-4 px-8 py-10 text-center"
-            : "flex flex-col items-center gap-4 px-8 py-20 text-center"
-        }
-      >
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-          <Icon name="building-2" size={24} />
+    // Sized to its content rather than the page: the question and its handful
+    // of rows are all there is, and a full-width card left them floating in a
+    // field of empty space. `size="sm"` because the default card padding plus
+    // any of our own doubled the whitespace above and below.
+    <Card size="sm" className="mx-auto w-full max-w-xl">
+      <CardContent className="flex flex-col items-center gap-4 text-center">
+        <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+          <Icon name="building-2" size={20} />
         </span>
-        <div className="max-w-md space-y-1">
-          <h3 className="text-sm font-semibold text-foreground">
-            {copy ? `Select a ${copy.label}` : "Select a Merchant ID"}
-          </h3>
-          <p className="text-xs text-muted-foreground">
-            {isInline
-              ? INLINE_HINT
-              : (copy?.hint ??
-                "Use the Merchant ID selector in the sidebar to choose an account, then you can use this feature for it.")}
+
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-foreground">Select a {copy.label}</h3>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            {lead} {instruction}
           </p>
         </div>
 
-        {isInline && (
+        {hasOptions && (
           // Left-aligned inside a centred card: the rows are records, and a
           // centred list of names and MIDs has no edge for the eye to run down.
-          <MidChoiceList
-            midOptions={midOptions}
-            onSelect={onSelectMid}
-            className="w-full max-w-xs text-left"
-          />
+          // Bordered so the rows read as one set of choices rather than loose
+          // text, and capped so a merchant with many MIDs scrolls the list
+          // instead of the page.
+          <div className="w-full rounded-xl border border-border bg-background p-1 text-left">
+            <MidChoiceList
+              midOptions={midOptions}
+              onSelect={select}
+              showChevron
+              className="max-h-80 overflow-y-auto"
+            />
+          </div>
+        )}
+
+        {hasOptions && showSidebarHint && (
+          <p className="flex items-center gap-1.5 text-[11.5px] text-muted-foreground">
+            <Icon name="info" size={12} />
+            You can switch accounts anytime from the Merchant ID selector in the sidebar.
+          </p>
         )}
       </CardContent>
     </Card>
