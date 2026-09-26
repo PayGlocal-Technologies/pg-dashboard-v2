@@ -13,6 +13,7 @@ export const MCA_PLATFORMS_GUIDE_KEY = "mca-platforms-v2";
 export const MCA_PLATFORMS_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-platform-selector",
+    chip: { label: "Platforms", icon: "link" },
     title: "Select platform",
     description: "Choose the platform you'd like to connect your account to.",
     side: "right",
@@ -20,6 +21,7 @@ export const MCA_PLATFORMS_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "mca-account-details",
+    chip: { label: "Account details", icon: "landmark" },
     title: "Account details",
     description: "Find your account details here when you need them to connect with a platform.",
     side: "left",

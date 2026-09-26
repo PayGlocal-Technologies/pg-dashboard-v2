@@ -54,14 +54,19 @@ export const DEFAULT_REFERRAL_STATUS_TAB: ReferralStatusTab = "ALL";
  *
  * `width`/`height` are the file's real pixel dimensions, handed to next/image as
  * the intrinsic size only: the rendered size comes from CSS, and these keep the
- * 1.75:1 aspect ratio correct and reserve the right space before it loads. The
- * banner is what states the $30 reward, which is why the heading beside it does
- * not repeat the figure.
+ * ~1.63:1 aspect ratio correct and reserve the right space before it loads.
+ *
+ * This asset (Background.png) is deliberately the full card's background, not
+ * just a top banner strip — unlike the previous asset, it fades all the way
+ * to solid white by its own bottom edge, which is what the description text
+ * and referral-link row sit on in ReferralHero (an absolutely-positioned
+ * overlay at the bottom of the same box the image fills), rather than being
+ * two separately-coloured blocks stacked with a seam between them.
  */
 export const REFERRAL_HERO_BANNER = {
-  src: "/assets/Refer&Earn.png",
-  width: 1660,
-  height: 948,
+  src: "/assets/Background.png",
+  width: 2196,
+  height: 1344,
 } as const;
 
 /**

@@ -6,11 +6,11 @@ import { toast } from "sonner";
 import {
   Button,
   Card,
-  Heading,
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
   Text,
+  VisuallyHidden,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { REFERRAL_HERO_BANNER } from "@/features/dashboard/refer-and-earn/constants";
@@ -76,37 +76,36 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
     // below carries its own. `overflow-hidden` clips the banner's top corners to
     // the card's radius.
     //
-    // No height of its own either — not a pixel value and not `h-full`. Beside
-    // the right-hand column this card is a stretched grid item, so it takes the
-    // row's height. Any slack the row has over this card's content is absorbed
-    // between the banner and the content rather than after it: the content block
-    // carries `mt-auto` (see below), so the banner stays at the top, the heading,
-    // copy, and link field stay pinned to the foot of the card, and the gap
-    // between the two opens up instead. Stacked on mobile the card is the only
-    // thing in its row, so it is its natural height and the two meet directly.
+    // No height of its own — this card IS stretched to match the right-hand
+    // column beside it (`md:items-stretch` in index.tsx, see its own
+    // comment). The image itself carries none of that stretch — see its own
+    // comment below — a trailing spacer after the content block (bottom of
+    // this component) is what absorbs it instead.
     <Card className="gap-0 overflow-hidden p-0">
-      {/* The reward banner. A raster asset, so the icon-registry forwardRef
-          pattern in CLAUDE.md does not apply (it is for SVG); it goes through
-          next/image per the same file's Images rule.
+      {/* The reward banner: sized by width only (`w-full` + `aspect-ratio`),
+          fixed — no `h-full`, no `grow`, nothing that lets an external
+          stretch touch this box's size. Every previous attempt to make the
+          hero match the sidebar's height did so by letting this box itself
+          grow, and every one of them eventually let the box's rendered ratio
+          drift from the source image's real ratio at some width, which
+          forces object-cover to crop unevenly and reads as the image
+          visibly distorting. Decoupling the image from the stretch
+          entirely — absorbing it elsewhere instead (the trailing spacer
+          below) — is what actually stops that from recurring.
 
-          Below lg: the box holds the asset's own 1660:948 ratio, so nothing is
-          scaled unevenly and nothing is cropped — the ticket, the PayGlocal
-          mark, the barcode, and the $30 are all always in frame.
+          The text content below is a separate block that follows it in
+          normal flow, not an overlay positioned on top of it, for the same
+          reason: a fixed image box means a fixed handoff point, so the text
+          is always the next thing in flow right under it.
 
-          From lg up, the hero's own column is wide enough that this ratio would
-          render a banner taller than the right-hand column's Total Earned and
-          How-it-works cards combined — the two sides used to only match by
-          coincidence at some widths and drift apart at others. `lg:aspect-[1660/705]`
-          is a second, shorter ratio calibrated to this exact file: rows 705–948
-          of the source image are pure flat colour (checked pixel-by-pixel —
-          nothing there but the gradient's own fade), so cropping down to that
-          ratio with `object-cover object-top` only ever removes blank margin,
-          never the ticket or the bills. It closes most, not all, of the gap —
-          the column stays a fixed rem width while the hero's column keeps
-          growing with the viewport, so at very wide screens the safe crop alone
-          isn't enough to fully match; going further would start cutting into
-          the ticket itself. */}
-      <div className="relative aspect-[1660/948] w-full lg:aspect-[1660/705]">
+          Since the artwork fades to solid white at its own bottom edge, and
+          the content block below uses the same white card surface, there's
+          no visible seam between the two blocks. */}
+      {/* 9:5 frame, a little shorter than the asset's own 2196:1344. With
+          object-top, the only thing cropped is the plain white fade at the
+          bottom of the artwork, which blends into the white content block
+          below anyway. */}
+      <div className="relative aspect-9/5 w-full">
         <Image
           src={REFERRAL_HERO_BANNER.src}
           alt=""
@@ -117,24 +116,17 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
         />
       </div>
 
-      {/* Content sits below the artwork, left-aligned, with its own horizontal
-          and bottom padding. No top padding: the banner's own artwork fades out
-          at its foot, so that fade is the breathing room above the heading.
-
-          `mt-auto` keeps this block bottom-aligned in the card. It is the only
-          child that can absorb free space, so whenever the card is taller than
-          the banner plus this content — which is whenever the row beside it is
-          the taller one — the extra height goes above this block and the heading,
-          copy, and field stay at the card's foot rather than floating mid-card. */}
-      <div className="mt-auto flex flex-col px-5 pb-6 sm:px-8 sm:pb-8">
-        {/* Page title — the hero heading is the h1, so this screen has no
-            separate PageHeader competing with it. The reward figure lives in the
-            banner above, so it is deliberately not repeated here. */}
-        <Heading level={1} size="2xl">
-          Refer and Earn
-        </Heading>
-
-        <Text size="md" color="subtle" className="mt-2 max-w-md leading-relaxed">
+      {/* Centered, not left-aligned: the banner's own artwork carries both
+          the "Refer and Earn" title and the $30 figure baked into the image
+          itself, so there is no separate on-page heading repeating it
+          visually. A VisuallyHidden h1 keeps the page's own heading
+          structure intact for screen readers, since the banner image is
+          decorative (`alt=""`) and its baked-in text is otherwise invisible
+          to them. No top padding here: the banner's own artwork fades out at
+          its foot, so that fade is the breathing room above the text. */}
+      <div className="flex flex-col items-center px-5 pt-4 pb-6 text-center sm:px-10 sm:pt-6 sm:pb-10">
+        <VisuallyHidden as="h1">Refer and Earn</VisuallyHidden>
+        <Text size="md" color="subtle" className="max-w-xl leading-relaxed">
           Share PayGlocal with your friends and get rewarded with $30 when they complete a
           transaction.
         </Text>
@@ -154,7 +146,7 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
             Below sm they stack full-width, which is what keeps a narrow viewport
             free of horizontal scroll rather than squeezing two controls onto a
             line that cannot hold them. */}
-        <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+        <div className="mt-8 flex w-full max-w-xl flex-col gap-2.5 sm:flex-row sm:items-center">
           <InputGroup className="min-w-0 sm:flex-1">
             <InputGroupInput
               readOnly
@@ -217,6 +209,21 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
           </Button>
         </div>
       </div>
+
+      {/* Absorbs any extra height `md:items-stretch` (index.tsx) hands this
+          card beyond the image + content's own natural size — a blank
+          spacer below the content, not a resize of the image or a repositioning
+          of the text. Same technique the right-hand column already uses when
+          the roles are reversed and it's the shorter side (see its own
+          comment): the taller side gets real content at its natural size,
+          the shorter side gets empty room underneath rather than anything
+          stretching or distorting to fill the gap. `grow`, not Tailwind's
+          `flex-1` — a 0%-basis spacer is still exactly what's wanted here
+          since it has no content of its own to protect, but `grow` is used
+          for consistency with the one other place in this file that has to
+          make the same "won't reach the card's height, but the elements
+          inside DO have a floor" tradeoff. */}
+      <div className="grow" />
     </Card>
   );
 }

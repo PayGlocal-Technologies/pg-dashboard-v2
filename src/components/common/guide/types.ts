@@ -1,5 +1,10 @@
+import type { IconName } from "@/components/icon";
+
 /** A single coach-mark in a screen tour. */
 export interface GuideStep {
+  /** Tinted label pinned to the card's top-left, naming the area this step
+   *  is about (e.g. "Quick actions"). */
+  chip?: { label: string; icon?: IconName };
   /**
    * Value of the `data-guide` attribute on the element this step highlights.
    * The element is looked up at runtime via `[data-guide="<target>"]`, so a

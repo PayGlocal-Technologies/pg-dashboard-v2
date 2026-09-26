@@ -203,7 +203,7 @@ export function Spotlight({ target, side, align, onMissing, pulse, children }: S
           collisionPadding={16}
           onOpenAutoFocus={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
-          className="pointer-events-auto z-[121] w-[320px] rounded-2xl border border-border bg-background p-4 shadow-2xl"
+          className="pointer-events-auto z-[121] w-[340px] rounded-2xl border border-border bg-background p-5 shadow-2xl"
         >
           {/* Ease the card in rather than letting it pop — matters most for the
               transaction drawer, where the tour appears over a just-settled

@@ -11,7 +11,7 @@
  */
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Button } from "@/components/ui";
+import { Button, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { Spotlight } from "@/components/common/guide/Spotlight";
 import type { GuideStep } from "@/components/common/guide/types";
@@ -65,100 +65,100 @@ export function GuideTour({ steps, open, onClose }: GuideTourProps) {
         align={step.align}
         onMissing={goNext}
       >
-      {/* Progress dots + Skip (dots persist across steps and animate width). */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          {steps.map((s, i) => (
-            <span
-              key={s.target}
-              className={
-                "h-1.5 rounded-full transition-all duration-300 " +
-                (i === stepIndex ? "w-5 bg-primary" : "w-2 bg-border")
-              }
-            />
-          ))}
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={onClose}
-          className="h-auto min-h-0 px-1.5 py-0.5 text-[12px] font-medium text-muted-foreground hover:text-foreground"
-        >
-          Skip
-        </Button>
-      </div>
-
-      {/* Step copy cross-fades on advance so the text doesn't jump-cut. */}
-      <div className="relative min-h-[68px]">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={stepIndex}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.22, ease: "easeOut" }}
-          >
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-[15px] font-semibold leading-snug text-foreground">
-                {step.title}
-              </h3>
-              {/* Amber, not red: nothing is wrong, this is simply a block the
-                  merchant will be stopped at if they skip it. */}
-              {step.required && (
-                <span className="rounded-full bg-amber-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-500">
-                  Required
-                </span>
-              )}
-            </div>
-            <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
-              {step.description}
-            </p>
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      <div className="mt-4 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground">
-          {stepIndex + 1} of {steps.length}
-        </span>
-        <div className="flex items-center gap-2">
-          {isLast
-            ? // Restart only makes sense for a multi-step tour — a single-step
-              // guide (e.g. the transaction drawer) has nothing to restart.
-              steps.length > 1 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={restart}
-                  leftIcon={<Icon name="rotate-ccw" className="h-3.5 w-3.5" aria-hidden />}
-                >
-                  Restart
-                </Button>
-              )
-            : stepIndex > 0 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goBack}
-                  leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" aria-hidden />}
-                >
-                  Back
-                </Button>
-              )}
-          <Button
-            variant="primary"
+        {/* Header: the step's chip on the left, close on the right. The chip
+          names the area being pointed at, so the card reads as "this is the
+          X section" before the title says what it does. */}
+        <div className="mb-3 flex items-start justify-between gap-3">
+          {step.chip ? (
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-2 py-1 text-[12px] font-medium text-primary">
+              {step.chip.icon && <Icon name={step.chip.icon} className="h-3.5 w-3.5" aria-hidden />}
+              {step.chip.label}
+            </span>
+          ) : (
+            <span />
+          )}
+          <IconButton
+            aria-label="Close guide"
+            variant="ghost"
             size="sm"
-            onClick={goNext}
-            rightIcon={
-              !isLast ? (
-                <Icon name="chevron-right" className="h-3.5 w-3.5" aria-hidden />
-              ) : undefined
-            }
+            onClick={onClose}
+            className="-mr-1.5 -mt-1 h-7 w-7 text-muted-foreground hover:text-foreground"
           >
-            {isLast ? "Done" : "Next"}
-          </Button>
+            <Icon name="x" className="h-4 w-4" />
+          </IconButton>
         </div>
-      </div>
+
+        {/* Step copy cross-fades on advance so the text doesn't jump-cut. */}
+        <div className="relative min-h-[68px]">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={stepIndex}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-[16px] font-semibold leading-snug text-foreground">
+                  {step.title}
+                </h3>
+                {/* Amber, not red: nothing is wrong, this is simply a block the
+                  merchant will be stopped at if they skip it. */}
+                {step.required && (
+                  <span className="rounded-full bg-amber-500/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-500">
+                    Required
+                  </span>
+                )}
+              </div>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-muted-foreground">
+                {step.description}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between">
+          <span className="text-[11px] font-medium text-muted-foreground">
+            {stepIndex + 1} of {steps.length}
+          </span>
+          <div className="flex items-center gap-2">
+            {isLast
+              ? // Restart only makes sense for a multi-step tour — a single-step
+                // guide (e.g. the transaction drawer) has nothing to restart.
+                steps.length > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={restart}
+                    leftIcon={<Icon name="rotate-ccw" className="h-3.5 w-3.5" aria-hidden />}
+                  >
+                    Restart
+                  </Button>
+                )
+              : stepIndex > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={goBack}
+                    leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" aria-hidden />}
+                  >
+                    Back
+                  </Button>
+                )}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={goNext}
+              rightIcon={
+                !isLast ? (
+                  <Icon name="chevron-right" className="h-3.5 w-3.5" aria-hidden />
+                ) : undefined
+              }
+            >
+              {isLast ? "Done" : "Next"}
+            </Button>
+          </div>
+        </div>
       </Spotlight>
     </AnimatePresence>
   );

@@ -69,29 +69,32 @@ export function ReferAndEarnFeature() {
   return (
     <div className="page-enter mx-auto max-w-[1400px] space-y-6 overflow-x-hidden lg:space-y-8">
       {/* Hero and the right-hand column share one row: the column is a
-          controlled width and the hero takes the remainder.
+          controlled width and the hero takes the remainder. `md:items-stretch`
+          matches the shorter side's card to the taller one's height, so
+          their bottom edges align.
 
-          The row's height is whichever side's own content is taller — there is
-          no height rule on either side beyond the stretch below, so when the
-          hero's banner grows with the viewport, or the column grows because its
-          two pieces together need more room, the row simply follows.
-
-          Stacked below md each side sits in its own auto row, so both keep
-          their natural height and the stretch relationship does not apply. */}
-      <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_17rem] md:items-stretch lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-6">
+          Three earlier attempts at this broke the image itself: stretching
+          the image box directly — via `h-full` on an `absolute`-overlaid
+          image, via a `max-h-*` cap fighting `w-full`, via `grow` on the
+          plain stacked layout — always risked the box's rendered ratio
+          drifting from the source image's real ratio, which forces
+          object-cover to crop unevenly and reads as the image visibly
+          distorting. This time the image is never touched: ReferralHero's
+          own trailing spacer (see its comment) is what grows to absorb the
+          extra height, the same "extra space collects as blank room, not
+          distortion" technique already used below for this column when
+          roles are reversed. */}
+      {/* Proportional columns (~62/38), not a fixed-rem sidebar: with a fixed
+          sidebar the hero column grows with the viewport, so its image grows
+          taller and the two sides drift apart in height. Keeping the ratio
+          fixed keeps both sides scaling together, matching the design. */}
+      <div className="grid gap-4 md:grid-cols-[minmax(0,1.63fr)_minmax(0,1fr)] md:items-stretch lg:gap-6">
         <ReferralHero referralUrl={referralUrl} />
 
         {/* Two independent pieces, stacked: the Total Earned card, and the
             How-it-works heading with its own card. Each hugs only its own
-            content, and so does the column around them — it is not given a
-            height of its own to fill, so the two cards sit at a fixed,
-            intentional `gap-6`/`gap-8` apart regardless of how tall the hero
-            beside them gets. The grid's `items-stretch` still stretches this
-            column's own box to the row height on wider screens, the same as
-            any grid item, but with nothing inside asking for that height the
-            two cards simply keep their own and the rest of the row is blank —
-            a shorter sidebar beside a taller hero, not a gap forced open
-            between two cards that belong together. */}
+            content, at a fixed, intentional `gap-6`/`gap-8` apart, and so
+            does this column around them. */}
         <div className="flex flex-col gap-6 lg:gap-8">
           <ReferralTotalsCard summary={summary} />
 
