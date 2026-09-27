@@ -19,6 +19,7 @@ export const PUBLIC_ROUTE_PATTERNS = [
 
 /** Prefix-based routes that are always public (no session required). */
 export const PUBLIC_ROUTE_PREFIXES = [
+  "/welcome",
   "/login",
   "/forgot-password",
   "/risk-underwriting",

@@ -124,9 +124,12 @@ import {
   X,
   ZoomIn,
   ZoomOut,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import { AmazonLogo } from "@/components/icon/AmazonLogo";
+import { FacebookLogo } from "@/components/icon/FacebookLogo";
+import { GoogleLogo } from "@/components/icon/GoogleLogo";
 import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
 import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
@@ -267,6 +270,7 @@ export const ICONS = {
   wrench: Wrench,
   "zoom-in": ZoomIn,
   "zoom-out": ZoomOut,
+  zap: Zap,
 
   // ─── Platform brand marks (Platforms tutorial page) ────────────────────────
   // Placeholder artwork until the official assets land — see each file's own
@@ -291,6 +295,10 @@ export const ICONS = {
   // The assistant's own mark, used for the sidebar entry, the header button
   // and every assistant turn in the transcript.
   "echo-mark": EchoMark as unknown as LucideIcon,
+
+  // ─── Auth: single sign-on providers ─────────────────────────────────────────
+  "google-logo": GoogleLogo as unknown as LucideIcon,
+  "facebook-logo": FacebookLogo as unknown as LucideIcon,
 } as const satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

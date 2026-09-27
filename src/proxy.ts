@@ -139,8 +139,14 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
 
   if (!isSessionValid) {
     const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    if (pathname !== "/") url.searchParams.set("from", pathname);
+    // A bare visit to the root lands on the public landing page first; deep
+    // links to a specific screen still go straight to sign-in with `from`.
+    if (pathname === "/") {
+      url.pathname = "/welcome";
+    } else {
+      url.pathname = "/login";
+      url.searchParams.set("from", pathname);
+    }
     return NextResponse.redirect(url);
   }
 
@@ -148,5 +154,8 @@ export async function proxy(req: NextRequest): Promise<NextResponse> {
 }
 
 export const config = {
-  matcher: ["/((?!api|gcc|_next/static|_next/image|_next|assets|favicon.ico).*)"],
+  // "/" listed on its own: under the /app-v2 base path the bare root doesn't
+  // match the catch-all pattern, so it would skip the proxy entirely (and the
+  // logged-out redirect to /welcome below) without this entry.
+  matcher: ["/", "/((?!api|gcc|_next/static|_next/image|_next|assets|favicon.ico).*)"],
 };

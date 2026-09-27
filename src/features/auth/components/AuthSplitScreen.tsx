@@ -1,58 +1,95 @@
-import { Icon, type IconName } from "@/components/icon";
-import { BrandLogo } from "@/features/auth/components/BrandLogo";
+"use client";
 
-const HIGHLIGHTS: { icon: IconName; title: string; body: string }[] = [
-  {
-    icon: "shield-check",
-    title: "Bank-grade security",
-    body: "End-to-end encrypted sign-in and multi-factor authentication on every login.",
-  },
-  {
-    icon: "repeat",
-    title: "Payments in one place",
-    body: "Transactions, settlements, and payouts across every market you operate in.",
-  },
-  {
-    icon: "bar-chart",
-    title: "Insights that move the needle",
-    body: "Real-time reporting on success rates, refunds, and reconciliation.",
-  },
-];
+import { AnimatePresence, motion } from "framer-motion";
+import { AppImage } from "@/components/common/AppImage";
+import { cn } from "@/lib/utils";
+import { isSignInView, useAuthView } from "@/stores/useAuthView";
 
-/** Marketing/brand panel shown on the left of the auth screens (desktop only). */
+interface PanelContent {
+  /** Transparent PNG; width/height are its intrinsic size. */
+  image: { src: string; width: number; height: number };
+  /** Max width within the panel; the sign-in artwork is wider and flatter
+   *  than the globe, so it needs more width to read at the same weight. */
+  maxWidth: string;
+  title: string;
+  subtitle?: string;
+}
+
+const SIGN_UP: PanelContent = {
+  image: { src: "/assets/login_globe.png", width: 2992, height: 2736 },
+  maxWidth: "max-w-[72%]",
+  title: "Trusted by 10,000+ merchants to power payments worldwide.",
+};
+
+const SIGN_IN: PanelContent = {
+  image: { src: "/assets/signin.png", width: 3252, height: 2604 },
+  maxWidth: "max-w-[92%]",
+  title: "More ways to get things done.",
+  subtitle: "Explore everything PayGlocal can do for your business.",
+};
+
+/**
+ * Brand panel on the left of the auth screens (desktop only): an
+ * illustration and a caption, one set for sign-up and another for sign-in,
+ * crossfading as the form switches. The pastel artwork behind it is the auth
+ * layout's own full-screen background, so this panel is transparent.
+ */
 export function AuthSplitScreen() {
+  const isSignIn = useAuthView((s) => isSignInView(s.view));
+  const content = isSignIn ? SIGN_IN : SIGN_UP;
+
   return (
-    <div className="relative hidden flex-col justify-between overflow-hidden bg-primary p-10 text-white lg:flex">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-white/10 blur-3xl"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-black/10 blur-3xl"
-      />
-      <BrandLogo onDark className="relative" />
+    <div className="relative hidden flex-col overflow-hidden lg:flex">
+      <div className="h-12 shrink-0" aria-hidden />
 
-      <div className="relative max-w-md space-y-8">
-        <h2 className="text-2xl font-semibold leading-snug">
-          The cross-border payments platform built for global growth.
-        </h2>
-        <ul className="space-y-5">
-          {HIGHLIGHTS.map((h) => (
-            <li key={h.title} className="flex gap-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15">
-                <Icon name={h.icon} size={18} />
-              </span>
-              <div>
-                <p className="text-sm font-semibold">{h.title}</p>
-                <p className="text-sm text-white/75">{h.body}</p>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.div
+          key={content.image.src}
+          className="flex min-h-0 flex-1 flex-col"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.35, ease: "easeOut" }}
+        >
+          {/* Illustration */}
+          <motion.div
+            className="relative flex min-h-0 flex-1 items-center justify-center p-8"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <AppImage
+              src={content.image.src}
+              alt=""
+              width={content.image.width}
+              height={content.image.height}
+              priority
+              className={cn("h-auto max-h-full w-auto object-contain", content.maxWidth)}
+            />
+          </motion.div>
 
-      <p className="relative text-xs text-white/60">© PayGlocal. All rights reserved.</p>
+          {/* Caption band */}
+          <div className="shrink-0 px-10 py-8">
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: "easeOut", delay: 0.2 }}
+              className="mx-auto max-w-md text-center"
+            >
+              <p className="text-2xl font-medium leading-snug tracking-tight text-balance text-slate-900 xl:text-[28px]">
+                {content.title}
+              </p>
+              {content.subtitle && (
+                <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
+                  {content.subtitle}
+                </p>
+              )}
+            </motion.div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+
+      <div className="h-8 shrink-0" aria-hidden />
     </div>
   );
 }
