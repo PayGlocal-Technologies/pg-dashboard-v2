@@ -552,15 +552,9 @@ export function McaInvoiceTable({
           midOptions={midOptions}
           onRun={openInvoiceUpload}
         />
-        <MidScopedAction
-          label="Create invoice"
-          icon="plus"
-          variant="primary"
-          className="h-auto min-h-0 shrink-0 py-1"
-          needsMidChoice={needsMidChoice}
-          midOptions={midOptions}
-          onRun={openInvoiceEditor}
-        />
+        {/* No Create invoice here: the page header already carries it, and
+            two identical primary CTAs a few pixels apart read as two
+            different actions. The table keeps only Upload invoice. */}
       </div>
     </>
   );
@@ -583,15 +577,6 @@ export function McaInvoiceTable({
           needsMidChoice={needsMidChoice}
           midOptions={midOptions}
           onRun={openInvoiceUpload}
-        />
-        <MidScopedAction
-          label="Create"
-          icon="plus"
-          variant="primary"
-          className="h-auto min-h-0 shrink-0 py-1"
-          needsMidChoice={needsMidChoice}
-          midOptions={midOptions}
-          onRun={openInvoiceEditor}
         />
       </div>
 

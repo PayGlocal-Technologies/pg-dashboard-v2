@@ -75,106 +75,110 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
-        <DialogTitle>Change password</DialogTitle>
-        <DialogDescription>Enter your current password, then choose a new one.</DialogDescription>
-
-        {apiError && <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>}
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle>Change password</DialogTitle>
+          <DialogDescription>Enter your current password, then choose a new one.</DialogDescription>
+        </div>
 
         <form
           onSubmit={(e) => {
             e.preventDefault();
             void form.handleSubmit();
           }}
-          className="space-y-4"
+          className="flex min-h-0 flex-1 flex-col"
           noValidate
         >
-          <form.Field
-            name="currentPassword"
-            validators={{
-              onBlur: ({ value }) => {
-                const r = changePasswordSchema.shape.currentPassword.safeParse(value);
-                return r.success ? undefined : r.error.issues[0]?.message;
-              },
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="settings-current-password">Current password</FieldLabel>
-                <PasswordInput
-                  id="settings-current-password"
-                  autoComplete="current-password"
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  placeholder="Enter your current password"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </Field>
-            )}
-          </form.Field>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+            {apiError && <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>}
 
-          <form.Field
-            name="newPassword"
-            validators={{
-              onBlur: ({ value }) => {
-                const r = changePasswordSchema.shape.newPassword.safeParse(value);
-                return r.success ? undefined : r.error.issues[0]?.message;
-              },
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="settings-new-password">New password</FieldLabel>
-                <PasswordInput
-                  id="settings-new-password"
-                  autoComplete="new-password"
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  placeholder="Create a strong password"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </Field>
-            )}
-          </form.Field>
+            <form.Field
+              name="currentPassword"
+              validators={{
+                onBlur: ({ value }) => {
+                  const r = changePasswordSchema.shape.currentPassword.safeParse(value);
+                  return r.success ? undefined : r.error.issues[0]?.message;
+                },
+              }}
+            >
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="settings-current-password">Current password</FieldLabel>
+                  <PasswordInput
+                    id="settings-current-password"
+                    autoComplete="current-password"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    placeholder="Enter your current password"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                  <FieldError>{field.state.meta.errors[0]}</FieldError>
+                </Field>
+              )}
+            </form.Field>
 
-          <form.Subscribe selector={(s) => s.values.newPassword}>
-            {(newPassword) => <PasswordRules value={newPassword} />}
-          </form.Subscribe>
+            <form.Field
+              name="newPassword"
+              validators={{
+                onBlur: ({ value }) => {
+                  const r = changePasswordSchema.shape.newPassword.safeParse(value);
+                  return r.success ? undefined : r.error.issues[0]?.message;
+                },
+              }}
+            >
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="settings-new-password">New password</FieldLabel>
+                  <PasswordInput
+                    id="settings-new-password"
+                    autoComplete="new-password"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    placeholder="Create a strong password"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                  <FieldError>{field.state.meta.errors[0]}</FieldError>
+                </Field>
+              )}
+            </form.Field>
 
-          <form.Field
-            name="confirmPassword"
-            validators={{
-              onBlur: ({ value, fieldApi }) => {
-                if (value !== fieldApi.form.getFieldValue("newPassword")) {
-                  return "The passwords do not match";
-                }
-                const r = changePasswordSchema.shape.confirmPassword.safeParse(value);
-                return r.success ? undefined : r.error.issues[0]?.message;
-              },
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="settings-confirm-password">Confirm new password</FieldLabel>
-                <PasswordInput
-                  id="settings-confirm-password"
-                  autoComplete="new-password"
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  placeholder="Re-enter the new password"
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </Field>
-            )}
-          </form.Field>
+            <form.Subscribe selector={(s) => s.values.newPassword}>
+              {(newPassword) => <PasswordRules value={newPassword} />}
+            </form.Subscribe>
 
-          <div className="flex justify-end gap-2 pt-2">
+            <form.Field
+              name="confirmPassword"
+              validators={{
+                onBlur: ({ value, fieldApi }) => {
+                  if (value !== fieldApi.form.getFieldValue("newPassword")) {
+                    return "The passwords do not match";
+                  }
+                  const r = changePasswordSchema.shape.confirmPassword.safeParse(value);
+                  return r.success ? undefined : r.error.issues[0]?.message;
+                },
+              }}
+            >
+              {(field) => (
+                <Field>
+                  <FieldLabel htmlFor="settings-confirm-password">Confirm new password</FieldLabel>
+                  <PasswordInput
+                    id="settings-confirm-password"
+                    autoComplete="new-password"
+                    aria-invalid={field.state.meta.errors.length > 0}
+                    placeholder="Re-enter the new password"
+                    value={field.state.value}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                  />
+                  <FieldError>{field.state.meta.errors[0]}</FieldError>
+                </Field>
+              )}
+            </form.Field>
+          </div>
+
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
             <DialogClose asChild>
               <Button type="button" variant="outline">
                 Cancel

@@ -100,27 +100,31 @@ export function EditContactDialog({ type, open, onOpenChange, onConfirm }: EditC
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
         {step === "verify-identity" && (
           <>
-            <DialogTitle>Verify it&apos;s you</DialogTitle>
-            <DialogDescription>
-              We&apos;ve sent a {MOCK_OTP_LENGTH}-digit code to your registered email and phone
-              number. Enter it below to continue.
-            </DialogDescription>
-            <Field>
-              <FieldLabel>Verification code</FieldLabel>
-              <OtpInput
-                value={identityOtp}
-                onChange={setIdentityOtp}
-                onComplete={verifyIdentity}
-                length={MOCK_OTP_LENGTH}
-                invalid={!!error}
-                autoFocus
-              />
-              <FieldError>{error}</FieldError>
-            </Field>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+              <DialogTitle>Verify it&apos;s you</DialogTitle>
+              <DialogDescription>
+                We&apos;ve sent a {MOCK_OTP_LENGTH}-digit code to your registered email and phone
+                number. Enter it below to continue.
+              </DialogDescription>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              <Field>
+                <FieldLabel>Verification code</FieldLabel>
+                <OtpInput
+                  value={identityOtp}
+                  onChange={setIdentityOtp}
+                  onComplete={verifyIdentity}
+                  length={MOCK_OTP_LENGTH}
+                  invalid={!!error}
+                  autoFocus
+                />
+                <FieldError>{error}</FieldError>
+              </Field>
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline">
                   Cancel
@@ -135,21 +139,25 @@ export function EditContactDialog({ type, open, onOpenChange, onConfirm }: EditC
 
         {step === "enter-new-value" && (
           <>
-            <DialogTitle>
-              {type === "email" ? "Update email address" : "Update phone number"}
-            </DialogTitle>
-            <DialogDescription>Enter your new {label} below.</DialogDescription>
-            <Field>
-              <FieldLabel>New {label}</FieldLabel>
-              <Input
-                value={newValue}
-                onChange={(e) => setNewValue(e.target.value)}
-                placeholder={`Enter your new ${label}`}
-                autoFocus
-              />
-              <FieldError>{error}</FieldError>
-            </Field>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+              <DialogTitle>
+                {type === "email" ? "Update email address" : "Update phone number"}
+              </DialogTitle>
+              <DialogDescription>Enter your new {label} below.</DialogDescription>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              <Field>
+                <FieldLabel>New {label}</FieldLabel>
+                <Input
+                  value={newValue}
+                  onChange={(e) => setNewValue(e.target.value)}
+                  placeholder={`Enter your new ${label}`}
+                  autoFocus
+                />
+                <FieldError>{error}</FieldError>
+              </Field>
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline">
                   Cancel
@@ -164,24 +172,28 @@ export function EditContactDialog({ type, open, onOpenChange, onConfirm }: EditC
 
         {step === "verify-new-contact" && (
           <>
-            <DialogTitle>Verify your new phone number</DialogTitle>
-            <DialogDescription>
-              We&apos;ve sent a {MOCK_OTP_LENGTH}-digit code to {newValue}. Enter it below to
-              confirm the change.
-            </DialogDescription>
-            <Field>
-              <FieldLabel>Verification code</FieldLabel>
-              <OtpInput
-                value={newValueOtp}
-                onChange={setNewValueOtp}
-                onComplete={verifyNewContact}
-                length={MOCK_OTP_LENGTH}
-                invalid={!!error}
-                autoFocus
-              />
-              <FieldError>{error}</FieldError>
-            </Field>
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+              <DialogTitle>Verify your new phone number</DialogTitle>
+              <DialogDescription>
+                We&apos;ve sent a {MOCK_OTP_LENGTH}-digit code to {newValue}. Enter it below to
+                confirm the change.
+              </DialogDescription>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              <Field>
+                <FieldLabel>Verification code</FieldLabel>
+                <OtpInput
+                  value={newValueOtp}
+                  onChange={setNewValueOtp}
+                  onComplete={verifyNewContact}
+                  length={MOCK_OTP_LENGTH}
+                  invalid={!!error}
+                  autoFocus
+                />
+                <FieldError>{error}</FieldError>
+              </Field>
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline">
                   Cancel
@@ -196,12 +208,16 @@ export function EditContactDialog({ type, open, onOpenChange, onConfirm }: EditC
 
         {step === "email-link-sent" && (
           <>
-            <DialogTitle>Check your inbox</DialogTitle>
-            <DialogDescription>
-              We&apos;ve sent a verification link to {newValue}. Please check your inbox and click
-              the link to confirm this change.
-            </DialogDescription>
-            <div className="flex justify-end pt-2">
+            {/* No form body on this step, so the header's own divider is left
+                off; the footer's border-t is the only rule between them. */}
+            <div className="shrink-0 px-6 py-4 pr-14">
+              <DialogTitle>Check your inbox</DialogTitle>
+              <DialogDescription>
+                We&apos;ve sent a verification link to {newValue}. Please check your inbox and click
+                the link to confirm this change.
+              </DialogDescription>
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
               <Button type="button" onClick={() => handleOpenChange(false)}>
                 Done
               </Button>

@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogTitle,
   Field,
+  FieldError,
   FieldLabel,
   Input,
   Select,
@@ -127,8 +128,13 @@ function EditBillerDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-        <DialogTitle>Edit biller details</DialogTitle>
+      {/* Header, scrolling body, pinned footer (AddTeamMemberModal's layout):
+          the field list outgrows short viewports, and Cancel/Save must not
+          scroll away with it. */}
+      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle>Edit biller details</DialogTitle>
+        </div>
         <EditBillerBody
           key={open ? "open" : "closed"}
           billerDetails={billerDetails}
@@ -140,6 +146,23 @@ function EditBillerDialog({
         />
       </DialogContent>
     </Dialog>
+  );
+}
+
+const BILLER_FIELD_IDS = {
+  legalName: "biller-legal-name",
+  streetAddress1: "biller-street1",
+  city: "biller-city",
+  zipcode: "biller-zip",
+  email: "biller-email",
+  phone: "biller-phone",
+} as const;
+
+function RequiredMark() {
+  return (
+    <span aria-hidden className="text-destructive">
+      *
+    </span>
   );
 }
 
@@ -157,157 +180,198 @@ function EditBillerBody({
 
   const patch = (next: Partial<BillerDetails>) => setValues((prev) => ({ ...prev, ...next }));
 
-  const isValid =
-    !!values.legalName?.trim() &&
-    !!values.streetAddress1?.trim() &&
-    !!values.city?.trim() &&
-    !!values.zipcode?.trim() &&
-    !!values.email?.trim() &&
-    !!values.phone?.trim();
+  // The same six production's EditBillerDetails drawer marks required (it
+  // also requires State; v2 never has, and this is not the place to widen
+  // it). They stay required, but Save no longer sits silently disabled:
+  // the fields carry a * up front, and a Save with gaps names each missing
+  // one instead of leaving the merchant to guess why nothing happens.
+  const missing = {
+    legalName: !values.legalName?.trim(),
+    streetAddress1: !values.streetAddress1?.trim(),
+    city: !values.city?.trim(),
+    zipcode: !values.zipcode?.trim(),
+    email: !values.email?.trim(),
+    phone: !values.phone?.trim(),
+  };
+  const isValid = !Object.values(missing).some(Boolean);
+  const [attempted, setAttempted] = useState(false);
+  const errorFor = (key: keyof typeof missing) =>
+    attempted && missing[key] ? "This field is required" : undefined;
+
+  const handleSave = () => {
+    if (isValid) {
+      onSave(values);
+      return;
+    }
+    setAttempted(true);
+    // Bring the first gap into view; on a short screen it can be below the fold.
+    const first = (Object.keys(missing) as (keyof typeof missing)[]).find((k) => missing[k]);
+    if (first) document.getElementById(BILLER_FIELD_IDS[first])?.focus();
+  };
 
   return (
-    <div className="mt-4 space-y-3">
-      <Field>
-        <FieldLabel htmlFor="biller-legal-name">Legal name</FieldLabel>
-        <Input
-          id="biller-legal-name"
-          className="shadow-none"
-          value={values.legalName ?? ""}
-          onChange={(e) => patch({ legalName: e.target.value })}
-        />
-      </Field>
-
-      <Field>
-        <FieldLabel htmlFor="biller-gstin">GSTIN</FieldLabel>
-        <Input
-          id="biller-gstin"
-          className="font-mono shadow-none"
-          placeholder="Optional"
-          value={values.gstIn ?? ""}
-          onChange={(e) => patch({ gstIn: e.target.value.toUpperCase() })}
-        />
-      </Field>
-
-      <Field>
-        <FieldLabel htmlFor="biller-street1">Address</FieldLabel>
-        <Input
-          id="biller-street1"
-          className="shadow-none"
-          value={values.streetAddress1 ?? ""}
-          onChange={(e) => patch({ streetAddress1: e.target.value })}
-        />
-      </Field>
-
-      <Field>
-        <FieldLabel htmlFor="biller-street2">Address line 2</FieldLabel>
-        <Input
-          id="biller-street2"
-          className="shadow-none"
-          placeholder="Optional"
-          value={values.streetAddress2 ?? ""}
-          onChange={(e) => patch({ streetAddress2: e.target.value })}
-        />
-      </Field>
-
-      <div className="grid gap-3 sm:grid-cols-2">
+    <>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
         <Field>
-          <FieldLabel htmlFor="biller-country">Country</FieldLabel>
-          {/* Searchable for the same reason State is, only more so: this list
+          <FieldLabel htmlFor="biller-legal-name">
+            <RequiredMark /> Legal name
+          </FieldLabel>
+          <Input
+            id="biller-legal-name"
+            aria-invalid={!!errorFor("legalName")}
+            className="shadow-none"
+            value={values.legalName ?? ""}
+            onChange={(e) => patch({ legalName: e.target.value })}
+          />
+          <FieldError>{errorFor("legalName")}</FieldError>
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="biller-gstin">GSTIN</FieldLabel>
+          <Input
+            id="biller-gstin"
+            className="font-mono shadow-none"
+            placeholder="Optional"
+            value={values.gstIn ?? ""}
+            onChange={(e) => patch({ gstIn: e.target.value.toUpperCase() })}
+          />
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="biller-street1">
+            <RequiredMark /> Address
+          </FieldLabel>
+          <Input
+            id="biller-street1"
+            aria-invalid={!!errorFor("streetAddress1")}
+            className="shadow-none"
+            value={values.streetAddress1 ?? ""}
+            onChange={(e) => patch({ streetAddress1: e.target.value })}
+          />
+          <FieldError>{errorFor("streetAddress1")}</FieldError>
+        </Field>
+
+        <Field>
+          <FieldLabel htmlFor="biller-street2">Address line 2</FieldLabel>
+          <Input
+            id="biller-street2"
+            className="shadow-none"
+            placeholder="Optional"
+            value={values.streetAddress2 ?? ""}
+            onChange={(e) => patch({ streetAddress2: e.target.value })}
+          />
+        </Field>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="biller-country">Country</FieldLabel>
+            {/* Searchable for the same reason State is, only more so: this list
               runs to roughly 200 entries. flux's own CountrySelect is not usable
               here — it is hardwired to its internal COUNTRIES array, while these
               options come from the API and carry the country *names* the address
               is stored under. */}
-          <SingleSelect
-            id="biller-country"
-            value={values.country ?? ""}
-            // See AddAddressDialog's twin of this line.
-            onChange={(next) => patch({ country: next, state: "" })}
-            options={countryOptions}
-            placeholder="Select country"
-            searchPlaceholder="Search country…"
-            emptyText="No country matches that search."
-          />
-        </Field>
+            <SingleSelect
+              id="biller-country"
+              value={values.country ?? ""}
+              // See AddAddressDialog's twin of this line.
+              onChange={(next) => patch({ country: next, state: "" })}
+              options={countryOptions}
+              placeholder="Select country"
+              searchPlaceholder="Search country…"
+              emptyText="No country matches that search."
+            />
+          </Field>
 
-        <Field>
-          <FieldLabel htmlFor="biller-state">State</FieldLabel>
-          {/* A select over the whole state list, which is what production's
+          <Field>
+            <FieldLabel htmlFor="biller-state">State</FieldLabel>
+            {/* A select over the whole state list, which is what production's
               biller form offers (EditBillerDetails maps every key of
               stateCodes into its own select, ungated by country — its form has
               no country field at all). Searchable because the list is long
               enough that scrolling a listbox is not reasonable. */}
-          <SingleSelect
-            id="biller-state"
-            value={values.state ?? ""}
-            onChange={(next) => patch({ state: next })}
-            options={stateOptions}
-            placeholder="Select state"
-            searchPlaceholder="Search state…"
-            emptyText="No state matches that search."
-          />
-        </Field>
+            <SingleSelect
+              id="biller-state"
+              value={values.state ?? ""}
+              onChange={(next) => patch({ state: next })}
+              options={stateOptions}
+              placeholder="Select state"
+              searchPlaceholder="Search state…"
+              emptyText="No state matches that search."
+            />
+          </Field>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="biller-city">
+              <RequiredMark /> City
+            </FieldLabel>
+            <Input
+              id="biller-city"
+              aria-invalid={!!errorFor("city")}
+              className="shadow-none"
+              value={values.city ?? ""}
+              onChange={(e) => patch({ city: e.target.value })}
+            />
+            <FieldError>{errorFor("city")}</FieldError>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="biller-zip">
+              <RequiredMark /> Zipcode
+            </FieldLabel>
+            <Input
+              id="biller-zip"
+              aria-invalid={!!errorFor("zipcode")}
+              className="shadow-none"
+              value={values.zipcode ?? ""}
+              onChange={(e) => patch({ zipcode: e.target.value })}
+            />
+            <FieldError>{errorFor("zipcode")}</FieldError>
+          </Field>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="biller-email">
+              <RequiredMark /> Primary contact email
+            </FieldLabel>
+            <Input
+              id="biller-email"
+              aria-invalid={!!errorFor("email")}
+              type="email"
+              className="shadow-none"
+              value={values.email ?? ""}
+              onChange={(e) => patch({ email: e.target.value })}
+            />
+            <FieldError>{errorFor("email")}</FieldError>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="biller-phone">
+              <RequiredMark /> Primary contact number
+            </FieldLabel>
+            <Input
+              id="biller-phone"
+              aria-invalid={!!errorFor("phone")}
+              inputMode="tel"
+              className="shadow-none"
+              value={values.phone ?? ""}
+              onChange={(e) => patch({ phone: e.target.value })}
+            />
+            <FieldError>{errorFor("phone")}</FieldError>
+          </Field>
+        </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="biller-city">City</FieldLabel>
-          <Input
-            id="biller-city"
-            className="shadow-none"
-            value={values.city ?? ""}
-            onChange={(e) => patch({ city: e.target.value })}
-          />
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="biller-zip">Zipcode</FieldLabel>
-          <Input
-            id="biller-zip"
-            className="shadow-none"
-            value={values.zipcode ?? ""}
-            onChange={(e) => patch({ zipcode: e.target.value })}
-          />
-        </Field>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="biller-email">Primary contact email</FieldLabel>
-          <Input
-            id="biller-email"
-            type="email"
-            className="shadow-none"
-            value={values.email ?? ""}
-            onChange={(e) => patch({ email: e.target.value })}
-          />
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="biller-phone">Primary contact number</FieldLabel>
-          <Input
-            id="biller-phone"
-            inputMode="tel"
-            className="shadow-none"
-            value={values.phone ?? ""}
-            onChange={(e) => patch({ phone: e.target.value })}
-          />
-        </Field>
-      </div>
-
-      <div className="flex justify-end gap-2 border-t border-border pt-4">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
         <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={!isValid}
-          onClick={() => onSave(values)}
-        >
+        <Button type="button" variant="primary" size="sm" onClick={handleSave}>
           Save
         </Button>
       </div>
-    </div>
+    </>
   );
 }

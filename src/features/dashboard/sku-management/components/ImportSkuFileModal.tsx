@@ -228,246 +228,256 @@ export function ImportSkuFileModal({ open, onOpenChange, mid }: ImportSkuFileMod
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? onOpenChange(true) : close())}>
-      <DialogContent className="w-[min(100%-1.5rem,56rem)] max-w-none gap-0 rounded-2xl p-6">
-        <DialogTitle className="text-[17px] font-semibold text-foreground">
-          Import items from a file
-        </DialogTitle>
-        <DialogDescription className="mt-1 text-[13px] text-muted-foreground">
-          Fill in the template and upload it. You&apos;ll see every row we read before anything is
-          added to your catalog.
-        </DialogDescription>
-
-        <div className="mt-5">
-          <StepRail current={step} />
+      <DialogContent className="flex max-h-[90vh] w-[min(100%-1.5rem,56rem)] max-w-none flex-col gap-0 overflow-hidden rounded-2xl p-0">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle className="text-[17px] font-semibold text-foreground">
+            Import items from a file
+          </DialogTitle>
+          <DialogDescription className="mt-1 text-[13px] text-muted-foreground">
+            Fill in the template and upload it. You&apos;ll see every row we read before anything is
+            added to your catalog.
+          </DialogDescription>
         </div>
 
-        {/* ── Step 1: upload ──────────────────────────────────────────────── */}
-        {step === "upload" ? (
-          <div className="mt-6 space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[13px] text-muted-foreground">
-                Not sure about the columns? Start from our template.
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                isLoading={isTemplateLoading}
-                leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-                onClick={downloadTemplate}
-              >
-                Download template
-              </Button>
-            </div>
+        {/* Only this band scrolls; each step's actions sit in the fixed footer
+            below it. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+          <StepRail current={step} />
 
-            {/* A label rather than a div with a click handler: the file input
+          {/* ── Step 1: upload ──────────────────────────────────────────────── */}
+          {step === "upload" ? (
+            <div className="mt-6 space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-[13px] text-muted-foreground">
+                  Not sure about the columns? Start from our template.
+                </p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  isLoading={isTemplateLoading}
+                  leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+                  onClick={downloadTemplate}
+                >
+                  Download template
+                </Button>
+              </div>
+
+              {/* A label rather than a div with a click handler: the file input
                 sits inside it, so a click and a keyboard activation both reach
                 the picker without re-implementing either. */}
-            <label
-              onDragOver={(event) => {
-                event.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={() => setDragging(false)}
-              onDrop={(event) => {
-                event.preventDefault();
-                setDragging(false);
-                onPick(event.dataTransfer.files?.[0]);
-              }}
-              className={cn(
-                "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center transition-colors",
-                dragging ? "border-primary bg-primary/5" : "border-border bg-muted/30",
-                isProcessing && "pointer-events-none opacity-70"
-              )}
-            >
-              {/* Bare <input type="file"> is deliberate: flux-ui has no file
+              <label
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragging(true);
+                }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragging(false);
+                  onPick(event.dataTransfer.files?.[0]);
+                }}
+                className={cn(
+                  "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-6 py-10 text-center transition-colors",
+                  dragging ? "border-primary bg-primary/5" : "border-border bg-muted/30",
+                  isProcessing && "pointer-events-none opacity-70"
+                )}
+              >
+                {/* Bare <input type="file"> is deliberate: flux-ui has no file
                   input, and this is the only element that can open the OS file
                   picker. Same exemption InvoiceDropzone takes. It is visually
                   hidden and driven by the label wrapping it, so the styled
                   dropzone above is what the merchant actually interacts with. */}
-              <input
-                ref={inputRef}
-                type="file"
-                accept={IMPORT_ACCEPTED_EXTENSIONS.join(",")}
-                className="sr-only"
-                // pointer-events-none on the label already stops a click, but the
-                // input stays keyboard-reachable without this — pg-dashboard
-                // disables its dragger for the same window.
-                disabled={isProcessing}
-                onChange={(event) => onPick(event.target.files?.[0])}
-              />
-              {isProcessing ? (
-                <>
-                  <Icon name="refresh" className="h-5 w-5 animate-spin text-muted-foreground" />
-                  <span className="text-[13px] font-medium text-foreground">
-                    Reading {file?.name}
-                  </span>
-                  <span className="text-[12px] text-muted-foreground">
-                    {file ? formatFileSize(file.size) : null}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Icon name="upload" className="h-5 w-5 text-muted-foreground" />
-                  <span className="text-[13px] font-medium text-foreground">
-                    Drop your file here, or click to choose
-                  </span>
-                  <span className="text-[12px] text-muted-foreground">
-                    Excel file (.xlsx) · up to 10 MB
-                  </span>
-                </>
-              )}
-            </label>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept={IMPORT_ACCEPTED_EXTENSIONS.join(",")}
+                  className="sr-only"
+                  // pointer-events-none on the label already stops a click, but the
+                  // input stays keyboard-reachable without this — pg-dashboard
+                  // disables its dragger for the same window.
+                  disabled={isProcessing}
+                  onChange={(event) => onPick(event.target.files?.[0])}
+                />
+                {isProcessing ? (
+                  <>
+                    <Icon name="refresh" className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <span className="text-[13px] font-medium text-foreground">
+                      Reading {file?.name}
+                    </span>
+                    <span className="text-[12px] text-muted-foreground">
+                      {file ? formatFileSize(file.size) : null}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Icon name="upload" className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-[13px] font-medium text-foreground">
+                      Drop your file here, or click to choose
+                    </span>
+                    <span className="text-[12px] text-muted-foreground">
+                      Excel file (.xlsx) · up to 10 MB
+                    </span>
+                  </>
+                )}
+              </label>
 
-            {/* Two sources, one slot: `rejection` is this component's own
+              {/* Two sources, one slot: `rejection` is this component's own
                 file-type check, `error` is whatever the hook's three legs
                 reported (initiate, the S3 PUT, the parse). Either way the
                 merchant is looking at the same dropzone, so the reason for
                 being back here has to be on screen — a toast alone scrolls
                 away and leaves the step looking like nothing happened. */}
-            {rejection || error ? (
-              <Callout variant="error">
-                <CalloutIcon>
-                  <Icon name="alert-triangle" className="h-4 w-4" />
-                </CalloutIcon>
-                <CalloutText>{rejection ?? error}</CalloutText>
-              </Callout>
-            ) : null}
-
-            {/* Cancel on every step, as production has it — the dialog's own X is
-                the only other way out, and it is not an obvious one while a file
-                is being read. */}
-            <div className="flex items-center justify-end pt-1">
-              <Button type="button" variant="outline" size="sm" onClick={close}>
-                Cancel
-              </Button>
+              {rejection || error ? (
+                <Callout variant="error">
+                  <CalloutIcon>
+                    <Icon name="alert-triangle" className="h-4 w-4" />
+                  </CalloutIcon>
+                  <CalloutText>{rejection ?? error}</CalloutText>
+                </Callout>
+              ) : null}
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
-        {/* ── Step 2: review what was parsed ──────────────────────────────── */}
-        {step === "review" ? (
-          <div className="mt-6 space-y-3">
-            {/* Leads with the count, as production's review banner does — the
+          {/* ── Step 2: review what was parsed ──────────────────────────────── */}
+          {step === "review" ? (
+            <div className="mt-6 space-y-3">
+              {/* Leads with the count, as production's review banner does — the
                 first thing to know here is whether the parse found what the
                 merchant expected it to. The zero case gets its own wording, since
                 "0 items found" with the generic follow-on would read as an
                 instruction to confirm nothing. */}
-            <Callout variant={rows.length === 0 ? "warning" : "info"}>
-              <CalloutIcon>
-                <Icon name={rows.length === 0 ? "alert-triangle" : "info"} className="h-4 w-4" />
-              </CalloutIcon>
-              <CalloutText>
-                {rows.length === 0 ? (
-                  <>
-                    No rows could be read from {file?.name}. Check that the sheet uses the
-                    template&apos;s columns, then choose the file again.
-                  </>
-                ) : (
-                  <>
-                    {rows.length} {rows.length === 1 ? "item" : "items"} found in {file?.name}.
-                    Confirm to add {rows.length === 1 ? "it" : "them"} to your catalog. Rows missing
-                    required fields (Type, Currency, or Selling price) will be skipped.
-                  </>
-                )}
-              </CalloutText>
-            </Callout>
+              <Callout variant={rows.length === 0 ? "warning" : "info"}>
+                <CalloutIcon>
+                  <Icon name={rows.length === 0 ? "alert-triangle" : "info"} className="h-4 w-4" />
+                </CalloutIcon>
+                <CalloutText>
+                  {rows.length === 0 ? (
+                    <>
+                      No rows could be read from {file?.name}. Check that the sheet uses the
+                      template&apos;s columns, then choose the file again.
+                    </>
+                  ) : (
+                    <>
+                      {rows.length} {rows.length === 1 ? "item" : "items"} found in {file?.name}.
+                      Confirm to add {rows.length === 1 ? "it" : "them"} to your catalog. Rows
+                      missing required fields (Type, Currency, or Selling price) will be skipped.
+                    </>
+                  )}
+                </CalloutText>
+              </Callout>
 
-            <div className="max-h-[22rem] overflow-auto">
-              <DataTable
-                columns={buildPreviewColumns()}
-                data={previewRows}
-                rowKey={(row) => row.rowKey}
-                density="compact"
-                tableLayout="content"
-                emptyTitle="Nothing to import"
-                emptyDescription="We couldn't read any rows from that file"
-              />
-            </div>
-
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[12.5px] text-muted-foreground">
-                {rows.length} {rows.length === 1 ? "row" : "rows"} read from {file?.name}
-              </span>
-              <div className="flex items-center gap-2">
-                <Button type="button" variant="ghost" size="sm" onClick={reset}>
-                  Choose another file
-                </Button>
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  isLoading={isImporting}
-                  // A parse that found nothing still lands here (that is the point
-                  // — see the hook's rowsReady), but committing it would send a
-                  // request that cannot do anything and then report "0 items
-                  // imported" as if that were an outcome. The way out of this state
-                  // is Choose another file, so that is the only live action.
-                  disabled={rows.length === 0}
-                  onClick={commit}
-                >
-                  Import {rows.length} {rows.length === 1 ? "item" : "items"}
-                </Button>
+              <div className="max-h-[22rem] overflow-auto">
+                <DataTable
+                  columns={buildPreviewColumns()}
+                  data={previewRows}
+                  rowKey={(row) => row.rowKey}
+                  density="compact"
+                  tableLayout="content"
+                  emptyTitle="Nothing to import"
+                  emptyDescription="We couldn't read any rows from that file"
+                />
               </div>
+            </div>
+          ) : null}
+
+          {/* ── Step 3: what actually went in ───────────────────────────────── */}
+          {step === "done" ? (
+            <div className="mt-6 space-y-4">
+              <div className="flex flex-col items-center gap-2 py-4 text-center">
+                <span
+                  className={cn(
+                    "flex h-11 w-11 items-center justify-center rounded-full",
+                    importedCount > 0
+                      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-500"
+                      : "bg-amber-500/10 text-amber-600 dark:text-amber-500"
+                  )}
+                >
+                  <Icon name={importedCount > 0 ? "check" : "alert-triangle"} className="h-5 w-5" />
+                </span>
+                <span className="text-[17px] font-semibold text-foreground">
+                  {importedCount} {importedCount === 1 ? "item" : "items"} imported
+                </span>
+                <span className="text-[13px] text-muted-foreground">
+                  {importedCount === 0
+                    ? "Nothing was added. Fix the rows below and upload the file again."
+                    : "They're in your catalog and ready to pull into invoices."}
+                </span>
+              </div>
+
+              {/* The skipped list is the whole point of this step: a count alone
+                leaves the merchant with no idea which line to go and fix. */}
+              {skipped.length > 0 ? (
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <div className="border-b border-border bg-muted/60 px-3 py-2 text-[12px] font-semibold text-muted-foreground">
+                    {skipped.length} {skipped.length === 1 ? "row" : "rows"} skipped
+                  </div>
+                  <ul className="max-h-52 divide-y divide-border overflow-auto">
+                    {skipped.map((item) => (
+                      <li
+                        key={`${item.row}-${item.reason}`}
+                        className="flex gap-3 px-3 py-2 text-[12.5px]"
+                      >
+                        <span className="shrink-0 font-medium tabular-nums text-foreground">
+                          Row {item.row}
+                        </span>
+                        <span className="text-muted-foreground">{item.reason}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Cancel on every step, as production has it — the dialog's own X is
+            the only other way out, and it is not an obvious one while a file
+            is being read. */}
+        {step === "upload" ? (
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+            <Button type="button" variant="outline" size="sm" onClick={close}>
+              Cancel
+            </Button>
+          </div>
+        ) : null}
+
+        {step === "review" ? (
+          <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-6 py-4">
+            <span className="text-[12.5px] text-muted-foreground">
+              {rows.length} {rows.length === 1 ? "row" : "rows"} read from {file?.name}
+            </span>
+            <div className="flex items-center gap-2">
+              <Button type="button" variant="ghost" size="sm" onClick={reset}>
+                Choose another file
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                size="sm"
+                isLoading={isImporting}
+                // A parse that found nothing still lands here (that is the point
+                // — see the hook's rowsReady), but committing it would send a
+                // request that cannot do anything and then report "0 items
+                // imported" as if that were an outcome. The way out of this state
+                // is Choose another file, so that is the only live action.
+                disabled={rows.length === 0}
+                onClick={commit}
+              >
+                Import {rows.length} {rows.length === 1 ? "item" : "items"}
+              </Button>
             </div>
           </div>
         ) : null}
 
-        {/* ── Step 3: what actually went in ───────────────────────────────── */}
         {step === "done" ? (
-          <div className="mt-6 space-y-4">
-            <div className="flex flex-col items-center gap-2 py-4 text-center">
-              <span
-                className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full",
-                  importedCount > 0
-                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-500"
-                    : "bg-amber-500/10 text-amber-600 dark:text-amber-500"
-                )}
-              >
-                <Icon name={importedCount > 0 ? "check" : "alert-triangle"} className="h-5 w-5" />
-              </span>
-              <span className="text-[17px] font-semibold text-foreground">
-                {importedCount} {importedCount === 1 ? "item" : "items"} imported
-              </span>
-              <span className="text-[13px] text-muted-foreground">
-                {importedCount === 0
-                  ? "Nothing was added. Fix the rows below and upload the file again."
-                  : "They're in your catalog and ready to pull into invoices."}
-              </span>
-            </div>
-
-            {/* The skipped list is the whole point of this step: a count alone
-                leaves the merchant with no idea which line to go and fix. */}
-            {skipped.length > 0 ? (
-              <div className="overflow-hidden rounded-lg border border-border">
-                <div className="border-b border-border bg-muted/60 px-3 py-2 text-[12px] font-semibold text-muted-foreground">
-                  {skipped.length} {skipped.length === 1 ? "row" : "rows"} skipped
-                </div>
-                <ul className="max-h-52 divide-y divide-border overflow-auto">
-                  {skipped.map((item) => (
-                    <li
-                      key={`${item.row}-${item.reason}`}
-                      className="flex gap-3 px-3 py-2 text-[12.5px]"
-                    >
-                      <span className="shrink-0 font-medium tabular-nums text-foreground">
-                        Row {item.row}
-                      </span>
-                      <span className="text-muted-foreground">{item.reason}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-
-            <div className="flex items-center justify-end gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={reset}>
-                Import another file
-              </Button>
-              <Button type="button" variant="primary" size="sm" onClick={close}>
-                Done
-              </Button>
-            </div>
+          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+            <Button type="button" variant="ghost" size="sm" onClick={reset}>
+              Import another file
+            </Button>
+            <Button type="button" variant="primary" size="sm" onClick={close}>
+              Done
+            </Button>
           </div>
         ) : null}
       </DialogContent>

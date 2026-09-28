@@ -45,8 +45,10 @@ export function SaveAsTemplateDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogTitle>Save as template</DialogTitle>
+      <DialogContent className="flex max-w-md flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle>Save as template</DialogTitle>
+        </div>
         <SaveBody
           // Remount per open so the field never reopens holding the last name.
           key={open ? "open" : "closed"}
@@ -106,59 +108,61 @@ function SaveBody({
   const excluded = ["Client", "Invoice number", "Issue and due dates", "Declaration"];
 
   return (
-    <div className="mt-4">
-      <Field>
-        <FieldLabel htmlFor="template-name">Template name</FieldLabel>
-        <Input
-          id="template-name"
-          autoFocus
-          maxLength={TEMPLATE_NAME_MAX_LENGTH}
-          placeholder="e.g. Monthly retainer, Design sprint"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => setTouched(true)}
-        />
-        {touched && error ? (
-          <FieldError>{error}</FieldError>
-        ) : (
-          <FieldDescription>Only you and your team see this name.</FieldDescription>
-        )}
-      </Field>
+    <>
+      <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+        <Field>
+          <FieldLabel htmlFor="template-name">Template name</FieldLabel>
+          <Input
+            id="template-name"
+            autoFocus
+            maxLength={TEMPLATE_NAME_MAX_LENGTH}
+            placeholder="e.g. Monthly retainer, Design sprint"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => setTouched(true)}
+          />
+          {touched && error ? (
+            <FieldError>{error}</FieldError>
+          ) : (
+            <FieldDescription>Only you and your team see this name.</FieldDescription>
+          )}
+        </Field>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        <div className="rounded-lg border border-border bg-muted/20 p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Saved
-          </p>
-          <ul className="space-y-1">
-            {captured.map((label) => (
-              <li key={label} className="flex items-start gap-1.5 text-[12px] text-foreground">
-                <Icon name="check" className="mt-0.5 h-3 w-3 shrink-0 text-success" />
-                {label}
-              </li>
-            ))}
-          </ul>
-        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Saved
+            </p>
+            <ul className="space-y-1">
+              {captured.map((label) => (
+                <li key={label} className="flex items-start gap-1.5 text-[12px] text-foreground">
+                  <Icon name="check" className="mt-0.5 h-3 w-3 shrink-0 text-success" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        <div className="rounded-lg border border-border p-3">
-          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Decided per invoice
-          </p>
-          <ul className="space-y-1">
-            {excluded.map((label) => (
-              <li
-                key={label}
-                className="flex items-start gap-1.5 text-[12px] text-muted-foreground"
-              >
-                <Icon name="x" className="mt-0.5 h-3 w-3 shrink-0" />
-                {label}
-              </li>
-            ))}
-          </ul>
+          <div className="rounded-lg border border-border p-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Decided per invoice
+            </p>
+            <ul className="space-y-1">
+              {excluded.map((label) => (
+                <li
+                  key={label}
+                  className="flex items-start gap-1.5 text-[12px] text-muted-foreground"
+                >
+                  <Icon name="x" className="mt-0.5 h-3 w-3 shrink-0" />
+                  {label}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       </div>
 
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
         <Button type="button" variant="secondary" size="sm" disabled={isSaving} onClick={onCancel}>
           Cancel
         </Button>
@@ -173,6 +177,6 @@ function SaveBody({
           {isSaving ? "Saving…" : "Save template"}
         </Button>
       </div>
-    </div>
+    </>
   );
 }
