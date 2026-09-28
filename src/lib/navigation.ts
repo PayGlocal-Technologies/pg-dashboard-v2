@@ -124,6 +124,12 @@ export const regularNavigation: NavGroup[] = [
         icon: "credit-card",
         permission: ["mandateResults", "mandateResultsMerchantContext"],
       },
+      {
+        label: "Payment Pages",
+        href: "/payment-pages",
+        icon: "credit-card",
+        permission: ["mandateResults", "mandateResultsMerchantContext"],
+      },
     ],
   },
   {
