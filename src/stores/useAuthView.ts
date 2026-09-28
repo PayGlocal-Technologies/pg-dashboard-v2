@@ -23,6 +23,10 @@ export interface SignInPrefill {
 interface AuthViewState {
   view: AuthView;
   signInPrefill: SignInPrefill | null;
+  /** The email the mock sign-up just used, for the demo dashboard's
+   *  "verification email sent" overlay. In memory only, never persisted. */
+  signedUpEmail: string | null;
+  setSignedUpEmail: (email: string) => void;
   setView: (view: AuthView) => void;
   /** Switch to sign-in with the number filled in, or, when `account` is
    *  given, straight to that account's password step. */
@@ -42,6 +46,8 @@ interface AuthViewState {
 export const useAuthView = create<AuthViewState>((set) => ({
   view: "account",
   signInPrefill: null,
+  signedUpEmail: null,
+  setSignedUpEmail: (signedUpEmail) => set({ signedUpEmail }),
   // Any other navigation drops the prefill, so a later visit to sign-in
   // starts clean.
   setView: (view) => set({ view, signInPrefill: null }),

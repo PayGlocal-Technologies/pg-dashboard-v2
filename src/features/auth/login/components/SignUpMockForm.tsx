@@ -197,6 +197,7 @@ export function SignUpMockForm() {
 
 function SignUpSteps({ view }: { view: SignUpView }) {
   const router = useRouter();
+  const setSignedUpEmail = useAuthView((st) => st.setSignedUpEmail);
   const setView = useAuthView((st) => st.setView);
   const signInWithPhone = useAuthView((st) => st.signInWithPhone);
   /** When the mobile OTP was (mock) last sent; drives the resend lock. */
@@ -214,7 +215,8 @@ function SignUpSteps({ view }: { view: SignUpView }) {
       country: "IN",
     },
     // Mock demo: nothing is created; the demo dashboard opens instead.
-    onSubmit: () => {
+    onSubmit: ({ value }) => {
+      setSignedUpEmail(value.email.trim());
       toast.success("Account created", { description: "Opening your dashboard." });
       router.push(DASHBOARD_PATH);
     },
