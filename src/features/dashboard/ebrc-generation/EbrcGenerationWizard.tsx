@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Badge, Button, IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { withBasePath } from "@/constants/basePath";
+import { brandBackdropStyle } from "@/lib/utils/brandBackdrop";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { useEbrcSelection } from "@/stores/useEbrcSelection";
@@ -375,19 +375,11 @@ export function EbrcGenerationWizard() {
           <StepList activeStep={activeStep} furthestStep={reachableStep} onJump={goToStep} />
 
           <div
-            className="relative min-h-0 flex-1 overflow-y-auto bg-cover bg-top bg-no-repeat"
-            // Quoted url(): the filename has a space ("bg image.png"), and an
-            // unquoted CSS url() is terminated by the first whitespace,
-            // which silently drops the whole background-image declaration —
-            // this is the exact bug that made this image "not load" before.
-            //
-            // The white wash is layered on as a second background
-            // (multiple-backgrounds, not `opacity` on this div) — opacity
-            // would fade the step content sitting on top of it too, not
-            // just the image underneath.
-            style={{
-              backgroundImage: `linear-gradient(rgba(255,255,255,0.78), rgba(255,255,255,0.78)), url("${withBasePath("/assets/bg image.png")}")`,
-            }}
+            className="brand-backdrop relative min-h-0 flex-1 overflow-y-auto bg-cover bg-top bg-no-repeat"
+            // The wash is layered on as a second background (not `opacity`
+            // on this div), which would fade the step content on top of it
+            // too, not just the image underneath.
+            style={brandBackdropStyle(78)}
           >
             <div className="px-6 py-6">
               {/* Header naming the current step's action in a few words —

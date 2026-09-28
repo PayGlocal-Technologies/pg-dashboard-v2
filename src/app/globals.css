@@ -719,3 +719,22 @@ textarea:focus-visible {
     display: none;
   }
 }
+
+/* Decorative artwork backdrop with a wash of the page background over it.
+ * Paired with brandBackdropStyle(), which supplies the image URL and the
+ * light-mode wash strength. The wash mixes in --background rather than white,
+ * and dark mode raises it to one fixed strength, so the light artwork sits
+ * back as a faint tint instead of a bright block. */
+.brand-backdrop {
+  --backdrop-wash-color: color-mix(
+    in srgb,
+    var(--background) var(--backdrop-wash, 55%),
+    transparent
+  );
+  background-image:
+    linear-gradient(var(--backdrop-wash-color), var(--backdrop-wash-color)), var(--backdrop-image);
+}
+
+.dark .brand-backdrop {
+  --backdrop-wash-color: color-mix(in srgb, var(--background) 90%, transparent);
+}
