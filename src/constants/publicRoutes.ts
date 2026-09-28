@@ -21,6 +21,9 @@ export const PUBLIC_ROUTE_PATTERNS = [
 export const PUBLIC_ROUTE_PREFIXES = [
   "/welcome",
   "/login",
+  // Design demo: the Home dashboard on sample data, no session (see
+  // app/(demo)). Remove with the mock sign-up.
+  "/demo",
   "/forgot-password",
   "/risk-underwriting",
   "/__/auth",

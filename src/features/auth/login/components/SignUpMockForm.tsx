@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useForm, useStore } from "@tanstack/react-form";
+import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Avatar,
@@ -62,7 +64,7 @@ import {
  * Sign-up, no stepper:
  *  1. Account: email, full name, password, country of registration, phone.
  *     "Continue" sends the OTP.
- *  2. Verify: the mobile OTP (plus a note that an email link went out too),
+ *  2. Verify: the mobile OTP,
  *     then create the account. If the number already has accounts, a
  *     "linked" screen comes first: sign in to one of them, or create another
  *     (blocked at the limit of 3). It sits after the OTP because that is the
@@ -72,6 +74,10 @@ import {
  * Account rules the real sign-up must enforce (backend): an email can hold
  * only one account; a phone number can be linked to at most 3 accounts.
  */
+
+/** Where a (mock) new account lands: the Home dashboard on sample data, a
+ *  public demo route that needs no session (see app/(demo)). */
+const DASHBOARD_PATH = "/demo/dashboard";
 
 const COPY: Record<Exclude<SignUpView, "linked">, { title: string; cta: string }> = {
   account: { title: "Create your account", cta: "Continue" },
@@ -190,6 +196,7 @@ export function SignUpMockForm() {
 }
 
 function SignUpSteps({ view }: { view: SignUpView }) {
+  const router = useRouter();
   const setView = useAuthView((st) => st.setView);
   const signInWithPhone = useAuthView((st) => st.signInWithPhone);
   /** When the mobile OTP was (mock) last sent; drives the resend lock. */
@@ -206,7 +213,11 @@ function SignUpSteps({ view }: { view: SignUpView }) {
       // India by default, matching the +91 phone code below it.
       country: "IN",
     },
-    onSubmit: () => notConnected("Sign up"),
+    // Mock demo: nothing is created; the demo dashboard opens instead.
+    onSubmit: () => {
+      toast.success("Account created", { description: "Opening your dashboard." });
+      router.push(DASHBOARD_PATH);
+    },
   });
 
   const email = useStore(form.store, (st) => st.values.email);
@@ -446,22 +457,6 @@ function SignUpSteps({ view }: { view: SignUpView }) {
               Terms &amp; Conditions
             </TextLink>{" "}
             and <TextLink onClick={() => notConnected("Privacy Policy")}>Privacy Policy</TextLink>.
-          </p>
-        )}
-
-        {/* Email is verified by link, separately from the phone OTP, so it's
-            one quiet line on the verify step rather than a second code. */}
-        {view === "verify" && (
-          <p className="mt-5 flex items-start gap-2 text-[12px] leading-relaxed text-muted-foreground">
-            <Icon name="mail" className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
-            <span className="min-w-0">
-              We&apos;ve also emailed a verification link to{" "}
-              <span className="break-words font-medium text-foreground">
-                {email || "your email"}
-              </span>
-              . You can verify it later.{" "}
-              <TextLink onClick={() => notConnected("Resend email")}>Resend</TextLink>
-            </span>
           </p>
         )}
       </motion.div>
