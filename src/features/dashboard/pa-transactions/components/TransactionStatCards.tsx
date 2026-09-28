@@ -73,9 +73,11 @@ export function TransactionStatCards({
         icon="alert-triangle"
         value={`₹${metrics.disputeAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
         trendLabel={`${metrics.disputeCount.toLocaleString("en-IN")} transaction${metrics.disputeCount === 1 ? "" : "s"} · ${trendLabel(metrics.disputeAmountTrendPct)}`}
-        // Inverted vs. every other card here, more disputes is a bad outcome,
-        // so a rising trend reads red, not green.
+        // Inverted vs. the volume cards: more disputes is a bad outcome, so a
+        // fall reads green and a rise red. The arrow still shows the real
+        // direction.
         trendPositive={metrics.disputeAmountTrendPct < 0}
+        trendUp={metrics.disputeAmountTrendPct >= 0}
         data={trendCharts.disputeAmount}
         accentColor="var(--chart-5)"
         formatTooltipValue={formatLakhTooltip}
@@ -88,7 +90,9 @@ export function TransactionStatCards({
         icon="repeat"
         value={`₹${metrics.refundAmount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}
         trendLabel={`${metrics.refundCount.toLocaleString("en-IN")} transaction${metrics.refundCount === 1 ? "" : "s"} · ${trendLabel(metrics.refundAmountTrendPct)}`}
-        trendPositive={metrics.refundAmountTrendPct >= 0}
+        // Same inversion as Disputes: fewer refunds is the good outcome.
+        trendPositive={metrics.refundAmountTrendPct < 0}
+        trendUp={metrics.refundAmountTrendPct >= 0}
         data={trendCharts.refundAmount}
         accentColor="var(--chart-3)"
         formatTooltipValue={formatLakhTooltip}

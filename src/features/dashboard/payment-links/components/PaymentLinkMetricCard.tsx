@@ -39,13 +39,19 @@ export interface PaymentLinkMetricCardProps {
   icon?: IconName;
   value: string;
   trendLabel: string;
+  /** Colours the trend: green when true (a good change), red when false. */
   trendPositive?: boolean;
+  /** Arrow direction, when it differs from trendPositive: for a metric where
+   *  a fall is good (disputes, refunds) the arrow points down while the
+   *  colour is green. Defaults to trendPositive. */
+  trendUp?: boolean;
   data: SparklinePoint[];
   accentColor: string;
   formatTooltipValue?: (y: number) => string;
   formatAxisValue?: (y: number) => string;
-  /** false: a bare trend line, no axes, gridlines or area fill; the tooltip
-   *  still names the period and value on hover. Default true. */
+  /** false: just the trend line and its gradient fill, no axes or
+   *  gridlines; the tooltip still names the period and value on hover.
+   *  Default true. */
   showAxes?: boolean;
   className?: string;
 }
@@ -56,6 +62,7 @@ export function PaymentLinkMetricCard({
   value,
   trendLabel,
   trendPositive = true,
+  trendUp,
   data,
   accentColor,
   formatTooltipValue = (y) => y.toLocaleString("en-US"),
@@ -84,7 +91,11 @@ export function PaymentLinkMetricCard({
               : "text-red-600 dark:text-red-400"
           )}
         >
-          <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
+          <Icon
+            name={(trendUp ?? trendPositive) ? "trending-up" : "trending-down"}
+            size={13}
+            aria-hidden
+          />
           <RollingNumber value={trendLabel} className="tabular-nums" />
         </div>
       </div>
@@ -134,7 +145,7 @@ export function PaymentLinkMetricCard({
               dataKey="y"
               stroke={accentColor}
               strokeWidth={2}
-              fill={showAxes ? `url(#${gradientId})` : "none"}
+              fill={`url(#${gradientId})`}
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0, fill: accentColor }}
             />
