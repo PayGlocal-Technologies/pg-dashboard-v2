@@ -51,6 +51,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/refer-and-earn",
   "/settlement-report",
   "/sku-management",
+  "/static-link",
   "/team-management",
   // The live settings sub-pages. /settings itself only redirects, and the rest
   // of src/app/(dashboard)/settings (developer, notifications, payments) exists
@@ -101,6 +102,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/mca-settlement-report": ["settlement", "UTR", "payout", "reports"],
   "/settlement-report": ["settlement", "UTR", "payout", "reports"],
   "/mca-links": ["payment link", "share link"],
+  "/static-link": ["static link", "vanity link", "payment handle", "pay link", "@"],
   "/sku-management": ["product", "HSN", "SAC", "catalogue"],
   "/team-management": ["teams", "users", "roles", "invite", "permissions"],
   "/client-management": ["clients", "customers", "buyers", "payers"],

@@ -107,6 +107,7 @@ export const regularNavigation: NavGroup[] = [
           { label: "Receipts", href: "/mca-receipts", permission: [], product: "PACB" },
           { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
           { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
+          { label: "Static Link", href: "/static-link", permission: [], product: "PA" },
           { label: "Invoice Links", href: "/invoice-links", permission: [] },
           { label: "Payment Button", href: "/payment-button", permission: [] },
         ],
