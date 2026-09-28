@@ -55,18 +55,26 @@ export function McaUpcomingSettlementCard() {
       )}
       {!isLoading && upcoming && upcoming.transactionCount > 0 && (
         <p className="text-xs text-muted-foreground">
-          {upcoming.transactionCount} transaction{upcoming.transactionCount === 1 ? "" : "s"}
+          {upcoming.transactionCount} transaction{upcoming.transactionCount === 1 ? "" : "s"} ready
+          to settle
         </p>
       )}
 
       {!isLoading && upcoming && upcoming.pendingInvoiceCount > 0 ? (
         <>
           <Separator className="my-0.5" />
+          {/* pendingInvoiceCount is NOT a subset of transactionCount above:
+              a DOCUMENT_PENDING transaction is blocked from this settlement
+              until its invoice lands, so it is counted here and not there.
+              The old "Upload the pending N invoices" copy sat under the
+              transaction count and read as N invoices for those
+              transactions, so a pending count larger than the transaction
+              count looked like a contradiction. Same wording as
+              SettlementStatCards / OutstandingAmountCard for the same fact. */}
           <p className="text-xs text-muted-foreground">
-            Upload the pending{" "}
             <span className="font-medium text-foreground">{upcoming.pendingInvoiceCount}</span>{" "}
-            invoice{upcoming.pendingInvoiceCount === 1 ? "" : "s"} before 8pm today to receive your
-            settlement today.
+            transaction{upcoming.pendingInvoiceCount === 1 ? " needs" : "s need"} an invoice
+            uploaded before 8pm today to be included in this settlement.
           </p>
         </>
       ) : (

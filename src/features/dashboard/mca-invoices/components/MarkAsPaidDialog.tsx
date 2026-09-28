@@ -63,18 +63,20 @@ export function MarkAsPaidDialog({
 
   return (
     <Dialog open={!!invoice} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <DialogTitle>Mark as paid</DialogTitle>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          {invoice ? (
-            <>
-              Records <span className="font-medium text-foreground">{invoice.invoiceNumber}</span>{" "}
-              as settled outside PayGlocal, for {invoice.currency} {invoice.totalAmount}.
-            </>
-          ) : null}
-        </p>
+      <DialogContent className="flex max-h-[90vh] max-w-sm flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle>Mark as paid</DialogTitle>
+          <p className="mt-1 text-[12.5px] text-muted-foreground">
+            {invoice ? (
+              <>
+                Records <span className="font-medium text-foreground">{invoice.invoiceNumber}</span>{" "}
+                as settled outside PayGlocal, for {invoice.currency} {invoice.totalAmount}.
+              </>
+            ) : null}
+          </p>
+        </div>
 
-        <div className="mt-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
           <Field>
             <FieldLabel>Payment date</FieldLabel>
             <DatePicker value={paidDate} onChange={setPaidDate} />
@@ -82,7 +84,7 @@ export function MarkAsPaidDialog({
           </Field>
         </div>
 
-        <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
           <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

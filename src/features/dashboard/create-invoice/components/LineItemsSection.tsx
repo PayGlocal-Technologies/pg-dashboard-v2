@@ -3,8 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
   Button,
-  Callout,
-  CalloutText,
   Command,
   CommandEmpty,
   CommandGroup,
@@ -32,6 +30,7 @@ import {
   getSubtotal,
   getTaxAmount,
   getTotalAmount,
+  resolveItemType,
 } from "@/features/dashboard/create-invoice/helpers";
 import { DISCOUNT_TYPE_OPTIONS } from "@/features/dashboard/create-invoice/constants";
 import { useLineItemSuggestions } from "@/features/dashboard/create-invoice/hooks";
@@ -163,7 +162,7 @@ export function LineItemsSection({
       {
         key,
         description: item.name,
-        type: item.type ?? "",
+        type: resolveItemType(item),
         hsn: item.hsn ?? "",
         gstRate: "",
         unitPrice: item.unitPrice ?? "",
@@ -647,12 +646,13 @@ export function LineItemsSection({
           the other as a code — "$0.00 vs NZD 100.00" reads as two currencies
           when it is meant to read as two amounts of one. */}
       {linkedExpectedTotal && (
-        <Callout variant="error" className="mt-3">
-          <CalloutText>
+        <div className="mt-3 flex items-start gap-1.5 text-[12.5px] leading-relaxed text-destructive">
+          <Icon name="alert-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>
             Items total {currency} {total}, which must match the linked transaction:{" "}
             {linkedCurrency || currency} {linkedExpectedTotal}.
-          </CalloutText>
-        </Callout>
+          </p>
+        </div>
       )}
 
       <AddLineItemDialog

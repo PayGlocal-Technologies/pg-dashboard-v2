@@ -147,8 +147,9 @@ function ManageTemplatesAction() {
 }
 
 /**
- * The page-level "Create invoice", same MID-scoping rule as the table's own
- * toolbar button (see McaInvoiceTable's openInvoiceEditor): a multi-MID
+ * The page-level "Create invoice", and since the table toolbar dropped its
+ * own copy, the only one outside the first-time empty state. Same MID-scoping
+ * rule as that empty state (see McaInvoiceTable's openInvoiceEditor): a multi-MID
  * merchant with nothing selected has to choose which account the new invoice
  * belongs to before the editor opens, since the editor puts one MID in every
  * request path rather than falling back to the merchant's first one.

@@ -10,7 +10,6 @@ import {
   FieldLabel,
   Input,
   PasswordInput,
-  Separator,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 
@@ -49,8 +48,10 @@ export function DgftLoginDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        <div className="flex flex-col items-center gap-3 text-center">
+      <DialogContent className="flex max-h-[90vh] max-w-sm flex-col gap-0 overflow-hidden p-0">
+        {/* The header's border-b is the rule that used to sit between the
+            title block and the fields. */}
+        <div className="flex shrink-0 flex-col items-center gap-3 border-b border-border px-6 pb-5 pt-10 text-center">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
             <Icon name="lock" className="h-5 w-5" />
           </span>
@@ -62,9 +63,7 @@ export function DgftLoginDialog({
           </div>
         </div>
 
-        <Separator className="my-5" />
-
-        <div className="space-y-4">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
           <Field>
             <FieldLabel htmlFor="dgft-username">Username</FieldLabel>
             <Input
@@ -87,7 +86,7 @@ export function DgftLoginDialog({
           </Field>
         </div>
 
-        <div className="mt-6 flex flex-col gap-2">
+        <div className="flex shrink-0 flex-col gap-2 border-t border-border px-6 py-4">
           <Button
             type="button"
             variant="primary"

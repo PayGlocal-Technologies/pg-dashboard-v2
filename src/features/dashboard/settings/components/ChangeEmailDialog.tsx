@@ -277,15 +277,22 @@ export function ChangeEmailDialog({
     </div>
   );
 
+  // Shown under the step's own content on every in-progress step. It lives in
+  // the scrolling body so the footer actions stay the last thing in the dialog.
+  const noticeLine =
+    notice && step !== "done" && step !== "stopped" ? (
+      <p className="text-xs text-muted-foreground">{notice}</p>
+    ) : null;
+
   return (
     <Dialog open onOpenChange={(next) => !next && close()}>
-      <DialogContent className="sm:max-w-md">
-        <div className="space-y-4">
-          {/* Rendered rather than folded into `step`, so no state is set from
-              the effect body. Without the key the OTP and the address would go
-              up in the clear, so the flow does not start at all. */}
-          {encryption === "failed" && step === "sending" && (
-            <>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
+        {/* Rendered rather than folded into `step`, so no state is set from
+            the effect body. Without the key the OTP and the address would go
+            up in the clear, so the flow does not start at all. */}
+        {encryption === "failed" && step === "sending" && (
+          <>
+            <div className="shrink-0 px-6 py-4 pr-14">
               <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
                   <Icon name="shield-alert" size={18} />
@@ -298,15 +305,17 @@ export function ChangeEmailDialog({
                   </DialogDescription>
                 </div>
               </div>
-              <div className="flex justify-end">
-                <Button type="button" onClick={close}>
-                  Close
-                </Button>
-              </div>
-            </>
-          )}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button type="button" onClick={close}>
+                Close
+              </Button>
+            </div>
+          </>
+        )}
 
-          {encryption !== "failed" && step === "sending" && (
+        {encryption !== "failed" && step === "sending" && (
+          <div className="flex shrink-0 flex-col gap-4 px-6 py-5 pr-14">
             <div className="flex items-center gap-3 py-4">
               <Icon name="loader" className="h-4 w-4 animate-spin text-muted-foreground" />
               <div>
@@ -316,18 +325,21 @@ export function ChangeEmailDialog({
                 </DialogDescription>
               </div>
             </div>
-          )}
+            {noticeLine}
+          </div>
+        )}
 
-          {step === "verify-old" && (
-            <>
-              <div>
-                <DialogTitle>Verify your current email</DialogTitle>
-                <DialogDescription>
-                  We&apos;ve sent a {EMAIL_OTP_LENGTH}-digit code to{" "}
-                  <span className="font-medium text-foreground">{currentEmail}</span>. Enter it to
-                  continue.
-                </DialogDescription>
-              </div>
+        {step === "verify-old" && (
+          <>
+            <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+              <DialogTitle>Verify your current email</DialogTitle>
+              <DialogDescription>
+                We&apos;ve sent a {EMAIL_OTP_LENGTH}-digit code to{" "}
+                <span className="font-medium text-foreground">{currentEmail}</span>. Enter it to
+                continue.
+              </DialogDescription>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
               <Field>
                 <FieldLabel>Verification code</FieldLabel>
                 <OtpInput
@@ -342,65 +354,71 @@ export function ChangeEmailDialog({
                 <FieldError>{error}</FieldError>
               </Field>
               {resendRow}
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => submitOldOtp(oldOtp)}
-                  isLoading={isBusy}
-                  disabled={oldOtp.length !== EMAIL_OTP_LENGTH}
-                >
-                  Verify
-                </Button>
-              </div>
-            </>
-          )}
+              {noticeLine}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => submitOldOtp(oldOtp)}
+                isLoading={isBusy}
+                disabled={oldOtp.length !== EMAIL_OTP_LENGTH}
+              >
+                Verify
+              </Button>
+            </div>
+          </>
+        )}
 
-          {step === "enter-new-email" && (
-            /* A real form so Enter submits, as merchants expect in a one-field
-               step. */
+        {step === "enter-new-email" && (
+          /* A real form so Enter submits, as merchants expect in a one-field
+             step. */
+          <>
+            <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+              <DialogTitle>Enter your new email</DialogTitle>
+              <DialogDescription>
+                We&apos;ll send a code to this address to confirm you can receive mail there.
+              </DialogDescription>
+            </div>
             <form
-              className="space-y-4"
+              className="flex min-h-0 flex-1 flex-col"
               noValidate
               onSubmit={(e) => {
                 e.preventDefault();
                 submitNewEmail();
               }}
             >
-              <div>
-                <DialogTitle>Enter your new email</DialogTitle>
-                <DialogDescription>
-                  We&apos;ll send a code to this address to confirm you can receive mail there.
-                </DialogDescription>
+              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+                <Field>
+                  <FieldLabel htmlFor="new-email">New email address</FieldLabel>
+                  <Input
+                    id="new-email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    spellCheck={false}
+                    placeholder="name@company.com"
+                    value={newEmail}
+                    aria-invalid={!!error}
+                    // Typing clears the message; it comes back on blur or submit,
+                    // so the merchant isn't corrected mid-keystroke.
+                    onChange={(e) => {
+                      setNewEmail(e.target.value);
+                      if (error) setError(null);
+                    }}
+                    onBlur={() => {
+                      if (newEmail.trim()) setError(validateNewEmail(newEmail, currentEmail));
+                    }}
+                    disabled={isBusy}
+                    autoFocus
+                  />
+                  <FieldError>{error}</FieldError>
+                </Field>
+                {noticeLine}
               </div>
-              <Field>
-                <FieldLabel htmlFor="new-email">New email address</FieldLabel>
-                <Input
-                  id="new-email"
-                  type="email"
-                  inputMode="email"
-                  autoComplete="email"
-                  spellCheck={false}
-                  placeholder="name@company.com"
-                  value={newEmail}
-                  aria-invalid={!!error}
-                  // Typing clears the message; it comes back on blur or submit,
-                  // so the merchant isn't corrected mid-keystroke.
-                  onChange={(e) => {
-                    setNewEmail(e.target.value);
-                    if (error) setError(null);
-                  }}
-                  onBlur={() => {
-                    if (newEmail.trim()) setError(validateNewEmail(newEmail, currentEmail));
-                  }}
-                  disabled={isBusy}
-                  autoFocus
-                />
-                <FieldError>{error}</FieldError>
-              </Field>
-              <div className="flex justify-end gap-2">
+              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
                 <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
                   Cancel
                 </Button>
@@ -409,18 +427,20 @@ export function ChangeEmailDialog({
                 </Button>
               </div>
             </form>
-          )}
+          </>
+        )}
 
-          {step === "verify-new" && (
-            <>
-              <div>
-                <DialogTitle>Verify your new email</DialogTitle>
-                <DialogDescription>
-                  We&apos;ve sent a {EMAIL_OTP_LENGTH}-digit code to{" "}
-                  <span className="font-medium text-foreground">{newEmail.trim()}</span>. Entering
-                  it changes your account email.
-                </DialogDescription>
-              </div>
+        {step === "verify-new" && (
+          <>
+            <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+              <DialogTitle>Verify your new email</DialogTitle>
+              <DialogDescription>
+                We&apos;ve sent a {EMAIL_OTP_LENGTH}-digit code to{" "}
+                <span className="font-medium text-foreground">{newEmail.trim()}</span>. Entering it
+                changes your account email.
+              </DialogDescription>
+            </div>
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
               <Field>
                 <FieldLabel>Verification code</FieldLabel>
                 <OtpInput
@@ -441,24 +461,27 @@ export function ChangeEmailDialog({
                 to sign in from now on.
               </p>
               {resendRow}
-              <div className="flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => submitNewOtp(newOtp)}
-                  isLoading={isBusy}
-                  disabled={newOtp.length !== EMAIL_OTP_LENGTH}
-                >
-                  Confirm change
-                </Button>
-              </div>
-            </>
-          )}
+              {noticeLine}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => submitNewOtp(newOtp)}
+                isLoading={isBusy}
+                disabled={newOtp.length !== EMAIL_OTP_LENGTH}
+              >
+                Confirm change
+              </Button>
+            </div>
+          </>
+        )}
 
-          {step === "done" && (
-            <>
+        {step === "done" && (
+          <>
+            <div className="shrink-0 px-6 py-4 pr-14">
               <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <Icon name="check-circle" size={18} />
@@ -473,16 +496,18 @@ export function ChangeEmailDialog({
                   </DialogDescription>
                 </div>
               </div>
-              <div className="flex justify-end">
-                <Button type="button" onClick={() => onCompleted(newEmail.trim())}>
-                  Done
-                </Button>
-              </div>
-            </>
-          )}
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button type="button" onClick={() => onCompleted(newEmail.trim())}>
+                Done
+              </Button>
+            </div>
+          </>
+        )}
 
-          {step === "stopped" && (
-            <>
+        {step === "stopped" && (
+          <>
+            <div className="shrink-0 px-6 py-4 pr-14">
               <div className="flex items-start gap-3">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
                   <Icon name="shield-alert" size={18} />
@@ -497,24 +522,20 @@ export function ChangeEmailDialog({
                   </DialogDescription>
                 </div>
               </div>
-              <div className="flex justify-end">
-                {stopReason === "signed-out" ? (
-                  <Button type="button" onClick={onSessionEnded}>
-                    Go to login
-                  </Button>
-                ) : (
-                  <Button type="button" onClick={close}>
-                    Close
-                  </Button>
-                )}
-              </div>
-            </>
-          )}
-
-          {notice && step !== "done" && step !== "stopped" && (
-            <p className="text-xs text-muted-foreground">{notice}</p>
-          )}
-        </div>
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              {stopReason === "signed-out" ? (
+                <Button type="button" onClick={onSessionEnded}>
+                  Go to login
+                </Button>
+              ) : (
+                <Button type="button" onClick={close}>
+                  Close
+                </Button>
+              )}
+            </div>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
