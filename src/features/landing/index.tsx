@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui";
+import { cn } from "@/lib/utils";
 import { Icon, type IconName } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
 import { BrandLogo } from "@/features/auth/components/BrandLogo";
-import { AUTH_BACKGROUND } from "@/features/auth/background";
+import { AUTH_IMAGE } from "@/features/auth/background";
+import { AUTH_CARD_CLASS, AUTH_PANEL_CLASS } from "@/features/auth/components/AuthSplitScreen";
 import { useAuthView } from "@/stores/useAuthView";
 import dynamic from "next/dynamic";
 
@@ -44,43 +46,32 @@ const SIGN_UP_PATH = "/login";
 const EASE = [0.65, 0, 0.35, 1] as const;
 
 /**
- * Covers the landing page with the sign-up screen's own composition — flat
- * #f1f1f1 with the gradient panel sweeping in from the left at exactly the
- * sign-up layout's 50% width — and only navigates once the sweep finishes, so
- * the real page mounts under an identical frame instead of cutting to it.
+ * Hand-off into sign-up: a white screen fades in over the landing page with
+ * the sign-up page's own image card already in place (same inset, radius and
+ * crop as AuthSplitScreen), and only navigates once the fade finishes, so the
+ * real page mounts under an identical frame instead of cutting to it.
  */
 function SignUpTransition({ onDone }: { onDone: () => void }) {
   return (
-    // One slow crossfade, no sideways travel: the sign-up screen's own
-    // full-screen background fades in over the landing page while the
-    // landing content fades out, so nothing moves and only the picture
-    // changes. Same image, fit and anchor as the auth layout, so navigation
-    // (which waits for the fade) lands on an identical frame.
     <motion.div
-      className="fixed inset-0 z-50 overflow-hidden bg-white"
+      className="fixed inset-0 z-50 grid overflow-hidden bg-white lg:grid-cols-2"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 1.1, ease: EASE }}
       onAnimationComplete={onDone}
     >
-      {/* A barely-there settle (4% → 100% scale, from the top-left anchor)
-          so the wash reads as arriving rather than switching on; it ends at
-          exactly the framing the sign-up page renders. */}
-      <motion.div
-        className="absolute inset-0 hidden origin-top-left lg:block"
-        initial={{ scale: 1.04 }}
-        animate={{ scale: 1 }}
-        transition={{ duration: 1.3, ease: EASE }}
-      >
-        <AppImage
-          src={AUTH_BACKGROUND}
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-left-top"
-        />
-      </motion.div>
+      <div className={cn(AUTH_PANEL_CLASS, "h-screen")}>
+        <div className={AUTH_CARD_CLASS}>
+          <AppImage
+            src={AUTH_IMAGE}
+            alt=""
+            fill
+            priority
+            sizes="50vw"
+            className="object-cover object-center"
+          />
+        </div>
+      </div>
     </motion.div>
   );
 }

@@ -2,94 +2,72 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { AppImage } from "@/components/common/AppImage";
-import { cn } from "@/lib/utils";
+import { AUTH_IMAGE } from "@/features/auth/background";
 import { isSignInView, useAuthView } from "@/stores/useAuthView";
 
-interface PanelContent {
-  /** Transparent PNG; width/height are its intrinsic size. */
-  image: { src: string; width: number; height: number };
-  /** Max width within the panel; the sign-in artwork is wider and flatter
-   *  than the globe, so it needs more width to read at the same weight. */
-  maxWidth: string;
+interface Caption {
   title: string;
   subtitle?: string;
 }
 
-const SIGN_UP: PanelContent = {
-  image: { src: "/assets/login_globe.png", width: 2992, height: 2736 },
-  maxWidth: "max-w-[72%]",
+const SIGN_UP: Caption = {
   title: "Trusted by 10,000+ merchants to power payments worldwide.",
 };
 
-const SIGN_IN: PanelContent = {
-  image: { src: "/assets/signin.png", width: 3252, height: 2604 },
-  maxWidth: "max-w-[92%]",
+const SIGN_IN: Caption = {
   title: "More ways to get things done.",
   subtitle: "Explore everything PayGlocal can do for your business.",
 };
 
+/** The panel's frame (inset + rounded card). Shared with the landing page's
+ *  hand-off so it lands on exactly this frame. */
+export const AUTH_PANEL_CLASS = "hidden min-h-0 p-6 lg:flex";
+export const AUTH_CARD_CLASS = "relative flex min-h-0 flex-1 overflow-hidden rounded-2xl";
+
 /**
- * Brand panel on the left of the auth screens (desktop only): an
- * illustration and a caption, one set for sign-up and another for sign-in,
- * crossfading as the form switches. The pastel artwork behind it is the auth
- * layout's own full-screen background, so this panel is transparent.
+ * Brand panel on the left of the auth screens (desktop only): one rounded
+ * image card inset from the page edge, with the caption laid over its
+ * bottom-left corner. The image stays put between sign-up and sign-in; only
+ * the caption crossfades.
  */
 export function AuthSplitScreen() {
   const isSignIn = useAuthView((s) => isSignInView(s.view));
-  const content = isSignIn ? SIGN_IN : SIGN_UP;
+  const caption = isSignIn ? SIGN_IN : SIGN_UP;
 
   return (
-    <div className="relative hidden flex-col overflow-hidden lg:flex">
-      <div className="h-12 shrink-0" aria-hidden />
+    <div className={AUTH_PANEL_CLASS}>
+      <div className={AUTH_CARD_CLASS}>
+        <AppImage
+          src={AUTH_IMAGE}
+          alt=""
+          fill
+          priority
+          sizes="50vw"
+          className="object-cover object-center"
+        />
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.div
-          key={content.image.src}
-          className="flex min-h-0 flex-1 flex-col"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-        >
-          {/* Illustration */}
-          <motion.div
-            className="relative flex min-h-0 flex-1 items-center justify-center p-8"
-            initial={{ opacity: 0, scale: 0.96 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            <AppImage
-              src={content.image.src}
-              alt=""
-              width={content.image.width}
-              height={content.image.height}
-              priority
-              className={cn("h-auto max-h-full w-auto object-contain", content.maxWidth)}
-            />
-          </motion.div>
-
-          {/* Caption band */}
-          <div className="shrink-0 px-10 py-8">
+        <div className="relative mt-auto w-full p-10 xl:p-12">
+          <AnimatePresence mode="wait" initial={false}>
             <motion.div
+              key={caption.title}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, ease: "easeOut", delay: 0.2 }}
-              className="mx-auto max-w-md text-center"
+              exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.35, ease: "easeOut" }}
+              className="max-w-md"
             >
-              <p className="text-2xl font-medium leading-snug tracking-tight text-balance text-slate-900 xl:text-[28px]">
-                {content.title}
+              <p className="text-[28px] font-medium leading-[1.15] tracking-tight text-balance text-slate-900 xl:text-[34px]">
+                {caption.title}
               </p>
-              {content.subtitle && (
-                <p className="mt-2 text-[15px] leading-relaxed text-slate-600">
-                  {content.subtitle}
+              {caption.subtitle && (
+                <p className="mt-2 text-[15px] leading-relaxed text-slate-700">
+                  {caption.subtitle}
                 </p>
               )}
             </motion.div>
-          </div>
-        </motion.div>
-      </AnimatePresence>
-
-      <div className="h-8 shrink-0" aria-hidden />
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }

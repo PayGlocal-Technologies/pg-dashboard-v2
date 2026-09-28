@@ -62,7 +62,7 @@ import {
  *
  * This component is sign-up; sign-in screens hand over to SignInMockForm.
  * Sign-up, no stepper:
- *  1. Account: email, full name, password, country of registration, phone.
+ *  1. Account: full name, email, password, country of registration, phone.
  *     "Continue" sends the OTP.
  *  2. Verify: the mobile OTP,
  *     then create the account. If the number already has accounts, a
@@ -302,6 +302,25 @@ function SignUpSteps({ view }: { view: SignUpView }) {
           >
             {view === "account" && (
               <>
+                <form.Field name="fullName">
+                  {(field) => (
+                    <Field className={FIELD}>
+                      <FieldLabel htmlFor="auth-name" className={LABEL}>
+                        Your full name
+                      </FieldLabel>
+                      <Input
+                        id="auth-name"
+                        autoComplete="name"
+                        placeholder="Enter your full name"
+                        value={field.state.value}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        onBlur={field.handleBlur}
+                        className={CONTROL}
+                      />
+                    </Field>
+                  )}
+                </form.Field>
+
                 <form.Field name="email">
                   {(field) => (
                     <Field className={FIELD}>
@@ -313,25 +332,6 @@ function SignUpSteps({ view }: { view: SignUpView }) {
                         type="email"
                         autoComplete="email"
                         placeholder="you@company.com"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        onBlur={field.handleBlur}
-                        className={CONTROL}
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-
-                <form.Field name="fullName">
-                  {(field) => (
-                    <Field className={FIELD}>
-                      <FieldLabel htmlFor="auth-name" className={LABEL}>
-                        Your full name
-                      </FieldLabel>
-                      <Input
-                        id="auth-name"
-                        autoComplete="name"
-                        placeholder="Enter your full name"
                         value={field.state.value}
                         onChange={(e) => field.handleChange(e.target.value)}
                         onBlur={field.handleBlur}

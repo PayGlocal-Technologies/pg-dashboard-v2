@@ -5,8 +5,6 @@ import { motion } from "framer-motion";
 import { AuthSplitScreen } from "@/features/auth/components/AuthSplitScreen";
 import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { getPublicKey } from "@/features/auth/helpers";
-import { AppImage } from "@/components/common/AppImage";
-import { AUTH_BACKGROUND } from "@/features/auth/background";
 import { AuthLogo } from "@/features/auth/components/AuthLogo";
 
 /**
@@ -21,20 +19,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    // `isolate` scopes the backdrop's -z-10 to this layout.
-    <div className="relative isolate grid min-h-screen bg-white lg:h-screen lg:grid-cols-2 lg:overflow-hidden">
-      {/* Anchored top-left: when the viewport's shape differs from the
-          image's, cover-cropping then only trims the plain white right side
-          and bottom, never the gradient. Desktop only; on a phone the form
-          stacks alone and would sit over the whole wash. */}
-      <AppImage
-        src={AUTH_BACKGROUND}
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="-z-10 hidden object-cover object-left-top lg:block"
-      />
+    <div className="relative grid min-h-screen bg-white lg:h-screen lg:grid-cols-2 lg:overflow-hidden">
       <AuthSplitScreen />
       {/* Right column: logo bar, the form, then the footer. All three
           share one left inset (lg:pl-[14%]) so their left edges line up. */}
@@ -48,8 +33,8 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             rather than the parent using items-center, which would push
             overflowing content up under the header instead of scrolling. */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-6 lg:pl-[14%] lg:pr-8">
-          {/* Eases in on arrival, pairing with the landing page's hand-off,
-              which ends on this same layout's background. */}
+          {/* Eases in on arrival, pairing with the landing page's hand-off
+              (a fade to white). */}
           <motion.div
             className="mx-auto my-auto w-full max-w-[25rem] lg:mx-0"
             initial={{ opacity: 0, y: 12 }}

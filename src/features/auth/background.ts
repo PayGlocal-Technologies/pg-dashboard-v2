@@ -1,5 +1,7 @@
-/** Full-screen artwork (web-sized copy of loginbgimage.png, 6912×4468 →
- *  2880px JPEG): a pastel wash on the left that fades to pure white well
- *  before the right edge. Shared with the landing page's hand-off, which
- *  fades to this same image before navigating here. */
-export const AUTH_BACKGROUND = "/assets/login_bg_full.jpg";
+/**
+ * The auth screens' artwork: a coins image shown as a rounded card in the
+ * left panel (see AuthSplitScreen). Also used by the landing page's hand-off
+ * into sign-up, so both render the exact same frame. Lives here, not in the
+ * (auth) layout, because a Next.js layout file may only export its component.
+ */
+export const AUTH_IMAGE = "/assets/loginimg.png";
