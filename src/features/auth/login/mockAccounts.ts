@@ -11,6 +11,21 @@
 
 export const MAX_ACCOUNTS_PER_PHONE = 3;
 
+export type AccountRole = "MERCHANT" | "PARTNER";
+
+/**
+ * Mock emails that hold more than one role. Signing in with one asks, after
+ * the password or OTP, which role to land on. Fictional; the real roles come
+ * from the login response once wired up.
+ */
+export const MOCK_MULTI_ROLE_EMAILS: Record<string, AccountRole[]> = {
+  "arjun@globaltraders.com": ["MERCHANT", "PARTNER"],
+};
+
+export function rolesForEmail(email: string): AccountRole[] {
+  return MOCK_MULTI_ROLE_EMAILS[email.trim().toLowerCase()] ?? [];
+}
+
 export interface MockAccount {
   id: string;
   /** Unknown before sign-in when the merchant identified by email. */

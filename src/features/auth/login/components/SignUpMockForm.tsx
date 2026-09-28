@@ -21,7 +21,6 @@ import {
   Separator,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
 import { OTP_LENGTH } from "@/features/auth/login/schemas";
 import { isSignInView, useAuthView, type SignUpView } from "@/stores/useAuthView";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
@@ -35,6 +34,7 @@ import {
 import {
   BackLink,
   CardHeading,
+  ChoiceRow,
   CONTROL,
   COUNTRIES,
   FIELD,
@@ -59,70 +59,45 @@ import {
  * pg-dashboard per CLAUDE.md's migration checklist.
  *
  * This component is sign-up; sign-in screens hand over to SignInMockForm.
- * Sign-up is three steps:
- *  1. Account: email, full name, password, phone. "Continue" sends the OTP.
- *  2. Verify: the mobile OTP (plus a note that an email link went out too).
- *     If the number already has accounts, a "linked" screen follows inside
- *     this step: sign in to one of them, or create another (blocked at the
- *     limit of 3). It sits here because this is the first point the
- *     merchant has proved they own the number, so the linked emails can be
- *     shown in full, and it comes before they invest in step 3.
- *  3. About you: registered country, then create account.
+ * Sign-up, no stepper:
+ *  1. Account: email, full name, password, country of registration, phone.
+ *     "Continue" sends the OTP.
+ *  2. Verify: the mobile OTP (plus a note that an email link went out too),
+ *     then create the account. If the number already has accounts, a
+ *     "linked" screen comes first: sign in to one of them, or create another
+ *     (blocked at the limit of 3). It sits after the OTP because that is the
+ *     first point the merchant has proved they own the number, so the linked
+ *     emails can be shown in full.
  *
  * Account rules the real sign-up must enforce (backend): an email can hold
  * only one account; a phone number can be linked to at most 3 accounts.
  */
 
-/** Sign-up steps, in order. */
-const STEPS = ["account", "verify", "about"] as const satisfies readonly SignUpView[];
-
 const COPY: Record<Exclude<SignUpView, "linked">, { title: string; cta: string }> = {
   account: { title: "Create your account", cta: "Continue" },
-  verify: { title: "Verify your phone number", cta: "Continue" },
-  about: { title: "Where is your business registered?", cta: "Create account" },
+  verify: { title: "Verify your phone number", cta: "Verify and create account" },
 };
 
-/** "Step n of 3", then one bar segment per step. */
-function StepMeter({ step }: { step: SignUpView }) {
-  // "linked" is part of step 2, not a step of its own.
-  const current = STEPS.indexOf(step === "linked" ? "verify" : step) + 1;
-  return (
-    <div className="mb-4 flex items-center gap-3">
-      <span className="shrink-0 text-[11.5px] font-medium tabular-nums text-muted-foreground">
-        Step {current} of {STEPS.length}
-      </span>
-      <div className="flex flex-1 gap-1.5" aria-hidden>
-        {STEPS.map((s, i) => (
-          <span
-            key={s}
-            className={cn(
-              "h-1 flex-1 rounded-full transition-colors",
-              i < current ? "bg-primary" : "bg-muted"
-            )}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /**
- * After OTP: the accounts this number is already linked to. Emails are shown
- * in full here, since the merchant has just proved they own the number.
+ * After OTP: the accounts this number is already linked to, as rows. Picking
+ * one goes to sign-in's password step for that account; the last row creates
+ * a new account instead (or, when that isn't allowed, offers the way out).
+ * Emails are shown in full here, since the merchant has just proved they own
+ * the number.
  */
 function LinkedAccounts({
   accounts,
   email,
   phoneLabel,
   onCreate,
-  onSignIn,
+  onSignInTo,
   onEditDetails,
 }: {
   accounts: MockAccount[];
   email: string;
   phoneLabel: string;
   onCreate: () => void;
-  onSignIn: () => void;
+  onSignInTo: (account: MockAccount) => void;
   onEditDetails: () => void;
 }) {
   const count = accounts.length;
@@ -143,10 +118,10 @@ function LinkedAccounts({
               {phoneLabel}
             </span>{" "}
             {atLimit
-              ? `has reached the limit of ${MAX_ACCOUNTS_PER_PHONE} accounts, so a new one can't be added to it.`
+              ? `has reached the limit of ${MAX_ACCOUNTS_PER_PHONE} accounts. Choose one to sign in to.`
               : emailTaken
-                ? "is linked to the accounts below, and your email already has one of them."
-                : `is linked to the ${noun} below. Sign in to ${count === 1 ? "it" : "one of them"}, or create a new account with ${normalizedEmail || "your email"}.`}
+                ? "is linked to the accounts below, and your email already has one of them. Choose one to sign in to."
+                : `is linked to the ${noun} below. Choose one to sign in to, or create a new account with ${normalizedEmail || "your email"}.`}
           </>
         }
       />
@@ -155,21 +130,46 @@ function LinkedAccounts({
         {accounts.map((account, i) => (
           <div key={account.id}>
             {i > 0 && <Separator />}
-            <div className="flex items-center gap-3 px-3 py-2.5">
-              <Avatar className="h-8 w-8 shrink-0">
-                <AvatarFallback className="bg-primary/10 text-[11.5px] font-semibold text-primary">
-                  {initials(account)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-foreground">
-                  {account.fullName}
-                </p>
-                <p className="truncate text-[12px] text-muted-foreground">{account.email}</p>
-              </div>
-            </div>
+            <ChoiceRow
+              onClick={() => onSignInTo(account)}
+              leading={
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarFallback className="bg-primary/10 text-[11.5px] font-semibold text-primary">
+                    {initials(account)}
+                  </AvatarFallback>
+                </Avatar>
+              }
+              title={account.fullName ?? account.email}
+              subtitle={account.email}
+            />
           </div>
         ))}
+        <Separator />
+        {/* The last row, same style as the accounts above it: create a new
+            one, or, when the limit or the email rules it out, fix the detail
+            that's blocking it. */}
+        <ChoiceRow
+          onClick={canCreate ? onCreate : onEditDetails}
+          leading={
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-dashed border-border text-muted-foreground">
+              <Icon name={canCreate ? "plus" : "pencil"} className="h-4 w-4" aria-hidden />
+            </span>
+          }
+          title={
+            canCreate
+              ? "Create a new account"
+              : atLimit
+                ? "Use a different number"
+                : "Use a different email"
+          }
+          subtitle={
+            canCreate
+              ? `With ${normalizedEmail || "your email"}`
+              : atLimit
+                ? `A number can be linked to up to ${MAX_ACCOUNTS_PER_PHONE} accounts.`
+                : "One email can hold only one account."
+          }
+        />
       </Card>
 
       {canCreate && (
@@ -178,38 +178,6 @@ function LinkedAccounts({
           {count + 1} of {MAX_ACCOUNTS_PER_PHONE}.
         </p>
       )}
-
-      <div className="mt-5 space-y-2.5">
-        {canCreate ? (
-          <>
-            <Button type="button" variant="primary" onClick={onCreate} className={PRIMARY_BUTTON}>
-              Create a new account
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onSignIn}
-              className="h-10 min-h-10 w-full bg-card text-[13px] font-medium shadow-none"
-            >
-              Sign in to an existing account
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button type="button" variant="primary" onClick={onSignIn} className={PRIMARY_BUTTON}>
-              Sign in to an existing account
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onEditDetails}
-              className="h-10 min-h-10 w-full bg-card text-[13px] font-medium shadow-none"
-            >
-              {atLimit ? "Use a different number" : "Use a different email"}
-            </Button>
-          </>
-        )}
-      </div>
     </>
   );
 }
@@ -235,7 +203,8 @@ function SignUpSteps({ view }: { view: SignUpView }) {
       phoneCode: "IN",
       phone: "",
       otp: "",
-      country: "",
+      // India by default, matching the +91 phone code below it.
+      country: "IN",
     },
     onSubmit: () => notConnected("Sign up"),
   });
@@ -250,13 +219,7 @@ function SignUpSteps({ view }: { view: SignUpView }) {
 
   const copy = view === "linked" ? null : COPY[view];
   const previous: SignUpView | undefined =
-    view === "verify"
-      ? "account"
-      : view === "about"
-        ? linked.length
-          ? "linked"
-          : "verify"
-        : undefined;
+    view === "verify" ? "account" : view === "linked" ? "verify" : undefined;
 
   function sendOtp() {
     form.setFieldValue("otp", "");
@@ -276,9 +239,7 @@ function SignUpSteps({ view }: { view: SignUpView }) {
         </span>
         . <TextLink onClick={() => setView("account")}>Change number</TextLink>
       </>
-    ) : (
-      "We use this to set up the right currencies, compliance checks and settlement options for you."
-    );
+    ) : null;
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -290,15 +251,14 @@ function SignUpSteps({ view }: { view: SignUpView }) {
         transition={{ duration: 0.22, ease: "easeOut" }}
       >
         {previous && <BackLink onClick={() => setView(previous)} />}
-        <StepMeter step={view} />
 
         {view === "linked" && (
           <LinkedAccounts
             accounts={linked}
             email={email}
             phoneLabel={enteredPhone ?? "This number"}
-            onCreate={() => setView("about")}
-            onSignIn={() => signInWithPhone({ phoneCode, phone })}
+            onCreate={() => void form.handleSubmit()}
+            onSignInTo={(account) => signInWithPhone({ phoneCode, phone, account })}
             onEditDetails={() => setView("account")}
           />
         )}
@@ -311,14 +271,15 @@ function SignUpSteps({ view }: { view: SignUpView }) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              // Steps 1 and 2 only hand off; the final step submits.
+              // Step 1 hands off to the OTP; after it, the account is created,
+              // unless the number already has accounts to show first.
               if (view === "account") {
                 sendOtp();
                 setView("verify");
                 return;
               }
-              if (view === "verify") {
-                setView(linked.length ? "linked" : "about");
+              if (view === "verify" && linked.length) {
+                setView("linked");
                 return;
               }
               void form.handleSubmit();
@@ -332,7 +293,7 @@ function SignUpSteps({ view }: { view: SignUpView }) {
                   {(field) => (
                     <Field className={FIELD}>
                       <FieldLabel htmlFor="auth-email" className={LABEL}>
-                        Work email
+                        Your email address
                       </FieldLabel>
                       <Input
                         id="auth-email"
@@ -352,7 +313,7 @@ function SignUpSteps({ view }: { view: SignUpView }) {
                   {(field) => (
                     <Field className={FIELD}>
                       <FieldLabel htmlFor="auth-name" className={LABEL}>
-                        Full name
+                        Your full name
                       </FieldLabel>
                       <Input
                         id="auth-name"
@@ -371,7 +332,7 @@ function SignUpSteps({ view }: { view: SignUpView }) {
                   {(field) => (
                     <Field className={FIELD}>
                       <FieldLabel htmlFor="auth-password" className={LABEL}>
-                        Password
+                        Set up a new password
                       </FieldLabel>
                       {/* The rule lives in the placeholder rather than a hint
                         line, to keep step 1 within one screen. */}
@@ -388,9 +349,41 @@ function SignUpSteps({ view }: { view: SignUpView }) {
                   )}
                 </form.Field>
 
+                <form.Field name="country">
+                  {(field) => (
+                    <Field className={FIELD}>
+                      <FieldLabel htmlFor="auth-country" className={LABEL}>
+                        Where is your business registered?
+                      </FieldLabel>
+                      <Select
+                        value={field.state.value}
+                        onValueChange={(next) => {
+                          field.handleChange(next);
+                          // Pre-select the matching dial code; still editable.
+                          form.setFieldValue("phoneCode", next);
+                        }}
+                      >
+                        <SelectTrigger id="auth-country" className={`w-full ${CONTROL}`}>
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNTRIES.map((c) => (
+                            <SelectItem key={c.iso2} value={c.iso2} className="text-[13px]">
+                              <span className="flex items-center gap-2">
+                                <CountryFlag iso2={c.iso2} />
+                                {c.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  )}
+                </form.Field>
+
                 <Field className={FIELD}>
                   <FieldLabel htmlFor="auth-phone" className={LABEL}>
-                    Phone number
+                    Your mobile number
                   </FieldLabel>
                   <form.Field name="phoneCode">
                     {(codeField) => (
@@ -436,33 +429,6 @@ function SignUpSteps({ view }: { view: SignUpView }) {
               </form.Field>
             )}
 
-            {view === "about" && (
-              <form.Field name="country">
-                {(field) => (
-                  <Field className={FIELD}>
-                    <FieldLabel htmlFor="auth-country" className={LABEL}>
-                      Country of registration
-                    </FieldLabel>
-                    <Select value={field.state.value} onValueChange={field.handleChange}>
-                      <SelectTrigger id="auth-country" className={`w-full ${CONTROL}`}>
-                        <SelectValue placeholder="Select country" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {COUNTRIES.map((c) => (
-                          <SelectItem key={c.iso2} value={c.iso2} className="text-[13px]">
-                            <span className="flex items-center gap-2">
-                              <CountryFlag iso2={c.iso2} />
-                              {c.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                )}
-              </form.Field>
-            )}
-
             <div className="pt-1">
               <Button type="submit" variant="primary" className={PRIMARY_BUTTON}>
                 {copy.cta}
@@ -491,7 +457,7 @@ function SignUpSteps({ view }: { view: SignUpView }) {
             <span className="min-w-0">
               We&apos;ve also emailed a verification link to{" "}
               <span className="break-words font-medium text-foreground">
-                {email || "your work email"}
+                {email || "your email"}
               </span>
               . You can verify it later.{" "}
               <TextLink onClick={() => notConnected("Resend email")}>Resend</TextLink>

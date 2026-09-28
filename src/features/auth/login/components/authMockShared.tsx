@@ -66,6 +66,48 @@ export function TextLink({
   );
 }
 
+/** One row of a choice box (linked accounts, roles): the whole row is the button, with a
+ *  chevron to say so. */
+export function ChoiceRow({
+  onClick,
+  leading,
+  title,
+  subtitle,
+  badge,
+}: {
+  onClick: () => void;
+  leading: ReactNode;
+  title: string;
+  subtitle?: string;
+  /** Beside the title, e.g. a role chip. */
+  badge?: ReactNode;
+}) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      onClick={onClick}
+      className="h-auto min-h-0 w-full justify-start rounded-none px-3 py-2.5 [&>span]:w-full"
+    >
+      <span className="flex w-full items-center gap-3 text-left">
+        {leading}
+        <span className="min-w-0 flex-1">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[13px] font-medium text-foreground">{title}</span>
+            {badge}
+          </span>
+          {subtitle && (
+            <span className="block truncate text-[12px] font-normal text-muted-foreground">
+              {subtitle}
+            </span>
+          )}
+        </span>
+        <Icon name="chevron-right" className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+      </span>
+    </Button>
+  );
+}
+
 export function BackLink({ onClick }: { onClick: () => void }) {
   return (
     <Button
@@ -147,6 +189,18 @@ export function OtpActions({ sentAt, onResend }: { sentAt: number; onResend: () 
   );
 }
 
+/** Puts the caret after the last character, so a field focused mid-typing
+ *  (see the sign-in identifier) carries on where the merchant was. */
+export function moveCaretToEnd(input: HTMLInputElement) {
+  const end = input.value.length;
+  // Only text-like inputs support selection ranges.
+  try {
+    input.setSelectionRange(end, end);
+  } catch {
+    // Not supported for this input type; the default caret is fine.
+  }
+}
+
 export function dialCodeFor(iso2: string) {
   return COUNTRIES.find((c) => c.iso2 === iso2)?.dialCode;
 }
@@ -171,10 +225,20 @@ export function PhoneInputRow({
   onNumberChange,
   onBlur,
   label,
+  autoFocus,
+  onNonNumericInput,
 }: {
   id: string;
   /** Accessible name when no visible label sits above the row. */
   label?: string;
+  /** Focus the number on mount, caret at the end (for a field that has just
+   *  turned into this row mid-typing). */
+  autoFocus?: boolean;
+  /** Called instead of onNumberChange when the typed value has anything
+   *  other than digits, spaces or dashes, e.g. a letter or "@" (someone
+   *  typing an email that starts with digits). Without it, such characters
+   *  are just stripped. */
+  onNonNumericInput?: (raw: string) => void;
   code: string;
   onCodeChange: (iso2: string) => void;
   number: string;
@@ -215,7 +279,13 @@ export function PhoneInputRow({
         autoComplete="tel-national"
         placeholder="Enter phone number"
         value={number}
-        onChange={(e) => onNumberChange(e.target.value.replace(/[^\d\s-]/g, ""))}
+        autoFocus={autoFocus}
+        onFocus={(e) => moveCaretToEnd(e.currentTarget)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          if (onNonNumericInput && /[^\d\s-]/.test(raw)) onNonNumericInput(raw);
+          else onNumberChange(raw.replace(/[^\d\s-]/g, ""));
+        }}
         onBlur={onBlur}
         className={`min-w-0 flex-1 ${CONTROL}`}
       />
