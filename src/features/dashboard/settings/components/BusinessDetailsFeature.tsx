@@ -302,7 +302,11 @@ export function BusinessDetailsFeature() {
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-3">
+            // Baseline, not start: the value and the link have different line
+            // heights, so top-aligning left Edit sitting above the code. The
+            // first baseline is the code's own line, so Edit lines up with it
+            // however many codes or description lines follow.
+            <div className="flex items-baseline gap-3">
               {isLoading ? (
                 <Shimmer className="h-4 w-40" />
               ) : purposeCodes.length ? (

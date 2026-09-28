@@ -122,7 +122,7 @@ export const PurposeCodeCombobox = forwardRef<PurposeCodeComboboxHandle, Purpose
             aria-invalid={invalid || undefined}
             aria-describedby={invalid ? errorId : undefined}
             className={cn(
-              "flex h-10 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-left text-[13px] shadow-sm",
+              "flex h-10 w-full items-center justify-between gap-2.5 rounded-lg border bg-card px-3.5 text-left text-[13px]",
               "transition-colors duration-150",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35",
               selected ? "text-foreground" : "text-muted-foreground",

@@ -253,7 +253,6 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
         variant="outline"
         size="sm"
         aria-label="Refresh products"
-        isLoading={false}
         disabled={isFetching}
         leftIcon={
           <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />

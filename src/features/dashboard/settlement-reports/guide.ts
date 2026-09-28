@@ -13,6 +13,7 @@ export const MCA_SETTLEMENT_GUIDE_KEY = "mca-settlement-v2";
 export const MCA_SETTLEMENT_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-settlement-calendar",
+    chip: { label: "Settlements", icon: "calendar-days" },
     title: "Settlement calendar",
     description: "See your upcoming settlements and all the details you need, in one place.",
     side: "bottom",
@@ -20,6 +21,7 @@ export const MCA_SETTLEMENT_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "mca-settlement-analytics",
+    chip: { label: "Analytics", icon: "bar-chart" },
     title: "View analytics",
     description: "Get a quick look at how your settlements are performing.",
     side: "bottom",

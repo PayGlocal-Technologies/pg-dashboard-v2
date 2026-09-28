@@ -14,6 +14,7 @@ export const MCA_INTL_ACCOUNTS_GUIDE_KEY = "mca-intl-accounts-v2";
 export const MCA_INTL_ACCOUNTS_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-region-selector",
+    chip: { label: "Accounts", icon: "globe" },
     title: "Select a client region",
     description: "Choose the region you want to send account details for.",
     side: "right",
@@ -21,6 +22,7 @@ export const MCA_INTL_ACCOUNTS_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "mca-share-copy",
+    chip: { label: "Share details", icon: "share-2" },
     title: "Share or Copy account details",
     description: "Share the account details with your client, or copy them to send yourself.",
     side: "top",
