@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Button, Card, Separator } from "@/components/ui";
+import { Button, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
@@ -18,8 +18,9 @@ import {
 } from "@/features/dashboard/pa-transactions/deriveTransactionDetail";
 import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
 import {
+  DetailBackLink,
   DetailRow,
-  SectionLabel,
+  DetailSection,
 } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import { AmountBreakdownBody } from "@/features/dashboard/pa-transactions/components/AmountBreakdownBody";
 import { LinkedTransactionsSection } from "@/features/dashboard/pa-transactions/components/LinkedTransactionsSection";
@@ -87,7 +88,7 @@ export function DisputeDetailFeature({
   origin = "transactions",
 }: DisputeDetailFeatureProps) {
   const router = useRouter();
-  const { listPath: LIST_PATH, backLabel, notFoundHint, pageTitle } = ORIGIN_COPY[origin];
+  const { listPath: LIST_PATH, backLabel, notFoundHint } = ORIGIN_COPY[origin];
   const transaction = useTransactionDetail((s) => s.transaction);
   const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
   const refundEvents = useRefundEvents(
@@ -192,57 +193,48 @@ export function DisputeDetailFeature({
   return (
     <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
       <div className="page-enter mx-auto max-w-350 space-y-5 overflow-x-hidden">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{pageTitle}</h1>
+        <DetailBackLink label={backLabel} onClick={() => router.push(LIST_PATH)} />
 
-        <Button
-          type="button"
-          variant="link"
-          leftIcon={<Icon name="chevron-left" size={14} />}
-          onClick={() => router.push(LIST_PATH)}
-          className="h-auto w-fit gap-1 p-0 text-sm font-medium"
-        >
-          {backLabel}
-        </Button>
-
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="flex items-baseline gap-2 text-4xl font-bold tracking-tight text-foreground tabular-nums">
+        {/* Summary, straight on the page like the MCA details page. */}
+        <div className="pb-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-[34px] font-semibold tabular-nums text-foreground">
               {formatCurrency(amount, currency)}
-              <span className="text-base font-medium text-muted-foreground">{currency}</span>
-            </p>
+            </span>
             <StatusBadgeWithTooltip
+              size="md"
               variant={statusMeta.variant}
               label={statusMeta.label}
               trailIcon={statusMeta.trailIcon}
               tooltip={statusMeta.tooltip}
-              size="sm"
             />
             {dispute.disputePhase && (
               <StatusBadgeWithTooltip
+                size="md"
                 variant="muted"
                 label={DISPUTE_PHASE_META[dispute.disputePhase].label}
                 tooltip={DISPUTE_PHASE_META[dispute.disputePhase].description}
-                size="sm"
               />
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
             <span>{formattedDateTime}</span>
             <Separator orientation="vertical" className="h-3.5" />
             <TransactionPaymentMethod row={transaction} />
           </div>
-
-          <p className="mt-4 text-sm text-muted-foreground">
-            Charged to <span className="font-semibold text-foreground/85">{name}</span>
+          <p className="mt-1.5 text-[13px] text-muted-foreground">
+            Charged to <span className="font-medium text-foreground">{name}</span>
           </p>
-          <Separator className="mt-4" />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
-          <div className="flex min-w-0 flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Dispute</SectionLabel>
+        {/* Same 3:1 split and spacing as the MCA details page. */}
+        <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[3fr_1fr] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-6">
+            <section>
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Dispute
+              </h3>
               <DisputeStatusCard
                 dispute={dispute}
                 disputeDetail={disputeDetail}
@@ -250,80 +242,68 @@ export function DisputeDetailFeature({
                 onContest={flow.handleContestDispute}
                 submittedDocuments={flow.submittedDocuments}
               />
-            </div>
+            </section>
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Timeline</SectionLabel>
-              <Card className="gap-0 p-5">
-                <PaymentTimeline steps={timelineSteps} />
-              </Card>
-            </div>
+            <DetailSection title="Timeline">
+              <PaymentTimeline steps={timelineSteps} />
+            </DetailSection>
 
             {detail.amountBreakdown && (
-              <div className="flex flex-col gap-2">
-                <SectionLabel>Payment Breakdown</SectionLabel>
-                <Card className="gap-0 p-5">
-                  <AmountBreakdownBody
-                    amountReceived={detail.amountBreakdown.amountReceived}
-                    fee={detail.amountBreakdown.fee}
-                    refundedAmount={detail.amountBreakdown.refundedAmount}
-                    disputedAmount={detail.amountBreakdown.disputedAmount}
-                    netAmount={detail.amountBreakdown.netAmount}
-                    currency={transaction.txnCurrency ?? currency}
-                  />
-                </Card>
-              </div>
+              <DetailSection title="Payment Breakdown">
+                <AmountBreakdownBody
+                  amountReceived={detail.amountBreakdown.amountReceived}
+                  fee={detail.amountBreakdown.fee}
+                  refundedAmount={detail.amountBreakdown.refundedAmount}
+                  disputedAmount={detail.amountBreakdown.disputedAmount}
+                  netAmount={detail.amountBreakdown.netAmount}
+                  currency={transaction.txnCurrency ?? currency}
+                />
+              </DetailSection>
             )}
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Linked Transactions</SectionLabel>
+            <section>
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Linked Transactions
+              </h3>
               <LinkedTransactionsSection
                 transactions={linkedTransactions}
                 onViewDetails={goToLinked}
               />
-            </div>
+            </section>
           </div>
 
-          <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
+          <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4">
             <DisputeDetailsCard
               dispute={disputeDetail}
               transaction={transaction}
               currency={currency}
             />
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Payment Details</SectionLabel>
-              <Card className="gap-0 p-5">
-                <div className="flex flex-col gap-5">
-                  <div className="group">
-                    <p className="text-xs text-muted-foreground">Transaction ID</p>
-                    <div className="mt-0.5">
-                      <CopyableCell
-                        value={truncateId(transaction.gid ?? "Not available")}
-                        copyValue={transaction.gid ?? ""}
-                        label="Transaction ID"
-                        monospace
-                        className="font-semibold text-foreground/85"
-                      />
-                    </div>
-                  </div>
-                  <DetailRow label="Payment Category" value={detail.paymentCategory} />
-                  {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
-                  <DetailRow label="Issuer" value={detail.issuerBank} />
-                </div>
-              </Card>
-            </div>
+            <DetailSection title="Payment Details">
+              <DetailRow
+                label="Transaction ID"
+                value={
+                  <span className="group">
+                    <CopyableCell
+                      value={truncateId(transaction.gid ?? "Not available")}
+                      copyValue={transaction.gid ?? ""}
+                      label="Transaction ID"
+                      monospace
+                      className="font-medium text-foreground"
+                    />
+                  </span>
+                }
+              />
+              <DetailRow label="Payment Category" value={detail.paymentCategory} />
+              {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
+              <DetailRow label="Issuer" value={detail.issuerBank} />
+            </DetailSection>
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Customer Details</SectionLabel>
-              <Card className="gap-0 p-5">
-                <div className="flex flex-col gap-5">
-                  <DetailRow label="Customer Name" value={name} />
-                  <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />
-                  <DetailRow label="Phone Number" value={detail.customerPhone} />
-                </div>
-              </Card>
-            </div>
+            <DetailSection title="Customer Details">
+              <DetailRow label="Customer Name" value={name} />
+              <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />
+              <DetailRow label="Phone Number" value={detail.customerPhone} />
+            </DetailSection>
           </div>
         </div>
 

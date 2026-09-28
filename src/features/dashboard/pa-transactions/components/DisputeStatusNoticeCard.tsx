@@ -2,6 +2,7 @@ import { Button, Card, Separator } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
+import { ACTION_CARD_CLASS } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import {
   DisputeStepList,
   type DisputeFormStep,
@@ -57,7 +58,9 @@ export function DisputeStatusNoticeCard({
   onLearnMore,
 }: DisputeStatusNoticeCardProps) {
   return (
-    <Card className="gap-0 p-5">
+    // Only a notice that asks for something (e.g. more evidence) gets the
+    // action-card wash; a purely informational one stays plain.
+    <Card className={cn("gap-0 p-5", action ? ACTION_CARD_CLASS : "shadow-none")}>
       <div className="flex items-start gap-3">
         <span
           className={cn(

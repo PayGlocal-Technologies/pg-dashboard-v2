@@ -44,6 +44,9 @@ export interface PaymentLinkMetricCardProps {
   accentColor: string;
   formatTooltipValue?: (y: number) => string;
   formatAxisValue?: (y: number) => string;
+  /** false: a bare trend line, no axes, gridlines or area fill; the tooltip
+   *  still names the period and value on hover. Default true. */
+  showAxes?: boolean;
   className?: string;
 }
 
@@ -57,6 +60,7 @@ export function PaymentLinkMetricCard({
   accentColor,
   formatTooltipValue = (y) => y.toLocaleString("en-US"),
   formatAxisValue = (y) => y.toLocaleString("en-US"),
+  showAxes = true,
   className,
 }: PaymentLinkMetricCardProps) {
   const gradientId = `payment-link-metric-fill-${useId().replace(/[:]/g, "")}`;
@@ -85,17 +89,27 @@ export function PaymentLinkMetricCard({
         </div>
       </div>
 
-      <div className="h-32 w-full">
+      <div className={cn("w-full", showAxes ? "h-32" : "h-24")}>
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+          <AreaChart
+            data={data}
+            margin={
+              showAxes
+                ? { top: 4, right: 4, left: 0, bottom: 0 }
+                : { top: 6, right: 4, left: 4, bottom: 6 }
+            }
+          >
             <defs>
               <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={accentColor} stopOpacity={0.28} />
                 <stop offset="100%" stopColor={accentColor} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+            {showAxes && (
+              <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+            )}
             <XAxis
+              hide={!showAxes}
               dataKey="x"
               axisLine={false}
               tickLine={false}
@@ -104,6 +118,10 @@ export function PaymentLinkMetricCard({
               height={20}
             />
             <YAxis
+              hide={!showAxes}
+              // Without an axis to read values off, the line uses the full
+              // height between its own low and high, so the trend is visible.
+              domain={showAxes ? undefined : ["dataMin", "dataMax"]}
               axisLine={false}
               tickLine={false}
               width={36}
@@ -116,7 +134,7 @@ export function PaymentLinkMetricCard({
               dataKey="y"
               stroke={accentColor}
               strokeWidth={2}
-              fill={`url(#${gradientId})`}
+              fill={showAxes ? `url(#${gradientId})` : "none"}
               dot={false}
               activeDot={{ r: 4, strokeWidth: 0, fill: accentColor }}
             />

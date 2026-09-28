@@ -1,6 +1,6 @@
 "use client";
 
-import { formatTimestamp } from "@/lib/utils/format";
+import { formatDateTime, formatTimestamp, parseApiDateTime } from "@/lib/utils/format";
 import { type Column, StatusBadge } from "@/components/ui";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
 import { TransactionCustomerCell } from "@/features/dashboard/pa-transactions/components/TransactionCustomerCell";
@@ -157,6 +157,13 @@ export function formatDisplayDateTime(value?: string): string | null {
   // month table. It is the shared formatter now: same output, but it also reads
   // the shapes this one could not (epoch millis, ISO, no-comma separators), so
   // an endpoint that changes its form does not silently render "N/A".
+  //
+  // The API's own "DD/MM/YYYY HH:mm:ss" (with or without a comma) is read by
+  // parseApiDateTime first: left to the generic parser, a comma form either
+  // fails outright or, for day 12 or lower, is read month-first and shows
+  // the wrong date. Anything else (ISO, epoch) still goes through it.
+  const apiDate = parseApiDateTime(value);
+  if (apiDate) return formatDateTime(apiDate);
   return formatTimestamp(value, "") || null;
 }
 

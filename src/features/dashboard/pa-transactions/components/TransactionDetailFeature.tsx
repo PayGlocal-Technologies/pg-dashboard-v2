@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button, Card, Separator } from "@/components/ui";
+import { Button, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn, formatCurrency } from "@/lib/utils";
 import { ProductFeedback } from "@/components/common/ProductFeedback";
@@ -18,8 +18,9 @@ import {
 } from "@/features/dashboard/pa-transactions/paColumns";
 import { deriveTransactionDetail } from "@/features/dashboard/pa-transactions/deriveTransactionDetail";
 import {
+  DetailBackLink,
   DetailRow,
-  SectionLabel,
+  DetailSection,
 } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import { AmountBreakdownBody } from "@/features/dashboard/pa-transactions/components/AmountBreakdownBody";
 import { DisputeStatusCard } from "@/features/dashboard/pa-transactions/components/DisputeStatusCard";
@@ -53,7 +54,6 @@ const EMPTY_REFUND_EVENTS: RefundEvent[] = [];
 // this page's only entry points are a plain "payment" row, "Back to
 // Transaction", or a Linked Transactions row pointing at the parent itself.
 const LIST_PATH = "/pa-transactions";
-const PAGE_TITLE = "Transactions";
 const BACK_LABEL = "Back to Transactions";
 const NOT_FOUND_HINT = "Open this transaction from the Transactions list to view its details.";
 
@@ -143,8 +143,7 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   // remaining amount left to refund, so only "pending" (money never
   // collected) and "failed" (payment never went through) buckets are
   // excluded — those two never have anything real to refund.
-  const canRefund =
-    statusBucket !== "pending" && statusBucket !== "failed" && refundableAmount > 0;
+  const canRefund = statusBucket !== "pending" && statusBucket !== "failed" && refundableAmount > 0;
   const linkedTransactions = detail.linkedTransactions;
   // Hides the promotional banner while a dispute is active, and (below)
   // shows the same Dispute status/action card DisputeDetailFeature's own
@@ -179,40 +178,39 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   // left/right arrangement. Column widths themselves (1fr / 360px) are
   // unchanged, only which section lands in which.
   const paymentDetailsSection = (
-    <div className="flex flex-col gap-2">
-      <SectionLabel>Payment Details</SectionLabel>
-      <Card className="gap-0 p-5">
-        <div className="flex flex-col gap-5">
-          <div className="group">
-            <p className="text-xs text-muted-foreground">Transaction ID</p>
-            <div className="mt-0.5">
-              <CopyableCell
-                value={truncateId(transaction.gid ?? "Not available")}
-                copyValue={transaction.gid ?? ""}
-                label="Transaction ID"
-                monospace
-                className="font-semibold text-foreground/85"
-              />
-            </div>
-          </div>
-          <div className="group">
-            <p className="text-xs text-muted-foreground">Merchant Transaction ID</p>
-            <div className="mt-0.5">
-              <CopyableCell
-                value={truncateId(detail.merchantTxnId)}
-                copyValue={detail.merchantTxnId}
-                label="Merchant Transaction ID"
-                monospace
-                className="font-semibold text-foreground/85"
-              />
-            </div>
-          </div>
-          <DetailRow label="Payment Category" value={detail.paymentCategory} />
-          {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
-          <DetailRow label="Issuer" value={detail.issuerBank} />
-        </div>
-      </Card>
-    </div>
+    <DetailSection title="Payment Details">
+      <DetailRow
+        label="Transaction ID"
+        value={
+          <span className="group">
+            <CopyableCell
+              value={truncateId(transaction.gid ?? "Not available")}
+              copyValue={transaction.gid ?? ""}
+              label="Transaction ID"
+              monospace
+              className="font-medium text-foreground"
+            />
+          </span>
+        }
+      />
+      <DetailRow
+        label="Merchant Transaction ID"
+        value={
+          <span className="group">
+            <CopyableCell
+              value={truncateId(detail.merchantTxnId)}
+              copyValue={detail.merchantTxnId}
+              label="Merchant Transaction ID"
+              monospace
+              className="font-medium text-foreground"
+            />
+          </span>
+        }
+      />
+      <DetailRow label="Payment Category" value={detail.paymentCategory} />
+      {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
+      <DetailRow label="Issuer" value={detail.issuerBank} />
+    </DetailSection>
   );
 
   // One unified timeline covering the transaction's entire lifecycle
@@ -225,64 +223,49 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   // itself a real (single-step) timeline, not a reason to fall back to a
   // "not applicable" note.
   const settlementDetailsSection = (
-    <div className="flex flex-col gap-2">
-      <SectionLabel>Timeline</SectionLabel>
-      <Card className="gap-0 p-5">
-        <PaymentTimeline
-          steps={formatTimelineSteps(
-            deriveTimelineSteps(detail.financials),
-            currency,
-            goToSettlement
-          )}
-        />
-      </Card>
-    </div>
+    <DetailSection title="Timeline">
+      <PaymentTimeline
+        steps={formatTimelineSteps(
+          deriveTimelineSteps(detail.financials),
+          currency,
+          goToSettlement
+        )}
+      />
+    </DetailSection>
   );
 
   // Customer Details <-> Amount Breakdown swap, unconditional (unlike the
   // Payment/Settlement swap above), applies to every PA transaction in this
   // feature regardless of status.
   const customerDetailsSection = (
-    <div className="flex flex-col gap-2">
-      <SectionLabel>Customer Details</SectionLabel>
-      <Card className="gap-0 p-5">
-        <div className="flex flex-col gap-5">
-          <DetailRow label="Customer Name" value={name} />
-          <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />
-          <DetailRow label="Phone Number" value={detail.customerPhone} />
-          <div>
-            <p className="text-xs text-muted-foreground">Address</p>
-            <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground/85">
-              {detail.customerAddress}
-            </p>
-          </div>
-          {detail.comments && (
-            <div>
-              <p className="text-xs text-muted-foreground">Comments</p>
-              <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground/85">
-                {detail.comments}
-              </p>
-            </div>
-          )}
-        </div>
-      </Card>
-    </div>
+    <DetailSection title="Customer Details">
+      <DetailRow label="Customer Name" value={name} />
+      <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />
+      <DetailRow label="Phone Number" value={detail.customerPhone} />
+      <DetailRow
+        label="Address"
+        value={<span className="leading-snug">{detail.customerAddress}</span>}
+      />
+      {detail.comments && (
+        <DetailRow
+          label="Comments"
+          value={<span className="leading-snug">{detail.comments}</span>}
+        />
+      )}
+    </DetailSection>
   );
 
   const amountBreakdownSection = detail.amountBreakdown && (
-    <div className="flex flex-col gap-2">
-      <SectionLabel>Payment Breakdown</SectionLabel>
-      <Card className="gap-0 p-5">
-        <AmountBreakdownBody
-          amountReceived={detail.amountBreakdown.amountReceived}
-          fee={detail.amountBreakdown.fee}
-          refundedAmount={detail.amountBreakdown.refundedAmount}
-          disputedAmount={detail.amountBreakdown.disputedAmount}
-          netAmount={detail.amountBreakdown.netAmount}
-          currency={currency}
-        />
-      </Card>
-    </div>
+    <DetailSection title="Payment Breakdown">
+      <AmountBreakdownBody
+        amountReceived={detail.amountBreakdown.amountReceived}
+        fee={detail.amountBreakdown.fee}
+        refundedAmount={detail.amountBreakdown.refundedAmount}
+        disputedAmount={detail.amountBreakdown.disputedAmount}
+        netAmount={detail.amountBreakdown.netAmount}
+        currency={currency}
+      />
+    </DetailSection>
   );
 
   function handleIssueRefund({ amount: refundAmount, reason, details }: RefundSubmission) {
@@ -349,33 +332,22 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   return (
     <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
       <div className="page-enter mx-auto max-w-[1400px] space-y-5 overflow-x-hidden">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{PAGE_TITLE}</h1>
+        <DetailBackLink label={BACK_LABEL} onClick={() => router.push(LIST_PATH)} />
 
-        <Button
-          type="button"
-          variant="link"
-          leftIcon={<Icon name="chevron-left" size={14} />}
-          onClick={() => router.push(LIST_PATH)}
-          className="h-auto w-fit gap-1 p-0 text-sm font-medium"
-        >
-          {BACK_LABEL}
-        </Button>
-
-        {/* Amount, currency, status, date/time and payment method, then
-         * charged-to, sits directly on the page background, no card. */}
-        <div>
+        {/* Summary, straight on the page like the MCA details page: the big
+         * amount and its status, then when/how it was paid and who by. */}
+        <div className="pb-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <p className="flex items-baseline gap-2 text-4xl font-bold tracking-tight text-foreground tabular-nums">
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="text-[34px] font-semibold tabular-nums text-foreground">
                 {formatCurrency(amount, currency)}
-                <span className="text-base font-medium text-muted-foreground">{currency}</span>
-              </p>
+              </span>
               <StatusBadgeWithTooltip
+                size="md"
                 variant={statusMeta.variant}
                 label={statusMeta.label}
                 trailIcon={statusMeta.trailIcon}
                 tooltip={statusMeta.tooltip}
-                size="sm"
               />
             </div>
             {canRefund && (
@@ -385,38 +357,25 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
             )}
           </div>
 
-          {/* Same text-[13px] font-medium text-foreground as TransactionPaymentMethod's
-           * own text and the Transactions table's Date & Time column, so nothing
-           * in this row reads lighter/heavier than anything else. */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
             <span>{formattedDateTime}</span>
             <Separator orientation="vertical" className="h-3.5" />
             <TransactionPaymentMethod row={transaction} />
           </div>
-
-          {isDisputed ? (
-            <>
-              <p className="mt-4 text-sm text-muted-foreground">
-                Charged to <span className="font-semibold text-foreground/85">{name}</span>
-              </p>
-              <Separator className="mt-4" />
-            </>
-          ) : (
-            <>
-              <Separator className="my-4" />
-              <p className="text-sm text-muted-foreground">
-                Charged to <span className="font-semibold text-foreground/85">{name}</span>
-              </p>
-            </>
-          )}
+          <p className="mt-1.5 text-[13px] text-muted-foreground">
+            Charged to <span className="font-medium text-foreground">{name}</span>
+          </p>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
+        {/* Same 3:1 split and spacing as the MCA details page. */}
+        <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[3fr_1fr] lg:items-start">
           {/* Left column */}
-          <div className="flex min-w-0 flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-6">
             {isDisputed && activeDisputeEvent && detail.dispute && (
-              <div className="flex flex-col gap-2">
-                <SectionLabel>Dispute</SectionLabel>
+              <section>
+                <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  Dispute
+                </h3>
                 <DisputeStatusCard
                   dispute={activeDisputeEvent}
                   disputeDetail={detail.dispute}
@@ -424,7 +383,7 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
                   onContest={flow.handleContestDispute}
                   submittedDocuments={flow.submittedDocuments}
                 />
-              </div>
+              </section>
             )}
 
             {settlementDetailsSection}
@@ -435,33 +394,32 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
 
             {amountBreakdownSection}
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Linked Transactions</SectionLabel>
+            <section>
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Linked Transactions
+              </h3>
               <LinkedTransactionsSection
                 transactions={linkedTransactions}
                 onViewDetails={goToDetail}
               />
-            </div>
+            </section>
           </div>
 
           {/* Right column, sticky */}
-          <div className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4">
+          <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4">
             {paymentDetailsSection}
 
             {customerDetailsSection}
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Status Notes</SectionLabel>
-              <Card
-                className={cn(
-                  "gap-5 p-5",
-                  statusMeta.variant === "danger" && "border-red-200 dark:border-red-900/50"
-                )}
-              >
-                <DetailRow label="Reason" value={detail.statusReason} />
-                {detail.errorCode && <DetailRow label="Error Code" value={detail.errorCode} />}
-              </Card>
-            </div>
+            <DetailSection
+              title="Status Notes"
+              cardClassName={cn(
+                statusMeta.variant === "danger" && "border-red-200 dark:border-red-900/50"
+              )}
+            >
+              <DetailRow label="Reason" value={detail.statusReason} />
+              {detail.errorCode && <DetailRow label="Error Code" value={detail.errorCode} />}
+            </DetailSection>
           </div>
         </div>
 

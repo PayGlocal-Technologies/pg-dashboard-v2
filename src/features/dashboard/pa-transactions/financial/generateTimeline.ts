@@ -353,7 +353,7 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
       case "DISPUTE_CLEARED":
         steps.push({
           id: `dispute-cleared-${event.disputeId}`,
-          label: "Dispute cleared",
+          label: "Dispute won",
           state: "complete",
           timestamp: event.timestamp,
           amount: event.amount,
@@ -363,7 +363,7 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
       case "DISPUTE_CHARGED_BACK":
         steps.push({
           id: `dispute-charged-back-${event.disputeId}`,
-          label: "Dispute charged back",
+          label: "Dispute lost",
           state: "danger",
           timestamp: event.timestamp,
           amount: event.amount,
@@ -373,7 +373,7 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
       case "DISPUTE_ACCEPTED":
         steps.push({
           id: `dispute-accepted-${event.disputeId}`,
-          label: "Dispute accepted",
+          label: "Dispute lost",
           state: "danger",
           timestamp: event.timestamp,
           amount: event.amount,
@@ -383,7 +383,7 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
       case "DISPUTE_EXPIRED":
         steps.push({
           id: `dispute-expired-${event.disputeId}`,
-          label: "Dispute expired",
+          label: "Dispute lost",
           state: "danger",
           timestamp: event.timestamp,
           amount: event.amount,

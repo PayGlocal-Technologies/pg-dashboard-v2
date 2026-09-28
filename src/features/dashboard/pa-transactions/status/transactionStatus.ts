@@ -77,9 +77,11 @@ export const TRANSACTION_STATUS_META: Record<TransactionStatusKey, StatusMeta> =
   },
   REFUNDED: { label: "Refunded", variant: "muted" },
   DISPUTED: { label: "Disputed", variant: "warning", tooltip: "Respond before the deadline." },
-  DISPUTE_CLEARED: { label: "Dispute cleared", variant: "success", trailIcon: "check" },
+  // Dispute outcomes read as Won / Lost (see disputeStatus.ts); the keys
+  // keep their original names since they describe the money movement.
+  DISPUTE_CLEARED: { label: "Dispute won", variant: "success", trailIcon: "check" },
   CHARGED_BACK: {
-    label: "Charged back",
+    label: "Dispute lost",
     variant: "danger",
     trailIcon: "x",
     tooltip: "Review why. Repeats affect your standing.",
@@ -90,7 +92,7 @@ export const TRANSACTION_STATUS_META: Record<TransactionStatusKey, StatusMeta> =
     tooltip: "Check the dispute does not cover the refunded goods.",
   },
   REFUNDED_AND_CHARGED_BACK: {
-    label: "Refunded and charged back",
+    label: "Refunded, dispute lost",
     variant: "danger",
     trailIcon: "x",
     tooltip: "Review. You may have paid twice.",

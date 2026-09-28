@@ -32,13 +32,7 @@ function StepMarker({ state }: { state: DisputeFormStepState }) {
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: "spring", stiffness: 500, damping: 22 }}
           >
-            <Icon
-              name="check"
-              size={9}
-              strokeWidth={3}
-              className="text-emerald-500"
-              aria-hidden
-            />
+            <Icon name="check" size={9} strokeWidth={3} className="text-emerald-500" aria-hidden />
           </motion.span>
         ) : state === "locked" ? (
           <motion.span

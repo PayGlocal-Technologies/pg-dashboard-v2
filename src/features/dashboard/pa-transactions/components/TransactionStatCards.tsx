@@ -52,6 +52,7 @@ export function TransactionStatCards({
         accentColor="var(--chart-4)"
         formatTooltipValue={formatLakhTooltip}
         formatAxisValue={formatLakhAxis}
+        showAxes={false}
       />
 
       <PaymentLinkMetricCard
@@ -64,6 +65,7 @@ export function TransactionStatCards({
         accentColor="var(--chart-1)"
         formatTooltipValue={formatLakhTooltip}
         formatAxisValue={formatRupeeAxis}
+        showAxes={false}
       />
 
       <PaymentLinkMetricCard
@@ -78,6 +80,7 @@ export function TransactionStatCards({
         accentColor="var(--chart-5)"
         formatTooltipValue={formatLakhTooltip}
         formatAxisValue={formatRupeeAxis}
+        showAxes={false}
       />
 
       <PaymentLinkMetricCard
@@ -90,6 +93,7 @@ export function TransactionStatCards({
         accentColor="var(--chart-3)"
         formatTooltipValue={formatLakhTooltip}
         formatAxisValue={formatRupeeAxis}
+        showAxes={false}
       />
     </div>
   );

@@ -81,14 +81,18 @@ const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
  * single dispute can run through this whole ladder — see the STAGE_GUIDES
  * doc comment above. */
 const ESCALATION_LADDER = [
-  { label: "Dispute", description: "The first round, right after the cardholder's bank raises it." },
+  {
+    label: "Dispute",
+    description: "The first round, right after the cardholder's bank raises it.",
+  },
   {
     label: "Pre-arbitration",
     description: "The bank came back after losing the first round and is trying again.",
   },
   {
     label: "Arbitration",
-    description: "The card network itself decides. This is final, and losing carries a penalty fee.",
+    description:
+      "The card network itself decides. This is final, and losing carries a penalty fee.",
   },
 ];
 
@@ -103,7 +107,11 @@ interface DisputeStageGuideDialogProps {
  * own page or the dispute's own page (see DisputeStatusCard's own doc
  * comment) — the explanation can never differ depending on which page the
  * merchant started from. */
-export function DisputeStageGuideDialog({ status, open, onOpenChange }: DisputeStageGuideDialogProps) {
+export function DisputeStageGuideDialog({
+  status,
+  open,
+  onOpenChange,
+}: DisputeStageGuideDialogProps) {
   const guide = STAGE_GUIDES[status];
 
   return (

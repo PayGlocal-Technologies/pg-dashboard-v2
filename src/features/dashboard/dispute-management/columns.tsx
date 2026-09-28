@@ -59,10 +59,7 @@ function DeadlineCell({ value, nowMs }: { value?: string; nowMs: number }) {
   );
 }
 
-const DISPUTE_ESCALATION_PHASE_LABEL: Record<
-  NonNullable<DisputeRow["disputePhase"]>,
-  string
-> = {
+const DISPUTE_ESCALATION_PHASE_LABEL: Record<NonNullable<DisputeRow["disputePhase"]>, string> = {
   DISPUTE: "Dispute",
   PRE_ARBITRATION: "Pre-arbitration",
   ARBITRATION: "Arbitration",

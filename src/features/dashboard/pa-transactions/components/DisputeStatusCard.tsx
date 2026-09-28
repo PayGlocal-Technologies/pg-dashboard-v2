@@ -124,7 +124,7 @@ export function DisputeStatusCard({
       <DisputeStatusNoticeCard
         icon="check-circle"
         iconClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-        title="Dispute cleared"
+        title="Dispute won"
         description="You successfully contested this dispute, the disputed amount stays with you. This dispute is now closed."
         onLearnMore={openGuide}
       />
@@ -132,9 +132,9 @@ export function DisputeStatusCard({
   } else if (dispute.status === "ACCEPTED") {
     card = (
       <DisputeStatusNoticeCard
-        icon="check-circle"
-        iconClassName="bg-muted text-muted-foreground"
-        title="Dispute closed"
+        icon="alert-triangle"
+        iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
+        title="Dispute lost"
         description="You accepted this dispute and a refund was initiated to the cardholder. This dispute is now closed."
         onLearnMore={openGuide}
       />
@@ -144,7 +144,7 @@ export function DisputeStatusCard({
       <DisputeStatusNoticeCard
         icon="alert-triangle"
         iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-        title="Dispute charged back"
+        title="Dispute lost"
         description="The bank ruled in the cardholder's favour. This dispute is now closed and the disputed amount was charged back."
         onLearnMore={openGuide}
       />
@@ -154,7 +154,7 @@ export function DisputeStatusCard({
       <DisputeStatusNoticeCard
         icon="alert-triangle"
         iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-        title="Dispute expired"
+        title="Dispute lost"
         description="The response deadline passed without a reply. This dispute is now closed and treated as a chargeback."
         onLearnMore={openGuide}
       />
@@ -196,7 +196,11 @@ export function DisputeStatusCard({
   return (
     <>
       {card}
-      <DisputeStageGuideDialog status={dispute.status} open={guideOpen} onOpenChange={setGuideOpen} />
+      <DisputeStageGuideDialog
+        status={dispute.status}
+        open={guideOpen}
+        onOpenChange={setGuideOpen}
+      />
     </>
   );
 }

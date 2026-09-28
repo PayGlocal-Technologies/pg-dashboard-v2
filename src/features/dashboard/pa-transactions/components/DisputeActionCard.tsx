@@ -7,6 +7,8 @@ import {
   Card,
   Separator,
 } from "@/components/ui";
+import { cn } from "@/lib/utils";
+import { ACTION_CARD_CLASS } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 
 interface DisputeActionCardProps {
   /** Short, concise, merchant-facing label derived from the dispute's own
@@ -48,7 +50,8 @@ export function DisputeActionCard({
   onContest,
 }: DisputeActionCardProps) {
   return (
-    <Card className="gap-0 p-5">
+    // The merchant has to act here, so it carries the action-card wash.
+    <Card className={cn("gap-0 p-5", ACTION_CARD_CLASS)}>
       <h2 className="text-base font-bold text-foreground">{merchantLabel}</h2>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         <Badge variant="secondary" size="sm" square className="font-mono">

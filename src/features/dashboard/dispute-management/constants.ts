@@ -6,10 +6,10 @@ export const DISPUTE_STATUS_SEGMENTS = [
   { value: "more-evidence-needed", label: "More evidence needed" },
   { value: "reopened", label: "Reopened" },
   { value: "all", label: "All disputes" },
-  { value: "cleared", label: "Cleared" },
-  { value: "charged-back", label: "Charged back" },
-  { value: "accepted", label: "Accepted" },
-  { value: "expired", label: "Expired" },
+  // Final outcomes, as the merchant sees them: Won (in their favour) or
+  // Lost (in the customer's), see disputeStatus.ts.
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" },
 ] as const;
 
 export type DisputeStatusSegment = (typeof DISPUTE_STATUS_SEGMENTS)[number]["value"];
@@ -24,10 +24,8 @@ export const DISPUTE_SEGMENT_RAW_STATUSES: Record<
   "under-review": ["UNDER_REVIEW"],
   "more-evidence-needed": ["MORE_EVIDENCE_NEEDED"],
   reopened: ["REOPENED"],
-  cleared: ["CLEARED"],
-  "charged-back": ["CHARGED_BACK"],
-  accepted: ["ACCEPTED"],
-  expired: ["EXPIRED"],
+  won: ["CLEARED"],
+  lost: ["CHARGED_BACK", "ACCEPTED", "EXPIRED"],
 };
 
 /** Segments whose rows still need a merchant response, the only ones the

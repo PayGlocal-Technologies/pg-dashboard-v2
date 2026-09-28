@@ -425,7 +425,9 @@ export function DisputeRespondForm({
                           className="shrink-0 cursor-default text-muted-foreground"
                         />
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-55 text-xs">{doc.description}</TooltipContent>
+                      <TooltipContent className="max-w-55 text-xs">
+                        {doc.description}
+                      </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </span>

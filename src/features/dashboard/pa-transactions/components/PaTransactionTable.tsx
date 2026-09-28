@@ -336,7 +336,8 @@ export function PaTransactionTable() {
       emptyTitle="No transactions found"
       emptyDescription="Try adjusting your filters or search query"
       rowKey={(row) =>
-        row.gid ?? `${row.merchantId ?? ""}-${row.formattedCreationDateTime ?? ""}-${row.totalAmount ?? ""}`
+        row.gid ??
+        `${row.merchantId ?? ""}-${row.formattedCreationDateTime ?? ""}-${row.totalAmount ?? ""}`
       }
       pagination={{
         mode: "client",
