@@ -334,7 +334,64 @@ export const mcaNavigation: NavGroup[] = [
   },
 ];
 
-// ─── Partner navigation ────────────────────────────────────────────────────────
+// ─── Partners navigation (Header's "Partners" tab, for merchant accounts) ──────
+// A merchant exploring the partner programme from the Header. Not the same as
+// partnerNavigation below, which is the whole app for a partner *account*.
+//
+// Built so far: /refer-and-earn, /team-management, and as design mocks on
+// sample data /transaction-overview, /commission and /partner-deals-dashboard
+// (with /partner-deals-dashboard/create). The other hrefs match
+// partnerNavigation's where it has one, and /pricing is a placeholder;
+// confirm each against pg-dashboard before those pages are built.
+
+export const partnersNavigation: NavGroup[] = [
+  {
+    label: "Overview",
+    items: [{ label: "Home", href: "/refer-and-earn", icon: "layout-grid", permission: [] }],
+  },
+  {
+    label: "Merchant",
+    items: [
+      { label: "Merchant Activation", href: "/my-merchants", icon: "users", permission: [] },
+      {
+        label: "Transaction Overview",
+        href: "/transaction-overview",
+        icon: "repeat",
+        permission: ["getTxnSearchResults"],
+      },
+    ],
+  },
+  {
+    label: "Partner",
+    items: [
+      { label: "Commissions", href: "/commission", icon: "file-text", permission: [] },
+      { label: "Deals", href: "/partner-deals-dashboard", icon: "receipt", permission: [] },
+    ],
+  },
+  {
+    label: "Account",
+    items: [
+      {
+        label: "Account Management",
+        href: "/configure",
+        icon: "settings",
+        permission: ["ucicSearchV3", "getListOfMerchantKeys", "userSearchV3"],
+        children: [
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
+          {
+            label: "Key Management System",
+            href: "/key-management-system",
+            permission: ["getListOfMerchantKeys"],
+          },
+          { label: "Webhooks", href: "/partner-webhooks", permission: [] },
+        ],
+      },
+      { label: "Pricing", href: "/pricing", icon: "tag", permission: [] },
+    ],
+  },
+];
+
+// ─── Partner navigation (partner accounts) ────────────────────────────────────
 
 export const partnerNavigation: NavGroup[] = [
   {
@@ -469,10 +526,10 @@ export const globalNavigation: NavGroup[] = [
 // sidebar has hidden, or missing one it shows.
 
 /**
- * Which of the five trees above applies. Partner and global-tenant accounts get
+ * Which of the six trees above applies. Partner and global-tenant accounts get
  * their own regardless of product context; everyone else follows the Header's
- * active tab — the short Home tree, the dedicated MCA tree, or the full
- * Payments one.
+ * active tab: the short Home tree, the dedicated MCA tree, the Partners tree,
+ * or the full Payments one.
  */
 export function navigationForContext({
   isPartnerUser,
@@ -487,6 +544,7 @@ export function navigationForContext({
   if (isGlobalTenant) return globalNavigation;
   if (activeContext === "HOME") return homeNavigation;
   if (activeContext === "PACB") return mcaNavigation;
+  if (activeContext === "PARTNERS") return partnersNavigation;
   return regularNavigation;
 }
 

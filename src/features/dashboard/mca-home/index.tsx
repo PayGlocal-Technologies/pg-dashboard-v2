@@ -227,13 +227,11 @@ export function McaDashboardFeature() {
         onOpenInvoice={handleOpenInvoice}
       />
 
-      {/* Guide launcher — highlighted once here (the main dashboard), a plain
-          button on every other screen. */}
-      <GuideLauncher
-        steps={guideSteps}
-        storageKey={MCA_DASHBOARD_GUIDE_KEY}
-        highlightOnFirstVisit
-      />
+      {/* Guide launcher: a plain button here, as on every other screen. No
+          first-visit "Take a quick tour" prompt, so the tour only ever
+          starts when the merchant asks for it (the welcome modal's "Start
+          tour" below, or this button). */}
+      <GuideLauncher steps={guideSteps} storageKey={MCA_DASHBOARD_GUIDE_KEY} />
 
       {/* Post-login welcome — a separate GuideTour instance from
           GuideLauncher's own internal one, since GuideLauncher exposes no

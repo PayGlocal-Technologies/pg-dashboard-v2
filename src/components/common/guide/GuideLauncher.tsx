@@ -7,10 +7,11 @@
  * placed on. The tour no longer starts on its own: the merchant taps the button
  * to run it, and can replay it any time.
  *
- * On the main dashboard only (`highlightOnFirstVisit`), the button is spotlighted
- * once on first visit with a short "take a tour" prompt. Starting the tour or
- * dismissing that prompt (the ✕) marks it seen so it never highlights again —
- * the button itself stays put regardless.
+ * Optionally (`highlightOnFirstVisit`) the button is spotlighted once on first
+ * visit with a short "take a tour" prompt. No screen currently opts in: the
+ * MCA dashboard's welcome modal is its one invitation, and the tour starts
+ * only from that modal's "Start tour" or this button. Starting the tour or
+ * dismissing the prompt marks it seen so it never highlights again.
  */
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui";

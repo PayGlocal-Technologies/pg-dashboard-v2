@@ -3,16 +3,17 @@ import { persist } from "zustand/middleware";
 import type { ProductType } from "@/lib/hooks/useResolvedMids";
 
 /**
- * Which of the Header's 3 top-level tabs the app is currently scoped to:
- * "HOME" (the combined overview), "PA" (Payments) or "PACB" (Multi-Currency
- * Accounts). Set by the Header's tabs, read by the Sidebar (to pick the
- * short Home nav tree, the MCA tree, or the full Payments tree) and by every
+ * Which of the Header's 4 top-level tabs the app is currently scoped to:
+ * "HOME" (the combined overview), "PA" (Payments), "PACB" (Multi-Currency
+ * Accounts) or "PARTNERS" (the partner programme). Set by the Header's tabs,
+ * read by the Sidebar (to pick the short Home nav tree, the MCA tree, the
+ * Partners tree, or the full Payments tree) and by every
  * feature that resolves mids or picks a mock dataset by product (via
  * toProductType() below), so the same URL (e.g. /settlement-report)
  * can render different data depending on which context the merchant last
  * selected. Defaults to "HOME", see navigation.md for the full model.
  */
-export type NavContext = "HOME" | "PA" | "PACB";
+export type NavContext = "HOME" | "PA" | "PACB" | "PARTNERS";
 
 interface ProductContextState {
   activeContext: NavContext;
@@ -42,8 +43,9 @@ export const useProductContext = create<ProductContextState>()(
   )
 );
 
-/** "HOME" has no PA/PACB data of its own, features that need a concrete
- * product to resolve mids or pick a mock dataset fall back to "PA". */
+/** "HOME" and "PARTNERS" have no PA/PACB data of their own, features that
+ * need a concrete product to resolve mids or pick a mock dataset fall back
+ * to "PA". */
 export function toProductType(context: NavContext): ProductType {
   return context === "PACB" ? "PACB" : "PA";
 }

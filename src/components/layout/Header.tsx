@@ -17,9 +17,10 @@ import { useAccountSetup } from "@/stores/useAccountSetup";
 import { useProductContext, type NavContext } from "@/stores/useProductContext";
 
 /**
- * The 4 tabs represent 3 contexts: Home (combined overview), Payments (PA)
- * and Multi-Currency Accounts (PACB), each carrying a `context` tag read by
- * useProductContext.ts. Partners is unrelated and carries none.
+ * The 4 tabs are 4 contexts: Home (combined overview), Payments (PA),
+ * Multi-Currency Accounts (PACB) and Partners, each carrying a `context` tag
+ * read by useProductContext.ts. Partners has its own sidebar tree but no
+ * PA/PACB data of its own.
  *
  * Each tab lands on its context's own dashboard (/dashboard, /pa-dashboard,
  * /mca-dashboard) and sets the active context, which decides both the Sidebar
@@ -35,7 +36,7 @@ const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
   // lands on /dashboard, rather than on one of its inner feature tables.
   { label: "Payments", href: "/pa-dashboard", context: "PA" },
   { label: "Multi-Currency Accounts", href: "/mca-dashboard", context: "PACB" },
-  { label: "Partners", href: "/refer-and-earn" },
+  { label: "Partners", href: "/refer-and-earn", context: "PARTNERS" },
 ] as const;
 
 // OUT OF SCOPE — Create button hidden for now. Flip back to true to restore.
@@ -143,15 +144,9 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
         {!isPartnerUser && (
           <nav className="hidden shrink-0 items-center gap-1 md:flex">
             {visibleTabs.map((tab) => {
-              // Home/Payments/MCA currently share the same feature routes, so
-              // their highlight is driven by the active context, not the URL.
-              // Partners still keys off its own unique route (it has no
-              // context tag, and never touches activeContext on click).
-              const onPartners =
-                pathname === "/refer-and-earn" || pathname.startsWith("/refer-and-earn/");
-              const isActive = tab.context
-                ? activeContext === tab.context && !onPartners
-                : pathname === tab.href || pathname.startsWith(tab.href + "/");
+              // The contexts share feature routes (/team-management, ...), so
+              // the highlight follows the active context, not the URL.
+              const isActive = activeContext === tab.context;
               return (
                 <Link
                   key={tab.href}

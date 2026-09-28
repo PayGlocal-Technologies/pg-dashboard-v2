@@ -37,7 +37,7 @@ const PA_STATUS_META: Record<string, StatusMeta> = {
   STEP_UP: { label: "Step up", variant: "warning" },
 };
 
-function getStatusMeta(raw?: string): StatusMeta {
+export function getStatusMeta(raw?: string): StatusMeta {
   if (!raw) return { label: "Unknown", variant: "muted" };
   const key = raw.toUpperCase().replace(/ /g, "_");
   return PA_STATUS_META[key] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
@@ -92,7 +92,13 @@ function FallbackBrand({ brand }: { brand?: string }) {
   );
 }
 
-function PaymentMethodCell({ row }: { row: PaTransaction }) {
+/** Only the three fields it reads, so other tables (e.g. the partner
+ *  Transaction Overview) can reuse it without building a whole PaTransaction. */
+export function PaymentMethodCell({
+  row,
+}: {
+  row: Pick<PaTransaction, "paymentInstrument" | "maskedCardNumber" | "cardBrand">;
+}) {
   const instrument = row.paymentInstrument?.toUpperCase();
   const last4 = row.maskedCardNumber?.replaceAll("x", "").replaceAll("X", "").trim();
 
