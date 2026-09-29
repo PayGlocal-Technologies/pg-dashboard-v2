@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
-import { Button, Field, FieldError, FieldLabel, PasswordInput } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { PasswordRules } from "@/features/auth/components/PasswordRules";
@@ -25,7 +24,7 @@ export function ChangePasswordForm({ setScreen }: LoginScreenProps) {
   const identifier = useLogin((s) => s.identifier);
   const setHasChangedPassword = useLogin((s) => s.setHasChangedPassword);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -52,107 +51,81 @@ export function ChangePasswordForm({ setScreen }: LoginScreenProps) {
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Update your password">
-        Your password has expired. Set a new one to continue.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Update your password">
+          Your password has expired. Set a new one to continue.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="currentPassword"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = changePasswordSchema.shape.currentPassword.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="currentPassword">Current password</FieldLabel>
-            <PasswordInput
+        <form.AppField
+          name="currentPassword"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = changePasswordSchema.shape.currentPassword.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.PasswordField
               id="currentPassword"
+              label="Current password"
               autoComplete="current-password"
-              aria-invalid={field.state.meta.errors.length > 0}
               placeholder="Enter your current password"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
             />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+          )}
+        </form.AppField>
 
-      <form.Field
-        name="newPassword"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = changePasswordSchema.shape.newPassword.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="newPassword">New password</FieldLabel>
-            <PasswordInput
+        <form.AppField
+          name="newPassword"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = changePasswordSchema.shape.newPassword.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.PasswordField
               id="newPassword"
+              label="New password"
               autoComplete="new-password"
-              aria-invalid={field.state.meta.errors.length > 0}
               placeholder="Create a strong password"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
             />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+          )}
+        </form.AppField>
 
-      <form.Subscribe selector={(s) => s.values.newPassword}>
-        {(newPassword) => <PasswordRules value={newPassword} />}
-      </form.Subscribe>
+        <form.Subscribe selector={(s) => s.values.newPassword}>
+          {(newPassword) => <PasswordRules value={newPassword} />}
+        </form.Subscribe>
 
-      <form.Field
-        name="confirmPassword"
-        validators={{
-          onBlur: ({ value, fieldApi }) => {
-            if (value !== fieldApi.form.getFieldValue("newPassword")) {
-              return "The passwords do not match";
-            }
-            const r = changePasswordSchema.shape.confirmPassword.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="confirmPassword">Confirm new password</FieldLabel>
-            <PasswordInput
+        <form.AppField
+          name="confirmPassword"
+          validators={{
+            onBlur: ({ value, fieldApi }) => {
+              if (value !== fieldApi.form.getFieldValue("newPassword")) {
+                return "The passwords do not match";
+              }
+              const r = changePasswordSchema.shape.confirmPassword.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.PasswordField
               id="confirmPassword"
+              label="Confirm new password"
               autoComplete="new-password"
-              aria-invalid={field.state.meta.errors.length > 0}
               placeholder="Re-enter the new password"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
             />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+          )}
+        </form.AppField>
 
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Update password
-      </Button>
-    </form>
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Update password
+        </form.SubmitButton>
+      </form.Form>
+    </form.AppForm>
   );
 }

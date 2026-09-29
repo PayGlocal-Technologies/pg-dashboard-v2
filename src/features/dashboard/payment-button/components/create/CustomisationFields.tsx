@@ -68,7 +68,7 @@ export function CustomisationFields({
             aria-invalid={hexInvalid}
             maxLength={7}
             spellCheck={false}
-            className="w-36 font-mono uppercase shadow-none"
+            className="w-36 uppercase shadow-none"
           />
         </div>
         {hexInvalid && <FieldError>Enter a hex colour, like #0061E3</FieldError>}

@@ -397,14 +397,15 @@ export function BillToSection({
           <p>
             This client&apos;s billing address is incomplete, so the invoice cannot be generated
             yet.{" "}
-            <button
+            <Button
               type="button"
+              variant="link"
+              leftIcon={<Icon name="pencil" className="h-3 w-3" />}
               onClick={() => setAddressOpen(true)}
-              className="inline-flex items-center gap-1 align-baseline font-medium text-primary hover:underline"
+              className="h-auto gap-1 p-0 align-baseline text-[12.5px] font-medium"
             >
-              <Icon name="pencil" className="h-3 w-3" />
               Complete address
-            </button>
+            </Button>
           </p>
         </div>
       )}

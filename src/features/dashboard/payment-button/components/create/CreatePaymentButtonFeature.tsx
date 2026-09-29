@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm, useStore } from "@tanstack/react-form";
@@ -27,7 +27,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
-import { RequiredMark } from "@/features/dashboard/sku-management/components/item-form/FormSection";
+import { RequiredMark } from "@/components/common/RequiredMark";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import {
   CollapsibleEditorSection,
   EditorSection,
@@ -286,7 +287,7 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                     disabled
                     value={created?.pbId ?? ""}
                     placeholder="Assigned on create"
-                    className="font-mono shadow-none"
+                    className="shadow-none"
                   />
                   <FieldDescription>For dashboard use, not visible to customers</FieldDescription>
                 </Field>
@@ -294,14 +295,14 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                 <form.Field
                   name="label"
                   validators={{
-                    onBlur: ({ value }) => validateButtonLabel(value),
+                    onChange: ({ value }) => validateButtonLabel(value),
                     onSubmit: ({ value }) => validateButtonLabel(value),
                   }}
                 >
                   {(field) => (
                     <Field>
                       <FieldLabel htmlFor="payment-button-label">
-                        Button Label <RequiredMark />
+                        <RequiredMark /> Button Label
                       </FieldLabel>
                       <Input
                         id="payment-button-label"
@@ -366,7 +367,7 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                 <form.Field
                   name="amount"
                   validators={{
-                    onSubmit: ({ value, fieldApi }) =>
+                    onChange: ({ value, fieldApi }) =>
                       validateButtonAmount(
                         value,
                         fieldApi.form.getFieldValue("amountType") === "FIXED"
@@ -377,7 +378,15 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                     const isFixed = values.amountType === "FIXED";
                     return (
                       <Field>
-                        <FieldLabel htmlFor="payment-button-amount">Value</FieldLabel>
+                        <FieldLabel htmlFor="payment-button-amount">
+                          {/* Only a fixed amount has a value to enter. */}
+                          {isFixed && (
+                            <>
+                              <RequiredMark />{" "}
+                            </>
+                          )}
+                          Value
+                        </FieldLabel>
                         <CurrencyValueField
                           id="payment-button-amount"
                           currency={values.currency}
@@ -485,7 +494,7 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                               <form.Field
                                 name={`customFields[${index}].label`}
                                 validators={{
-                                  onBlur: ({ value }) => validateCustomFieldLabel(value),
+                                  onChange: ({ value }) => validateCustomFieldLabel(value),
                                   onSubmit: ({ value, fieldApi }) =>
                                     fieldApi.form.getFieldValue("customFieldsEnabled")
                                       ? validateCustomFieldLabel(value)
@@ -535,7 +544,7 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                               <form.Field
                                 name={`customFields[${index}].defaultValue`}
                                 validators={{
-                                  onBlur: ({ value }) => validateCustomFieldDefault(value),
+                                  onChange: ({ value }) => validateCustomFieldDefault(value),
                                   onSubmit: ({ value, fieldApi }) =>
                                     fieldApi.form.getFieldValue("customFieldsEnabled") &&
                                     fieldApi.form.getFieldValue(`customFields[${index}].hasDefault`)
@@ -620,7 +629,7 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                   <form.Field
                     name="contact.email"
                     validators={{
-                      onBlur: ({ value }) => validateContactEmail(value),
+                      onChange: ({ value }) => validateContactEmail(value),
                       onSubmit: ({ value }) => validateContactEmail(value),
                     }}
                   >
@@ -649,7 +658,7 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
                   <form.Field
                     name="contact.phoneNumber"
                     validators={{
-                      onBlur: ({ value, fieldApi }) =>
+                      onChange: ({ value, fieldApi }) =>
                         validatePhone(fieldApi.form.getFieldValue("contact.phoneCountry"), value),
                       onSubmit: ({ value, fieldApi }) =>
                         validatePhone(fieldApi.form.getFieldValue("contact.phoneCountry"), value),
@@ -781,19 +790,14 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
 }
 
 /**
- * Explains why a code action is unavailable while it is. A disabled button
- * takes no pointer events, so the tip hangs off a focusable wrapper; once the
- * button exists the wrapper steps aside and the button is used directly.
+ * Explains why a code action is unavailable while it is, via the shared
+ * DisabledReason wrapper; once the button exists it steps aside.
  */
-function NeedsCreatedButton({ ready, children }: { ready: boolean; children: ReactNode }) {
-  if (ready) return <>{children}</>;
+function NeedsCreatedButton({ ready, children }: { ready: boolean; children: ReactElement }) {
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0}>{children}</span>
-      </TooltipTrigger>
-      <TooltipContent>Available once the button is created</TooltipContent>
-    </Tooltip>
+    <DisabledReason reason={ready ? null : "Available once the button is created"}>
+      {children}
+    </DisabledReason>
   );
 }
 

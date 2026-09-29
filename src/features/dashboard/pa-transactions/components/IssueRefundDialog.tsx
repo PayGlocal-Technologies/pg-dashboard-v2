@@ -1,26 +1,20 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useStore } from "@tanstack/react-form";
 import {
   Button,
   Dialog,
   DialogContent,
   DialogTitle,
-  Field,
-  FieldLabel,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, required, rules } from "@/components/form/rules";
 
 const REFUND_REASONS = [
   { value: "requested_by_customer", label: "Requested by customer" },
@@ -40,7 +34,12 @@ interface IssueRefundDialogProps {
   onOpenChange: (open: boolean) => void;
   currency: string;
   refundableAmount: number;
-  onSubmit: (input: RefundSubmission) => void;
+  /**
+   * Returns a reason string when the caller rejects the refund (e.g. it would
+   * over-refund against earlier refunds), which is shown under the amount and
+   * keeps the dialog open. Returns nothing when the refund went through.
+   */
+  onSubmit: (input: RefundSubmission) => string | void;
 }
 
 /**
@@ -57,28 +56,47 @@ export function IssueRefundDialog({
   refundableAmount,
   onSubmit,
 }: IssueRefundDialogProps) {
-  const [amountInput, setAmountInput] = useState(() => String(refundableAmount));
-  const [reason, setReason] = useState(REFUND_REASONS[0]!.value);
-  const [details, setDetails] = useState("");
-  const amountInputRef = useRef<HTMLInputElement>(null);
+  const clamp = (raw: string) => Math.min(Math.max(parseFloat(raw) || 0, 0), refundableAmount);
+
+  const form = useAppForm({
+    defaultValues: {
+      amount: String(refundableAmount),
+      reason: REFUND_REASONS[0]!.value,
+      details: "",
+    },
+    onSubmit: ({ value, formApi }) => {
+      const rejection = onSubmit({
+        amount: clamp(value.amount),
+        reason: value.reason,
+        details: value.details,
+      });
+      if (rejection) {
+        // The caller's reason (e.g. an over-refund) shows under the amount and
+        // the dialog stays open; editing the amount clears it.
+        formApi.setFieldMeta("amount", (meta) => ({
+          ...meta,
+          errorMap: { ...meta.errorMap, onSubmit: rejection },
+        }));
+        document.getElementById("refund-amount")?.focus();
+        return;
+      }
+      onOpenChange(false);
+    },
+  });
+  const amountInput = useStore(form.store, (state) => state.values.amount);
+  const parsedAmount = clamp(amountInput);
 
   function handleOpenChange(next: boolean) {
     if (next) {
       // Resync the draft every time the dialog opens, not via an effect, see
       // CLAUDE.md's hooks purity rules.
-      setAmountInput(String(refundableAmount));
-      setReason(REFUND_REASONS[0]!.value);
-      setDetails("");
+      form.reset({
+        amount: String(refundableAmount),
+        reason: REFUND_REASONS[0]!.value,
+        details: "",
+      });
     }
     onOpenChange(next);
-  }
-
-  const parsedAmount = Math.min(Math.max(parseFloat(amountInput) || 0, 0), refundableAmount);
-
-  function handleSubmit() {
-    if (parsedAmount <= 0) return;
-    onSubmit({ amount: parsedAmount, reason, details });
-    onOpenChange(false);
   }
 
   return (
@@ -90,7 +108,7 @@ export function IssueRefundDialog({
           // would otherwise be the info icon button, opening its tooltip the
           // instant the dialog appears. Redirect focus to the amount input.
           e.preventDefault();
-          amountInputRef.current?.focus();
+          document.getElementById("refund-amount")?.focus();
         }}
       >
         {/* Header / scrolling body / fixed footer, so Cancel and Refund stay
@@ -118,71 +136,84 @@ export function IssueRefundDialog({
           </Tooltip>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
-          <Field className="gap-2">
-            <FieldLabel htmlFor="refund-amount">Refund amount</FieldLabel>
-            <div className="flex items-center gap-2">
-              <Input
-                ref={amountInputRef}
-                id="refund-amount"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={refundableAmount}
-                value={amountInput}
-                onChange={(e) => setAmountInput(e.target.value)}
-                className="flex-1"
-              />
-              <span className="text-sm text-muted-foreground">{currency}</span>
+        <form.AppForm>
+          <form.Form className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
+              {/* Refund stays enabled; the amount validates as it changes once
+                  edited, and on Refund (the app-wide rule). */}
+              <form.AppField
+                name="amount"
+                validators={{
+                  onChange: rules(
+                    required("Refund amount"),
+                    check((raw: string) => clamp(raw) <= 0 && "Enter an amount greater than zero")
+                  ),
+                }}
+              >
+                {(field) => (
+                  <field.CustomField<string>
+                    id="refund-amount"
+                    label="Refund amount"
+                    className="gap-2"
+                    description={`Up to ${formatCurrency(refundableAmount, currency)} refundable.`}
+                  >
+                    {({ id, value, invalid, onChange, onBlur }) => (
+                      <div className="flex items-center gap-2">
+                        <Input
+                          id={id}
+                          type="number"
+                          inputMode="decimal"
+                          min={0}
+                          max={refundableAmount}
+                          value={value}
+                          aria-invalid={invalid || undefined}
+                          onChange={(e) => onChange(e.target.value)}
+                          onBlur={onBlur}
+                          className="flex-1"
+                        />
+                        <span className="text-sm text-muted-foreground">{currency}</span>
+                      </div>
+                    )}
+                  </field.CustomField>
+                )}
+              </form.AppField>
+
+              <form.AppField name="reason">
+                {(field) => (
+                  <field.SelectField
+                    id="refund-reason"
+                    label="Reason"
+                    options={REFUND_REASONS}
+                    className="gap-2"
+                    triggerClassName=""
+                  />
+                )}
+              </form.AppField>
+
+              {/* No "(optional)" suffix: required fields carry the *, so an
+                  unmarked field already reads as optional. */}
+              <form.AppField name="details">
+                {(field) => (
+                  <field.TextareaField
+                    id="refund-details"
+                    label="Additional details"
+                    placeholder="Add more details about this refund"
+                    rows={3}
+                    className="gap-2"
+                    inputClassName="resize-none text-sm"
+                  />
+                )}
+              </form.AppField>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Up to {formatCurrency(refundableAmount, currency)} refundable.
-            </p>
-          </Field>
 
-          <Field className="gap-2">
-            <FieldLabel htmlFor="refund-reason">Reason</FieldLabel>
-            <Select value={reason} onValueChange={setReason}>
-              <SelectTrigger id="refund-reason">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {REFUND_REASONS.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>
-                    {r.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-
-          <Field className="gap-2">
-            <FieldLabel htmlFor="refund-details">Additional details (optional)</FieldLabel>
-            <Textarea
-              id="refund-details"
-              value={details}
-              onChange={(e) => setDetails(e.target.value)}
-              placeholder="Add more details about this refund"
-              rows={3}
-              className="resize-none text-sm"
-            />
-          </Field>
-        </div>
-
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-          <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={handleSubmit}
-            disabled={parsedAmount <= 0}
-          >
-            Refund {formatCurrency(parsedAmount, currency)}
-          </Button>
-        </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <form.SubmitButton>Refund {formatCurrency(parsedAmount, currency)}</form.SubmitButton>
+            </div>
+          </form.Form>
+        </form.AppForm>
       </DialogContent>
     </Dialog>
   );

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
-import { Button, Field, FieldError, FieldLabel, OtpInput } from "@/components/ui";
+import { Button, FieldLabel, OtpInput } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { ResendOtpMessage } from "@/features/auth/components/ResendOtpMessage";
@@ -31,7 +31,7 @@ export function TwoFAOtpForm({ setScreen }: LoginScreenProps) {
   const emailTs = useLogin((s) => s.emailOtpInitiateTimestamp);
   const setEmailOtpInitiateTimestamp = useLogin((s) => s.setEmailOtpInitiateTimestamp);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { otp: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -63,52 +63,50 @@ export function TwoFAOtpForm({ setScreen }: LoginScreenProps) {
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Two-factor verification">
-        For extra security, enter the {OTP_LENGTH}-digit code sent to {maskedEmail || identifier}.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Two-factor verification">
+          For extra security, enter the {OTP_LENGTH}-digit code sent to {maskedEmail || identifier}.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="otp"
-        validators={{
-          onChange: ({ value }) => {
-            const r = otpSchema.shape.otp.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel>Email OTP</FieldLabel>
-            <OtpInput
-              value={field.state.value}
-              onChange={field.handleChange}
-              onComplete={() => void form.handleSubmit()}
-              length={OTP_LENGTH}
-              invalid={field.state.meta.errors.length > 0}
-              autoFocus
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+        <form.AppField
+          name="otp"
+          validators={{
+            onChange: ({ value }) => {
+              const r = otpSchema.shape.otp.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.CustomField<string>>
+              {({ value, invalid, onChange }) => (
+                <>
+                  <FieldLabel>Email OTP</FieldLabel>
+                  <OtpInput
+                    value={value}
+                    onChange={onChange}
+                    onComplete={() => void form.handleSubmit()}
+                    length={OTP_LENGTH}
+                    invalid={invalid}
+                    autoFocus
+                  />
+                </>
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
 
-      <ResendOtpMessage
-        startTime={emailTs}
-        message="Didn't receive it?"
-        onResend={() => void handleResend()}
-      />
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Verify
-      </Button>
-    </form>
+        <ResendOtpMessage
+          startTime={emailTs}
+          message="Didn't receive it?"
+          onResend={() => void handleResend()}
+        />
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Verify
+        </form.SubmitButton>
+      </form.Form>
+    </form.AppForm>
   );
 }

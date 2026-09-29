@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, Dialog, DialogContent, DialogTitle } from "@/components/ui";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import { ZohoConnectBadge } from "@/features/dashboard/zoho-integration/components/ZohoConnectBadge";
 
 /**
@@ -53,16 +54,19 @@ export function ZohoSyncDialog({
           >
             Cancel
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            className="flex-1"
-            isLoading={isSyncing}
-            disabled={!mid}
-            onClick={onSync}
-          >
-            Sync now
-          </Button>
+          <DisabledReason reason={mid ? null : "Connect a mid to Zoho first"} className="flex-1">
+            <Button
+              variant="primary"
+              size="sm"
+              // flex-1 when enabled (no wrapper), w-full inside the wrapper.
+              className="w-full flex-1"
+              isLoading={isSyncing}
+              disabled={!mid}
+              onClick={onSync}
+            >
+              Sync now
+            </Button>
+          </DisabledReason>
         </div>
       </DialogContent>
     </Dialog>

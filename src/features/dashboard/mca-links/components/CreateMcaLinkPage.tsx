@@ -23,6 +23,7 @@ import {
   Separator,
   Textarea,
 } from "@/components/ui";
+import { RequiredMark } from "@/components/common/RequiredMark";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { currencySymbol } from "@/lib/utils/format";
@@ -35,16 +36,16 @@ import { CustomerPreview } from "@/features/dashboard/mca-links/components/Custo
 const CURRENCY_OPTIONS = CURRENCY_FILTER_OPTIONS;
 
 const paymentDetailsSchema = z.object({
-  currency: z.string().min(1, "Select a currency"),
+  currency: z.string().min(1, "Currency is required"),
   amount: z
     .string()
-    .min(1, "Enter an amount")
+    .min(1, "Payment amount is required")
     .refine(
       (v) => Number.isFinite(parseFloat(v)) && parseFloat(v) > 0,
       "Enter an amount greater than 0"
     ),
-  invoiceNumber: z.string().trim().min(1, "Enter an invoice number"),
-  description: z.string().trim().min(1, "Enter a product description"),
+  invoiceNumber: z.string().trim().min(1, "Invoice number is required"),
+  description: z.string().trim().min(1, "Product description is required"),
 });
 
 /**
@@ -62,15 +63,6 @@ function StepIndicator({ step, complete }: { step: number; complete: boolean }) 
       )}
     >
       {complete ? <Icon name="check" className="h-3.5 w-3.5" /> : step}
-    </span>
-  );
-}
-
-/** Red asterisk before a required field's label, matching the reference. */
-function RequiredMark() {
-  return (
-    <span aria-hidden className="text-destructive">
-      *
     </span>
   );
 }
@@ -226,7 +218,7 @@ export function CreateMcaLinkPage({ onBack }: CreateMcaLinkPageProps) {
                         <form.Field
                           name="amount"
                           validators={{
-                            onBlur: ({ value }) => {
+                            onChange: ({ value }) => {
                               const r = paymentDetailsSchema.shape.amount.safeParse(value);
                               return r.success ? undefined : r.error.issues[0]?.message;
                             },
@@ -255,7 +247,7 @@ export function CreateMcaLinkPage({ onBack }: CreateMcaLinkPageProps) {
                     <form.Field
                       name="invoiceNumber"
                       validators={{
-                        onBlur: ({ value }) => {
+                        onChange: ({ value }) => {
                           const r = paymentDetailsSchema.shape.invoiceNumber.safeParse(value);
                           return r.success ? undefined : r.error.issues[0]?.message;
                         },
@@ -284,7 +276,7 @@ export function CreateMcaLinkPage({ onBack }: CreateMcaLinkPageProps) {
                   <form.Field
                     name="description"
                     validators={{
-                      onBlur: ({ value }) => {
+                      onChange: ({ value }) => {
                         const r = paymentDetailsSchema.shape.description.safeParse(value);
                         return r.success ? undefined : r.error.issues[0]?.message;
                       },

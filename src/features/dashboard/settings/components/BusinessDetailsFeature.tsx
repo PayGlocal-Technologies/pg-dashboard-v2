@@ -1,10 +1,13 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
 import { PurposeCodeCombobox } from "@/components/common/PurposeCodeCombobox";
+import { RequiredMark } from "@/components/common/RequiredMark";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { NO_DESCRIPTION, PURPOSE_CODES } from "@/lib/purposeCodes";
 import { SettingsDetailRow } from "@/features/dashboard/settings/components/SettingsDetailRow";
 import {
@@ -123,7 +126,7 @@ export function BusinessDetailsFeature() {
   const purposeCodes = uniqueCodes(business?.purposeCode ?? []);
   const hasLegacyMultiple = purposeCodes.length > 1;
   const [editing, setEditing] = useState(false);
-  const [selectedCode, setSelectedCode] = useState("");
+  const [initialCode, setInitialCode] = useState("");
   // The saved codes are folded into the option list so an existing one the API
   // no longer offers is still selectable rather than silently absent.
   const { options: purposeCodeOptions, isLoading: isOptionsLoading } =
@@ -143,13 +146,11 @@ export function BusinessDetailsFeature() {
     // A single saved code is the obvious starting selection. With several there
     // is no defensible pick, so the field starts empty and the merchant chooses
     // which one the account keeps.
-    setSelectedCode(hasLegacyMultiple ? "" : (purposeCodes[0] ?? ""));
+    setInitialCode(hasLegacyMultiple ? "" : (purposeCodes[0] ?? ""));
     setEditing(true);
   };
 
-  const saveCodes = (): void => {
-    if (!selectedCode) return;
-
+  const saveCodes = (selectedCode: string): void => {
     // The endpoint still takes the plural array pg-dashboard sends; we just
     // never send more than one entry.
     updateBusiness(
@@ -255,52 +256,23 @@ export function BusinessDetailsFeature() {
             not among public-facing or support fields. */}
         <div className="flex items-start justify-between gap-6 py-3">
           <div className="max-w-xs">
-            <p className="text-sm text-muted-foreground">Purpose code</p>
+            <p className="text-sm text-muted-foreground">
+              {editing && <RequiredMark />} Purpose code
+            </p>
             <p className="mt-0.5 text-xs text-muted-foreground/70">
               RBI purpose code used for cross-border transactions.
             </p>
           </div>
           {editing ? (
-            <div className="w-full max-w-md space-y-2">
-              <PurposeCodeCombobox
-                id="business-purpose-code"
-                value={selectedCode}
-                onChange={setSelectedCode}
-                options={purposeCodeOptions}
-                isLoading={isOptionsLoading}
-              />
-              {hasLegacyMultiple ? (
-                <p className="text-[11px] text-destructive">
-                  This account currently holds {purposeCodes.length} purpose codes (
-                  {purposeCodes.join(", ")}). Accounts now carry a single code, so saving replaces
-                  all of them with the one you pick here.
-                </p>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  One code per account. Search by code or by what it covers.
-                </p>
-              )}
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={saveCodes}
-                  isLoading={isSaving}
-                  disabled={!selectedCode}
-                >
-                  Save changes
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditing(false)}
-                  disabled={isSaving}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
+            <PurposeCodeEditor
+              initialCode={initialCode}
+              options={purposeCodeOptions}
+              isOptionsLoading={isOptionsLoading}
+              isSaving={isSaving}
+              legacyCodes={hasLegacyMultiple ? purposeCodes : null}
+              onSave={saveCodes}
+              onCancel={() => setEditing(false)}
+            />
           ) : (
             // Baseline, not start: the value and the link have different line
             // heights, so top-aligning left Edit sitting above the code. The
@@ -355,5 +327,77 @@ export function BusinessDetailsFeature() {
         fields={supportFields}
       />
     </div>
+  );
+}
+
+/**
+ * The purpose-code edit: one required pick. Save stays live; a press with no
+ * code names it under the picker, and a pick validates as it changes (the
+ * app-wide rule, see components/form). The label sits in the row to the left,
+ * so its * is drawn there by the caller.
+ */
+function PurposeCodeEditor({
+  initialCode,
+  options,
+  isOptionsLoading,
+  isSaving,
+  legacyCodes,
+  onSave,
+  onCancel,
+}: {
+  initialCode: string;
+  options: ComponentProps<typeof PurposeCodeCombobox>["options"];
+  isOptionsLoading: boolean;
+  isSaving: boolean;
+  /** Every saved code, when the account still holds several. */
+  legacyCodes: string[] | null;
+  onSave: (code: string) => void;
+  onCancel: () => void;
+}) {
+  const form = useAppForm({
+    defaultValues: { code: initialCode },
+    onSubmit: ({ value }) => onSave(value.code),
+  });
+
+  return (
+    <form.AppForm>
+      <form.Form className="w-full max-w-md space-y-2">
+        <form.AppField name="code" validators={{ onChange: rules(required("Purpose code")) }}>
+          {(field) => (
+            <field.CustomField<string> id="business-purpose-code">
+              {({ id, value, invalid, onChange }) => (
+                <PurposeCodeCombobox
+                  id={id}
+                  value={value}
+                  onChange={onChange}
+                  invalid={invalid}
+                  options={options}
+                  isLoading={isOptionsLoading}
+                />
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
+        {legacyCodes ? (
+          <p className="text-[11px] text-destructive">
+            This account currently holds {legacyCodes.length} purpose codes (
+            {legacyCodes.join(", ")}). Accounts now carry a single code, so saving replaces all of
+            them with the one you pick here.
+          </p>
+        ) : (
+          <p className="text-[11px] text-muted-foreground">
+            One code per account. Search by code or by what it covers.
+          </p>
+        )}
+        <div className="flex gap-2">
+          <form.SubmitButton variant="primary" isLoading={isSaving}>
+            Save changes
+          </form.SubmitButton>
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </Button>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }

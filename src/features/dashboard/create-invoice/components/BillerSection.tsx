@@ -1,24 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Field,
-  FieldError,
-  FieldLabel,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Shimmer,
-  SingleSelect,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogTitle, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { useClientGeo } from "@/features/dashboard/create-invoice/hooks";
 import type { BillerDetails } from "@/features/dashboard/create-invoice/types";
 
@@ -149,23 +135,6 @@ function EditBillerDialog({
   );
 }
 
-const BILLER_FIELD_IDS = {
-  legalName: "biller-legal-name",
-  streetAddress1: "biller-street1",
-  city: "biller-city",
-  zipcode: "biller-zip",
-  email: "biller-email",
-  phone: "biller-phone",
-} as const;
-
-function RequiredMark() {
-  return (
-    <span aria-hidden className="text-destructive">
-      *
-    </span>
-  );
-}
-
 function EditBillerBody({
   billerDetails,
   onCancel,
@@ -175,203 +144,156 @@ function EditBillerBody({
   onCancel: () => void;
   onSave: (next: BillerDetails) => void;
 }) {
-  const [values, setValues] = useState<BillerDetails>(() => ({ ...(billerDetails ?? {}) }));
   const { countryOptions, stateOptions } = useClientGeo(true);
 
-  const patch = (next: Partial<BillerDetails>) => setValues((prev) => ({ ...prev, ...next }));
+  // The whole record rides through, so keys this form doesn't show are saved
+  // back untouched, exactly as the old useState copy did.
+  const form = useAppForm({
+    defaultValues: { ...(billerDetails ?? {}) } as BillerDetails,
+    onSubmit: ({ value }) => onSave(value),
+  });
 
   // The same six production's EditBillerDetails drawer marks required (it
   // also requires State; v2 never has, and this is not the place to widen
-  // it). They stay required, but Save no longer sits silently disabled:
-  // the fields carry a * up front, and a Save with gaps names each missing
-  // one instead of leaving the merchant to guess why nothing happens.
-  const missing = {
-    legalName: !values.legalName?.trim(),
-    streetAddress1: !values.streetAddress1?.trim(),
-    city: !values.city?.trim(),
-    zipcode: !values.zipcode?.trim(),
-    email: !values.email?.trim(),
-    phone: !values.phone?.trim(),
-  };
-  const isValid = !Object.values(missing).some(Boolean);
-  const [attempted, setAttempted] = useState(false);
-  const errorFor = (key: keyof typeof missing) =>
-    attempted && missing[key] ? "This field is required" : undefined;
-
-  const handleSave = () => {
-    if (isValid) {
-      onSave(values);
-      return;
-    }
-    setAttempted(true);
-    // Bring the first gap into view; on a short screen it can be below the fold.
-    const first = (Object.keys(missing) as (keyof typeof missing)[]).find((k) => missing[k]);
-    if (first) document.getElementById(BILLER_FIELD_IDS[first])?.focus();
-  };
-
+  // it). Their * comes from `required(...)` below; see components/form.
   return (
-    <>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
-        <Field>
-          <FieldLabel htmlFor="biller-legal-name">
-            <RequiredMark /> Legal name
-          </FieldLabel>
-          <Input
-            id="biller-legal-name"
-            aria-invalid={!!errorFor("legalName")}
-            className="shadow-none"
-            value={values.legalName ?? ""}
-            onChange={(e) => patch({ legalName: e.target.value })}
-          />
-          <FieldError>{errorFor("legalName")}</FieldError>
-        </Field>
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
+          <form.AppField name="legalName" validators={{ onChange: rules(required("Legal name")) }}>
+            {(field) => (
+              <field.TextField
+                inputClassName="shadow-none"
+                id="biller-legal-name"
+                label="Legal name"
+              />
+            )}
+          </form.AppField>
 
-        <Field>
-          <FieldLabel htmlFor="biller-gstin">GSTIN</FieldLabel>
-          <Input
-            id="biller-gstin"
-            className="font-mono shadow-none"
-            placeholder="Optional"
-            value={values.gstIn ?? ""}
-            onChange={(e) => patch({ gstIn: e.target.value.toUpperCase() })}
-          />
-        </Field>
+          <form.AppField name="gstIn">
+            {(field) => (
+              <field.TextField
+                inputClassName="shadow-none"
+                id="biller-gstin"
+                label="GSTIN"
+                placeholder="Optional"
+                parse={(raw) => raw.toUpperCase()}
+              />
+            )}
+          </form.AppField>
 
-        <Field>
-          <FieldLabel htmlFor="biller-street1">
-            <RequiredMark /> Address
-          </FieldLabel>
-          <Input
-            id="biller-street1"
-            aria-invalid={!!errorFor("streetAddress1")}
-            className="shadow-none"
-            value={values.streetAddress1 ?? ""}
-            onChange={(e) => patch({ streetAddress1: e.target.value })}
-          />
-          <FieldError>{errorFor("streetAddress1")}</FieldError>
-        </Field>
+          <form.AppField
+            name="streetAddress1"
+            validators={{ onChange: rules(required("Address")) }}
+          >
+            {(field) => (
+              <field.TextField inputClassName="shadow-none" id="biller-street1" label="Address" />
+            )}
+          </form.AppField>
 
-        <Field>
-          <FieldLabel htmlFor="biller-street2">Address line 2</FieldLabel>
-          <Input
-            id="biller-street2"
-            className="shadow-none"
-            placeholder="Optional"
-            value={values.streetAddress2 ?? ""}
-            onChange={(e) => patch({ streetAddress2: e.target.value })}
-          />
-        </Field>
+          <form.AppField name="streetAddress2">
+            {(field) => (
+              <field.TextField
+                inputClassName="shadow-none"
+                id="biller-street2"
+                label="Address line 2"
+                placeholder="Optional"
+              />
+            )}
+          </form.AppField>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="biller-country">Country</FieldLabel>
+          <div className="grid gap-3 sm:grid-cols-2">
             {/* Searchable for the same reason State is, only more so: this list
-              runs to roughly 200 entries. flux's own CountrySelect is not usable
-              here — it is hardwired to its internal COUNTRIES array, while these
-              options come from the API and carry the country *names* the address
-              is stored under. */}
-            <SingleSelect
-              id="biller-country"
-              value={values.country ?? ""}
-              // See AddAddressDialog's twin of this line.
-              onChange={(next) => patch({ country: next, state: "" })}
-              options={countryOptions}
-              placeholder="Select country"
-              searchPlaceholder="Search country…"
-              emptyText="No country matches that search."
-            />
-          </Field>
+                runs to roughly 200 entries. flux's own CountrySelect is not usable
+                here — it is hardwired to its internal COUNTRIES array, while these
+                options come from the API and carry the country *names* the address
+                is stored under. */}
+            <form.AppField name="country">
+              {(field) => (
+                <field.SingleSelectField
+                  id="biller-country"
+                  label="Country"
+                  options={countryOptions}
+                  placeholder="Select country"
+                  searchPlaceholder="Search country…"
+                  emptyText="No country matches that search."
+                  // See AddAddressDialog's twin of this line.
+                  onValueChange={() => form.setFieldValue("state", "")}
+                />
+              )}
+            </form.AppField>
 
-          <Field>
-            <FieldLabel htmlFor="biller-state">State</FieldLabel>
             {/* A select over the whole state list, which is what production's
-              biller form offers (EditBillerDetails maps every key of
-              stateCodes into its own select, ungated by country — its form has
-              no country field at all). Searchable because the list is long
-              enough that scrolling a listbox is not reasonable. */}
-            <SingleSelect
-              id="biller-state"
-              value={values.state ?? ""}
-              onChange={(next) => patch({ state: next })}
-              options={stateOptions}
-              placeholder="Select state"
-              searchPlaceholder="Search state…"
-              emptyText="No state matches that search."
-            />
-          </Field>
+                biller form offers (EditBillerDetails maps every key of
+                stateCodes into its own select, ungated by country — its form has
+                no country field at all). Searchable because the list is long
+                enough that scrolling a listbox is not reasonable. */}
+            <form.AppField name="state">
+              {(field) => (
+                <field.SingleSelectField
+                  id="biller-state"
+                  label="State"
+                  options={stateOptions}
+                  placeholder="Select state"
+                  searchPlaceholder="Search state…"
+                  emptyText="No state matches that search."
+                />
+              )}
+            </form.AppField>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <form.AppField name="city" validators={{ onChange: rules(required("City")) }}>
+              {(field) => (
+                <field.TextField inputClassName="shadow-none" id="biller-city" label="City" />
+              )}
+            </form.AppField>
+
+            <form.AppField name="zipcode" validators={{ onChange: rules(required("Zipcode")) }}>
+              {(field) => (
+                <field.TextField inputClassName="shadow-none" id="biller-zip" label="Zipcode" />
+              )}
+            </form.AppField>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <form.AppField
+              name="email"
+              validators={{ onChange: rules(required("Primary contact email")) }}
+            >
+              {(field) => (
+                <field.TextField
+                  inputClassName="shadow-none"
+                  id="biller-email"
+                  type="email"
+                  label="Primary contact email"
+                />
+              )}
+            </form.AppField>
+
+            <form.AppField
+              name="phone"
+              validators={{ onChange: rules(required("Primary contact number")) }}
+            >
+              {(field) => (
+                <field.TextField
+                  inputClassName="shadow-none"
+                  id="biller-phone"
+                  inputMode="tel"
+                  label="Primary contact number"
+                />
+              )}
+            </form.AppField>
+          </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="biller-city">
-              <RequiredMark /> City
-            </FieldLabel>
-            <Input
-              id="biller-city"
-              aria-invalid={!!errorFor("city")}
-              className="shadow-none"
-              value={values.city ?? ""}
-              onChange={(e) => patch({ city: e.target.value })}
-            />
-            <FieldError>{errorFor("city")}</FieldError>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="biller-zip">
-              <RequiredMark /> Zipcode
-            </FieldLabel>
-            <Input
-              id="biller-zip"
-              aria-invalid={!!errorFor("zipcode")}
-              className="shadow-none"
-              value={values.zipcode ?? ""}
-              onChange={(e) => patch({ zipcode: e.target.value })}
-            />
-            <FieldError>{errorFor("zipcode")}</FieldError>
-          </Field>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+          <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <form.SubmitButton>Save</form.SubmitButton>
         </div>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="biller-email">
-              <RequiredMark /> Primary contact email
-            </FieldLabel>
-            <Input
-              id="biller-email"
-              aria-invalid={!!errorFor("email")}
-              type="email"
-              className="shadow-none"
-              value={values.email ?? ""}
-              onChange={(e) => patch({ email: e.target.value })}
-            />
-            <FieldError>{errorFor("email")}</FieldError>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="biller-phone">
-              <RequiredMark /> Primary contact number
-            </FieldLabel>
-            <Input
-              id="biller-phone"
-              aria-invalid={!!errorFor("phone")}
-              inputMode="tel"
-              className="shadow-none"
-              value={values.phone ?? ""}
-              onChange={(e) => patch({ phone: e.target.value })}
-            />
-            <FieldError>{errorFor("phone")}</FieldError>
-          </Field>
-        </div>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="button" variant="primary" size="sm" onClick={handleSave}>
-          Save
-        </Button>
-      </div>
-    </>
+      </form.Form>
+    </form.AppForm>
   );
 }

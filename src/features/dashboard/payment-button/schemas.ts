@@ -6,7 +6,7 @@
 
 export function validateButtonLabel(value: string): string | undefined {
   const trimmed = value.trim();
-  if (!trimmed) return "Enter a button label";
+  if (!trimmed) return "Button label is required";
   return trimmed.length <= 30 ? undefined : "Keep the label to 30 characters or fewer";
 }
 
@@ -18,7 +18,7 @@ export function validateButtonAmount(amount: string, isFixed: boolean): string |
 }
 
 export function validateCustomFieldLabel(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a label for this field";
+  return value.trim() ? undefined : "Field label is required";
 }
 
 export function validateCustomFieldDefault(value: string): string | undefined {

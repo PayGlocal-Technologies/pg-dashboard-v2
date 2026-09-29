@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import {
   Alert,
@@ -15,8 +14,6 @@ import {
   DialogTitle,
   Field,
   FieldError,
-  FieldLabel,
-  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -24,6 +21,10 @@ import {
   SelectValue,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { DisabledReason } from "@/components/common/DisabledReason";
+import { RequiredMark } from "@/components/common/RequiredMark";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, required, rules } from "@/components/form/rules";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/utils/format";
 import { usePost } from "@/lib/api/hooks";
@@ -239,18 +240,21 @@ function UploadInvoiceBody({
         <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
           Cancel
         </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={!pendingFile || isScanning}
-          isLoading={isScanning}
-          onClick={() => {
-            if (pendingFile) void upload.startUpload(pendingFile);
-          }}
-        >
-          {isScanning ? "Extracting data…" : "Upload invoice"}
-        </Button>
+        {/* No file, nothing to upload: disabled, with the reason on hover. */}
+        <DisabledReason reason={pendingFile ? null : "Choose a PDF invoice to continue"}>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={!pendingFile || isScanning}
+            isLoading={isScanning}
+            onClick={() => {
+              if (pendingFile) void upload.startUpload(pendingFile);
+            }}
+          >
+            {isScanning ? "Extracting data…" : "Upload invoice"}
+          </Button>
+        </DisabledReason>
       </div>
     </>
   );
@@ -396,7 +400,7 @@ function ConfirmInvoiceStep({
     { invalidateQueries: INVOICE_DATA_KEYS }
   );
 
-  const form = useForm({
+  const form = useAppForm({
     // Seeded from extraction, which is why this step is only ever mounted once
     // the payload has landed: defaultValues are read on the first render.
     defaultValues: {
@@ -435,275 +439,225 @@ function ConfirmInvoiceStep({
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="flex min-h-0 flex-1 flex-col"
-      noValidate
-    >
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
-        <p className="text-[13px] font-semibold text-foreground">Confirm invoice details</p>
-        <p className="mt-1 text-[12px] text-muted-foreground">
-          Check what we read off your invoice, and correct anything that is wrong.
-        </p>
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+          <p className="text-[13px] font-semibold text-foreground">Confirm invoice details</p>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Check what we read off your invoice, and correct anything that is wrong.
+          </p>
 
-        <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-muted/20 p-4">
-          <form.Field
-            name="clientId"
-            validators={{
-              onSubmit: ({ value }) => (value ? undefined : "Please select a client"),
-            }}
-          >
-            {(field) => {
-              const picked = clientOptions.find((c) => c.value === field.state.value);
-              return (
-                <Field>
-                  <FieldLabel htmlFor="upload-invoice-client">
-                    Client <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(next) => field.handleChange(next)}
-                  >
-                    <SelectTrigger
-                      id="upload-invoice-client"
-                      className="w-full"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                    >
-                      <SelectValue placeholder="Select client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clientOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {/* Production flags this case too: the name came off the
-                      document and is not on file yet, so confirming creates it. */}
-                  {picked?.isNew && (
-                    <Badge variant="success" className="mt-1 w-fit">
-                      New client — the name will be saved when you confirm
-                    </Badge>
-                  )}
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              );
-            }}
-          </form.Field>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <form.Field
-              name="currency"
-              validators={{
-                onSubmit: ({ value }) => (value ? undefined : "Please select a currency"),
+          <div className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-muted/20 p-4">
+            <form.AppField name="clientId" validators={{ onChange: rules(required("Client")) }}>
+              {(field) => {
+                const picked = clientOptions.find((c) => c.value === field.state.value);
+                return (
+                  <field.CustomField<string> id="upload-invoice-client" label="Client">
+                    {({ id, value, invalid, onChange }) => (
+                      <>
+                        <Select value={value} onValueChange={onChange}>
+                          <SelectTrigger
+                            id={id}
+                            className="w-full"
+                            aria-invalid={invalid || undefined}
+                          >
+                            <SelectValue placeholder="Select client" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {clientOptions.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {/* Production flags this case too: the name came off the
+                          document and is not on file yet, so confirming creates it. */}
+                        {picked?.isNew && (
+                          <Badge variant="success" className="mt-1 w-fit">
+                            New client — the name will be saved when you confirm
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </field.CustomField>
+                );
               }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="upload-invoice-currency">
-                    Currency <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(next) => field.handleChange(next)}
-                  >
-                    <SelectTrigger
-                      id="upload-invoice-currency"
-                      className="w-full"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                    >
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map((currency) => (
-                        <SelectItem key={currency.currencyCode} value={currency.currencyCode}>
-                          {currency.currencyCode} {currency.currencySymbol}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
+            </form.AppField>
 
-            <form.Field
-              name="totalAmount"
-              validators={{
-                onSubmit: ({ value }) => {
-                  if (!value.trim()) return "Please enter the total amount";
-                  return Number(value) > 0 ? undefined : "Enter an amount greater than zero";
-                },
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="upload-invoice-amount">
-                    Amount <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <Input
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.AppField name="currency" validators={{ onChange: rules(required("Currency")) }}>
+                {(field) => (
+                  <field.SelectField
+                    id="upload-invoice-currency"
+                    label="Currency"
+                    placeholder="Select currency"
+                    options={currencies.map((currency) => ({
+                      value: currency.currencyCode,
+                      label: `${currency.currencyCode} ${currency.currencySymbol}`,
+                    }))}
+                  />
+                )}
+              </form.AppField>
+
+              <form.AppField
+                name="totalAmount"
+                validators={{
+                  onChange: ({ value }) => {
+                    if (!value.trim()) return "Amount is required";
+                    return Number(value) > 0 ? undefined : "Enter an amount greater than zero";
+                  },
+                }}
+              >
+                {(field) => (
+                  <field.TextField
                     id="upload-invoice-amount"
+                    label="Amount"
+                    required
                     inputMode="decimal"
                     placeholder="0.00"
-                    value={field.state.value}
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-          </div>
+                )}
+              </form.AppField>
+            </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <form.Field
-              name="invoiceDate"
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.AppField
+                name="invoiceDate"
+                validators={{ onChange: rules(required("Invoice date")) }}
+              >
+                {(field) => (
+                  <field.CustomField<string>
+                    id="upload-invoice-date"
+                    label="Invoice date"
+                    onValueChange={() => {
+                      // Production clears the due date whenever the invoice date
+                      // moves, since the one bounds the other. A programmatic
+                      // clear, so it only re-checks a due date already in play.
+                      form.setFieldValue("dueDate", "", { dontValidate: true });
+                      const due = form.getFieldMeta("dueDate");
+                      if (due?.isTouched || due?.errors.length) {
+                        void form.validateField("dueDate", "change");
+                      }
+                    }}
+                  >
+                    {({ value, invalid, onChange }) => (
+                      <div aria-invalid={invalid || undefined}>
+                        <DatePicker value={value} onChange={onChange} placeholder="Select date" />
+                      </div>
+                    )}
+                  </field.CustomField>
+                )}
+              </form.AppField>
+
+              <form.Subscribe selector={(state) => state.values.invoiceDate}>
+                {(invoiceDate) => (
+                  <form.AppField
+                    name="dueDate"
+                    validators={{
+                      onChange: rules(
+                        required("Due date"),
+                        check(
+                          (value: string) =>
+                            !!invoiceDate &&
+                            value < invoiceDate &&
+                            "Due date cannot be before the invoice date"
+                        )
+                      ),
+                    }}
+                  >
+                    {(field) => (
+                      <field.CustomField<string> id="upload-invoice-due-date" label="Due date">
+                        {({ value, invalid, onChange }) => (
+                          <div aria-invalid={invalid || undefined}>
+                            <DatePicker
+                              value={value}
+                              onChange={onChange}
+                              min={invoiceDate || undefined}
+                              placeholder="Select date"
+                            />
+                          </div>
+                        )}
+                      </field.CustomField>
+                    )}
+                  </form.AppField>
+                )}
+              </form.Subscribe>
+            </div>
+
+            <form.AppField
+              name="invoiceNumber"
               validators={{
-                onSubmit: ({ value }) => (value ? undefined : "Please select the invoice date"),
+                onChange: ({ value }) => (value.trim() ? undefined : "Invoice number is required"),
               }}
             >
               {(field) => (
-                <Field>
-                  <FieldLabel>
-                    Invoice date <span className="text-destructive">*</span>
-                  </FieldLabel>
-                  <DatePicker
-                    value={field.state.value}
-                    onChange={(next) => {
-                      field.handleChange(next);
-                      // Production clears the due date whenever the invoice
-                      // date moves, since the one bounds the other.
-                      form.setFieldValue("dueDate", "");
-                    }}
-                    placeholder="Select date"
-                  />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
+                <field.TextField
+                  id="upload-invoice-number"
+                  label="Invoice number"
+                  required
+                  placeholder="e.g. INV-1042"
+                />
               )}
-            </form.Field>
-
-            <form.Subscribe selector={(state) => state.values.invoiceDate}>
-              {(invoiceDate) => (
-                <form.Field
-                  name="dueDate"
-                  validators={{
-                    onSubmit: ({ value }) => {
-                      if (!value) return "Please select the due date";
-                      if (invoiceDate && value < invoiceDate)
-                        return "Due date cannot be before the invoice date";
-                      return undefined;
-                    },
-                  }}
-                >
-                  {(field) => (
-                    <Field>
-                      <FieldLabel>
-                        Due date <span className="text-destructive">*</span>
-                      </FieldLabel>
-                      <DatePicker
-                        value={field.state.value}
-                        onChange={(next) => field.handleChange(next)}
-                        min={invoiceDate || undefined}
-                        placeholder="Select date"
-                      />
-                      <FieldError>{field.state.meta.errors[0]}</FieldError>
-                    </Field>
-                  )}
-                </form.Field>
-              )}
-            </form.Subscribe>
+            </form.AppField>
           </div>
 
           <form.Field
-            name="invoiceNumber"
+            name="userCreateConsent"
             validators={{
-              onSubmit: ({ value }) =>
-                value.trim() ? undefined : "Please enter the invoice number",
+              onChange: ({ value }) => (value ? undefined : "Consent is required"),
             }}
           >
             {(field) => (
-              <Field>
-                <FieldLabel htmlFor="upload-invoice-number">
-                  Invoice number <span className="text-destructive">*</span>
-                </FieldLabel>
-                <Input
-                  id="upload-invoice-number"
-                  placeholder="e.g. INV-1042"
-                  value={field.state.value}
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
+              <Field className="mt-4">
+                <label className="flex cursor-pointer items-start gap-3">
+                  <Checkbox
+                    aria-invalid={field.state.meta.errors.length > 0 || undefined}
+                    checked={field.state.value}
+                    onCheckedChange={(next) => field.handleChange(next === true)}
+                    className="mt-0.5"
+                  />
+                  <span className="text-[12.5px] text-muted-foreground">
+                    {/* Required: the validator below blocks submit without it. */}
+                    <RequiredMark /> {CONSENT_TEXT.short}
+                    {showMore && <> {CONSENT_TEXT.more}</>}{" "}
+                    <Button
+                      type="button"
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 align-baseline text-[12.5px]"
+                      onClick={(e) => {
+                        // The label wraps this, so a bare click would also toggle
+                        // the box.
+                        e.preventDefault();
+                        setShowMore((v) => !v);
+                      }}
+                    >
+                      {showMore ? "Show less" : "Show more"}
+                    </Button>
+                  </span>
+                </label>
                 <FieldError>{field.state.meta.errors[0]}</FieldError>
               </Field>
             )}
           </form.Field>
         </div>
 
-        <form.Field
-          name="userCreateConsent"
-          validators={{
-            onSubmit: ({ value }) => (value ? undefined : "Please accept to proceed"),
-          }}
-        >
-          {(field) => (
-            <Field className="mt-4">
-              <label className="flex cursor-pointer items-start gap-3">
-                <Checkbox
-                  checked={field.state.value}
-                  onCheckedChange={(next) => field.handleChange(next === true)}
-                  className="mt-0.5"
-                />
-                <span className="text-[12.5px] text-muted-foreground">
-                  {CONSENT_TEXT.short}
-                  {showMore && <> {CONSENT_TEXT.more}</>}{" "}
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 align-baseline text-[12.5px]"
-                    onClick={(e) => {
-                      // The label wraps this, so a bare click would also toggle
-                      // the box.
-                      e.preventDefault();
-                      setShowMore((v) => !v);
-                    }}
-                  >
-                    {showMore ? "Show less" : "Show more"}
-                  </Button>
-                </span>
-              </label>
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            </Field>
-          )}
-        </form.Field>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
-        <Button
-          type="button"
-          variant="secondary"
-          size="sm"
-          disabled={isPending}
-          onClick={onUploadDifferent}
-        >
-          Upload different file
-        </Button>
-        <Button
-          type="submit"
-          variant="primary"
-          size="sm"
-          disabled={isPending}
-          isLoading={isPending}
-        >
-          {isPending ? "Creating…" : "Confirm"}
-        </Button>
-      </div>
-    </form>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-4">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={isPending}
+            onClick={onUploadDifferent}
+          >
+            Upload different file
+          </Button>
+          <form.SubmitButton pending={isPending} isLoading={isPending}>
+            {isPending ? "Creating…" : "Confirm"}
+          </form.SubmitButton>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }

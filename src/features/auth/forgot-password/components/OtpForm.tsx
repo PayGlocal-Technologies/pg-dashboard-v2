@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
-import { Button, Field, FieldError, FieldLabel, OtpInput } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { Button, FieldLabel, OtpInput } from "@/components/ui";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { ResendOtpMessage } from "@/features/auth/components/ResendOtpMessage";
@@ -35,7 +35,7 @@ export function OtpForm({ setScreen }: ForgotPasswordScreenProps) {
 
   const [isLocked, setIsLocked] = useState(false);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { emailOtp: "", mobileOtp: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -68,86 +68,97 @@ export function OtpForm({ setScreen }: ForgotPasswordScreenProps) {
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="We've sent you OTPs">
-        Enter the {OTP_LENGTH}-digit codes sent to{" "}
-        {maskedPhoneNumber ? `${maskedPhoneNumber} and ` : ""}
-        {maskedEmail || identifier}.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="We've sent you OTPs">
+          Enter the {OTP_LENGTH}-digit codes sent to{" "}
+          {maskedPhoneNumber ? `${maskedPhoneNumber} and ` : ""}
+          {maskedEmail || identifier}.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="mobileOtp"
-        validators={{
-          onChange: ({ value }) =>
-            value.length > 0 && value.length !== OTP_LENGTH ? "Enter the complete OTP" : undefined,
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel>Mobile OTP</FieldLabel>
-            <OtpInput
-              value={field.state.value}
-              onChange={field.handleChange}
-              length={OTP_LENGTH}
-              invalid={field.state.meta.errors.length > 0}
-              autoFocus
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
+        <form.AppField
+          name="mobileOtp"
+          validators={{
+            onChange: ({ value }) =>
+              value.length > 0 && value.length !== OTP_LENGTH
+                ? "Enter the complete OTP"
+                : undefined,
+          }}
+        >
+          {(field) => (
+            <field.CustomField<string>>
+              {({ value, invalid, onChange }) => (
+                <>
+                  <FieldLabel>Mobile OTP</FieldLabel>
+                  <OtpInput
+                    value={value}
+                    onChange={onChange}
+                    length={OTP_LENGTH}
+                    invalid={invalid}
+                    autoFocus
+                  />
+                </>
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
+
+        <form.AppField
+          name="emailOtp"
+          validators={{
+            onChange: ({ value }) =>
+              value.length > 0 && value.length !== OTP_LENGTH
+                ? "Enter the complete OTP"
+                : undefined,
+          }}
+        >
+          {(field) => (
+            <field.CustomField<string>>
+              {({ value, invalid, onChange }) => (
+                <>
+                  <FieldLabel>Email OTP</FieldLabel>
+                  <OtpInput
+                    value={value}
+                    onChange={onChange}
+                    length={OTP_LENGTH}
+                    invalid={invalid}
+                  />
+                </>
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
+
+        {isLocked ? (
+          <p className="text-sm text-destructive">
+            Your account has been locked. Please try again later or contact support.
+          </p>
+        ) : (
+          <ResendOtpMessage
+            startTime={otpTs}
+            message="Didn't receive it?"
+            onResend={() => void handleResend()}
+          />
         )}
-      </form.Field>
-
-      <form.Field
-        name="emailOtp"
-        validators={{
-          onChange: ({ value }) =>
-            value.length > 0 && value.length !== OTP_LENGTH ? "Enter the complete OTP" : undefined,
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel>Email OTP</FieldLabel>
-            <OtpInput
-              value={field.state.value}
-              onChange={field.handleChange}
-              length={OTP_LENGTH}
-              invalid={field.state.meta.errors.length > 0}
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
-
-      {isLocked ? (
-        <p className="text-sm text-destructive">
-          Your account has been locked. Please try again later or contact support.
-        </p>
-      ) : (
-        <ResendOtpMessage
-          startTime={otpTs}
-          message="Didn't receive it?"
-          onResend={() => void handleResend()}
-        />
-      )}
-      <Button type="submit" size="lg" isLoading={isPending} disabled={isLocked} className="w-full">
-        Verify OTP
-      </Button>
-      <Button
-        variant="ghost"
-        type="button"
-        onClick={() => setScreen("identifier")}
-        className="w-full text-xs text-muted-foreground hover:text-foreground"
-      >
-        Use a different account
-      </Button>
-    </form>
+        <Button
+          type="submit"
+          size="lg"
+          isLoading={isPending}
+          disabled={isLocked}
+          className="w-full"
+        >
+          Verify OTP
+        </Button>
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => setScreen("identifier")}
+          className="w-full text-xs text-muted-foreground hover:text-foreground"
+        >
+          Use a different account
+        </Button>
+      </form.Form>
+    </form.AppForm>
   );
 }

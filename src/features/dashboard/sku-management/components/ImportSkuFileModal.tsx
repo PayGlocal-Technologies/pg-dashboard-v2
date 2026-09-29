@@ -13,6 +13,7 @@ import {
   DialogTitle,
   type Column,
 } from "@/components/ui";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatFileSize } from "@/lib/utils/format";
@@ -451,21 +452,25 @@ export function ImportSkuFileModal({ open, onOpenChange, mid }: ImportSkuFileMod
               <Button type="button" variant="ghost" size="sm" onClick={reset}>
                 Choose another file
               </Button>
-              <Button
-                type="button"
-                variant="primary"
-                size="sm"
-                isLoading={isImporting}
-                // A parse that found nothing still lands here (that is the point
-                // — see the hook's rowsReady), but committing it would send a
-                // request that cannot do anything and then report "0 items
-                // imported" as if that were an outcome. The way out of this state
-                // is Choose another file, so that is the only live action.
-                disabled={rows.length === 0}
-                onClick={commit}
+              <DisabledReason
+                reason={rows.length === 0 ? "No rows were read from this file to import" : null}
               >
-                Import {rows.length} {rows.length === 1 ? "item" : "items"}
-              </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="sm"
+                  isLoading={isImporting}
+                  // A parse that found nothing still lands here (that is the point
+                  // — see the hook's rowsReady), but committing it would send a
+                  // request that cannot do anything and then report "0 items
+                  // imported" as if that were an outcome. The way out of this state
+                  // is Choose another file, so that is the only live action.
+                  disabled={rows.length === 0}
+                  onClick={commit}
+                >
+                  Import {rows.length} {rows.length === 1 ? "item" : "items"}
+                </Button>
+              </DisabledReason>
             </div>
           </div>
         ) : null}

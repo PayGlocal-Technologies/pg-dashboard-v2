@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Button, IconButton, Textarea } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import { cn } from "@/lib/utils";
 import {
   ATTACHMENT_ACCEPT,
@@ -25,6 +26,14 @@ export function QueryComposer({ thread }: { thread: UseQueryThreadResult }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const atLimit = thread.attachments.length >= MAX_ATTACHMENTS;
+
+  // Chat-style, so Send stays disabled rather than erroring on click, but the
+  // tooltip says why. Mirrors the checks behind thread.canSend.
+  const sendBlockedReason = !thread.comment.trim()
+    ? "Type your query to send"
+    : thread.attachments.some((a) => a.uploading)
+      ? "Wait for files to finish uploading"
+      : null;
 
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList?.length) return;
@@ -144,17 +153,19 @@ export function QueryComposer({ thread }: { thread: UseQueryThreadResult }) {
           <span className="text-[11px] text-muted-foreground">
             {thread.comment.length}/{MAX_COMMENT_LENGTH}
           </span>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            disabled={!thread.canSend}
-            isLoading={thread.isSending}
-            rightIcon={<Icon name="send" className="h-3.5 w-3.5" />}
-            onClick={() => void thread.send()}
-          >
-            Send
-          </Button>
+          <DisabledReason reason={sendBlockedReason}>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              disabled={!!sendBlockedReason || !thread.canSend}
+              isLoading={thread.isSending}
+              rightIcon={<Icon name="send" className="h-3.5 w-3.5" />}
+              onClick={() => void thread.send()}
+            >
+              Send
+            </Button>
+          </DisabledReason>
         </div>
       </div>
     </div>

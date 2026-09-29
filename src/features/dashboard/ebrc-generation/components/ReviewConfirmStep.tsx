@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, CardContent, Checkbox } from "@/components/ui";
+import type { ReactNode } from "react";
+import { Card, CardContent } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils/format";
 import {
@@ -21,8 +22,8 @@ interface ReviewConfirmStepProps {
    *  form state, so the figures on this screen are the ones actually saved —
    *  and therefore the ones `push_irm` will submit. */
   records: Map<string, IrmDetails>;
-  agreed: boolean;
-  onAgreedChange: (agreed: boolean) => void;
+  /** The Terms & Conditions tick, rendered by the wizard, whose form owns it. */
+  termsField: ReactNode;
 }
 
 /** Step 3 — "Review eBRC Configuration" (Desktop/eBRC.pdf).
@@ -33,8 +34,7 @@ export function ReviewConfirmStep({
   selectedIds,
   mappings,
   records,
-  agreed,
-  onAgreedChange,
+  termsField,
 }: ReviewConfirmStepProps) {
   const selectedRecords = selectedIds
     .map((id) => records.get(id))
@@ -219,17 +219,7 @@ export function ReviewConfirmStep({
         </p>
       </div>
 
-      <label className="flex cursor-pointer items-start gap-2.5">
-        <Checkbox
-          checked={agreed}
-          onCheckedChange={(next) => onAgreedChange(next === true)}
-          className="mt-0.5"
-        />
-        <span className="text-[12.5px] text-muted-foreground">
-          I have read and agree to the Terms &amp; Conditions and understand the steps required to
-          complete this eBRC request.
-        </span>
-      </label>
+      {termsField}
     </div>
   );
 }

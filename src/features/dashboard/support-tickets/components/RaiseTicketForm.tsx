@@ -1,19 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Button,
-  Field,
-  FieldDescription,
-  FieldLabel,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Textarea,
-} from "@/components/ui";
+import { useStore } from "@tanstack/react-form";
+import { Field, FieldDescription, FieldLabel, Textarea } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import {
   TICKET_ISSUES,
   categoriesForIssue,
@@ -45,145 +35,141 @@ export function RaiseTicketForm({ onRaised }: { onRaised?: (ticket: SupportTicke
   const { createTicket, isCreating, canCreate } = useCreateTicket();
   const attachments = useTicketAttachments();
 
-  const [subject, setSubject] = useState("");
-  const [issue, setIssue] = useState("");
-  const [category, setCategory] = useState("");
-  const [description, setDescription] = useState("");
-
-  const categories = categoriesForIssue(issue);
-
   // Subject and description are the API's only required fields; the issue and
   // category are required here anyway, since letting them default routes the
   // ticket to "Merchant Request / Escalation Matrix" regardless of what it is
-  // actually about.
-  const canSubmit =
-    canCreate &&
-    !isCreating &&
-    subject.trim().length > 0 &&
-    description.trim().length > 0 &&
-    !!issue &&
-    !!category;
+  // actually about. Raise stays enabled; errors follow the app-wide rule
+  // (components/form). The two pickers are labelled as questions, so their
+  // messages name the thing ("Issue type is required").
+  const form = useAppForm({
+    defaultValues: { subject: "", issue: "", category: "", description: "" },
+    onSubmit: ({ value, formApi }) => {
+      if (blockedReason || isCreating) return;
+      createTicket(
+        {
+          subject: value.subject,
+          description: value.description,
+          cfIssue: value.issue,
+          cfCategory: value.category,
+          attachments: attachments.files,
+        },
+        (ticket) => {
+          formApi.reset();
+          attachments.clear();
+          onRaised?.(ticket);
+        }
+      );
+    },
+  });
+  const issue = useStore(form.store, (state) => state.values.issue);
+  const categories = categoriesForIssue(issue);
 
-  const handleSubmit = () => {
-    if (!canSubmit) return;
-
-    createTicket(
-      {
-        subject,
-        description,
-        cfIssue: issue,
-        cfCategory: category,
-        attachments: attachments.files,
-      },
-      (ticket) => {
-        setSubject("");
-        setIssue("");
-        setCategory("");
-        setDescription("");
-        attachments.clear();
-        onRaised?.(ticket);
-      }
-    );
-  };
+  // Not being able to raise tickets at all is the one case the button stays
+  // disabled for, and it says why.
+  const blockedReason = canCreate ? null : "You don't have permission to raise tickets";
 
   return (
-    <div className="space-y-4">
-      <Field>
-        <FieldLabel htmlFor="ticket-subject" className="text-[12.5px]">
-          Subject
-        </FieldLabel>
-        <Input
-          id="ticket-subject"
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-          maxLength={SUBJECT_MAX_LENGTH}
-          placeholder="e.g. June settlement not credited"
-          className="text-[13px]"
-        />
-      </Field>
+    <form.AppForm>
+      <form.Form className="space-y-4">
+        <form.AppField name="subject" validators={{ onChange: rules(required("Subject")) }}>
+          {(field) => (
+            <field.TextField
+              id="ticket-subject"
+              label="Subject"
+              labelClassName="text-[12.5px]"
+              maxLength={SUBJECT_MAX_LENGTH}
+              placeholder="e.g. June settlement not credited"
+              inputClassName="text-[13px]"
+            />
+          )}
+        </form.AppField>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel htmlFor="ticket-issue" className="text-[12.5px]">
-            What is this about?
-          </FieldLabel>
-          <Select
-            value={issue}
-            onValueChange={(value) => {
-              setIssue(value);
-              // The old category cannot be valid under a new issue.
-              setCategory("");
-            }}
-          >
-            <SelectTrigger id="ticket-issue" aria-label="Issue">
-              <SelectValue placeholder="Choose a topic" />
-            </SelectTrigger>
-            <SelectContent>
-              {TICKET_ISSUES.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <form.AppField name="issue" validators={{ onChange: rules(required("Issue type")) }}>
+            {(field) => (
+              <field.SelectField
+                id="ticket-issue"
+                label="What is this about?"
+                labelClassName="text-[12.5px]"
+                placeholder="Choose a topic"
+                options={TICKET_ISSUES}
+                triggerClassName=""
+                onValueChange={() => {
+                  // The old category cannot be valid under a new issue. A
+                  // programmatic clear, so it only re-checks one in play.
+                  form.setFieldValue("category", "", { dontValidate: true });
+                  const meta = form.getFieldMeta("category");
+                  if (meta?.isTouched || meta?.errors.length) {
+                    void form.validateField("category", "change");
+                  }
+                }}
+              />
+            )}
+          </form.AppField>
 
-        <Field>
-          <FieldLabel htmlFor="ticket-category" className="text-[12.5px]">
-            More specifically
-          </FieldLabel>
-          <Select value={category} onValueChange={setCategory} disabled={!issue}>
-            <SelectTrigger id="ticket-category" aria-label="Category">
-              <SelectValue placeholder={issue ? "Choose a category" : "Choose a topic first"} />
-            </SelectTrigger>
-            <SelectContent>
-              {categories.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label ?? option.value}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      </div>
+          <form.AppField name="category" validators={{ onChange: rules(required("Category")) }}>
+            {(field) => (
+              <field.SelectField
+                id="ticket-category"
+                label="More specifically"
+                labelClassName="text-[12.5px]"
+                placeholder={issue ? "Choose a category" : "Choose a topic first"}
+                options={categories.map((option) => ({
+                  value: option.value,
+                  label: option.label ?? option.value,
+                }))}
+                disabled={!issue}
+                triggerClassName=""
+              />
+            )}
+          </form.AppField>
+        </div>
 
-      <Field>
-        <FieldLabel htmlFor="ticket-details" className="text-[12.5px]">
-          Details
-        </FieldLabel>
-        <Textarea
-          id="ticket-details"
-          rows={4}
-          value={description}
-          maxLength={DESCRIPTION_MAX_LENGTH}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Describe what's happening. Include any transaction, settlement or account IDs that would help us look into it."
-          className="min-h-28 px-3 py-2 text-[13px] leading-normal"
-        />
-        <FieldDescription className="text-[11px]">
-          Please don&apos;t include card numbers, CVV or full bank account numbers.
-        </FieldDescription>
-      </Field>
-
-      <Field>
-        <FieldLabel className="text-[12.5px]">
-          Attachments <span className="font-normal text-muted-foreground">(optional)</span>
-        </FieldLabel>
-        <TicketAttachmentField attachments={attachments} disabled={isCreating} />
-      </Field>
-
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={!canSubmit}
-          isLoading={isCreating}
-          onClick={handleSubmit}
+        <form.AppField
+          name="description"
+          validators={{ onChange: rules(required("Details", "Details are required")) }}
         >
-          Raise ticket
-        </Button>
-      </div>
-    </div>
+          {(field) => (
+            <field.CustomField<string>
+              id="ticket-details"
+              label="Details"
+              labelClassName="text-[12.5px]"
+            >
+              {({ id, value, invalid, onChange, onBlur }) => (
+                <>
+                  <Textarea
+                    id={id}
+                    aria-invalid={invalid || undefined}
+                    rows={4}
+                    value={value}
+                    maxLength={DESCRIPTION_MAX_LENGTH}
+                    onChange={(e) => onChange(e.target.value)}
+                    onBlur={onBlur}
+                    placeholder="Describe what's happening. Include any transaction, settlement or account IDs that would help us look into it."
+                    className="min-h-28 px-3 py-2 text-[13px] leading-normal"
+                  />
+                  {/* Always shown, error or not: it's the one line that keeps
+                      card and bank numbers out of the ticket. */}
+                  <FieldDescription className="text-[11px]">
+                    Please don&apos;t include card numbers, CVV or full bank account numbers.
+                  </FieldDescription>
+                </>
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
+
+        <Field>
+          <FieldLabel className="text-[12.5px]">Attachments</FieldLabel>
+          <TicketAttachmentField attachments={attachments} disabled={isCreating} />
+        </Field>
+
+        <div className="flex justify-end">
+          <form.SubmitButton disabledReason={blockedReason} isLoading={isCreating}>
+            Raise ticket
+          </form.SubmitButton>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { EbrcRequestReceivedOverlay } from "@/features/dashboard/ebrc-generation/components/EbrcRequestReceivedOverlay";
@@ -209,15 +210,17 @@ export function BulkUploadDialog({
               {result ? "Close" : "Cancel"}
             </Button>
             {!result && (
-              <Button
-                type="button"
-                variant="primary"
-                disabled={!fileName || isUploading}
-                isLoading={isUploading}
-                onClick={handleUpload}
-              >
-                Upload
-              </Button>
+              <DisabledReason reason={fileName ? null : "Choose a file to upload"}>
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={!fileName || isUploading}
+                  isLoading={isUploading}
+                  onClick={handleUpload}
+                >
+                  Upload
+                </Button>
+              </DisabledReason>
             )}
           </div>
         </DialogContent>

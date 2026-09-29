@@ -1,17 +1,9 @@
 "use client";
 
-import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Field,
-  FieldError,
-  FieldLabel,
-  Input,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogTitle } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { usePost } from "@/lib/api/hooks";
 import { addBankAccountApi } from "@/features/dashboard/create-invoice/services";
 import { useInvoiceMerchantId } from "@/features/dashboard/create-invoice/hooks";
@@ -22,11 +14,6 @@ interface AddBankRequest {
   accountHolderName: string;
   accountNumber: string;
   ifscCode: string;
-}
-
-/** All four fields are required, matching pg-dashboard's AddBankAccount drawer. */
-function required(label: string) {
-  return (value: string) => (value.trim() ? undefined : `${label} is required`);
 }
 
 export function AddBankAccountDialog({
@@ -65,7 +52,8 @@ function AddBankBody({ onCancel, onAdded }: { onCancel: () => void; onAdded: () 
     { invalidateQueries: false }
   );
 
-  const form = useForm({
+  // All four fields are required, matching pg-dashboard's AddBankAccount drawer.
+  const form = useAppForm({
     defaultValues: { bankName: "", accountHolderName: "", accountNumber: "", ifscCode: "" },
     onSubmit: ({ value }) => {
       addAccount(
@@ -88,106 +76,60 @@ function AddBankBody({ onCancel, onAdded }: { onCancel: () => void; onAdded: () 
   });
 
   return (
-    <form
-      noValidate
-      className="flex min-h-0 flex-1 flex-col"
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-    >
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
-        <form.Field
-          name="bankName"
-          validators={{ onSubmit: ({ value }) => required("Bank name")(value) }}
-        >
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor="bank-name">Bank name</FieldLabel>
-              <Input
-                id="bank-name"
-                placeholder="Enter bank name"
-                value={field.state.value}
-                aria-invalid={field.state.meta.errors.length > 0}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-              />
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            </Field>
-          )}
-        </form.Field>
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
+          <form.AppField name="bankName" validators={{ onChange: rules(required("Bank name")) }}>
+            {(field) => (
+              <field.TextField id="bank-name" label="Bank name" placeholder="Enter bank name" />
+            )}
+          </form.AppField>
 
-        <form.Field
-          name="accountHolderName"
-          validators={{ onSubmit: ({ value }) => required("Account holder name")(value) }}
-        >
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor="bank-holder">Account holder name</FieldLabel>
-              <Input
+          <form.AppField
+            name="accountHolderName"
+            validators={{ onChange: rules(required("Account holder name")) }}
+          >
+            {(field) => (
+              <field.TextField
                 id="bank-holder"
+                label="Account holder name"
                 placeholder="Enter account holder name"
-                value={field.state.value}
-                aria-invalid={field.state.meta.errors.length > 0}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
               />
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            </Field>
-          )}
-        </form.Field>
+            )}
+          </form.AppField>
 
-        <form.Field
-          name="accountNumber"
-          validators={{ onSubmit: ({ value }) => required("Account number")(value) }}
-        >
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor="bank-account-number">Account number</FieldLabel>
-              <Input
+          <form.AppField
+            name="accountNumber"
+            validators={{ onChange: rules(required("Account number")) }}
+          >
+            {(field) => (
+              <field.TextField
                 id="bank-account-number"
+                label="Account number"
                 placeholder="Enter account number"
-                value={field.state.value}
-                aria-invalid={field.state.meta.errors.length > 0}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-                className="font-mono"
               />
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            </Field>
-          )}
-        </form.Field>
+            )}
+          </form.AppField>
 
-        <form.Field
-          name="ifscCode"
-          validators={{ onSubmit: ({ value }) => required("IFSC code")(value) }}
-        >
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor="bank-ifsc">IFSC code</FieldLabel>
-              <Input
+          <form.AppField name="ifscCode" validators={{ onChange: rules(required("IFSC code")) }}>
+            {(field) => (
+              <field.TextField
                 id="bank-ifsc"
+                label="IFSC code"
                 placeholder="Enter IFSC code"
-                value={field.state.value}
-                aria-invalid={field.state.meta.errors.length > 0}
-                onChange={(e) => field.handleChange(e.target.value.toUpperCase())}
-                onBlur={field.handleBlur}
-                className="font-mono"
+                parse={(raw) => raw.toUpperCase()}
               />
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            </Field>
-          )}
-        </form.Field>
-      </div>
+            )}
+          </form.AppField>
+        </div>
 
-      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-        <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button type="submit" variant="primary" size="sm" disabled={isPending}>
-          {isPending ? "Adding…" : "Add"}
-        </Button>
-      </div>
-    </form>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+          <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <form.SubmitButton pending={isPending}>{isPending ? "Adding…" : "Add"}</form.SubmitButton>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }

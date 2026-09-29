@@ -9,7 +9,6 @@ import {
   DrawerHeader,
   DrawerTitle,
   Field,
-  FieldError,
   FieldLabel,
   IconButton,
   Input,
@@ -19,8 +18,10 @@ import {
   SelectTrigger,
   SelectValue,
   Shimmer,
-  Textarea,
 } from "@/components/ui";
+import { DisabledReason } from "@/components/common/DisabledReason";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, required, rules } from "@/components/form/rules";
 import { Icon } from "@/components/icon";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
@@ -90,51 +91,22 @@ export function SettlementStatementDrawer({
     onDownloaded: () => onOpenChange(false),
   });
 
-  // Prefilled from the merchant's own record — the same source pg-dashboard
-  // prefills from — and held as *overrides* rather than seeded state, so the
-  // fields follow the profile as it resolves without a setState in an effect
-  // (which CLAUDE.md rules out). Null means "not edited".
-  const [dbaNameOverride, setDbaNameOverride] = useState<string | null>(null);
-  const [addressOverride, setAddressOverride] = useState<string | null>(null);
-  const [email, setEmail] = useState("");
-
-  const registeredName = profile?.merchantRegisteredName ?? "";
-  const dbaName = dbaNameOverride ?? profile?.merchantShortName ?? "";
-  const address = addressOverride ?? merchantRegisteredAddressOf(profile);
-
-  // Errors surface on blur, not on every keystroke, matching pg-dashboard's
-  // validateTrigger="onBlur".
-  const [emailTouched, setEmailTouched] = useState(false);
-  const [addressTouched, setAddressTouched] = useState(false);
-
-  const emailError = email.trim() && !isValidEmail(email) ? "Invalid email address" : "";
-  const addressMessage = addressError(address);
-
   // details[0] is always the primary identifier (Account Number / IBAN / …)
   // and details[1] the routing-style one, the same order the account card and
   // Quick Access read them in.
   const [primaryIdentifier, routingIdentifier] = account?.details ?? [];
 
-  const canSubmit =
-    !!account &&
-    !!dbaName.trim() &&
-    isValidEmail(email) &&
-    !!address.trim() &&
-    !addressMessage &&
-    !isWorking;
-
-  const submit = () => {
-    if (!account || !canSubmit) return;
-
+  const submit = (values: StatementFields) => {
+    if (!account || isWorking) return;
     // Exactly the six fields pg-dashboard's DownloadReport sends — note
     // `merchantName` is the DBA name, not the registered legal name.
     void requestStatement({
       currency: account.currency,
       accountNumber: primaryIdentifier?.value ?? "",
       routingCode: routingIdentifier?.value ?? "",
-      merchantName: dbaName.trim(),
-      merchantRegisteredAddress: address.trim(),
-      contactEmail: email.trim(),
+      merchantName: values.dbaName.trim(),
+      merchantRegisteredAddress: values.address.trim(),
+      contactEmail: values.email.trim(),
     });
   };
 
@@ -164,148 +136,219 @@ export function SettlementStatementDrawer({
           </IconButton>
         </DrawerHeader>
 
+        {isLoadingProfile || !account ? (
+          // Three of these fields are prefilled from the profile, and a
+          // blank editable "DBA name" reads as something to type — so the
+          // form waits for the record rather than rendering half of it.
+          <>
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
+              {isLoadingProfile && (
+                <div className="space-y-5">
+                  <Shimmer className="h-16 w-full" />
+                  <Shimmer className="h-16 w-full" />
+                  <Shimmer className="h-16 w-full" />
+                  <Shimmer className="h-16 w-full" />
+                  <Shimmer className="h-16 w-full" />
+                </div>
+              )}
+            </div>
+            <DrawerFooter>
+              <DisabledReason reason="Loading your details…" className="w-full">
+                <Button variant="primary" className="w-full" disabled>
+                  Download
+                </Button>
+              </DisabledReason>
+            </DrawerFooter>
+          </>
+        ) : (
+          <StatementForm
+            // Mounted once the profile has resolved, so its defaults are the
+            // profile's values (no setState-in-effect to seed them).
+            defaults={{
+              dbaName: profile?.merchantShortName ?? "",
+              email: "",
+              address: merchantRegisteredAddressOf(profile),
+            }}
+            registeredName={profile?.merchantRegisteredName ?? ""}
+            accounts={accounts}
+            account={account}
+            onAccountChange={setAccountId}
+            primaryIdentifier={primaryIdentifier?.value ?? ""}
+            routingIdentifier={routingIdentifier?.value ?? ""}
+            isWorking={isWorking}
+            onSubmit={submit}
+          />
+        )}
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+interface StatementFields {
+  dbaName: string;
+  email: string;
+  address: string;
+}
+
+/** The statement form, mounted once the profile has loaded. Errors follow the
+ *  app-wide rule (components/form): an edited field validates as it changes,
+ *  Download validates the rest. */
+function StatementForm({
+  defaults,
+  registeredName,
+  accounts,
+  account,
+  onAccountChange,
+  primaryIdentifier,
+  routingIdentifier,
+  isWorking,
+  onSubmit,
+}: {
+  defaults: StatementFields;
+  registeredName: string;
+  accounts: VirtualAccount[];
+  account: VirtualAccount;
+  onAccountChange: (id: string) => void;
+  primaryIdentifier: string;
+  routingIdentifier: string;
+  isWorking: boolean;
+  onSubmit: (values: StatementFields) => void;
+}) {
+  const form = useAppForm({
+    defaultValues: defaults,
+    onSubmit: ({ value }) => onSubmit(value),
+  });
+
+  return (
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
         {/* min-h-0 + flex-1 is what makes this the scrolling region rather than
             the drawer itself, so the Download footer stays put at the bottom
             however long the form runs. space-y-5 is the medium step between
             one field and the next. */}
         <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
-          {isLoadingProfile ? (
-            // Three of these fields are prefilled from the profile, and a
-            // blank editable "DBA name" reads as something to type — so the
-            // form waits for the record rather than rendering half of it.
-            <div className="space-y-5">
-              <Shimmer className="h-16 w-full" />
-              <Shimmer className="h-16 w-full" />
-              <Shimmer className="h-16 w-full" />
-              <Shimmer className="h-16 w-full" />
-              <Shimmer className="h-16 w-full" />
-            </div>
-          ) : (
-            account && (
-              <>
-                <Field>
-                  <FieldLabel htmlFor="settlement-currency">Currency</FieldLabel>
-                  <Select value={account.id} onValueChange={setAccountId}>
-                    <SelectTrigger id="settlement-currency" className="w-full">
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((option) => (
-                        <SelectItem key={option.id} value={option.id}>
-                          <span className="flex items-center gap-2">
-                            {/* A SWIFT-rail catch-all account has no single
-                                country behind it, so it shows a globe instead of
-                                a flag — the same fallback the page's own currency
-                                select uses. */}
-                            {option.iso2 === "ROW" ? (
-                              <Icon
-                                name="globe"
-                                className="h-3.5 w-5 shrink-0 text-muted-foreground"
-                              />
-                            ) : (
-                              <CountryFlag iso2={option.iso2} />
-                            )}
-                            {option.currency}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
+          <Field>
+            <FieldLabel htmlFor="settlement-currency">Currency</FieldLabel>
+            <Select value={account.id} onValueChange={onAccountChange}>
+              <SelectTrigger id="settlement-currency" className="w-full">
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {accounts.map((option) => (
+                  <SelectItem key={option.id} value={option.id}>
+                    <span className="flex items-center gap-2">
+                      {/* A SWIFT-rail catch-all account has no single
+                          country behind it, so it shows a globe instead of
+                          a flag — the same fallback the page's own currency
+                          select uses. */}
+                      {option.iso2 === "ROW" ? (
+                        <Icon name="globe" className="h-3.5 w-5 shrink-0 text-muted-foreground" />
+                      ) : (
+                        <CountryFlag iso2={option.iso2} />
+                      )}
+                      {option.currency}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
 
-                {/* The two identifiers of the account named above, side by side
-                    from `sm` up: they are one fact about one account, so they are
-                    grouped closer to each other (16px) than to the fields around
-                    them (20px). Read-only — they are what the selected currency
-                    resolves to, not something to retype, and editing them here
-                    would only produce a statement for an account that isn't
-                    yours. */}
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="settlement-account-number">Account Number</FieldLabel>
-                    <Input
-                      id="settlement-account-number"
-                      value={primaryIdentifier?.value ?? ""}
-                      readOnly
-                    />
-                  </Field>
+          {/* The two identifiers of the account named above, side by side
+              from `sm` up: they are one fact about one account, so they are
+              grouped closer to each other (16px) than to the fields around
+              them (20px). Read-only — they are what the selected currency
+              resolves to, not something to retype, and editing them here
+              would only produce a statement for an account that isn't
+              yours. */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="settlement-account-number">Account Number</FieldLabel>
+              <Input id="settlement-account-number" value={primaryIdentifier} readOnly />
+            </Field>
 
-                  <Field>
-                    <FieldLabel htmlFor="settlement-routing-code">Routing Code</FieldLabel>
-                    <Input
-                      id="settlement-routing-code"
-                      value={routingIdentifier?.value ?? ""}
-                      readOnly
-                    />
-                  </Field>
-                </div>
+            <Field>
+              <FieldLabel htmlFor="settlement-routing-code">Routing Code</FieldLabel>
+              <Input id="settlement-routing-code" value={routingIdentifier} readOnly />
+            </Field>
+          </div>
 
-                <Field>
-                  <FieldLabel htmlFor="settlement-legal-name">Seller legal name</FieldLabel>
-                  {/* The registered name on the merchant's own record, read-only
-                      as pg-dashboard has it: shown so the merchant can see which
-                      entity the request is made under, not sent with it. */}
-                  <Input
-                    id="settlement-legal-name"
-                    value={registeredName}
-                    placeholder="Enter seller legal name"
-                    readOnly
-                    disabled
-                  />
-                </Field>
+          <Field>
+            <FieldLabel htmlFor="settlement-legal-name">Seller legal name</FieldLabel>
+            {/* The registered name on the merchant's own record, read-only
+                as pg-dashboard has it: shown so the merchant can see which
+                entity the request is made under, not sent with it. */}
+            <Input
+              id="settlement-legal-name"
+              value={registeredName}
+              placeholder="Enter seller legal name"
+              readOnly
+              disabled
+            />
+          </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="settlement-dba-name">Seller DBA name</FieldLabel>
-                  {/* The trading name the statement is actually issued to — this
-                      is the `merchantName` the endpoint receives. Prefilled from
-                      the profile's short name and editable, since a seller's
-                      Amazon storefront name often isn't the registered one. */}
-                  <Input
-                    id="settlement-dba-name"
-                    value={dbaName}
-                    placeholder="Enter seller name"
-                    onChange={(e) => setDbaNameOverride(e.target.value)}
-                  />
-                </Field>
+          {/* The trading name the statement is actually issued to — this
+              is the `merchantName` the endpoint receives. Prefilled from
+              the profile's short name and editable, since a seller's
+              Amazon storefront name often isn't the registered one. */}
+          <form.AppField
+            name="dbaName"
+            validators={{ onChange: rules(required("Seller DBA name")) }}
+          >
+            {(field) => (
+              <field.TextField
+                id="settlement-dba-name"
+                label="Seller DBA name"
+                placeholder="Enter seller name"
+              />
+            )}
+          </form.AppField>
 
-                <Field>
-                  <FieldLabel htmlFor="settlement-email">Seller account contact email</FieldLabel>
-                  {/* Part of the request, not a convenience: the statement is
-                      issued against this address. No default — the login email
-                      isn't necessarily the inbox that should receive it. */}
-                  <Input
-                    id="settlement-email"
-                    type="email"
-                    autoComplete="off"
-                    value={email}
-                    placeholder="Enter contact email"
-                    aria-invalid={emailTouched && !!emailError}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onBlur={() => setEmailTouched(true)}
-                  />
-                  {emailTouched && emailError && <FieldError>{emailError}</FieldError>}
-                </Field>
+          {/* Part of the request, not a convenience: the statement is
+              issued against this address. No default — the login email
+              isn't necessarily the inbox that should receive it. */}
+          <form.AppField
+            name="email"
+            validators={{
+              onChange: rules(
+                required("Seller account contact email"),
+                check((value: string) => !isValidEmail(value) && "Invalid email address")
+              ),
+            }}
+          >
+            {(field) => (
+              <field.TextField
+                id="settlement-email"
+                label="Seller account contact email"
+                type="email"
+                autoComplete="off"
+                placeholder="Enter contact email"
+              />
+            )}
+          </form.AppField>
 
-                <Field>
-                  <FieldLabel htmlFor="settlement-country">Country</FieldLabel>
-                  <Input id="settlement-country" value={REGISTERED_COUNTRY} readOnly disabled />
-                </Field>
+          <Field>
+            <FieldLabel htmlFor="settlement-country">Country</FieldLabel>
+            <Input id="settlement-country" value={REGISTERED_COUNTRY} readOnly disabled />
+          </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="settlement-address">Seller Address</FieldLabel>
-                  <Textarea
-                    id="settlement-address"
-                    value={address}
-                    placeholder="Enter seller address"
-                    aria-invalid={addressTouched && !!addressMessage}
-                    onChange={(e) => setAddressOverride(e.target.value)}
-                    onBlur={() => setAddressTouched(true)}
-                  />
-                  {addressTouched && addressMessage && <FieldError>{addressMessage}</FieldError>}
-                </Field>
-              </>
-            )
-          )}
+          <form.AppField
+            name="address"
+            validators={{
+              onChange: rules(
+                required("Seller address"),
+                check((value: string) => addressError(value))
+              ),
+            }}
+          >
+            {(field) => (
+              <field.TextareaField
+                id="settlement-address"
+                label="Seller Address"
+                placeholder="Enter seller address"
+              />
+            )}
+          </form.AppField>
         </div>
 
         {/* DrawerFooter's own border-t and mt-auto make the section break
@@ -316,13 +359,12 @@ export function SettlementStatementDrawer({
           {/* Generation is asynchronous — the request returns a timestamp and the
               PDF arrives seconds later — so the button stays disabled for the
               whole round trip rather than only the POST, and says which stage
-              it is at. Every field the endpoint needs and cannot derive has to
-              be filled before it enables. */}
-          <Button variant="primary" className="w-full" disabled={!canSubmit} onClick={submit}>
+              it is at. Missing fields never disable it: a press names them. */}
+          <form.SubmitButton size="md" className="w-full" pending={isWorking}>
             {isWorking ? "Preparing statement…" : "Download"}
-          </Button>
+          </form.SubmitButton>
         </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+      </form.Form>
+    </form.AppForm>
   );
 }

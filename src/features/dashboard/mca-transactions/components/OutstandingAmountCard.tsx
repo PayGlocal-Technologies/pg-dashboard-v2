@@ -15,10 +15,7 @@ import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
-import {
-  useDocumentPending,
-  useDocumentPendingByCurrency,
-} from "@/features/dashboard/mca-transactions/hooks";
+import { useDocumentPendingByCurrency } from "@/features/dashboard/mca-transactions/hooks";
 
 /** Human label for a currency bucket. Only REST_OF_WORLD needs remapping; every
  *  real code reads as itself. */
@@ -32,17 +29,17 @@ function currencyLabel(currency: string): string {
  * tight title/KPI stack with the pending-count chip beside the title, and an
  * expandable per-currency breakdown.
  *
- * The headline amount + count come from the document-pending endpoint for the
- * given `timeframe`. The "By currency" breakdown is a separate live snapshot of
- * everything currently DOCUMENT_PENDING (no timeframe), so it's labelled as such
- * to keep the two figures from being read as the same window.
+ * Headline, count and "By currency" breakdown all come from ONE response: the
+ * by-currency snapshot of everything currently DOCUMENT_PENDING. The headline
+ * used to read the timeframe-scoped document-pending endpoint instead, so the
+ * card could say "195 pending" above a breakdown summing to 238 (the snapshot
+ * counts pending transactions of any age, the timeframe total only those
+ * created in the window). Pending is a current state, not a period metric, so
+ * the snapshot is the right source for all of it and the card no longer takes
+ * a timeframe.
  */
 export function OutstandingAmountCard({
   className,
-  /** today | week | month | ytd. Defaults to ytd for the aggregate placements
-   *  (e.g. International Accounts) that have no time-range control of their own;
-   *  the Transactions analytics section passes its selected range through. */
-  timeframe = "ytd",
   /** When set (e.g. the International Accounts page, keyed to the selected
    *  region), the headline shows that one currency's pending slice from the
    *  by-currency snapshot instead of the timeframe total, and the per-currency
@@ -65,25 +62,22 @@ export function OutstandingAmountCard({
   dangerTint = false,
 }: {
   className?: string;
-  timeframe?: string;
   currency?: string;
   hideIcon?: boolean;
   badgePlacement?: "title" | "below-amount";
   dangerTint?: boolean;
 }) {
-  const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe);
-  const { breakdown, isLoading: isBreakdownLoading } = useDocumentPendingByCurrency();
+  const { breakdown, isLoading } = useDocumentPendingByCurrency();
 
   const isCurrencyScoped = !!scopedCurrency;
   const scopedRow = isCurrencyScoped
     ? breakdown?.currencies.find((row) => row.currency === scopedCurrency)
     : undefined;
 
-  // Amounts are reported in INR on both endpoints.
-  const displayCurrency = documentPending?.reportingCurrency ?? "INR";
-  const amount = isCurrencyScoped ? (scopedRow?.amount ?? 0) : (documentPending?.amount ?? 0);
-  const pendingCount = isCurrencyScoped ? (scopedRow?.count ?? 0) : (documentPending?.count ?? 0);
-  const isLoading = isCurrencyScoped ? isBreakdownLoading : isTimeframeLoading;
+  // The snapshot reports every amount in INR.
+  const displayCurrency = "INR";
+  const amount = isCurrencyScoped ? (scopedRow?.amount ?? 0) : (breakdown?.totalAmount ?? 0);
+  const pendingCount = isCurrencyScoped ? (scopedRow?.count ?? 0) : (breakdown?.totalCount ?? 0);
 
   const currencyRows = [...(breakdown?.currencies ?? [])]
     .filter((row) => row.amount > 0 || row.count > 0)
@@ -178,11 +172,8 @@ export function OutstandingAmountCard({
           </>
         )}
 
-        {/* Per-currency breakdown of what's currently pending — a snapshot, not
-            scoped to the timeframe above, so it's named that way (and, unlike
-            the headline KPI, it does not change when the section's time-range
-            control changes — useDocumentPendingByCurrency takes no timeframe
-            argument at all).
+        {/* Per-currency breakdown of the same snapshot the headline reads, so
+            its rows always add up to the count and amount above.
 
             A hover tooltip now, not an always-visible list and not a
             click-to-expand one either: both of those put the row list in

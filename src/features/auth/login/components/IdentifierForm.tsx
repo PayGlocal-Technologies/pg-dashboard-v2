@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useForm } from "@tanstack/react-form";
 import { useSearchParams } from "next/navigation";
 import { getRedirectResult, type UserCredential } from "firebase/auth";
-import { Button, Field, FieldError, FieldLabel, Input, Separator } from "@/components/ui";
+import { Button, Separator } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { useEncryptPayload } from "@/features/auth/hooks";
@@ -180,7 +180,7 @@ export function IdentifierForm({ setScreen }: LoginScreenProps) {
       });
   }, []);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { identifier: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -243,45 +243,33 @@ export function IdentifierForm({ setScreen }: LoginScreenProps) {
       )}
       <AuthError message={apiError} />
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void form.handleSubmit();
-        }}
-        className="space-y-5"
-        noValidate
-      >
-        <form.Field
-          name="identifier"
-          validators={{
-            onBlur: ({ value }) => {
-              const r = identifierSchema.shape.identifier.safeParse(value);
-              return r.success ? undefined : r.error.issues[0]?.message;
-            },
-          }}
-        >
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor="identifier">Email, phone, or username</FieldLabel>
-              <Input
+      <form.AppForm>
+        <form.Form className="space-y-5">
+          <form.AppField
+            name="identifier"
+            validators={{
+              onBlur: ({ value }) => {
+                const r = identifierSchema.shape.identifier.safeParse(value);
+                return r.success ? undefined : r.error.issues[0]?.message;
+              },
+            }}
+          >
+            {(field) => (
+              <field.TextField
                 id="identifier"
+                label="Email, phone, or username"
                 autoComplete="username"
                 autoFocus
-                aria-invalid={field.state.meta.errors.length > 0}
                 placeholder="you@company.com"
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
               />
-              <FieldError>{field.state.meta.errors[0]}</FieldError>
-            </Field>
-          )}
-        </form.Field>
+            )}
+          </form.AppField>
 
-        <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-          Continue
-        </Button>
-      </form>
+          <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+            Continue
+          </form.SubmitButton>
+        </form.Form>
+      </form.AppForm>
 
       {FIREBASE_ENABLED && (
         <>

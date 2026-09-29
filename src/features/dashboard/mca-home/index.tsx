@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Icon } from "@/components/icon";
@@ -9,6 +9,7 @@ import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { GuideTour } from "@/components/common/guide/GuideTour";
+import { markGuideCompleted } from "@/components/common/guide/storage";
 import { useHasEcho } from "@/features/dashboard/echo/hooks";
 import { WelcomeExperienceModal } from "@/features/dashboard/mca-home/components/WelcomeExperienceModal";
 import { McaDashboardAurora } from "@/features/dashboard/mca-home/components/McaDashboardAurora";
@@ -81,6 +82,17 @@ export function McaDashboardFeature() {
   const [editMode, setEditMode] = useState(false);
   const [needsAttentionOpen, setNeedsAttentionOpen] = useState(false);
   const [welcomeTourOpen, setWelcomeTourOpen] = useState(false);
+  // The Guide button's first-visit highlight waits for the welcome modal to
+  // decide. Both used to open on a first login, stacked on top of each other.
+  // When the welcome shows, it IS the first-visit intro (it ends in "Start
+  // tour"), so the highlight is marked seen and never follows it; the Guide
+  // button itself stays. When the welcome was seen before, the highlight runs
+  // as it always did.
+  const [welcomeSettled, setWelcomeSettled] = useState(false);
+  const handleWelcomeSettled = useCallback((shown: boolean) => {
+    if (shown) markGuideCompleted(MCA_DASHBOARD_GUIDE_KEY);
+    setWelcomeSettled(true);
+  }, []);
   const [layout, setLayout] = useState<McaWidgetId[]>(() => readMcaDashboardLayout());
   const layoutSnapshot = useRef<McaWidgetId[]>(layout);
 
@@ -232,7 +244,7 @@ export function McaDashboardFeature() {
       <GuideLauncher
         steps={guideSteps}
         storageKey={MCA_DASHBOARD_GUIDE_KEY}
-        highlightOnFirstVisit
+        highlightOnFirstVisit={welcomeSettled}
       />
 
       {/* Post-login welcome — a separate GuideTour instance from
@@ -242,7 +254,10 @@ export function McaDashboardFeature() {
           tour" here and the floating Guide button run the identical
           walkthrough — this is just a second, session-gated entry point
           into it, not a second tour. */}
-      <WelcomeExperienceModal onStartTour={() => setWelcomeTourOpen(true)} />
+      <WelcomeExperienceModal
+        onStartTour={() => setWelcomeTourOpen(true)}
+        onSettled={handleWelcomeSettled}
+      />
       <GuideTour
         steps={guideSteps}
         open={welcomeTourOpen}

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
-import { Button, Field, FieldError, FieldLabel, Input } from "@/components/ui";
+import { Button } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { useEncryptPayload } from "@/features/auth/hooks";
@@ -41,7 +41,7 @@ export function UsernameForm({ setScreen }: LoginScreenProps) {
   const setSmsOtpInitiateTimestamp = useLogin((s) => s.setSmsOtpInitiateTimestamp);
   const setMaskedPhoneNumber = useLogin((s) => s.setMaskedPhoneNumber);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { username: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -76,57 +76,45 @@ export function UsernameForm({ setScreen }: LoginScreenProps) {
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Enter your username">
-        Your account requires a username to continue.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Enter your username">
+          Your account requires a username to continue.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="username"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = usernameSchema.shape.username.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="username">Username</FieldLabel>
-            <Input
+        <form.AppField
+          name="username"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = usernameSchema.shape.username.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.TextField
               id="username"
+              label="Username"
               autoComplete="username"
               autoFocus
-              aria-invalid={field.state.meta.errors.length > 0}
               placeholder="your_username"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
             />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+          )}
+        </form.AppField>
 
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Continue
-      </Button>
-      <Button
-        variant="ghost"
-        type="button"
-        onClick={() => setScreen("identifier")}
-        className="w-full text-xs text-muted-foreground hover:text-foreground"
-      >
-        Use a different account
-      </Button>
-    </form>
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Continue
+        </form.SubmitButton>
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => setScreen("identifier")}
+          className="w-full text-xs text-muted-foreground hover:text-foreground"
+        >
+          Use a different account
+        </Button>
+      </form.Form>
+    </form.AppForm>
   );
 }

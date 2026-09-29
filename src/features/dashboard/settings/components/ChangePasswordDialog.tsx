@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import {
   Button,
@@ -10,11 +9,9 @@ import {
   DialogContent,
   DialogDescription,
   DialogTitle,
-  Field,
-  FieldError,
-  FieldLabel,
-  PasswordInput,
 } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, required, rules } from "@/components/form/rules";
 import { PasswordRules } from "@/features/auth/components/PasswordRules";
 import { useEncryptPayload } from "@/features/auth/hooks";
 import { changePasswordSchema } from "@/features/auth/login/schemas";
@@ -41,7 +38,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
   const { mutate, isPending } = usePost<AuthEnvelope, EncryptedPayload>(changePasswordApi);
   const [apiError, setApiError] = useState<string | null>(null);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -81,114 +78,106 @@ export function ChangePasswordDialog({ open, onOpenChange }: ChangePasswordDialo
           <DialogDescription>Enter your current password, then choose a new one.</DialogDescription>
         </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void form.handleSubmit();
-          }}
-          className="flex min-h-0 flex-1 flex-col"
-          noValidate
-        >
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-            {apiError && <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>}
+        <form.AppForm>
+          <form.Form className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              {apiError && <p className="text-sm text-red-600 dark:text-red-400">{apiError}</p>}
 
-            <form.Field
-              name="currentPassword"
-              validators={{
-                onBlur: ({ value }) => {
-                  const r = changePasswordSchema.shape.currentPassword.safeParse(value);
-                  return r.success ? undefined : r.error.issues[0]?.message;
-                },
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="settings-current-password">Current password</FieldLabel>
-                  <PasswordInput
+              {/* "… is required" is named here, not in the shared login schema
+                  (auth forms keep theirs); the schema then checks the rest. */}
+              <form.AppField
+                name="currentPassword"
+                validators={{
+                  onChange: rules(
+                    required("Current password"),
+                    check(
+                      (value: string) =>
+                        changePasswordSchema.shape.currentPassword.safeParse(value).error?.issues[0]
+                          ?.message
+                    )
+                  ),
+                }}
+              >
+                {(field) => (
+                  <field.PasswordField
                     id="settings-current-password"
+                    label="Current password"
                     autoComplete="current-password"
-                    aria-invalid={field.state.meta.errors.length > 0}
                     placeholder="Enter your current password"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
+                )}
+              </form.AppField>
 
-            <form.Field
-              name="newPassword"
-              validators={{
-                onBlur: ({ value }) => {
-                  const r = changePasswordSchema.shape.newPassword.safeParse(value);
-                  return r.success ? undefined : r.error.issues[0]?.message;
-                },
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="settings-new-password">New password</FieldLabel>
-                  <PasswordInput
+              <form.AppField
+                name="newPassword"
+                validators={{
+                  onChange: rules(
+                    required("New password"),
+                    check(
+                      (value: string) =>
+                        changePasswordSchema.shape.newPassword.safeParse(value).error?.issues[0]
+                          ?.message
+                    )
+                  ),
+                }}
+              >
+                {(field) => (
+                  <field.PasswordField
                     id="settings-new-password"
+                    label="New password"
                     autoComplete="new-password"
-                    aria-invalid={field.state.meta.errors.length > 0}
                     placeholder="Create a strong password"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
+                )}
+              </form.AppField>
 
-            <form.Subscribe selector={(s) => s.values.newPassword}>
-              {(newPassword) => <PasswordRules value={newPassword} />}
-            </form.Subscribe>
+              <form.Subscribe selector={(s) => s.values.newPassword}>
+                {(newPassword) => <PasswordRules value={newPassword} />}
+              </form.Subscribe>
 
-            <form.Field
-              name="confirmPassword"
-              validators={{
-                onBlur: ({ value, fieldApi }) => {
-                  if (value !== fieldApi.form.getFieldValue("newPassword")) {
-                    return "The passwords do not match";
-                  }
-                  const r = changePasswordSchema.shape.confirmPassword.safeParse(value);
-                  return r.success ? undefined : r.error.issues[0]?.message;
-                },
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="settings-confirm-password">Confirm new password</FieldLabel>
-                  <PasswordInput
+              <form.AppField
+                name="confirmPassword"
+                validators={{
+                  onChange: ({ value, fieldApi }) =>
+                    rules(
+                      required("Confirm new password"),
+                      check(
+                        (confirm: string) =>
+                          confirm !== fieldApi.form.getFieldValue("newPassword") &&
+                          "The passwords do not match"
+                      ),
+                      check(
+                        (confirm: string) =>
+                          changePasswordSchema.shape.confirmPassword.safeParse(confirm).error
+                            ?.issues[0]?.message
+                      )
+                    )({ value }),
+                }}
+              >
+                {(field) => (
+                  <field.PasswordField
                     id="settings-confirm-password"
+                    label="Confirm new password"
+                    required
                     autoComplete="new-password"
-                    aria-invalid={field.state.meta.errors.length > 0}
                     placeholder="Re-enter the new password"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-          </div>
+                )}
+              </form.AppField>
+            </div>
 
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </DialogClose>
-            <Button type="submit" isLoading={isPending}>
-              Update password
-            </Button>
-          </div>
-        </form>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </DialogClose>
+              <form.SubmitButton size="md" isLoading={isPending}>
+                Update password
+              </form.SubmitButton>
+            </div>
+          </form.Form>
+        </form.AppForm>
       </DialogContent>
     </Dialog>
   );

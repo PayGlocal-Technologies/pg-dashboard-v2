@@ -155,14 +155,6 @@ export const mcaSavedAmountApi = (merchantId: string) =>
     ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/saved-amount`
     : "";
 
-/** Documents pending amount + count for a timeframe (today | week | month |
- *  ytd; backend defaults to today). Backs OutstandingAmountCard's headline. */
-export const mcaDocumentPendingApi = (merchantId: string, timeframe: string) =>
-  merchantId
-    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending` +
-      (timeframe ? `?timeframe=${encodeURIComponent(timeframe)}` : "")
-    : "";
-
 /** Documents pending broken down by currency — a live snapshot of everything
  *  currently DOCUMENT_PENDING (no timeframe). Backs the per-currency breakdown. */
 export const mcaDocumentPendingByCurrencyApi = (merchantId: string) =>

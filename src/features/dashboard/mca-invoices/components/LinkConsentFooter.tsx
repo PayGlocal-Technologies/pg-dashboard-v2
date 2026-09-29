@@ -1,14 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Button,
-  Checkbox,
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui";
-import { cn } from "@/lib/utils";
+import { Button, Checkbox } from "@/components/ui";
+import { DisabledReason } from "@/components/common/DisabledReason";
 
 /**
  * The consent tick and the Cancel/confirm pair, shared by both directions of
@@ -58,16 +52,7 @@ export function LinkConsentFooter({
   const isDisabled = !!disabledReason || isPending;
 
   const action = (
-    <Button
-      type="button"
-      variant="primary"
-      size="sm"
-      disabled={isDisabled}
-      // A disabled button emits no pointer events, so without this the hover
-      // would land on the button and never reach the tooltip's trigger.
-      className={cn(isDisabled && "pointer-events-none")}
-      onClick={onConfirm}
-    >
+    <Button type="button" variant="primary" size="sm" disabled={isDisabled} onClick={onConfirm}>
       {isPending ? pendingLabel : actionLabel}
     </Button>
   );
@@ -103,19 +88,8 @@ export function LinkConsentFooter({
         <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>
-        {disabledReason ? (
-          <Tooltip>
-            {/* The span is the trigger, not the button — see the className note
-                above. inline-flex so it wraps the button without changing its
-                box. */}
-            <TooltipTrigger asChild>
-              <span className="inline-flex">{action}</span>
-            </TooltipTrigger>
-            <TooltipContent>{disabledReason}</TooltipContent>
-          </Tooltip>
-        ) : (
-          action
-        )}
+        {/* The shared wrapper this footer's tooltip was lifted into. */}
+        <DisabledReason reason={disabledReason}>{action}</DisabledReason>
       </div>
     </div>
   );

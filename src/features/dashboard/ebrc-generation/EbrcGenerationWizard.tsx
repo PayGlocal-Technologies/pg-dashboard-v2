@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AnimatePresence, motion } from "framer-motion";
 import { Badge, Button, IconButton } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { brandBackdropStyle } from "@/lib/utils/brandBackdrop";
@@ -191,7 +193,6 @@ export function EbrcGenerationWizard() {
   // record it was made against. The form's values are derived from this and
   // the server records together, see `mappings` below.
   const [edits, setEdits] = useState<Record<string, { value: IrmMapping; basedOn: string }>>({});
-  const [agreed, setAgreed] = useState(false);
   const [receivedOpen, setReceivedOpen] = useState(false);
 
   // This wizard only makes sense once DGFT is connected — that gate lives
@@ -241,7 +242,21 @@ export function EbrcGenerationWizard() {
    */
   const allSelectedMapped =
     selectedIds.length > 0 && selectedIds.every((id) => isMappingComplete(recordsByIrm.get(id)));
+  // Unmapped IRMs are fixed on step 2, not here, so that case keeps the
+  // button disabled with its reason. The terms tick is a field on this step:
+  // Confirm stays live and a press names it under the checkbox.
+  const confirmBlockedReason = allSelectedMapped
+    ? null
+    : "Map a shipping bill to every selected IRM first";
   const reachableStep = allSelectedMapped ? furthestStep : Math.min(furthestStep, 2);
+
+  // The terms tick is step 3's one field, so Confirm submits it like any other
+  // form: it stays live and a press without the tick names it under the box
+  // (the app-wide rule, components/form).
+  const termsForm = useAppForm({
+    defaultValues: { agreed: false },
+    onSubmit: () => handleConfirm(),
+  });
 
   // Each IRM's form values: the merchant's own edit while the server's
   // shipping-bill record is still the one that edit was made against, and the
@@ -428,40 +443,59 @@ export function EbrcGenerationWizard() {
                     />
                   )}
                   {activeStep === 3 && (
-                    <div className="space-y-4">
-                      <ReviewConfirmStep
-                        selectedIds={selectedIds}
-                        mappings={mappings}
-                        records={recordsByIrm}
-                        agreed={agreed}
-                        onAgreedChange={setAgreed}
-                      />
-                      <EbrcStepFooterBar
-                        right={
-                          <>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              className="h-auto min-h-0 p-0 text-[12.5px] text-muted-foreground hover:bg-transparent hover:text-foreground"
-                              leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
-                              onClick={() => goToStep(2)}
+                    <termsForm.AppForm>
+                      <termsForm.Form className="space-y-4">
+                        <ReviewConfirmStep
+                          selectedIds={selectedIds}
+                          mappings={mappings}
+                          records={recordsByIrm}
+                          termsField={
+                            <termsForm.AppField
+                              name="agreed"
+                              validators={{
+                                onChange: rules(
+                                  required<boolean>(
+                                    "Terms",
+                                    "Agree to the Terms & Conditions to continue"
+                                  )
+                                ),
+                              }}
                             >
-                              Back
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="primary"
-                              disabled={!agreed || !allSelectedMapped || isPushing}
-                              isLoading={isPushing}
-                              onClick={handleConfirm}
-                            >
-                              Confirm and generate
-                            </Button>
-                          </>
-                        }
-                      />
-                    </div>
+                              {(field) => (
+                                <field.CheckboxField id="ebrc-agree-terms">
+                                  I have read and agree to the Terms &amp; Conditions and understand
+                                  the steps required to complete this eBRC request.
+                                </field.CheckboxField>
+                              )}
+                            </termsForm.AppField>
+                          }
+                        />
+                        <EbrcStepFooterBar
+                          right={
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-auto min-h-0 p-0 text-[12.5px] text-muted-foreground hover:bg-transparent hover:text-foreground"
+                                leftIcon={<Icon name="chevron-left" className="h-3.5 w-3.5" />}
+                                onClick={() => goToStep(2)}
+                              >
+                                Back
+                              </Button>
+                              <termsForm.SubmitButton
+                                size="md"
+                                disabledReason={confirmBlockedReason}
+                                pending={isPushing}
+                                isLoading={isPushing}
+                              >
+                                Confirm and generate
+                              </termsForm.SubmitButton>
+                            </>
+                          }
+                        />
+                      </termsForm.Form>
+                    </termsForm.AppForm>
                   )}
                 </motion.div>
               </AnimatePresence>

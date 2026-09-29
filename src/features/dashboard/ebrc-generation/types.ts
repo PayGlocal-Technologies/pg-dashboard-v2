@@ -501,7 +501,7 @@ export function normalizePortCode(value: string): string {
  *  own rejection so both read the same. */
 export function portCodeError(value: string | null | undefined): string | null {
   const code = normalizePortCode(value ?? "");
-  if (!code) return "Please enter port code";
+  if (!code) return "Port code is required";
   if (PORT_CODE_PATTERN.test(code)) return null;
   if (code.length !== 6) {
     return `A port code is 6 characters ("IN" and four letters or digits, e.g. INDEL4); this one is ${code.length}. A 3-letter airport or city code is not a port code.`;
@@ -513,27 +513,27 @@ export function validateMapping(mapping: IrmMapping, remittanceAmount: number): 
   const errors: MappingFieldErrors = {};
 
   if (!mapping.shippingBillNumber.trim()) {
-    errors.shippingBillNumber = "Please enter shipping bill number";
+    errors.shippingBillNumber = "Shipping bill number is required";
   }
   const portError = portCodeError(mapping.portCode);
   if (portError) errors.portCode = portError;
   if (!mapping.billInvoiceNumber.trim()) {
-    errors.billInvoiceNumber = "Please enter bill/invoice number";
+    errors.billInvoiceNumber = "Bill/invoice number is required";
   }
   if (!mapping.shippingBillDate.trim()) {
-    errors.shippingBillDate = "Please select shipping bill date";
+    errors.shippingBillDate = "Shipping bill date is required";
   }
 
   const value = mapping.shippingBillValue.trim();
   if (!value) {
-    errors.shippingBillValue = "Please enter shipping bill value";
+    errors.shippingBillValue = "Shipping bill value is required";
   } else if (!AMOUNT_RE.test(value)) {
-    errors.shippingBillValue = "Please enter a valid amount (up to 2 decimal places).";
+    errors.shippingBillValue = "Enter a valid amount (up to 2 decimal places)";
   }
 
   const mapped = mapping.irmAmountToMap.trim();
   if (!mapped) {
-    errors.irmAmountToMap = "Please enter amount to be mapped";
+    errors.irmAmountToMap = "IRM amount to be mapped is required";
   } else if (!AMOUNT_RE.test(mapped)) {
     errors.irmAmountToMap = "The Amount to be Mapped must be a positive number";
   } else {

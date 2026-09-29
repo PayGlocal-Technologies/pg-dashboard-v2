@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm, useStore } from "@tanstack/react-form";
+import { useStore } from "@tanstack/react-form";
 import {
   Alert,
   AlertDescription,
@@ -20,6 +20,9 @@ import {
   PurposeCodeCombobox,
   type PurposeCodeComboboxHandle,
 } from "@/components/common/PurposeCodeCombobox";
+import { RequiredMark } from "@/components/common/RequiredMark";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { usePurposeCodes } from "@/features/dashboard/mca-transactions/hooks";
 import { merchantProfilePurposeCodeApi } from "@/features/dashboard/mca-transactions/services";
 import { usePut } from "@/lib/api/hooks";
@@ -185,6 +188,10 @@ export function UploadInvoiceForm({
   // upload.
   const hasCbaRemitterName = upload.phase === "ready" && isCbaNameFlagged(upload.matching);
   const isInvoiceReady = upload.phase === "ready" || verificationFailed;
+  // A scan in flight is the one state with nothing field-level to point at, so
+  // it alone keeps Submit disabled, with its reason. A missing file does not:
+  // the click names it under the dropzone instead.
+  const scanningReason = upload.phase === "scanning" ? "Reading the invoice…" : null;
   // Nothing to opt into when the comparison never produced a name to compare.
   // Still suppressed while the transaction's own name is the unusable one:
   // whether a CBA-named transaction may take the invoice's name onto its FIRC
@@ -204,7 +211,7 @@ export function UploadInvoiceForm({
       "We couldn't check this invoice against the transaction. It will go to manual review, which might delay settlement.";
   }
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: {
       // Empty until the profile call resolves; the effect below fills it in.
       // A merchant who picks a code before then keeps their choice, since
@@ -251,13 +258,20 @@ export function UploadInvoiceForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (scanningReason) return;
     if (!isInvoiceReady) {
       // The invoice is no longer a form field (the upload hook owns it), so
       // its "required" check lives here rather than in a field validator.
-      // Only a missing file or an in-flight scan gets here now — a flagged
-      // result, CBA name included, is submittable.
-      setInvoiceError("Upload an invoice to continue.");
-      dropzoneRef.current?.focus();
+      // Only a missing file gets here — a flagged result, CBA name included,
+      // is submittable. The purpose code is validated in the same click so
+      // both gaps show at once, and focus goes to the first of them.
+      setInvoiceError("Invoice is required");
+      await form.validateAllFields("submit");
+      if ((form.getFieldMeta("purposeCode")?.errors ?? []).length > 0) {
+        purposeCodeRef.current?.focus();
+      } else {
+        dropzoneRef.current?.focus();
+      }
       return;
     }
     setInvoiceError(null);
@@ -269,7 +283,10 @@ export function UploadInvoiceForm({
   };
 
   return (
-    <>
+    <form.AppForm>
+      {/* A plain <form> with its own handler rather than form.Form: the
+          invoice file lives in the upload hook, not the form, so its
+          "required" check and focus are handled in handleSubmit above. */}
       <form
         onSubmit={handleSubmit}
         noValidate
@@ -298,12 +315,9 @@ export function UploadInvoiceForm({
             </DialogDescription>
           )}
 
-          <form.Field
+          <form.AppField
             name="purposeCode"
-            validators={{
-              onBlur: ({ value }) => (!value ? "Select a purpose code to continue." : undefined),
-              onSubmit: ({ value }) => (!value ? "Select a purpose code to continue." : undefined),
-            }}
+            validators={{ onChange: rules(required("Purpose code")) }}
           >
             {(field) => (
               // mt-5 only in the modal: there it separates this field from the
@@ -312,32 +326,31 @@ export function UploadInvoiceForm({
               // own top padding — stacking a second top margin on top of that
               // padding was the extra gap above "Purpose code" this card
               // wasn't supposed to have.
-              <Field
+              <field.CustomField<string>
+                id="purposeCode"
+                label="Purpose code"
                 className={cn("mb-5", isModal && "mt-5")}
-                invalid={field.state.meta.errors.length > 0}
               >
-                <FieldLabel htmlFor="purposeCode">
-                  Purpose code <span className="text-destructive">*</span>
-                </FieldLabel>
-                <PurposeCodeCombobox
-                  ref={purposeCodeRef}
-                  id="purposeCode"
-                  value={field.state.value}
-                  onChange={field.handleChange}
-                  onBlur={field.handleBlur}
-                  invalid={field.state.meta.errors.length > 0}
-                  errorId="purposeCode-error"
-                  options={purposeCodeOptions}
-                  isLoading={isLoadingPurposeCodes}
-                />
-                <FieldError id="purposeCode-error">{field.state.meta.errors[0]}</FieldError>
-              </Field>
+                {({ id, errorId, value, invalid, onChange, onBlur }) => (
+                  <PurposeCodeCombobox
+                    ref={purposeCodeRef}
+                    id={id}
+                    value={value}
+                    onChange={onChange}
+                    onBlur={onBlur}
+                    invalid={invalid}
+                    errorId={errorId}
+                    options={purposeCodeOptions}
+                    isLoading={isLoadingPurposeCodes}
+                  />
+                )}
+              </field.CustomField>
             )}
-          </form.Field>
+          </form.AppField>
 
           <Field invalid={!!invoiceError}>
             <FieldLabel htmlFor="invoice">
-              Invoice <span className="text-destructive">*</span>
+              <RequiredMark /> Invoice
             </FieldLabel>
             <FieldDescription>
               Invoice must match the amount, currency, and sender name. It should also include the
@@ -363,13 +376,8 @@ export function UploadInvoiceForm({
         </div>
 
         <div className={cn(isModal ? "shrink-0 border-t border-border bg-card px-6 py-4" : "mt-5")}>
-          <form.Subscribe
-            selector={(s) => ({
-              purposeCode: s.values.purposeCode,
-              isSubmitting: s.isSubmitting,
-            })}
-          >
-            {({ purposeCode, isSubmitting }) => (
+          <form.Subscribe selector={(s) => s.isSubmitting}>
+            {(isSubmitting) => (
               <>
                 {showRemitterNameOptIn && (
                   <form.Field name="generateFircWithInvoiceRemitterName">
@@ -396,16 +404,16 @@ export function UploadInvoiceForm({
                       Cancel
                     </Button>
                   )}
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    size="sm"
-                    disabled={!purposeCode || !isInvoiceReady}
+                  <form.SubmitButton
+                    disabledReason={scanningReason}
                     isLoading={isSubmitting}
                     className={cn(isModal ? "flex-1" : "w-full")}
+                    // The scanning tooltip wraps the button in a span; give the
+                    // span the same stretch so the button keeps its width.
+                    wrapperClassName={cn(isModal ? "flex-1" : "w-full")}
                   >
                     {isSubmitting ? "Submitting…" : isSubmitUnverified ? "Submit anyway" : "Submit"}
-                  </Button>
+                  </form.SubmitButton>
                 </div>
                 {isSubmitUnverified && (
                   <p className="mt-2 text-center text-[11px] text-muted-foreground">
@@ -427,11 +435,12 @@ export function UploadInvoiceForm({
         onOpenChange={setLinkingOpen}
         onLinked={() => {
           void queryClient.invalidateQueries({ queryKey: ["mca-transactions"] });
-          void queryClient.invalidateQueries({ queryKey: ["mca-document-pending"] });
+          // The Invoice required headline and home widget read this snapshot.
+          void queryClient.invalidateQueries({ queryKey: ["mca-document-pending-by-currency"] });
           void queryClient.invalidateQueries({ queryKey: ["mca-document-pending-transactions"] });
           onSuccess?.();
         }}
       />
-    </>
+    </form.AppForm>
   );
 }

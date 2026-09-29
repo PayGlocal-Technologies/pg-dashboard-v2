@@ -156,7 +156,7 @@ export function InvoiceNumberChip({
           value={value}
           placeholder="BHM-INV-25-0003"
           onChange={(e) => onChange(e.target.value)}
-          className="font-mono text-[13.5px]"
+          className="text-[13.5px]"
         />
         <FieldDescription>
           {isEdited ? (

@@ -2,9 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Button, IconButton, Textarea } from "@/components/ui";
+import { FieldError, FieldLabel, IconButton, Textarea } from "@/components/ui";
+import { RequiredMark } from "@/components/common/RequiredMark";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, rules } from "@/components/form/rules";
 import { usePost } from "@/lib/api/hooks";
 import {
   feedbackApi,
@@ -67,7 +70,6 @@ export function FeedbackSheet() {
   // Index into REACTIONS rather than the label, since whether to ask for a
   // comment depends on where the rating sits on the scale.
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [comment, setComment] = useState("");
   const reduceMotion = useReducedMotion();
 
   const { mutate: checkEligibility } = usePost<FeedbackEligibilityResponse, FeedbackTypePayload>(
@@ -111,7 +113,9 @@ export function FeedbackSheet() {
   // A low score with no explanation tells the product team something is wrong
   // without saying what, so the follow-up is required wherever it is asked —
   // matching pg-dashboard, which makes its own fields required below 3 stars.
-  const canSubmit = hasSelection && (!wantsComment || comment.trim().length > 0);
+  // Submit stays enabled and a click without one says so under the field,
+  // rather than leaving a dead button. Submit only renders once a rating is
+  // picked, so a missing rating can't be submitted and needs no message.
 
   // The emoji row is ordered worst-to-best, so its index maps straight onto
   // the API's 1-based rating scale.
@@ -123,16 +127,23 @@ export function FeedbackSheet() {
   // reporting this merchant as eligible. A failed post is never retried in the
   // merchant's face — this is optional feedback, not something worth blocking
   // on.
-  const resolve = (rating?: number) => {
+  const resolve = (rating?: number, freeText = "") => {
     if (rating != null) {
       submitFeedback(
-        { type: "GENERAL", rating, freeText: comment.trim(), expectations: "" },
+        { type: "GENERAL", rating, freeText: freeText.trim(), expectations: "" },
         { onError: () => undefined }
       );
     }
     markShown({ type: "GENERAL" }, { onError: () => undefined });
     setClosed(true);
   };
+
+  // Both Submit buttons (inline, and under the comment) submit this one form;
+  // the comment's rule applies only while it is asked for. See components/form.
+  const form = useAppForm({
+    defaultValues: { comment: "" },
+    onSubmit: ({ value }) => resolve(ratingFor(selectedIndex), value.comment),
+  });
 
   return (
     <AnimatePresence>
@@ -177,100 +188,114 @@ export function FeedbackSheet() {
               space for it. For low and neutral ratings Submit moves below a
               comment field instead (see the block after this row), so the
               inline one is suppressed in that case rather than duplicated. */}
-          <div className="mt-2.5 flex items-center justify-between gap-2">
-            <div className="flex items-center gap-1">
-              {REACTIONS.map((reaction, i) => {
-                const isSelected = selectedIndex === i;
-                return (
-                  <button
-                    key={reaction.label}
-                    type="button"
-                    aria-label={reaction.label}
-                    aria-pressed={isSelected}
-                    onClick={() => setSelectedIndex(i)}
-                    className="flex items-center justify-center rounded-lg p-1 transition-colors hover:bg-muted/50"
-                  >
-                    <motion.span
-                      animate={{ scale: isSelected ? 1.2 : 1 }}
+          <form.AppForm>
+            <form.Form>
+              <div className="mt-2.5 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1">
+                  {REACTIONS.map((reaction, i) => {
+                    const isSelected = selectedIndex === i;
+                    return (
+                      <button
+                        key={reaction.label}
+                        type="button"
+                        aria-label={reaction.label}
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedIndex(i)}
+                        className="flex items-center justify-center rounded-lg p-1 transition-colors hover:bg-muted/50"
+                      >
+                        <motion.span
+                          animate={{ scale: isSelected ? 1.2 : 1 }}
+                          transition={{ duration: 0.2, ease: EASE }}
+                          className={cn(
+                            "text-xl leading-none transition-[filter,opacity] duration-200",
+                            !isSelected && "opacity-60 grayscale"
+                          )}
+                        >
+                          {reaction.emoji}
+                        </motion.span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <AnimatePresence>
+                  {hasSelection && !wantsComment && (
+                    <motion.div
+                      initial={reduceMotion ? false : { opacity: 0, x: 8 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
                       transition={{ duration: 0.2, ease: EASE }}
-                      className={cn(
-                        "text-xl leading-none transition-[filter,opacity] duration-200",
-                        !isSelected && "opacity-60 grayscale"
-                      )}
                     >
-                      {reaction.emoji}
-                    </motion.span>
-                  </button>
-                );
-              })}
-            </div>
+                      <form.SubmitButton>Submit</form.SubmitButton>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-            <AnimatePresence>
-              {hasSelection && !wantsComment && (
-                <motion.div
-                  initial={reduceMotion ? false : { opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={reduceMotion ? { opacity: 0 } : { opacity: 0, x: 8 }}
-                  transition={{ duration: 0.2, ease: EASE }}
-                >
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={() => resolve(ratingFor(selectedIndex))}
-                    disabled={!canSubmit}
-                  >
-                    Submit
-                  </Button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Follow-up prompt for the bottom three ratings only. Animating
+              {/* Follow-up prompt for the bottom three ratings only. Animating
               height to/from auto (rather than just fading) means the card's own
               growth is smooth and continuous with the width expansion already
               running, instead of the tray snapping to a taller box. The outer
               overflow-hidden is what keeps this clipped while it collapses. */}
-          <AnimatePresence>
-            {wantsComment && (
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={reduceMotion ? { opacity: 0, height: 0 } : { opacity: 0, height: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.28, ease: EASE }}
-                className="overflow-hidden"
-              >
-                <div className="mt-2.5 space-y-2">
-                  <Textarea
-                    rows={3}
-                    value={comment}
-                    onChange={(e) => setComment(e.target.value)}
-                    placeholder="What could we improve?"
-                    aria-label="What could we improve?"
-                    required
-                    // min-w-0 stops the field claiming an intrinsic width
-                    // wider than the tray, and ring-inset keeps its focus
-                    // outline inside its own box. Either one overflowing gets
-                    // sliced by the tray's overflow-hidden (which the width
-                    // animation needs), which is what cut the left and right
-                    // edges off the focus ring.
-                    className="min-h-0 w-full min-w-0 resize-none text-[12.5px] focus-visible:ring-inset"
-                  />
-                  <Button
-                    type="button"
-                    variant="primary"
-                    size="sm"
-                    onClick={() => resolve(ratingFor(selectedIndex))}
-                    disabled={!canSubmit}
-                    className="w-full"
+              <AnimatePresence>
+                {wantsComment && (
+                  <motion.div
+                    initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={reduceMotion ? { opacity: 0, height: 0 } : { opacity: 0, height: 0 }}
+                    transition={{ duration: reduceMotion ? 0 : 0.28, ease: EASE }}
+                    className="overflow-hidden"
                   >
-                    Submit
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                    <div className="mt-2.5 space-y-2">
+                      <form.Field
+                        name="comment"
+                        validators={{
+                          onChange: rules(
+                            check(
+                              (value: string) =>
+                                wantsComment && !value.trim() && "Tell us what we could improve"
+                            )
+                          ),
+                        }}
+                      >
+                        {(field) => {
+                          const error = field.state.meta.errors[0] as string | undefined;
+                          return (
+                            <>
+                              {/* The comment is only asked for (and only
+                                  rendered) on a low rating, where it is
+                                  required, so the * is unconditional. */}
+                              <FieldLabel htmlFor="feedback-comment">
+                                <RequiredMark /> What could we improve?
+                              </FieldLabel>
+                              <Textarea
+                                id="feedback-comment"
+                                rows={3}
+                                value={field.state.value}
+                                onChange={(e) => field.handleChange(e.target.value)}
+                                onBlur={field.handleBlur}
+                                placeholder="Tell us what went wrong"
+                                aria-invalid={!!error || undefined}
+                                // min-w-0 stops the field claiming an intrinsic width
+                                // wider than the tray, and ring-inset keeps its focus
+                                // outline inside its own box. Either one overflowing gets
+                                // sliced by the tray's overflow-hidden (which the width
+                                // animation needs), which is what cut the left and right
+                                // edges off the focus ring.
+                                className="min-h-0 w-full min-w-0 resize-none text-[12.5px] focus-visible:ring-inset"
+                              />
+                              <FieldError>{error}</FieldError>
+                            </>
+                          );
+                        }}
+                      </form.Field>
+                      <form.SubmitButton className="w-full">Submit</form.SubmitButton>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </form.Form>
+          </form.AppForm>
         </motion.div>
       )}
     </AnimatePresence>

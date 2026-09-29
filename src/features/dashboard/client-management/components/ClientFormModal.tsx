@@ -3,7 +3,6 @@
 import { useState, type ReactNode } from "react";
 import { Icon } from "@/components/icon";
 
-import { useForm } from "@tanstack/react-form";
 import {
   Accordion,
   AccordionContent,
@@ -19,20 +18,12 @@ import {
   DrawerContent,
   DrawerTitle,
   Field,
-  FieldError,
-  FieldLabel,
   Checkbox,
   Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Shimmer,
-  Textarea,
   useBreakpoint,
-  SingleSelect,
 } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { cn } from "@/lib/utils";
 import { CLIENT_BUSINESS_TYPES } from "@/features/dashboard/client-management/constants";
 import { useClientTagOptions } from "@/features/dashboard/client-management/hooks";
@@ -66,14 +57,6 @@ const countrySelectOptions = COUNTRIES.map((country) => ({
   value: country.code,
   label: `${country.flag} ${country.name}`,
 }));
-
-function RequiredMark() {
-  return (
-    <span aria-hidden className="text-destructive">
-      *
-    </span>
-  );
-}
 
 /**
  * "+ Add website", "+ Add tags", "+ Add shipping address"… — the trigger for
@@ -354,7 +337,7 @@ function ClientFormBody({
   // at all any more — both State fields are free text, as production's are.
   const { tags: tagSuggestions } = useClientTagOptions(midOverride);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: initialValues ?? emptyClientForm(),
     onSubmit: ({ value }) => onSubmit(value),
   });
@@ -368,297 +351,233 @@ function ClientFormBody({
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="flex min-h-0 flex-col"
-      noValidate
-    >
-      {/* Header — the Dialog/Drawer's own close button sits at the top right,
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-col">
+        {/* Header — the Dialog/Drawer's own close button sits at the top right,
           so the title row only carries the title. */}
-      <div className="flex-shrink-0 border-b border-border px-5 py-4">
-        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{title}</h2>
-      </div>
+        <div className="flex-shrink-0 border-b border-border px-5 py-4">
+          <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{title}</h2>
+        </div>
 
-      {/* Only this middle band scrolls, so the footer actions stay reachable
+        {/* Only this middle band scrolls, so the footer actions stay reachable
           however tall the form runs. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-1">
-        {/* type="multiple" so the open sections are independent — opening
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-1">
+          {/* type="multiple" so the open sections are independent — opening
             Contract must not collapse Address the way a single-value accordion
             would. gap-3 between the containers: each already draws its own
             border, so this only needs to keep them from touching, not to stand
             in for a divider. */}
-        <Accordion
-          type="multiple"
-          defaultValue={DEFAULT_OPEN_SECTIONS}
-          className="flex flex-col gap-3 py-2"
-        >
-          {/* ── Business information ─────────────────────────────────────── */}
-          <FormSection value="business" title="Business information">
-            <form.Field
-              name="businessName"
-              validators={{
-                onBlur: ({ value }) => validateBusinessName(value),
-                onSubmit: ({ value }) => validateBusinessName(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-business-name">
-                    <RequiredMark /> Business name
-                  </FieldLabel>
-                  <Input
+          <Accordion
+            type="multiple"
+            defaultValue={DEFAULT_OPEN_SECTIONS}
+            className="flex flex-col gap-3 py-2"
+          >
+            {/* ── Business information ─────────────────────────────────────── */}
+            <FormSection value="business" title="Business information">
+              <form.AppField
+                name="businessName"
+                validators={{ onChange: ({ value }) => validateBusinessName(value) }}
+              >
+                {(field) => (
+                  <field.TextField
                     id="client-business-name"
+                    label="Business name"
+                    required
                     placeholder="Enter business name"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    className="shadow-none"
+                    inputClassName="shadow-none"
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
+                )}
+              </form.AppField>
 
-            <form.Field
-              name="businessType"
-              validators={{
-                onChange: ({ value }) => validateBusinessType(value),
-                onSubmit: ({ value }) => validateBusinessType(value),
-              }}
-            >
-              {(field) => {
-                const invalid = field.state.meta.errors.length > 0;
-                return (
-                  <Field invalid={invalid}>
-                    <FieldLabel htmlFor="client-business-type">
-                      <RequiredMark /> Business type
-                    </FieldLabel>
-                    <Select value={field.state.value} onValueChange={field.handleChange}>
-                      <SelectTrigger
-                        id="client-business-type"
-                        aria-invalid={invalid}
-                        className="shadow-none"
-                      >
-                        <SelectValue placeholder="Select business type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CLIENT_BUSINESS_TYPES.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                );
-              }}
-            </form.Field>
+              <form.AppField
+                name="businessType"
+                validators={{ onChange: ({ value }) => validateBusinessType(value) }}
+              >
+                {(field) => (
+                  <field.SelectField
+                    id="client-business-type"
+                    label="Business type"
+                    required
+                    options={CLIENT_BUSINESS_TYPES}
+                    placeholder="Select business type"
+                    triggerClassName="shadow-none"
+                  />
+                )}
+              </form.AppField>
 
-            {/* Optional, and the least consequential thing in the section —
+              {/* Optional, and the least consequential thing in the section —
                 starts as a plain "+ Add website" link rather than an empty
                 field, and only turns into one once clicked. */}
-            <form.Field
-              name="website"
-              validators={{
-                onBlur: ({ value }) => validateWebsite(value),
-                onSubmit: ({ value }) => validateWebsite(value),
-              }}
-            >
-              {(field) =>
-                websiteOpen ? (
-                  <OptionalFieldSlot
-                    removeLabel="Remove website"
-                    onRemove={() => {
-                      field.handleChange("");
-                      setWebsiteOpen(false);
-                    }}
-                  >
-                    <Field>
-                      <FieldLabel htmlFor="client-website">Website</FieldLabel>
-                      <Input
+              <form.AppField
+                name="website"
+                validators={{ onChange: ({ value }) => validateWebsite(value) }}
+              >
+                {(field) =>
+                  websiteOpen ? (
+                    <OptionalFieldSlot
+                      removeLabel="Remove website"
+                      onRemove={() => {
+                        field.handleChange("");
+                        setWebsiteOpen(false);
+                      }}
+                    >
+                      <field.TextField
                         id="client-website"
+                        label="Website"
                         inputMode="url"
                         placeholder="https://example.com"
-                        aria-invalid={field.state.meta.errors.length > 0}
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        onBlur={field.handleBlur}
-                        className="shadow-none"
+                        inputClassName="shadow-none"
                       />
-                      <FieldError>{field.state.meta.errors[0]}</FieldError>
-                    </Field>
-                  </OptionalFieldSlot>
-                ) : (
-                  <AddOptionalTrigger label="Add website" onClick={() => setWebsiteOpen(true)} />
-                )
-              }
-            </form.Field>
+                    </OptionalFieldSlot>
+                  ) : (
+                    <AddOptionalTrigger label="Add website" onClick={() => setWebsiteOpen(true)} />
+                  )
+                }
+              </form.AppField>
 
-            <form.Field name="tags">
-              {(field) =>
-                tagsOpen ? (
-                  <OptionalFieldSlot
-                    removeLabel="Remove tags"
-                    onRemove={() => {
-                      field.handleChange([]);
-                      setTagsOpen(false);
-                    }}
-                  >
-                    <Field>
-                      <FieldLabel htmlFor="client-tags">Tags</FieldLabel>
-                      <ClientTagsInput
-                        id="client-tags"
-                        value={field.state.value}
-                        onChange={field.handleChange}
-                        suggestions={tagSuggestions}
-                      />
-                    </Field>
-                  </OptionalFieldSlot>
-                ) : (
-                  <AddOptionalTrigger label="Add tags" onClick={() => setTagsOpen(true)} />
-                )
-              }
-            </form.Field>
-          </FormSection>
+              <form.AppField name="tags">
+                {(field) =>
+                  tagsOpen ? (
+                    <OptionalFieldSlot
+                      removeLabel="Remove tags"
+                      onRemove={() => {
+                        field.handleChange([]);
+                        setTagsOpen(false);
+                      }}
+                    >
+                      <field.CustomField<string[]> id="client-tags" label="Tags">
+                        {({ id, value, onChange }) => (
+                          <ClientTagsInput
+                            id={id}
+                            value={value}
+                            onChange={onChange}
+                            suggestions={tagSuggestions}
+                          />
+                        )}
+                      </field.CustomField>
+                    </OptionalFieldSlot>
+                  ) : (
+                    <AddOptionalTrigger label="Add tags" onClick={() => setTagsOpen(true)} />
+                  )
+                }
+              </form.AppField>
+            </FormSection>
 
-          {/* ── Primary contact ──────────────────────────────────────────── */}
-          <FormSection value="contact" title="Primary contact">
-            {/* For a sole trader the contact and the business are the same name,
+            {/* ── Primary contact ──────────────────────────────────────────── */}
+            <FormSection value="contact" title="Primary contact">
+              {/* For a sole trader the contact and the business are the same name,
                 and typing it twice is busywork. Ticked, the field below collapses
                 and the business name is submitted as the contact name too (see
                 toClientApiPayload). */}
-            <form.Field name="sameAsBusinessName">
-              {(field) => (
-                <label className="mb-3 flex w-fit items-center gap-2 text-[13px] text-muted-foreground">
-                  <Checkbox
-                    id="client-same-as-business"
-                    checked={field.state.value}
-                    onCheckedChange={(checked) => field.handleChange(checked === true)}
-                  />
-                  Contact name is the same as the business name
-                </label>
-              )}
-            </form.Field>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <form.Subscribe selector={(state) => state.values.sameAsBusinessName}>
-                {(sameAsBusinessName) =>
-                  sameAsBusinessName ? null : (
-                    <form.Field
-                      name="primaryContactName"
-                      validators={{
-                        onBlur: ({ value }) => validateContactName(value),
-                        onSubmit: ({ value }) => validateContactName(value),
-                      }}
-                    >
-                      {(field) => (
-                        <Field>
-                          <FieldLabel htmlFor="client-contact-name">
-                            <RequiredMark /> Primary contact name
-                          </FieldLabel>
-                          <Input
-                            id="client-contact-name"
-                            placeholder="Enter contact name"
-                            aria-invalid={field.state.meta.errors.length > 0}
-                            value={field.state.value}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            onBlur={field.handleBlur}
-                            className="shadow-none"
-                          />
-                          <FieldError>{field.state.meta.errors[0]}</FieldError>
-                        </Field>
-                      )}
-                    </form.Field>
-                  )
-                }
-              </form.Subscribe>
-
-              <form.Field
-                name="primaryContactEmail"
-                validators={{
-                  onBlur: ({ value }) => validateContactEmail(value),
-                  onSubmit: ({ value }) => validateContactEmail(value),
-                }}
-              >
+              <form.Field name="sameAsBusinessName">
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-contact-email">
-                      <RequiredMark /> Primary contact email
-                    </FieldLabel>
-                    <Input
-                      id="client-contact-email"
-                      type="email"
-                      placeholder="name@company.com"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className="shadow-none"
+                  <label className="mb-3 flex w-fit items-center gap-2 text-[13px] text-muted-foreground">
+                    <Checkbox
+                      id="client-same-as-business"
+                      checked={field.state.value}
+                      onCheckedChange={(checked) => field.handleChange(checked === true)}
                     />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
+                    Contact name is the same as the business name
+                  </label>
                 )}
               </form.Field>
-            </div>
 
-            {/* Dial code and number are one field to the person filling this in,
+              <div className="grid gap-3 sm:grid-cols-2">
+                <form.Subscribe selector={(state) => state.values.sameAsBusinessName}>
+                  {(sameAsBusinessName) =>
+                    sameAsBusinessName ? null : (
+                      <form.AppField
+                        name="primaryContactName"
+                        validators={{ onChange: ({ value }) => validateContactName(value) }}
+                      >
+                        {(field) => (
+                          <field.TextField
+                            id="client-contact-name"
+                            label="Primary contact name"
+                            required
+                            placeholder="Enter contact name"
+                            inputClassName="shadow-none"
+                          />
+                        )}
+                      </form.AppField>
+                    )
+                  }
+                </form.Subscribe>
+
+                <form.AppField
+                  name="primaryContactEmail"
+                  validators={{ onChange: ({ value }) => validateContactEmail(value) }}
+                >
+                  {(field) => (
+                    <field.TextField
+                      id="client-contact-email"
+                      label="Primary contact email"
+                      required
+                      type="email"
+                      placeholder="name@company.com"
+                      inputClassName="shadow-none"
+                    />
+                  )}
+                </form.AppField>
+              </div>
+
+              {/* Dial code and number are one field to the person filling this in,
               so they share a row and a single error message — the country
               picker below is only there to supply the code, which is how the
               record stores it (phoneDialCode + phoneNumber). */}
-            <form.Field
-              name="phoneNumber"
-              validators={{
-                onBlur: ({ value }) => validatePhone(form.getFieldValue("phoneCountry"), value),
-                onSubmit: ({ value }) => validatePhone(form.getFieldValue("phoneCountry"), value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-phone-number">
-                    <RequiredMark /> Primary contact number
-                  </FieldLabel>
-                  <div className="grid gap-2 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
-                    <form.Field name="phoneCountry">
-                      {(countryField) => (
-                        <CountrySelect
-                          value={countryField.state.value}
-                          onValueChange={(code) => {
-                            countryField.handleChange(code);
-                            // The number's validity depends on this, so its error
-                            // is re-evaluated here rather than waiting for
-                            // another blur on the number field.
-                            form.validateField("phoneNumber", "blur");
-                          }}
-                          showDialCode
-                          placeholder="Code"
+              <form.AppField
+                name="phoneNumber"
+                validators={{
+                  onChange: ({ value }) => validatePhone(form.getFieldValue("phoneCountry"), value),
+                }}
+              >
+                {(field) => (
+                  <field.CustomField<string>
+                    id="client-phone-number"
+                    label="Primary contact number"
+                    required
+                  >
+                    {({ id, value, invalid, onChange, onBlur }) => (
+                      <div className="grid gap-2 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
+                        <form.Field name="phoneCountry">
+                          {(countryField) => (
+                            <CountrySelect
+                              value={countryField.state.value}
+                              onValueChange={(code) => {
+                                countryField.handleChange(code);
+                                // The number's validity depends on this, so it is
+                                // re-checked here, once it has been edited or is
+                                // already showing an error (the app-wide rule).
+                                const meta = form.getFieldMeta("phoneNumber");
+                                if (meta?.isTouched || meta?.errors.length) {
+                                  void form.validateField("phoneNumber", "change");
+                                }
+                              }}
+                              showDialCode
+                              placeholder="Code"
+                              className="shadow-none"
+                            />
+                          )}
+                        </form.Field>
+                        <Input
+                          id={id}
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="Enter contact number"
+                          aria-invalid={invalid || undefined}
+                          value={value}
+                          onChange={(e) => onChange(e.target.value)}
+                          onBlur={onBlur}
                           className="shadow-none"
                         />
-                      )}
-                    </form.Field>
-                    <Input
-                      id="client-phone-number"
-                      type="tel"
-                      inputMode="tel"
-                      placeholder="Enter contact number"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className="shadow-none"
-                    />
-                  </div>
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-          </FormSection>
+                      </div>
+                    )}
+                  </field.CustomField>
+                )}
+              </form.AppField>
+            </FormSection>
 
-          {/* ── Address ──────────────────────────────────────────────────────
+            {/* ── Address ──────────────────────────────────────────────────────
               Laid out as the reference's address block: the street address
               across the full width, the two fields that qualify a city on one
               row beneath it, then the postcode. Country leads, since it is the
@@ -671,33 +590,30 @@ function ClientFormBody({
               so the fields stack in this same order on a phone and nothing ever
               scrolls sideways. Spacing between the groups is the section's own
               flex gap-3 — no rules or separators. */}
-          <FormSection value="address" title="Address">
-            <form.Field
-              name="country"
-              validators={{
-                onChange: ({ value }) => validateCountry(value),
-                onSubmit: ({ value }) => validateCountry(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-country">
-                    <RequiredMark /> Country
-                  </FieldLabel>
-                  {/* SingleSelect rather than flux's CountrySelect. The
-                      original reason — CountrySelect's popover could not be
-                      scrolled inside a modal Dialog — is fixed in flux 0.3.3,
-                      so CountrySelect is usable again; this stays on
-                      SingleSelect only because the options are built from
-                      COUNTRIES here and carry the same ISO codes, and swapping
-                      the control is a change to make deliberately rather than
-                      in passing. */}
-                  <SingleSelect
+            <FormSection value="address" title="Address">
+              {/* SingleSelect rather than flux's CountrySelect. The
+                original reason — CountrySelect's popover could not be
+                scrolled inside a modal Dialog — is fixed in flux 0.3.3,
+                so CountrySelect is usable again; this stays on
+                SingleSelect only because the options are built from
+                COUNTRIES here and carry the same ISO codes, and swapping
+                the control is a change to make deliberately rather than
+                in passing. */}
+              <form.AppField
+                name="country"
+                validators={{ onChange: ({ value }) => validateCountry(value) }}
+              >
+                {(field) => (
+                  <field.SingleSelectField
                     id="client-country"
-                    value={field.state.value}
+                    label="Country"
+                    required
                     options={countrySelectOptions}
-                    onChange={(code) => {
-                      field.handleChange(code);
+                    placeholder="Select country"
+                    searchPlaceholder="Search country…"
+                    emptyText="No country matches that search."
+                    selectClassName="shadow-none"
+                    onValueChange={(code) => {
                       // Cleared on a country change, which is what production's
                       // own country field does
                       // (ADD_CLIENT_FIELDS_FORM_ADDRESS's onChange resets
@@ -711,102 +627,56 @@ function ClientFormBody({
                         form.setFieldValue("phoneCountry", code);
                       }
                     }}
-                    placeholder="Select country"
-                    searchPlaceholder="Search country…"
-                    emptyText="No country matches that search."
-                    invalid={field.state.meta.errors.length > 0}
-                    className="shadow-none"
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-
-            <form.Field
-              name="addressLine"
-              validators={{
-                onBlur: ({ value }) => validateAddress(value),
-                onSubmit: ({ value }) => validateAddress(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-address">
-                    <RequiredMark /> Address
-                  </FieldLabel>
-                  <Textarea
-                    id="client-address"
-                    rows={2}
-                    placeholder="Enter street address"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    className="shadow-none"
-                  />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-
-            {/* Second line, optional — the API's address has always had it and
-                this form used to send it empty. */}
-            <form.Field name="addressLine2">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-address-2">Address line 2</FieldLabel>
-                  <Input
-                    id="client-address-2"
-                    placeholder="Apartment, suite, floor (optional)"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    className="shadow-none"
-                  />
-                </Field>
-              )}
-            </form.Field>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              <form.Field
-                name="city"
-                validators={{
-                  onBlur: ({ value }) => validateCity(value),
-                  onSubmit: ({ value }) => validateCity(value),
-                }}
-              >
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-city">
-                      <RequiredMark /> City
-                    </FieldLabel>
-                    <Input
-                      id="client-city"
-                      placeholder="Enter city"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className="shadow-none"
-                    />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
                 )}
-              </form.Field>
+              </form.AppField>
 
-              <form.Field
-                name="state"
-                validators={{
-                  onBlur: ({ value }) => validateState(value),
-                  onSubmit: ({ value }) => validateState(value),
-                }}
+              <form.AppField
+                name="addressLine"
+                validators={{ onChange: ({ value }) => validateAddress(value) }}
               >
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="client-state">
-                      <RequiredMark /> State
-                    </FieldLabel>
-                    {/* Free text, the same control production uses — and the
+                  <field.TextareaField
+                    id="client-address"
+                    label="Address"
+                    required
+                    placeholder="Enter street address"
+                    rows={2}
+                    inputClassName="shadow-none"
+                  />
+                )}
+              </form.AppField>
+
+              {/* Second line, optional — the API's address has always had it and
+                this form used to send it empty. */}
+              <form.AppField name="addressLine2">
+                {(field) => (
+                  <field.TextField
+                    id="client-address-2"
+                    label="Address line 2"
+                    placeholder="Apartment, suite, floor (optional)"
+                    inputClassName="shadow-none"
+                  />
+                )}
+              </form.AppField>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <form.AppField
+                  name="city"
+                  validators={{ onChange: ({ value }) => validateCity(value) }}
+                >
+                  {(field) => (
+                    <field.TextField
+                      id="client-city"
+                      label="City"
+                      required
+                      placeholder="Enter city"
+                      inputClassName="shadow-none"
+                    />
+                  )}
+                </form.AppField>
+
+                {/* Free text, the same control production uses — and the
                         same one the shipping state below already is.
 
                         It was a select over the state reference list, which
@@ -817,51 +687,41 @@ function ClientFormBody({
                         replaced it (ADD_CLIENT_FIELDS_FORM_ADDRESS), because a
                         client in California has a state and the list has no way
                         to say so. */}
-                    <Input
+                <form.AppField
+                  name="state"
+                  validators={{ onChange: ({ value }) => validateState(value) }}
+                >
+                  {(field) => (
+                    <field.TextField
                       id="client-state"
+                      label="State"
+                      required
                       placeholder="Enter state"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      aria-invalid={field.state.meta.errors.length > 0}
                     />
-                    <FieldError>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                )}
-              </form.Field>
-            </div>
+                  )}
+                </form.AppField>
+              </div>
 
-            <form.Field
-              name="zipcode"
-              validators={{
-                onBlur: ({ value }) => validateZipcode(value),
-                onSubmit: ({ value }) => validateZipcode(value),
-              }}
-            >
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="client-zipcode">
-                    <RequiredMark /> Zipcode
-                  </FieldLabel>
-                  {/* Not type="number": postcodes are alphanumeric in half the
+              {/* Not type="number": postcodes are alphanumeric in half the
                       world (SW1A 1AA, K1P 5Z9), so this stays a text field. */}
-                  <Input
+              <form.AppField
+                name="zipcode"
+                validators={{ onChange: ({ value }) => validateZipcode(value) }}
+              >
+                {(field) => (
+                  <field.TextField
                     id="client-zipcode"
+                    label="Zipcode"
+                    required
                     placeholder="Enter zipcode"
-                    aria-invalid={field.state.meta.errors.length > 0}
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    onBlur={field.handleBlur}
-                    className="shadow-none"
+                    inputClassName="shadow-none"
                   />
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
-              )}
-            </form.Field>
-          </FormSection>
-        </Accordion>
+                )}
+              </form.AppField>
+            </FormSection>
+          </Accordion>
 
-        {/* ── The rest: all-optional, no card/accordion of their own ──────
+          {/* ── The rest: all-optional, no card/accordion of their own ──────
             Same "+ Add X" pattern as Website/Tags above — each starts as a
             plain trigger and only becomes a field (or, for Shipping, a
             group of them) once clicked, with the delete-on-hover affordance
@@ -869,269 +729,238 @@ function ClientFormBody({
             header. Plain space-y rhythm rather than each in its own bordered
             container, now that there's no card left to draw a border
             around. */}
-        <div className="space-y-4 py-3">
-          {/* ── Shipping address ───────────────────────────────────────── */}
-          {shippingOpen ? (
-            <OptionalFieldSlot
-              removeLabel="Remove shipping address"
-              onRemove={() => {
-                form.setFieldValue("sameAsBillingAddress", true);
-                form.setFieldValue("shippingCountry", "");
-                form.setFieldValue("shippingAddressLine", "");
-                form.setFieldValue("shippingAddressLine2", "");
-                form.setFieldValue("shippingCity", "");
-                form.setFieldValue("shippingState", "");
-                form.setFieldValue("shippingZipcode", "");
-                setShippingOpen(false);
-              }}
-            >
-              <div className="space-y-3">
-                <p className="text-[13px] font-semibold text-foreground">Shipping address</p>
+          <div className="space-y-4 py-3">
+            {/* ── Shipping address ───────────────────────────────────────── */}
+            {shippingOpen ? (
+              <OptionalFieldSlot
+                removeLabel="Remove shipping address"
+                onRemove={() => {
+                  form.setFieldValue("sameAsBillingAddress", true);
+                  form.setFieldValue("shippingCountry", "");
+                  form.setFieldValue("shippingAddressLine", "");
+                  form.setFieldValue("shippingAddressLine2", "");
+                  form.setFieldValue("shippingCity", "");
+                  form.setFieldValue("shippingState", "");
+                  form.setFieldValue("shippingZipcode", "");
+                  setShippingOpen(false);
+                }}
+              >
+                <div className="space-y-3">
+                  <p className="text-[13px] font-semibold text-foreground">Shipping address</p>
 
-                <form.Field name="shippingCountry">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="client-shipping-country">Country</FieldLabel>
-                      {/* The same country control the billing address uses,
-                          and independent of it: a client can be billed in one
-                          country and shipped to in another. */}
-                      <CountrySelect
-                        value={field.state.value}
-                        onValueChange={(code) => field.handleChange(code)}
-                        placeholder="Select country"
-                        className="shadow-none"
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-
-                <form.Field name="shippingAddressLine">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="client-shipping-address">Address</FieldLabel>
-                      <Textarea
-                        id="client-shipping-address"
-                        rows={2}
-                        placeholder="Enter street address"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        onBlur={field.handleBlur}
-                        className="shadow-none"
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-
-                <form.Field name="shippingAddressLine2">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="client-shipping-address-2">Address line 2</FieldLabel>
-                      <Input
-                        id="client-shipping-address-2"
-                        placeholder="Apartment, suite, floor (optional)"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        onBlur={field.handleBlur}
-                        className="shadow-none"
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <form.Field name="shippingCity">
+                  {/* The same country control the billing address uses,
+                    and independent of it: a client can be billed in one
+                    country and shipped to in another. */}
+                  <form.AppField name="shippingCountry">
                     {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="client-shipping-city">City</FieldLabel>
-                        <Input
-                          id="client-shipping-city"
-                          placeholder="Enter city"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          onBlur={field.handleBlur}
-                          className="shadow-none"
-                        />
-                      </Field>
+                      <field.CustomField<string> id="client-shipping-country" label="Country">
+                        {({ value, onChange }) => (
+                          <CountrySelect
+                            value={value}
+                            onValueChange={onChange}
+                            placeholder="Select country"
+                            className="shadow-none"
+                          />
+                        )}
+                      </field.CustomField>
                     )}
-                  </form.Field>
+                  </form.AppField>
 
-                  <form.Field name="shippingState">
+                  <form.AppField name="shippingAddressLine">
                     {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="client-shipping-state">State</FieldLabel>
-                        {/* Free text, unlike the billing state's select: the
+                      <field.TextareaField
+                        id="client-shipping-address"
+                        label="Address"
+                        placeholder="Enter street address"
+                        rows={2}
+                        inputClassName="shadow-none"
+                      />
+                    )}
+                  </form.AppField>
+
+                  <form.AppField name="shippingAddressLine2">
+                    {(field) => (
+                      <field.TextField
+                        id="client-shipping-address-2"
+                        label="Address line 2"
+                        placeholder="Apartment, suite, floor (optional)"
+                        inputClassName="shadow-none"
+                      />
+                    )}
+                  </form.AppField>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <form.AppField name="shippingCity">
+                      {(field) => (
+                        <field.TextField
+                          id="client-shipping-city"
+                          label="City"
+                          placeholder="Enter city"
+                          inputClassName="shadow-none"
+                        />
+                      )}
+                    </form.AppField>
+
+                    {/* Free text, unlike the billing state's select: the
                             state endpoint only covers India, and the shipping
                             country is independent — so a select here would be
                             empty for most of the countries this field exists
                             to serve. */}
-                        <Input
+                    <form.AppField name="shippingState">
+                      {(field) => (
+                        <field.TextField
                           id="client-shipping-state"
+                          label="State"
                           placeholder="Enter state"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          onBlur={field.handleBlur}
-                          className="shadow-none"
+                          inputClassName="shadow-none"
                         />
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
+                      )}
+                    </form.AppField>
+                  </div>
 
-                <form.Field name="shippingZipcode">
-                  {(field) => (
-                    <Field>
-                      <FieldLabel htmlFor="client-shipping-zipcode">Zipcode</FieldLabel>
-                      <Input
+                  <form.AppField name="shippingZipcode">
+                    {(field) => (
+                      <field.TextField
                         id="client-shipping-zipcode"
+                        label="Zipcode"
                         placeholder="Enter zipcode"
-                        value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
-                        onBlur={field.handleBlur}
-                        className="shadow-none"
+                        inputClassName="shadow-none"
                       />
-                    </Field>
-                  )}
-                </form.Field>
-              </div>
-            </OptionalFieldSlot>
-          ) : (
-            <AddOptionalTrigger
-              label="Add shipping address"
-              onClick={() => {
-                // Opening this is a deliberate "ship somewhere else" choice,
-                // so it un-ticks the billing-address copy the same way
-                // unchecking the old checkbox did — the fields below are
-                // about to hold a real, different address.
-                form.setFieldValue("sameAsBillingAddress", false);
-                setShippingOpen(true);
-              }}
-            />
-          )}
+                    )}
+                  </form.AppField>
+                </div>
+              </OptionalFieldSlot>
+            ) : (
+              <AddOptionalTrigger
+                label="Add shipping address"
+                onClick={() => {
+                  // Opening this is a deliberate "ship somewhere else" choice,
+                  // so it un-ticks the billing-address copy the same way
+                  // unchecking the old checkbox did — the fields below are
+                  // about to hold a real, different address.
+                  form.setFieldValue("sameAsBillingAddress", false);
+                  setShippingOpen(true);
+                }}
+              />
+            )}
 
-          {/* ── GST ───────────────────────────────────────────────────── */}
-          <form.Field name="gstin">
-            {(field) =>
-              gstOpen ? (
-                <OptionalFieldSlot
-                  removeLabel="Remove GSTIN"
-                  onRemove={() => {
-                    field.handleChange("");
-                    setGstOpen(false);
-                  }}
-                >
-                  <Field>
-                    <FieldLabel htmlFor="client-gstin">GSTIN</FieldLabel>
-                    <Input
+            {/* ── GST ───────────────────────────────────────────────────── */}
+            <form.AppField name="gstin">
+              {(field) =>
+                gstOpen ? (
+                  <OptionalFieldSlot
+                    removeLabel="Remove GSTIN"
+                    onRemove={() => {
+                      field.handleChange("");
+                      setGstOpen(false);
+                    }}
+                  >
+                    <field.TextField
                       id="client-gstin"
+                      label="GSTIN"
                       placeholder="Enter GSTIN"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className="shadow-none"
+                      inputClassName="shadow-none"
                     />
-                  </Field>
-                </OptionalFieldSlot>
-              ) : (
-                <AddOptionalTrigger label="Add GST" onClick={() => setGstOpen(true)} />
-              )
-            }
-          </form.Field>
+                  </OptionalFieldSlot>
+                ) : (
+                  <AddOptionalTrigger label="Add GST" onClick={() => setGstOpen(true)} />
+                )
+              }
+            </form.AppField>
 
-          {/* ── Additional information ───────────────────────────────── */}
-          <form.Field name="notes">
-            {(field) =>
-              notesOpen ? (
-                <OptionalFieldSlot
-                  removeLabel="Remove notes"
-                  onRemove={() => {
-                    field.handleChange("");
-                    setNotesOpen(false);
-                  }}
-                >
-                  <Field>
-                    <FieldLabel htmlFor="client-notes">Notes</FieldLabel>
-                    <Textarea
+            {/* ── Additional information ───────────────────────────────── */}
+            <form.AppField name="notes">
+              {(field) =>
+                notesOpen ? (
+                  <OptionalFieldSlot
+                    removeLabel="Remove notes"
+                    onRemove={() => {
+                      field.handleChange("");
+                      setNotesOpen(false);
+                    }}
+                  >
+                    <field.TextareaField
                       id="client-notes"
+                      label="Notes"
                       rows={3}
                       placeholder="Add notes about this client"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      onBlur={field.handleBlur}
-                      className="shadow-none"
+                      inputClassName="shadow-none"
                     />
-                  </Field>
-                </OptionalFieldSlot>
-              ) : (
-                <AddOptionalTrigger label="Add notes" onClick={() => setNotesOpen(true)} />
-              )
-            }
-          </form.Field>
+                  </OptionalFieldSlot>
+                ) : (
+                  <AddOptionalTrigger label="Add notes" onClick={() => setNotesOpen(true)} />
+                )
+              }
+            </form.AppField>
 
-          {/* ── Contract ──────────────────────────────────────────────── */}
-          <form.Field name="contract">
-            {(field) =>
-              contractOpen ? (
-                <OptionalFieldSlot
-                  removeLabel="Remove contract"
-                  onRemove={() => {
-                    // Only clears this session's local pick — a contract the
-                    // server already holds is removed through the component's
-                    // own "Remove" action (onRemoveStored below), which also
-                    // calls the API. This just collapses the section back.
-                    field.handleChange(null);
-                    setContractOpen(false);
-                  }}
-                >
-                  <Field>
-                    <FieldLabel htmlFor="client-contract">Contract</FieldLabel>
-                    <ClientContractUpload
+            {/* ── Contract ──────────────────────────────────────────────── */}
+            <form.AppField name="contract">
+              {(field) =>
+                contractOpen ? (
+                  <OptionalFieldSlot
+                    removeLabel="Remove contract"
+                    onRemove={() => {
+                      // Only clears this session's local pick — a contract the
+                      // server already holds is removed through the component's
+                      // own "Remove" action (onRemoveStored below), which also
+                      // calls the API. This just collapses the section back.
+                      field.handleChange(null);
+                      setContractOpen(false);
+                    }}
+                  >
+                    <field.CustomField<ClientFormValues["contract"]>
                       id="client-contract"
-                      value={field.state.value}
-                      onChange={field.handleChange}
-                      // Only for a contract the server holds — a file picked in
-                      // this session has nothing to view and nothing to delete
-                      // remotely. `file` being absent is what distinguishes them.
-                      onViewStored={
-                        field.state.value && !field.state.value.file
-                          ? onViewStoredContract
-                          : undefined
-                      }
-                      onRemoveStored={
-                        field.state.value && !field.state.value.file
-                          ? onRemoveStoredContract
-                          : undefined
-                      }
-                    />
-                  </Field>
-                </OptionalFieldSlot>
-              ) : (
-                <AddOptionalTrigger label="Add contract" onClick={() => setContractOpen(true)} />
-              )
-            }
-          </form.Field>
+                      label="Contract"
+                    >
+                      {({ id, value, onChange }) => (
+                        <ClientContractUpload
+                          id={id}
+                          value={value}
+                          onChange={onChange}
+                          // Only for a contract the server holds — a file picked in
+                          // this session has nothing to view and nothing to delete
+                          // remotely. `file` being absent is what distinguishes them.
+                          onViewStored={
+                            field.state.value && !field.state.value.file
+                              ? onViewStoredContract
+                              : undefined
+                          }
+                          onRemoveStored={
+                            field.state.value && !field.state.value.file
+                              ? onRemoveStoredContract
+                              : undefined
+                          }
+                        />
+                      )}
+                    </field.CustomField>
+                  </OptionalFieldSlot>
+                ) : (
+                  <AddOptionalTrigger label="Add contract" onClick={() => setContractOpen(true)} />
+                )
+              }
+            </form.AppField>
+          </div>
         </div>
-      </div>
 
-      {/* ── Actions ──────────────────────────────────────────────────────
+        {/* ── Actions ──────────────────────────────────────────────────────
           Cancel and the primary action, pulled right by justify-end, where
           they sit in every other single-action footer. */}
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3.5">
-        {/* Cancel turns into its own confirmation once the form has been
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3.5">
+          {/* Cancel turns into its own confirmation once the form has been
             typed into: one more click discards, and moving away from it (or
             typing again) is not needed to undo, since nothing has been
             thrown away yet. */}
-        <Button
-          type="button"
-          variant={confirmingDiscard ? "danger" : "outline"}
-          size="sm"
-          onClick={handleCancel}
-        >
-          {confirmingDiscard ? "Discard changes?" : "Cancel"}
-        </Button>
-        <Button type="submit" variant="primary" size="sm">
-          {isEdit ? "Update client" : "Add client"}
-        </Button>
-      </div>
-    </form>
+          <Button
+            type="button"
+            variant={confirmingDiscard ? "danger" : "outline"}
+            size="sm"
+            onClick={handleCancel}
+          >
+            {confirmingDiscard ? "Discard changes?" : "Cancel"}
+          </Button>
+          <form.SubmitButton>{isEdit ? "Update client" : "Add client"}</form.SubmitButton>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }

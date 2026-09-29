@@ -1,16 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Field,
-  FieldLabel,
-  Input,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogTitle } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { usePost } from "@/lib/api/hooks";
 import { requestPlatformApi } from "@/features/dashboard/platforms/services";
 import type {
@@ -32,29 +25,27 @@ export function RequestPlatformDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const [message, setMessage] = useState("");
-
   const { mutate: requestPlatform, isPending } = usePost<
     RequestPlatformResponse,
     RequestPlatformRequest
   >(requestPlatformApi, { invalidateQueries: false });
 
-  const submit = () => {
-    const platformRequestMessage = message.trim();
-    if (!platformRequestMessage) return;
-
-    requestPlatform(
-      { platformRequestMessage },
-      {
-        onSuccess: (response) => {
-          toast.success(response?.message || "Thanks, we've noted your request.");
-          setMessage("");
-          onOpenChange(false);
-        },
-        onError: (error) => toast.error(error.message || "Couldn't send your request."),
-      }
-    );
-  };
+  const form = useAppForm({
+    defaultValues: { message: "" },
+    onSubmit: ({ value }) => {
+      requestPlatform(
+        { platformRequestMessage: value.message.trim() },
+        {
+          onSuccess: (response) => {
+            toast.success(response?.message || "Thanks, we've noted your request.");
+            form.reset();
+            onOpenChange(false);
+          },
+          onError: (error) => toast.error(error.message || "Couldn't send your request."),
+        }
+      );
+    },
+  });
 
   return (
     <Dialog
@@ -63,7 +54,7 @@ export function RequestPlatformDialog({
         onOpenChange(next);
         // Dismissing discards the draft, so reopening starts clean rather than
         // showing a request the merchant chose not to send.
-        if (!next) setMessage("");
+        if (!next) form.reset();
       }}
     >
       {/* The close button keeps its default top-3 here: it centres on the
@@ -79,35 +70,36 @@ export function RequestPlatformDialog({
           </p>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-          <Field>
-            <FieldLabel htmlFor="platform-request">Which other platforms do you use?</FieldLabel>
-            <Input
-              id="platform-request"
-              autoComplete="off"
-              placeholder="Enter a platform or marketplace"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              // Enter submits: a one-field form shouldn't need a trip to the
-              // button.
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-            />
-          </Field>
-        </div>
+        {/* A real form, so Enter submits: a one-field form shouldn't need a
+            trip to the button. */}
+        <form.AppForm>
+          <form.Form className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              <form.AppField
+                name="message"
+                validators={{ onChange: rules(required("Platform name")) }}
+              >
+                {(field) => (
+                  <field.TextField
+                    id="platform-request"
+                    label="Which other platforms do you use?"
+                    autoComplete="off"
+                    placeholder="Enter a platform or marketplace"
+                  />
+                )}
+              </form.AppField>
+            </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button variant="primary" onClick={submit} disabled={isPending || !message.trim()}>
-            {isPending ? "Sending…" : "Submit"}
-          </Button>
-        </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <form.SubmitButton size="md" pending={isPending}>
+                {isPending ? "Sending…" : "Submit"}
+              </form.SubmitButton>
+            </div>
+          </form.Form>
+        </form.AppForm>
       </DialogContent>
     </Dialog>
   );

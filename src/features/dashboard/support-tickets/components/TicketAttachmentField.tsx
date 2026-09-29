@@ -119,6 +119,8 @@ export function TicketAttachmentField({
                 {formatFileSize(file.size)}
               </span>
               <IconButton
+                // Inside the ticket <form>: without this it would submit it.
+                type="button"
                 aria-label={`Remove ${file.name}`}
                 variant="ghost"
                 size="sm"

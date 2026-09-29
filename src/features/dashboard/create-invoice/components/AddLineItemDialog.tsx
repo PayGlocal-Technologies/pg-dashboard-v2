@@ -1,15 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useStore } from "@tanstack/react-form";
 import {
   Button,
   Dialog,
   DialogContent,
   DialogTitle,
-  Field,
-  FieldError,
-  FieldLabel,
-  Input,
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
@@ -21,13 +18,13 @@ import {
   RadioGroupItem,
   Switch,
 } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { cn } from "@/lib/utils";
 import {
   GST_RATE_OPTIONS,
   LINE_ITEM_TYPE_OPTIONS,
 } from "@/features/dashboard/create-invoice/constants";
-import { resolveItemType } from "@/features/dashboard/create-invoice/helpers";
 import { useLineItemSuggestions } from "@/features/dashboard/create-invoice/hooks";
 import type { LineItemDraft, LineItemSuggestion } from "@/features/dashboard/create-invoice/types";
 
@@ -43,43 +40,14 @@ const EMPTY: LineItemValues = {
   saveAsSku: false,
 };
 
-/** The fields a submit can be blocked on, in the order they appear in the form
- *  — which is also the order a failed submit walks to find the first one to
- *  focus. `hsn` is last because it is conditional: the invoice takes a line item
- *  without a tax code, but the SKU catalogue does not. */
-const REQUIRED_FIELDS = ["type", "description", "unitPrice", "quantity", "hsn"] as const;
-
-type RequiredField = (typeof REQUIRED_FIELDS)[number];
-type FieldErrors = Partial<Record<RequiredField, string>>;
-
-/** Where focus goes when a field is missing. The type radio has no single
- *  input, so the first option stands in for the group. */
-const FIELD_IDS: Record<RequiredField, string> = {
-  type: "line-item-type-GOOD",
-  description: "line-item-name",
-  unitPrice: "line-item-rate",
-  quantity: "line-item-qty",
-  hsn: "line-item-hsn",
-};
-
-/** Says what to do, not what went wrong: "Pick Good or Service" is actionable
- *  where "Item type is required" only restates the label. */
-function validate(values: LineItemValues): FieldErrors {
-  const errors: FieldErrors = {};
-  if (!values.type.trim()) errors.type = "Pick whether this is a good or a service.";
-  if (!values.description.trim()) errors.description = "Give this item a name.";
-  if (!values.unitPrice.trim()) errors.unitPrice = "Enter the rate you are charging.";
-  if (!values.quantity.trim()) errors.quantity = "Enter a quantity.";
-  // The catalogue rejects an item with no tax code, and the import that would
-  // hit that rule runs after the invoice is already saved — so a blank one here
-  // surfaces as a failure nothing on this screen can still fix. Ask now.
-  if (values.saveAsSku && !values.hsn.trim()) {
-    errors.hsn =
-      values.type === "SERVICE"
-        ? "Enter a SAC code to save this to your catalogue."
-        : "Enter an HSN code to save this to your catalogue.";
-  }
-  return errors;
+/** The catalogue rejects an item with no tax code, and the import that would
+ *  hit that rule runs after the invoice is already saved — so a blank one here
+ *  surfaces as a failure nothing on this screen can still fix. Ask now. */
+function hsnError(hsn: string, saveAsSku: boolean | undefined, type: string): string | undefined {
+  if (!saveAsSku || hsn.trim()) return undefined;
+  return type === "SERVICE"
+    ? "SAC code is required to save this to your catalogue"
+    : "HSN code is required to save this to your catalogue";
 }
 
 /**
@@ -162,70 +130,37 @@ function LineItemBody({
   onCancel: () => void;
   onSubmit: (values: LineItemValues) => void;
 }) {
-  const [values, setValues] = useState<LineItemValues>(() =>
-    editingItem
+  const form = useAppForm({
+    defaultValues: (editingItem
       ? {
           description: editingItem.description,
-          // Rows added from the inline picker before resolveItemType existed
-          // carry an empty type; fill it from the code where it can be told.
-          type: editingItem.type || resolveItemType(editingItem),
+          type: editingItem.type,
           hsn: editingItem.hsn,
           gstRate: editingItem.gstRate,
           unitPrice: editingItem.unitPrice,
           quantity: editingItem.quantity,
           saveAsSku: editingItem.saveAsSku ?? false,
         }
-      : { ...EMPTY, description: initialDescription ?? EMPTY.description }
-  );
+      : { ...EMPTY, description: initialDescription ?? EMPTY.description }) as LineItemValues,
+    onSubmit: ({ value }) => onSubmit(value),
+  });
+  const values = useStore(form.store, (state) => state.values);
   const [showGst, setShowGst] = useState(!!editingItem?.gstRate);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  /**
-   * Set when the item was picked from the merchant's existing items and its
-   * type could be resolved: Good/Service is a property of that item, not a
-   * per-invoice choice, so the radios lock to it rather than asking again.
-   * Typing a different name makes it a new item and hands the choice back.
-   */
-  const [typeFromItem, setTypeFromItem] = useState(false);
 
   const suggestions = useLineItemSuggestions(currency);
 
   /**
-   * Which required fields have been asked about and left empty.
-   *
-   * The submit button used to be disabled until all four were filled, which
-   * said nothing about *which* was missing — and the one most often missed is
-   * the item type, whose two radios read as optional when nothing is selected.
-   * So the button always acts, and a failed attempt names every gap at once and
-   * moves focus to the first.
+   * Picking a suggestion fills several fields at once. That is not the
+   * merchant editing them, so it doesn't validate them (an untouched field
+   * stays quiet); a field already showing an error is re-checked so a fill
+   * that fixes it clears the message.
    */
-  const [errors, setErrors] = useState<FieldErrors>({});
-
-  const patch = (next: Partial<LineItemValues>) => {
-    setValues((prev) => ({ ...prev, ...next }));
-    // Clear as soon as the field is answered, so the message never outlives the
-    // problem it describes.
-    setErrors((prev) => {
-      const cleared = { ...prev };
-      for (const key of Object.keys(next) as (keyof LineItemValues)[]) {
-        if (key in cleared) delete cleared[key as RequiredField];
-      }
-      // Switching the catalogue off retires the tax-code rule with it, so its
-      // message goes too rather than sitting under a field that is optional again.
-      if (next.saveAsSku === false) delete cleared.hsn;
-      return cleared;
-    });
-  };
-
-  const handleSubmit = () => {
-    const found = validate(values);
-    setErrors(found);
-
-    const firstMissing = REQUIRED_FIELDS.find((field) => found[field]);
-    if (!firstMissing) {
-      onSubmit(values);
-      return;
+  const fillFromSuggestion = (next: Partial<LineItemValues>) => {
+    for (const [name, value] of Object.entries(next) as [keyof LineItemValues, never][]) {
+      form.setFieldValue(name, value, { dontValidate: true, dontUpdateMeta: true });
+      if (form.getFieldMeta(name)?.errors.length) void form.validateField(name, "change");
     }
-    document.getElementById(FIELD_IDS[firstMissing])?.focus();
   };
 
   // Suggestions are previously-billed line items and carry no id, so the same
@@ -272,250 +207,268 @@ function LineItemBody({
   const isService = values.type === "SERVICE";
 
   return (
-    <>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
-        <Field>
-          <FieldLabel>Item type</FieldLabel>
-          <RadioGroup
-            value={values.type}
-            onValueChange={(next) => patch({ type: next })}
-            disabled={typeFromItem}
-            aria-invalid={!!errors.type || undefined}
-            // flex-row is explicit: RadioGroup defaults to flex-col, and a bare
-            // `flex` does not override a direction tailwind-merge sees no conflict
-            // with — without it the two options stack.
-            className="flex flex-row items-center gap-5"
-          >
-            {LINE_ITEM_TYPE_OPTIONS.map((option) => (
-              <label
-                key={option.value}
-                className={cn(
-                  "flex items-center gap-2 text-[13.5px] font-medium text-foreground",
-                  typeFromItem ? "cursor-default opacity-70" : "cursor-pointer"
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+          {/* The submit button used to be disabled until all four were filled,
+              which said nothing about *which* was missing — and the one most
+              often missed is the item type, whose two radios read as optional
+              when nothing is selected. So the button always acts. */}
+          <form.AppField name="type" validators={{ onChange: rules(required("Item type")) }}>
+            {(field) => (
+              <field.CustomField<string> id="line-item-type" label="Item type">
+                {({ value, invalid, onChange }) => (
+                  <RadioGroup
+                    value={value}
+                    onValueChange={onChange}
+                    aria-invalid={invalid || undefined}
+                    // flex-row is explicit: RadioGroup defaults to flex-col, and a bare
+                    // `flex` does not override a direction tailwind-merge sees no conflict
+                    // with — without it the two options stack.
+                    className="flex flex-row items-center gap-5"
+                  >
+                    {LINE_ITEM_TYPE_OPTIONS.map((option) => (
+                      <label
+                        key={option.value}
+                        className="flex cursor-pointer items-center gap-2 text-[13.5px] font-medium text-foreground"
+                      >
+                        <RadioGroupItem
+                          value={option.value}
+                          id={`line-item-type-${option.value}`}
+                        />
+                        {option.label}
+                      </label>
+                    ))}
+                  </RadioGroup>
                 )}
-              >
-                <RadioGroupItem value={option.value} id={`line-item-type-${option.value}`} />
-                {option.label}
-              </label>
-            ))}
-          </RadioGroup>
-          {typeFromItem && (
-            <p className="text-[11.5px] text-muted-foreground">Set by the saved item.</p>
-          )}
-          {errors.type && <FieldError>{errors.type}</FieldError>}
-        </Field>
-
-        {/* `modal` was how this popover got a scrollable list: it lives inside a
-          Dialog, flux's PopoverContent portals to document.body — outside the
-          Dialog's subtree — and the Dialog's react-remove-scroll lock cancels
-          the wheel out there. flux 0.3.3 fixes that for every popover
-          (ScrollLockTakeover in PopoverContent), so `modal` is no longer needed
-          for scrolling. Kept because it also keeps the suggestion list as its
-          own layer; drop it if this should stop trapping focus. */}
-        <Popover
-          modal
-          open={suggestionsOpen && matches.length > 0}
-          onOpenChange={setSuggestionsOpen}
-        >
-          <PopoverAnchor asChild>
-            <Field>
-              <FieldLabel htmlFor="line-item-name">Item name</FieldLabel>
-              <Input
-                id="line-item-name"
-                autoFocus
-                autoComplete="off"
-                className="shadow-none"
-                placeholder="e.g. Logo design, Consulting fee…"
-                value={values.description}
-                onFocus={() => setSuggestionsOpen(true)}
-                onChange={(e) => {
-                  patch({ description: e.target.value });
-                  setTypeFromItem(false);
-                  setSuggestionsOpen(true);
-                }}
-                aria-invalid={!!errors.description || undefined}
-              />
-              {errors.description && <FieldError>{errors.description}</FieldError>}
-            </Field>
-          </PopoverAnchor>
-
-          {/* Suggestions from the merchant's previous items. Picking one fills in
-            the rate and HSN it was last billed at, which is the whole point of
-            the endpoint — typing the name again should not mean retyping those. */}
-          <PopoverContent
-            align="start"
-            className="max-h-64 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
-            // Keep focus in the input so typing continues to filter.
-            onOpenAutoFocus={(e) => e.preventDefault()}
-          >
-            {matches.map(({ item: match, key }) => {
-              // The secondary line production shows: type, HSN and last rate,
-              // joined. It is the whole reason to pick a suggestion rather than
-              // retype the name, so it has to be visible *before* choosing.
-              const matchType = resolveItemType(match);
-              const meta = [
-                matchType ? (matchType === "SERVICE" ? "Service" : "Good") : "",
-                match.hsn ? `${matchType === "SERVICE" ? "SAC" : "HSN"} ${match.hsn}` : "",
-                match.unitPrice ? `${currencySymbol}${match.unitPrice}` : "",
-              ]
-                .filter(Boolean)
-                .join(" · ");
-
-              return (
-                <Button
-                  key={key}
-                  type="button"
-                  variant="ghost"
-                  className="h-auto w-full justify-start px-2 py-1.5 text-left [&>span]:min-w-0 [&>span]:flex-1"
-                  onClick={() => {
-                    patch({
-                      description: match.name,
-                      unitPrice: match.unitPrice ?? values.unitPrice,
-                      hsn: match.hsn ?? values.hsn,
-                      type: matchType || values.type,
-                      // Production clears this on select: picking an item that is
-                      // already in the catalogue must not queue it for re-import.
-                      saveAsSku: false,
-                    });
-                    setTypeFromItem(!!matchType);
-                    setSuggestionsOpen(false);
-                  }}
-                >
-                  <span className="block min-w-0">
-                    <span className="block truncate text-[13px] font-medium text-foreground">
-                      {match.name}
-                    </span>
-                    {meta && (
-                      <span className="block truncate text-[11.5px] font-normal text-muted-foreground">
-                        {meta}
-                      </span>
-                    )}
-                  </span>
-                </Button>
-              );
-            })}
-          </PopoverContent>
-        </Popover>
-
-        <div className="grid grid-cols-2 gap-3">
-          <Field>
-            <FieldLabel htmlFor="line-item-rate">Rate</FieldLabel>
-            <InputGroup className="shadow-none">
-              <InputGroupAddon>
-                <InputGroupText>{currencySymbol}</InputGroupText>
-              </InputGroupAddon>
-              <InputGroupInput
-                id="line-item-rate"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={values.unitPrice}
-                onChange={(e) => patch({ unitPrice: e.target.value })}
-                aria-invalid={!!errors.unitPrice || undefined}
-              />
-            </InputGroup>
-            {errors.unitPrice && <FieldError>{errors.unitPrice}</FieldError>}
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="line-item-qty">Quantity</FieldLabel>
-            <Input
-              id="line-item-qty"
-              inputMode="numeric"
-              className="shadow-none"
-              value={values.quantity}
-              onChange={(e) => patch({ quantity: e.target.value })}
-              aria-invalid={!!errors.quantity || undefined}
-            />
-            {errors.quantity && <FieldError>{errors.quantity}</FieldError>}
-          </Field>
-        </div>
-
-        <Field>
-          <FieldLabel htmlFor="line-item-hsn">
-            {isService ? "SAC code" : "HSN code"}
-            {/* Dropped rather than swapped for a required marker: every other
-              required field in this dialog carries no marker, so the suffix
-              going away is what "required" looks like here. */}
-            {!values.saveAsSku && (
-              <span className="font-normal text-muted-foreground"> (optional)</span>
+              </field.CustomField>
             )}
-          </FieldLabel>
-          <Input
-            id="line-item-hsn"
-            inputMode="numeric"
-            className="shadow-none"
-            placeholder={isService ? "e.g. 998314" : "e.g. 8471"}
-            value={values.hsn}
-            onChange={(e) => patch({ hsn: e.target.value })}
-            aria-invalid={!!errors.hsn || undefined}
-          />
-          {errors.hsn && <FieldError>{errors.hsn}</FieldError>}
-        </Field>
+          </form.AppField>
 
-        <div className="space-y-1">
-          <div className={cn(showGst && "border-b border-border")}>
+          {/* `modal` was how this popover got a scrollable list: it lives inside a
+            Dialog, flux's PopoverContent portals to document.body — outside the
+            Dialog's subtree — and the Dialog's react-remove-scroll lock cancels
+            the wheel out there. flux 0.3.3 fixes that for every popover
+            (ScrollLockTakeover in PopoverContent), so `modal` is no longer needed
+            for scrolling. Kept because it also keeps the suggestion list as its
+            own layer; drop it if this should stop trapping focus. */}
+          <Popover
+            modal
+            open={suggestionsOpen && matches.length > 0}
+            onOpenChange={setSuggestionsOpen}
+          >
+            <PopoverAnchor asChild>
+              <div>
+                <form.AppField
+                  name="description"
+                  validators={{ onChange: rules(required("Item name")) }}
+                >
+                  {(field) => (
+                    <field.TextField
+                      id="line-item-name"
+                      label="Item name"
+                      autoFocus
+                      autoComplete="off"
+                      inputClassName="shadow-none"
+                      placeholder="e.g. Logo design, Consulting fee…"
+                      onFocus={() => setSuggestionsOpen(true)}
+                      onValueChange={() => setSuggestionsOpen(true)}
+                    />
+                  )}
+                </form.AppField>
+              </div>
+            </PopoverAnchor>
+
+            {/* Suggestions from the merchant's previous items. Picking one fills in
+              the rate and HSN it was last billed at, which is the whole point of
+              the endpoint — typing the name again should not mean retyping those. */}
+            <PopoverContent
+              align="start"
+              className="max-h-64 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
+              // Keep focus in the input so typing continues to filter.
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
+              {matches.map(({ item: match, key }) => {
+                // The secondary line production shows: type, HSN and last rate,
+                // joined. It is the whole reason to pick a suggestion rather than
+                // retype the name, so it has to be visible *before* choosing.
+                const meta = [
+                  match.type ? (match.type === "SERVICE" ? "Service" : "Good") : "",
+                  match.hsn ? `${match.type === "SERVICE" ? "SAC" : "HSN"} ${match.hsn}` : "",
+                  match.unitPrice ? `${currencySymbol}${match.unitPrice}` : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+
+                return (
+                  <Button
+                    key={key}
+                    type="button"
+                    variant="ghost"
+                    className="h-auto w-full justify-start px-2 py-1.5 text-left [&>span]:min-w-0 [&>span]:flex-1"
+                    onClick={() => {
+                      fillFromSuggestion({
+                        description: match.name,
+                        unitPrice: match.unitPrice ?? values.unitPrice,
+                        hsn: match.hsn ?? values.hsn,
+                        type: match.type ?? values.type,
+                        // Production clears this on select: picking an item that is
+                        // already in the catalogue must not queue it for re-import.
+                        saveAsSku: false,
+                      });
+                      setSuggestionsOpen(false);
+                    }}
+                  >
+                    <span className="block min-w-0">
+                      <span className="block truncate text-[13px] font-medium text-foreground">
+                        {match.name}
+                      </span>
+                      {meta && (
+                        <span className="block truncate text-[11.5px] font-normal text-muted-foreground">
+                          {meta}
+                        </span>
+                      )}
+                    </span>
+                  </Button>
+                );
+              })}
+            </PopoverContent>
+          </Popover>
+
+          <div className="grid grid-cols-2 gap-3">
+            <form.AppField name="unitPrice" validators={{ onChange: rules(required("Rate")) }}>
+              {(field) => (
+                <field.CustomField<string> id="line-item-rate" label="Rate">
+                  {({ id, value, invalid, onChange, onBlur }) => (
+                    <InputGroup className="shadow-none">
+                      <InputGroupAddon>
+                        <InputGroupText>{currencySymbol}</InputGroupText>
+                      </InputGroupAddon>
+                      <InputGroupInput
+                        id={id}
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={value}
+                        onBlur={onBlur}
+                        onChange={(e) => onChange(e.target.value)}
+                        aria-invalid={invalid || undefined}
+                      />
+                    </InputGroup>
+                  )}
+                </field.CustomField>
+              )}
+            </form.AppField>
+
+            <form.AppField name="quantity" validators={{ onChange: rules(required("Quantity")) }}>
+              {(field) => (
+                <field.TextField
+                  id="line-item-qty"
+                  label="Quantity"
+                  inputMode="numeric"
+                  inputClassName="shadow-none"
+                />
+              )}
+            </form.AppField>
+          </div>
+
+          {/* Required only while "Save to SKU catalogue" is on, so the * follows
+              that toggle and the rule reads the toggle and the type at check time. */}
+          <form.AppField
+            name="hsn"
+            validators={{
+              onChange: ({ value, fieldApi }) =>
+                hsnError(
+                  value,
+                  fieldApi.form.getFieldValue("saveAsSku"),
+                  fieldApi.form.getFieldValue("type")
+                ),
+            }}
+          >
+            {(field) => (
+              <field.TextField
+                id="line-item-hsn"
+                label={isService ? "SAC code" : "HSN code"}
+                required={!!values.saveAsSku}
+                inputMode="numeric"
+                inputClassName="shadow-none"
+                placeholder={isService ? "e.g. 998314" : "e.g. 8471"}
+              />
+            )}
+          </form.AppField>
+
+          <div className="space-y-1">
+            <div className={cn(showGst && "border-b border-border")}>
+              <div className="flex items-center justify-between py-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-[13px] font-semibold text-foreground">Add GST</p>
+                  <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                    Optional
+                  </span>
+                </div>
+                <Switch
+                  checked={showGst}
+                  onCheckedChange={(checked) => {
+                    setShowGst(checked);
+                    if (!checked) form.setFieldValue("gstRate", "");
+                  }}
+                  aria-label="Toggle GST"
+                />
+              </div>
+
+              {showGst && (
+                <div className="flex flex-wrap items-center gap-2 pb-3">
+                  {GST_RATE_OPTIONS.filter((option) => option.value !== "").map((option) => (
+                    <Button
+                      key={option.value}
+                      type="button"
+                      variant={values.gstRate === option.value ? "primary" : "outline"}
+                      size="sm"
+                      className="rounded-full"
+                      onClick={() => form.setFieldValue("gstRate", option.value)}
+                    >
+                      {option.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <div className="flex items-center justify-between py-2">
-              <div className="flex items-center gap-2">
-                <p className="text-[13px] font-semibold text-foreground">Add GST</p>
-                <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                  Optional
-                </span>
+              <div>
+                <p className="text-[13px] font-semibold text-foreground">Save to SKU catalogue</p>
+                <p className="text-[11px] text-muted-foreground">
+                  Reuse this item on future invoices without retyping it.
+                </p>
               </div>
               <Switch
-                checked={showGst}
+                checked={values.saveAsSku ?? false}
                 onCheckedChange={(checked) => {
-                  setShowGst(checked);
-                  if (!checked) patch({ gstRate: "" });
+                  form.setFieldValue("saveAsSku", checked);
+                  // The tax-code rule follows the toggle: re-check it if it is
+                  // already showing, or if the merchant has edited it.
+                  const hsnMeta = form.getFieldMeta("hsn");
+                  if (hsnMeta?.isTouched || hsnMeta?.errors.length) {
+                    void form.validateField("hsn", "change");
+                  }
                 }}
-                aria-label="Toggle GST"
+                aria-label="Save item to SKU catalogue"
               />
             </div>
-
-            {showGst && (
-              <div className="flex flex-wrap items-center gap-2 pb-3">
-                {GST_RATE_OPTIONS.filter((option) => option.value !== "").map((option) => (
-                  <Button
-                    key={option.value}
-                    type="button"
-                    variant={values.gstRate === option.value ? "primary" : "outline"}
-                    size="sm"
-                    className="rounded-full"
-                    onClick={() => patch({ gstRate: option.value })}
-                  >
-                    {option.label}
-                  </Button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between py-2">
-            <div>
-              <p className="text-[13px] font-semibold text-foreground">Save to SKU catalogue</p>
-              <p className="text-[11px] text-muted-foreground">
-                Reuse this item on future invoices without retyping it.
-              </p>
-            </div>
-            <Switch
-              checked={values.saveAsSku ?? false}
-              onCheckedChange={(checked) => patch({ saveAsSku: checked })}
-              aria-label="Save item to SKU catalogue"
-            />
           </div>
         </div>
-      </div>
 
-      <div className="shrink-0 space-y-2 border-t border-border px-6 py-4">
-        {/* Never disabled: a dead button cannot say why it is dead. Pressing it
-            with something missing is what surfaces the messages above. */}
-        <Button type="button" variant="primary" className="w-full" onClick={handleSubmit}>
-          {editingItem ? "Save changes" : "Add item"}
-        </Button>
-        <Button type="button" variant="secondary" className="w-full" onClick={onCancel}>
-          Cancel
-        </Button>
-      </div>
-    </>
+        <div className="shrink-0 space-y-2 border-t border-border px-6 py-4">
+          {/* Never disabled: a dead button cannot say why it is dead. Pressing it
+              with something missing is what surfaces the messages above. */}
+          <form.SubmitButton size="md" className="w-full">
+            {editingItem ? "Save changes" : "Add item"}
+          </form.SubmitButton>
+          <Button type="button" variant="secondary" className="w-full" onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }
 

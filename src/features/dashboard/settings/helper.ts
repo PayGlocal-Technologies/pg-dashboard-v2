@@ -10,8 +10,8 @@ import type { ChangeEmailFailure } from "@/features/dashboard/settings/types";
  *  so the merchant sees one wording whichever side catches it. */
 export function validateNewEmail(value: string, currentEmail?: string | null): string | null {
   const email = value.trim();
-  if (!email) return "Please enter your new email address.";
-  if (!isValidEmail(email)) return "Please provide a valid email id";
+  if (!email) return "New email address is required";
+  if (!isValidEmail(email)) return "Enter a valid email address";
 
   const current = currentEmail?.trim();
   if (current && current.toLowerCase() === email.toLowerCase()) {

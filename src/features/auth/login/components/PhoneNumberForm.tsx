@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
-import { Button, Field, FieldError, FieldLabel, Input } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { useEncryptPayload } from "@/features/auth/hooks";
@@ -35,7 +34,7 @@ export function PhoneNumberForm({ setScreen }: LoginScreenProps) {
   const setSmsOtpInitiateTimestamp = useLogin((s) => s.setSmsOtpInitiateTimestamp);
   const setIsPhoneNumberOtpLogin = useLogin((s) => s.setIsPhoneNumberOtpLogin);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { phoneNumber: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -61,51 +60,39 @@ export function PhoneNumberForm({ setScreen }: LoginScreenProps) {
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Add your phone number">
-        Enter your mobile number to secure your account with OTP verification.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Add your phone number">
+          Enter your mobile number to secure your account with OTP verification.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="phoneNumber"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = phoneSchema.shape.phoneNumber.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="phoneNumber">Phone number</FieldLabel>
-            <Input
+        <form.AppField
+          name="phoneNumber"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = phoneSchema.shape.phoneNumber.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.TextField
               id="phoneNumber"
+              label="Phone number"
               type="tel"
               autoComplete="tel"
               autoFocus
-              aria-invalid={field.state.meta.errors.length > 0}
               placeholder="+91 9876543210"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
             />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+          )}
+        </form.AppField>
 
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Send OTP
-      </Button>
-    </form>
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Send OTP
+        </form.SubmitButton>
+      </form.Form>
+    </form.AppForm>
   );
 }
 
@@ -130,7 +117,7 @@ export function NamePhoneNumberForm({ setScreen }: LoginScreenProps) {
       .regex(/^\+?[0-9]{10,15}$/, "Enter a valid phone number"),
   });
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { name: "", phoneNumber: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -156,76 +143,57 @@ export function NamePhoneNumberForm({ setScreen }: LoginScreenProps) {
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Tell us about yourself">
-        Please provide your name and phone number to continue.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Tell us about yourself">
+          Please provide your name and phone number to continue.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="name"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = namePhoneSchema.shape.name.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="name">Full name</FieldLabel>
-            <Input
+        <form.AppField
+          name="name"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = namePhoneSchema.shape.name.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.TextField
               id="name"
+              label="Full name"
               autoComplete="name"
               autoFocus
-              aria-invalid={field.state.meta.errors.length > 0}
               placeholder="Your full name"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
             />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+          )}
+        </form.AppField>
 
-      <form.Field
-        name="phoneNumber"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = namePhoneSchema.shape.phoneNumber.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="pn-nameform">Phone number</FieldLabel>
-            <Input
+        <form.AppField
+          name="phoneNumber"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = namePhoneSchema.shape.phoneNumber.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.TextField
               id="pn-nameform"
+              label="Phone number"
               type="tel"
               autoComplete="tel"
-              aria-invalid={field.state.meta.errors.length > 0}
               placeholder="+91 9876543210"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
             />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+          )}
+        </form.AppField>
 
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Continue
-      </Button>
-    </form>
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Continue
+        </form.SubmitButton>
+      </form.Form>
+    </form.AppForm>
   );
 }

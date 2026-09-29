@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { withBasePath } from "@/constants/basePath";
-import { useForm } from "@tanstack/react-form";
-import { Button, Field, FieldError, FieldLabel, OtpInput, Separator } from "@/components/ui";
+import { Button, FieldLabel, OtpInput, Separator } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { ResendOtpMessage } from "@/features/auth/components/ResendOtpMessage";
@@ -50,7 +50,7 @@ export function OtpForm({ setScreen }: LoginScreenProps) {
 
   const target = isPhone ? maskedPhoneNumber || "your phone" : maskedEmail || identifier;
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { otp: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -101,71 +101,69 @@ export function OtpForm({ setScreen }: LoginScreenProps) {
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Enter the code we sent">
-        We sent a {OTP_LENGTH}-digit code to {target}.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Enter the code we sent">
+          We sent a {OTP_LENGTH}-digit code to {target}.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="otp"
-        validators={{
-          onChange: ({ value }) => {
-            const r = otpSchema.shape.otp.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel>{isPhone ? "Phone OTP" : "Email OTP"}</FieldLabel>
-            <OtpInput
-              value={field.state.value}
-              onChange={field.handleChange}
-              onComplete={() => void form.handleSubmit()}
-              length={OTP_LENGTH}
-              invalid={field.state.meta.errors.length > 0}
-              autoFocus
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
+        <form.AppField
+          name="otp"
+          validators={{
+            onChange: ({ value }) => {
+              const r = otpSchema.shape.otp.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.CustomField<string>>
+              {({ value, invalid, onChange }) => (
+                <>
+                  <FieldLabel>{isPhone ? "Phone OTP" : "Email OTP"}</FieldLabel>
+                  <OtpInput
+                    value={value}
+                    onChange={onChange}
+                    onComplete={() => void form.handleSubmit()}
+                    length={OTP_LENGTH}
+                    invalid={invalid}
+                    autoFocus
+                  />
+                </>
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
+
+        <ResendOtpMessage
+          startTime={isPhone ? smsTs : emailTs}
+          message="Didn't receive it?"
+          onResend={() => void handleResend()}
+        />
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Verify &amp; continue
+        </form.SubmitButton>
+
+        {hasPassword && !isPhone && (
+          <>
+            <div className="flex items-center gap-3">
+              <Separator className="flex-1" />
+              <span className="text-xs text-muted-foreground">OR</span>
+              <Separator className="flex-1" />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => setScreen("password")}
+              className="w-full"
+            >
+              Sign in with password instead
+            </Button>
+          </>
         )}
-      </form.Field>
-
-      <ResendOtpMessage
-        startTime={isPhone ? smsTs : emailTs}
-        message="Didn't receive it?"
-        onResend={() => void handleResend()}
-      />
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Verify &amp; continue
-      </Button>
-
-      {hasPassword && !isPhone && (
-        <>
-          <div className="flex items-center gap-3">
-            <Separator className="flex-1" />
-            <span className="text-xs text-muted-foreground">OR</span>
-            <Separator className="flex-1" />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            onClick={() => setScreen("password")}
-            className="w-full"
-          >
-            Sign in with password instead
-          </Button>
-        </>
-      )}
-    </form>
+      </form.Form>
+    </form.AppForm>
   );
 }

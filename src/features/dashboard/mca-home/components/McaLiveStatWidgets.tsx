@@ -5,7 +5,10 @@ import { useScopeId } from "@/lib/hooks/useScopeId";
 import { formatCurrencyShort } from "@/lib/utils/format";
 import { McaStatCard } from "@/features/dashboard/mca-home/components/McaStatCard";
 import { useInvoiceSummary } from "@/features/dashboard/mca-invoices/hooks";
-import { useCurrencySplit, useDocumentPending } from "@/features/dashboard/mca-transactions/hooks";
+import {
+  useCurrencySplit,
+  useDocumentPendingByCurrency,
+} from "@/features/dashboard/mca-transactions/hooks";
 import { useSettlementUpcoming } from "@/features/dashboard/settlement-reports/hooks";
 
 /**
@@ -37,19 +40,18 @@ function buildLast30Range(): { startDate: string; endDate: string } {
   return { startDate: iso(start), endDate: iso(end) };
 }
 
-/** Collected but not yet invoiced: the same document-pending figure, and the
- *  same year-to-date window, as the Transactions page's Outstanding amount. */
+/** Collected but not yet invoiced: the same by-currency snapshot, so the same
+ *  count and amount, as the Transactions page's Invoice required card. */
 export function OutstandingAmountWidget() {
-  const { documentPending, isLoading } = useDocumentPending("ytd");
-  const count = documentPending?.count ?? 0;
+  const { breakdown, isLoading } = useDocumentPendingByCurrency();
+  const count = breakdown?.totalCount ?? 0;
   return (
     <McaStatCard
       isLoading={isLoading}
       data={{
         title: "Outstanding amount",
-        valueLabel: documentPending
-          ? formatCurrencyShort(documentPending.amount, documentPending.reportingCurrency)
-          : "—",
+        // The snapshot reports every amount in INR.
+        valueLabel: breakdown ? formatCurrencyShort(breakdown.totalAmount, "INR") : "—",
         captionLabel: `${count} transaction${count === 1 ? "" : "s"} awaiting an invoice`,
         accentColor: "var(--chart-3)",
       }}

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import {
   Alert,
@@ -11,9 +10,6 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  Field,
-  FieldError,
-  FieldLabel,
   Input,
   Separator,
   Tabs,
@@ -25,7 +21,10 @@ import {
   TooltipTrigger,
   VisuallyHidden,
 } from "@/components/ui";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import { Icon } from "@/components/icon";
+import { useAppForm } from "@/components/form/AppForm";
+import { email, required, rules } from "@/components/form/rules";
 import { useApp } from "@/stores/useApp";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
 import { RegionSelector } from "@/features/dashboard/multi-currency/components/RegionSelector";
@@ -40,13 +39,9 @@ import {
 import { useSendAccountEmail, useShareLink } from "@/features/dashboard/multi-currency/hooks";
 import type { VirtualAccount } from "@/features/dashboard/multi-currency/types";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function validateEmail(value: string, required: boolean): string | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return required ? "Enter an email address" : undefined;
-  return EMAIL_RE.test(trimmed) ? undefined : "Enter a valid email address";
-}
+/** Client email is required; Cc/Bcc are optional but must be valid if given. */
+const CLIENT_EMAIL_RULES = rules(required("Client email"), email());
+const COPY_EMAIL_RULES = rules(email());
 
 interface ShareAccountDetailsModalProps {
   open: boolean;
@@ -114,13 +109,13 @@ export function ShareAccountDetailsModal({
   // entered client/Cc/Bcc details and the Cc/Bcc toggle survive a trip back
   // to Share via link and forward again.
   const [showCcBcc, setShowCcBcc] = useState(false);
-  const emailForm = useForm({
+  const emailForm = useAppForm({
     defaultValues: { clientName: "", clientEmail: "", cc: "", bcc: "" },
     onSubmit: async ({ value }) => {
       if (
-        validateEmail(value.clientEmail, true) ||
-        validateEmail(value.cc, false) ||
-        validateEmail(value.bcc, false)
+        CLIENT_EMAIL_RULES({ value: value.clientEmail }) ||
+        COPY_EMAIL_RULES({ value: value.cc }) ||
+        COPY_EMAIL_RULES({ value: value.bcc })
       ) {
         return;
       }
@@ -233,19 +228,24 @@ export function ShareAccountDetailsModal({
                     value={shareUrl}
                     className="min-w-0 border-0 bg-transparent text-xs shadow-none focus-visible:ring-0"
                   />
-                  <Button
-                    variant="primary"
-                    size="sm"
+                  <DisabledReason
+                    reason={!shareUrl || isRequesting ? "Generating the share link…" : null}
                     className="shrink-0"
-                    leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
-                    onClick={() => onCopyLink(shareUrl)}
-                    // The link is issued by the backend, so there is nothing to
-                    // copy until it arrives. Mirrors pg-dashboard, which also
-                    // requests the link when the modal opens.
-                    disabled={!shareUrl || isRequesting}
                   >
-                    Copy Link
-                  </Button>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      className="shrink-0"
+                      leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
+                      onClick={() => onCopyLink(shareUrl)}
+                      // The link is issued by the backend, so there is nothing to
+                      // copy until it arrives. Mirrors pg-dashboard, which also
+                      // requests the link when the modal opens.
+                      disabled={!shareUrl || isRequesting}
+                    >
+                      Copy Link
+                    </Button>
+                  </DisabledReason>
                 </div>
               </div>
             </Card>
@@ -396,120 +396,84 @@ export function ShareAccountDetailsModal({
                     above/below the rule itself. */}
                 <Separator className="my-4" />
 
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void emailForm.handleSubmit();
-                  }}
-                  // space-y-4 (medium) is every "field → field" and "Cc/Bcc →
-                  // Send Email" step at once — Client Name, Client Email, the
-                  // Cc/Bcc toggle/fields, and Send Email are all direct
-                  // children of this form.
-                  className="space-y-4"
-                  noValidate
-                >
-                  <emailForm.Field name="clientName">
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="clientName">Client Name</FieldLabel>
-                        <Input
+                {/* space-y-4 (medium) is every "field → field" and "Cc/Bcc →
+                    Send Email" step at once — Client Name, Client Email, the
+                    Cc/Bcc toggle/fields, and Send Email are all direct
+                    children of this form. */}
+                <emailForm.AppForm>
+                  <emailForm.Form className="space-y-4">
+                    <emailForm.AppField name="clientName">
+                      {(field) => (
+                        <field.TextField
                           id="clientName"
+                          label="Client Name"
                           placeholder="Enter client name"
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
                         />
-                      </Field>
-                    )}
-                  </emailForm.Field>
+                      )}
+                    </emailForm.AppField>
 
-                  <emailForm.Field
-                    name="clientEmail"
-                    validators={{ onBlur: ({ value }) => validateEmail(value, true) }}
-                  >
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="clientEmail">Client Email</FieldLabel>
-                        <Input
+                    <emailForm.AppField
+                      name="clientEmail"
+                      validators={{ onChange: CLIENT_EMAIL_RULES }}
+                    >
+                      {(field) => (
+                        <field.TextField
                           id="clientEmail"
                           type="email"
+                          label="Client Email"
                           placeholder="Enter client email"
-                          aria-invalid={field.state.meta.errors.length > 0}
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          onBlur={field.handleBlur}
                         />
-                        <FieldError>{field.state.meta.errors[0]}</FieldError>
-                      </Field>
-                    )}
-                  </emailForm.Field>
+                      )}
+                    </emailForm.AppField>
 
-                  {showCcBcc ? (
-                    <div className="space-y-4">
-                      <emailForm.Field
-                        name="cc"
-                        validators={{ onBlur: ({ value }) => validateEmail(value, false) }}
-                      >
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="cc">Cc</FieldLabel>
-                            <Input
+                    {showCcBcc ? (
+                      <div className="space-y-4">
+                        <emailForm.AppField name="cc" validators={{ onChange: COPY_EMAIL_RULES }}>
+                          {(field) => (
+                            <field.TextField
                               id="cc"
                               type="email"
+                              label="Cc"
                               placeholder="cc@company.com"
-                              aria-invalid={field.state.meta.errors.length > 0}
-                              value={field.state.value}
-                              onChange={(e) => field.handleChange(e.target.value)}
-                              onBlur={field.handleBlur}
                             />
-                            <FieldError>{field.state.meta.errors[0]}</FieldError>
-                          </Field>
-                        )}
-                      </emailForm.Field>
-                      <emailForm.Field
-                        name="bcc"
-                        validators={{ onBlur: ({ value }) => validateEmail(value, false) }}
-                      >
-                        {(field) => (
-                          <Field>
-                            <FieldLabel htmlFor="bcc">Bcc</FieldLabel>
-                            <Input
+                          )}
+                        </emailForm.AppField>
+                        <emailForm.AppField name="bcc" validators={{ onChange: COPY_EMAIL_RULES }}>
+                          {(field) => (
+                            <field.TextField
                               id="bcc"
                               type="email"
+                              label="Bcc"
                               placeholder="bcc@company.com"
-                              aria-invalid={field.state.meta.errors.length > 0}
-                              value={field.state.value}
-                              onChange={(e) => field.handleChange(e.target.value)}
-                              onBlur={field.handleBlur}
                             />
-                            <FieldError>{field.state.meta.errors[0]}</FieldError>
-                          </Field>
-                        )}
-                      </emailForm.Field>
-                    </div>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="link"
-                      size="sm"
-                      className="h-auto px-0 text-muted-foreground"
-                      leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-                      onClick={() => setShowCcBcc(true)}
-                    >
-                      Add Cc Bcc
-                    </Button>
-                  )}
+                          )}
+                        </emailForm.AppField>
+                      </div>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto px-0 text-muted-foreground"
+                        leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+                        onClick={() => setShowCcBcc(true)}
+                      >
+                        Add Cc Bcc
+                      </Button>
+                    )}
 
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    leftIcon={<Icon name="send-horizontal" className="h-4 w-4" />}
-                    // Same in-flight guard pg-dashboard's McaShareModal applies
-                    // via isSendingEmail, so one submit can't be sent twice.
-                    disabled={isSending}
-                  >
-                    Send Email
-                  </Button>
-                </form>
+                    {/* Same in-flight guard pg-dashboard's McaShareModal applies
+                        via isSendingEmail, so one submit can't be sent twice. */}
+                    <emailForm.SubmitButton
+                      size="md"
+                      className="w-full"
+                      leftIcon={<Icon name="send-horizontal" className="h-4 w-4" />}
+                      pending={isSending}
+                    >
+                      Send Email
+                    </emailForm.SubmitButton>
+                  </emailForm.Form>
+                </emailForm.AppForm>
               </Card>
 
               {/* Preview: secondary, on the same muted grey surface (and the

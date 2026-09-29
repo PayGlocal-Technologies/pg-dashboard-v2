@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { useGet } from "@/lib/api/hooks";
 import {
   mcaCurrencySplitApi,
-  mcaDocumentPendingApi,
   mcaDocumentPendingByCurrencyApi,
   mcaDocumentPendingListApi,
   mcaFircDownloadApi,
@@ -30,10 +29,8 @@ import type {
   CurrencySplitResponse,
   DocumentPendingByCurrencyData,
   DocumentPendingByCurrencyResponse,
-  DocumentPendingData,
   DocumentPendingListResponse,
   DocumentPendingListRow,
-  DocumentPendingResponse,
   DocumentPendingSortBy,
   DocumentPendingTimeframe,
   FircDownloadResponse,
@@ -269,29 +266,9 @@ export function useSettledCurrencyTrend(): {
 }
 
 /**
- * Documents pending amount + count for a timeframe (today | week | month |
- * ytd). Backs OutstandingAmountCard's headline. Scoped like useSettledByAccount:
- * a selected MID, else the UCIC roll-up.
- */
-export function useDocumentPending(timeframe: string): {
-  documentPending: DocumentPendingData | undefined;
-  isLoading: boolean;
-  isError: boolean;
-} {
-  const { scopeId: merchantId, isReady } = useScopeId("PACB");
-
-  const { data, isPending, isError } = useGet<DocumentPendingResponse>(
-    ["mca-document-pending", merchantId, timeframe],
-    mcaDocumentPendingApi(merchantId, timeframe),
-    { enabled: isReady }
-  );
-
-  return { documentPending: data?.data, isLoading: isReady && isPending, isError };
-}
-
-/**
  * Documents pending broken down by currency — a live snapshot of everything
- * currently DOCUMENT_PENDING (no timeframe). Scoped like useDocumentPending.
+ * currently DOCUMENT_PENDING (no timeframe). Scoped like useSettledByAccount:
+ * a selected MID, else the UCIC roll-up. Backs OutstandingAmountCard.
  */
 export function useDocumentPendingByCurrency(): {
   breakdown: DocumentPendingByCurrencyData | undefined;
@@ -386,10 +363,9 @@ export function toMetricNumber(value: number | string | undefined): number {
  *
  * Those two figures are the reason a caller needs only this hook: the card's
  * headline and its rows come from one response, so they always describe the
- * same window. useDocumentPending remains for callers that want the aggregate
- * WITHOUT rows, and on its own narrower today/week/month/ytd vocabulary.
+ * same window.
  *
- * A path-scoped analytics call like useDocumentPending, so it scopes with
+ * A path-scoped analytics call like useDocumentPendingByCurrency, so it scopes with
  * useScopeId rather than useResolvedMids, and the server does the ranking and
  * paging. That server-side sort is the point of the endpoint: this used to be
  * an OpenSearch search that pulled a 200-row pool and sorted it client-side on

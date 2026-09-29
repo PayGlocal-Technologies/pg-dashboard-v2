@@ -1,17 +1,9 @@
 "use client";
 
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-  Field,
-  FieldLabel,
-  Input,
-  PasswordInput,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 
 /**
  * DGFT account login — a proper popup (Dialog), not the inline two-column
@@ -63,51 +55,91 @@ export function DgftLoginDialog({
           </div>
         </div>
 
+        {/* Mounted with the content, so each opening starts clean. */}
+        <DgftLoginForm
+          username={username}
+          password={password}
+          onUsernameChange={onUsernameChange}
+          onPasswordChange={onPasswordChange}
+          onLogin={onLogin}
+          onCancel={() => onOpenChange(false)}
+          isPending={isPending}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * The two credentials. The parent owns their values (its login call reads
+ * them), so each change is mirrored up; the form owns validation. Login stays
+ * enabled; errors follow the app-wide rule (components/form).
+ */
+function DgftLoginForm({
+  username,
+  password,
+  onUsernameChange,
+  onPasswordChange,
+  onLogin,
+  onCancel,
+  isPending,
+}: {
+  username: string;
+  password: string;
+  onUsernameChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onLogin: () => void;
+  onCancel: () => void;
+  isPending: boolean;
+}) {
+  const form = useAppForm({
+    defaultValues: { username, password },
+    onSubmit: () => onLogin(),
+  });
+
+  return (
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-          <Field>
-            <FieldLabel htmlFor="dgft-username">Username</FieldLabel>
-            <Input
-              id="dgft-username"
-              autoComplete="off"
-              value={username}
-              onChange={(e) => onUsernameChange(e.target.value)}
-              className="shadow-none"
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="dgft-password">Password</FieldLabel>
-            <PasswordInput
-              id="dgft-password"
-              autoComplete="off"
-              value={password}
-              onChange={(e) => onPasswordChange(e.target.value)}
-              className="shadow-none"
-            />
-          </Field>
+          <form.AppField name="username" validators={{ onChange: rules(required("Username")) }}>
+            {(field) => (
+              <field.TextField
+                id="dgft-username"
+                label="Username"
+                autoComplete="off"
+                inputClassName="shadow-none"
+                onValueChange={onUsernameChange}
+              />
+            )}
+          </form.AppField>
+          <form.AppField name="password" validators={{ onChange: rules(required("Password")) }}>
+            {(field) => (
+              <field.PasswordField
+                id="dgft-password"
+                label="Password"
+                autoComplete="off"
+                inputClassName="shadow-none"
+                onValueChange={onPasswordChange}
+              />
+            )}
+          </form.AppField>
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 border-t border-border px-6 py-4">
-          <Button
-            type="button"
-            variant="primary"
-            className="w-full"
-            onClick={onLogin}
-            disabled={isPending || !username.trim() || !password}
-            isLoading={isPending}
-          >
+          <form.SubmitButton size="md" className="w-full" pending={isPending} isLoading={isPending}>
             Login to DGFT
-          </Button>
+          </form.SubmitButton>
           <Button
             type="button"
             variant="ghost"
             className="w-full"
             disabled={isPending}
-            onClick={() => onOpenChange(false)}
+            onClick={onCancel}
           >
             Cancel
           </Button>
         </div>
-      </DialogContent>
-    </Dialog>
+      </form.Form>
+    </form.AppForm>
   );
 }

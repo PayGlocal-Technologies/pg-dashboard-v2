@@ -229,7 +229,11 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
     </div>
   );
 
-  function handleIssueRefund({ amount: refundAmount, reason, details }: RefundSubmission) {
+  function handleIssueRefund({
+    amount: refundAmount,
+    reason,
+    details,
+  }: RefundSubmission): string | void {
     // Over-refund prevention: checked against every existing refund on this
     // transaction, mock-seeded and session-issued alike (detail.financials.
     // refundEvents is the merged set, see deriveTransactionDetail), not just
@@ -240,8 +244,9 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
       currency,
     });
     if (!validation.ok) {
-      toast.error("Refund not issued", { description: validation.reason });
-      return;
+      // Handed back to the dialog, which shows it under the amount and stays
+      // open so the merchant can correct it, rather than a toast after close.
+      return validation.reason;
     }
 
     const reasonLabel = reason.replace(/_/g, " ");

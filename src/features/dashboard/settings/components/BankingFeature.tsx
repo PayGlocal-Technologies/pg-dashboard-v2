@@ -1,20 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
-import {
-  Badge,
-  Button,
-  Card,
-  Field,
-  FieldError,
-  FieldLabel,
-  Input,
-  PageHeader,
-  Shimmer,
-} from "@/components/ui";
+import { Badge, Button, Card, PageHeader, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { DisabledReason } from "@/components/common/DisabledReason";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, pattern, required, rules } from "@/components/form/rules";
 import { cn } from "@/lib/utils";
 import { useSettlementDetails, useUpdateAccountDetails } from "@/features/dashboard/settings/hooks";
 
@@ -47,7 +39,7 @@ export function BankingFeature() {
   const accountNumber = settlement?.accountNumber ?? settlement?.maskedAccountNumber ?? "—";
   const ifscCode = settlement?.ifscCode ?? "—";
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { number: "", ifscCode: "" },
     onSubmit: ({ value }) => {
       updateAccount(
@@ -95,86 +87,80 @@ export function BankingFeature() {
 
         <div>
           {editing ? (
-            <form
-              className="mt-2 space-y-2.5"
-              onSubmit={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                void form.handleSubmit();
-              }}
-            >
-              <form.Field
-                name="number"
-                validators={{
-                  onSubmit: ({ value }) =>
-                    ACCOUNT_RE.test(value.trim())
-                      ? undefined
-                      : "Enter a valid account number (9–18 digits)",
-                }}
-              >
-                {(field) => (
-                  <Field className={COMPACT_FIELD}>
-                    <FieldLabel htmlFor="account-number" className={COMPACT_LABEL}>
-                      Account number
-                    </FieldLabel>
-                    <Input
+            <form.AppForm>
+              <form.Form className="mt-2 space-y-2.5">
+                <form.AppField
+                  name="number"
+                  validators={{
+                    onChange: rules(
+                      required("Account number"),
+                      pattern(ACCOUNT_RE, "Enter a valid account number (9–18 digits)")
+                    ),
+                  }}
+                >
+                  {(field) => (
+                    <field.TextField
                       id="account-number"
+                      label="Account number"
                       inputMode="numeric"
                       placeholder="Enter new account number"
-                      value={field.state.value}
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      onChange={(e) => field.handleChange(e.target.value.replace(/\D/g, ""))}
-                      onBlur={field.handleBlur}
-                      className={cn(COMPACT_INPUT, "font-mono tabular-nums")}
+                      parse={(raw) => raw.replace(/\D/g, "")}
+                      className={COMPACT_FIELD}
+                      labelClassName={COMPACT_LABEL}
+                      inputClassName={cn(COMPACT_INPUT, "tabular-nums")}
+                      errorClassName={COMPACT_ERROR}
                     />
-                    <FieldError className={COMPACT_ERROR}>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                )}
-              </form.Field>
+                  )}
+                </form.AppField>
 
-              <form.Field
-                name="ifscCode"
-                validators={{
-                  onSubmit: ({ value }) =>
-                    IFSC_RE.test(value.trim().toUpperCase())
-                      ? undefined
-                      : "Enter a valid IFSC code",
-                }}
-              >
-                {(field) => (
-                  <Field className={COMPACT_FIELD}>
-                    <FieldLabel htmlFor="ifsc-code" className={COMPACT_LABEL}>
-                      IFSC code
-                    </FieldLabel>
-                    <Input
-                      id="ifsc-code"
-                      placeholder="e.g. HDFC0000123"
-                      value={field.state.value}
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      onChange={(e) => field.handleChange(e.target.value.toUpperCase())}
-                      onBlur={field.handleBlur}
-                      className={cn(COMPACT_INPUT, "font-mono")}
-                    />
-                    <FieldError className={COMPACT_ERROR}>{field.state.meta.errors[0]}</FieldError>
-                  </Field>
-                )}
-              </form.Field>
-
-              <div className="flex gap-2">
-                <Button type="submit" size="sm" isLoading={isSaving} disabled={!canEdit}>
-                  Save changes
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setEditing(false)}
-                  disabled={isSaving}
+                <form.AppField
+                  name="ifscCode"
+                  validators={{
+                    onChange: rules(
+                      required("IFSC code"),
+                      check(
+                        (value: string) =>
+                          !IFSC_RE.test(value.trim().toUpperCase()) && "Enter a valid IFSC code"
+                      )
+                    ),
+                  }}
                 >
-                  Cancel
-                </Button>
-              </div>
-            </form>
+                  {(field) => (
+                    <field.TextField
+                      id="ifsc-code"
+                      label="IFSC code"
+                      placeholder="e.g. HDFC0000123"
+                      parse={(raw) => raw.toUpperCase()}
+                      className={COMPACT_FIELD}
+                      labelClassName={COMPACT_LABEL}
+                      inputClassName={COMPACT_INPUT}
+                      errorClassName={COMPACT_ERROR}
+                    />
+                  )}
+                </form.AppField>
+
+                <div className="flex gap-2">
+                  {/* Only the edit permission keeps Save disabled, and it says so. */}
+                  <form.SubmitButton
+                    isLoading={isSaving}
+                    disabledReason={
+                      canEdit ? null : "You don't have permission to edit bank details"
+                    }
+                  >
+                    Save changes
+                  </form.SubmitButton>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditing(false)}
+                    disabled={isSaving}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form.Form>
+            </form.AppForm>
           ) : (
             <>
               {/* Account number and IFSC grouped as one labelled pair, not two
@@ -215,16 +201,21 @@ export function BankingFeature() {
                 </div>
               </div>
 
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="mt-3 h-auto min-h-0 p-0 text-[13px] font-medium"
-                onClick={startEditing}
-                disabled={!canEdit}
+              <DisabledReason
+                reason={canEdit ? null : "You don't have permission to edit bank details"}
+                className="mt-3"
               >
-                Edit
-              </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className={cn("h-auto min-h-0 p-0 text-[13px] font-medium", canEdit && "mt-3")}
+                  onClick={startEditing}
+                  disabled={!canEdit}
+                >
+                  Edit
+                </Button>
+              </DisabledReason>
             </>
           )}
         </div>

@@ -17,6 +17,8 @@ import {
 import { currencySymbol, formatCurrency } from "@/lib/utils/format";
 import { cn } from "@/lib/utils";
 import { SKU_PRICE_LOCALE } from "@/features/dashboard/sku-management/constants";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, required, rules } from "@/components/form/rules";
 
 /**
  * A price the merchant can retype, but only ever a valid one:
@@ -61,41 +63,9 @@ export function EditablePriceCell({
   emphasis = false,
 }: EditablePriceCellProps) {
   const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [error, setError] = useState<string | null>(null);
-
-  // Both Cancel and a click outside land here with `next === false`, so the
-  // draft is discarded on either — only Save (below) ever calls onSave.
-  const onOpenChange = (next: boolean) => {
-    if (next) {
-      // Seeded from the current value, unformatted: the merchant edits the
-      // number itself, not "$1,850.00", and the grouped/symbolised form comes
-      // back the moment it's saved.
-      setDraft(String(value));
-      setError(null);
-    }
-    setOpen(next);
-  };
-
-  const handleSave = () => {
-    const result = parsePriceDraft(draft);
-    if ("error" in result) {
-      setError(result.error);
-      return;
-    }
-    onSave(result.amount);
-    setOpen(false);
-  };
-
-  // useId rather than a slug of the label: every row renders one of these per
-  // price column, so a label-derived id would be duplicated across the table
-  // and the label/description would point at whichever input mounted first.
-  const fieldId = useId();
-  const inputId = `${fieldId}-amount`;
-  const descriptionId = `${fieldId}-description`;
 
   return (
-    <Popover open={open} onOpenChange={onOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         {/* Ghost Button stripped back to the cell's own type scale — the same
             way mcaColumns' in-table actions override it — so the value keeps
@@ -135,94 +105,152 @@ export function EditablePriceCell({
         // from the top of the page instead of the next cell.
         onCloseAutoFocus={(e) => e.preventDefault()}
       >
-        <Field>
-          {/* Uppercased via CSS, not in the string: the text stays the
-              column's exact title, so it reads correctly to a screen reader
-              and follows the column if it's ever renamed. */}
-          <FieldLabel
-            htmlFor={inputId}
-            className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground"
-          >
-            {label}
-          </FieldLabel>
-          <FieldDescription id={descriptionId} className="text-[12px]">
-            This will update the {label.toLowerCase()} of this product
-          </FieldDescription>
-
-          {/* Currency is static text beside the amount: it's the product's own
-              currency and this interaction never changes it, which is why this
-              isn't flux's CurrencyAmountInput (that pairs the amount with a
-              currency *selector*).
-
-              justify-end keeps the symbol and the amount together as one group
-              flush with the field's right edge (items-stretch plus the text's
-              own items-center centre them vertically), rather than the default
-              inline-start addon pinning the symbol to the left with the amount
-              stranded opposite it. The grey fill replaces the default card
-              background/border/shadow, and the focus ring InputGroup normally
-              raises on the inner control is suppressed here. */}
-          <InputGroup
-            className={cn(
-              "h-10 min-h-10 justify-end gap-1 border-transparent bg-muted pr-3.5 shadow-none",
-              "has-[[data-slot=input-group-control]:focus-visible]:ring-0"
-            )}
-          >
-            <InputGroupText className="flex-none text-[13px] font-medium text-foreground">
-              {currencySymbol(currency)}
-            </InputGroupText>
-            <InputGroupInput
-              id={inputId}
-              aria-describedby={descriptionId}
-              // type="number" gives mobile a numeric keypad and blocks most
-              // stray characters at the source; parsePriceDraft above is still
-              // the authority, since a number input can be pasted into.
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={draft}
-              aria-invalid={error ? true : undefined}
-              onChange={(e) => {
-                setDraft(e.target.value);
-                if (error) setError(null);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleSave();
-                }
-                // Escape already closes the popover through Radix's own
-                // dismiss handling, which routes to onOpenChange(false) and
-                // discards the draft — nothing to add here.
-              }}
-              // Width tracks the text being typed, so the amount never leaves
-              // a gap between itself and its currency symbol the way a fixed
-              // width would once justify-end pushes the pair right. tabular-nums
-              // makes every digit exactly 1ch; the +1 covers the narrower
-              // separators (a decimal point or thousands comma) plus the caret.
-              style={{ width: `${Math.max(5, draft.length + 1)}ch` }}
-              className={cn(
-                "flex-none bg-transparent px-0 text-left text-[13px] tabular-nums",
-                "focus-visible:outline-none focus-visible:ring-0",
-                // Number inputs render stepper arrows on hover/focus, which
-                // would sit in the middle of the centred group.
-                "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              )}
-            />
-          </InputGroup>
-
-          {error && <FieldError>{error}</FieldError>}
-        </Field>
-
-        <div className="mt-3 flex items-center justify-end gap-2">
-          <Button type="button" variant="ghost" size="sm" onClick={() => setOpen(false)}>
-            Cancel
-          </Button>
-          <Button type="button" variant="primary" size="sm" onClick={handleSave}>
-            Save
-          </Button>
-        </div>
+        {/* Mounted only while open, so each opening starts from the saved
+            value, unformatted: the merchant edits the number itself, not
+            "$1,850.00". Cancel and a click outside both discard the draft;
+            only Save (or Enter) ever calls onSave. */}
+        <PriceEditForm
+          label={label}
+          value={value}
+          currency={currency}
+          onCancel={() => setOpen(false)}
+          onSave={(amount) => {
+            onSave(amount);
+            setOpen(false);
+          }}
+        />
       </PopoverContent>
     </Popover>
+  );
+}
+
+/** The popover's one-field form. Save stays live; the amount validates as it
+ *  changes once edited, and on Save or Enter (the app-wide rule). Its markup
+ *  is its own (label, assistive line, the right-aligned amount), so it renders
+ *  the field directly rather than through a shared field component. */
+function PriceEditForm({
+  label,
+  value,
+  currency,
+  onCancel,
+  onSave,
+}: {
+  label: string;
+  value: number;
+  currency: string;
+  onCancel: () => void;
+  onSave: (amount: number) => void;
+}) {
+  const fieldId = useId();
+  const inputId = `${fieldId}-amount`;
+  const descriptionId = `${fieldId}-description`;
+
+  const form = useAppForm({
+    defaultValues: { amount: String(value) },
+    onSubmit: ({ value: { amount } }) => {
+      const result = parsePriceDraft(amount);
+      if ("amount" in result) onSave(result.amount);
+    },
+  });
+
+  return (
+    <form.AppForm>
+      <form.Form>
+        <form.Field
+          name="amount"
+          validators={{
+            onChange: rules(
+              required(label),
+              check((draft: string) => {
+                const result = parsePriceDraft(draft);
+                return "error" in result && result.error;
+              })
+            ),
+          }}
+        >
+          {(field) => {
+            const draft = field.state.value;
+            const error = field.state.meta.errors[0] as string | undefined;
+            const invalid = !!error;
+            return (
+              <Field>
+                {/* Uppercased via CSS, not in the string: the text stays the
+                  column's exact title, so it reads correctly to a screen reader
+                  and follows the column if it's ever renamed. */}
+                <FieldLabel
+                  htmlFor={inputId}
+                  className="text-[11px] font-semibold tracking-widest uppercase text-muted-foreground"
+                >
+                  {label}
+                </FieldLabel>
+                <FieldDescription id={descriptionId} className="text-[12px]">
+                  This will update the {label.toLowerCase()} of this product
+                </FieldDescription>
+
+                {/* Currency is static text beside the amount: it's the product's own
+                  currency and this interaction never changes it, which is why this
+                  isn't flux's CurrencyAmountInput (that pairs the amount with a
+                  currency *selector*).
+
+                  justify-end keeps the symbol and the amount together as one group
+                  flush with the field's right edge (items-stretch plus the text's
+                  own items-center centre them vertically), rather than the default
+                  inline-start addon pinning the symbol to the left with the amount
+                  stranded opposite it. The grey fill replaces the default card
+                  background/border/shadow, and the focus ring InputGroup normally
+                  raises on the inner control is suppressed here. */}
+                <InputGroup
+                  className={cn(
+                    "h-10 min-h-10 justify-end gap-1 border-transparent bg-muted pr-3.5 shadow-none",
+                    "has-[[data-slot=input-group-control]:focus-visible]:ring-0"
+                  )}
+                >
+                  <InputGroupText className="flex-none text-[13px] font-medium text-foreground">
+                    {currencySymbol(currency)}
+                  </InputGroupText>
+                  <InputGroupInput
+                    id={inputId}
+                    aria-describedby={descriptionId}
+                    // type="number" gives mobile a numeric keypad and blocks most
+                    // stray characters at the source; parsePriceDraft above is still
+                    // the authority, since a number input can be pasted into.
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    step="0.01"
+                    value={draft}
+                    aria-invalid={invalid || undefined}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    onBlur={field.handleBlur}
+                    // Width tracks the text being typed, so the amount never leaves
+                    // a gap between itself and its currency symbol the way a fixed
+                    // width would once justify-end pushes the pair right. tabular-nums
+                    // makes every digit exactly 1ch; the +1 covers the narrower
+                    // separators (a decimal point or thousands comma) plus the caret.
+                    style={{ width: `${Math.max(5, draft.length + 1)}ch` }}
+                    className={cn(
+                      "flex-none bg-transparent px-0 text-left text-[13px] tabular-nums",
+                      "focus-visible:outline-none focus-visible:ring-0",
+                      // Number inputs render stepper arrows on hover/focus, which
+                      // would sit in the middle of the centred group.
+                      "[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    )}
+                  />
+                </InputGroup>
+
+                <FieldError>{error}</FieldError>
+              </Field>
+            );
+          }}
+        </form.Field>
+
+        <div className="mt-3 flex items-center justify-end gap-2">
+          <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <form.SubmitButton>Save</form.SubmitButton>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }

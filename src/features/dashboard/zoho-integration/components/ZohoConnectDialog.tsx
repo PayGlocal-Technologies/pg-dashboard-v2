@@ -1,17 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui";
+import { Button, Dialog, DialogContent, DialogTitle } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { Icon } from "@/components/icon";
 import { ZohoConnectBadge } from "@/features/dashboard/zoho-integration/components/ZohoConnectBadge";
 import type { IconName } from "@/components/icon";
@@ -56,24 +47,8 @@ export function ZohoConnectDialog({
   isConnecting: boolean;
   pacbMids: string[];
 }) {
-  const [chosenMid, setChosenMid] = useState("");
-
-  const needsMidSelection = pacbMids.length > 1;
-  const resolvedMid = chosenMid || pacbMids[0] || "";
-
-  function close() {
-    setChosenMid("");
-    onOpenChange(false);
-  }
-
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) setChosenMid("");
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[32rem]">
         <div className="flex shrink-0 flex-col items-center gap-2 border-b border-border px-6 pb-4 pt-10 text-center">
           <ZohoConnectBadge />
@@ -85,23 +60,67 @@ export function ZohoConnectDialog({
           </p>
         </div>
 
+        {/* Mounted with the content, so each opening starts with no pick. */}
+        <ZohoConnectForm
+          pacbMids={pacbMids}
+          isConnecting={isConnecting}
+          onConnect={onConnect}
+          onCancel={() => onOpenChange(false)}
+        />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/**
+ * The mid pick (only when there is more than one) and the actions. No account
+ * at all is the one case Connect stays disabled, since nothing on screen could
+ * fix it. A missing pick is a field: Connect stays live and a press names it
+ * under the select (the app-wide rule, components/form).
+ */
+function ZohoConnectForm({
+  pacbMids,
+  isConnecting,
+  onConnect,
+  onCancel,
+}: {
+  pacbMids: string[];
+  isConnecting: boolean;
+  onConnect: (mid: string) => void;
+  onCancel: () => void;
+}) {
+  const needsMidSelection = pacbMids.length > 1;
+  const form = useAppForm({
+    defaultValues: { mid: "" },
+    onSubmit: ({ value }) => {
+      const resolvedMid = value.mid || pacbMids[0] || "";
+      if (resolvedMid) onConnect(resolvedMid);
+    },
+  });
+  const connectBlockedReason = pacbMids.length ? null : "No MCA account is available to connect";
+
+  return (
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
           {needsMidSelection && (
-            <div className="space-y-1.5">
-              <p className="text-[13px] font-semibold text-foreground">Select the mid to connect</p>
-              <Select value={chosenMid} onValueChange={setChosenMid}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a mid" />
-                </SelectTrigger>
-                <SelectContent>
-                  {pacbMids.map((mid) => (
-                    <SelectItem key={mid} value={mid} className="tabular-nums">
-                      {mid}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <form.AppField name="mid" validators={{ onChange: rules(required("Mid")) }}>
+              {(field) => (
+                <field.SelectField
+                  id="zoho-connect-mid"
+                  label="Select the mid to connect"
+                  labelClassName="text-[13px] font-semibold text-foreground"
+                  className="gap-1.5"
+                  placeholder="Select a mid"
+                  // tabular-nums on the label, since SelectField takes no
+                  // per-item class (the old SelectItem carried it).
+                  options={pacbMids.map((mid) => ({
+                    value: mid,
+                    label: <span className="tabular-nums">{mid}</span>,
+                  }))}
+                />
+              )}
+            </form.AppField>
           )}
 
           <div className="space-y-2.5 rounded-xl border border-border bg-muted/40 p-3.5">
@@ -125,21 +144,15 @@ export function ZohoConnectDialog({
             Your data stays safe and protected
           </span>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={close}>
+            <Button type="button" variant="outline" size="sm" onClick={onCancel}>
               Cancel
             </Button>
-            <Button
-              variant="primary"
-              size="sm"
-              isLoading={isConnecting}
-              disabled={!resolvedMid || (needsMidSelection && !chosenMid)}
-              onClick={() => resolvedMid && onConnect(resolvedMid)}
-            >
+            <form.SubmitButton disabledReason={connectBlockedReason} isLoading={isConnecting}>
               Connect securely
-            </Button>
+            </form.SubmitButton>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </form.Form>
+    </form.AppForm>
   );
 }

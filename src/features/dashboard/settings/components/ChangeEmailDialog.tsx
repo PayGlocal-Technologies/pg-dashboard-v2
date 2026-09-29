@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-  Field,
-  FieldError,
-  FieldLabel,
-  Input,
   OtpInput,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, required, rules } from "@/components/form/rules";
 import {
   EMAIL_OTP_LENGTH,
   EMAIL_OTP_RESEND_COOLDOWN_SECONDS,
@@ -89,9 +87,7 @@ export function ChangeEmailDialog({
 
   const [step, setStep] = useState<Step>("sending");
   const [stopReason, setStopReason] = useState<StopReason>("restart");
-  const [oldOtp, setOldOtp] = useState("");
   const [newEmail, setNewEmail] = useState("");
-  const [newOtp, setNewOtp] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -199,7 +195,6 @@ export function ChangeEmailDialog({
     void run(
       () => api.verifyOld(code),
       () => {
-        setOldOtp("");
         setWrongCodes(0);
         setNotice(null);
         setStep("enter-new-email");
@@ -208,18 +203,10 @@ export function ChangeEmailDialog({
     );
   };
 
-  // Why the address can't be submitted yet, or null when it can. Gates the Send
-  // code button; the same message surfaces under the field on blur so a disabled
-  // button always has a visible reason next to it.
-  const newEmailIssue = validateNewEmail(newEmail, currentEmail);
-
-  const submitNewEmail = (): void => {
-    if (newEmailIssue) {
-      setError(newEmailIssue);
-      return;
-    }
+  const submitNewEmail = (email: string): void => {
+    setNewEmail(email);
     void run(
-      () => api.sendNewOtp(newEmail.trim()),
+      () => api.sendNewOtp(email.trim()),
       (message) => {
         setNotice(message);
         setStep("verify-new");
@@ -339,36 +326,16 @@ export function ChangeEmailDialog({
                 continue.
               </DialogDescription>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-              <Field>
-                <FieldLabel>Verification code</FieldLabel>
-                <OtpInput
-                  value={oldOtp}
-                  onChange={setOldOtp}
-                  onComplete={submitOldOtp}
-                  length={EMAIL_OTP_LENGTH}
-                  invalid={!!error}
-                  disabled={isBusy}
-                  autoFocus
-                />
-                <FieldError>{error}</FieldError>
-              </Field>
+            <CodeStepForm
+              serverError={error}
+              isBusy={isBusy}
+              submitLabel="Verify"
+              onVerify={submitOldOtp}
+              onCancel={close}
+            >
               {resendRow}
               {noticeLine}
-            </div>
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-              <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => submitOldOtp(oldOtp)}
-                isLoading={isBusy}
-                disabled={oldOtp.length !== EMAIL_OTP_LENGTH}
-              >
-                Verify
-              </Button>
-            </div>
+            </CodeStepForm>
           </>
         )}
 
@@ -382,51 +349,15 @@ export function ChangeEmailDialog({
                 We&apos;ll send a code to this address to confirm you can receive mail there.
               </DialogDescription>
             </div>
-            <form
-              className="flex min-h-0 flex-1 flex-col"
-              noValidate
-              onSubmit={(e) => {
-                e.preventDefault();
-                submitNewEmail();
-              }}
+            <NewEmailForm
+              currentEmail={currentEmail}
+              serverError={error}
+              isBusy={isBusy}
+              onSubmit={submitNewEmail}
+              onCancel={close}
             >
-              <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-                <Field>
-                  <FieldLabel htmlFor="new-email">New email address</FieldLabel>
-                  <Input
-                    id="new-email"
-                    type="email"
-                    inputMode="email"
-                    autoComplete="email"
-                    spellCheck={false}
-                    placeholder="name@company.com"
-                    value={newEmail}
-                    aria-invalid={!!error}
-                    // Typing clears the message; it comes back on blur or submit,
-                    // so the merchant isn't corrected mid-keystroke.
-                    onChange={(e) => {
-                      setNewEmail(e.target.value);
-                      if (error) setError(null);
-                    }}
-                    onBlur={() => {
-                      if (newEmail.trim()) setError(validateNewEmail(newEmail, currentEmail));
-                    }}
-                    disabled={isBusy}
-                    autoFocus
-                  />
-                  <FieldError>{error}</FieldError>
-                </Field>
-                {noticeLine}
-              </div>
-              <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-                <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
-                  Cancel
-                </Button>
-                <Button type="submit" isLoading={isBusy} disabled={!!newEmailIssue}>
-                  Send code
-                </Button>
-              </div>
-            </form>
+              {noticeLine}
+            </NewEmailForm>
           </>
         )}
 
@@ -440,20 +371,13 @@ export function ChangeEmailDialog({
                 changes your account email.
               </DialogDescription>
             </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-              <Field>
-                <FieldLabel>Verification code</FieldLabel>
-                <OtpInput
-                  value={newOtp}
-                  onChange={setNewOtp}
-                  onComplete={submitNewOtp}
-                  length={EMAIL_OTP_LENGTH}
-                  invalid={!!error}
-                  disabled={isBusy}
-                  autoFocus
-                />
-                <FieldError>{error}</FieldError>
-              </Field>
+            <CodeStepForm
+              serverError={error}
+              isBusy={isBusy}
+              submitLabel="Confirm change"
+              onVerify={submitNewOtp}
+              onCancel={close}
+            >
               {/* The commit can't be undone, and it's what the next sign-in will
                   ask for — worth saying before they click. */}
               <p className="text-xs text-muted-foreground">
@@ -462,20 +386,7 @@ export function ChangeEmailDialog({
               </p>
               {resendRow}
               {noticeLine}
-            </div>
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-              <Button type="button" variant="outline" onClick={close} disabled={isBusy}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => submitNewOtp(newOtp)}
-                isLoading={isBusy}
-                disabled={newOtp.length !== EMAIL_OTP_LENGTH}
-              >
-                Confirm change
-              </Button>
-            </div>
+            </CodeStepForm>
           </>
         )}
 
@@ -538,5 +449,154 @@ export function ChangeEmailDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * One code step (current or new email). The code is required and must be
+ * whole; unlike every other field in the app it is checked only on Verify,
+ * not as it changes, because it fills a digit at a time and a complete code
+ * submits itself (onComplete). A server message shows under the boxes when
+ * there is no validation message to show instead.
+ */
+function CodeStepForm({
+  serverError,
+  isBusy,
+  submitLabel,
+  onVerify,
+  onCancel,
+  children,
+}: {
+  serverError: string | null;
+  isBusy: boolean;
+  submitLabel: string;
+  onVerify: (code: string) => void;
+  onCancel: () => void;
+  children: ReactNode;
+}) {
+  const form = useAppForm({
+    defaultValues: { code: "" },
+    onSubmit: ({ value }) => onVerify(value.code),
+  });
+
+  return (
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+          <form.AppField
+            name="code"
+            validators={{
+              onSubmit: rules(
+                required("Verification code"),
+                check(
+                  (code: string) =>
+                    code.length !== EMAIL_OTP_LENGTH &&
+                    `Enter the full ${EMAIL_OTP_LENGTH}-digit code`
+                )
+              ),
+            }}
+          >
+            {(field) => (
+              <field.CustomField<string>
+                id="email-otp"
+                label="Verification code"
+                required
+                description={
+                  !field.state.meta.errors.length && serverError ? (
+                    <span className="text-destructive">{serverError}</span>
+                  ) : undefined
+                }
+              >
+                {({ value, invalid, onChange }) => (
+                  <OtpInput
+                    value={value}
+                    onChange={onChange}
+                    onComplete={() => void form.handleSubmit()}
+                    length={EMAIL_OTP_LENGTH}
+                    invalid={invalid || !!serverError}
+                    disabled={isBusy}
+                    autoFocus
+                  />
+                )}
+              </field.CustomField>
+            )}
+          </form.AppField>
+          {children}
+        </div>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isBusy}>
+            Cancel
+          </Button>
+          <form.SubmitButton size="md" isLoading={isBusy} pending={isBusy}>
+            {submitLabel}
+          </form.SubmitButton>
+        </div>
+      </form.Form>
+    </form.AppForm>
+  );
+}
+
+/** The new-address step: a real form so Enter submits, validated as it
+ *  changes once edited and on Send code (validateNewEmail). A server message
+ *  shows under the field when there is no validation message instead. */
+function NewEmailForm({
+  currentEmail,
+  serverError,
+  isBusy,
+  onSubmit,
+  onCancel,
+  children,
+}: {
+  currentEmail: string | null | undefined;
+  serverError: string | null;
+  isBusy: boolean;
+  onSubmit: (email: string) => void;
+  onCancel: () => void;
+  children: ReactNode;
+}) {
+  const form = useAppForm({
+    defaultValues: { newEmail: "" },
+    onSubmit: ({ value }) => onSubmit(value.newEmail),
+  });
+
+  return (
+    <form.AppForm>
+      <form.Form className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+          <form.AppField
+            name="newEmail"
+            validators={{
+              onChange: ({ value }) => validateNewEmail(value, currentEmail) ?? undefined,
+            }}
+          >
+            {(field) => (
+              <field.TextField
+                id="new-email"
+                label="New email address"
+                required
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="name@company.com"
+                disabled={isBusy}
+                autoFocus
+                description={
+                  serverError ? <span className="text-destructive">{serverError}</span> : undefined
+                }
+              />
+            )}
+          </form.AppField>
+          {children}
+        </div>
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isBusy}>
+            Cancel
+          </Button>
+          <form.SubmitButton size="md" isLoading={isBusy} pending={isBusy}>
+            Send code
+          </form.SubmitButton>
+        </div>
+      </form.Form>
+    </form.AppForm>
   );
 }

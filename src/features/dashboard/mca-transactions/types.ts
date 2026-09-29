@@ -472,20 +472,6 @@ export interface SavedAmountResponse {
 
 // ── Documents pending ────────────────────────────────────────────────────────
 
-/** Amount + count of DOCUMENT_PENDING transactions for a timeframe. */
-export interface DocumentPendingData {
-  timeframe: string;
-  reportingCurrency: string;
-  amount: number;
-  count: number;
-}
-
-export interface DocumentPendingResponse {
-  data: DocumentPendingData;
-  message?: string;
-  errors?: unknown;
-}
-
 /** One currency's slice of the currently-pending snapshot. */
 export interface DocumentPendingCurrencyRow {
   currency: string;
@@ -516,11 +502,7 @@ export type DocumentPendingSortBy = "AMOUNT" | "CREATED_TIME";
  * their windows differently, and sending one's values to the other silently
  * falls back to that endpoint's default rather than erroring.
  */
-export type DocumentPendingTimeframe =
-  | "all_time"
-  | "last_7_days"
-  | "last_30_days"
-  | "last_90_days";
+export type DocumentPendingTimeframe = "all_time" | "last_7_days" | "last_30_days" | "last_90_days";
 
 /**
  * One transaction awaiting documents, as document-pending-list returns it.

@@ -58,6 +58,9 @@ export function WidgetLibraryModal({
 }) {
   const [staged, setStaged] = useState<WidgetId[]>(layout);
   const [searchQuery, setSearchQuery] = useState("");
+  // The minimum-count rule is shown inline in the footer, not as a toast, the
+  // moment a click would break it.
+  const [showMinNotice, setShowMinNotice] = useState(false);
   const prevOpen = useRef(false);
 
   const grouped = useMemo(() => filterCatalogByQuery(searchQuery), [searchQuery]);
@@ -70,23 +73,22 @@ export function WidgetLibraryModal({
     if (open && !prevOpen.current) {
       setStaged([...layout]);
       setSearchQuery("");
+      setShowMinNotice(false);
     }
     prevOpen.current = open;
   }, [open, layout]);
 
   const toggle = (id: WidgetId) => {
-    setStaged((prev) => {
-      if (prev.includes(id)) {
-        if (prev.length <= MIN_DASHBOARD_WIDGETS) {
-          toast.message("Minimum widgets on dashboard", {
-            description: `Keep at least ${MIN_DASHBOARD_WIDGETS} charts.`,
-          });
-          return prev;
-        }
-        return prev.filter((w) => w !== id);
+    if (staged.includes(id)) {
+      if (staged.length <= MIN_DASHBOARD_WIDGETS) {
+        setShowMinNotice(true);
+        return;
       }
-      return [...prev, id];
-    });
+      setStaged(staged.filter((w) => w !== id));
+    } else {
+      setStaged([...staged, id]);
+    }
+    setShowMinNotice(false);
   };
 
   const handleCancel = () => {
@@ -95,9 +97,7 @@ export function WidgetLibraryModal({
 
   const handleApply = () => {
     if (staged.length < MIN_DASHBOARD_WIDGETS) {
-      toast.error("Not enough charts", {
-        description: `Select at least ${MIN_DASHBOARD_WIDGETS} widgets.`,
-      });
+      setShowMinNotice(true);
       return;
     }
     onApplyLayout(staged);
@@ -221,6 +221,16 @@ export function WidgetLibraryModal({
             <Button type="button" variant="primary" size="sm" onClick={handleApply}>
               Apply
             </Button>
+            {/* Last in the DOM so the column-reverse mobile stack puts it above
+                the buttons; mr-auto pins it left of them from sm up. */}
+            {showMinNotice && (
+              <p
+                role="alert"
+                className="self-center text-[12px] text-destructive sm:order-first sm:mr-auto"
+              >
+                Keep at least {MIN_DASHBOARD_WIDGETS} charts.
+              </p>
+            )}
           </div>
         </div>
       </DialogContent>

@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { Button, Dialog, DialogContent, DialogTitle, EmptyState, Input } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, required, rules } from "@/components/form/rules";
 import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
 import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/create-invoice/constants";
 import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
@@ -43,13 +45,11 @@ export function ManageTemplatesDialog({
   onEdit: (templateId: string) => void;
 }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const startRename = (template: InvoiceTemplate) => {
     setPendingDeleteId(null);
     setRenamingId(template.id);
-    setRenameValue(template.name);
   };
 
   /**
@@ -65,22 +65,8 @@ export function ManageTemplatesDialog({
         template.id !== exceptId && template.name.toLowerCase() === name.trim().toLowerCase()
     );
 
-  const renameError =
-    renamingId && renameValue.trim() && isDuplicateName(renameValue, renamingId)
-      ? "Another template already has that name."
-      : null;
-
-  const commitRename = () => {
-    const name = renameValue.trim();
-    if (!renamingId || !name || renameError) return;
-    onRename(renamingId, name);
-    setRenamingId(null);
-    setRenameValue("");
-  };
-
   const reset = () => {
     setRenamingId(null);
-    setRenameValue("");
     setPendingDeleteId(null);
   };
 
@@ -110,38 +96,16 @@ export function ManageTemplatesDialog({
               return (
                 <div key={template.id} className="py-3 first:pt-0 last:pb-0">
                   {isRenaming ? (
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          autoFocus
-                          maxLength={TEMPLATE_NAME_MAX_LENGTH}
-                          aria-label={`Rename ${template.name}`}
-                          aria-invalid={!!renameError}
-                          value={renameValue}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") commitRename();
-                            if (e.key === "Escape") reset();
-                          }}
-                          className="h-8 flex-1 text-[13px]"
-                        />
-                        <Button
-                          type="button"
-                          variant="primary"
-                          size="sm"
-                          disabled={!renameValue.trim() || !!renameError || isMutating}
-                          onClick={commitRename}
-                        >
-                          {isMutating ? "Saving…" : "Save"}
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={reset}>
-                          Cancel
-                        </Button>
-                      </div>
-                      {renameError && (
-                        <p className="mt-1 text-[11.5px] text-destructive">{renameError}</p>
-                      )}
-                    </div>
+                    <RenameTemplateForm
+                      template={template}
+                      isDuplicate={(name) => isDuplicateName(name, template.id)}
+                      isMutating={isMutating}
+                      onCancel={reset}
+                      onSave={(name) => {
+                        onRename(template.id, name);
+                        setRenamingId(null);
+                      }}
+                    />
                   ) : (
                     <div className="flex items-start gap-3">
                       <div className="min-w-0 flex-1">
@@ -233,5 +197,77 @@ export function ManageTemplatesDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * The inline rename row. Save stays live and Enter submits; the name validates
+ * once edited (empty or a duplicate) or on Save, per the app-wide rule, so a
+ * fresh edit opens clean. Escape cancels.
+ */
+function RenameTemplateForm({
+  template,
+  isDuplicate,
+  isMutating,
+  onCancel,
+  onSave,
+}: {
+  template: InvoiceTemplate;
+  isDuplicate: (name: string) => boolean;
+  isMutating: boolean;
+  onCancel: () => void;
+  onSave: (name: string) => void;
+}) {
+  const form = useAppForm({
+    defaultValues: { name: template.name },
+    onSubmit: ({ value }) => onSave(value.name.trim()),
+  });
+
+  return (
+    <form.AppForm>
+      <form.Form className="flex items-start gap-2">
+        <form.AppField
+          name="name"
+          validators={{
+            onChange: rules(
+              required("Template name"),
+              check(
+                (name: string) => isDuplicate(name) && "Another template already has that name."
+              )
+            ),
+          }}
+        >
+          {(field) => (
+            <field.CustomField<string>
+              id={`rename-template-${template.id}`}
+              className="flex-1 gap-1"
+            >
+              {({ id, value, invalid, onChange, onBlur }) => (
+                <Input
+                  id={id}
+                  autoFocus
+                  maxLength={TEMPLATE_NAME_MAX_LENGTH}
+                  aria-label={`Rename ${template.name}`}
+                  aria-invalid={invalid || undefined}
+                  value={value}
+                  onChange={(e) => onChange(e.target.value)}
+                  onBlur={onBlur}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") onCancel();
+                  }}
+                  className="h-8 flex-1 text-[13px]"
+                />
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
+        <form.SubmitButton pending={isMutating}>
+          {isMutating ? "Saving…" : "Save"}
+        </form.SubmitButton>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+      </form.Form>
+    </form.AppForm>
   );
 }

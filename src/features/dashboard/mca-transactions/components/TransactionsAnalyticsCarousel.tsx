@@ -40,15 +40,6 @@ const LAST_PAGE = PAGE_LABELS.length - 1;
 // width instead of the analytics section switching early on its own.
 const PAGE_CLASSES = "w-full shrink-0 snap-start lg:w-auto";
 
-/** Section TimeRange → the document-pending endpoint's timeframe param. Same
- *  mapping the settled/saved cards use internally. */
-const TIMEFRAME_BY_RANGE: Record<TimeRange, string> = {
-  today: "today",
-  week: "week",
-  month: "month",
-  year: "ytd",
-};
-
 /**
  * Section TimeRange → the settlement overview's own timeframe vocabulary,
  * now that Total settled follows the page's range control rather than
@@ -209,10 +200,9 @@ export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRa
             column-major: both left cards, then both right), so every card
             names its own column and row explicitly. */}
         <div className={cn("flex flex-col gap-4", PAGE_CLASSES, "lg:contents")}>
-          <OutstandingAmountCard
-            timeframe={TIMEFRAME_BY_RANGE[timeRange]}
-            className="lg:col-start-2 lg:row-start-1 lg:h-full"
-          />
+          {/* No timeframe: pending is a current snapshot, not a period
+              metric (see OutstandingAmountCard). */}
+          <OutstandingAmountCard className="lg:col-start-2 lg:row-start-1 lg:h-full" />
           <SavedAmountCard
             timeRange={timeRange}
             className="lg:col-start-2 lg:row-start-2 lg:h-full"

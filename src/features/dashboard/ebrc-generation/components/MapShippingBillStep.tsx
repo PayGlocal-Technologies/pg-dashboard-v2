@@ -21,11 +21,12 @@ import {
   Shimmer,
   Switch,
 } from "@/components/ui";
-import { toast } from "sonner";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrency, formatDate } from "@/lib/utils/format";
 import { AppImage } from "@/components/common/AppImage";
+import { RequiredMark } from "@/components/common/RequiredMark";
 import { EbrcStepFooterBar } from "@/features/dashboard/ebrc-generation/components/EbrcStepFooterBar";
 import {
   DEDUCTION_FIELDS,
@@ -106,7 +107,7 @@ function IrmNavItem({
         {irm ? formatCurrency(irm.remittanceAmount, irm.currencyCode) : irmId}
       </span>
       {/* The IRM number is what every message about an IRM names (the save
-          gate's toast, DGFT, the merchant's own bank statement), so it is on
+          gate's message, DGFT, the merchant's own bank statement), so it is on
           the row too: without it "CITIN…635 needs mapping" could not be
           matched to anything in this list. */}
       {irm && <span className="font-mono text-[11px] text-muted-foreground">{irmId}</span>}
@@ -322,11 +323,7 @@ function MappingForm({
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor={`sb-number-${irmId}`}>
-              Shipping bill number
-              <span aria-hidden className="text-destructive">
-                {" "}
-                *
-              </span>
+              <RequiredMark /> Shipping bill number
             </FieldLabel>
             <Input
               id={`sb-number-${irmId}`}
@@ -352,11 +349,7 @@ function MappingForm({
 
           <Field>
             <FieldLabel htmlFor={`sb-value-${irmId}`}>
-              Shipping bill value
-              <span aria-hidden className="text-destructive">
-                {" "}
-                *
-              </span>
+              <RequiredMark /> Shipping bill value
             </FieldLabel>
             <Input
               id={`sb-value-${irmId}`}
@@ -370,11 +363,7 @@ function MappingForm({
 
           <Field>
             <FieldLabel htmlFor={`sb-date-${irmId}`}>
-              Shipping bill date
-              <span aria-hidden className="text-destructive">
-                {" "}
-                *
-              </span>
+              <RequiredMark /> Shipping bill date
             </FieldLabel>
             <Input
               id={`sb-date-${irmId}`}
@@ -388,11 +377,7 @@ function MappingForm({
 
           <Field>
             <FieldLabel htmlFor={`port-code-${irmId}`}>
-              Port code
-              <span aria-hidden className="text-destructive">
-                {" "}
-                *
-              </span>
+              <RequiredMark /> Port code
             </FieldLabel>
             <Input
               id={`port-code-${irmId}`}
@@ -411,11 +396,7 @@ function MappingForm({
 
           <Field>
             <FieldLabel htmlFor={`bill-invoice-${irmId}`}>
-              Bill/invoice number
-              <span aria-hidden className="text-destructive">
-                {" "}
-                *
-              </span>
+              <RequiredMark /> Bill/invoice number
             </FieldLabel>
             <Input
               id={`bill-invoice-${irmId}`}
@@ -428,11 +409,7 @@ function MappingForm({
 
           <Field className="sm:col-span-2">
             <FieldLabel htmlFor={`irm-amount-${irmId}`}>
-              IRM amount to be mapped
-              <span aria-hidden className="text-destructive">
-                {" "}
-                *
-              </span>
+              <RequiredMark /> IRM amount to be mapped
             </FieldLabel>
             <Input
               id={`irm-amount-${irmId}`}
@@ -525,6 +502,9 @@ function MappingForm({
           Configure Deductions (Optional)
         </Button>
       )}
+      {/* Inline beside the section it is about, rather than a toast: this is
+          a form error the merchant fixes here, not a server failure. */}
+      {errors.deductions && <FieldError className="mt-2">{errors.deductions}</FieldError>}
 
       <Drawer open={deductionsDrawerOpen} onOpenChange={setDeductionsDrawerOpen}>
         <DrawerContent className="w-full sm:w-xl sm:max-w-[92vw]">
@@ -647,7 +627,11 @@ export function MapShippingBillStep({
   // Field errors per IRM, raised on a failed save attempt and cleared as soon
   // as that IRM is edited again — production's forms behave the same way:
   // validation surfaces on submit, not while typing.
-  const [errorsByIrm, setErrorsByIrm] = useState<Record<string, MappingFieldErrors>>({});
+  // App-wide validation rule, per IRM: a field the merchant edits validates
+  // as it changes; Save & next validates the rest. Extraction filling the form
+  // is not an edit, so it marks nothing.
+  const [attemptedByIrm, setAttemptedByIrm] = useState<Record<string, boolean>>({});
+  const [touchedByIrm, setTouchedByIrm] = useState<Record<string, string[]>>({});
   // IRMs the last "Save & review" found unaccepted. Each one's flag lifts on
   // its own once its record reports IN_PROGRESS (see `blocked` below).
   const [blockedIds, setBlockedIds] = useState<string[]>([]);
@@ -753,6 +737,31 @@ export function MapShippingBillStep({
   const activeIndex = activeId ? selectedIds.indexOf(activeId) : -1;
   const isLastByPosition = activeIndex === selectedIds.length - 1;
 
+  // Live rules for the open IRM, filtered by the app-wide rule: after a save
+  // attempt every field shows, before it only the ones edited.
+  const liveErrors: MappingFieldErrors =
+    activeMapping && activeRecord
+      ? validateMapping(activeMapping, toAmount(activeRecord.remittanceFCCAmount))
+      : {};
+  const activeTouched = activeId ? (touchedByIrm[activeId] ?? []) : [];
+  const activeAttempted = !!activeId && !!attemptedByIrm[activeId];
+  const visibleErrors: MappingFieldErrors = Object.fromEntries(
+    Object.entries(liveErrors).filter(([key]) => activeAttempted || activeTouched.includes(key))
+  );
+
+  // The last save's gate, shown inline beside Save rather than toasted: it
+  // names what still needs doing here, and each IRM drops out of it as soon
+  // as its record reports IN_PROGRESS, the same rule the list's flag uses.
+  const stillPending = blockedIds.filter(
+    (id) => records.get(id)?.irmProcessStatus !== "IN_PROGRESS"
+  );
+  const pendingMessage =
+    stillPending.length === 0
+      ? null
+      : stillPending.length === 1
+        ? `IRM ${stillPending[0]} still needs its shipping bill saved. It's open on the right.`
+        : `${stillPending.length} IRMs still need their shipping bills saved: ${stillPending.join(", ")}. They're flagged in the list.`;
+
   const handleSaveAndNext = () => {
     if (!activeId || !activeMapping || !activeRecord) return;
 
@@ -762,11 +771,11 @@ export function MapShippingBillStep({
     // IRM's status honest — NOT_STARTED until a complete mapping is accepted.
     const fieldErrors = validateMapping(activeMapping, toAmount(activeRecord.remittanceFCCAmount));
     if (Object.keys(fieldErrors).length > 0) {
-      setErrorsByIrm((prev) => ({ ...prev, [activeId]: fieldErrors }));
-      if (fieldErrors.deductions) toast.error(fieldErrors.deductions);
+      // A deductions error shows under the deduction section, like every other
+      // field error, so nothing is toasted here.
+      setAttemptedByIrm((prev) => ({ ...prev, [activeId]: true }));
       return;
     }
-    setErrorsByIrm((prev) => (prev[activeId] ? { ...prev, [activeId]: {} } : prev));
 
     save(toShippingBillData(activeMapping, activeRecord), async () => {
       const fresh = await onRefetchIrms();
@@ -787,11 +796,6 @@ export function MapShippingBillStep({
           // list, and open the first so the merchant lands on the form to fix.
           setBlockedIds(pending as string[]);
           setExplicitActiveId(pending[0] ?? null);
-          toast.error(
-            pending.length === 1
-              ? `IRM ${pending[0]} still needs its shipping bill saved. It's open on the right.`
-              : `${pending.length} IRMs still need their shipping bills saved: ${pending.join(", ")}. They're flagged in the list.`
-          );
           return;
         }
         setBlockedIds([]);
@@ -922,13 +926,21 @@ export function MapShippingBillStep({
                       mapping={activeMapping}
                       record={activeRecord}
                       previewUrl={presignedUrls[activeId]}
-                      errors={errorsByIrm[activeId] ?? {}}
+                      errors={visibleErrors}
                       onChange={(next) => {
-                        // Editing clears that field's complaint, so a corrected
-                        // value stops looking wrong before the next save.
-                        setErrorsByIrm((prev) =>
-                          prev[activeId] ? { ...prev, [activeId]: {} } : prev
+                        // Whichever fields this edit changed now validate live.
+                        const changed = (Object.keys(next) as (keyof IrmMapping)[]).filter(
+                          (key) => next[key] !== activeMapping?.[key]
                         );
+                        if (changed.length > 0) {
+                          setTouchedByIrm((prev) => {
+                            const had = prev[activeId] ?? [];
+                            const added = changed.filter((key) => !had.includes(key));
+                            return added.length
+                              ? { ...prev, [activeId]: [...had, ...added] }
+                              : prev;
+                          });
+                        }
                         onMappingChange(activeId, next);
                       }}
                       onUploaded={onRefetchIrms}
@@ -972,9 +984,16 @@ export function MapShippingBillStep({
           wizard rather than each step growing a differently-placed footer. */}
       <EbrcStepFooterBar
         left={
-          <span className="text-[13px] text-muted-foreground">
-            {completedCount} of {selectedIds.length} IRMs mapped
-          </span>
+          <>
+            <span className="text-[13px] text-muted-foreground">
+              {completedCount} of {selectedIds.length} IRMs mapped
+            </span>
+            {pendingMessage && (
+              <p role="alert" className="text-[12.5px] text-destructive">
+                {pendingMessage}
+              </p>
+            )}
+          </>
         }
         right={
           <>
@@ -987,16 +1006,26 @@ export function MapShippingBillStep({
             >
               Back
             </Button>
-            <Button
-              type="button"
-              variant="primary"
-              rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
-              disabled={isSaving || !activeRecord || activeExtracting}
-              isLoading={isSaving}
-              onClick={handleSaveAndNext}
+            <DisabledReason
+              reason={
+                activeExtracting
+                  ? "Wait for the shipping bill to finish reading"
+                  : !activeRecord
+                    ? "Select an IRM to map first"
+                    : null
+              }
             >
-              {isLastByPosition ? "Save & review" : "Save & next"}
-            </Button>
+              <Button
+                type="button"
+                variant="primary"
+                rightIcon={<Icon name="arrow-right" className="h-3.5 w-3.5" />}
+                disabled={isSaving || !activeRecord || activeExtracting}
+                isLoading={isSaving}
+                onClick={handleSaveAndNext}
+              >
+                {isLastByPosition ? "Save & review" : "Save & next"}
+              </Button>
+            </DisabledReason>
           </>
         }
       />

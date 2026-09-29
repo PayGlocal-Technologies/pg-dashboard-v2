@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "@tanstack/react-form";
 import { z } from "zod";
-import { Button, Field, FieldError, FieldLabel } from "@/components/ui";
+import { Button, FieldLabel } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { useEncryptPayload } from "@/features/auth/hooks";
@@ -46,7 +46,7 @@ export function CountryQuestionnaireForm({ setScreen }: LoginScreenProps) {
   const setEmailOtpInitiateTimestamp = useLogin((s) => s.setEmailOtpInitiateTimestamp);
   const setSmsOtpInitiateTimestamp = useLogin((s) => s.setSmsOtpInitiateTimestamp);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { countryCode: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -84,61 +84,59 @@ export function CountryQuestionnaireForm({ setScreen }: LoginScreenProps) {
   });
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Where are you based?">
-        Select your country to continue with the right sign-in flow.
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Where are you based?">
+          Select your country to continue with the right sign-in flow.
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="countryCode"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = countrySchema.shape.countryCode.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="countryCode">Country</FieldLabel>
-            <select
-              id="countryCode"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-            >
-              <option value="">Select your country</option>
-              {SUPPORTED_COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+        <form.AppField
+          name="countryCode"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = countrySchema.shape.countryCode.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.CustomField<string> id="countryCode">
+              {({ id, value, onChange, onBlur }) => (
+                <>
+                  <FieldLabel htmlFor={id}>Country</FieldLabel>
+                  <select
+                    id={id}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onBlur={onBlur}
+                  >
+                    <option value="">Select your country</option>
+                    {SUPPORTED_COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+            </field.CustomField>
+          )}
+        </form.AppField>
 
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Continue
-      </Button>
-      <Button
-        variant="ghost"
-        type="button"
-        onClick={() => setScreen("identifier")}
-        className="w-full text-xs text-muted-foreground hover:text-foreground"
-      >
-        Use a different account
-      </Button>
-    </form>
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Continue
+        </form.SubmitButton>
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => setScreen("identifier")}
+          className="w-full text-xs text-muted-foreground hover:text-foreground"
+        >
+          Use a different account
+        </Button>
+      </form.Form>
+    </form.AppForm>
   );
 }

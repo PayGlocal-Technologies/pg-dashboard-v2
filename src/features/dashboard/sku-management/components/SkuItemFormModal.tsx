@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useRef } from "react";
-import { useForm } from "@tanstack/react-form";
 import {
   Button,
   Dialog,
@@ -11,9 +10,6 @@ import {
   DrawerContent,
   DrawerTitle,
   Field,
-  FieldError,
-  FieldLabel,
-  Input,
   InputGroup,
   InputGroupInput,
   InputGroupText,
@@ -22,9 +18,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Textarea,
   useBreakpoint,
 } from "@/components/ui";
+import { submitAppForm, useAppForm } from "@/components/form/AppForm";
 import { cn } from "@/lib/utils";
 import { currencySymbol } from "@/lib/utils/format";
 import {
@@ -44,7 +40,7 @@ import {
   validateType,
 } from "@/features/dashboard/sku-management/schemas";
 import { SkuMediaUpload } from "@/features/dashboard/sku-management/components/SkuMediaUpload";
-import type { SkuItemFormValues, SkuProductType } from "@/features/dashboard/sku-management/types";
+import type { SkuItemFormValues } from "@/features/dashboard/sku-management/types";
 
 /**
  * The currency select's options: `{ value, country }`, whichever source they
@@ -71,16 +67,6 @@ function useCurrencyOptions(): { value: string; country: string }[] {
       country: currency.countryName,
     }));
   }, [currencies]);
-}
-
-/** Red asterisk after a required field's label — required-ness reads
- *  identically across the product. */
-function RequiredMark() {
-  return (
-    <span aria-hidden className="-ml-1.5 text-destructive">
-      *
-    </span>
-  );
 }
 
 /** Section heading inside the form. Groups fields by proximity rather than
@@ -186,7 +172,7 @@ function SkuItemFormBody({
 
   const currencyOptions = useCurrencyOptions();
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: initialValues ?? emptySkuItemForm(),
     onSubmit: ({ value, formApi }) => {
       onSubmit(value, keepOpenRef.current);
@@ -197,314 +183,248 @@ function SkuItemFormBody({
     },
   });
 
-  const submitWith = (keepOpen: boolean) => {
+  // "Save and add another" sets the flag only for its own submit, so a plain
+  // Save or Enter afterwards (valid or not) always closes as before.
+  const submitWith = async (keepOpen: boolean) => {
     keepOpenRef.current = keepOpen;
-    void form.handleSubmit();
+    await submitAppForm(form, document.getElementById("sku-item-form"));
+    keepOpenRef.current = false;
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        submitWith(false);
-      }}
-      className="flex min-h-0 flex-col"
-      noValidate
-    >
-      {/* Header — the Dialog/Drawer's own close button sits at the top right,
+    <form.AppForm>
+      <form.Form id="sku-item-form" className="flex min-h-0 flex-col">
+        {/* Header — the Dialog/Drawer's own close button sits at the top right,
           so the title row only carries the title. */}
-      <div className="flex-shrink-0 border-b border-border px-5 py-4">
-        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{title}</h2>
-      </div>
+        <div className="flex-shrink-0 border-b border-border px-5 py-4">
+          <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{title}</h2>
+        </div>
 
-      {/* Only this middle band scrolls, so the footer actions stay reachable
+        {/* Only this middle band scrolls, so the footer actions stay reachable
           however tall the media strip grows. */}
-      <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
-        {/* ── Item information ─────────────────────────────────────────── */}
-        <div className="flex flex-col gap-3">
-          <form.Field
-            name="name"
-            validators={{
-              onBlur: ({ value }) => validateName(value),
-              onSubmit: ({ value }) => validateName(value),
-            }}
-          >
-            {(field) => (
-              <Field>
-                <FieldLabel htmlFor="sku-name">
-                  {/* Names the field for both kinds of catalogue item; the
-                      table still shows it under the Product column. */}
-                  Product/Service Name
-                  <RequiredMark />
-                </FieldLabel>
-                <Input
-                  id="sku-name"
-                  placeholder="e.g. Consulting services"
-                  aria-invalid={field.state.meta.errors.length > 0}
-                  value={field.state.value}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  onBlur={field.handleBlur}
-                />
-                <FieldError>{field.state.meta.errors[0]}</FieldError>
-              </Field>
-            )}
-          </form.Field>
-
-          {/* Type and the tax code share a row on desktop and stack on mobile
-              — they're one thought (what this is, and how it's coded). */}
-          <div className="grid gap-3 sm:grid-cols-2">
-            <form.Field
-              name="type"
-              validators={{
-                onChange: ({ value }) => validateType(value),
-                onSubmit: ({ value }) => validateType(value),
-              }}
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-4">
+          {/* ── Item information ─────────────────────────────────────────── */}
+          <div className="flex flex-col gap-3">
+            {/* "Product/Service Name" names the field for both kinds of
+              catalogue item; the table still shows it under the Product column. */}
+            <form.AppField
+              name="name"
+              validators={{ onChange: ({ value }) => validateName(value) }}
             >
               {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="sku-type">
-                    Type
-                    <RequiredMark />
-                  </FieldLabel>
-                  <Select
-                    value={field.state.value}
-                    onValueChange={(v) => {
-                      field.handleChange(v as SkuProductType);
-                      // The tax code's label, placeholder, and necessity all
-                      // follow the type, so its error is re-evaluated here
-                      // rather than waiting for another blur on that field.
-                      form.validateField("hsnSac", "change");
-                    }}
-                  >
-                    <SelectTrigger
-                      id="sku-type"
-                      aria-invalid={field.state.meta.errors.length > 0}
-                      className="w-full"
-                    >
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SKU_TYPE_OPTIONS.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError>{field.state.meta.errors[0]}</FieldError>
-                </Field>
+                <field.TextField
+                  id="sku-name"
+                  label="Product/Service Name"
+                  required
+                  placeholder="e.g. Consulting services"
+                />
               )}
-            </form.Field>
+            </form.AppField>
 
-            <form.Subscribe selector={(state) => state.values.type}>
-              {(type) => {
-                const scheme =
-                  type === "GOODS" || type === "SERVICES"
-                    ? SKU_TAX_CODE[type]
-                    : SKU_TAX_CODE_FALLBACK;
-                return (
-                  <form.Field
-                    name="hsnSac"
-                    validators={{
-                      onBlur: ({ value }) => validateHsnSac(value, form.getFieldValue("type")),
-                      onSubmit: ({ value }) => validateHsnSac(value, form.getFieldValue("type")),
+            {/* Type and the tax code share a row on desktop and stack on mobile
+              — they're one thought (what this is, and how it's coded). */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <form.AppField
+                name="type"
+                validators={{ onChange: ({ value }) => validateType(value) }}
+              >
+                {(field) => (
+                  <field.SelectField
+                    id="sku-type"
+                    label="Type"
+                    required
+                    options={SKU_TYPE_OPTIONS}
+                    placeholder="Select type"
+                    onValueChange={() => {
+                      // The tax code's label, placeholder, and necessity all
+                      // follow the type, so it is re-checked here once it has
+                      // been edited or is already showing an error.
+                      const meta = form.getFieldMeta("hsnSac");
+                      if (meta?.isTouched || meta?.errors.length) {
+                        void form.validateField("hsnSac", "change");
+                      }
                     }}
-                  >
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="sku-hsn-sac">
-                          {/* Named for the scheme that actually applies once a
-                              type is chosen; the table column stays HSN/SAC. */}
-                          {scheme.label}
-                          <RequiredMark />
-                        </FieldLabel>
-                        <Input
+                  />
+                )}
+              </form.AppField>
+
+              <form.Subscribe selector={(state) => state.values.type}>
+                {(type) => {
+                  const scheme =
+                    type === "GOODS" || type === "SERVICES"
+                      ? SKU_TAX_CODE[type]
+                      : SKU_TAX_CODE_FALLBACK;
+                  return (
+                    <form.AppField
+                      name="hsnSac"
+                      validators={{
+                        onChange: ({ value }) => validateHsnSac(value, form.getFieldValue("type")),
+                      }}
+                    >
+                      {/* Named for the scheme that actually applies once a type is
+                        chosen; the table column stays HSN/SAC. */}
+                      {(field) => (
+                        <field.TextField
                           id="sku-hsn-sac"
+                          label={scheme.label}
+                          required
                           inputMode="numeric"
                           placeholder={scheme.placeholder}
-                          aria-invalid={field.state.meta.errors.length > 0}
-                          value={field.state.value}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          onBlur={field.handleBlur}
                         />
-                        <FieldError>{field.state.meta.errors[0]}</FieldError>
-                      </Field>
-                    )}
-                  </form.Field>
+                      )}
+                    </form.AppField>
+                  );
+                }}
+              </form.Subscribe>
+            </div>
+          </div>
+
+          {/* ── Pricing ──────────────────────────────────────────────────── */}
+          <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3.5">
+            <SectionLabel>Pricing</SectionLabel>
+
+            <form.Subscribe selector={(state) => state.values.currency}>
+              {(currency) => {
+                const symbol = currency ? currencySymbol(currency) : null;
+                return (
+                  // Three across where there's room, stacking on mobile in the
+                  // order currency → selling price → product cost.
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <form.AppField
+                      name="currency"
+                      validators={{ onChange: ({ value }) => validateCurrency(value) }}
+                    >
+                      {(field) => (
+                        <field.CustomField<string> id="sku-currency" label="Currency" required>
+                          {({ id, value, invalid, onChange }) => (
+                            <Select value={value} onValueChange={onChange}>
+                              <SelectTrigger
+                                id={id}
+                                aria-invalid={invalid || undefined}
+                                // SelectTrigger already line-clamps its value span,
+                                // but a flex child defaults to min-width:auto and
+                                // so refuses to shrink below its content — which is
+                                // why "AED United Arab Emirates" was pushing past
+                                // the trigger in this third-width column instead of
+                                // clipping. min-w-0 lets that clamp take effect.
+                                className="w-full [&>span]:min-w-0"
+                              >
+                                <SelectValue placeholder="Select" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {currencyOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {/* The code never truncates and the country
+                                    always does: whichever is dropped, the row
+                                    still has to identify the currency. */}
+                                    <span className="flex min-w-0 items-center gap-2">
+                                      <span className="shrink-0 font-medium">{option.value}</span>
+                                      <span className="truncate text-muted-foreground">
+                                        {option.country}
+                                      </span>
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                        </field.CustomField>
+                      )}
+                    </form.AppField>
+
+                    <form.AppField
+                      name="sellingPrice"
+                      validators={{ onChange: ({ value }) => validateSellingPrice(value) }}
+                    >
+                      {(field) => (
+                        <field.CustomField<string>
+                          id="sku-selling-price"
+                          label="Selling price"
+                          required
+                        >
+                          {() => (
+                            <PriceInput id="sku-selling-price" symbol={symbol} field={field} />
+                          )}
+                        </field.CustomField>
+                      )}
+                    </form.AppField>
+
+                    <form.AppField
+                      name="productCost"
+                      validators={{ onChange: ({ value }) => validateProductCost(value) }}
+                    >
+                      {(field) => (
+                        <field.CustomField<string> id="sku-product-cost" label="Product cost">
+                          {() => <PriceInput id="sku-product-cost" symbol={symbol} field={field} />}
+                        </field.CustomField>
+                      )}
+                    </form.AppField>
+                  </div>
                 );
               }}
             </form.Subscribe>
           </div>
-        </div>
 
-        {/* ── Pricing ──────────────────────────────────────────────────── */}
-        <div className="flex flex-col gap-3 rounded-xl border border-border bg-muted/30 p-3.5">
-          <SectionLabel>Pricing</SectionLabel>
-
-          <form.Subscribe selector={(state) => state.values.currency}>
-            {(currency) => {
-              const symbol = currency ? currencySymbol(currency) : null;
-              return (
-                // Three across where there's room, stacking on mobile in the
-                // order currency → selling price → product cost.
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <form.Field
-                    name="currency"
-                    validators={{
-                      onChange: ({ value }) => validateCurrency(value),
-                      onSubmit: ({ value }) => validateCurrency(value),
-                    }}
-                  >
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="sku-currency">
-                          Currency
-                          <RequiredMark />
-                        </FieldLabel>
-                        <Select
-                          value={field.state.value}
-                          onValueChange={(v) => field.handleChange(v as typeof field.state.value)}
-                        >
-                          <SelectTrigger
-                            id="sku-currency"
-                            aria-invalid={field.state.meta.errors.length > 0}
-                            // SelectTrigger already line-clamps its value span,
-                            // but a flex child defaults to min-width:auto and
-                            // so refuses to shrink below its content — which is
-                            // why "AED United Arab Emirates" was pushing past
-                            // the trigger in this third-width column instead of
-                            // clipping. min-w-0 lets that clamp take effect.
-                            className="w-full [&>span]:min-w-0"
-                          >
-                            <SelectValue placeholder="Select" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {currencyOptions.map((option) => (
-                              <SelectItem key={option.value} value={option.value}>
-                                {/* The code never truncates and the country
-                                    always does: whichever is dropped, the row
-                                    still has to identify the currency. */}
-                                <span className="flex min-w-0 items-center gap-2">
-                                  <span className="shrink-0 font-medium">{option.value}</span>
-                                  <span className="truncate text-muted-foreground">
-                                    {option.country}
-                                  </span>
-                                </span>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FieldError>{field.state.meta.errors[0]}</FieldError>
-                      </Field>
-                    )}
-                  </form.Field>
-
-                  <form.Field
-                    name="sellingPrice"
-                    validators={{
-                      onBlur: ({ value }) => validateSellingPrice(value),
-                      onSubmit: ({ value }) => validateSellingPrice(value),
-                    }}
-                  >
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="sku-selling-price">
-                          Selling price
-                          <RequiredMark />
-                        </FieldLabel>
-                        <PriceInput id="sku-selling-price" symbol={symbol} field={field} />
-                        <FieldError>{field.state.meta.errors[0]}</FieldError>
-                      </Field>
-                    )}
-                  </form.Field>
-
-                  <form.Field
-                    name="productCost"
-                    validators={{
-                      onBlur: ({ value }) => validateProductCost(value),
-                      onSubmit: ({ value }) => validateProductCost(value),
-                    }}
-                  >
-                    {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor="sku-product-cost">Product cost</FieldLabel>
-                        <PriceInput id="sku-product-cost" symbol={symbol} field={field} />
-                        <FieldError>{field.state.meta.errors[0]}</FieldError>
-                      </Field>
-                    )}
-                  </form.Field>
-                </div>
-              );
-            }}
-          </form.Subscribe>
-        </div>
-
-        {/* ── Media ──────────────────────────────────────────────────────
+          {/* ── Media ──────────────────────────────────────────────────────
             One image, matching what the catalogue stores. `savedImageUrl` is
             read off the values the form opened with, so discarding a
             replacement restores the picture the item already has rather than
             emptying the slot. */}
-        <div className="flex flex-col gap-2">
-          <SectionLabel>Media</SectionLabel>
-          <form.Field name="image">
+          <div className="flex flex-col gap-2">
+            <SectionLabel>Media</SectionLabel>
+            <form.Field name="image">
+              {(field) => (
+                <SkuMediaUpload
+                  id="sku-media"
+                  value={field.state.value}
+                  onChange={(next) => field.handleChange(next)}
+                  savedImageUrl={initialValues?.image?.url}
+                />
+              )}
+            </form.Field>
+          </div>
+
+          {/* ── Description ──────────────────────────────────────────────── */}
+          <form.AppField name="description">
             {(field) => (
-              <SkuMediaUpload
-                id="sku-media"
-                value={field.state.value}
-                onChange={(next) => field.handleChange(next)}
-                savedImageUrl={initialValues?.image?.url}
+              <field.TextareaField
+                id="sku-description"
+                label="Description"
+                placeholder="Optional notes that appear with the item on invoices"
+                rows={3}
               />
             )}
-          </form.Field>
+          </form.AppField>
         </div>
 
-        {/* ── Description ──────────────────────────────────────────────── */}
-        <form.Field name="description">
-          {(field) => (
-            <Field>
-              <FieldLabel htmlFor="sku-description">Description</FieldLabel>
-              <Textarea
-                id="sku-description"
-                rows={3}
-                placeholder="Optional notes that appear with the item on invoices"
-                value={field.state.value}
-                onChange={(e) => field.handleChange(e.target.value)}
-                onBlur={field.handleBlur}
-              />
-            </Field>
-          )}
-        </form.Field>
-      </div>
-
-      {/* ── Actions ──────────────────────────────────────────────────────
+        {/* ── Actions ──────────────────────────────────────────────────────
           Save and add another sits opposite the pair, as a link-style action,
           so it reads as a secondary route through the same form rather than a
           third button competing with the primary CTA. */}
-      <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3.5">
-        {showAddAnother ? (
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="px-0"
-            onClick={() => submitWith(true)}
-          >
-            Save and add another
-          </Button>
-        ) : (
-          <span />
-        )}
+        <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-2 border-t border-border px-5 py-3.5">
+          {showAddAnother ? (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="px-0"
+              onClick={() => void submitWith(true)}
+            >
+              Save and add another
+            </Button>
+          ) : (
+            <span />
+          )}
 
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" size="sm">
-            {submitLabel}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={onCancel}>
+              Cancel
+            </Button>
+            <form.SubmitButton>{submitLabel}</form.SubmitButton>
+          </div>
         </div>
-      </div>
-    </form>
+      </form.Form>
+    </form.AppForm>
   );
 }
 

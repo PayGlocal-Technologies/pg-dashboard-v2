@@ -16,13 +16,13 @@ import type { Client, ClientFormValues } from "@/features/dashboard/client-manag
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export function validateBusinessName(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a business name";
+  return value.trim() ? undefined : "Business name is required";
 }
 
 export function validateBusinessType(value: string): string | undefined {
   return CLIENT_BUSINESS_TYPES.some((option) => option.value === value)
     ? undefined
-    : "Select a business type";
+    : "Business type is required";
 }
 
 /**
@@ -37,12 +37,12 @@ export function validateWebsite(value: string): string | undefined {
 }
 
 export function validateContactName(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a contact name";
+  return value.trim() ? undefined : "Primary contact name is required";
 }
 
 export function validateContactEmail(value: string): string | undefined {
   const trimmed = value.trim();
-  if (!trimmed) return "Enter an email address";
+  if (!trimmed) return "Primary contact email is required";
   return EMAIL_RE.test(trimmed) ? undefined : "Enter a valid email address";
 }
 
@@ -61,23 +61,23 @@ export function validatePhone(countryIso2: string, number: string): string | und
 }
 
 export function validateCountry(value: string): string | undefined {
-  return COUNTRIES.some((c) => c.code === value) ? undefined : "Select a country";
+  return COUNTRIES.some((c) => c.code === value) ? undefined : "Country is required";
 }
 
 export function validateState(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a state";
+  return value.trim() ? undefined : "State is required";
 }
 
 export function validateAddress(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a street address";
+  return value.trim() ? undefined : "Address is required";
 }
 
 export function validateCity(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a city";
+  return value.trim() ? undefined : "City is required";
 }
 
 export function validateZipcode(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a zipcode";
+  return value.trim() ? undefined : "Zipcode is required";
 }
 
 /**

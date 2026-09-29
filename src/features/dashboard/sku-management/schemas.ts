@@ -13,11 +13,11 @@ import type { SkuItemFormValues } from "@/features/dashboard/sku-management/type
  */
 
 export function validateName(value: string): string | undefined {
-  return value.trim() ? undefined : "Enter a product name";
+  return value.trim() ? undefined : "Product/Service name is required";
 }
 
 export function validateType(value: string): string | undefined {
-  return value === "GOODS" || value === "SERVICES" ? undefined : "Select a product type";
+  return value === "GOODS" || value === "SERVICES" ? undefined : "Type is required";
 }
 
 /**
@@ -28,7 +28,7 @@ export function validateType(value: string): string | undefined {
  * genuinely configured for.
  */
 export function validateCurrency(value: string): string | undefined {
-  return value.trim() ? undefined : "Select a currency";
+  return value.trim() ? undefined : "Currency is required";
 }
 
 /**

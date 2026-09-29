@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button, Dialog, DialogContent, DialogTitle } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { DisabledReason } from "@/components/common/DisabledReason";
 import { AppImage as Image } from "@/components/common/AppImage";
 
 /** Matches pg-dashboard's dragger: `.png,.jpg`, one file, 10MB. */
@@ -168,16 +169,20 @@ function UploadBody({
         >
           Cancel
         </Button>
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          disabled={!file || isUploading}
-          leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
-          onClick={() => file && onUpload(file)}
-        >
-          {isUploading ? "Uploading…" : `Upload ${label.toLowerCase()}`}
-        </Button>
+        {/* Nothing to validate until a file is chosen, so the button stays
+            disabled and says why on hover. */}
+        <DisabledReason reason={file ? null : "Choose a file to continue"}>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled={!file || isUploading}
+            leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
+            onClick={() => file && onUpload(file)}
+          >
+            {isUploading ? "Uploading…" : `Upload ${label.toLowerCase()}`}
+          </Button>
+        </DisabledReason>
       </div>
     </div>
   );

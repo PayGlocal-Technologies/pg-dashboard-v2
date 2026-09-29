@@ -1,17 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { toast } from "sonner";
-import {
-  Button,
-  DatePicker,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui";
+import { Button, DatePicker, Dialog, DialogContent, DialogTitle } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
+import { required, rules } from "@/components/form/rules";
 import { usePost } from "@/lib/api/hooks";
 import { markInvoicePaidApi } from "@/features/dashboard/mca-invoices/services";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
@@ -37,8 +29,6 @@ export function MarkAsPaidDialog({
   onDone: () => void;
   today: string;
 }) {
-  const [paidDate, setPaidDate] = useState(today);
-
   const { mutate: markAsPaid, isPending } = usePost<BaseResponse<null>, { paidDate: string }>(
     invoice ? markInvoicePaidApi(invoice.mid, invoice.id) : "",
     // Moves the invoice out of Outstanding and into Paid, so both the list and
@@ -46,20 +36,25 @@ export function MarkAsPaidDialog({
     { invalidateQueries: INVOICE_DATA_KEYS }
   );
 
-  const handleConfirm = () => {
-    if (!invoice) return;
-    markAsPaid(
-      { paidDate },
-      {
-        onSuccess: () => {
-          toast.success("Invoice marked as paid", { description: invoice.invoiceNumber });
-          onDone();
-          onOpenChange(false);
-        },
-        onError: (error) => toast.error("Couldn't mark it as paid", { description: error.message }),
-      }
-    );
-  };
+  // The date is required but the button stays enabled (the app-wide rule).
+  const form = useAppForm({
+    defaultValues: { paidDate: today },
+    onSubmit: ({ value: { paidDate } }) => {
+      if (!invoice) return;
+      markAsPaid(
+        { paidDate },
+        {
+          onSuccess: () => {
+            toast.success("Invoice marked as paid", { description: invoice.invoiceNumber });
+            onDone();
+            onOpenChange(false);
+          },
+          onError: (error) =>
+            toast.error("Couldn't mark it as paid", { description: error.message }),
+        }
+      );
+    },
+  });
 
   return (
     <Dialog open={!!invoice} onOpenChange={onOpenChange}>
@@ -76,28 +71,46 @@ export function MarkAsPaidDialog({
           </p>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-          <Field>
-            <FieldLabel>Payment date</FieldLabel>
-            <DatePicker value={paidDate} onChange={setPaidDate} />
-            <FieldDescription>The date the money actually arrived.</FieldDescription>
-          </Field>
-        </div>
+        <form.AppForm>
+          <form.Form className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              <form.AppField
+                name="paidDate"
+                validators={{ onChange: rules(required("Payment date")) }}
+              >
+                {(field) => (
+                  <field.CustomField<string>
+                    id="mark-paid-date"
+                    label="Payment date"
+                    description="The date the money actually arrived."
+                  >
+                    {({ value, invalid, onChange }) => (
+                      // DatePicker takes no id or aria-invalid; the wrapper
+                      // carries the invalid state so a failed save can focus it.
+                      <div aria-invalid={invalid || undefined}>
+                        <DatePicker value={value} onChange={onChange} />
+                      </div>
+                    )}
+                  </field.CustomField>
+                )}
+              </form.AppField>
+            </div>
 
-        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-          <Button type="button" variant="secondary" size="sm" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            disabled={isPending || !paidDate}
-            onClick={handleConfirm}
-          >
-            {isPending ? "Saving…" : "Paid outside PayGlocal"}
-          </Button>
-        </div>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancel
+              </Button>
+              <form.SubmitButton pending={isPending}>
+                {isPending ? "Saving…" : "Paid outside PayGlocal"}
+              </form.SubmitButton>
+            </div>
+          </form.Form>
+        </form.AppForm>
       </DialogContent>
     </Dialog>
   );

@@ -1,6 +1,5 @@
 "use client";
 
-import { useForm } from "@tanstack/react-form";
 import type { QueryKey } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -8,19 +7,13 @@ import {
   Dialog,
   DialogContent,
   DialogTitle,
-  Field,
-  FieldLabel,
-  Input,
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useAppForm } from "@/components/form/AppForm";
+import { check, email, required, rules } from "@/components/form/rules";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { buildDepartmentOptions } from "@/features/dashboard/team-management/constants";
 import { iamRolesApi, inviteTempUserApi } from "@/features/dashboard/team-management/services";
@@ -45,20 +38,22 @@ const DEFAULT_VALUES: AddTeamMemberFormValues = {
   phone: "",
 };
 
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-}
-
-function computeIsValid(v: AddTeamMemberFormValues): boolean {
-  return Boolean(
-    v.firstName.trim() &&
-    v.lastName.trim() &&
-    v.username.trim() &&
-    v.department.trim() &&
-    isValidEmail(v.email) &&
-    v.phone.replace(/\D/g, "").length >= 7
-  );
-}
+/**
+ * Per-field rules, the same ones the Send button used to be silently disabled
+ * on. Every field is required, so each carries a * (from `required`) and the
+ * button stays live: a press with gaps names each one.
+ */
+const FIELD_RULES = {
+  firstName: rules(required("First name")),
+  lastName: rules(required("Last name")),
+  username: rules(required("Username")),
+  department: rules(required("Role")),
+  email: rules(required("Email ID"), email("Enter a valid email ID")),
+  phone: rules(
+    required("Phone number"),
+    check((value: string) => value.replace(/\D/g, "").length < 7 && "Enter a valid phone number")
+  ),
+};
 
 interface AddTeamMemberModalProps {
   open: boolean;
@@ -91,7 +86,7 @@ export function AddTeamMemberModal({
     invalidateQueries: invalidateKey,
   });
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: DEFAULT_VALUES,
     onSubmit: async ({ value }) => {
       // Old dashboard mapping: the dropdown shows `department`, submits it as
@@ -141,135 +136,75 @@ export function AddTeamMemberModal({
           </p>
         </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void form.handleSubmit();
-          }}
-          className="flex min-h-0 flex-1 flex-col"
-          noValidate
-        >
-          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <form.Field name="firstName">
-                {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="firstName">First name</FieldLabel>
-                    <Input
-                      id="firstName"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      required
-                    />
-                  </Field>
-                )}
-              </form.Field>
+        <form.AppForm>
+          <form.Form className="flex min-h-0 flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <form.AppField name="firstName" validators={{ onChange: FIELD_RULES.firstName }}>
+                  {(field) => <field.TextField id="firstName" label="First name" />}
+                </form.AppField>
 
-              <form.Field name="lastName">
+                <form.AppField name="lastName" validators={{ onChange: FIELD_RULES.lastName }}>
+                  {(field) => <field.TextField id="lastName" label="Last name" />}
+                </form.AppField>
+              </div>
+
+              <form.AppField name="username" validators={{ onChange: FIELD_RULES.username }}>
                 {(field) => (
-                  <Field>
-                    <FieldLabel htmlFor="lastName">Last name</FieldLabel>
-                    <Input
-                      id="lastName"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      required
-                    />
-                  </Field>
+                  <field.TextField id="username" label="Username" placeholder="e.g. priya.nair" />
                 )}
-              </form.Field>
+              </form.AppField>
+
+              <form.AppField name="department" validators={{ onChange: FIELD_RULES.department }}>
+                {(field) => (
+                  <field.SelectField
+                    id="role"
+                    label="Role / Department"
+                    options={departmentOptions}
+                    placeholder={rolesQuery.isPending ? "Loading roles…" : "Select a role"}
+                    triggerClassName=""
+                  />
+                )}
+              </form.AppField>
+
+              <form.AppField name="email" validators={{ onChange: FIELD_RULES.email }}>
+                {(field) => <field.TextField id="email" type="email" label="Email ID" />}
+              </form.AppField>
+
+              <form.AppField name="phone" validators={{ onChange: FIELD_RULES.phone }}>
+                {(field) => (
+                  <field.CustomField<string> id="phone" label="Phone number">
+                    {({ id, value, invalid, onChange, onBlur }) => (
+                      <InputGroup>
+                        <InputGroupAddon>+91</InputGroupAddon>
+                        <InputGroupInput
+                          id={id}
+                          type="tel"
+                          value={value}
+                          onChange={(e) => onChange(e.target.value)}
+                          onBlur={onBlur}
+                          aria-invalid={invalid || undefined}
+                        />
+                      </InputGroup>
+                    )}
+                  </field.CustomField>
+                )}
+              </form.AppField>
             </div>
 
-            <form.Field name="username">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="username">Username</FieldLabel>
-                  <Input
-                    id="username"
-                    placeholder="e.g. priya.nair"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    required
-                  />
-                </Field>
-              )}
-            </form.Field>
-
-            <form.Field name="department">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="role">Role / Department</FieldLabel>
-                  <Select value={field.state.value} onValueChange={(v) => field.handleChange(v)}>
-                    <SelectTrigger id="role">
-                      <SelectValue
-                        placeholder={rolesQuery.isPending ? "Loading roles…" : "Select a role"}
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departmentOptions.map((opt) => (
-                        <SelectItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-            </form.Field>
-
-            <form.Field name="email">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="email">Email ID</FieldLabel>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={field.state.value}
-                    onChange={(e) => field.handleChange(e.target.value)}
-                    required
-                  />
-                </Field>
-              )}
-            </form.Field>
-
-            <form.Field name="phone">
-              {(field) => (
-                <Field>
-                  <FieldLabel htmlFor="phone">Phone number</FieldLabel>
-                  <InputGroup>
-                    <InputGroupAddon>+91</InputGroupAddon>
-                    <InputGroupInput
-                      id="phone"
-                      type="tel"
-                      value={field.state.value}
-                      onChange={(e) => field.handleChange(e.target.value)}
-                      required
-                    />
-                  </InputGroup>
-                </Field>
-              )}
-            </form.Field>
-          </div>
-
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
-            <Button type="button" variant="outline" size="sm" onClick={handleClose}>
-              Cancel
-            </Button>
-            <form.Subscribe selector={(s) => [s.values, s.isSubmitting] as const}>
-              {([values, isSubmitting]) => (
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="sm"
-                  disabled={!computeIsValid(values) || isSubmitting || isPending}
-                  leftIcon={<Icon name="send-horizontal" className="h-3.5 w-3.5" />}
-                >
-                  Send Invite
-                </Button>
-              )}
-            </form.Subscribe>
-          </div>
-        </form>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
+              <Button type="button" variant="outline" size="sm" onClick={handleClose}>
+                Cancel
+              </Button>
+              <form.SubmitButton
+                pending={isPending}
+                leftIcon={<Icon name="send-horizontal" className="h-3.5 w-3.5" />}
+              >
+                Send Invite
+              </form.SubmitButton>
+            </div>
+          </form.Form>
+        </form.AppForm>
       </DialogContent>
     </Dialog>
   );

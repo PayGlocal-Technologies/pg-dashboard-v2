@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useForm } from "@tanstack/react-form";
-import { Button, Field, FieldError, FieldLabel, PasswordInput, Separator } from "@/components/ui";
+import { Button, FieldLabel, PasswordInput, Separator } from "@/components/ui";
+import { useAppForm } from "@/components/form/AppForm";
 import { AuthHeading } from "@/features/auth/components/AuthHeading";
 import { AuthError } from "@/features/auth/components/AuthError";
 import { useEncryptPayload } from "@/features/auth/hooks";
@@ -38,7 +38,7 @@ export function PasswordForm({ setScreen }: LoginScreenProps) {
   const setEmailOtpInitiateTimestamp = useLogin((s) => s.setEmailOtpInitiateTimestamp);
   const setIsPhoneNumberOtpLogin = useLogin((s) => s.setIsPhoneNumberOtpLogin);
 
-  const form = useForm({
+  const form = useAppForm({
     defaultValues: { password: "" },
     onSubmit: async ({ value }) => {
       setApiError(null);
@@ -85,91 +85,89 @@ export function PasswordForm({ setScreen }: LoginScreenProps) {
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        void form.handleSubmit();
-      }}
-      className="space-y-5"
-      noValidate
-    >
-      <AuthHeading title="Enter your password">
-        {maskedEmail ? `Signing in as ${maskedEmail}` : `Signing in as ${identifier}`}
-      </AuthHeading>
-      <AuthError message={apiError} />
+    <form.AppForm>
+      <form.Form className="space-y-5">
+        <AuthHeading title="Enter your password">
+          {maskedEmail ? `Signing in as ${maskedEmail}` : `Signing in as ${identifier}`}
+        </AuthHeading>
+        <AuthError message={apiError} />
 
-      <form.Field
-        name="password"
-        validators={{
-          onBlur: ({ value }) => {
-            const r = passwordSchema.shape.password.safeParse(value);
-            return r.success ? undefined : r.error.issues[0]?.message;
-          },
-        }}
-      >
-        {(field) => (
-          <Field>
-            <div className="flex items-center justify-between">
-              <FieldLabel htmlFor="password">Password</FieldLabel>
-              {isWebsiteLogin ? (
-                <button
-                  type="button"
-                  onClick={() => sendMessage({ type: "WEBSITE_FORGOT_PASSWORD" })}
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  Forgot password?
-                </button>
-              ) : (
-                <Link
-                  href="/forgot-password"
-                  className="text-xs font-medium text-primary hover:underline"
-                >
-                  Forgot password?
-                </Link>
+        <form.AppField
+          name="password"
+          validators={{
+            onBlur: ({ value }) => {
+              const r = passwordSchema.shape.password.safeParse(value);
+              return r.success ? undefined : r.error.issues[0]?.message;
+            },
+          }}
+        >
+          {(field) => (
+            <field.CustomField<string> id="password">
+              {({ id, value, invalid, onChange, onBlur }) => (
+                <>
+                  <div className="flex items-center justify-between">
+                    <FieldLabel htmlFor={id}>Password</FieldLabel>
+                    {isWebsiteLogin ? (
+                      <button
+                        type="button"
+                        onClick={() => sendMessage({ type: "WEBSITE_FORGOT_PASSWORD" })}
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    ) : (
+                      <Link
+                        href="/forgot-password"
+                        className="text-xs font-medium text-primary hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    )}
+                  </div>
+                  <PasswordInput
+                    id={id}
+                    autoComplete="current-password"
+                    autoFocus
+                    aria-invalid={invalid}
+                    placeholder="Enter your password"
+                    value={value}
+                    onChange={(e) => onChange(e.target.value)}
+                    onBlur={onBlur}
+                  />
+                </>
               )}
-            </div>
-            <PasswordInput
-              id="password"
-              autoComplete="current-password"
-              autoFocus
-              aria-invalid={field.state.meta.errors.length > 0}
-              placeholder="Enter your password"
-              value={field.state.value}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+            </field.CustomField>
+          )}
+        </form.AppField>
 
-      <Button type="submit" size="lg" isLoading={isPending} className="w-full">
-        Continue
-      </Button>
+        <form.SubmitButton size="lg" isLoading={isPending} className="w-full">
+          Continue
+        </form.SubmitButton>
 
-      <div className="flex items-center gap-3">
-        <Separator className="flex-1" />
-        <span className="text-xs text-muted-foreground">OR</span>
-        <Separator className="flex-1" />
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="lg"
-        isLoading={sendingOtp || resendingOtp}
-        onClick={() => void handleUseOtp()}
-        className="w-full"
-      >
-        Sign in with email OTP instead
-      </Button>
-      <Button
-        variant="ghost"
-        type="button"
-        onClick={() => setScreen("identifier")}
-        className="w-full text-xs text-muted-foreground hover:text-foreground"
-      >
-        Use a different account
-      </Button>
-    </form>
+        <div className="flex items-center gap-3">
+          <Separator className="flex-1" />
+          <span className="text-xs text-muted-foreground">OR</span>
+          <Separator className="flex-1" />
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="lg"
+          isLoading={sendingOtp || resendingOtp}
+          onClick={() => void handleUseOtp()}
+          className="w-full"
+        >
+          Sign in with email OTP instead
+        </Button>
+        <Button
+          variant="ghost"
+          type="button"
+          onClick={() => setScreen("identifier")}
+          className="w-full text-xs text-muted-foreground hover:text-foreground"
+        >
+          Use a different account
+        </Button>
+      </form.Form>
+    </form.AppForm>
   );
 }

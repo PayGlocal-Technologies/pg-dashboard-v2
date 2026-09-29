@@ -30,7 +30,6 @@ import {
   getSubtotal,
   getTaxAmount,
   getTotalAmount,
-  resolveItemType,
 } from "@/features/dashboard/create-invoice/helpers";
 import { DISCOUNT_TYPE_OPTIONS } from "@/features/dashboard/create-invoice/constants";
 import { useLineItemSuggestions } from "@/features/dashboard/create-invoice/hooks";
@@ -162,7 +161,7 @@ export function LineItemsSection({
       {
         key,
         description: item.name,
-        type: resolveItemType(item),
+        type: item.type ?? "",
         hsn: item.hsn ?? "",
         gstRate: "",
         unitPrice: item.unitPrice ?? "",
