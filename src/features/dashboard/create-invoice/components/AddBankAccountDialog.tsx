@@ -151,7 +151,6 @@ function AddBankBody({ onCancel, onAdded }: { onCancel: () => void; onAdded: () 
                 aria-invalid={field.state.meta.errors.length > 0}
                 onChange={(e) => field.handleChange(e.target.value)}
                 onBlur={field.handleBlur}
-                className="font-mono"
               />
               <FieldError>{field.state.meta.errors[0]}</FieldError>
             </Field>
@@ -172,7 +171,6 @@ function AddBankBody({ onCancel, onAdded }: { onCancel: () => void; onAdded: () 
                 aria-invalid={field.state.meta.errors.length > 0}
                 onChange={(e) => field.handleChange(e.target.value.toUpperCase())}
                 onBlur={field.handleBlur}
-                className="font-mono"
               />
               <FieldError>{field.state.meta.errors[0]}</FieldError>
             </Field>

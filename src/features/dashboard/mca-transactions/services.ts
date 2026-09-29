@@ -163,11 +163,14 @@ export const mcaDocumentPendingApi = (merchantId: string, timeframe: string) =>
       (timeframe ? `?timeframe=${encodeURIComponent(timeframe)}` : "")
     : "";
 
-/** Documents pending broken down by currency — a live snapshot of everything
- *  currently DOCUMENT_PENDING (no timeframe). Backs the per-currency breakdown. */
-export const mcaDocumentPendingByCurrencyApi = (merchantId: string) =>
+/** Documents pending broken down by currency. Takes the same timeframe set as
+ *  document-pending (today | week | month | ytd); with none it is a live
+ *  snapshot of everything currently DOCUMENT_PENDING. Backs the per-currency
+ *  breakdown. */
+export const mcaDocumentPendingByCurrencyApi = (merchantId: string, timeframe: string) =>
   merchantId
-    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-by-currency`
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-by-currency` +
+      (timeframe ? `?timeframe=${encodeURIComponent(timeframe)}` : "")
     : "";
 
 /**
