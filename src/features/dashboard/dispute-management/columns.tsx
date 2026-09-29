@@ -1,4 +1,5 @@
-import { type Column, StatusBadge } from "@/components/ui";
+import { Badge, type Column, StatusBadge } from "@/components/ui";
+import { Icon, type IconName } from "@/components/icon";
 import { TransactionAmount } from "@/features/dashboard/pa-transactions/components/TransactionAmount";
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { formatDisplayDateTime } from "@/features/dashboard/pa-transactions/paColumns";
@@ -100,14 +101,36 @@ function StageCell({ value }: { value?: string }) {
   );
 }
 
+/**
+ * The escalation round as a chip, so how far a dispute has gone reads at a
+ * glance: Dispute (first round) plain, Pre-arbitration amber with one
+ * up-chevron, Arbitration red with two (the last round, where losing carries
+ * a fee). Colour always comes with the label and chevrons, never alone.
+ */
+const PHASE_CHIP: Record<
+  NonNullable<DisputeRow["disputePhase"]>,
+  { variant: "secondary" | "warning" | "error"; icon?: IconName }
+> = {
+  DISPUTE: { variant: "secondary" },
+  PRE_ARBITRATION: { variant: "warning", icon: "chevron-up" },
+  ARBITRATION: { variant: "error", icon: "chevrons-up" },
+};
+
 function PhaseCell({ phase }: { phase?: DisputeRow["disputePhase"] }) {
   if (!phase) {
     return <span className="text-[12px] text-muted-foreground">{"–"}</span>;
   }
+  const { variant, icon } = PHASE_CHIP[phase];
   return (
-    <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+    <Badge
+      variant={variant}
+      size="sm"
+      // Same height, radius and type size as the Status chip beside it.
+      className="gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium"
+    >
       {DISPUTE_ESCALATION_PHASE_LABEL[phase]}
-    </span>
+      {icon && <Icon name={icon} size={12} aria-hidden />}
+    </Badge>
   );
 }
 
