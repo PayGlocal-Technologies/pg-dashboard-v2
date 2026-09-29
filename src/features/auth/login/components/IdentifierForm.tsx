@@ -82,12 +82,15 @@ export function IdentifierForm({ setScreen }: LoginScreenProps) {
   // Fire campaign POST to intake service (not encrypted, uses raw fetch).
   const handleCampaignTracking = useCallback(
     async (encodedCampaignTrkData: string): Promise<void> => {
+      // Best-effort, as in pg-dashboard: a failed POST (e.g. the dev intake
+      // host refusing CORS from localhost) must not surface as an uncaught
+      // rejection on the login screen. The request itself is unchanged.
       await fetch(campaignTrackingApi, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ campaignDetails: encodedCampaignTrkData, formType: "campaign" }),
         credentials: "include",
-      });
+      }).catch(() => undefined);
     },
     []
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -13,6 +13,8 @@ const OPTIONS: { value: ThemeOption; icon: "sun" | "moon" | "monitor"; label: st
   { value: "dark", icon: "moon", label: "Dark" },
   { value: "system", icon: "monitor", label: "System" },
 ];
+
+const subscribeNoop = () => () => {};
 
 export function ThemeToggle() {
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -27,8 +29,12 @@ export function ThemeToggle() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  // theme/resolvedTheme are undefined during SSR — default to "moon" before hydration
-  const isMounted = typeof document !== "undefined";
+  // theme/resolvedTheme are unknown during SSR, so the first client render must
+  // draw exactly what the server did ("moon") or hydration fails. A
+  // `typeof document` check is already true on that first client render, which
+  // is what caused the mismatch; useSyncExternalStore returns the server
+  // snapshot (false) while hydrating and the client one (true) after.
+  const isMounted = useSyncExternalStore(subscribeNoop, () => true, () => false);
   const currentIcon = !isMounted
     ? "moon"
     : theme === "system"
