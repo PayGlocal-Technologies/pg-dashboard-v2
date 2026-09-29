@@ -10,6 +10,16 @@ export type DisputeRawStatus =
   | "ACCEPTED"
   | "EXPIRED";
 
+/** How a closed dispute got its outcome, for the table's "Won · …" /
+ * "Lost · …" chip. Only meaningful once `status` is final (CLEARED,
+ * CHARGED_BACK, ACCEPTED, EXPIRED). TODO(integration): read from the
+ * chargeback API; the mock sets it per row. */
+export type DisputeResolution =
+  | "NO_RESPONSE" // merchant never responded, closed for the customer
+  | "CONTESTED" // merchant submitted evidence, the bank decided
+  | "CUSTOMER_DROPPED" // customer withdrew the dispute
+  | "ACCEPTED"; // merchant accepted it and refunded
+
 export interface DisputeRow {
   disputeId: string;
   txnGid: string;
@@ -53,6 +63,8 @@ export interface DisputeRow {
    * see mockDocumentPreview.ts) shows there too, not just when reached
    * through the Transactions table. */
   documents?: string[];
+  /** See DisputeResolution. */
+  resolution?: DisputeResolution;
 }
 
 // TODO(integration): this feature is mock-data only, see mockRows.ts. Wire up

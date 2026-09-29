@@ -4,13 +4,37 @@ import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/c
 import { formatDisplayDateTime } from "@/features/dashboard/pa-transactions/paColumns";
 import { parseFormattedTimestamp } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
 import { DISPUTE_STATUS_META } from "@/features/dashboard/pa-transactions/status/disputeStatus";
-import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
+import type { DisputeResolution, DisputeRow } from "@/features/dashboard/dispute-management/types";
 
 // Reuses DISPUTE_STATUS_META as-is, same chip labels/colors as the disputed
 // rows already shown in the Transactions table, so a dispute looks
 // identical wherever it appears.
-function statusMeta(status: DisputeRow["status"]) {
-  return DISPUTE_STATUS_META[status];
+const RESOLUTION_LABEL: Record<DisputeResolution, string> = {
+  NO_RESPONSE: "No response",
+  CONTESTED: "Contested",
+  CUSTOMER_DROPPED: "Customer dropped",
+  ACCEPTED: "Accepted",
+};
+
+/** When a row has no explicit resolution, the most likely one for its status. */
+const DEFAULT_RESOLUTION: Partial<Record<DisputeRow["status"], DisputeResolution>> = {
+  CLEARED: "CONTESTED",
+  CHARGED_BACK: "CONTESTED",
+  ACCEPTED: "ACCEPTED",
+  EXPIRED: "NO_RESPONSE",
+};
+
+/**
+ * DISPUTE_STATUS_META's chip, with a closed dispute's "Won" / "Lost" label
+ * extended by how it got there: "Lost · No response", "Won · Contested",
+ * "Won · Customer dropped". Colour and icon stay the status's own. Open
+ * disputes keep their plain status label.
+ */
+function statusMeta(row: DisputeRow) {
+  const meta = DISPUTE_STATUS_META[row.status];
+  const resolution = row.resolution ?? DEFAULT_RESOLUTION[row.status];
+  if (!resolution) return meta;
+  return { ...meta, label: `${meta.label} · ${RESOLUTION_LABEL[resolution]}` };
 }
 
 // Same single-line "D MMM 'YY, hh:mm AM/PM" format and font/color
@@ -124,9 +148,10 @@ function buildColumn(key: string): Column<DisputeRow> | null {
       return {
         key: "status",
         header: "Status",
-        minWidth: 155,
+        // Fits the longest chip, "Won · Customer dropped", on one line.
+        minWidth: 200,
         render: (row) => {
-          const { label, variant, trailIcon } = statusMeta(row.status);
+          const { label, variant, trailIcon } = statusMeta(row);
           return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
         },
       };
