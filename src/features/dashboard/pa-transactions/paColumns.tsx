@@ -3,7 +3,6 @@
 import { formatDateTime, formatTimestamp, parseApiDateTime } from "@/lib/utils/format";
 import { type Column, StatusBadge } from "@/components/ui";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
-import { TransactionCustomerCell } from "@/features/dashboard/pa-transactions/components/TransactionCustomerCell";
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { TransactionAmount } from "@/features/dashboard/pa-transactions/components/TransactionAmount";
 import { TransactionId } from "@/features/dashboard/pa-transactions/components/TransactionId";
@@ -192,7 +191,6 @@ export const PA_TRANSACTION_COLUMN_DEFS: { key: string; label: string }[] = [
   { key: "amount", label: "Amount" },
   { key: "status", label: "Status" },
   { key: "paymentMethod", label: "Payment Method" },
-  { key: "customerName", label: "Customer Name" },
   { key: "customerEmail", label: "Customer Email" },
   { key: "transactionId", label: "Transaction ID" },
   { key: "dateTime", label: "Date & Time" },
@@ -202,13 +200,6 @@ export const PA_TRANSACTION_COLUMN_ORDER: string[] = PA_TRANSACTION_COLUMN_DEFS.
 
 function buildColumn(key: string): Column<PaTransaction> | null {
   switch (key) {
-    case "customerName":
-      return {
-        key: "customerName",
-        header: "Customer Name",
-        minWidth: 180,
-        render: (row) => <TransactionCustomerCell name={customerName(row)} />,
-      };
     case "customerEmail":
       return {
         key: "customerEmail",
