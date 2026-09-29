@@ -12,6 +12,9 @@ const AUTO_MS = 6500;
 interface PromoSlide {
   id: string;
   image: string;
+  /** Dark-theme artwork, same size and layout as `image`. Falls back to
+   *  `image` when a slide has none. */
+  imageDark?: string;
   headline: React.ReactNode;
   body: string;
   ctaLabel: string;
@@ -22,6 +25,7 @@ const SLIDES: PromoSlide[] = [
   {
     id: "sell-globally",
     image: "/assets/dashboardPG_banner1.png",
+    imageDark: "/assets/dashboardPG_banner_dark mode.png",
     headline: (
       <>
         Add international and domestic cards checkout
@@ -103,14 +107,26 @@ export function McaPromoCarousel() {
             aria-hidden={i !== index}
             inert={i !== index}
           >
+            {/* The theme class on <html> picks light or dark artwork, so
+                there's no flash or hydration mismatch while it loads. */}
             <AppImage
               src={slide.image}
               alt=""
               fill
               sizes="100vw"
               priority={i === 0}
-              className="object-cover object-center"
+              className={cn("object-cover object-center", slide.imageDark && "dark:hidden")}
             />
+            {slide.imageDark && (
+              <AppImage
+                src={slide.imageDark}
+                alt=""
+                fill
+                sizes="100vw"
+                priority={i === 0}
+                className="hidden object-cover object-center dark:block"
+              />
+            )}
 
             <div className="absolute inset-y-0 left-0 flex w-1/2 flex-col justify-center gap-2 px-6 py-5 sm:gap-2.5 sm:px-10">
               <h2 className="text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl">

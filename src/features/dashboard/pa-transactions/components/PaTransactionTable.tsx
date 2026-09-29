@@ -175,7 +175,7 @@ export function PaTransactionTable() {
       }
       emptyState={
         <PlaceholderState
-          variant="no-transactions"
+          variant="empty-table"
           title={emptyCopy.title}
           description={emptyCopy.description}
           className="py-16"

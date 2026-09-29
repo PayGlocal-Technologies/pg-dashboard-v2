@@ -250,7 +250,7 @@ export function McaReceiptTable() {
         isLoading={isLoading}
         emptyState={
           <PlaceholderState
-            variant="no-data"
+            variant="empty-table"
             title={emptyTitle}
             description={emptyDescription}
             className="py-16"
@@ -289,7 +289,7 @@ export function McaReceiptTable() {
           isLoading={isLoading}
           emptyState={
             <PlaceholderState
-              variant="no-data"
+              variant="empty-table"
               size="sm"
               title={emptyTitle}
               description={emptyDescription}

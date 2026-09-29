@@ -2,6 +2,7 @@
 
 import { Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { useSavedAmount } from "@/features/dashboard/mca-transactions/hooks";
@@ -74,9 +75,22 @@ export function SavedAmountCard({
         className="pointer-events-none absolute -bottom-16 right-0 h-40 w-40 rounded-full bg-emerald-100/70 blur-3xl dark:bg-emerald-500/10"
       />
 
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
-        <Icon name="piggy-bank" className="h-5 w-5" />
-      </span>
+      {/* Nothing saved in this period: the shared "no metric data" artwork
+          in the same slot and size, instead of the piggy bank. */}
+      {!isLoading && amount === 0 ? (
+        <AppImage
+          src="/assets/No data(metric usage).png"
+          alt=""
+          width={40}
+          height={40}
+          unoptimized
+          className="relative h-10 w-10 shrink-0"
+        />
+      ) : (
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">
+          <Icon name="piggy-bank" className="h-5 w-5" />
+        </span>
+      )}
 
       <div className="relative mt-3 flex flex-1 flex-col justify-center">
         <p className="text-base font-semibold leading-tight text-foreground">

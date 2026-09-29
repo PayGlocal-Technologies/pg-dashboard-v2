@@ -666,7 +666,7 @@ export function McaTransactionTable({
 
   const emptyPanel = (
     <PlaceholderState
-      variant="no-transactions"
+      variant="empty-table"
       title={emptyCopy.title}
       description={emptyCopy.description}
       className="py-16"
@@ -743,7 +743,7 @@ export function McaTransactionTable({
           renderSkeleton={() => <TransactionCardSkeleton />}
           emptyState={
             <PlaceholderState
-              variant="no-transactions"
+              variant="empty-table"
               size="sm"
               title={emptyCopy.title}
               description={emptyCopy.description}

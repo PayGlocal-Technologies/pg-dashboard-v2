@@ -14,7 +14,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { currencySymbol, formatNextSettlementDate, formatSharePct } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
@@ -431,13 +431,20 @@ export function SettlementAnalyticsCard({
               </div>
             </div>
           ) : accountRows.length === 0 ? (
-            <PlaceholderState
-              variant="no-settlements"
-              size="xs"
-              className="h-full justify-center py-0"
-              title={isAmountMode ? "No amount settled" : "No settled transactions"}
-              description="Once payments settle, this breaks the total down by the currency each one arrived in."
-            />
+            // The same empty chart as Total settled beneath it, so the two
+            // cards read alike when a period has nothing. This card is about
+            // money coming in, so the copy says so (not "settled").
+            <div className="relative h-40">
+              <EmptyAxesChart
+                labels={EMPTY_AXIS_LABELS[timeRange]}
+                title={
+                  isAmountMode
+                    ? "No payments collected in this period"
+                    : "No transactions in this period"
+                }
+                description="As payments come in, this breaks the total down by the currency each one arrived in."
+              />
+            </div>
           ) : (
             accountRows.length > 0 && (
               <div className="space-y-3">

@@ -312,7 +312,7 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
         // nothing. `emptyTitle` still covers the filtered-to-nothing case.
         emptyState={
           <PlaceholderState
-            variant="no-payment-links"
+            variant="empty-table"
             title={emptyCopy.title}
             description={emptyCopy.description}
             action={

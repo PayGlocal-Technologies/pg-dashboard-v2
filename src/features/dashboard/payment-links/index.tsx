@@ -212,7 +212,7 @@ export function PaymentLinksFeature() {
         }
         emptyState={
           <PlaceholderState
-            variant="no-payment-links"
+            variant="empty-table"
             title={emptyCopy.title}
             description={emptyCopy.description}
             action={

@@ -344,7 +344,7 @@ export function McaInvoiceOriginsCard() {
               />
             ) : rows.length === 0 ? (
               <PlaceholderState
-                variant="no-analytics"
+                variant="no-metric-data"
                 size="sm"
                 title="Nothing invoiced in this period"
                 description="Once you raise invoices, this shows where your invoiced volume comes from."

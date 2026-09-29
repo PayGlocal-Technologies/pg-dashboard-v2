@@ -25,6 +25,7 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { formatCurrencyShort } from "@/lib/utils/format";
@@ -39,6 +40,13 @@ import type {
 /** Day window per timeframe. The revenue-trend endpoint is date-ranged, so each
  *  tab asks for its own window and gets its own series — the chart is NOT one
  *  fixed curve. Computed once on mount (no `new Date()` in render). */
+/** Empty-chart x-axis per timeframe (1W, 1M, 3M). */
+const REVENUE_EMPTY_LABELS: Record<RevenueTimeframe, string[]> = {
+  "1W": EMPTY_AXIS_LABELS.week,
+  "1M": EMPTY_AXIS_LABELS.month,
+  "3M": EMPTY_AXIS_LABELS.quarter,
+};
+
 const TIMEFRAME_DAYS: Record<RevenueTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
 
 /** What the trend line reads as for each tab — "vs last week" / "vs last
@@ -299,13 +307,14 @@ export function McaRevenueCard() {
               className="h-full min-h-28"
             />
           ) : !hasChartData ? (
-            <PlaceholderState
-              variant="no-analytics"
-              size="sm"
-              title="No data in this period"
-              description="This metric is charted here as activity comes in."
-              className="h-full min-h-28"
-            />
+            <div className="relative h-full min-h-28">
+              <EmptyAxesChart
+                labels={REVENUE_EMPTY_LABELS[timeframe]}
+                zeroLabel={isMoneyMetric ? "₹0" : "0"}
+                title="No data in this period"
+                description="This metric is charted here as activity comes in."
+              />
+            </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart
