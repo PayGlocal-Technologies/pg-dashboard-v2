@@ -117,7 +117,7 @@ function ManageTemplatesAction() {
   // bootstrap there reads `?templateId=` in a first-render lazy initializer that
   // useSearchParams does not reliably populate on a soft navigation — so the
   // template id was captured as empty and the draft opened blank. A full load
-  // makes the URL synchronous, and withBasePath keeps the /app-v2 prefix a raw
+  // makes the URL synchronous, and withBasePath keeps the /hub prefix a raw
   // window.location navigation would otherwise drop.
   // The MID rides along because this is a full page load: the selection is
   // in-memory (see useAccountSetup), so without it a multi-MID merchant lands

@@ -21,7 +21,7 @@ import type {
  * "Switch to old view" — an escape hatch back to pg-dashboard for a merchant
  * who isn't ready for this one yet, with a two-question feedback ask on the
  * way out. A raw browser navigation, not `router.push`: pg-dashboard is a
- * separate app served from `/app` on the same origin as this one's `/app-v2`
+ * separate app served from `/app` on the same origin as this one's `/hub`
  * (see `src/constants/basePath.ts`), so it is reachable only by leaving this
  * app's basePath, not by routing within it. Origin-relative so the switch
  * stays on whatever host the merchant is on — see `goToOldView`.
@@ -54,7 +54,7 @@ export function SwitchToOldViewButton() {
 
   const goToOldView = () => {
     // Origin-relative on purpose: pg-dashboard (the old view) is served from
-    // `/app` on the SAME origin this app runs on (`/app-v2`), so switching must
+    // `/app` on the SAME origin this app runs on (`/hub`), so switching must
     // stay on the current host — localhost when local, the uat/prod host when
     // deployed. Hardcoding a live host is what sent a local session off to uat.
     window.location.href = `${window.location.origin}/app/dashboard`;

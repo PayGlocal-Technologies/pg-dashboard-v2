@@ -57,7 +57,7 @@ async function reportError(error: AxiosError): Promise<void> {
  * The path being remembered is normalised the other way. `url.pathname` carries
  * the base path, and storing it in that shape defeated `isSafePath`'s
  * `path !== "/login"` guard in auth/helpers.ts — a session that expired *on* the
- * login page stored "/app-v2/login", which is not literally "/login", so the
+ * login page stored "/hub/login", which is not literally "/login", so the
  * next successful login was sent straight back to the login page.
  */
 function redirectToLogin(): void {
