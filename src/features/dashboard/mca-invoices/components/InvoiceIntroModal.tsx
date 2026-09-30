@@ -22,10 +22,33 @@ const POINTS: { icon: IconName; title: string; body: string }[] = [
   { icon: "pencil", title: "Easy to customise", body: "Make every invoice feel like your own." },
 ];
 
+/** Bump when the modal's content changes: a new key is a new announcement, so
+ *  it shows once more to everyone who closed the previous one. */
+const SEEN_KEY = "payglocal_mca_invoices_intro_seen_v1";
+
+function hasSeen(): boolean {
+  try {
+    return localStorage.getItem(SEEN_KEY) === "1";
+  } catch {
+    // Storage blocked (private mode, site data off): treat as seen rather
+    // than risk showing it on every single visit, same as
+    // WelcomeExperienceModal.
+    return true;
+  }
+}
+
+function markSeen(): void {
+  try {
+    localStorage.setItem(SEEN_KEY, "1");
+  } catch {
+    // Nothing to do; see hasSeen.
+  }
+}
+
 /**
- * "Create invoices your way": what Invoice Management offers, shown every
- * time the page loads (including a refresh); closing it hides it until the
- * next load.
+ * "Create invoices your way": what Invoice Management offers, shown the first
+ * time the merchant opens the page in this browser (see SEEN_KEY). Any way of
+ * closing it ("Got it", the ×, Esc, the overlay) counts as seen.
  *
  * Side by side over a blurred page: a "New update" label, the heading, one
  * line of description, the three points and a single action on the left;
@@ -37,12 +60,19 @@ export function InvoiceIntroModal() {
   useEffect(() => {
     // Deferred (not a synchronous setState in the effect body), and gives the
     // page its first paint before this opens over it.
-    const timer = window.setTimeout(() => setOpen(true), 300);
+    const timer = window.setTimeout(() => {
+      if (!hasSeen()) setOpen(true);
+    }, 300);
     return () => window.clearTimeout(timer);
   }, []);
 
+  const handleOpenChange = (next: boolean): void => {
+    if (!next) markSeen();
+    setOpen(next);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         overlayClassName="bg-black/20 backdrop-blur-md"
         // Keeps the focus ring off the button on open; focus still moves
@@ -82,7 +112,7 @@ export function InvoiceIntroModal() {
               type="button"
               variant="primary"
               className="mt-6 w-full sm:w-fit sm:px-8"
-              onClick={() => setOpen(false)}
+              onClick={() => handleOpenChange(false)}
             >
               Got it
             </Button>
