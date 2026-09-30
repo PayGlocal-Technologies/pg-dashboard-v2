@@ -4,16 +4,24 @@ import { BASE_URL_V1, BASE_URL_V2, BASE_URL_V3 } from "@/api";
 // src/features/my-account/services.ts. Every one is scoped by the merchant's
 // onboarding id (profile.onboardingId), the same value pg-dashboard passes.
 
-/** Business trade name + purpose codes. GET reads, PUT updates the codes. */
+/** Business trade name (and the legacy purpose-code array, which Business
+ *  details no longer reads — see merchantPurposeCodeApi). */
 export const businessDetailsApi = (onbId: string): string =>
   `${BASE_URL_V3}/merchants/profile/${onbId}/business`;
+
+/** The merchant's single purpose code. GET returns `{ data: { purposeCode } }`
+ *  (null when none was ever set); PUT `{ purposeCode }` overwrites it on every
+ *  call. Keyed by the first PACB MID from enabled-products, not the
+ *  onboarding id (see usePurposeCodeMerchantId). */
+export const merchantPurposeCodeApi = (merchantId: string): string =>
+  merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/purpose-code` : "";
 
 /** The purpose codes this merchant may pick from. GET returns
  *  `{ data: { suggestedPurposeCodes, possiblePurposeCodes } }`, where
  *  `possiblePurposeCodes` is a code -> description map. Same endpoint
  *  pg-dashboard's PurposeCodeBanner and tid-management AddProduct read (see
- *  its OnboardingBanners/services.ts purposeCodeApi); the codes are saved
- *  through businessDetailsApi above, not here. */
+ *  its OnboardingBanners/services.ts purposeCodeApi); the chosen code is saved
+ *  through merchantPurposeCodeApi above, not here. */
 export const purposeCodeOptionsApi = (onbId: string): string =>
   onbId ? `${BASE_URL_V3}/merchants/banner/${onbId}/purpose-codes` : "";
 

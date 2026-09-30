@@ -14,6 +14,7 @@ import { SavedAmountCard } from "@/features/dashboard/mca-transactions/component
 // from it. Cross-feature imports are established here (SettlementAnalyticsCard
 // takes CountryFlagAvatar from multi-currency the same way).
 import { TotalSettledCard } from "@/features/dashboard/mca-settlement-report/components/TotalSettledCard";
+import { EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import type { TotalSettledTimeframe } from "@/features/dashboard/mca-settlement-report/constants";
 import { useSettlementOverview } from "@/features/dashboard/mca-settlement-report/hooks";
 import { useScopeId } from "@/lib/hooks/useScopeId";
@@ -200,6 +201,7 @@ export function TransactionsAnalyticsCarousel({ timeRange }: { timeRange: TimeRa
             timeframe={SETTLED_TIMEFRAME_BY_RANGE[timeRange]}
             chartData={settledChartData}
             chartClassName="h-40 lg:h-auto lg:min-h-0 lg:flex-1"
+            emptyAxisLabels={EMPTY_AXIS_LABELS[timeRange]}
             className="lg:col-start-1 lg:row-start-2 lg:h-full"
           />
         </div>

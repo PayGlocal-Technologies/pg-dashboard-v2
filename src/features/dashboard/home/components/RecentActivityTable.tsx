@@ -297,7 +297,7 @@ export function RecentActivityTable({
       emptyDescription="As customers start paying you, your most recent transactions show up in this list."
       emptyState={
         <PlaceholderState
-          variant="no-transactions"
+          variant="empty-table"
           size="sm"
           title="Your payments will appear here"
           description="As customers start paying you, your most recent transactions show up in this list."
@@ -318,7 +318,7 @@ export function RecentActivityTable({
       emptyDescription="Once payouts begin, the most recent ones are listed here with the amount that reached your account."
       emptyState={
         <PlaceholderState
-          variant="no-settlements"
+          variant="empty-table"
           size="sm"
           title="Your settlements will appear here"
           description="Once payouts begin, the most recent ones are listed here with the amount that reached your account."

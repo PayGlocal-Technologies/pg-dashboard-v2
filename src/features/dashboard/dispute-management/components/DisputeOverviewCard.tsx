@@ -11,7 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card, EmptyState } from "@/components/ui";
+import { Card } from "@/components/ui";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { PillToggle } from "@/components/common/PillToggle";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -102,7 +103,9 @@ export function DisputeOverviewCard({ disputes }: DisputeOverviewCardProps) {
       </div>
 
       {isEmpty ? (
-        <EmptyState
+        <PlaceholderState
+          variant="no-metric-data"
+          size="sm"
           title="No disputes in this period"
           description="If a customer disputes a payment, it will be counted here by status."
           className="flex-1 justify-center py-0"

@@ -167,7 +167,8 @@ export const regularNavigation: NavGroup[] = [
         label: "Regularise Bills",
         href: "/shipping-bill-regularisation",
         icon: "file-text",
-        permission: ["showEdpms"],
+        // pg-dashboard's own gate for Regularise Bills (Sidebar/constants.ts).
+        permission: ["billRegularization"],
       },
       {
         label: "eBRC",
@@ -296,7 +297,9 @@ export const mcaNavigation: NavGroup[] = [
           { label: "IRM Repository", href: "/irm-repository", permission: [] },
         ],
       },
-      { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
+      // This tree's name for the Payments tree's Regularise Bills, so it takes
+      // the same billRegularization gate pg-dashboard puts on that entry.
+      { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: ["billRegularization"] },
       // Same /mca-receipts page the Payments tree reaches under Payment Products and
       // Finance, labelled for what an MCA merchant comes here for: the GST
       // invoices PayGlocal raises against them. A compliance record in this tree,

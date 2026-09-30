@@ -61,12 +61,16 @@ export interface PurposeCodesResponse {
   data?: PurposeCodesData | null;
 }
 
-/** The PUT body pg-dashboard sends — note the plural key `purposeCodes`, which
- *  differs from the singular `purposeCode` the GET returns. */
-export interface BusinessUpdatePayload {
-  /** Still an array on the wire, so the contract is untouched, but the UI now
-   *  only ever sends a single code, see BusinessDetailsFeature. */
-  purposeCodes: string[];
+/** GET /v1/merchants/{merchantId}/purpose-code. `purposeCode` is null when
+ *  the merchant has never had one set. */
+export interface MerchantPurposeCodeResponse {
+  data?: { purposeCode?: string | null } | null;
+}
+
+/** PUT /v1/merchants/{merchantId}/purpose-code body. Overwrites the stored
+ *  code every time. */
+export interface MerchantPurposeCodeUpdatePayload {
+  purposeCode: string;
 }
 
 export interface SettlementData {

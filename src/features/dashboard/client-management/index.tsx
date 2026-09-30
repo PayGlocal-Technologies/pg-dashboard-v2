@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, PageHeader } from "@/components/ui";
+import { PageIntroBanner } from "@/components/common/PageIntroBanner";
 import { Icon } from "@/components/icon";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { SelectMidView } from "@/components/common/SelectMidView";
@@ -60,6 +61,14 @@ export function ClientManagementFeature() {
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
+      {/* Top of the page, above the title and its CTAs: what this page is
+          for. Shows on every load; the × hides it until the next one. */}
+      <PageIntroBanner
+        image="/assets/Client management.png"
+        aspectClassName="aspect-4680/892"
+        title="All your clients in one place"
+        description="Every transaction automatically saves the client here. You can also add your own clients anytime."
+      />
       {/* PageHeader puts `actions` at the far right of the title row, so the
           primary CTA sits opposite the title at every width. */}
       <PageHeader

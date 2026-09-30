@@ -298,7 +298,7 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
     />
   ) : (
     <PlaceholderState
-      variant="no-data"
+      variant="empty-table"
       title={emptyTitle}
       description={emptyDescription}
       className="py-16"

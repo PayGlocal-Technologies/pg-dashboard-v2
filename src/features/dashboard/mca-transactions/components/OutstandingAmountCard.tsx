@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
@@ -125,9 +126,22 @@ export function OutstandingAmountCard({
             {/* h-12 w-12/rounded-full/amber-500 at 10% opacity: the same subtle
                 tinted-circle treatment as Saved Amount's green version, amber for
                 "pending". */}
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-              <Icon name="clock" size={22} />
-            </span>
+            {/* Nothing pending: the shared "no metric data" artwork in the same
+                slot and size, instead of the clock. */}
+            {!isLoading && amount === 0 && pendingCount === 0 ? (
+              <AppImage
+                src="/assets/No data(metric usage).png"
+                alt=""
+                width={48}
+                height={48}
+                unoptimized
+                className="h-12 w-12 shrink-0"
+              />
+            ) : (
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                <Icon name="clock" size={22} />
+              </span>
+            )}
           </div>
         )}
 

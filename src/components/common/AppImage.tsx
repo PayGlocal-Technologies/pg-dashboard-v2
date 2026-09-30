@@ -6,7 +6,7 @@ import { withBasePath } from "@/constants/basePath";
  *
  * Next prefixes the image *optimizer route* with basePath but not the `src`
  * it is pointed at, and for `unoptimized` images it does not touch the src
- * either — so a `/assets/…` file served from `/app-v2/assets/…` 404s both
+ * either — so a `/assets/…` file served from `/hub/assets/…` 404s both
  * ways round (the optimizer answers 400 "not a valid image" because the file
  * it fetched at the origin root does not exist).
  *

@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useFeatureApplicable } from "@/lib/hooks/useFeatureApplicable";
 import { useNeedsMidSelection } from "@/features/dashboard/multi-currency/hooks";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { ebrcFetchApi, ebrcGenerationApi } from "@/features/dashboard/ebrc-generation/services";
@@ -143,6 +144,20 @@ function useEbrcScope(): {
   const mid = needsMidSelection ? "" : urlMid || merchantIds?.[0] || "";
 
   return { mid, merchantIds, midFilter, urlMid, isReady, guardState };
+}
+
+/**
+ * Whether the MID the eBRC calls address carries the "EBRC" entitlement.
+ * pg-dashboard checks `useFeatureApplicable(resolvedMerchantId, "EBRC")` on its
+ * mapping and review screens, i.e. against the resolved MID (selected, else the
+ * first PACB one) rather than only an explicitly selected one, which is why
+ * this reads `mid` from the eBRC scope instead of going through MidGuard. True
+ * while no MID is resolved yet: that state asks for a MID, it doesn't deny.
+ */
+export function useEbrcEntitled(): boolean {
+  const { mid } = useEbrcScope();
+  const hasFeature = useFeatureApplicable(mid, EBRC_FEATURE);
+  return !mid || hasFeature;
 }
 
 // ── 1/2. Search: irm/search and ebrc/search ──────────────────────────────────

@@ -184,7 +184,6 @@ export function useFetchCommonData(): { isLoading: boolean; isError: boolean } {
       ) as Record<string, unknown>;
 
       const additionalPermissions: PermissionsByLevel = { s: [], b: [], c: [] };
-      if (profile?.showEdpms) additionalPermissions.b.push("showEdpms");
 
       const permissions = (initialData?.[2]?.data as Entitlements)?.["User Entitlements"];
       if (permissions) {

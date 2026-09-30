@@ -175,13 +175,13 @@ import Image from "next/image";
 
 ### Why AppImage and not `next/image` — COMPULSORY RULE
 
-The app is served from a base path (`/app-v2`, see `src/constants/basePath.ts`).
+The app is served from a base path (`/hub`, see `src/constants/basePath.ts`).
 Next applies that prefix to the image **optimizer route** but *not* to the `src`
 it points at, and for `unoptimized` images it does not touch the src at all. A
 `public/` file therefore fails **both** ways round:
 
 ```
-optimized:   src="/app-v2/_next/image?url=%2Fassets%2Flogo.png"   → 400 "not a valid image"
+optimized:   src="/hub/_next/image?url=%2Fassets%2Flogo.png"   → 400 "not a valid image"
 unoptimized: src="/assets/logo.png"                                → 404
 ```
 
@@ -192,7 +192,7 @@ everywhere.
 
 `src/components/common/AppImage.tsx` is the only file allowed to import
 `next/image`; an ESLint `no-restricted-imports` rule enforces this. **Never
-hardcode the base path into a src** (`src="/app-v2/assets/…"`) — that is what
+hardcode the base path into a src** (`src="/hub/assets/…"`) — that is what
 pg-dashboard does in 41 places, and it means every base-path change is a
 find-and-replace.
 

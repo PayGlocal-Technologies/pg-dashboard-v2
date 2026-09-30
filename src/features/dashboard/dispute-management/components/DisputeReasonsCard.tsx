@@ -1,4 +1,5 @@
-import { Card, EmptyState } from "@/components/ui";
+import { Card } from "@/components/ui";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
 
 interface ReasonBreakdown {
   reason: string;
@@ -16,7 +17,9 @@ export function DisputeReasonsCard({ breakdown }: DisputeReasonsCardProps) {
       <h2 className="text-sm font-semibold text-foreground">Dispute reasons</h2>
 
       {breakdown.length === 0 ? (
-        <EmptyState
+        <PlaceholderState
+          variant="no-metric-data"
+          size="sm"
           title="No disputes in this period"
           description="When disputes come in, this breaks them down by the reason the customer gave."
           className="flex-1 justify-center py-0"

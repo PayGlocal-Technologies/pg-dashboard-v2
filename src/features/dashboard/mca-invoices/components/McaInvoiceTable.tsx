@@ -622,7 +622,7 @@ export function McaInvoiceTable({
         errorState={isError ? errorPanel : undefined}
         emptyState={
           <PlaceholderState
-            variant="no-invoices"
+            variant="empty-table"
             title={emptyCopy.title}
             description={emptyCopy.description}
             action={emptyAction}
@@ -664,7 +664,7 @@ export function McaInvoiceTable({
           errorState={isError ? errorPanel : undefined}
           emptyState={
             <PlaceholderState
-              variant="no-invoices"
+              variant="empty-table"
               size="sm"
               title={emptyCopy.title}
               description={emptyCopy.description}

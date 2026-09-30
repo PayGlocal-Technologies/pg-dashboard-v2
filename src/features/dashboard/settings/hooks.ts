@@ -14,6 +14,7 @@ import {
   initiateEmailChangeApi,
   merchantLogoUploadApi,
   merchantProfileApi,
+  merchantPurposeCodeApi,
   purposeCodeOptionsApi,
   resendNewEmailOtpApi,
   resendOldEmailOtpApi,
@@ -33,7 +34,6 @@ import type {
   AccountDetailsUpdatePayload,
   BusinessData,
   BusinessDataResponse,
-  BusinessUpdatePayload,
   ChangeEmailCommit,
   ChangeEmailResponse,
   ContactData,
@@ -41,6 +41,8 @@ import type {
   MerchantBusinessSummary,
   MerchantLogoUploadResponse,
   MerchantProfileResponse,
+  MerchantPurposeCodeResponse,
+  MerchantPurposeCodeUpdatePayload,
   PurposeCodesResponse,
   SettlementData,
   SettlementDataResponse,
@@ -53,7 +55,7 @@ function useOnboardingId(): string {
   return useApp((s) => s.profile?.onboardingId) ?? "";
 }
 
-/** Business trade name + purpose codes (read). */
+/** Business trade name (read). */
 export function useBusinessDetails(): {
   business: BusinessData | null;
   isLoading: boolean;
@@ -151,17 +153,47 @@ export function usePurposeCodeOptions(extraCodes: string[] = []): {
   return { options: [...missing, ...fromApi], isLoading: !!onbId && isPending };
 }
 
-/** Update the merchant's purpose codes. pg-dashboard sends `{ purposeCodes }`
- *  (plural) as plain JSON and invalidates the business read on success. */
-export function useUpdateBusinessDetails(): {
-  updateBusiness: UseMutateFunction<unknown, Error, BusinessUpdatePayload>;
-  isSaving: boolean;
+/** The MID the purpose-code endpoint is addressed by: the first PACB MID from
+ *  the enabled-products response (purpose codes are a cross-border setting),
+ *  not profile.mid. Empty until enabled-products loads, or when the account has
+ *  no PACB MID, which keeps the read disabled and the save a no-op. */
+function usePurposeCodeMerchantId(): string {
+  return useApp((s) => s.paCbMids[0]) ?? "";
+}
+
+/** The merchant's saved purpose code, from GET /v1/merchants/{mid}/purpose-code.
+ *  Normalised to trimmed upper case; empty string when none was ever set. */
+export function useMerchantPurposeCode(): {
+  purposeCode: string;
+  isLoading: boolean;
 } {
-  const onbId = useOnboardingId();
-  const { mutate, isPending } = usePut<unknown, BusinessUpdatePayload>(businessDetailsApi(onbId), {
-    invalidateQueries: [["settings-business", onbId]],
-  });
-  return { updateBusiness: mutate, isSaving: isPending };
+  const merchantId = usePurposeCodeMerchantId();
+  const { data, isPending } = useGet<MerchantPurposeCodeResponse>(
+    ["settings-purpose-code", merchantId],
+    merchantPurposeCodeApi(merchantId),
+    { enabled: !!merchantId }
+  );
+  return {
+    purposeCode: data?.data?.purposeCode?.trim().toUpperCase() ?? "",
+    isLoading: !!merchantId && isPending,
+  };
+}
+
+/** Save the merchant's purpose code via PUT /v1/merchants/{mid}/purpose-code,
+ *  plain JSON `{ purposeCode }`. The endpoint overwrites on every call, so the
+ *  same hook serves a first-time set and an edit. Invalidates the read above. */
+export function useUpdateMerchantPurposeCode(): {
+  updatePurposeCode: UseMutateFunction<unknown, Error, MerchantPurposeCodeUpdatePayload>;
+  isSaving: boolean;
+  /** False while there is no PACB MID to address. */
+  canEdit: boolean;
+} {
+  const merchantId = usePurposeCodeMerchantId();
+  const { mutate, isPending } = usePut<unknown, MerchantPurposeCodeUpdatePayload>(
+    merchantPurposeCodeApi(merchantId),
+    { invalidateQueries: [["settings-purpose-code", merchantId]] }
+  );
+  return { updatePurposeCode: mutate, isSaving: isPending, canEdit: !!merchantId };
 }
 
 /** Settlement account (IFSC + account number). `masked` picks which endpoint

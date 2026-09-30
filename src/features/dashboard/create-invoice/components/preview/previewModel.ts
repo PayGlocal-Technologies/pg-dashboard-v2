@@ -179,7 +179,11 @@ export function buildPreviewModel(source: PreviewSource): PreviewModel {
       key: item.key,
       name: item.description || "Untitled item",
       codeLabel: item.hsn ? `${item.type === "SERVICE" ? "SAC" : "HSN"} ${item.hsn}` : "",
-      quantity: item.quantity || "-",
+      quantity: item.quantity
+        ? item.billing === "HOURLY"
+          ? `${item.quantity} ${item.quantity === "1" ? "hr" : "hrs"}`
+          : item.quantity
+        : "-",
       unitPrice: item.unitPrice || "-",
       gstLabel: item.gstRate ? `${item.gstRate}%` : "",
       amount: money(getAmount(item.unitPrice || "0", item.quantity || "0", item.gstRate || "0")),

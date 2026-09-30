@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Button } from "@/components/ui";
+import { Button, Shimmer } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatMonthYearLabel, formatShortDate } from "@/lib/utils/format";
@@ -9,6 +9,7 @@ import {
   buildMonthGrid,
   diffInDays,
   type CalendarCell,
+  type HolidayInfo,
 } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { useBankHolidays } from "@/features/dashboard/settlement-reports/hooks";
 import type { SettlementRow } from "@/features/dashboard/settlement-reports/types";
@@ -61,7 +62,7 @@ const DETAIL_ICON_CLASSNAME: Record<DayDetail["kind"], string> = {
   settled: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400",
   holiday: "bg-amber-500/15 text-amber-700 dark:text-amber-400",
   "next-settlement": "bg-blue-500/15 text-blue-600 dark:text-blue-400",
-  none: "bg-muted text-muted-foreground",
+  none: "bg-card text-muted-foreground",
 };
 
 function detailPrimaryText(detail: DayDetail): string {
@@ -112,33 +113,130 @@ function DayCell({
   const detail = getDayDetail(cell.dateKey, settledRowByDate, holidayMap, nextSettlementDate);
   const isToday = cell.dateKey === todayKey;
 
+  // Every day is the same 36px square, so the selected fill and the
+  // next-settlement ring are one shape, and the number sits in the same spot
+  // in every cell with its marker dot pinned just under it.
   return (
     <Button
       type="button"
       variant="ghost"
       onClick={() => onSelect(cell.dateKey)}
+      aria-pressed={isSelected}
       className={cn(
-        "h-auto min-h-0 w-full gap-0 rounded-md p-0 py-1 font-normal",
-        !cell.inCurrentMonth && "text-muted-foreground/40",
-        cell.inCurrentMonth && "text-foreground",
-        isSelected && "bg-primary/10 hover:bg-primary/10",
+        "relative mx-auto flex h-9 min-h-0 w-9 min-w-0 items-center justify-center rounded-lg p-0 text-xs font-normal",
+        cell.inCurrentMonth ? "text-foreground" : "text-muted-foreground/40",
+        isToday && "font-bold",
+        isSelected && "bg-primary/10 font-semibold text-primary hover:bg-primary/10",
         detail.kind === "next-settlement" && "ring-1 ring-inset ring-blue-500"
       )}
     >
-      <span className="flex flex-col items-center gap-0.5">
-        <span className={cn("text-xs", isToday && "font-bold")}>{cell.day}</span>
-        <span
-          className={cn(
-            "h-1 w-1 rounded-full",
-            detail.kind === "settled" && "bg-emerald-500",
-            detail.kind === "holiday" && "bg-amber-500",
-            detail.kind === "next-settlement" && "bg-blue-500",
-            detail.kind === "none" && "bg-transparent"
-          )}
-          aria-hidden="true"
-        />
-      </span>
+      <span className="leading-none">{cell.day}</span>
+      <span
+        className={cn(
+          "absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full",
+          detail.kind === "settled" && "bg-emerald-500",
+          detail.kind === "holiday" && "bg-amber-500",
+          detail.kind === "next-settlement" && "bg-blue-500",
+          detail.kind === "none" && "hidden"
+        )}
+        aria-hidden="true"
+      />
     </Button>
+  );
+}
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Day of week for a YYYY-MM-DD key, read at local midnight (not UTC, which
+ *  would shift the day for anyone west of Greenwich). */
+function weekdayOf(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return WEEKDAY_SHORT[new Date(year!, month! - 1, day!).getDay()]!;
+}
+
+/**
+ * Left column of the popover: every holiday in the month the calendar is
+ * showing, as the calendar API returns them (weekends included, since those
+ * pause settlements too). A row selects its day, so the calendar and the
+ * detail panel under it follow the list. Scrolls inside a column the calendar
+ * sets the height of, so a long month never makes the popover taller.
+ */
+function HolidayList({
+  holidays,
+  isLoading,
+  monthName,
+  selectedDateKey,
+  onSelect,
+}: {
+  holidays: HolidayInfo[];
+  isLoading: boolean;
+  /** The month on screen, e.g. "September". */
+  monthName: string;
+  selectedDateKey: string;
+  onSelect: (dateKey: string) => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col border-t border-border sm:border-t-0 sm:border-r">
+      <div className="flex items-baseline justify-between gap-2 px-4 pt-4 pb-2">
+        <p className="text-sm font-semibold text-foreground">Holidays in {monthName}</p>
+        {!isLoading && holidays.length > 0 && (
+          <p className="text-[11px] tabular-nums text-muted-foreground">
+            {holidays.length} {holidays.length === 1 ? "day" : "days"}
+          </p>
+        )}
+      </div>
+
+      <div className="max-h-56 min-h-0 flex-1 overflow-y-auto px-2 pb-3 sm:max-h-none">
+        {isLoading ? (
+          <div className="space-y-1.5 px-2 pt-1">
+            {[0, 1, 2, 3].map((i) => (
+              <Shimmer key={i} className="h-11 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : holidays.length === 0 ? (
+          <p className="px-2 pt-1 text-xs text-muted-foreground">
+            No holidays this month. Settlements run on every working day.
+          </p>
+        ) : (
+          <ul className="space-y-0.5">
+            {holidays.map((holiday) => {
+              const isSelected = holiday.date === selectedDateKey;
+              return (
+                <li key={holiday.date}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => onSelect(holiday.date)}
+                    aria-pressed={isSelected}
+                    className={cn(
+                      "h-auto min-h-0 w-full justify-start gap-3 rounded-lg px-2 py-1.5 text-left font-normal [&>span]:flex [&>span]:w-full [&>span]:min-w-0 [&>span]:items-center [&>span]:gap-3",
+                      isSelected && "bg-primary/10 hover:bg-primary/10"
+                    )}
+                  >
+                    <span className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-lg bg-amber-500/15 leading-none text-amber-700 dark:text-amber-400">
+                      <span className="text-[13px] font-semibold">
+                        {Number(holiday.date.slice(8, 10))}
+                      </span>
+                      <span className="mt-0.5 text-[9px] font-medium uppercase tracking-wide">
+                        {weekdayOf(holiday.date)}
+                      </span>
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-medium text-foreground">
+                        {holiday.name}
+                      </span>
+                      <span className="block truncate text-[11px] text-muted-foreground">
+                        Settlements paused
+                      </span>
+                    </span>
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -178,7 +276,10 @@ export function SettlementCalendarButton({
   // amber badge above needs no fetch of its own: hasUpcomingHoliday arrives as a
   // prop from the page's own calendar read.
   const { from: monthFrom, to: monthTo } = monthWindow(viewYear, viewMonth);
-  const { holidays: monthHolidays } = useBankHolidays(open ? monthFrom : "", open ? monthTo : "");
+  const { holidays: monthHolidays, isLoading: isHolidaysLoading } = useBankHolidays(
+    open ? monthFrom : "",
+    open ? monthTo : ""
+  );
   const holidayMap = useMemo(
     () => new Map(monthHolidays.map((h) => [h.date, h.name])),
     [monthHolidays]
@@ -255,7 +356,7 @@ export function SettlementCalendarButton({
 
       {open && (
         <div
-          className="absolute right-0 z-50 w-[300px] overflow-hidden rounded-xl border border-border bg-card shadow-lg"
+          className="absolute right-0 z-50 w-[min(37rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-border bg-card shadow-lg"
           style={{ top: "calc(100% + 8px)" }}
         >
           {showDelayBanner && (
@@ -281,83 +382,101 @@ export function SettlementCalendarButton({
             </div>
           )}
 
-          <div className="p-3">
-            <div className="flex items-center justify-between">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={goToPrevMonth}
-                className="h-6 w-6 min-h-0 min-w-0 rounded-md p-0"
-                aria-label="Previous month"
-              >
-                <Icon name="chevron-left" size={14} />
-              </Button>
-              <p className="text-sm font-semibold text-foreground">
-                {formatMonthYearLabel(viewYear, viewMonth)}
-              </p>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={goToNextMonth}
-                className="h-6 w-6 min-h-0 min-w-0 rounded-md p-0"
-                aria-label="Next month"
-              >
-                <Icon name="chevron-right" size={14} />
-              </Button>
-            </div>
-
-            <div className="mt-3 grid grid-cols-7 text-center text-[10px] font-medium uppercase text-muted-foreground">
-              {WEEKDAY_LABELS.map((label, i) => (
-                <span key={`${label}-${i}`}>{label}</span>
-              ))}
-            </div>
-
-            <div className="mt-1 grid grid-cols-7 gap-y-1">
-              {cells.map((cell) => (
-                <DayCell
-                  key={cell.dateKey}
-                  cell={cell}
-                  isSelected={cell.dateKey === selectedDateKey}
+          {/* Two columns on sm+: the month's holidays on the left, the
+              calendar on the right (it sets the height; the list scrolls
+              within it). Stacked on phones, calendar first. */}
+          <div className="flex flex-col-reverse sm:flex-row">
+            <div className="relative sm:flex-1">
+              <div className="flex h-full flex-col sm:absolute sm:inset-0">
+                <HolidayList
+                  holidays={monthHolidays}
+                  isLoading={isHolidaysLoading}
+                  monthName={new Date(viewYear, viewMonth, 1).toLocaleString("en-US", {
+                    month: "long",
+                  })}
+                  selectedDateKey={selectedDateKey}
                   onSelect={setSelectedDateKey}
-                  settledRowByDate={settledRowByDate}
-                  holidayMap={holidayMap}
-                  nextSettlementDate={nextSettlementDate}
-                  todayKey={todayKey}
                 />
-              ))}
+              </div>
             </div>
-
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-emerald-500" aria-hidden="true" />
-                Settled
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-amber-500" aria-hidden="true" />
-                Holiday
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="h-2 w-2 rounded-sm bg-blue-500" aria-hidden="true" />
-                Next settlement
-              </span>
-            </div>
-
-            <div className="mt-3 flex items-center gap-2.5 rounded-[7px] bg-muted p-2.5">
-              <span
-                className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
-                  DETAIL_ICON_CLASSNAME[detail.kind]
-                )}
-              >
-                <Icon name={DETAIL_ICON[detail.kind]} size={15} aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <p className="truncate text-xs font-semibold text-foreground">
-                  {detailPrimaryText(detail)}
+            <div className="p-3 sm:w-[300px] sm:shrink-0">
+              <div className="flex items-center justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={goToPrevMonth}
+                  className="h-7 w-7 min-h-0 min-w-0 rounded-lg p-0"
+                  aria-label="Previous month"
+                >
+                  <Icon name="chevron-left" size={14} />
+                </Button>
+                <p className="text-sm font-semibold text-foreground">
+                  {formatMonthYearLabel(viewYear, viewMonth)}
                 </p>
-                <p className="truncate text-[11px] text-muted-foreground">
-                  {detailSecondaryText(detail)}
-                </p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={goToNextMonth}
+                  className="h-7 w-7 min-h-0 min-w-0 rounded-lg p-0"
+                  aria-label="Next month"
+                >
+                  <Icon name="chevron-right" size={14} />
+                </Button>
+              </div>
+
+              <div className="mt-3 grid grid-cols-7 text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
+                {WEEKDAY_LABELS.map((label, i) => (
+                  <span key={`${label}-${i}`}>{label}</span>
+                ))}
+              </div>
+
+              <div className="mt-1.5 grid grid-cols-7 gap-y-0.5">
+                {cells.map((cell) => (
+                  <DayCell
+                    key={cell.dateKey}
+                    cell={cell}
+                    isSelected={cell.dateKey === selectedDateKey}
+                    onSelect={setSelectedDateKey}
+                    settledRowByDate={settledRowByDate}
+                    holidayMap={holidayMap}
+                    nextSettlementDate={nextSettlementDate}
+                    todayKey={todayKey}
+                  />
+                ))}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                  Settled
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
+                  Holiday
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-blue-500" aria-hidden="true" />
+                  Next settlement
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2.5 rounded-[7px] bg-muted p-2.5">
+                <span
+                  className={cn(
+                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
+                    DETAIL_ICON_CLASSNAME[detail.kind]
+                  )}
+                >
+                  <Icon name={DETAIL_ICON[detail.kind]} size={15} aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-semibold text-foreground">
+                    {detailPrimaryText(detail)}
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {detailSecondaryText(detail)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
