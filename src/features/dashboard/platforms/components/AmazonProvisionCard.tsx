@@ -10,7 +10,7 @@ import { AppImage } from "@/components/common/AppImage";
  *
  * A banner in the slot the account details and the connect steps occupy
  * (neither can say anything until an account exists): the ask on the left,
- * the Amazon artwork on the right, on a flat #F2F2F2 fill. "Create account"
+ * the Amazon artwork on the right, on a flat #F2F2F2 fill. "Activate account"
  * runs the same provisioning request pg-dashboard's "Get Amazon Account" did.
  * Production used to drop Amazon out of the platform list entirely in this
  * state, which left a merchant who *wanted* an Amazon account with nothing to
@@ -51,8 +51,12 @@ export function AmazonProvisionCard({
             onClick={onProvision}
             className="mt-3 w-fit"
           >
-            Create account
+            Activate account
           </Button>
+          <p className="flex items-center gap-1.5 text-[12px] font-medium text-muted-foreground">
+            <Icon name="zap" size={14} className="text-primary" aria-hidden />
+            Instant activation
+          </p>
         </div>
 
         {/* The artwork's own shape (2368 x 1296) at the banner's height, so it

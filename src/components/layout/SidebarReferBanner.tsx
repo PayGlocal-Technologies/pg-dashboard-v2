@@ -7,9 +7,9 @@ import { Icon } from "@/components/icon";
 import { brandBackdropStyle } from "@/lib/utils/brandBackdrop";
 
 /** Compact "Refer & Earn" promo card sized for the sidebar's nav column
- * (~200px), a vertical stack (icon, heading, one-line pitch, full-width CTA)
- * rather than the wider horizontal ReferAndEarnBanner used on content pages,
- * same gift-icon visual language.
+ * (~200px), a vertical stack (heading, one-line pitch, full-width white CTA)
+ * rather than the wider horizontal ReferAndEarnBanner used on content pages.
+ * The gift icon appears only on the collapsed row.
  *
  * The X collapses it to a single nav-row-sized "Refer & Earn" link in the same
  * pinned slot above the profile section, so it stops taking space without
@@ -52,22 +52,26 @@ export function SidebarReferBanner() {
         variant="ghost"
         size="sm"
         onClick={() => setCollapsed(true)}
-        className="absolute right-1.5 top-1.5 h-6 w-6 min-h-0 min-w-0 text-muted-foreground hover:text-foreground"
+        className="absolute right-1.5 top-1.5 z-10 h-6 w-6 min-h-0 min-w-0 text-muted-foreground hover:text-foreground"
       >
         <Icon name="x" size={13} />
       </IconButton>
-      <Icon name="gift" size={18} className="relative text-primary" aria-hidden />
-      <h3 className="relative mt-2 text-[13px] font-semibold text-foreground">Refer &amp; Earn</h3>
+      {/* pr-6 keeps the heading's text clear of the × in the corner; the ×'s
+          z-10 keeps it clickable, since this `relative` heading comes later in
+          the DOM and would otherwise sit on top of it. */}
+      <h3 className="relative pr-6 text-[13px] font-semibold text-foreground">Refer &amp; Earn</h3>
       <p className="relative mt-0.5 text-[11px] leading-snug text-muted-foreground">
         Invite a business, earn rewards on their first settlement.
       </p>
       <Button
         type="button"
-        variant="primary"
+        variant="outline"
         size="sm"
         rightIcon={<Icon name="arrow-right" size={11} />}
         onClick={goToReferral}
-        className="relative mt-2.5 w-full"
+        // White on the brand wash (card-coloured in dark mode), with the brand
+        // colour moved to the label.
+        className="relative mt-2.5 w-full border-transparent bg-white text-primary shadow-sm hover:bg-white/85 hover:text-primary dark:bg-card dark:hover:bg-card/85"
       >
         Refer Now
       </Button>

@@ -41,6 +41,7 @@ const EMPTY: LineItemValues = {
   unitPrice: "",
   quantity: "1",
   saveAsSku: false,
+  billing: "FIXED",
 };
 
 /** The fields a submit can be blocked on, in the order they appear in the form
@@ -68,8 +69,13 @@ function validate(values: LineItemValues): FieldErrors {
   const errors: FieldErrors = {};
   if (!values.type.trim()) errors.type = "Pick whether this is a good or a service.";
   if (!values.description.trim()) errors.description = "Give this item a name.";
-  if (!values.unitPrice.trim()) errors.unitPrice = "Enter the rate you are charging.";
-  if (!values.quantity.trim()) errors.quantity = "Enter a quantity.";
+  const hourly = values.billing === "HOURLY";
+  if (!values.unitPrice.trim())
+    errors.unitPrice = hourly ? "Enter your hourly rate." : "Enter the rate you are charging.";
+  if (!values.quantity.trim())
+    errors.quantity = hourly ? "Enter the hours worked." : "Enter a quantity.";
+  else if (hourly && !(Number(values.quantity) > 0))
+    errors.quantity = "Enter the hours as a number, e.g. 2.5.";
   // The catalogue rejects an item with no tax code, and the import that would
   // hit that rule runs after the invoice is already saved — so a blank one here
   // surfaces as a failure nothing on this screen can still fix. Ask now.
@@ -89,8 +95,11 @@ function validate(values: LineItemValues): FieldErrors {
  *
  * - Nova's item-type radio (Amount only / Quantity / Hours) is replaced by
  *   Good / Service. The API's `type` field is the SKU kind and drives SAC-vs-HSN
- *   validation; it has no concept of an hours-based item, so offering one would
- *   produce a value the server rejects.
+ *   validation; it has no concept of an hours-based item, so offering one as a
+ *   type would produce a value the server rejects. Hourly billing is instead a
+ *   separate, client-side choice on a service (Fixed / Hourly): hours travel
+ *   as the quantity and the hourly rate as the unit price, so the server sees
+ *   an ordinary line item with the same total.
  * - Nova's per-item discount is gone. `LineItem` has no field for it, so a
  *   discount entered per row would be silently dropped on save. Invoice-level
  *   discount lives in the totals footer, where the API does store it.
@@ -174,6 +183,7 @@ function LineItemBody({
           unitPrice: editingItem.unitPrice,
           quantity: editingItem.quantity,
           saveAsSku: editingItem.saveAsSku ?? false,
+          billing: editingItem.billing ?? "FIXED",
         }
       : { ...EMPTY, description: initialDescription ?? EMPTY.description }
   );
@@ -270,6 +280,8 @@ function LineItemBody({
   }, [suggestions, values.description]);
 
   const isService = values.type === "SERVICE";
+  const isHourly = isService && values.billing === "HOURLY";
+  const hourlyTotal = isHourly ? Number(values.unitPrice) * Number(values.quantity) : NaN;
 
   return (
     <>
@@ -278,7 +290,10 @@ function LineItemBody({
           <FieldLabel>Item type</FieldLabel>
           <RadioGroup
             value={values.type}
-            onValueChange={(next) => patch({ type: next })}
+            onValueChange={(next) =>
+              // Hourly only applies to a service; a good goes back to per unit.
+              patch(next === "SERVICE" ? { type: next } : { type: next, billing: "FIXED" })
+            }
             disabled={typeFromItem}
             aria-invalid={!!errors.type || undefined}
             // flex-row is explicit: RadioGroup defaults to flex-col, and a bare
@@ -304,6 +319,33 @@ function LineItemBody({
           )}
           {errors.type && <FieldError>{errors.type}</FieldError>}
         </Field>
+
+        {/* Services only: a good is always sold by the unit. */}
+        {isService && (
+          <Field>
+            <FieldLabel>Billing</FieldLabel>
+            <RadioGroup
+              value={values.billing ?? "FIXED"}
+              onValueChange={(next) => patch({ billing: next as "FIXED" | "HOURLY" })}
+              className="flex flex-row items-center gap-5"
+            >
+              {(
+                [
+                  { value: "FIXED", label: "Fixed" },
+                  { value: "HOURLY", label: "Hourly" },
+                ] as const
+              ).map((option) => (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-center gap-2 text-[13.5px] font-medium text-foreground"
+                >
+                  <RadioGroupItem value={option.value} id={`line-item-billing-${option.value}`} />
+                  {option.label}
+                </label>
+              ))}
+            </RadioGroup>
+          </Field>
+        )}
 
         {/* `modal` was how this popover got a scrollable list: it lives inside a
           Dialog, flux's PopoverContent portals to document.body — outside the
@@ -399,7 +441,7 @@ function LineItemBody({
 
         <div className="grid grid-cols-2 gap-3">
           <Field>
-            <FieldLabel htmlFor="line-item-rate">Rate</FieldLabel>
+            <FieldLabel htmlFor="line-item-rate">{isHourly ? "Rate per hour" : "Rate"}</FieldLabel>
             <InputGroup className="shadow-none">
               <InputGroupAddon>
                 <InputGroupText>{currencySymbol}</InputGroupText>
@@ -412,23 +454,57 @@ function LineItemBody({
                 onChange={(e) => patch({ unitPrice: e.target.value })}
                 aria-invalid={!!errors.unitPrice || undefined}
               />
+              {isHourly && (
+                <InputGroupAddon align="inline-end">
+                  <InputGroupText>/ hr</InputGroupText>
+                </InputGroupAddon>
+              )}
             </InputGroup>
             {errors.unitPrice && <FieldError>{errors.unitPrice}</FieldError>}
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="line-item-qty">Quantity</FieldLabel>
-            <Input
-              id="line-item-qty"
-              inputMode="numeric"
-              className="shadow-none"
-              value={values.quantity}
-              onChange={(e) => patch({ quantity: e.target.value })}
-              aria-invalid={!!errors.quantity || undefined}
-            />
+            <FieldLabel htmlFor="line-item-qty">{isHourly ? "Hours" : "Quantity"}</FieldLabel>
+            {isHourly ? (
+              <InputGroup className="shadow-none">
+                <InputGroupInput
+                  id="line-item-qty"
+                  inputMode="decimal"
+                  placeholder="e.g. 2.5"
+                  value={values.quantity}
+                  onChange={(e) => patch({ quantity: e.target.value })}
+                  aria-invalid={!!errors.quantity || undefined}
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupText>hrs</InputGroupText>
+                </InputGroupAddon>
+              </InputGroup>
+            ) : (
+              <Input
+                id="line-item-qty"
+                inputMode="numeric"
+                className="shadow-none"
+                value={values.quantity}
+                onChange={(e) => patch({ quantity: e.target.value })}
+                aria-invalid={!!errors.quantity || undefined}
+              />
+            )}
             {errors.quantity && <FieldError>{errors.quantity}</FieldError>}
           </Field>
         </div>
+
+        {/* The arithmetic spelled out, so hours × rate is visibly what lands on
+            the invoice (before GST). */}
+        {isHourly && Number.isFinite(hourlyTotal) && hourlyTotal > 0 && (
+          <p className="-mt-1 text-[12px] tabular-nums text-muted-foreground">
+            {values.quantity} hrs × {currencySymbol}
+            {values.unitPrice} / hr ={" "}
+            <span className="font-semibold text-foreground">
+              {currencySymbol}
+              {hourlyTotal.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+            </span>
+          </p>
+        )}
 
         <Field>
           <FieldLabel htmlFor="line-item-hsn">

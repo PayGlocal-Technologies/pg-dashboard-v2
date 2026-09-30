@@ -228,6 +228,14 @@ export interface LineItemDraft {
   quantity: string;
   /** Ticked in the line-item dialog: pushes the item into SKU management. */
   saveAsSku?: boolean;
+  /**
+   * How a service is charged. Client-side only: LineItem has no billing
+   * field, so an hourly item is sent as quantity = hours and unitPrice = rate
+   * per hour, which is the same arithmetic. It shapes the dialog's labels and
+   * the preview's quantity ("2.5 hrs"); an invoice reopened from the server
+   * comes back as FIXED.
+   */
+  billing?: "FIXED" | "HOURLY";
 }
 
 export interface InvoiceFormState {

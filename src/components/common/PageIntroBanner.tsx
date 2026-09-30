@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
@@ -25,7 +25,8 @@ export function PageIntroBanner({
 }: {
   image: string;
   aspectClassName: string;
-  title: string;
+  /** A string, or a node when the heading needs a set line break. */
+  title: ReactNode;
   description: string;
 }) {
   const [visible, setVisible] = useState(true);

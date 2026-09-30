@@ -20,15 +20,16 @@ import { CountryFlag } from "@/features/dashboard/multi-currency/components/Coun
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
-// Label and colour per raw status, matching pg-dashboard's
-// STATUS_TEXT_BADGE_MAPPING exactly — including that both "sent for" states
-// are positive (green) rather than pending-amber, and that both reversal
-// statuses collapse to one label.
+// Label and colour per raw status, from pg-dashboard's
+// STATUS_TEXT_BADGE_MAPPING, including that both reversal statuses collapse to
+// one label. One deliberate difference, at the design's request: both "sent
+// for" states are blue (in progress) rather than pg-dashboard's green, so
+// green is kept for money that has actually settled.
 const MCA_STATUS_META: Record<string, StatusMeta> = {
   FUNDS_ON_HOLD: { label: "Funds on Hold", variant: "warning" },
   DOCUMENT_PENDING: { label: "Invoice Pending", variant: "warning" },
-  SENT_FOR_REVIEW: { label: "Sent for Review", variant: "success", trailIcon: "clock" },
-  SENT_FOR_SETTLEMENT: { label: "Sent for Settlement", variant: "success" },
+  SENT_FOR_REVIEW: { label: "Sent for Review", variant: "info", trailIcon: "clock" },
+  SENT_FOR_SETTLEMENT: { label: "Sent for Settlement", variant: "info" },
   SETTLED: { label: "Settled", variant: "success", trailIcon: "check" },
   FIRC_SETTLED: { label: "FIRC Settled", variant: "success", trailIcon: "check" },
   REVERSAL_FOR_RISK_REJECTED: { label: "Funds reversed", variant: "danger", trailIcon: "x" },

@@ -20,6 +20,7 @@ import { useInvoiceTemplates } from "@/features/dashboard/create-invoice/hooks";
 import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
 import { InvoiceIntroModal } from "@/features/dashboard/mca-invoices/components/InvoiceIntroModal";
 import { InvoicePromoBanner } from "@/features/dashboard/mca-invoices/components/InvoicePromoBanner";
+import { SettlementHolidayBanner } from "@/features/dashboard/mca-settlement-report/components/SettlementHolidayBanner";
 import {
   ALL_TIME_RANGE_VALUE,
   INVOICE_DATA_KEYS,
@@ -43,6 +44,7 @@ export function McaInvoicesFeature() {
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
       {/* Top of the page, above the title and its CTAs: the templates banner
           (closable). */}
+      <SettlementHolidayBanner />
       <InvoicePromoBanner />
       <PageHeader
         title="Invoice management"

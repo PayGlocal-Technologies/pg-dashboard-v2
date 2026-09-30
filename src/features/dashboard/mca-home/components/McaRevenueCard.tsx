@@ -130,10 +130,34 @@ function TrendTooltip({
  */
 type PerformanceMetric = "collected" | "net-volume" | "payments";
 
-const METRIC_OPTIONS: { value: PerformanceMetric; label: string; metric: RevenueMetric }[] = [
-  { value: "collected", label: "Total amount collected", metric: "revenue" },
-  { value: "net-volume", label: "Net volume", metric: "net_volume" },
-  { value: "payments", label: "Number of payments", metric: "number_of_payments" },
+/** `info` is the ⓘ tooltip beside the selected metric. Net volume's wording
+ *  follows how the product defines it elsewhere (successful volume minus
+ *  refunds, see pa-transactions/summary.ts); revenue-trend's own contract
+ *  does not spell it out. */
+const METRIC_OPTIONS: {
+  value: PerformanceMetric;
+  label: string;
+  metric: RevenueMetric;
+  info: string;
+}[] = [
+  {
+    value: "collected",
+    label: "Total amount collected",
+    metric: "revenue",
+    info: "Includes collections from all sources, including invoices.",
+  },
+  {
+    value: "net-volume",
+    label: "Net volume",
+    metric: "net_volume",
+    info: "What you collected from successful payments, minus refunds.",
+  },
+  {
+    value: "payments",
+    label: "Number of payments",
+    metric: "number_of_payments",
+    info: "How many payments you received in this period.",
+  },
 ];
 
 export function McaRevenueCard() {
@@ -192,18 +216,15 @@ export function McaRevenueCard() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {metric === "collected" && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="-ml-2 flex items-center text-muted-foreground">
-                <Icon name="info" className="h-3 w-3" />
-              </span>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs">
-              Includes collections from all sources, including invoices.
-            </TooltipContent>
-          </Tooltip>
-        )}
+        {/* Every metric carries its own ⓘ, beside the dropdown. */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="-ml-2 flex items-center text-muted-foreground">
+              <Icon name="info" className="h-3 w-3" />
+            </span>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">{selectedOption.info}</TooltipContent>
+        </Tooltip>
 
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-border bg-muted/50 p-1">
           {revenueTimeframes.map((opt) => (

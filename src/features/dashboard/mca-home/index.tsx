@@ -18,6 +18,7 @@ import {
   MCA_DASHBOARD_GUIDE_STEPS,
 } from "@/features/dashboard/mca-home/guide";
 import { McaPromoCarousel } from "@/features/dashboard/mca-home/components/McaPromoCarousel";
+import { SettlementHolidayBanner } from "@/features/dashboard/mca-settlement-report/components/SettlementHolidayBanner";
 import { McaRevenueCard } from "@/features/dashboard/mca-home/components/McaRevenueCard";
 import { McaNeedsAttentionCard } from "@/features/dashboard/mca-home/components/McaNeedsAttentionCard";
 import { McaUpcomingSettlementCard } from "@/features/dashboard/mca-home/components/McaUpcomingSettlementCard";
@@ -135,6 +136,8 @@ export function McaDashboardFeature() {
 
   return (
     <McaDashboardAurora contentClassName="space-y-5">
+      {/* Only when a bank holiday moves the upcoming settlement. */}
+      <SettlementHolidayBanner />
       {/* ── 1. Greeting ──────────────────────────────────────────────── */}
       <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
         <div>

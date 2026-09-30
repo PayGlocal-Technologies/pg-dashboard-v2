@@ -7,7 +7,13 @@ export function InvoicePromoBanner() {
     <PageIntroBanner
       image="/assets/invbannerforpage.png"
       aspectClassName="aspect-4680/892"
-      title="Customise your invoices. Make them yours."
+      title={
+        <>
+          Customise your invoices.
+          <br />
+          Make them yours.
+        </>
+      }
       description="Choose from ready-to-use templates and personalise them with your brand, colours and design."
     />
   );

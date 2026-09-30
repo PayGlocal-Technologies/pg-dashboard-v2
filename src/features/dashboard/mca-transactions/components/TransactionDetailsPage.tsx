@@ -385,12 +385,13 @@ export function TransactionDetailsContent({
             <p className="text-[13px] text-muted-foreground">
               Charged to <span className="font-medium text-foreground">{counterpartyName}</span>
             </p>
-            {/* Drawer only, and only until Payment Details joins the drawer's
-                stack at settlement: before that it is the one place the
-                drawer can say when this will settle. The full page always
-                shows Payment Details, which carries the same date. Mirrors
-                pg-dashboard's TxnHeaderCard tag, "To be updated" included.
-                Never for reversed transactions, which never settle. */}
+            {/* Drawer only, and only before settlement: it is the one place
+                the drawer says when this will settle (the drawer has no
+                Payment Details; once settled, the chip reads "Settled on …").
+                The full page shows Payment Details, which carries the same
+                date. Mirrors pg-dashboard's TxnHeaderCard tag, "To be
+                updated" included. Never for reversed transactions, which
+                never settle. */}
             {layout === "drawer" && !isSettled && !isReversed && row.settlementDate && (
               <Badge variant="outline" size="sm">
                 Settlement date:{" "}
@@ -437,40 +438,20 @@ export function TransactionDetailsContent({
     // page's 2-column grid below nests both identically, just inside its
     // own column.
     //
-    // Payment Details and Sender Details, the same two sections the full
-    // page's right column shows, join the stack once settlement is actually
-    // done (isSettled) — not before. Both are read straight through the
-    // exact same PaymentDetailsSection/SenderDetailsSection the page uses
-    // (floatTitle={false} either way: floating only matters for sharing a
-    // grid row with a taller sibling, which a single-column stack never
-    // does), so there is nothing here that could drift from the page's own
-    // version of these two cards. Gating on isSettled rather than always
-    // showing them: before settlement, every field either of them displays
-    // is still a "-" placeholder (see DetailRow above), and
-    // the drawer is meant to stay the lighter of the two views up to that
-    // point.
+    // Payment Details and Sender Details are the expanded page's alone: the
+    // drawer is the lighter view and never shows them, settled or not. The
+    // settlement BATCH's details still join the stack once settlement is
+    // done (isSettled).
     return (
       <div className="space-y-4">
         {summary}
         <SettlementActionCard row={row} onUploaded={onUploaded} />
         <SettlementTimelineSection row={row} />
-        {isSettled && (
-          <>
-            <PaymentDetailsSection row={row} currency={currency} floatTitle={false} />
-            <SenderDetailsSection
-              row={row}
-              counterpartyName={counterpartyName}
-              isPartnerUser={isPartnerUser}
-            />
-            {/* The settlement BATCH's own Details/Amount Breakdown — a
-                different, wider question than Payment Details above answers
-                (that one is this one transaction's own record; this is the
-                whole settlement it landed in). See
-                SettlementBatchDetailsSection's own doc for the distinction
-                from SettlementBreakdown nested in the timeline above. */}
-            <SettlementBatchDetailsSection row={row} layout="drawer" />
-          </>
-        )}
+        {/* The settlement BATCH's own Details/Amount Breakdown: the whole
+            settlement this transaction landed in, not this transaction's own
+            record. See SettlementBatchDetailsSection's own doc for the
+            distinction from SettlementBreakdown nested in the timeline. */}
+        {isSettled && <SettlementBatchDetailsSection row={row} layout="drawer" />}
       </div>
     );
   }

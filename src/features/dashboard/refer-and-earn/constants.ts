@@ -51,21 +51,17 @@ export const DEFAULT_REFERRAL_STATUS_TAB: ReferralStatusTab = "ALL";
  * icon-registry entry (that pattern is for SVG forwardRef components) and goes
  * through `next/image` instead — see CLAUDE.md's Images rule.
  *
- * `width`/`height` are the file's real pixel dimensions, handed to next/image as
- * the intrinsic size only: the rendered size comes from CSS, and these keep the
- * ~1.63:1 aspect ratio correct and reserve the right space before it loads.
+ * `width`/`height` are the file's real pixel dimensions (the intrinsic size
+ * handed to the image; the rendered size comes from CSS).
  *
- * This asset (Background.png) is deliberately the full card's background, not
- * just a top banner strip — unlike the previous asset, it fades all the way
- * to solid white by its own bottom edge, which is what the description text
- * and referral-link row sit on in ReferralHero (an absolutely-positioned
- * overlay at the bottom of the same box the image fills), rather than being
- * two separately-coloured blocks stacked with a seam between them.
+ * "Refer and earn.png" is a whole card: the artwork (title, +$30, coins) in
+ * its top 61%, plain white below. ReferralHero shows the top part in a 9:5
+ * frame and puts the live copy and referral link on the card's white below.
  */
 export const REFERRAL_HERO_BANNER = {
-  src: "/assets/Background.png",
-  width: 2196,
-  height: 1344,
+  src: "/assets/Refer and earn.png",
+  width: 2224,
+  height: 1989,
 } as const;
 
 export interface ReferralStep {
