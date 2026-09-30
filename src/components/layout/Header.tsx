@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
+// OUT OF SCOPE — theme toggle hidden, the app is light-only for now (see
+// ThemeProvider). Restore with the usage below.
+// import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
 import { AskEchoHeaderButton } from "@/components/layout/AskEchoButton";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
@@ -139,7 +141,11 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           <Icon name="menu" size={20} />
         </Button>
 
-        {/* Top-level category tabs */}
+        {/* OUT OF SCOPE — top-level category tabs (Home, Payments,
+            Multi-Currency Accounts, Partners) hidden for now. The active
+            context still falls back to the first product the account holds
+            (see the effect above). Restore by un-commenting this block. */}
+        {/*
         {!isPartnerUser && (
           <nav className="hidden shrink-0 items-center gap-1 md:flex">
             {visibleTabs.map((tab) => {
@@ -178,6 +184,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             })}
           </nav>
         )}
+        */}
 
         {/* Global search — takes the space the spacer used to hold, pushed
             right by its own ml-auto so the product tabs keep their position.
@@ -203,7 +210,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               ask on the way out — see SwitchToOldViewButton. */}
           <SwitchToOldViewButton />
 
-          <ThemeToggle />
+          {/* OUT OF SCOPE — theme toggle hidden, see the import above. */}
+          {/* <ThemeToggle /> */}
 
           {/* Help — support contacts and hours, see HeaderHelpMenu. */}
           <HeaderHelpMenu />
