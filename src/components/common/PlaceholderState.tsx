@@ -12,8 +12,9 @@ import { cn } from "@/lib/utils";
  * files rather than icon-registry components (unlike logos/icons) because they
  * are large decorative artwork sized by the box, not themeable glyphs, and are
  * rendered through AppImage — which applies the base path — exactly as the
- * platform logos in public/assets already are. `unoptimized` because these are
- * SVGs, which Next's image optimizer does not process.
+ * platform logos in public/assets already are. `unoptimized` because most are
+ * SVGs, which Next's image optimizer does not process (the two PNGs are small
+ * enough to serve as-is).
  */
 export type PlaceholderVariant =
   | "no-transactions"
@@ -26,6 +27,10 @@ export type PlaceholderVariant =
   | "no-notifications"
   | "no-analytics"
   | "no-data"
+  /** A metric with no axes (pie/donut, bar list, breakdown) with no data. */
+  | "no-metric-data"
+  /** Any table or list with no rows. */
+  | "empty-table"
   | "no-internet"
   | "error"
   | "404";
@@ -41,6 +46,8 @@ const VARIANT_ASSET: Record<PlaceholderVariant, string> = {
   "no-notifications": "/assets/no-notifications.svg",
   "no-analytics": "/assets/no-analytics.svg",
   "no-data": "/assets/no-data-available.svg",
+  "no-metric-data": "/assets/No data(metric usage).png",
+  "empty-table": "/assets/table empty.png",
   "no-internet": "/assets/no-internet.svg",
   error: "/assets/something-went-wrong.svg",
   "404": "/assets/404-error.svg",
@@ -68,6 +75,9 @@ const VARIANT_SCALE: Record<PlaceholderVariant, number> = {
   "no-notifications": 0.94,
   "no-analytics": 0.9,
   "no-data": 0.94,
+  // PNGs whose tinted circle fills the whole canvas.
+  "no-metric-data": 0.8,
+  "empty-table": 0.8,
   "no-internet": 1.07,
   error: 1.05,
   "404": 0.8,

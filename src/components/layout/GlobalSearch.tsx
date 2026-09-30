@@ -213,7 +213,7 @@ export function GlobalSearch() {
   return (
     <div
       ref={rootRef}
-      className="relative ml-auto flex h-9 w-9 min-w-0 items-center justify-end md:w-full md:max-w-[380px]"
+      className="relative ml-auto flex h-10 w-9 min-w-0 items-center justify-end md:w-full md:max-w-[380px]"
     >
       {/* Below md the header has no room for a 380px field next to the product
           tabs, so it collapses to this button and expands over the tab row. */}
@@ -266,11 +266,10 @@ export function GlobalSearch() {
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
           // flux-ui's base Input carries its own min-h-11 (44px) and
-          // shadow-sm — min-h-11 wins over this h-9 since min-height beats a
-          // smaller height, and the shadow read as a stray glow under the
-          // bar. min-h-9/shadow-none cancel both so this actually renders at
-          // the same 36px, flat, as its header neighbours.
-          className="h-9 min-h-9 bg-muted/50 pl-8 pr-8 text-xs shadow-none"
+          // shadow-sm; min-h-10/shadow-none override both so this renders at
+          // the same 40px, flat, as its header neighbours (the flux Buttons
+          // beside it are min-h-10).
+          className="h-10 min-h-10 bg-muted/50 pl-8 pr-8 text-xs shadow-none"
         />
         {query && (
           <Button

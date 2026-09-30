@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { CompactAmount } from "@/components/common/CompactAmount";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   totalSettledTimeframes,
@@ -152,13 +152,12 @@ export function TotalSettledCard({
         </div>
       </div>
 
-      <div className="h-76 w-full">
+      <div className="relative h-76 w-full">
         {!hasData ? (
-          <PlaceholderState
-            variant="no-settlements"
+          <EmptyAxesChart
+            labels={EMPTY_AXIS_LABELS[timeframe]}
             title="No settlements in this period"
             description="As payouts are made, this charts how much settled to your account over time."
-            className="h-full"
           />
         ) : (
           <ResponsiveContainer width="100%" height="100%">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Button,
   Callout,
@@ -252,6 +252,7 @@ export function FxCalculatorModal({
   // The response quotes INR per unit of foreign currency as a fraction, so the
   // headline "1 USD = x INR" is its reciprocal — the same inversion
   // pg-dashboard applies before displaying it.
+  const amountInputRef = useRef<HTMLInputElement>(null);
   const rate = Number(rates?.fxRate);
   const displayRate =
     rates && Number.isFinite(rate) && rate > 0 ? (1 / rate).toFixed(2) : undefined;
@@ -267,28 +268,11 @@ export function FxCalculatorModal({
             reads it as "pick a currency → here's the rate → type an amount"
             instead of hunting for what's editable. ─────────────────────── */}
         <Card size="sm" className="mt-4 gap-0 border-primary/10 bg-card/70 p-4 shadow-sm">
-          <p className="text-[13px] font-medium text-foreground">They will send</p>
+          {/* Right-aligned throughout, like the fee rows and "You will receive"
+              below, so every figure in the calculator lines up on one edge. */}
+          <p className="text-right text-[13px] font-medium text-foreground">They will send</p>
 
-          <div className="mt-2.5 flex items-center gap-2.5">
-            <Select value={currency} onValueChange={setCurrency} disabled={!resultsRevealed}>
-              <SelectTrigger
-                className="h-9 min-h-0 w-28 shrink-0 gap-1.5 px-3 text-[13px]"
-                aria-label="Invoice currency"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {QUOTE_CURRENCIES.map((option) => (
-                  <SelectItem key={option.code} value={option.code}>
-                    <span className="flex items-center gap-2">
-                      <CountryFlag iso2={option.iso2} />
-                      {option.code}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
+          <div className="mt-2.5 flex items-center justify-end gap-2.5">
             {/* Live rate — helper text, not a competing headline: it explains
                 what the currency choice means before the amount field asks for
                 a number. */}
@@ -308,34 +292,70 @@ export function FxCalculatorModal({
                 <span className="truncate">Fetching rate…</span>
               )}
             </span>
+            <Select value={currency} onValueChange={setCurrency} disabled={!resultsRevealed}>
+              <SelectTrigger
+                className="h-9 min-h-0 w-28 shrink-0 gap-1.5 px-3 text-[13px]"
+                aria-label="Invoice currency"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {QUOTE_CURRENCIES.map((option) => (
+                  <SelectItem key={option.code} value={option.code}>
+                    <span className="flex items-center gap-2">
+                      <CountryFlag iso2={option.iso2} />
+                      {option.code}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* The amount — the only field here a merchant types into, so it's
               the only element that looks like one: bordered, tall, with a
               focus ring, rather than borderless text sitting next to the
               currency dropdown. */}
-          <InputGroup className="mt-3 h-14 border-primary/20 bg-background transition-colors focus-within:border-primary/50">
-            {/* pl-0, not the addon's own default inset: this field's border
-                sits at the same x as "They will send" above it (both are
-                flush with the Card's own p-4), so any left padding here
-                pushes the $ sign in past where the label starts — flush
-                is what makes the two actually read as left-aligned. */}
-            <InputGroupAddon className="pl-0 text-2xl leading-none font-semibold text-foreground">
+          {/* Symbol and amount sit together on the right, like every other
+              figure in the calculator: the input sizes itself to the digits
+              (an invisible copy of the value in the same grid cell sets its
+              width; the input itself is w-0 min-w-full so its default width
+              doesn't count), so the symbol stays right
+              beside the number. A click anywhere in the box focuses it. */}
+          <InputGroup
+            className="mt-3 h-14 cursor-text justify-end border-primary/20 bg-background pr-4 transition-colors focus-within:border-primary/50"
+            onMouseDown={(e) => {
+              if (e.target instanceof HTMLInputElement) return;
+              e.preventDefault();
+              amountInputRef.current?.focus();
+            }}
+          >
+            <InputGroupAddon className="pr-1.5 pl-4 text-2xl leading-none font-semibold text-muted-foreground">
               {currencySymbol(currency)}
             </InputGroupAddon>
-            <InputGroupInput
-              inputMode="decimal"
-              autoComplete="off"
-              aria-label={`Amount in ${currency}`}
-              // Read-only for the whole intro, typing and reveal beat alike:
-              // the digits are revealed by `displayAmount`, not typed by the
-              // merchant, and editing mid-reveal would leave the INR side
-              // rolling in for an amount that's no longer on screen.
-              readOnly={!resultsRevealed}
-              value={displayAmount}
-              onChange={(e) => setAmountInput(sanitizeAmount(e.target.value))}
-              className="h-full min-h-0 px-0 pr-4 text-2xl leading-none font-semibold tabular-nums"
-            />
+            <span className="inline-grid h-full min-w-0 items-center">
+              <span
+                aria-hidden
+                className="invisible col-start-1 row-start-1 whitespace-pre text-2xl leading-none font-semibold tabular-nums"
+              >
+                {displayAmount || "0"}
+              </span>
+              <InputGroupInput
+                ref={amountInputRef}
+                inputMode="decimal"
+                autoComplete="off"
+                aria-label={`Amount in ${currency}`}
+                // Read-only for the whole intro, typing and reveal beat alike:
+                // the digits are revealed by `displayAmount`, not typed by the
+                // merchant, and editing mid-reveal would leave the INR side
+                // rolling in for an amount that's no longer on screen.
+                readOnly={!resultsRevealed}
+                value={displayAmount}
+                placeholder="0"
+                onChange={(e) => setAmountInput(sanitizeAmount(e.target.value))}
+                className="col-start-1 row-start-1 h-full min-h-0 w-0 min-w-full flex-none px-0 text-2xl leading-none font-semibold tabular-nums"
+              />
+            </span>
           </InputGroup>
 
           <p className="mt-2 text-right text-xs tabular-nums text-muted-foreground">
@@ -358,9 +378,9 @@ export function FxCalculatorModal({
 
         {/* ── You will receive ───────────────────────────────────────────── */}
         <div className="rounded-2xl border border-primary/10 bg-linear-to-br from-primary/8 to-transparent p-4">
-          <p className="text-[13px] text-muted-foreground">You will receive</p>
-          <div className="mt-1 flex items-center justify-between gap-3">
-            <CountryFlag iso2="IN" alt="" className="h-5 w-7" />
+          <p className="text-right text-[13px] text-muted-foreground">You will receive</p>
+          <div className="mt-1 flex items-center justify-end gap-2.5">
+            <CountryFlag iso2="IN" alt="" className="h-5 w-7 shrink-0" />
             {/* `AnimatedAmount` stays mounted the whole time — swapping it in
                 only once the figure is already known (as this used to) means
                 `useAnimatedNumber` never sees an undefined→number transition
@@ -369,7 +389,9 @@ export function FxCalculatorModal({
                 once revealed is what makes it actually count up instead.
                 Shimmer sits on top as a plain visual overlay for "nothing to
                 show yet", covering both the typing intro and a cold fetch. */}
-            <div className="relative min-h-9 min-w-0 flex-1">
+            {/* Sized to the figure (not flex-1), so the flag sits right
+                beside the amount; min-w-40 keeps room for the shimmer. */}
+            <div className="relative min-h-9 min-w-40 max-w-full">
               <AnimatedAmount
                 value={showResults && !(isLoading && !rates) ? rates?.settlementAmount : undefined}
                 className={cn(

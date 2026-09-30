@@ -111,7 +111,7 @@ export function ReferralEarnings({
     pagination: tablePaging,
     emptyState: (
       <PlaceholderState
-        variant="no-data"
+        variant="empty-table"
         size="sm"
         title={empty.title}
         description={empty.description}

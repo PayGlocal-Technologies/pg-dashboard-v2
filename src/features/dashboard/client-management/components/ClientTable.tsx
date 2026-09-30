@@ -406,7 +406,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
         // The drawn first-run state, kept from before the card.
         emptyState={
           <PlaceholderState
-            variant="no-data"
+            variant="empty-table"
             title={emptyTitle}
             description={emptyDescription}
             action={emptyAction}
@@ -478,7 +478,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
           isLoading={isLoading}
           emptyState={
             <PlaceholderState
-              variant="no-data"
+              variant="empty-table"
               size="sm"
               title={emptyTitle}
               description={emptyDescription}

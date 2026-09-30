@@ -18,6 +18,9 @@ import { InvoiceActionCard } from "@/features/dashboard/mca-invoices/components/
 import { useZohoPullSync, zohoSyncLabel } from "@/features/dashboard/zoho-integration/hooks";
 import { useInvoiceTemplates } from "@/features/dashboard/create-invoice/hooks";
 import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
+import { InvoiceIntroModal } from "@/features/dashboard/mca-invoices/components/InvoiceIntroModal";
+import { InvoicePromoBanner } from "@/features/dashboard/mca-invoices/components/InvoicePromoBanner";
+import { SettlementHolidayBanner } from "@/features/dashboard/mca-settlement-report/components/SettlementHolidayBanner";
 import {
   ALL_TIME_RANGE_VALUE,
   INVOICE_DATA_KEYS,
@@ -39,6 +42,10 @@ import { endOfDayMs, summaryWindowSeconds } from "@/features/dashboard/mca-invoi
 export function McaInvoicesFeature() {
   return (
     <div className="mx-auto max-w-[1400px] space-y-4 page-enter">
+      {/* Top of the page, above the title and its CTAs: the templates banner
+          (closable). */}
+      <SettlementHolidayBanner />
+      <InvoicePromoBanner />
       <PageHeader
         title="Invoice management"
         actions={
@@ -235,10 +242,14 @@ function McaInvoicesContent() {
   );
 
   return (
-    <McaInvoiceTable
-      summarySection={summary}
-      statusFilters={statusFilters}
-      onStatusFiltersChange={setStatusFilters}
-    />
+    <>
+      <McaInvoiceTable
+        summarySection={summary}
+        statusFilters={statusFilters}
+        onStatusFiltersChange={setStatusFilters}
+      />
+      {/* First visit only: what Invoice Management offers. */}
+      <InvoiceIntroModal />
+    </>
   );
 }
