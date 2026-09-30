@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Icon } from "@/components/icon";
 
 import { useForm } from "@tanstack/react-form";
@@ -202,9 +202,8 @@ interface ClientFormModalProps {
    *  holds the modal in a loading state rather than mounting the form on partial
    *  values. See ClientTable's by-id fetch. */
   isLoading?: boolean;
-  /** Called with validated values. `keepOpen` distinguishes Add client from
-   *  Save and add another, so the caller doesn't need two callbacks. */
-  onSubmit: (values: ClientFormValues, keepOpen: boolean) => void;
+  /** Called with validated values. */
+  onSubmit: (values: ClientFormValues) => void;
   /** Opens the contract stored against the client being edited. Undefined in add
    *  mode, and for an edited client that has none. */
   onViewStoredContract?: () => void;
@@ -326,18 +325,14 @@ function ClientFormBody({
   mode: "add" | "edit";
   initialValues?: ClientFormValues;
   onCancel: () => void;
-  onSubmit: (values: ClientFormValues, keepOpen: boolean) => void;
+  onSubmit: (values: ClientFormValues) => void;
   onViewStoredContract?: () => void;
   onRemoveStoredContract?: () => void;
   midOverride?: string;
 }) {
-  // Which button started the submit. A ref, not state: it's read inside the
-  // submit handler in the same tick it's written, and re-rendering on it would
-  // be pointless.
   const isEdit = mode === "edit";
   const title = isEdit ? "Edit client" : "Add client";
 
-  const keepOpenRef = useRef(false);
   // Cancel with typed-in values asks first; an untouched form just closes.
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
   // Whether each all-optional field/section is revealed. Lifted here (rather
@@ -361,19 +356,8 @@ function ClientFormBody({
 
   const form = useForm({
     defaultValues: initialValues ?? emptyClientForm(),
-    onSubmit: ({ value, formApi }) => {
-      onSubmit(value, keepOpenRef.current);
-      if (keepOpenRef.current) {
-        // Save and add another: back to a blank form, ready to type into.
-        formApi.reset(emptyClientForm());
-      }
-    },
+    onSubmit: ({ value }) => onSubmit(value),
   });
-
-  const submitWith = (keepOpen: boolean) => {
-    keepOpenRef.current = keepOpen;
-    void form.handleSubmit();
-  };
 
   const handleCancel = () => {
     if (isClientFormDirty(form.state.values) && !confirmingDiscard) {
@@ -387,7 +371,7 @@ function ClientFormBody({
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        submitWith(false);
+        void form.handleSubmit();
       }}
       className="flex min-h-0 flex-col"
       noValidate
@@ -1129,52 +1113,24 @@ function ClientFormBody({
       </div>
 
       {/* ── Actions ──────────────────────────────────────────────────────
-          In add mode, Save and add another sits opposite the pair as a
-          link-style action, so it reads as a secondary route through the same
-          form rather than a third button competing with the primary CTA — the
-          same arrangement as the Add item form's footer.
-
-          In edit mode it is not rendered at all: "another" has no meaning when
-          the form is open on one existing record, and the action would either
-          have to save the edit and then open a blank Add form (a different task
-          the merchant did not ask for) or duplicate the client. Nothing to
-          disable, so nothing is shown. justify-end then pulls the remaining pair
-          to the right, where they sit in every other single-action footer. */}
-      <div
-        className={cn(
-          "flex flex-shrink-0 flex-wrap items-center gap-2 border-t border-border px-5 py-3.5",
-          isEdit ? "justify-end" : "justify-between"
-        )}
-      >
-        {!isEdit && (
-          <Button
-            type="button"
-            variant="link"
-            size="sm"
-            className="px-0"
-            onClick={() => submitWith(true)}
-          >
-            Save and add another
-          </Button>
-        )}
-
-        <div className="flex items-center gap-2">
-          {/* Cancel turns into its own confirmation once the form has been
-              typed into: one more click discards, and moving away from it (or
-              typing again) is not needed to undo, since nothing has been
-              thrown away yet. */}
-          <Button
-            type="button"
-            variant={confirmingDiscard ? "danger" : "outline"}
-            size="sm"
-            onClick={handleCancel}
-          >
-            {confirmingDiscard ? "Discard changes?" : "Cancel"}
-          </Button>
-          <Button type="submit" variant="primary" size="sm">
-            {isEdit ? "Update client" : "Add client"}
-          </Button>
-        </div>
+          Cancel and the primary action, pulled right by justify-end, where
+          they sit in every other single-action footer. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-3.5">
+        {/* Cancel turns into its own confirmation once the form has been
+            typed into: one more click discards, and moving away from it (or
+            typing again) is not needed to undo, since nothing has been
+            thrown away yet. */}
+        <Button
+          type="button"
+          variant={confirmingDiscard ? "danger" : "outline"}
+          size="sm"
+          onClick={handleCancel}
+        >
+          {confirmingDiscard ? "Discard changes?" : "Cancel"}
+        </Button>
+        <Button type="submit" variant="primary" size="sm">
+          {isEdit ? "Update client" : "Add client"}
+        </Button>
       </div>
     </form>
   );

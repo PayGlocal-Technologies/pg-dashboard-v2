@@ -42,6 +42,7 @@ export const MCA_DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     // chrome. The attribute is on AskEchoButton, which renders nothing
     // without `getEchoActiveSession`; see the filter in mca-home/index.tsx.
     target: MCA_DASHBOARD_GUIDE_ECHO_TARGET,
+    chip: { label: "Echo", icon: "echo-mark" },
     title: "Meet Echo",
     description:
       "Ask Echo about transactions, settlements, disputes, accounts and payment links, and skip the menus entirely.",
@@ -63,6 +64,7 @@ export const MCA_DASHBOARD_GUIDE_STEPS: GuideStep[] = [
     // The Invoice step above it is the page header, which sits higher still,
     // so the three together read straight down the screen.
     target: "mca-quick-access",
+    chip: { label: "Quick actions", icon: "layout-grid" },
     title: "Quick actions",
     description: "Quickly find the tools and information you need to manage your virtual accounts.",
     side: "bottom",
@@ -70,6 +72,7 @@ export const MCA_DASHBOARD_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "mca-needs-attention",
+    chip: { label: "Invoices", icon: "receipt" },
     title: "Invoice status",
     description: "See anything that needs your attention, so you know what to take care of.",
     side: "left",

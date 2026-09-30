@@ -116,11 +116,16 @@ export function McaQuickAccess({ editMode = false, onEditDashboard }: McaQuickAc
           const tile = (
             <Button
               type="button"
-              variant={isPrimary ? "primary" : "ghost"}
+              variant="ghost"
               title={item.description}
               className={cn(
                 quickAccessTileClass,
-                !isPrimary && "border-border bg-muted hover:bg-muted/70"
+                isPrimary
+                  ? // A light tint, not a solid fill — enough to mark it as
+                    // the primary action among flat grey pills, without
+                    // reading as loudly as a fully-saturated blue button.
+                    "border-transparent bg-primary-light hover:bg-primary-light/70"
+                  : "border-transparent bg-muted hover:bg-muted/70"
               )}
               {...(item.id === "invoice-links" && needsMidChoice
                 ? {}
@@ -130,14 +135,14 @@ export function McaQuickAccess({ editMode = false, onEditDashboard }: McaQuickAc
                 name={item.icon}
                 className={cn(
                   "h-3.5 w-3.5 shrink-0",
-                  isPrimary ? "text-primary-foreground" : "text-foreground"
+                  isPrimary ? "text-primary" : "text-foreground"
                 )}
                 aria-hidden
               />
               <span
                 className={cn(
                   "whitespace-nowrap text-[13px] font-medium",
-                  isPrimary ? "text-primary-foreground" : "text-foreground"
+                  isPrimary ? "text-primary" : "text-foreground"
                 )}
               >
                 {item.label}

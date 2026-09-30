@@ -316,9 +316,6 @@ export function SettlementDetailsContent({
   const { settlement, payments } = detail;
   const netAmountLabel = formatCurrency(settlement.amount, settlement.currency);
 
-  // TODO(integration): wire up to the real settlement report download
-  // endpoint once it exists, see the list page's "Export" action, which is
-  // the same mock-only placeholder.
   /** Same call a row's Download button makes: one settlement's report, keyed by
    *  its settlement date. No format choice — the endpoint produces one format,
    *  so offering three would have been a menu over a single outcome. */

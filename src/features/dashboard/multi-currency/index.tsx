@@ -441,7 +441,11 @@ function MultiCurrencyContent() {
             above the grid) — this content has no counterpart on the region
             list side, so it can't help that comparison, only widen it. */}
         {selectedAccount && (
-          <div className="min-w-0 lg:col-start-2">
+          // mt-3, on this grid-item div itself, not the nested <section> —
+          // matches the left column's warning callout exactly (same margin
+          // value, same DOM level) so both row-3 items start at the same
+          // vertical offset instead of the callout appearing to sit higher.
+          <div className="mt-3 min-w-0 lg:col-start-2">
             <AnimatePresence mode="wait">
               <motion.div
                 key={selectedAccount.id}
@@ -454,8 +458,16 @@ function MultiCurrencyContent() {
                     for proof of ownership right after reading the account
                     they'd share, so it sits directly under Account details
                     rather than beside the region list. */}
-                <section className="mt-4">
-                  <h2 className={cn(MODULE_TITLE, "mb-3")}>Documents you might need</h2>
+                <section>
+                  {/* leading-none: comparing a bordered box (its border sits
+                      flush with the container's own top edge) against bare
+                      heading text (whose line-height otherwise leaves a few
+                      px of empty space above the glyphs themselves) made the
+                      callout on the left read as sitting higher even once
+                      both containers shared the same mt-3 top offset. */}
+                  <h2 className={cn(MODULE_TITLE, "mb-3 leading-none")}>
+                    Documents you might need
+                  </h2>
                   <Card
                     size="sm"
                     className="flex-col items-start gap-4 py-6 sm:flex-row sm:items-center"

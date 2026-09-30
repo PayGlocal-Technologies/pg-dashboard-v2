@@ -8,7 +8,6 @@ import {
   StatCardSkeleton,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -187,30 +186,28 @@ export function SettlementStatCards({
             {/* MOCK (hidden): the gross/tax/fee breakup has no endpoint — shown
                 only when index.tsx passes those props again. */}
             {previousSettledGrossLabel && previousSettledTaxLabel && previousSettledFeeLabel && (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="link"
-                      className="h-auto w-fit justify-start p-0 text-xs font-semibold"
-                    >
-                      Settlement breakup
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom" align="end" className="w-56 space-y-1.5 p-3">
-                    <SettlementBreakupRow label="Gross amount" value={previousSettledGrossLabel} />
-                    <SettlementBreakupRow label="Tax" value={`−${previousSettledTaxLabel}`} />
-                    <SettlementBreakupRow label="Fee" value={`−${previousSettledFeeLabel}`} />
-                    <div className="border-t border-border pt-1.5">
-                      <SettlementBreakupRow
-                        label="Net amount"
-                        value={formatCurrency(previousSettledAmount, "INR")}
-                        emphasis
-                      />
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="link"
+                    className="h-auto w-fit justify-start p-0 text-xs font-semibold"
+                  >
+                    Settlement breakup
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" align="end" className="w-56 space-y-1.5 p-3">
+                  <SettlementBreakupRow label="Gross amount" value={previousSettledGrossLabel} />
+                  <SettlementBreakupRow label="Tax" value={`−${previousSettledTaxLabel}`} />
+                  <SettlementBreakupRow label="Fee" value={`−${previousSettledFeeLabel}`} />
+                  <div className="border-t border-border pt-1.5">
+                    <SettlementBreakupRow
+                      label="Net amount"
+                      value={formatCurrency(previousSettledAmount, "INR")}
+                      emphasis
+                    />
+                  </div>
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
 

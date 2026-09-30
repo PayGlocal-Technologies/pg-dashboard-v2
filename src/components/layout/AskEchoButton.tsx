@@ -145,7 +145,11 @@ export function AskEchoHeaderButton() {
         aria-pressed={onEchoPage ? undefined : pressed}
         onClick={activate}
         className={cn(
-          "relative z-1 h-9 rounded-lg border-0 px-3 text-[13px] font-medium shadow-sm backdrop-blur-sm transition-colors",
+          // 38px (min-h too, or flux's min-h-10 wins): the ring-wrap's own 1px
+          // padding on each side adds 2px back, so this renders at the same
+          // 40px as its neighbours (search, Switch to old view, theme
+          // toggle, help).
+          "relative z-1 h-9.5 min-h-9.5 rounded-lg border-0 px-3 text-[13px] font-medium shadow-sm backdrop-blur-sm transition-colors",
           "[&>span]:flex [&>span]:items-center [&>span]:gap-1.5",
           // The rotating gradient ring already carries this control's "active/
           // focused" affordance, so the flux Button's own blue focus-visible

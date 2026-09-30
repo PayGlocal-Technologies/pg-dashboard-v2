@@ -4,10 +4,8 @@ import {
   type Column,
   StatusBadge,
   Button,
-  IconButton,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
@@ -22,15 +20,16 @@ import { CountryFlag } from "@/features/dashboard/multi-currency/components/Coun
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
-// Label and colour per raw status, matching pg-dashboard's
-// STATUS_TEXT_BADGE_MAPPING exactly — including that both "sent for" states
-// are positive (green) rather than pending-amber, and that both reversal
-// statuses collapse to one label.
+// Label and colour per raw status, from pg-dashboard's
+// STATUS_TEXT_BADGE_MAPPING, including that both reversal statuses collapse to
+// one label. One deliberate difference, at the design's request: both "sent
+// for" states are blue (in progress) rather than pg-dashboard's green, so
+// green is kept for money that has actually settled.
 const MCA_STATUS_META: Record<string, StatusMeta> = {
   FUNDS_ON_HOLD: { label: "Funds on Hold", variant: "warning" },
   DOCUMENT_PENDING: { label: "Invoice Pending", variant: "warning" },
-  SENT_FOR_REVIEW: { label: "Sent for Review", variant: "success", trailIcon: "clock" },
-  SENT_FOR_SETTLEMENT: { label: "Sent for Settlement", variant: "success" },
+  SENT_FOR_REVIEW: { label: "Sent for Review", variant: "info", trailIcon: "clock" },
+  SENT_FOR_SETTLEMENT: { label: "Sent for Settlement", variant: "info" },
   SETTLED: { label: "Settled", variant: "success", trailIcon: "check" },
   FIRC_SETTLED: { label: "FIRC Settled", variant: "success", trailIcon: "check" },
   REVERSAL_FOR_RISK_REJECTED: { label: "Funds reversed", variant: "danger", trailIcon: "x" },
@@ -89,18 +88,16 @@ export function MdrOfferBadge({ totalMdrDiscount }: { totalMdrDiscount?: string 
   if (!discount) return null;
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center" aria-label="Offer applied">
-            <Icon name="mdr-offer" className="h-4 w-4" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>
-          MDR Waiver: ₹{discount.toLocaleString("en-IN", { maximumFractionDigits: 2 })} INR applied
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center" aria-label="Offer applied">
+          <Icon name="mdr-offer" className="h-4 w-4" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>
+        MDR Waiver: ₹{discount.toLocaleString("en-IN", { maximumFractionDigits: 2 })} INR applied
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -113,19 +110,17 @@ export function FrmPendingBadge({ frmStatus }: { frmStatus?: McaTransaction["frm
   if (frmStatus !== "PENDING_MERCHANT_UPLOAD") return null;
 
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center" aria-label="Documents required">
-            <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs">
-          We need some documents from you to process this transaction. Please upload the required
-          documents to avoid payment delays.
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center" aria-label="Documents required">
+          <Icon name="alert-circle" className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-xs">
+        We need some documents from you to process this transaction. Please upload the required
+        documents to avoid payment delays.
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -180,7 +175,7 @@ function buildRowActions(row: McaTransaction, handlers: RowActionHandlers): RowA
       return [
         {
           key: "firc-download",
-          label: "FIRC Download",
+          label: "Download FIRC",
           icon: "download",
           onSelect: () => handlers.onDownloadFirc(row),
         },
@@ -190,35 +185,31 @@ function buildRowActions(row: McaTransaction, handlers: RowActionHandlers): RowA
   }
 }
 
-/** One row's actions, direct icon buttons rather than a "…" menu — today
- *  that's at most a single action (FIRC Download, on a FIRC_SETTLED row),
+/** One row's actions, labelled buttons rather than a "…" menu — today
+ *  that's at most a single action (Download FIRC, on a FIRC_SETTLED row),
  *  and hiding the one thing there is to do behind a dropdown cost an extra
- *  click for no reason. Each action gets its own icon (a tooltip carries the
- *  label, since there's no room for text beside several of these), laid out
- *  left of the row's View details/Take action control rather than replacing
+ *  click for no reason. Same "Take action" treatment (outline, labelled,
+ *  always visible) the DOCUMENT_PENDING row's own button uses below, rather
+ *  than an icon-only button that only reveals its meaning on hover/tooltip —
+ *  laid out left of the row's View details control rather than replacing
  *  it. */
 function RowActionButtons({ actions }: { actions: RowAction[] }) {
   return (
     <>
       {actions.map((action) => (
-        <TooltipProvider key={action.key} delayDuration={200}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <IconButton
-                aria-label={action.label}
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  action.onSelect();
-                }}
-              >
-                <Icon name={action.icon} className="h-4 w-4" />
-              </IconButton>
-            </TooltipTrigger>
-            <TooltipContent side="top">{action.label}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+        <Button
+          key={action.key}
+          variant="outline"
+          size="sm"
+          leftIcon={<Icon name={action.icon} className="h-3 w-3" />}
+          onClick={(e) => {
+            e.stopPropagation();
+            action.onSelect();
+          }}
+          className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+        >
+          {action.label}
+        </Button>
       ))}
     </>
   );
@@ -349,7 +340,7 @@ export function buildMcaColumns(
               </span>
             ) : (
               <>
-                {/* Direct icon button(s) — FIRC Download today — ahead of
+                {/* Labelled button(s) — Download FIRC today — ahead of
                     View details rather than behind a "…" menu. Always
                     visible, unlike View details below: this is the row's own
                     distinct action, not a secondary way to reach the same
@@ -360,7 +351,7 @@ export function buildMcaColumns(
                      display/width change) so revealing it never shifts the
                      layout. Opens the same drawer a click anywhere else on the
                      row does. Plain text, no icon — the eye glyph read as one
-                     more action alongside FIRC Download rather than what it
+                     more action alongside Download FIRC rather than what it
                      actually is, the row's own "open" control. */}
                 <Button
                   variant="outline"

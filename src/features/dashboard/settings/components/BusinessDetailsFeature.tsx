@@ -10,8 +10,9 @@ import { SettingsDetailRow } from "@/features/dashboard/settings/components/Sett
 import {
   useBusinessDetails,
   useMerchantBusinessProfile,
+  useMerchantPurposeCode,
   usePurposeCodeOptions,
-  useUpdateBusinessDetails,
+  useUpdateMerchantPurposeCode,
 } from "@/features/dashboard/settings/hooks";
 
 interface BusinessField {
@@ -33,20 +34,6 @@ const LINE_OF_BUSINESS_LABELS: Record<string, string> = {
   SERVICES_EXPORT: "Services export",
   SERVICES_IMPORT: "Services import",
 };
-
-/** Trims, upper-cases and de-duplicates a list of purpose codes, keeping the
- *  order the API sent them in. */
-function uniqueCodes(codes: (string | null | undefined)[]): string[] {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const raw of codes) {
-    const code = raw?.trim().toUpperCase();
-    if (!code || seen.has(code)) continue;
-    seen.add(code);
-    result.push(code);
-  }
-  return result;
-}
 
 function formatLineOfBusiness(code: string | null | undefined): string {
   if (!code) return "";
@@ -106,28 +93,23 @@ function FieldGroupCard({
 export function BusinessDetailsFeature() {
   const profile = useApp((s) => s.profile);
   const { business, isLoading } = useBusinessDetails();
-  const { updateBusiness, isSaving } = useUpdateBusinessDetails();
   // GST / address / website / line-of-business / support contact now come from
   // the merchant profile's merchantBusinessSummary block.
   const { businessProfile, isLoading: isProfileLoading } = useMerchantBusinessProfile();
 
-  // The purpose code is the one editable field on this page. It used to be a
-  // free-text box taking a comma-separated list; it is now a single-select over
-  // the codes the API offers, so a merchant can hold exactly one code going
-  // forward. Accounts configured before this still read back several, which the
-  // read view lists in full and the editor makes explicit before replacing.
-  // Deduped and normalised: the endpoint really does return the same code more
-  // than once on some accounts (and in mixed case), which would otherwise list
-  // it twice under duplicate React keys and inflate the "N purpose codes"
-  // count in the replace warning below.
-  const purposeCodes = uniqueCodes(business?.purposeCode ?? []);
-  const hasLegacyMultiple = purposeCodes.length > 1;
+  // The purpose code is the one editable field on this page: a single-select
+  // over the codes the banner endpoint offers. The saved value is read from,
+  // and written back to, the merchant's own purpose-code endpoint, which holds
+  // exactly one code (or none).
+  const { purposeCode, isLoading: isPurposeCodeLoading } = useMerchantPurposeCode();
+  const { updatePurposeCode, isSaving, canEdit } = useUpdateMerchantPurposeCode();
   const [editing, setEditing] = useState(false);
   const [selectedCode, setSelectedCode] = useState("");
-  // The saved codes are folded into the option list so an existing one the API
+  // The saved code is folded into the option list so an existing one the API
   // no longer offers is still selectable rather than silently absent.
-  const { options: purposeCodeOptions, isLoading: isOptionsLoading } =
-    usePurposeCodeOptions(purposeCodes);
+  const { options: purposeCodeOptions, isLoading: isOptionsLoading } = usePurposeCodeOptions(
+    purposeCode ? [purposeCode] : []
+  );
 
   // The API's own wording for a code wins (it is the list this merchant was
   // offered), then the static RBI table. Neither knowing it returns empty so
@@ -140,20 +122,15 @@ export function BusinessDetailsFeature() {
   };
 
   const startEditing = (): void => {
-    // A single saved code is the obvious starting selection. With several there
-    // is no defensible pick, so the field starts empty and the merchant chooses
-    // which one the account keeps.
-    setSelectedCode(hasLegacyMultiple ? "" : (purposeCodes[0] ?? ""));
+    setSelectedCode(purposeCode);
     setEditing(true);
   };
 
   const saveCodes = (): void => {
     if (!selectedCode) return;
 
-    // The endpoint still takes the plural array pg-dashboard sends; we just
-    // never send more than one entry.
-    updateBusiness(
-      { purposeCodes: [selectedCode] },
+    updatePurposeCode(
+      { purposeCode: selectedCode },
       {
         onSuccess: () => {
           toast.success("Business details updated successfully.");
@@ -165,7 +142,7 @@ export function BusinessDetailsFeature() {
   };
 
   // registeredName/mid from the session profile (already resolved, so no loading
-  // state); tradeName/purposeCode from the /business endpoint; the rest from the
+  // state); tradeName from the /business endpoint; the rest from the
   // merchant profile's merchantBusinessSummary block. An empty value renders as
   // "Not available" in the row below, so none of these need their own fallback.
   const legalFields: BusinessField[] = [
@@ -269,17 +246,9 @@ export function BusinessDetailsFeature() {
                 options={purposeCodeOptions}
                 isLoading={isOptionsLoading}
               />
-              {hasLegacyMultiple ? (
-                <p className="text-[11px] text-destructive">
-                  This account currently holds {purposeCodes.length} purpose codes (
-                  {purposeCodes.join(", ")}). Accounts now carry a single code, so saving replaces
-                  all of them with the one you pick here.
-                </p>
-              ) : (
-                <p className="text-[11px] text-muted-foreground">
-                  One code per account. Search by code or by what it covers.
-                </p>
-              )}
+              <p className="text-[11px] text-muted-foreground">
+                One code per account. Search by code or by what it covers.
+              </p>
               <div className="flex gap-2">
                 <Button
                   type="button"
@@ -302,32 +271,35 @@ export function BusinessDetailsFeature() {
               </div>
             </div>
           ) : (
-            <div className="flex items-start gap-3">
-              {isLoading ? (
+            // Baseline, not start: the value and the link have different line
+            // heights, so top-aligning left Edit sitting above the code. The
+            // first baseline is the code's own line, so Edit lines up with it
+            // however many description lines follow.
+            <div className="flex items-baseline gap-3">
+              {isPurposeCodeLoading ? (
                 <Shimmer className="h-4 w-40" />
-              ) : purposeCodes.length ? (
-                // Every saved code is listed, not just the first: an account
-                // configured before the single-code rule still has several and
-                // hiding the extras would misreport what it is set to.
-                <div className="space-y-1 text-right">
-                  {purposeCodes.map((code) => {
-                    const description = describeCode(code);
-                    return (
-                      <div key={code}>
-                        <span className="text-sm font-semibold text-foreground">{code}</span>
-                        {description && (
-                          <p className="text-xs text-muted-foreground">{description}</p>
-                        )}
-                      </div>
-                    );
-                  })}
+              ) : purposeCode ? (
+                <div className="text-right">
+                  <span className="text-sm font-semibold text-foreground">{purposeCode}</span>
+                  {describeCode(purposeCode) && (
+                    <p className="text-xs text-muted-foreground">{describeCode(purposeCode)}</p>
+                  )}
                 </div>
               ) : (
                 <span className="text-sm font-semibold text-foreground">Not set</span>
               )}
-              <Button type="button" variant="outline" size="sm" onClick={startEditing}>
-                Edit
-              </Button>
+              {/* No PACB MID means nothing to save against, so no Edit. */}
+              {canEdit && (
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto min-h-0 p-0 text-[13px] font-medium"
+                  onClick={startEditing}
+                >
+                  Edit
+                </Button>
+              )}
             </div>
           )}
         </div>

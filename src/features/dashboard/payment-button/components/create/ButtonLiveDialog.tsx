@@ -53,22 +53,27 @@ export function ButtonLiveDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onDone()}>
-      <DialogContent className="sm:max-w-3xl [&_*]:shadow-none">
-        <LiveIllustration />
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl [&_*]:shadow-none">
+        {/* Illustration, copy and snippet scroll together; only the actions
+            are pinned below. pt-10 keeps the room the default padding left
+            for the close button. */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-5 pt-10">
+          <LiveIllustration />
 
-        <div className="mt-2 text-center">
-          <DialogTitle className="text-xl">Your payment button is live</DialogTitle>
-          <DialogDescription className="mt-1">
-            &ldquo;{label}&rdquo; is ready to accept payments. Add the snippet below to your website
-            to start collecting them.
-          </DialogDescription>
+          <div className="mt-2 text-center">
+            <DialogTitle className="text-xl">Your payment button is live</DialogTitle>
+            <DialogDescription className="mt-1">
+              &ldquo;{label}&rdquo; is ready to accept payments. Add the snippet below to your
+              website to start collecting them.
+            </DialogDescription>
+          </div>
+
+          <div className="mt-4">
+            <EmbedCodeBlock caption="HTML code" lines={lines} />
+          </div>
         </div>
 
-        <div className="mt-4">
-          <EmbedCodeBlock caption="HTML code" lines={lines} />
-        </div>
-
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="grid shrink-0 gap-3 border-t border-border px-6 py-4 sm:grid-cols-2">
           <Button
             type="button"
             variant="outline"

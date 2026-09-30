@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
-  Callout,
-  CalloutText,
   Command,
   CommandEmpty,
   CommandGroup,
@@ -92,7 +90,7 @@ export function BillToSection({
   const { createClient } = useCreateClient(merchantId);
   const { uploadContract } = useClientContractUpload(merchantId);
 
-  const onSubmitClient = (values: ClientFormValues, keepOpen: boolean) => {
+  const onSubmitClient = (values: ClientFormValues) => {
     const payload = toClientApiPayload(values, (iso2) =>
       iso2 ? (countryMap.iso2ToApiCountry[iso2.toUpperCase()] ?? iso2) : ""
     );
@@ -107,7 +105,7 @@ export function BillToSection({
       refetch();
     });
 
-    if (!keepOpen) setAddClientOpen(false);
+    setAddClientOpen(false);
   };
 
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -390,33 +388,37 @@ export function BillToSection({
       </Popover>
 
       {/* Both gates production enforces, surfaced where the choice was made
-          rather than only at submit time. */}
+          rather than only at submit time. Compact icon + text rather than a
+          boxed Callout, per the design change for in-form errors; the
+          action is the same icon + text link the section headers use. */}
       {issue.kind === "incomplete-address" && (
-        <Callout variant="warning" className="mt-3">
-          <CalloutText>
+        <div className="mt-3 flex items-start gap-1.5 text-[12.5px] leading-relaxed text-amber-700 dark:text-amber-500">
+          <Icon name="alert-triangle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>
             This client&apos;s billing address is incomplete, so the invoice cannot be generated
             yet.{" "}
-            <Button
+            <button
               type="button"
-              variant="link"
-              className="h-auto p-0 align-baseline text-sm"
               onClick={() => setAddressOpen(true)}
+              className="inline-flex items-center gap-1 align-baseline font-medium text-primary hover:underline"
             >
+              <Icon name="pencil" className="h-3 w-3" />
               Complete address
-            </Button>
-          </CalloutText>
-        </Callout>
+            </button>
+          </p>
+        </div>
       )}
 
       {issue.kind === "remitter-mismatch" && (
-        <Callout variant="error" className="mt-3">
-          <CalloutText>
+        <div className="mt-3 flex items-start gap-1.5 text-[12.5px] leading-relaxed text-destructive">
+          <Icon name="alert-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>
             {issue.clientName
               ? `"${issue.clientName}" does not match the remitter on the linked transaction ("${issue.remitterName}").`
               : `The selected client does not match the remitter on the linked transaction ("${issue.remitterName}").`}{" "}
             Pick the matching client to continue.
-          </CalloutText>
-        </Callout>
+          </p>
+        </div>
       )}
 
       <ClientFormModal

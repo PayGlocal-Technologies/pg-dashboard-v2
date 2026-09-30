@@ -6,7 +6,9 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { ThemeToggle } from "@/components/theme/ThemeToggle";
+// OUT OF SCOPE — theme toggle hidden, the app is light-only for now (see
+// ThemeProvider). Restore with the usage below.
+// import { ThemeToggle } from "@/components/theme/ThemeToggle";
 import { HeaderHelpMenu } from "@/components/layout/HeaderHelpMenu";
 import { AskEchoHeaderButton } from "@/components/layout/AskEchoButton";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
@@ -128,7 +130,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
 
   return (
     <div className="sticky top-0 z-30 flex flex-col">
-      <header className="flex h-[57px] items-center gap-2 px-4 md:px-5 flex-shrink-0 bg-header border-b border-header-border">
+      <header className="flex h-[57px] items-center gap-2 px-4 md:px-5 flex-shrink-0 bg-header">
         {/* Hamburger (mobile only) */}
         <Button
           variant="ghost"
@@ -139,7 +141,11 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
           <Icon name="menu" size={20} />
         </Button>
 
-        {/* Top-level category tabs */}
+        {/* OUT OF SCOPE — top-level category tabs (Home, Payments,
+            Multi-Currency Accounts, Partners) hidden for now. The active
+            context still falls back to the first product the account holds
+            (see the effect above). Restore by un-commenting this block. */}
+        {/*
         {!isPartnerUser && (
           <nav className="hidden shrink-0 items-center gap-1 md:flex">
             {visibleTabs.map((tab) => {
@@ -158,8 +164,18 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                   href={tab.href}
                   onClick={() => tab.context && setActiveContext(tab.context)}
                   className={cn(
+                    // With the header's own bottom divider gone, the tab row
+                    // had nothing to anchor it — plain coloured text read as
+                    // barely-there next to the rest of the header's solid
+                    // controls. A quiet pill (existing --primary-light /
+                    // --muted tokens, the same "soft, not loud" treatment the
+                    // "Viewing as" ribbon already uses) gives the active tab
+                    // real presence and inactive ones a hover target, without
+                    // introducing a new colour or a heavier component.
                     "whitespace-nowrap rounded-lg px-3 py-1.5 text-[13.5px] font-medium transition-colors",
-                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                    isActive
+                      ? "bg-primary-light text-primary"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   )}
                 >
                   {tab.label}
@@ -168,6 +184,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             })}
           </nav>
         )}
+        */}
 
         {/* Global search — takes the space the spacer used to hold, pushed
             right by its own ml-auto so the product tabs keep their position.
@@ -193,7 +210,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               ask on the way out — see SwitchToOldViewButton. */}
           <SwitchToOldViewButton />
 
-          <ThemeToggle />
+          {/* OUT OF SCOPE — theme toggle hidden, see the import above. */}
+          {/* <ThemeToggle /> */}
 
           {/* Help — support contacts and hours, see HeaderHelpMenu. */}
           <HeaderHelpMenu />

@@ -483,15 +483,40 @@ const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
  * `remittanceAmount` is the IRM's own remittance value, which bounds how much
  * of it can be mapped — production passes it into the validator as `max`.
  */
+/**
+ * A DGFT port code: exactly six characters, "IN" then four letters or digits
+ * (INDEL4 is Delhi Air Cargo). The rule `push_irm` enforces server-side; it is
+ * checked here too so a bad code is caught on the field at save time, not
+ * once the whole request is submitted.
+ */
+const PORT_CODE_PATTERN = /^IN[A-Z0-9]{4}$/;
+
+/** Upper-cased and trimmed: port codes are case-insensitive to the merchant
+ *  but always sent upper case. */
+export function normalizePortCode(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+/** Null when valid, otherwise the message to show. Worded after the server's
+ *  own rejection so both read the same. */
+export function portCodeError(value: string | null | undefined): string | null {
+  const code = normalizePortCode(value ?? "");
+  if (!code) return "Please enter port code";
+  if (PORT_CODE_PATTERN.test(code)) return null;
+  if (code.length !== 6) {
+    return `A port code is 6 characters ("IN" and four letters or digits, e.g. INDEL4); this one is ${code.length}. A 3-letter airport or city code is not a port code.`;
+  }
+  return 'A port code starts with "IN" followed by four letters or digits, e.g. INDEL4.';
+}
+
 export function validateMapping(mapping: IrmMapping, remittanceAmount: number): MappingFieldErrors {
   const errors: MappingFieldErrors = {};
 
   if (!mapping.shippingBillNumber.trim()) {
     errors.shippingBillNumber = "Please enter shipping bill number";
   }
-  if (!mapping.portCode.trim()) {
-    errors.portCode = "Please enter port code";
-  }
+  const portError = portCodeError(mapping.portCode);
+  if (portError) errors.portCode = portError;
   if (!mapping.billInvoiceNumber.trim()) {
     errors.billInvoiceNumber = "Please enter bill/invoice number";
   }
@@ -613,3 +638,10 @@ export interface EbrcRequestRow {
  *  currency is a merchant choice, and DGFT accepts any of these against an
  *  IRM. Lived in mock-data.ts before the endpoints landed. */
 export const CURRENCY_OPTIONS = ["INR", "USD", "EUR", "GBP", "AED"];
+/** Set by EbrcGenerationWizard right before it shows the "request received"
+ *  overlay, read (and cleared) by EbrcStatusTable on its next mount — the
+ *  "wait 4 hours" callout only means something the moment a request was
+ *  actually just queued, not on every visit to this page. sessionStorage,
+ *  not a store field: it only needs to survive the one navigation back from
+ *  the wizard, the same lifetime the earlier "just logged in" flag used. */
+export const EBRC_JUST_QUEUED_KEY = "ebrc_just_queued";

@@ -3,7 +3,6 @@
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
   type Column,
 } from "@/components/ui";
@@ -59,7 +58,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "businessName",
       header: "Business name",
-      minWidth: 240,
+      minWidth: 180,
       // Compact density puts overflow-hidden on every cell, which would clip
       // the un-wrapped name back to the column's current width and defeat the
       // min-w-max measurement below — cancelled here, same as mcaColumns does
@@ -77,16 +76,14 @@ export function buildClientColumns(): Column<Client>[] {
               own that would be empty for most rows. */}
           <span className="flex min-w-max items-center gap-1.5">
             {row.source === "ZOHO" ? (
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="flex shrink-0 items-center">
-                      <Icon name="zoho-logo" className="h-3 w-3" aria-label="Imported from Zoho" />
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>Imported from Zoho</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="flex shrink-0 items-center">
+                    <Icon name="zoho-logo" className="h-3 w-3" aria-label="Imported from Zoho" />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Imported from Zoho</TooltipContent>
+              </Tooltip>
             ) : null}
             <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
               {row.businessName}
@@ -98,7 +95,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "primaryContactName",
       header: "Primary contact name",
-      minWidth: 200,
+      minWidth: 150,
       render: (row) => (
         <span className="block w-[170px] truncate text-[13px] text-foreground">
           {row.primaryContactName}
@@ -108,7 +105,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "email",
       header: "Email",
-      minWidth: 150,
+      minWidth: 130,
       // Compact density clips every cell; the copy button's hover state sits
       // slightly proud of the text and would otherwise be cut at the boundary.
       cellClassName: "overflow-visible",
@@ -139,7 +136,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "phone",
       header: "Phone number",
-      minWidth: 165,
+      minWidth: 140,
       cellClassName: "overflow-visible",
       render: (row) => (
         <>
@@ -165,7 +162,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "country",
       header: "Country",
-      minWidth: 170,
+      minWidth: 140,
       // Same as the Transactions table's Country column: the flag and name
       // must never clip, so compact density's overflow-hidden is cancelled and
       // min-w-max below is what actually grows the column.
@@ -197,7 +194,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "totalReceived",
       header: "Total received",
-      minWidth: 165,
+      minWidth: 130,
       // Right-aligned, exactly as the Transactions table aligns its own Amount
       // column: figures line up on their last digit down the column, which is
       // what makes two rows comparable at a glance.
@@ -248,7 +245,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "outstandingAmount",
       header: "Outstanding",
-      minWidth: 140,
+      minWidth: 110,
       align: "right",
       render: (row) => {
         // The record's own figure, in INR — see CLIENT_AMOUNT_CURRENCY. Not the
@@ -288,7 +285,7 @@ export function buildClientColumns(): Column<Client>[] {
     {
       key: "createdAt",
       header: "Created",
-      minWidth: 130,
+      minWidth: 100,
       render: (row) => (
         <>
           {/* Date only — a client record's creation time of day is noise next

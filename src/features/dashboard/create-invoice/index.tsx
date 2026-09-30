@@ -16,6 +16,7 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { withBasePath } from "@/constants/basePath";
+import { brandBackdropStyle } from "@/lib/utils/brandBackdrop";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
@@ -212,7 +213,15 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="min-h-0 overflow-y-auto bg-muted">
+        {/* Same background as the loaded preview column below, so the
+            skeleton doesn't flash a plain grey panel right before it. */}
+        <div
+          className="brand-backdrop min-h-0 overflow-y-auto bg-cover bg-top bg-no-repeat"
+          // A wash layered under the image (not `opacity` on this div)
+          // lightens the image itself without touching the foreground
+          // content's own opacity.
+          style={brandBackdropStyle(55)}
+        >
           <div className="space-y-4 p-4 md:p-6">
             <div className="flex items-center justify-between">
               <Shimmer className="h-4 w-20" />
@@ -244,7 +253,7 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
  */
 export function CreateInvoiceFeature() {
   const router = useRouter();
-  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+  const { needsMidChoice } = usePacbMidScope();
 
   // "Edit template" reaches this route by a full page load, which drops the
   // in-memory MID selection, so it hands the MID over in `?mid=`. Applying it
@@ -268,9 +277,8 @@ export function CreateInvoiceFeature() {
    * which account is meant. Nothing has been created at this point, so leaving
    * costs the merchant nothing.
    *
-   * The picker is rendered *in* the card rather than the usual "use the selector
-   * in the sidebar": this route is the full-screen editor shell, which draws no
-   * sidebar at all, so that instruction would point at nothing.
+   * The sidebar hint is switched off: this route is the full-screen editor
+   * shell, which draws no sidebar at all, so that line would point at nothing.
    *
    * A MID arriving in `?mid=` is the one case that answers the question before
    * it is asked, so the handover is held above rather than flashing this picker
@@ -295,7 +303,7 @@ export function CreateInvoiceFeature() {
           </h1>
         </header>
         <div className="mx-auto w-full max-w-2xl px-6 py-16">
-          <SelectMidView midType="PACB" midOptions={midOptions} onSelectMid={selectMid} />
+          <SelectMidView midType="PACB" showSidebarHint={false} />
         </div>
       </>
     );
@@ -890,7 +898,7 @@ function InvoiceEditor({
   const generateAfterTemplateSave = useRef(false);
   const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   /** BrandingSection's own collapse state, lifted here so the preview
-   *  sidebar's "Customise template" button can open it directly. */
+   *  sidebar's "Customise branding" button can open it directly. */
   const [brandingExpanded, setBrandingExpanded] = useState(false);
 
   // BrandingSection renders nothing at all while collapsed (see its own
@@ -1105,7 +1113,7 @@ function InvoiceEditor({
    */
   const handleEditTemplate = (templateId: string) => {
     // withBasePath because a raw `window.location` navigation is handed to the
-    // browser as-is — Next only prefixes /app-v2 for framework navigation
+    // browser as-is — Next only prefixes /hub for framework navigation
     // (router.push, next/link), not this. See src/constants/basePath.ts.
     // The MID rides along for the same reason the invoice list's copy does:
     // the selection does not survive a full page load.
@@ -1744,7 +1752,17 @@ function InvoiceEditor({
           </div>
         </div>
 
-        <div className="min-h-0 overflow-y-auto bg-muted">
+        {/* The preview column only — bg-cover/bg-top rather than tiling,
+            since this is a decorative wash behind the document card, not a
+            repeating pattern; bg-top keeps the same crop visible however
+            tall the scrollable content ends up. */}
+        <div
+          className="brand-backdrop min-h-0 overflow-y-auto bg-cover bg-top bg-no-repeat"
+          // A wash layered under the image (not `opacity` on this div)
+          // lightens the image itself without touching the foreground
+          // content's own opacity.
+          style={brandBackdropStyle(55)}
+        >
           <div className="space-y-4 p-4 md:p-6" data-guide="invoice-preview">
             <InvoicePreviewSidebar
               source={previewSource}
@@ -1752,7 +1770,7 @@ function InvoiceEditor({
               onCustomiseClick={() => setBrandingExpanded((value) => !value)}
             />
             {/* Directly under the Document/Email tabs, not off in its own
-                titled tab/accordion any more — "Customise template" is now
+                titled tab/accordion any more — "Customise branding" is now
                 the only way in or out of it. */}
             <BrandingSection
               logoEnabled={form.logoEnabled}

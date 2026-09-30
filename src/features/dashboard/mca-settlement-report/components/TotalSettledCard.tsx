@@ -12,9 +12,10 @@ import {
 import { Button, Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
+import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { CompactAmount } from "@/components/common/CompactAmount";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   totalSettledTimeframes,
@@ -87,6 +88,10 @@ interface TotalSettledCardProps {
    * so passing a height class simply wins over the default.
    */
   chartClassName?: string;
+  /** X-axis labels for the empty chart; defaults to the timeframe's own
+   *  (a caller whose period isn't one of this card's timeframes, like the
+   *  Transactions page's "Today", passes its own). */
+  emptyAxisLabels?: string[];
 }
 
 export function TotalSettledCard({
@@ -98,6 +103,7 @@ export function TotalSettledCard({
   chartData,
   className,
   chartClassName,
+  emptyAxisLabels,
 }: TotalSettledCardProps) {
   const trendPositive = totalSettledTrendPct >= 0;
   const data = chartData;
@@ -175,24 +181,17 @@ export function TotalSettledCard({
         )}
       </div>
 
-      <div className={cn("h-76 w-full", chartClassName)}>
+      {/* relative + the empty state absolutely filling it: the empty state
+          never adds height of its own, so an empty period can't make this
+          card (or the grid row it shares) taller than a loaded one. */}
+      <div className={cn("relative h-76 w-full", chartClassName)}>
         {!hasData ? (
-          // size="xs": the default md illustration's own natural footprint
-          // (~132px icon + its padding) ran well past this card's neighbor
-          // in the Transactions page's row (SavedAmountCard, floored at
-          // min-h-64/256px) — since that row is `items-stretch`, the
-          // larger of the two set the row height, stretching SavedAmountCard
-          // down to match and leaving visible dead space inside it. A
-          // smaller illustration keeps the empty state's own natural height
-          // close to what a loaded sparkline needs, so there's little left
-          // for the stretch to inflate either card with. Same fix already
-          // applied to SettlementAnalyticsCard's own empty state.
-          <PlaceholderState
-            variant="no-settlements"
-            size="xs"
+          // The platform-wide chart empty state (see EmptyAxesChart): same
+          // axes, a flat zero line and a caption, sized by this box.
+          <EmptyAxesChart
+            labels={emptyAxisLabels ?? EMPTY_AXIS_LABELS[timeframe]}
             title="No settlements in this period"
-            description="As payouts are made, this charts how much settled to your account over time."
-            className="h-full"
+            description="As payouts are made, this charts how much settled to your account."
           />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -203,7 +202,7 @@ export function TotalSettledCard({
                   <stop offset="100%" stopColor="var(--chart-4)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+              <CartesianGrid horizontal={DotGridLine} vertical={false} />
               <XAxis
                 dataKey="x"
                 axisLine={false}

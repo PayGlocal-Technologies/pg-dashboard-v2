@@ -16,7 +16,7 @@ const MODULE_SUBTITLE = "text-[13px] text-muted-foreground";
 
 /**
  * The connect walkthrough as its own full page, reached from the Platforms
- * header's "Steps to connect" button.
+ * header's "Guide to connect" button.
  *
  * It used to run inline under the account details, which made the page's own
  * subject — the receiving account a merchant came to read and copy — the

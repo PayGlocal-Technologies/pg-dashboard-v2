@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { McaDashboardWidgetRenderer } from "@/features/dashboard/mca-home/components/widgets/McaDashboardWidgetRenderer";
 import {
@@ -70,32 +70,30 @@ export function SortableMcaDashboardWidget({
       <Icon name="x" className="h-4 w-4" strokeWidth={2} aria-hidden />
     </Button>
   ) : (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="absolute right-2 top-2 z-30 inline-flex">
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label={`Remove ${meta.name}`}
-              aria-disabled
-              title={`Minimum ${MIN_MCA_DASHBOARD_WIDGETS} widgets required`}
-              disabled
-              className={removeBtnClass}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <Icon name="x" className="h-4 w-4" strokeWidth={2} aria-hidden />
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent
-          className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
-          sideOffset={4}
-        >
-          Minimum {MIN_MCA_DASHBOARD_WIDGETS} widgets required
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="absolute right-2 top-2 z-30 inline-flex">
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label={`Remove ${meta.name}`}
+            aria-disabled
+            title={`Minimum ${MIN_MCA_DASHBOARD_WIDGETS} widgets required`}
+            disabled
+            className={removeBtnClass}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <Icon name="x" className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent
+        className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+        sideOffset={4}
+      >
+        Minimum {MIN_MCA_DASHBOARD_WIDGETS} widgets required
+      </TooltipContent>
+    </Tooltip>
   );
 
   const body = (

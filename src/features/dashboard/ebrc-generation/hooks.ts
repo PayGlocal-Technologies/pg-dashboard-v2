@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
+import { useFeatureApplicable } from "@/lib/hooks/useFeatureApplicable";
 import { useNeedsMidSelection } from "@/features/dashboard/multi-currency/hooks";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { ebrcFetchApi, ebrcGenerationApi } from "@/features/dashboard/ebrc-generation/services";
@@ -143,6 +144,20 @@ function useEbrcScope(): {
   const mid = needsMidSelection ? "" : urlMid || merchantIds?.[0] || "";
 
   return { mid, merchantIds, midFilter, urlMid, isReady, guardState };
+}
+
+/**
+ * Whether the MID the eBRC calls address carries the "EBRC" entitlement.
+ * pg-dashboard checks `useFeatureApplicable(resolvedMerchantId, "EBRC")` on its
+ * mapping and review screens, i.e. against the resolved MID (selected, else the
+ * first PACB one) rather than only an explicitly selected one, which is why
+ * this reads `mid` from the eBRC scope instead of going through MidGuard. True
+ * while no MID is resolved yet: that state asks for a MID, it doesn't deny.
+ */
+export function useEbrcEntitled(): boolean {
+  const { mid } = useEbrcScope();
+  const hasFeature = useFeatureApplicable(mid, EBRC_FEATURE);
+  return !mid || hasFeature;
 }
 
 // ── 1/2. Search: irm/search and ebrc/search ──────────────────────────────────
@@ -602,7 +617,10 @@ export const MAX_SHIPPING_BILL_MB = 10;
  *    asynchronously and is what the extraction-status poll waits on.
  */
 export function useShippingBillUpload(): {
-  upload: (irmNumber: string, file: File, onSettled: () => void) => void;
+  /** `onSettled(started)`: true once `extract_shipping_data` has accepted the
+   *  file (extraction is now running server-side), false if any step before
+   *  that failed, so the caller knows whether there is anything to wait on. */
+  upload: (irmNumber: string, file: File, onSettled: (started: boolean) => void) => void;
 } {
   const { mid } = useEbrcScope();
   const handleDgftError = useDgftErrorHandler();
@@ -622,12 +640,12 @@ export function useShippingBillUpload(): {
   >(ebrcGenerationApi(mid, "extract_shipping_data"), { invalidateQueries: false });
 
   const upload = useCallback(
-    (irmNumber: string, file: File, onSettled: () => void) => {
+    (irmNumber: string, file: File, onSettled: (started: boolean) => void) => {
       if (!mid || !irmNumber) return;
 
       if (file.size > MAX_SHIPPING_BILL_MB * 1024 * 1024) {
         toast.error(`File size exceeds the maximum limit of ${MAX_SHIPPING_BILL_MB} MB.`);
-        onSettled();
+        onSettled(false);
         return;
       }
 
@@ -636,13 +654,13 @@ export function useShippingBillUpload(): {
         {
           onSuccess: (res) => {
             if (handleDgftError(res)) {
-              onSettled();
+              onSettled(false);
               return;
             }
             const uploadUrl = res?.data?.upload_url;
             if (!uploadUrl) {
               toast.error("Couldn't get an upload URL.");
-              onSettled();
+              onSettled(false);
               return;
             }
 
@@ -661,20 +679,21 @@ export function useShippingBillUpload(): {
                       irmNumber,
                     },
                     {
+                      onSuccess: () => onSettled(true),
                       onError: (error) => {
+                        onSettled(false);
                         if (handleDgftError(error)) return;
                         toast.error(
                           error?.message ||
                             "Couldn't extract shipping bill data from the uploaded file."
                         );
                       },
-                      onSettled,
                     }
                   );
                 },
                 onError: (error) => {
                   toast.error(error?.message || "Couldn't upload the file.");
-                  onSettled();
+                  onSettled(false);
                 },
               }
             );
@@ -683,7 +702,7 @@ export function useShippingBillUpload(): {
             if (!handleDgftError(error)) {
               toast.error(error?.message || "Couldn't get an upload URL.");
             }
-            onSettled();
+            onSettled(false);
           },
         }
       );

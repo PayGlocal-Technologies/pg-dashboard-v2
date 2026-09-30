@@ -34,6 +34,15 @@ function toLinkable(row: DocumentPendingListRow): LinkableTransaction {
   };
 }
 
+/** "glme3703...e297" — enough of each end to spot a specific transaction
+ *  without spelling out the full gid on a row that's mostly amount/actions.
+ *  CSS `truncate` on the wrapping span still shortens this further if the
+ *  row runs out of room, so this fixed cut is the floor, not the only one. */
+function truncateGid(gid: string, headLen = 8, tailLen = 4): string {
+  if (gid.length <= headLen + tailLen + 3) return gid;
+  return `${gid.slice(0, headLen)}...${gid.slice(-tailLen)}`;
+}
+
 /**
  * Companion to InvoiceSummaryCards: the "amount already collected but not yet
  * invoiced" figure OutstandingAmountCard also shows on the Transactions page,
@@ -53,9 +62,9 @@ function toLinkable(row: DocumentPendingListRow): LinkableTransaction {
  * Below the headline, up to MAX_ROWS individual document-pending transactions
  * replace what used to be a single generic "Create invoices" button — each row
  * is a specific transaction the merchant can act on directly, highest amount
- * first. Fewer than MAX_ROWS rows stretch to fill the same reserved block
- * (flex-1 per row, same technique InvoiceSummaryCards' legend uses) so the
- * card's own height never depends on how many are waiting.
+ * first. Fewer than MAX_ROWS rows leave the rest of the same reserved block
+ * to a trailing spacer (see below) so the card's own height never depends on
+ * how many are waiting.
  */
 export function InvoiceActionCard({
   timeframe,
@@ -96,7 +105,7 @@ export function InvoiceActionCard({
       <CardContent className="flex flex-1 flex-col">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-base font-semibold text-foreground">Waiting on documents from you</p>
+            <p className="text-base font-semibold text-foreground">Invoices required</p>
             {!isLoading && pendingCount > 0 && (
               <Badge variant="secondary" size="sm" className="shrink-0">
                 {pendingCount.toLocaleString("en-IN")} transaction{pendingCount === 1 ? "" : "s"}
@@ -118,12 +127,17 @@ export function InvoiceActionCard({
         </div>
 
         {isLoading ? (
-          <Shimmer className="mt-2 h-9 w-32" />
+          <Shimmer className="mt-2 mb-4 h-9 w-32" />
         ) : (
           <CompactAmount
             amount={amount}
             currency={displayCurrency}
-            className="mt-2 block text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+            // mb-4 guarantees a real gap before the divider below —
+            // mt-auto on that divider's own wrapper only distributes
+            // whatever slack this card's height-matching leaves over, which
+            // can resolve close to 0 and left the divider crowding the
+            // amount above it.
+            className="mt-2 mb-4 block text-3xl font-semibold tabular-nums tracking-tight text-foreground"
           />
         )}
 
@@ -132,72 +146,94 @@ export function InvoiceActionCard({
             slack that leaves collects here — above the row list — rather
             than stranding a void under it. Same mt-auto-over-fixed-margin
             technique OutstandingAmountCard uses to ground its own bottom
-            block. flex-1 on the list itself is what then lets fewer rows
-            grow to fill that reserved space instead of shrinking the card. */}
+            block. flex-1 on the list itself, plus the trailing spacer inside
+            it (below), is what then lets extra reserved space collect below
+            the rows themselves instead of stretching each row's own padding
+            — a `flex-1` on every `<li>` used to distribute that slack across
+            all three rows individually, which read as loosely padded rows
+            rather than a compact list with room left over underneath. */}
         <div className="mt-auto flex flex-1 flex-col border-t border-border pt-3">
           {isLoading ? (
             <div className="flex flex-1 flex-col divide-y divide-border">
               {Array.from({ length: MAX_ROWS }).map((_, i) => (
-                <div key={i} className="flex flex-1 items-center justify-between gap-3 py-2.5">
-                  <div className="min-w-0 space-y-1.5">
-                    <Shimmer className="h-3.5 w-28" />
-                    <Shimmer className="h-4 w-20" />
-                  </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    <Shimmer className="h-7 w-24 rounded-md" />
-                    <Shimmer className="h-7 w-20 rounded-md" />
+                <div key={i} className="flex items-center justify-between gap-3 py-2">
+                  <Shimmer className="h-4 w-40" />
+                  <div className="flex shrink-0 gap-3">
+                    <Shimmer className="h-3.5 w-20" />
+                    <Shimmer className="h-3.5 w-16" />
                   </div>
                 </div>
               ))}
+              <div className="flex-1" />
             </div>
           ) : rows.length === 0 ? (
             <p className="flex flex-1 items-center text-[13px] leading-relaxed text-muted-foreground">
               You&apos;re all caught up! Start creating invoices to collect payments globally.
             </p>
           ) : (
-            <ul className="flex flex-1 flex-col divide-y divide-border">
-              {rows.map((row) => (
-                <li key={row.gid} className="flex flex-1 items-center justify-between gap-3 py-2.5">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {row.customerName || row.gid}
-                    </p>
-                    <CompactAmount
-                      amount={row.amount}
-                      currency={row.currency}
-                      className="text-sm tabular-nums text-muted-foreground"
-                    />
-                  </div>
+            <>
+              <ul className="flex flex-col divide-y divide-border">
+                {rows.map((row) => (
+                  <li key={row.gid} className="flex items-center justify-between gap-3 py-2">
+                    {/* Single line, not stacked: amount carries the weight
+                        (font-semibold), the id/currency trail it as muted
+                        secondary text. min-w-0 + truncate on the trailing
+                        span is what lets this shrink gracefully at narrow
+                        widths instead of colliding with the actions — the
+                        browser's own ellipsis takes over once there's less
+                        room than the fixed head/tail cut already gives it. */}
+                    <div className="flex min-w-0 flex-1 items-center gap-x-2">
+                      {/* BACKEND GAP: the design puts the remitter's country
+                          flag (CountryFlagAvatar, resolved through useApp's
+                          countryCurrencyMap the way the transactions table's
+                          CountryCell does) before the amount. document-pending-list
+                          rows carry no country, so there is nothing to draw
+                          until the endpoint adds one. */}
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <CompactAmount
+                          amount={row.amount}
+                          currency={row.currency}
+                          className="text-sm font-semibold tabular-nums text-foreground"
+                        />
+                      </div>
+                      <span className="min-w-0 truncate text-xs text-muted-foreground">
+                        {row.customerName || truncateGid(row.gid)}
+                      </span>
+                    </div>
 
-                  {/* Neither button is solid-filled: a solid primary blue
-                      repeated three times down one card reads as three
-                      competing "most important thing on the page" signals,
-                      which is too loud for a row-level action. text-primary
-                      is what still marks Create as the row's default action
-                      over Link, without the heavy fill. */}
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 rounded-md border-primary/30 px-2.5 text-xs font-medium text-primary hover:bg-primary/5"
-                      onClick={() => handleCreateInvoice(row.merchantId, row.gid)}
-                    >
-                      Create invoice
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-7 rounded-md px-2.5 text-xs font-medium"
-                      onClick={() => setLinkingTxn(toLinkable(row))}
-                    >
-                      Link invoice
-                    </Button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                    {/* Link invoice stays a plain text link (variant="link",
+                        no border/background/shadow) — it's the secondary
+                        action. Create invoice is now the filled primary CTA,
+                        same compact pill shape McaTransactionTable's Refresh
+                        button uses (h-auto min-h-0 py-1), just on
+                        variant="primary" for the blue fill instead of
+                        outline. Order swapped to put the primary action last,
+                        closest to the row's trailing edge. */}
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto min-h-0 p-0 text-xs font-medium text-muted-foreground hover:text-foreground"
+                        onClick={() => setLinkingTxn(toLinkable(row))}
+                      >
+                        Link invoice
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        size="sm"
+                        className="h-auto min-h-0 shrink-0 py-1 text-xs font-medium"
+                        onClick={() => handleCreateInvoice(row.merchantId, row.gid)}
+                      >
+                        Create invoice
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <div className="flex-1" />
+            </>
           )}
         </div>
       </CardContent>

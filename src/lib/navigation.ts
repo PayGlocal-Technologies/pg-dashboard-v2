@@ -44,7 +44,9 @@ export const homeNavigation: NavGroup[] = [
         href: "/settings",
         icon: "settings",
         permission: [],
-        children: [{ label: "Team Management", href: "/team-management", permission: [] }],
+        children: [
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
+        ],
       },
     ],
   },
@@ -165,7 +167,8 @@ export const regularNavigation: NavGroup[] = [
         label: "Regularise Bills",
         href: "/shipping-bill-regularisation",
         icon: "file-text",
-        permission: ["showEdpms"],
+        // pg-dashboard's own gate for Regularise Bills (Sidebar/constants.ts).
+        permission: ["billRegularization"],
       },
       {
         label: "eBRC",
@@ -210,9 +213,9 @@ export const regularNavigation: NavGroup[] = [
         label: "Configure",
         href: "/configure",
         icon: "settings",
-        permission: ["ucicSearchV3", "getListOfMerchantKeys"],
+        permission: ["ucicSearchV3", "getListOfMerchantKeys", "userSearchV3"],
         children: [
-          { label: "Team Management", href: "/team-management", permission: ["ucicSearchV3"] },
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
           {
             label: "Key Management System",
             href: "/key-management-system",
@@ -294,7 +297,9 @@ export const mcaNavigation: NavGroup[] = [
           { label: "IRM Repository", href: "/irm-repository", permission: [] },
         ],
       },
-      { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: [] },
+      // This tree's name for the Payments tree's Regularise Bills, so it takes
+      // the same billRegularization gate pg-dashboard puts on that entry.
+      { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: ["billRegularization"] },
       // Same /mca-receipts page the Payments tree reaches under Payment Products and
       // Finance, labelled for what an MCA merchant comes here for: the GST
       // invoices PayGlocal raises against them. A compliance record in this tree,
@@ -320,7 +325,14 @@ export const mcaNavigation: NavGroup[] = [
         permission: ["getAllMcaClient"],
       },
       { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
-      { label: "Team management", href: "/team-management", icon: "user-plus", permission: [] },
+      // userSearchV3, the permission pg-dashboard's sidebar gates Team
+      // Management on in every menu (the page lists users through it).
+      {
+        label: "Team management",
+        href: "/team-management",
+        icon: "user-plus",
+        permission: ["userSearchV3"],
+      },
     ],
   },
 ];
@@ -364,9 +376,9 @@ export const partnerNavigation: NavGroup[] = [
         label: "Account Management",
         href: "/configure",
         icon: "settings",
-        permission: ["ucicSearchV3", "getListOfMerchantKeys"],
+        permission: ["ucicSearchV3", "getListOfMerchantKeys", "userSearchV3"],
         children: [
-          { label: "Team Management", href: "/team-management", permission: ["ucicSearchV3"] },
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
           {
             label: "Key Management System",
             href: "/key-management-system",
@@ -439,9 +451,9 @@ export const globalNavigation: NavGroup[] = [
         label: "Configure",
         href: "/configure",
         icon: "settings",
-        permission: ["ucicSearchV3", "getListOfMerchantKeys"],
+        permission: ["ucicSearchV3", "getListOfMerchantKeys", "userSearchV3"],
         children: [
-          { label: "Team Management", href: "/team-management", permission: ["ucicSearchV3"] },
+          { label: "Team Management", href: "/team-management", permission: ["userSearchV3"] },
           {
             label: "Key Management System",
             href: "/key-management-system",

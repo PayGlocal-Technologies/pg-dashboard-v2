@@ -27,6 +27,7 @@ import {
   GST_RATE_OPTIONS,
   LINE_ITEM_TYPE_OPTIONS,
 } from "@/features/dashboard/create-invoice/constants";
+import { resolveItemType } from "@/features/dashboard/create-invoice/helpers";
 import { useLineItemSuggestions } from "@/features/dashboard/create-invoice/hooks";
 import type { LineItemDraft, LineItemSuggestion } from "@/features/dashboard/create-invoice/types";
 
@@ -40,6 +41,7 @@ const EMPTY: LineItemValues = {
   unitPrice: "",
   quantity: "1",
   saveAsSku: false,
+  billing: "FIXED",
 };
 
 /** The fields a submit can be blocked on, in the order they appear in the form
@@ -67,8 +69,13 @@ function validate(values: LineItemValues): FieldErrors {
   const errors: FieldErrors = {};
   if (!values.type.trim()) errors.type = "Pick whether this is a good or a service.";
   if (!values.description.trim()) errors.description = "Give this item a name.";
-  if (!values.unitPrice.trim()) errors.unitPrice = "Enter the rate you are charging.";
-  if (!values.quantity.trim()) errors.quantity = "Enter a quantity.";
+  const hourly = values.billing === "HOURLY";
+  if (!values.unitPrice.trim())
+    errors.unitPrice = hourly ? "Enter your hourly rate." : "Enter the rate you are charging.";
+  if (!values.quantity.trim())
+    errors.quantity = hourly ? "Enter the hours worked." : "Enter a quantity.";
+  else if (hourly && !(Number(values.quantity) > 0))
+    errors.quantity = "Enter the hours as a number, e.g. 2.5.";
   // The catalogue rejects an item with no tax code, and the import that would
   // hit that rule runs after the invoice is already saved — so a blank one here
   // surfaces as a failure nothing on this screen can still fix. Ask now.
@@ -88,8 +95,11 @@ function validate(values: LineItemValues): FieldErrors {
  *
  * - Nova's item-type radio (Amount only / Quantity / Hours) is replaced by
  *   Good / Service. The API's `type` field is the SKU kind and drives SAC-vs-HSN
- *   validation; it has no concept of an hours-based item, so offering one would
- *   produce a value the server rejects.
+ *   validation; it has no concept of an hours-based item, so offering one as a
+ *   type would produce a value the server rejects. Hourly billing is instead a
+ *   separate, client-side choice on a service (Fixed / Hourly): hours travel
+ *   as the quantity and the hourly rate as the unit price, so the server sees
+ *   an ordinary line item with the same total.
  * - Nova's per-item discount is gone. `LineItem` has no field for it, so a
  *   discount entered per row would be silently dropped on save. Invoice-level
  *   discount lives in the totals footer, where the API does store it.
@@ -121,8 +131,12 @@ export function AddLineItemDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogTitle>{editingItem ? "Edit line item" : "Add line item"}</DialogTitle>
+      {/* Pinned header and footer around a scrolling body: with GST open the
+          fields outgrow a laptop screen, and Save must stay in view. */}
+      <DialogContent className="flex max-w-md flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle>{editingItem ? "Edit line item" : "Add line item"}</DialogTitle>
+        </div>
         <LineItemBody
           // Remount per open/target so the fields start from the right values
           // and no stale validation carries over.
@@ -161,17 +175,27 @@ function LineItemBody({
     editingItem
       ? {
           description: editingItem.description,
-          type: editingItem.type,
+          // Rows added from the inline picker before resolveItemType existed
+          // carry an empty type; fill it from the code where it can be told.
+          type: editingItem.type || resolveItemType(editingItem),
           hsn: editingItem.hsn,
           gstRate: editingItem.gstRate,
           unitPrice: editingItem.unitPrice,
           quantity: editingItem.quantity,
           saveAsSku: editingItem.saveAsSku ?? false,
+          billing: editingItem.billing ?? "FIXED",
         }
       : { ...EMPTY, description: initialDescription ?? EMPTY.description }
   );
   const [showGst, setShowGst] = useState(!!editingItem?.gstRate);
   const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  /**
+   * Set when the item was picked from the merchant's existing items and its
+   * type could be resolved: Good/Service is a property of that item, not a
+   * per-invoice choice, so the radios lock to it rather than asking again.
+   * Typing a different name makes it a new item and hands the choice back.
+   */
+  const [typeFromItem, setTypeFromItem] = useState(false);
 
   const suggestions = useLineItemSuggestions(currency);
 
@@ -256,223 +280,308 @@ function LineItemBody({
   }, [suggestions, values.description]);
 
   const isService = values.type === "SERVICE";
+  const isHourly = isService && values.billing === "HOURLY";
+  const hourlyTotal = isHourly ? Number(values.unitPrice) * Number(values.quantity) : NaN;
 
   return (
-    <div className="mt-4 space-y-4">
-      <Field>
-        <FieldLabel>Item type</FieldLabel>
-        <RadioGroup
-          value={values.type}
-          onValueChange={(next) => patch({ type: next })}
-          aria-invalid={!!errors.type || undefined}
-          // flex-row is explicit: RadioGroup defaults to flex-col, and a bare
-          // `flex` does not override a direction tailwind-merge sees no conflict
-          // with — without it the two options stack.
-          className="flex flex-row items-center gap-5"
-        >
-          {LINE_ITEM_TYPE_OPTIONS.map((option) => (
-            <label
-              key={option.value}
-              className="flex cursor-pointer items-center gap-2 text-[13.5px] font-medium text-foreground"
-            >
-              <RadioGroupItem value={option.value} id={`line-item-type-${option.value}`} />
-              {option.label}
-            </label>
-          ))}
-        </RadioGroup>
-        {errors.type && <FieldError>{errors.type}</FieldError>}
-      </Field>
+    <>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
+        <Field>
+          <FieldLabel>Item type</FieldLabel>
+          <RadioGroup
+            value={values.type}
+            onValueChange={(next) =>
+              // Hourly only applies to a service; a good goes back to per unit.
+              patch(next === "SERVICE" ? { type: next } : { type: next, billing: "FIXED" })
+            }
+            disabled={typeFromItem}
+            aria-invalid={!!errors.type || undefined}
+            // flex-row is explicit: RadioGroup defaults to flex-col, and a bare
+            // `flex` does not override a direction tailwind-merge sees no conflict
+            // with — without it the two options stack.
+            className="flex flex-row items-center gap-5"
+          >
+            {LINE_ITEM_TYPE_OPTIONS.map((option) => (
+              <label
+                key={option.value}
+                className={cn(
+                  "flex items-center gap-2 text-[13.5px] font-medium text-foreground",
+                  typeFromItem ? "cursor-default opacity-70" : "cursor-pointer"
+                )}
+              >
+                <RadioGroupItem value={option.value} id={`line-item-type-${option.value}`} />
+                {option.label}
+              </label>
+            ))}
+          </RadioGroup>
+          {typeFromItem && (
+            <p className="text-[11.5px] text-muted-foreground">Set by the saved item.</p>
+          )}
+          {errors.type && <FieldError>{errors.type}</FieldError>}
+        </Field>
 
-      {/* `modal` was how this popover got a scrollable list: it lives inside a
+        {/* Services only: a good is always sold by the unit. */}
+        {isService && (
+          <Field>
+            <FieldLabel>Billing</FieldLabel>
+            <RadioGroup
+              value={values.billing ?? "FIXED"}
+              onValueChange={(next) => patch({ billing: next as "FIXED" | "HOURLY" })}
+              className="flex flex-row items-center gap-5"
+            >
+              {(
+                [
+                  { value: "FIXED", label: "Fixed" },
+                  { value: "HOURLY", label: "Hourly" },
+                ] as const
+              ).map((option) => (
+                <label
+                  key={option.value}
+                  className="flex cursor-pointer items-center gap-2 text-[13.5px] font-medium text-foreground"
+                >
+                  <RadioGroupItem value={option.value} id={`line-item-billing-${option.value}`} />
+                  {option.label}
+                </label>
+              ))}
+            </RadioGroup>
+          </Field>
+        )}
+
+        {/* `modal` was how this popover got a scrollable list: it lives inside a
           Dialog, flux's PopoverContent portals to document.body — outside the
           Dialog's subtree — and the Dialog's react-remove-scroll lock cancels
           the wheel out there. flux 0.3.3 fixes that for every popover
           (ScrollLockTakeover in PopoverContent), so `modal` is no longer needed
           for scrolling. Kept because it also keeps the suggestion list as its
           own layer; drop it if this should stop trapping focus. */}
-      <Popover modal open={suggestionsOpen && matches.length > 0} onOpenChange={setSuggestionsOpen}>
-        <PopoverAnchor asChild>
-          <Field>
-            <FieldLabel htmlFor="line-item-name">Item name</FieldLabel>
-            <Input
-              id="line-item-name"
-              autoFocus
-              autoComplete="off"
-              placeholder="e.g. Logo design, Consulting fee…"
-              value={values.description}
-              onFocus={() => setSuggestionsOpen(true)}
-              onChange={(e) => {
-                patch({ description: e.target.value });
-                setSuggestionsOpen(true);
-              }}
-              aria-invalid={!!errors.description || undefined}
-            />
-            {errors.description && <FieldError>{errors.description}</FieldError>}
-          </Field>
-        </PopoverAnchor>
+        <Popover
+          modal
+          open={suggestionsOpen && matches.length > 0}
+          onOpenChange={setSuggestionsOpen}
+        >
+          <PopoverAnchor asChild>
+            <Field>
+              <FieldLabel htmlFor="line-item-name">Item name</FieldLabel>
+              <Input
+                id="line-item-name"
+                autoFocus
+                autoComplete="off"
+                className="shadow-none"
+                placeholder="e.g. Logo design, Consulting fee…"
+                value={values.description}
+                onFocus={() => setSuggestionsOpen(true)}
+                onChange={(e) => {
+                  patch({ description: e.target.value });
+                  setTypeFromItem(false);
+                  setSuggestionsOpen(true);
+                }}
+                aria-invalid={!!errors.description || undefined}
+              />
+              {errors.description && <FieldError>{errors.description}</FieldError>}
+            </Field>
+          </PopoverAnchor>
 
-        {/* Suggestions from the merchant's previous items. Picking one fills in
+          {/* Suggestions from the merchant's previous items. Picking one fills in
             the rate and HSN it was last billed at, which is the whole point of
             the endpoint — typing the name again should not mean retyping those. */}
-        <PopoverContent
-          align="start"
-          className="max-h-64 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
-          // Keep focus in the input so typing continues to filter.
-          onOpenAutoFocus={(e) => e.preventDefault()}
-        >
-          {matches.map(({ item: match, key }) => {
-            // The secondary line production shows: type, HSN and last rate,
-            // joined. It is the whole reason to pick a suggestion rather than
-            // retype the name, so it has to be visible *before* choosing.
-            const meta = [
-              match.type ? (match.type === "SERVICE" ? "Service" : "Good") : "",
-              match.hsn ? `${match.type === "SERVICE" ? "SAC" : "HSN"} ${match.hsn}` : "",
-              match.unitPrice ? `${currencySymbol}${match.unitPrice}` : "",
-            ]
-              .filter(Boolean)
-              .join(" · ");
+          <PopoverContent
+            align="start"
+            className="max-h-64 w-[var(--radix-popover-trigger-width)] overflow-y-auto p-1"
+            // Keep focus in the input so typing continues to filter.
+            onOpenAutoFocus={(e) => e.preventDefault()}
+          >
+            {matches.map(({ item: match, key }) => {
+              // The secondary line production shows: type, HSN and last rate,
+              // joined. It is the whole reason to pick a suggestion rather than
+              // retype the name, so it has to be visible *before* choosing.
+              const matchType = resolveItemType(match);
+              const meta = [
+                matchType ? (matchType === "SERVICE" ? "Service" : "Good") : "",
+                match.hsn ? `${matchType === "SERVICE" ? "SAC" : "HSN"} ${match.hsn}` : "",
+                match.unitPrice ? `${currencySymbol}${match.unitPrice}` : "",
+              ]
+                .filter(Boolean)
+                .join(" · ");
 
-            return (
-              <Button
-                key={key}
-                type="button"
-                variant="ghost"
-                className="h-auto w-full justify-start px-2 py-1.5 text-left [&>span]:min-w-0 [&>span]:flex-1"
-                onClick={() => {
-                  patch({
-                    description: match.name,
-                    unitPrice: match.unitPrice ?? values.unitPrice,
-                    hsn: match.hsn ?? values.hsn,
-                    type: match.type ?? values.type,
-                    // Production clears this on select: picking an item that is
-                    // already in the catalogue must not queue it for re-import.
-                    saveAsSku: false,
-                  });
-                  setSuggestionsOpen(false);
-                }}
-              >
-                <span className="block min-w-0">
-                  <span className="block truncate text-[13px] font-medium text-foreground">
-                    {match.name}
-                  </span>
-                  {meta && (
-                    <span className="block truncate text-[11.5px] font-normal text-muted-foreground">
-                      {meta}
+              return (
+                <Button
+                  key={key}
+                  type="button"
+                  variant="ghost"
+                  className="h-auto w-full justify-start px-2 py-1.5 text-left [&>span]:min-w-0 [&>span]:flex-1"
+                  onClick={() => {
+                    patch({
+                      description: match.name,
+                      unitPrice: match.unitPrice ?? values.unitPrice,
+                      hsn: match.hsn ?? values.hsn,
+                      type: matchType || values.type,
+                      // Production clears this on select: picking an item that is
+                      // already in the catalogue must not queue it for re-import.
+                      saveAsSku: false,
+                    });
+                    setTypeFromItem(!!matchType);
+                    setSuggestionsOpen(false);
+                  }}
+                >
+                  <span className="block min-w-0">
+                    <span className="block truncate text-[13px] font-medium text-foreground">
+                      {match.name}
                     </span>
-                  )}
-                </span>
-              </Button>
-            );
-          })}
-        </PopoverContent>
-      </Popover>
+                    {meta && (
+                      <span className="block truncate text-[11.5px] font-normal text-muted-foreground">
+                        {meta}
+                      </span>
+                    )}
+                  </span>
+                </Button>
+              );
+            })}
+          </PopoverContent>
+        </Popover>
 
-      <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Field>
+            <FieldLabel htmlFor="line-item-rate">{isHourly ? "Rate per hour" : "Rate"}</FieldLabel>
+            <InputGroup className="shadow-none">
+              <InputGroupAddon>
+                <InputGroupText>{currencySymbol}</InputGroupText>
+              </InputGroupAddon>
+              <InputGroupInput
+                id="line-item-rate"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={values.unitPrice}
+                onChange={(e) => patch({ unitPrice: e.target.value })}
+                aria-invalid={!!errors.unitPrice || undefined}
+              />
+              {isHourly && (
+                <InputGroupAddon align="inline-end">
+                  <InputGroupText>/ hr</InputGroupText>
+                </InputGroupAddon>
+              )}
+            </InputGroup>
+            {errors.unitPrice && <FieldError>{errors.unitPrice}</FieldError>}
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="line-item-qty">{isHourly ? "Hours" : "Quantity"}</FieldLabel>
+            {isHourly ? (
+              <InputGroup className="shadow-none">
+                <InputGroupInput
+                  id="line-item-qty"
+                  inputMode="decimal"
+                  placeholder="e.g. 2.5"
+                  value={values.quantity}
+                  onChange={(e) => patch({ quantity: e.target.value })}
+                  aria-invalid={!!errors.quantity || undefined}
+                />
+                <InputGroupAddon align="inline-end">
+                  <InputGroupText>hrs</InputGroupText>
+                </InputGroupAddon>
+              </InputGroup>
+            ) : (
+              <Input
+                id="line-item-qty"
+                inputMode="numeric"
+                className="shadow-none"
+                value={values.quantity}
+                onChange={(e) => patch({ quantity: e.target.value })}
+                aria-invalid={!!errors.quantity || undefined}
+              />
+            )}
+            {errors.quantity && <FieldError>{errors.quantity}</FieldError>}
+          </Field>
+        </div>
+
+        {/* The arithmetic spelled out, so hours × rate is visibly what lands on
+            the invoice (before GST). */}
+        {isHourly && Number.isFinite(hourlyTotal) && hourlyTotal > 0 && (
+          <p className="-mt-1 text-[12px] tabular-nums text-muted-foreground">
+            {values.quantity} hrs × {currencySymbol}
+            {values.unitPrice} / hr ={" "}
+            <span className="font-semibold text-foreground">
+              {currencySymbol}
+              {hourlyTotal.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+            </span>
+          </p>
+        )}
+
         <Field>
-          <FieldLabel htmlFor="line-item-rate">Rate</FieldLabel>
-          <InputGroup>
-            <InputGroupAddon>
-              <InputGroupText>{currencySymbol}</InputGroupText>
-            </InputGroupAddon>
-            <InputGroupInput
-              id="line-item-rate"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={values.unitPrice}
-              onChange={(e) => patch({ unitPrice: e.target.value })}
-              aria-invalid={!!errors.unitPrice || undefined}
-            />
-          </InputGroup>
-          {errors.unitPrice && <FieldError>{errors.unitPrice}</FieldError>}
-        </Field>
-
-        <Field>
-          <FieldLabel htmlFor="line-item-qty">Quantity</FieldLabel>
-          <Input
-            id="line-item-qty"
-            inputMode="numeric"
-            value={values.quantity}
-            onChange={(e) => patch({ quantity: e.target.value })}
-            aria-invalid={!!errors.quantity || undefined}
-          />
-          {errors.quantity && <FieldError>{errors.quantity}</FieldError>}
-        </Field>
-      </div>
-
-      <Field>
-        <FieldLabel htmlFor="line-item-hsn">
-          {isService ? "SAC code" : "HSN code"}
-          {/* Dropped rather than swapped for a required marker: every other
+          <FieldLabel htmlFor="line-item-hsn">
+            {isService ? "SAC code" : "HSN code"}
+            {/* Dropped rather than swapped for a required marker: every other
               required field in this dialog carries no marker, so the suffix
               going away is what "required" looks like here. */}
-          {!values.saveAsSku && (
-            <span className="font-normal text-muted-foreground"> (optional)</span>
-          )}
-        </FieldLabel>
-        <Input
-          id="line-item-hsn"
-          inputMode="numeric"
-          placeholder={isService ? "e.g. 998314" : "e.g. 8471"}
-          value={values.hsn}
-          onChange={(e) => patch({ hsn: e.target.value })}
-          aria-invalid={!!errors.hsn || undefined}
-        />
-        {errors.hsn && <FieldError>{errors.hsn}</FieldError>}
-      </Field>
+            {!values.saveAsSku && (
+              <span className="font-normal text-muted-foreground"> (optional)</span>
+            )}
+          </FieldLabel>
+          <Input
+            id="line-item-hsn"
+            inputMode="numeric"
+            className="shadow-none"
+            placeholder={isService ? "e.g. 998314" : "e.g. 8471"}
+            value={values.hsn}
+            onChange={(e) => patch({ hsn: e.target.value })}
+            aria-invalid={!!errors.hsn || undefined}
+          />
+          {errors.hsn && <FieldError>{errors.hsn}</FieldError>}
+        </Field>
 
-      <div className="space-y-1">
-        <div className={cn(showGst && "border-b border-border")}>
+        <div className="space-y-1">
+          <div className={cn(showGst && "border-b border-border")}>
+            <div className="flex items-center justify-between py-2">
+              <div className="flex items-center gap-2">
+                <p className="text-[13px] font-semibold text-foreground">Add GST</p>
+                <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  Optional
+                </span>
+              </div>
+              <Switch
+                checked={showGst}
+                onCheckedChange={(checked) => {
+                  setShowGst(checked);
+                  if (!checked) patch({ gstRate: "" });
+                }}
+                aria-label="Toggle GST"
+              />
+            </div>
+
+            {showGst && (
+              <div className="flex flex-wrap items-center gap-2 pb-3">
+                {GST_RATE_OPTIONS.filter((option) => option.value !== "").map((option) => (
+                  <Button
+                    key={option.value}
+                    type="button"
+                    variant={values.gstRate === option.value ? "primary" : "outline"}
+                    size="sm"
+                    className="rounded-full"
+                    onClick={() => patch({ gstRate: option.value })}
+                  >
+                    {option.label}
+                  </Button>
+                ))}
+              </div>
+            )}
+          </div>
+
           <div className="flex items-center justify-between py-2">
-            <div className="flex items-center gap-2">
-              <p className="text-[13px] font-semibold text-foreground">Add GST</p>
-              <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                Optional
-              </span>
+            <div>
+              <p className="text-[13px] font-semibold text-foreground">Save to SKU catalogue</p>
+              <p className="text-[11px] text-muted-foreground">
+                Reuse this item on future invoices without retyping it.
+              </p>
             </div>
             <Switch
-              checked={showGst}
-              onCheckedChange={(checked) => {
-                setShowGst(checked);
-                if (!checked) patch({ gstRate: "" });
-              }}
-              aria-label="Toggle GST"
+              checked={values.saveAsSku ?? false}
+              onCheckedChange={(checked) => patch({ saveAsSku: checked })}
+              aria-label="Save item to SKU catalogue"
             />
           </div>
-
-          {showGst && (
-            <div className="flex flex-wrap items-center gap-2 pb-3">
-              {GST_RATE_OPTIONS.filter((option) => option.value !== "").map((option) => (
-                <Button
-                  key={option.value}
-                  type="button"
-                  variant={values.gstRate === option.value ? "primary" : "outline"}
-                  size="sm"
-                  className="rounded-full"
-                  onClick={() => patch({ gstRate: option.value })}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="flex items-center justify-between py-2">
-          <div>
-            <p className="text-[13px] font-semibold text-foreground">Save to SKU catalogue</p>
-            <p className="text-[11px] text-muted-foreground">
-              Reuse this item on future invoices without retyping it.
-            </p>
-          </div>
-          <Switch
-            checked={values.saveAsSku ?? false}
-            onCheckedChange={(checked) => patch({ saveAsSku: checked })}
-            aria-label="Save item to SKU catalogue"
-          />
         </div>
       </div>
 
-      <div className="space-y-2 border-t border-border pt-4">
+      <div className="shrink-0 space-y-2 border-t border-border px-6 py-4">
         {/* Never disabled: a dead button cannot say why it is dead. Pressing it
             with something missing is what surfaces the messages above. */}
         <Button type="button" variant="primary" className="w-full" onClick={handleSubmit}>
@@ -482,7 +591,7 @@ function LineItemBody({
           Cancel
         </Button>
       </div>
-    </div>
+    </>
   );
 }
 

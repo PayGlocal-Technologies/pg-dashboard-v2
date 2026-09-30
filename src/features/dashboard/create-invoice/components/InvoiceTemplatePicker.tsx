@@ -88,7 +88,13 @@ export function InvoiceTemplatePicker({
         </div>
 
         {templates.length > 0 && (
-          <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={onManage}>
+          <Button
+            type="button"
+            variant="link"
+            size="sm"
+            className="h-auto p-0 text-[13px] font-medium"
+            onClick={onManage}
+          >
             Manage templates
           </Button>
         )}
@@ -106,7 +112,7 @@ export function InvoiceTemplatePicker({
               // sibling of the children wrapper; `[&>span]:min-w-0` is what lets
               // that wrapper shrink, so a long template name truncates instead
               // of pushing the chevron out of the button.
-              className="h-auto w-full justify-between px-3.5 py-2.5 text-left [&>span]:min-w-0 [&>span]:flex-1"
+              className="h-auto w-full justify-between px-3.5 py-2.5 text-left shadow-none [&>span]:min-w-0 [&>span]:flex-1"
               rightIcon={
                 <Icon
                   name="chevron-down"

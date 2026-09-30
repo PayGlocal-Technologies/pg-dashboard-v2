@@ -8,18 +8,14 @@ import type { ReferralSummary } from "@/features/dashboard/refer-and-earn/helper
  * be an icon-registry entry (that pattern is for SVG forwardRef components)
  * and goes through `next/image` instead — see CLAUDE.md's Images rule.
  *
- * The file's own ratio (1463:1075, ≈1.36:1) is taller than the card's fixed
- * 16:9 frame, so `object-cover` has to crop it vertically to fill the frame —
- * there is no ratio that avoids that once the card's own ratio is fixed. The
- * crop is anchored to the bottom (see the `object-bottom` below) rather than
- * centred, because the top of this asset is empty gradient with nothing in it,
- * while the jar sits low in the frame with a soft shadow beneath it — bottom
- * anchoring is what loses only the empty part and keeps the jar whole.
+ * The file's own ratio (1344:756) is exactly 16:9, matching the card's own
+ * fixed aspect-video frame, so `object-cover` here is just a safety net
+ * against any future asset swap rather than doing real cropping work.
  */
 const TOTAL_EARNED_BACKGROUND = {
-  src: "/assets/Total Earned2.png",
-  width: 1463,
-  height: 1075,
+  src: "/assets/total earning.png",
+  width: 1344,
+  height: 756,
 } as const;
 
 interface ReferralTotalsCardProps {
@@ -50,7 +46,7 @@ export function ReferralTotalsCard({ summary }: ReferralTotalsCardProps) {
         alt=""
         fill
         sizes="(min-width: 1024px) 21rem, (min-width: 768px) 17rem, 100vw"
-        className="-z-10 object-cover object-bottom"
+        className="-z-10 object-cover"
       />
 
       {/* Upper-left, on the asset's own light corner. Capped at 60% of the

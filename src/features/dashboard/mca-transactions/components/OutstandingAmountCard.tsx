@@ -5,13 +5,14 @@ import {
   Button,
   Card,
   CardContent,
+  Separator,
   Shimmer,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
@@ -33,16 +34,19 @@ function currencyLabel(currency: string): string {
  * expandable per-currency breakdown.
  *
  * The headline amount + count come from the document-pending endpoint for the
- * given `timeframe`. The "By currency" breakdown is a separate live snapshot of
- * everything currently DOCUMENT_PENDING (no timeframe), so it's labelled as such
- * to keep the two figures from being read as the same window.
+ * given `timeframe`, and the "By currency" breakdown from
+ * document-pending-by-currency for the same window, so the two always agree.
+ * Only when no timeframe is passed (International Accounts) does the breakdown
+ * fall back to the endpoint's live snapshot of everything currently pending.
  */
 export function OutstandingAmountCard({
   className,
-  /** today | week | month | ytd. Defaults to ytd for the aggregate placements
-   *  (e.g. International Accounts) that have no time-range control of their own;
-   *  the Transactions analytics section passes its selected range through. */
-  timeframe = "ytd",
+  /** today | week | month | ytd. The Transactions analytics section passes its
+   *  selected range through, and both calls follow it. Placements with no
+   *  time-range control of their own (International Accounts) omit it: the
+   *  headline then defaults to ytd and the by-currency call sends no timeframe,
+   *  keeping its currently-pending snapshot. */
+  timeframe,
   /** When set (e.g. the International Accounts page, keyed to the selected
    *  region), the headline shows that one currency's pending slice from the
    *  by-currency snapshot instead of the timeframe total, and the per-currency
@@ -71,8 +75,8 @@ export function OutstandingAmountCard({
   badgePlacement?: "title" | "below-amount";
   dangerTint?: boolean;
 }) {
-  const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe);
-  const { breakdown, isLoading: isBreakdownLoading } = useDocumentPendingByCurrency();
+  const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe ?? "ytd");
+  const { breakdown, isLoading: isBreakdownLoading } = useDocumentPendingByCurrency(timeframe);
 
   const isCurrencyScoped = !!scopedCurrency;
   const scopedRow = isCurrencyScoped
@@ -122,9 +126,22 @@ export function OutstandingAmountCard({
             {/* h-12 w-12/rounded-full/amber-500 at 10% opacity: the same subtle
                 tinted-circle treatment as Saved Amount's green version, amber for
                 "pending". */}
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-              <Icon name="clock" size={22} />
-            </span>
+            {/* Nothing pending: the shared "no metric data" artwork in the same
+                slot and size, instead of the clock. */}
+            {!isLoading && amount === 0 && pendingCount === 0 ? (
+              <AppImage
+                src="/assets/No data(metric usage).png"
+                alt=""
+                width={48}
+                height={48}
+                unoptimized
+                className="h-12 w-12 shrink-0"
+              />
+            ) : (
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                <Icon name="clock" size={22} />
+              </span>
+            )}
           </div>
         )}
 
@@ -134,7 +151,7 @@ export function OutstandingAmountCard({
             header on this page was brought in line with. */}
         <div className={hideIcon ? undefined : "mt-4"}>
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-normal text-muted-foreground">Documents pending</p>
+            <p className="text-sm font-normal text-muted-foreground">Invoice required</p>
             {badgePlacement === "title" && badge}
           </div>
           {isLoading ? (
@@ -163,17 +180,23 @@ export function OutstandingAmountCard({
             already *is* "how many need an invoice before the next
             settlement" — no separate number to reconcile. */}
         {!isCurrencyScoped && !isLoading && pendingCount > 0 && (
-          <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-            {pendingCount === 1 ? "This transaction needs" : "These transactions need"} an invoice
-            before {pendingCount === 1 ? "it" : "they"} can be included in the next settlement.
-          </p>
+          // Same "N transaction(s) need an invoice uploaded before it/they
+          // can be included in <settlement>" line the settlement cards use
+          // (see SettlementStatCards) — one wording for the same fact
+          // wherever it shows up, rather than a differently-phrased version
+          // here.
+          <>
+            <Separator className="mt-3" />
+            <p className="pt-2.5 text-xs leading-relaxed text-muted-foreground">
+              {pendingCount} transaction{pendingCount === 1 ? "" : "s"} need
+              {pendingCount === 1 ? "s" : ""} an invoice uploaded before{" "}
+              {pendingCount === 1 ? "it" : "they"} can be included in the next settlement.
+            </p>
+          </>
         )}
 
-        {/* Per-currency breakdown of what's currently pending — a snapshot, not
-            scoped to the timeframe above, so it's named that way (and, unlike
-            the headline KPI, it does not change when the section's time-range
-            control changes — useDocumentPendingByCurrency takes no timeframe
-            argument at all).
+        {/* Per-currency breakdown of what's pending, for the same timeframe as
+            the headline above (it follows the section's time-range control).
 
             A hover tooltip now, not an always-visible list and not a
             click-to-expand one either: both of those put the row list in
@@ -194,39 +217,37 @@ export function OutstandingAmountCard({
           // beneath it — grounded to the bottom, not floating with a gap
           // under it.
           <div className="mt-auto border-t border-border pt-3">
-            <TooltipProvider delayDuration={200}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    className="h-auto min-h-0 w-auto p-0 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
-                  >
-                    Currently pending by currency
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" align="start" className="w-64 max-w-none p-3">
-                  <ul className="space-y-2">
-                    {currencyRows.map((row) => (
-                      <li
-                        key={row.currency}
-                        className="flex items-center justify-between gap-3 text-[13px]"
-                      >
-                        <span className="min-w-0 truncate font-medium text-popover-foreground">
-                          {currencyLabel(row.currency)}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-auto min-h-0 w-auto p-0 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
+                >
+                  {timeframe ? "Pending by currency" : "Currently pending by currency"}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="start" className="w-64 max-w-none p-3">
+                <ul className="space-y-2">
+                  {currencyRows.map((row) => (
+                    <li
+                      key={row.currency}
+                      className="flex items-center justify-between gap-3 text-[13px]"
+                    >
+                      <span className="min-w-0 truncate font-medium text-popover-foreground">
+                        {currencyLabel(row.currency)}
+                      </span>
+                      <span className="shrink-0 tabular-nums text-muted-foreground">
+                        {formatCurrency(row.amount, displayCurrency, "en-IN")}
+                        <span className="ml-1.5 text-[11px]">
+                          · {row.count.toLocaleString("en-IN")}
                         </span>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">
-                          {formatCurrency(row.amount, displayCurrency, "en-IN")}
-                          <span className="ml-1.5 text-[11px]">
-                            · {row.count.toLocaleString("en-IN")}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </TooltipContent>
+            </Tooltip>
           </div>
         )}
       </CardContent>

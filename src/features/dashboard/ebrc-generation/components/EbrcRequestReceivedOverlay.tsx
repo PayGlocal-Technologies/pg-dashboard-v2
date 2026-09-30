@@ -54,7 +54,7 @@ export function EbrcRequestReceivedOverlay({
         role="dialog"
         aria-modal="true"
         aria-labelledby="ebrc-request-received-title"
-        className="fixed inset-0 z-100 flex items-center justify-center p-6"
+        className="fixed inset-0 z-100 flex items-center justify-center bg-background p-6"
       >
         <AppImage
           src="/assets/bg image.png"
@@ -62,7 +62,9 @@ export function EbrcRequestReceivedOverlay({
           fill
           sizes="100vw"
           priority
-          className="-z-10 object-cover"
+          // Faded toward bg-background in dark mode, the same strength
+          // .brand-backdrop uses, so the light artwork isn't a bright page.
+          className="-z-10 object-cover dark:opacity-10"
         />
 
         <Card className="w-full max-w-sm rounded-2xl p-6 text-center shadow-lg">

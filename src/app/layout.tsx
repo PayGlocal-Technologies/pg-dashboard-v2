@@ -24,7 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         {/* apiBasePath must be prefixed by hand. Lumen's client defaults it to
             "/api/lumen", which is the path its route handler would sit at in an
             app served from the root — this one is served from BASE_PATH, so the
-            handler is really at "/app-v2/api/lumen" and the default 404s on
+            handler is really at "/hub/api/lumen" and the default 404s on
             every call (auth, usage, publish, upload, and the chat SSE). Next
             cannot fix this for us: the value is a fetch URL inside a
             node_modules component, not a next/link or next/navigation call. */}

@@ -2,7 +2,12 @@
 
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Card } from "@/components/ui";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { invoiceTrend } from "@/features/dashboard/mca-home/mock-data";
+
+// BACKEND GAP: Invoice Trend (spec 4.2) has no endpoint, so this card is kept ready but is
+// not in the widget catalog; it only ever renders mock-data.ts. Offer it again
+// (widget-catalog.ts + McaDashboardWidgetRenderer) once the endpoint exists.
 
 function InvoiceTrendTooltip({
   active,
@@ -46,7 +51,7 @@ export function McaInvoiceTrendCard() {
             barGap={2}
             margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="4 6" stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid horizontal={DotGridLine} vertical={false} />
             <XAxis
               dataKey="month"
               axisLine={false}

@@ -9,7 +9,6 @@ import {
   Separator,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -66,22 +65,20 @@ export function SettlementBreakdown({ data }: { data: FxSettlementEvent | undefi
                   touch devices instead of only on hover. stopPropagation
                   keeps a tap/click here from also toggling the accordion
                   this whole row sits inside AccordionTrigger's own button. */}
-              <TooltipProvider delayDuration={200}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span
-                      tabIndex={0}
-                      onClick={(e) => e.stopPropagation()}
-                      className="cursor-help whitespace-nowrap text-[12px] text-muted-foreground underline decoration-dotted underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
-                    >
-                      (using live FX)
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="text-xs">
-                    Settled at FX: {data.conversionRate}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    tabIndex={0}
+                    onClick={(e) => e.stopPropagation()}
+                    className="cursor-help whitespace-nowrap text-[12px] text-muted-foreground underline decoration-dotted underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+                  >
+                    (using live FX)
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="text-xs">
+                  Settled at FX: {data.conversionRate}
+                </TooltipContent>
+              </Tooltip>
               {discount > 0 && (
                 <Badge variant="success" size="sm">
                   Saved {inrSymbol}

@@ -6,7 +6,6 @@ import {
   Checkbox,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -105,17 +104,15 @@ export function LinkConsentFooter({
           Cancel
         </Button>
         {disabledReason ? (
-          <TooltipProvider delayDuration={200}>
-            <Tooltip>
-              {/* The span is the trigger, not the button — see the className note
-                  above. inline-flex so it wraps the button without changing its
-                  box. */}
-              <TooltipTrigger asChild>
-                <span className="inline-flex">{action}</span>
-              </TooltipTrigger>
-              <TooltipContent>{disabledReason}</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <Tooltip>
+            {/* The span is the trigger, not the button — see the className note
+                above. inline-flex so it wraps the button without changing its
+                box. */}
+            <TooltipTrigger asChild>
+              <span className="inline-flex">{action}</span>
+            </TooltipTrigger>
+            <TooltipContent>{disabledReason}</TooltipContent>
+          </Tooltip>
         ) : (
           action
         )}

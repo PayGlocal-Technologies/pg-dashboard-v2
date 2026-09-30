@@ -117,8 +117,8 @@ export function EbrcGenerationFeature() {
           subtitle="Check the status of your eBRC requests"
           actions={
             // "Bulk Upload" no longer sits beside this as its own button —
-            // that same flow ("Upload an Excel file" here) is now one of the
-            // two ways to generate, both reached from this one entry point
+            // that same flow ("Upload Bulk" here, an Excel file) is now one
+            // of the two ways to generate, both reached from this one entry point
             // instead of two separate ones.
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -134,7 +134,7 @@ export function EbrcGenerationFeature() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onSelect={() => setBulkUploadOpen(true)}>
                   <Icon name="upload" className="h-3.5 w-3.5" />
-                  Upload an Excel file
+                  Upload Bulk
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => router.push("/ebrc-generation/generate")}>
                   <Icon name="list-checks" className="h-3.5 w-3.5" />

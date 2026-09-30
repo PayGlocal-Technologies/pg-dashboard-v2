@@ -5,6 +5,7 @@ import { Card } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CompactAmount } from "@/components/common/CompactAmount";
+import { DecorativeTrendGlyph } from "@/components/common/charts/DecorativeTrendGlyph";
 import { useInvoiceOrigins } from "@/features/dashboard/mca-transactions/hooks";
 
 /** Last 30 days, once on mount (no `new Date()` in render). */
@@ -21,7 +22,10 @@ function buildLast30Range(): { startDate: string; endDate: string } {
  * a muted "· Last 30 days" suffix), since neither card has the timeframe control
  * the Transactions card above them does. Value + trend come from the live
  * invoice-origins totals (no time-series endpoint — invoice-origins returns one
- * figure for the whole range, so there's no real sparkline to draw).
+ * figure for the whole range, so there's no real sparkline to draw). The space
+ * that would hold one instead gets DecorativeTrendGlyph — the same
+ * not-real-data-but-agrees-with-the-number flourish McaInvoiceOriginsCard uses
+ * for the same reason, rather than leaving the card looking unfinished.
  */
 export function McaTotalInvoicedCard() {
   const [range] = useState(buildLast30Range);
@@ -36,7 +40,7 @@ export function McaTotalInvoicedCard() {
   const positive = hasTrend && trendPct >= 0;
 
   return (
-    <Card className="h-full gap-2 p-5">
+    <Card className="flex h-full flex-col gap-2 p-5">
       <h2 className="text-sm font-semibold text-foreground">
         Total invoiced{" "}
         <span className="text-xs font-normal text-muted-foreground">· Last 30 days</span>
@@ -68,6 +72,13 @@ export function McaTotalInvoicedCard() {
             </span>
           </div>
         )}
+      </div>
+
+      <div className="mt-1 flex flex-1 items-end">
+        {/* Only beside a real trend: with none (loading, nothing invoiced, no
+            trend field) `positive` is false, which would draw a falling curve
+            no data backs. The wrapper stays so the card keeps its height. */}
+        {hasTrend && <DecorativeTrendGlyph positive={positive} />}
       </div>
     </Card>
   );

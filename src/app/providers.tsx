@@ -3,6 +3,7 @@
 import { type ReactNode, useEffect, useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { TooltipProvider } from "@/components/ui";
 import { ThemeProvider } from "@/components/theme/ThemeProvider";
 import { AppToaster } from "@/components/theme/AppToaster";
 import { useProductContext } from "@/stores/useProductContext";
@@ -39,8 +40,13 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        {children}
-        <AppToaster />
+        {/* One app-wide tooltip provider, as Radix intends. flux's <Tooltip> is
+            the bare Radix root and throws at render without one, so no feature
+            mounts its own. */}
+        <TooltipProvider delayDuration={200}>
+          {children}
+          <AppToaster />
+        </TooltipProvider>
       </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-right" />
     </QueryClientProvider>

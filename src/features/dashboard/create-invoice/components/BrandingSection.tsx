@@ -28,7 +28,7 @@ function withSelected<T extends { name: string }>(options: T[], selected: T): T[
 
 /**
  * Branding options — invoice theme, brand colours, logo and signature.
- * Renders nothing until the preview sidebar's "Customise template" button
+ * Renders nothing until the preview sidebar's "Customise branding" button
  * opens it (see `expanded`); there is no tab or accordion header of its own
  * any more, so once open this is just the details, directly under the
  * Document/Email tabs it changes the look of.
@@ -78,7 +78,7 @@ export function BrandingSection({
   /** Puts the colour pair back to the server's own default. */
   onResetColors: () => void;
   onOpenUpload: (type: "LOGO" | "SIGNATURE") => void;
-  /** Entirely controlled by the preview sidebar's "Customise template"
+  /** Entirely controlled by the preview sidebar's "Customise branding"
    *  button now — there's no "Advanced branding options" tab/trigger of its
    *  own any more, so this renders nothing at all until that button says
    *  otherwise. */

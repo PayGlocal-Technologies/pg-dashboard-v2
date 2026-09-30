@@ -12,7 +12,7 @@
  * navigation — `window.location.href = "/login"` is handed straight to the
  * browser — which is what withBasePath below is for.
  */
-export const BASE_PATH = "/app-v2";
+export const BASE_PATH = "/hub";
 
 /**
  * Paths on this host that belong to something other than this app, and so must

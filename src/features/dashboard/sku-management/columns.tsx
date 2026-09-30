@@ -62,10 +62,10 @@ export function buildSkuColumns(
       header: "Product",
       // The floor, not the final width: `tableLayout="content"` sizes this
       // column to its widest cell, and min-w-max below keeps that measurement
-      // honest, so the longest product name sets the column width. 340 covers
-      // the 70px thumbnail plus a typical name, so the column doesn't jump
-      // around while the table is still filling in.
-      minWidth: 340,
+      // honest, so the longest product name sets the column width. 260 covers
+      // the 32px table-row thumbnail (see ProductThumbnail's className
+      // override below) plus a typical name.
+      minWidth: 260,
       // Compact density puts overflow-hidden on every cell, which would clip
       // the un-wrapped name back to the column's current width and defeat the
       // min-w-max measurement — cancelled here, same as mcaColumns does for
@@ -76,7 +76,15 @@ export function buildSkuColumns(
           {/* min-w-max: the cell never shrinks below thumbnail + full name, so
               the column widens to fit rather than truncating or wrapping. */}
           <div className="flex min-w-max items-center gap-3" data-guide="mca-sku-image">
-            <ProductThumbnail product={row} className="shrink-0" />
+            {/* 32px, not the component's 70px default (used by the mobile
+                card list) — a row in a compact-density table (44px min
+                height) is much shorter than a card, and 70px was taller
+                than the row itself. */}
+            <ProductThumbnail
+              product={row}
+              className="h-8 w-8 rounded-md"
+              iconClassName="h-3.5 w-3.5"
+            />
             <span className="text-[13px] font-medium whitespace-nowrap text-foreground">
               {row.name}
             </span>
@@ -101,7 +109,7 @@ export function buildSkuColumns(
     {
       key: "type",
       header: "Type of product",
-      minWidth: 150,
+      minWidth: 120,
       render: (row) => (
         <StatusBadge
           variant={row.type === "GOODS" ? "info" : "muted"}
@@ -113,7 +121,7 @@ export function buildSkuColumns(
     {
       key: "hsnSac",
       header: "HSN/SAC",
-      minWidth: 130,
+      minWidth: 100,
       render: (row) => (
         <span className="text-[13px] tabular-nums whitespace-nowrap text-muted-foreground">
           {row.hsnSac}
@@ -123,7 +131,7 @@ export function buildSkuColumns(
     {
       key: "sellingPrice",
       header: SELLING_PRICE_HEADER,
-      minWidth: 140,
+      minWidth: 110,
       align: "right",
       // Compact density clips cells; the trigger's hover fill sits slightly
       // proud of the text box and would be cut off without this.
@@ -143,7 +151,7 @@ export function buildSkuColumns(
     {
       key: "productCost",
       header: PRODUCT_COST_HEADER,
-      minWidth: 140,
+      minWidth: 110,
       align: "right",
       cellClassName: "overflow-visible",
       render: (row) => (

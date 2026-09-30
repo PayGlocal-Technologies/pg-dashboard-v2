@@ -13,6 +13,7 @@ export const MCA_TRANSACTIONS_GUIDE_KEY = "mca-transactions-v2";
 export const MCA_TRANSACTIONS_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-txn-analytics",
+    chip: { label: "Analytics", icon: "bar-chart" },
     title: "View analytics",
     description: "Get a quick overview of how your virtual accounts are performing.",
     side: "bottom",
@@ -20,6 +21,7 @@ export const MCA_TRANSACTIONS_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "mca-txn-upload-invoice",
+    chip: { label: "Invoices", icon: "upload" },
     title: "Upload invoice to settle",
     description:
       "Upload an invoice directly from the table to move the transaction toward settlement.",
@@ -40,6 +42,7 @@ export const TXN_DETAIL_GUIDE_KEY = "mca-txn-detail-v2";
 export const TXN_DETAIL_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-txn-detail-expand",
+    chip: { label: "Transactions", icon: "expand" },
     title: "Detailed view",
     description: "See the details and settlement status for this transaction.",
     side: "bottom",

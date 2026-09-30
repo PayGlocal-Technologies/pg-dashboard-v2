@@ -17,6 +17,7 @@ export const SKU_GUIDE_KEY = "sku-management-v2";
 export const SKU_GUIDE_STEPS: GuideStep[] = [
   {
     target: "mca-sku-image",
+    chip: { label: "SKU management", icon: "package" },
     title: "Add images to your SKU",
     description:
       "Add an image to your SKUs to easily identify your products and services. Edit product → Media.",

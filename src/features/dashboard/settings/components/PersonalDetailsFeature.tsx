@@ -176,10 +176,15 @@ export function PersonalDetailsFeature() {
                 <span className="text-sm font-semibold text-foreground">{email}</span>
               )}
               {/* Gated on a known current address: step 1 mails the code there,
-                  and the first screen has nothing to show without it. */}
+                  and the first screen has nothing to show without it. A plain
+                  text link, not an outlined button — a full-weight button for
+                  a single word like "Edit" drew more attention than the
+                  email address it sits beside. */}
               <Button
-                variant="outline"
+                type="button"
+                variant="link"
                 size="sm"
+                className="h-auto min-h-0 p-0 text-[13px] font-medium"
                 onClick={() => setChangingEmail(true)}
                 disabled={isLoading || email === "Not available"}
               >
@@ -193,7 +198,13 @@ export function PersonalDetailsFeature() {
             <p className="text-sm text-muted-foreground">Password</p>
             <div className="flex items-center gap-3">
               <span className="font-mono text-sm text-foreground">••••••••••••</span>
-              <Button variant="outline" size="sm" onClick={() => setPasswordDialogOpen(true)}>
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                className="h-auto min-h-0 p-0 text-[13px] font-medium"
+                onClick={() => setPasswordDialogOpen(true)}
+              >
                 Change password
               </Button>
             </div>

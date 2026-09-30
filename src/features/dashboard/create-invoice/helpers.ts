@@ -16,6 +16,7 @@ import type {
   InvoiceTemplateSnapshot,
   InvoiceTheme,
   LineItemDraft,
+  LineItemSuggestion,
   TemplateWriteBody,
   ThemeMetadata,
 } from "@/features/dashboard/create-invoice/types";
@@ -119,6 +120,25 @@ export const isLineItemComplete = (item: LineItemDraft): boolean =>
   !!item.unitPrice?.trim() &&
   !!item.quantity?.trim() &&
   !!item.type?.trim();
+
+/**
+ * The Good/Service type an existing item carries, so picking it never asks.
+ *
+ * get-line-items returns `type: null` for items billed before the field
+ * existed (the SKU catalogue has the same gap, see sku-management/types.ts),
+ * which is why picking "Table" from the list used to leave both radios
+ * empty. Where the API says, that wins. Where it does not, the tax code
+ * settles it: every SAC (services) code sits in chapter 99, and no HSN
+ * (goods) code does, so a 99-prefixed code is a service and any other code
+ * is a good. With neither, there is nothing to go on and the merchant
+ * still chooses.
+ */
+export const resolveItemType = (item: Pick<LineItemSuggestion, "type" | "hsn">): string => {
+  if (item.type === "GOOD" || item.type === "SERVICE") return item.type;
+  const code = item.hsn?.replace(/\s/g, "") ?? "";
+  if (!/^\d{4,8}$/.test(code)) return "";
+  return code.startsWith("99") ? "SERVICE" : "GOOD";
+};
 
 export const hasCompleteLineItems = (items: LineItemDraft[]): boolean =>
   items.length > 0 && items.every(isLineItemComplete);

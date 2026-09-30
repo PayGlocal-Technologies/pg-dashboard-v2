@@ -7,7 +7,6 @@ import { useForm, useStore } from "@tanstack/react-form";
 import {
   Accordion,
   Button,
-  Card,
   Checkbox,
   CountrySelect,
   Field,
@@ -25,7 +24,6 @@ import {
   StatusBadge,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
@@ -61,7 +59,7 @@ import {
 } from "@/features/dashboard/payment-button/hooks";
 import { PaymentButtonNotEnabled } from "@/features/dashboard/payment-button/components/PaymentButtonNotEnabled";
 import { MidGuard } from "@/components/common/MidGuard";
-import { MidChoiceList } from "@/components/common/MidScopedAction";
+import { SelectMidView } from "@/components/common/SelectMidView";
 import {
   validateButtonAmount,
   validateButtonLabel,
@@ -94,21 +92,19 @@ import type {
  */
 function InfoTip({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            aria-label={label}
-            className="h-4 w-4 min-h-0 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
-          >
-            <Icon name="info" className="h-3.5 w-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-[240px]">{children}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label={label}
+          className="h-4 w-4 min-h-0 shrink-0 rounded-full p-0 text-muted-foreground hover:bg-transparent hover:text-foreground"
+        >
+          <Icon name="info" className="h-3.5 w-3.5" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent className="max-w-[240px]">{children}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -792,14 +788,12 @@ function CreatePaymentButtonEditor({ mid }: { mid: string }) {
 function NeedsCreatedButton({ ready, children }: { ready: boolean; children: ReactNode }) {
   if (ready) return <>{children}</>;
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span tabIndex={0}>{children}</span>
-        </TooltipTrigger>
-        <TooltipContent>Available once the button is created</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0}>{children}</span>
+      </TooltipTrigger>
+      <TooltipContent>Available once the button is created</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -863,24 +857,14 @@ export function CreatePaymentButtonFeature() {
     return (
       <EditorGateShell>
         <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
-          <Card className="gap-3 p-5">
-            <div>
-              <h2 className="text-[15px] font-semibold text-foreground">Which account?</h2>
-              <p className="mt-0.5 text-[13px] text-muted-foreground">
-                {midOptions.length > 0
-                  ? "You hold more than one. Pick the one this payment button belongs to."
-                  : "None of your accounts can create payment buttons yet."}
-              </p>
-            </div>
-            {midOptions.length > 0 && (
-              <MidChoiceList
-                midOptions={midOptions}
-                onSelect={(choice) =>
-                  router.replace(`/payment-button/create?mid=${encodeURIComponent(choice)}`)
-                }
-              />
-            )}
-          </Card>
+          <SelectMidView
+            midType="PA"
+            midOptions={midOptions}
+            onSelectMid={(choice) =>
+              router.replace(`/payment-button/create?mid=${encodeURIComponent(choice)}`)
+            }
+            showSidebarHint={false}
+          />
         </MidGuard>
       </EditorGateShell>
     );

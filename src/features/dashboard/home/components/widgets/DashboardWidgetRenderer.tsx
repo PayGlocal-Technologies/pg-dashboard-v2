@@ -23,6 +23,7 @@ import {
 import { ChartSkeleton, DataTable, type Column } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import type { WidgetId } from "@/features/dashboard/home/widget-catalog";
 import {
   countryInsights,
@@ -148,7 +149,7 @@ function BarChartCard({
       ) : (
         <ResponsiveContainer width="100%" height={height}>
           <BarChart data={data} barCategoryGap="22%" barGap={2}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+            <CartesianGrid horizontal={DotGridLine} vertical={false} />
             <XAxis
               dataKey={xKey}
               axisLine={false}
@@ -604,7 +605,7 @@ export function DashboardWidgetRenderer({
           <div className="h-[188px] w-full min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={ht}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                <CartesianGrid horizontal={DotGridLine} vertical={false} />
                 <XAxis
                   dataKey="t"
                   tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
@@ -720,7 +721,7 @@ export function DashboardWidgetRenderer({
                 barCategoryGap="18%"
                 margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                <CartesianGrid horizontal={DotGridLine} vertical={false} />
                 <XAxis
                   dataKey="bucket"
                   tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
@@ -774,11 +775,7 @@ export function DashboardWidgetRenderer({
                 data={paymentFailureReasons}
                 margin={{ left: 4, right: 16, top: 4, bottom: 4 }}
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="var(--chart-grid)"
-                  horizontal={false}
-                />
+                <CartesianGrid horizontal={false} vertical={DotGridLine} />
                 <XAxis type="number" domain={[0, maxCount]} hide />
                 <YAxis
                   type="category"

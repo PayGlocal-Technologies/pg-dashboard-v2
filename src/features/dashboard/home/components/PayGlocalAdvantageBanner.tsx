@@ -531,8 +531,8 @@ export function PayGlocalAdvantageBanner({
       </motion.div>
 
       <Dialog open={insightModalOpen} onOpenChange={setInsightModalOpen}>
-        <DialogContent className="max-w-[calc(100%-1.5rem)] gap-0 overflow-hidden p-0 sm:h-[min(88vh,740px)] sm:max-w-2xl">
-          <div className="relative overflow-hidden border-b border-border/80 bg-gradient-to-r from-primary/[0.12] via-primary/[0.06] to-transparent px-5 pb-4 pt-5 sm:px-6">
+        <DialogContent className="flex max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:h-[min(88vh,740px)] sm:max-w-2xl">
+          <div className="relative shrink-0 overflow-hidden border-b border-border/80 bg-gradient-to-r from-primary/[0.12] via-primary/[0.06] to-transparent px-5 pb-4 pt-5 sm:px-6">
             <div
               className="absolute inset-0 bg-gradient-to-b from-transparent to-background/[0.35]"
               aria-hidden
@@ -550,7 +550,7 @@ export function PayGlocalAdvantageBanner({
             </div>
           </div>
 
-          <div className="space-y-4 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4 sm:px-6 sm:py-5">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={modalInsight.headline}
@@ -657,7 +657,7 @@ export function PayGlocalAdvantageBanner({
             </div>
           </div>
 
-          <div className="flex flex-col-reverse gap-2 border-t border-border/80 bg-muted/25 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
+          <div className="flex shrink-0 flex-col-reverse gap-2 border-t border-border/80 bg-muted/25 px-5 py-3 sm:flex-row sm:items-center sm:justify-end sm:px-6">
             <Button
               variant="primary"
               size="sm"

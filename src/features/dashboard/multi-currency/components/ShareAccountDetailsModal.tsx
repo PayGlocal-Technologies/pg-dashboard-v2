@@ -22,7 +22,6 @@ import {
   TabsTrigger,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
   VisuallyHidden,
 } from "@/components/ui";
@@ -283,27 +282,25 @@ export function ShareAccountDetailsModal({
                     there is nothing to open before then. Wrapped in a span so
                     the tooltip still triggers while disabled: a native disabled
                     button suppresses pointer events entirely. */}
-                <TooltipProvider delayDuration={200}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={!shareUrl || isRequesting}
-                          onClick={() => window.open(shareUrl, "_blank", "noopener,noreferrer")}
-                          rightIcon={<Icon name="arrow-up-right" className="h-3.5 w-3.5" />}
-                        >
-                          Preview full page
-                        </Button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent className={TOOLTIP_CONTENT_CLASS} sideOffset={4}>
-                      {shareUrl ? "Opens in a new tab" : "Preparing the link…"}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="inline-flex">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!shareUrl || isRequesting}
+                        onClick={() => window.open(shareUrl, "_blank", "noopener,noreferrer")}
+                        rightIcon={<Icon name="arrow-up-right" className="h-3.5 w-3.5" />}
+                      >
+                        Preview full page
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className={TOOLTIP_CONTENT_CLASS} sideOffset={4}>
+                    {shareUrl ? "Opens in a new tab" : "Preparing the link…"}
+                  </TooltipContent>
+                </Tooltip>
               </div>
 
               {/* A picture of the client-facing page, not a working copy of

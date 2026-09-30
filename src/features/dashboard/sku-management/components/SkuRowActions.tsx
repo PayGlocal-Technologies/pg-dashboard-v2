@@ -92,13 +92,13 @@ export function SkuRowActions({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        {/* Flux's secondary Button, squared off to an icon-only control — the
-            same fill, border, and shadow as other secondary actions, at the
-            32px height the compact table controls use. Icon-only, so it needs
-            its own aria-label. */}
+        {/* Flux's ghost Button, squared off to an icon-only control — no
+            resting fill/border, just the three dots; a hover/focus tint is
+            the only affordance, at the 32px height the compact table
+            controls use. Icon-only, so it needs its own aria-label. */}
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
           size="sm"
           aria-label={`Actions for ${product.name}`}
           aria-haspopup="menu"

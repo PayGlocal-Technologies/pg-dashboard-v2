@@ -10,7 +10,6 @@ import {
   StatusBadge,
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
   type Column,
 } from "@/components/ui";
@@ -189,31 +188,27 @@ function RowActionsMenu({ actions }: { actions: RowAction[] }) {
 /** "Imported from Zoho", production's own mark beside the invoice number. */
 function ZohoMark() {
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center">
-            <Icon name="zoho-logo" className="h-3.5 w-3.5" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Imported from Zoho</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center">
+          <Icon name="zoho-logo" className="h-3.5 w-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Imported from Zoho</TooltipContent>
+    </Tooltip>
   );
 }
 
 function RecurringMark() {
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="flex shrink-0 items-center text-primary" aria-label="Recurring invoice">
-            <Icon name="recurring-outlined" className="h-3.5 w-3.5" />
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>Recurring invoice</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex shrink-0 items-center text-primary" aria-label="Recurring invoice">
+          <Icon name="recurring-outlined" className="h-3.5 w-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Recurring invoice</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -267,9 +262,12 @@ export function buildInvoiceColumns(options: {
     {
       key: "clientName",
       header: "Client Name",
-      minWidth: 170,
+      // Was 170 with a 150px inner span — the mismatch left ~20px of dead
+      // space inside the cell on top of the table's own column gap. Sized to
+      // the content instead, with the span now spanning the full cell width.
+      minWidth: 140,
       render: (row) => (
-        <span className="block w-[150px] truncate text-[13px] text-foreground">
+        <span className="block w-full truncate text-[13px] text-foreground">
           {row.clientName || "—"}
         </span>
       ),
@@ -277,9 +275,9 @@ export function buildInvoiceColumns(options: {
     {
       key: "clientBusinessName",
       header: "Business Name",
-      minWidth: 180,
+      minWidth: 150,
       render: (row) => (
-        <span className="block w-[160px] truncate text-[13px] text-muted-foreground">
+        <span className="block w-full truncate text-[13px] text-muted-foreground">
           {row.clientBusinessName || "—"}
         </span>
       ),

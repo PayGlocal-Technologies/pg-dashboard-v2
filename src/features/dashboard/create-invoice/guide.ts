@@ -30,6 +30,7 @@ export const CREATE_INVOICE_GUIDE_KEY = "create-invoice-v2";
 export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   {
     target: "invoice-template",
+    chip: { label: "Template", icon: "layout-template" },
     title: "Start from a template",
     description:
       "Reuse a saved invoice's items, terms and branding. Skip this to start from scratch, and save this invoice as a template when you are done.",
@@ -38,6 +39,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "invoice-dates",
+    chip: { label: "Dates", icon: "calendar-days" },
     title: "Number it and set the dates",
     description:
       "The number is generated for you and the issue date defaults to today, so the one to set is the due date. Pick a term like Net 15, or a specific day. Nothing generates without it.",
@@ -47,6 +49,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "invoice-client",
+    chip: { label: "Client", icon: "users" },
     title: "Choose who it bills",
     description:
       "Pick an existing client or add a new one. Their billing address prints on the invoice, so it has to be complete before you can generate.",
@@ -56,6 +59,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "invoice-items",
+    chip: { label: "Line items", icon: "package" },
     title: "Add what you sold",
     description:
       "Each line needs a name, type, rate and quantity. Set the invoice currency here too, and add a discount or tax below the items.",
@@ -65,6 +69,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "invoice-payment",
+    chip: { label: "Payment", icon: "credit-card" },
     title: "Pick where you get paid",
     description:
       "Choose the receiving account to print on the invoice. Your PayGlocal accounts are suggested for the currency you picked, and you can add your own.",
@@ -74,6 +79,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "invoice-preview",
+    chip: { label: "Preview", icon: "eye" },
     title: "See it as your customer will",
     description:
       "The document and the notification email update as you type. Advanced branding below sets your logo, signature, theme and colours.",
@@ -82,6 +88,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "invoice-consent",
+    chip: { label: "Consent", icon: "shield-check" },
     title: "Confirm the details are right",
     description:
       "PayGlocal is the platform, not the auditor of what goes out, so you confirm the invoice is accurate before it is finalised. The tick is the last thing standing between a draft and a generated invoice.",
@@ -91,6 +98,7 @@ export const CREATE_INVOICE_GUIDE_STEPS: GuideStep[] = [
   },
   {
     target: "invoice-generate",
+    chip: { label: "Generate", icon: "send" },
     title: "Generate when you are ready",
     description:
       "Your draft saves itself as you work. The counter beside this button lists anything still missing and jumps you to it; once it reads Ready, generating finalises the invoice, renders the PDF and lets you email it.",

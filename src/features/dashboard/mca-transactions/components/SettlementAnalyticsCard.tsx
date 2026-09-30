@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   Button,
   Card,
@@ -13,7 +14,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { currencySymbol, formatNextSettlementDate, formatSharePct } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
 import { CountryFlagAvatar } from "@/features/dashboard/multi-currency/components/CountryFlagAvatar";
@@ -150,6 +151,9 @@ interface AccountBarRowData {
    *  switch to a transaction count in count mode. Absent on the rest-of-world
    *  bucket, which has no single native currency. */
   currencyAmount?: number;
+  /** Settled amount in the reporting currency (INR), whatever the mode —
+   *  count mode's subtext shows it in place of the native figure. */
+  amount: number;
 }
 
 /** One currency's row in the full-width breakdown list: flag, bold currency
@@ -164,14 +168,27 @@ function CurrencyChip({
   row,
   sharePct,
   isAmountMode,
+  index,
   className,
 }: {
   row: AccountBarRowData;
   sharePct: number;
   isAmountMode: boolean;
+  /** Row position in its own list — staggers this chip's sweep-in a beat
+   *  after the one above it, so a mode switch reads as the whole list
+   *  resettling top-to-bottom rather than every value changing at once. */
+  index: number;
   className?: string;
 }) {
-  const nativeLabel = isAmountMode ? formatNativeAmount(row.accountId, row.currencyAmount) : null;
+  // Amount mode's subtext is the native-currency figure ("$8,377,993");
+  // count mode has no native-currency reading of its own (a transaction
+  // count has no currency), so it shows the same INR amount the amount-mode
+  // headline uses instead of leaving that line blank — same placement
+  // either way, just which figure fills it.
+  const subLabel = isAmountMode
+    ? formatNativeAmount(row.accountId, row.currencyAmount)
+    : formatBarAmount(row.amount);
+  const delay = Math.min(index, 8) * 0.04;
   return (
     <li className={cn("flex items-center gap-2.5 py-2.5", className)}>
       <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-7 w-7 shrink-0" />
@@ -183,12 +200,29 @@ function CurrencyChip({
           {formatSharePct(sharePct)} of total
         </span>
       </span>
-      <span className="shrink-0 text-right">
-        <span className="block text-sm font-semibold tabular-nums text-foreground">
-          {row.valueLabel}
-        </span>
-        {nativeLabel && (
-          <span className="block truncate text-[11px] text-muted-foreground">{nativeLabel}</span>
+      <span className="shrink-0 overflow-hidden text-right">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={isAmountMode ? "amount" : "count"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.3, delay, ease: "easeOut" }}
+            className="block text-sm font-semibold tabular-nums text-foreground"
+          >
+            {row.valueLabel}
+          </motion.span>
+        </AnimatePresence>
+        {subLabel && (
+          <motion.span
+            key={isAmountMode ? "native" : "inr"}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: delay + 0.06, ease: "easeOut" }}
+            className="block truncate text-[11px] text-muted-foreground"
+          >
+            {subLabel}
+          </motion.span>
         )}
       </span>
     </li>
@@ -239,6 +273,7 @@ export function SettlementAnalyticsCard({
           ? formatBarAmount(account.amount)
           : account.count.toLocaleString("en-IN"),
         currencyAmount: account.currencyAmount,
+        amount: account.amount,
       };
     })
     .sort((a, b) => b.value - a.value);
@@ -298,17 +333,34 @@ export function SettlementAnalyticsCard({
               <Shimmer className="h-9 w-40" />
             ) : (
               <>
-                {isAmountMode ? (
-                  <CompactAmount
-                    amount={settledValue}
-                    currency="INR"
-                    className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
-                  />
-                ) : (
-                  <p className="text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-                    {settledCount.toLocaleString("en-IN")}
-                  </p>
-                )}
+                <AnimatePresence mode="wait" initial={false}>
+                  {isAmountMode ? (
+                    <motion.div
+                      key="amount"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.3, ease: "easeOut" }}
+                    >
+                      <CompactAmount
+                        amount={settledValue}
+                        currency="INR"
+                        className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.p
+                      key="count"
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.3, ease: "easeOut" }}
+                      className="text-3xl font-semibold tabular-nums tracking-tight text-foreground"
+                    >
+                      {settledCount.toLocaleString("en-IN")}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
                 {/* Visually subordinate to the KPI (muted, smaller, on the
                     same baseline rather than its own row) and wraps beneath
                     it naturally on narrow widths via the flex-wrap above. */}
@@ -379,13 +431,20 @@ export function SettlementAnalyticsCard({
               </div>
             </div>
           ) : accountRows.length === 0 ? (
-            <PlaceholderState
-              variant="no-settlements"
-              size="xs"
-              className="h-full justify-center py-0"
-              title={isAmountMode ? "No amount settled" : "No settled transactions"}
-              description="Once payments settle, this breaks the total down by the currency each one arrived in."
-            />
+            // The same empty chart as Total settled beneath it, so the two
+            // cards read alike when a period has nothing. This card is about
+            // money coming in, so the copy says so (not "settled").
+            <div className="relative h-40">
+              <EmptyAxesChart
+                labels={EMPTY_AXIS_LABELS[timeRange]}
+                title={
+                  isAmountMode
+                    ? "No payments collected in this period"
+                    : "No transactions in this period"
+                }
+                description="As payments come in, this breaks the total down by the currency each one arrived in."
+              />
+            </div>
           ) : (
             accountRows.length > 0 && (
               <div className="space-y-3">
@@ -411,6 +470,7 @@ export function SettlementAnalyticsCard({
                       key={row.accountId}
                       row={row}
                       isAmountMode={isAmountMode}
+                      index={index}
                       sharePct={totalValue > 0 ? row.value / totalValue : 0}
                       className={
                         isPairedLayout ? pairedCellClasses(index, firstFiveRows.length) : undefined
@@ -447,6 +507,7 @@ export function SettlementAnalyticsCard({
                     key={row.accountId}
                     row={row}
                     isAmountMode={isAmountMode}
+                    index={index}
                     sharePct={totalValue > 0 ? row.value / totalValue : 0}
                     className={
                       isPairedLayout ? pairedCellClasses(index, restRows.length) : undefined

@@ -40,8 +40,10 @@ export function AddBankAccountDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogTitle>Add new bank details</DialogTitle>
+      <DialogContent className="flex max-w-md flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle>Add new bank details</DialogTitle>
+        </div>
         <AddBankBody
           key={open ? "open" : "closed"}
           onCancel={() => onOpenChange(false)}
@@ -88,95 +90,95 @@ function AddBankBody({ onCancel, onAdded }: { onCancel: () => void; onAdded: () 
   return (
     <form
       noValidate
-      className="mt-4 space-y-3"
+      className="flex min-h-0 flex-1 flex-col"
       onSubmit={(e) => {
         e.preventDefault();
         void form.handleSubmit();
       }}
     >
-      <form.Field
-        name="bankName"
-        validators={{ onSubmit: ({ value }) => required("Bank name")(value) }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="bank-name">Bank name</FieldLabel>
-            <Input
-              id="bank-name"
-              placeholder="Enter bank name"
-              value={field.state.value}
-              aria-invalid={field.state.meta.errors.length > 0}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
+        <form.Field
+          name="bankName"
+          validators={{ onSubmit: ({ value }) => required("Bank name")(value) }}
+        >
+          {(field) => (
+            <Field>
+              <FieldLabel htmlFor="bank-name">Bank name</FieldLabel>
+              <Input
+                id="bank-name"
+                placeholder="Enter bank name"
+                value={field.state.value}
+                aria-invalid={field.state.meta.errors.length > 0}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+              />
+              <FieldError>{field.state.meta.errors[0]}</FieldError>
+            </Field>
+          )}
+        </form.Field>
 
-      <form.Field
-        name="accountHolderName"
-        validators={{ onSubmit: ({ value }) => required("Account holder name")(value) }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="bank-holder">Account holder name</FieldLabel>
-            <Input
-              id="bank-holder"
-              placeholder="Enter account holder name"
-              value={field.state.value}
-              aria-invalid={field.state.meta.errors.length > 0}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+        <form.Field
+          name="accountHolderName"
+          validators={{ onSubmit: ({ value }) => required("Account holder name")(value) }}
+        >
+          {(field) => (
+            <Field>
+              <FieldLabel htmlFor="bank-holder">Account holder name</FieldLabel>
+              <Input
+                id="bank-holder"
+                placeholder="Enter account holder name"
+                value={field.state.value}
+                aria-invalid={field.state.meta.errors.length > 0}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+              />
+              <FieldError>{field.state.meta.errors[0]}</FieldError>
+            </Field>
+          )}
+        </form.Field>
 
-      <form.Field
-        name="accountNumber"
-        validators={{ onSubmit: ({ value }) => required("Account number")(value) }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="bank-account-number">Account number</FieldLabel>
-            <Input
-              id="bank-account-number"
-              placeholder="Enter account number"
-              value={field.state.value}
-              aria-invalid={field.state.meta.errors.length > 0}
-              onChange={(e) => field.handleChange(e.target.value)}
-              onBlur={field.handleBlur}
-              className="font-mono"
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+        <form.Field
+          name="accountNumber"
+          validators={{ onSubmit: ({ value }) => required("Account number")(value) }}
+        >
+          {(field) => (
+            <Field>
+              <FieldLabel htmlFor="bank-account-number">Account number</FieldLabel>
+              <Input
+                id="bank-account-number"
+                placeholder="Enter account number"
+                value={field.state.value}
+                aria-invalid={field.state.meta.errors.length > 0}
+                onChange={(e) => field.handleChange(e.target.value)}
+                onBlur={field.handleBlur}
+              />
+              <FieldError>{field.state.meta.errors[0]}</FieldError>
+            </Field>
+          )}
+        </form.Field>
 
-      <form.Field
-        name="ifscCode"
-        validators={{ onSubmit: ({ value }) => required("IFSC code")(value) }}
-      >
-        {(field) => (
-          <Field>
-            <FieldLabel htmlFor="bank-ifsc">IFSC code</FieldLabel>
-            <Input
-              id="bank-ifsc"
-              placeholder="Enter IFSC code"
-              value={field.state.value}
-              aria-invalid={field.state.meta.errors.length > 0}
-              onChange={(e) => field.handleChange(e.target.value.toUpperCase())}
-              onBlur={field.handleBlur}
-              className="font-mono"
-            />
-            <FieldError>{field.state.meta.errors[0]}</FieldError>
-          </Field>
-        )}
-      </form.Field>
+        <form.Field
+          name="ifscCode"
+          validators={{ onSubmit: ({ value }) => required("IFSC code")(value) }}
+        >
+          {(field) => (
+            <Field>
+              <FieldLabel htmlFor="bank-ifsc">IFSC code</FieldLabel>
+              <Input
+                id="bank-ifsc"
+                placeholder="Enter IFSC code"
+                value={field.state.value}
+                aria-invalid={field.state.meta.errors.length > 0}
+                onChange={(e) => field.handleChange(e.target.value.toUpperCase())}
+                onBlur={field.handleBlur}
+              />
+              <FieldError>{field.state.meta.errors[0]}</FieldError>
+            </Field>
+          )}
+        </form.Field>
+      </div>
 
-      <div className="flex justify-end gap-2 border-t border-border pt-4">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
         <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>

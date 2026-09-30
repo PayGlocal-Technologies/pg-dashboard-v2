@@ -17,6 +17,7 @@ import { Button, Card, ChartSkeleton, Tabs, TabsList, TabsTrigger } from "@/comp
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { formatCurrencyShort } from "@/lib/utils/format";
+import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { todaysAnalytics } from "@/features/dashboard/home/mock-data";
 
 const VOLUME_PAY_MODE_LABELS = ["UPI", "Cards", "Net banking", "Wallets"] as const;
@@ -536,11 +537,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
                         <stop offset="100%" stopColor={CHART_PRIMARY} stopOpacity={0} />
                       </linearGradient>
                     </defs>
-                    <CartesianGrid
-                      strokeDasharray="4 6"
-                      stroke="var(--chart-grid)"
-                      vertical={false}
-                    />
+                    <CartesianGrid horizontal={DotGridLine} vertical={false} />
                     <XAxis
                       dataKey="label"
                       axisLine={{ stroke: "var(--border)", strokeOpacity: 0.55 }}
@@ -641,7 +638,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
                     <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                <CartesianGrid horizontal={DotGridLine} vertical={false} />
                 <XAxis
                   dataKey="label"
                   axisLine={false}
@@ -738,7 +735,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
             <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 p-2.5 dark:bg-muted/15">
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold leading-snug text-foreground">
-                  Documents pending
+                  Invoice required
                 </p>
                 <p className="mt-1 font-sans text-sm font-bold tabular-nums tracking-[-0.02em] text-amber-800 dark:text-amber-300 sm:text-base">
                   {formatInrCompact(attention.fundsOnHold.amount)}

@@ -482,7 +482,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
               }
               emptyState={
                 <PlaceholderState
-                  variant="no-settlements"
+                  variant="empty-table"
                   title={emptyCopy.title}
                   description={emptyCopy.description}
                   className="py-14"

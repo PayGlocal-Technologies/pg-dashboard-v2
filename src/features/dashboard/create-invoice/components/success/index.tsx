@@ -87,7 +87,7 @@ export function CreateInvoiceSuccess({
   const goToInvoices = () => router.push("/mca-invoices");
 
   return (
-    <div className="relative flex min-h-full items-center justify-center overflow-y-auto p-6">
+    <div className="relative flex min-h-full items-center justify-center overflow-y-auto bg-background p-6">
       {/* Decorative full-bleed background — the card and text above it carry
           all the real content, so alt="". */}
       <AppImage
@@ -96,7 +96,9 @@ export function CreateInvoiceSuccess({
         fill
         sizes="100vw"
         priority
-        className="object-cover"
+        // Faded toward bg-background in dark mode, the same strength
+        // .brand-backdrop uses, so the light artwork isn't a bright page.
+        className="object-cover dark:opacity-10"
       />
 
       <Card className="relative w-full max-w-sm rounded-2xl p-6 shadow-lg">

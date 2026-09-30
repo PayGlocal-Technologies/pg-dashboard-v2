@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -421,24 +421,22 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
                               {displayTag || tradeName}
                             </p>
                             {merchantWebsite && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <span
-                                      className="inline-flex flex-shrink-0 text-muted-foreground"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <Icon name="info" size={11} />
-                                    </span>
-                                  </TooltipTrigger>
-                                  <TooltipContent
-                                    className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
-                                    sideOffset={4}
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <span
+                                    className="inline-flex flex-shrink-0 text-muted-foreground"
+                                    onClick={(e) => e.stopPropagation()}
                                   >
-                                    {merchantWebsite}
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
+                                    <Icon name="info" size={11} />
+                                  </span>
+                                </TooltipTrigger>
+                                <TooltipContent
+                                  className="z-[200] rounded-lg border border-border bg-popover px-2 py-1 text-xs text-popover-foreground shadow-md"
+                                  sideOffset={4}
+                                >
+                                  {merchantWebsite}
+                                </TooltipContent>
+                              </Tooltip>
                             )}
                           </div>
                           <p className="truncate text-[10.5px] text-muted-foreground">{mid}</p>

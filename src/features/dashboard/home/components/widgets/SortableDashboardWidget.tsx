@@ -2,7 +2,7 @@
 
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
+import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { DashboardWidgetRenderer } from "@/features/dashboard/home/components/widgets/DashboardWidgetRenderer";
 import { type WidgetId, WIDGET_BY_ID } from "@/features/dashboard/home/widget-catalog";
@@ -74,32 +74,30 @@ export function SortableDashboardWidget({
       <Icon name="x" className="h-4 w-4" strokeWidth={2} aria-hidden />
     </Button>
   ) : (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <span className="absolute top-2 right-2 z-30 inline-flex">
-            <Button
-              type="button"
-              variant="ghost"
-              aria-label={`Remove ${meta.name}`}
-              aria-disabled
-              title="Minimum 2 widgets required"
-              disabled
-              className={removeBtnClass}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              <Icon name="x" className="h-4 w-4" strokeWidth={2} aria-hidden />
-            </Button>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent
-          className="rounded-lg bg-popover text-popover-foreground border border-border text-xs px-2 py-1 shadow-md z-[200]"
-          sideOffset={4}
-        >
-          Minimum 2 widgets required
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="absolute top-2 right-2 z-30 inline-flex">
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label={`Remove ${meta.name}`}
+            aria-disabled
+            title="Minimum 2 widgets required"
+            disabled
+            className={removeBtnClass}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <Icon name="x" className="h-4 w-4" strokeWidth={2} aria-hidden />
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent
+        className="rounded-lg bg-popover text-popover-foreground border border-border text-xs px-2 py-1 shadow-md z-[200]"
+        sideOffset={4}
+      >
+        Minimum 2 widgets required
+      </TooltipContent>
+    </Tooltip>
   );
 
   const body = (
