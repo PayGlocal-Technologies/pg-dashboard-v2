@@ -46,6 +46,17 @@ export interface SettlementSchedule {
   nonWorkingDayDate: string | null;
   /** Holiday name, only set when nonWorkingDayReason === "holiday". */
   nonWorkingDayName: string | null;
+  /** Every non-working day the walk stepped over, in order. A Friday before a
+   *  Monday holiday skips three (Sat, Sun, Mon), not one. */
+  skippedDays: SkippedDay[];
+}
+
+export interface SkippedDay {
+  /** YYYY-MM-DD */
+  date: string;
+  reason: NonWorkingDayReason;
+  /** Holiday name, only set when reason === "holiday". */
+  name: string | null;
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -86,11 +97,13 @@ export function computeSettlementSchedule(
   let nonWorkingDayDate: string | null = null;
   let nonWorkingDayReason: NonWorkingDayReason | null = null;
   let nonWorkingDayName: string | null = null;
+  const skippedDays: SkippedDay[] = [];
 
   while (true) {
     const date = parseDateKey(candidate);
 
     if (isWeekend(date)) {
+      skippedDays.push({ date: candidate, reason: "weekend", name: null });
       if (!nonWorkingDayReason) {
         nonWorkingDayDate = candidate;
         nonWorkingDayReason = "weekend";
@@ -101,6 +114,7 @@ export function computeSettlementSchedule(
 
     const holidayName = holidayMap.get(candidate);
     if (holidayName) {
+      skippedDays.push({ date: candidate, reason: "holiday", name: holidayName });
       if (nonWorkingDayReason !== "holiday") {
         nonWorkingDayDate = candidate;
         nonWorkingDayReason = "holiday";
@@ -119,7 +133,22 @@ export function computeSettlementSchedule(
     nonWorkingDayReason,
     nonWorkingDayDate,
     nonWorkingDayName,
+    skippedDays,
   };
+}
+
+/** "the weekend", "Diwali", "the weekend and Diwali", "Diwali, Bhai Dooj and
+ *  the weekend": every reason the walk skipped a day, in the order first met,
+ *  each named once. Null when nothing was skipped. */
+function describeSkippedDays(skipped: SkippedDay[]): string | null {
+  const parts: string[] = [];
+  for (const day of skipped) {
+    const label = day.reason === "weekend" ? "the weekend" : (day.name ?? "a bank holiday");
+    if (!parts.includes(label)) parts.push(label);
+  }
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0]!;
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 }
 
 /** Walks forward from the day after `todayKey` to the next working day,
@@ -131,17 +160,14 @@ export function computeNextSettlement(
   holidays: HolidayInfo[]
 ): NextSettlementInfo {
   const schedule = computeSettlementSchedule(todayKey, holidays);
-  const reason =
-    schedule.nonWorkingDayReason === "holiday"
-      ? schedule.nonWorkingDayName
-      : schedule.nonWorkingDayReason === "weekend"
-        ? "the weekend"
-        : null;
 
+  // Every skipped day counts and every reason is named. This used to report a
+  // flat 1 and only the deciding reason, so a weekend followed by a holiday
+  // read as a one-day delay for the holiday alone.
   return {
     date: schedule.settlementDate,
-    skippedDays: schedule.affectedByNonWorkingDay ? 1 : 0,
-    reason,
+    skippedDays: schedule.skippedDays.length,
+    reason: describeSkippedDays(schedule.skippedDays),
   };
 }
 

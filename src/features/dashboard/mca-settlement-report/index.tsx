@@ -378,7 +378,8 @@ export function McaSettlementReportFeature() {
               /> */}
               <span data-guide="mca-settlement-calendar" className="inline-flex">
                 <SettlementCalendarButton
-                  rows={enhancedRows}
+                  // OUT OF SCOPE: past settled days are not shown for now.
+                  // rows={enhancedRows}
                   todayKey={calendar.today}
                   nextSettlementDate={calendar.nextSettlement.date}
                   nextSettlementReason={calendar.nextSettlement.reason}
