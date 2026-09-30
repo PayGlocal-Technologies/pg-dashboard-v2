@@ -18,7 +18,7 @@ const INITIAL_VALUES: EtaFormValues = {
 };
 
 /**
- * "Looking for a transaction?" (opens the payment ETA check), beside Settlement calendar in the Transactions header.
+ * "Check transaction status" (opens the payment ETA check), beside Settlement calendar in the Transactions header.
  * Same outline, size and text colour as its neighbour. Today's date is read when it's clicked (not during render), and each
  * open mounts a fresh modal so a new check starts from the defaults.
  */
@@ -37,12 +37,12 @@ export function PaymentEtaButton() {
           setSession((s) => ({ id: s.id + 1, todayKey: todayDateKey() }));
           setOpen(true);
         }}
-        aria-label="Looking for a transaction?"
+        aria-label="Check transaction status"
         className="max-sm:gap-0 max-sm:px-2.5"
       >
         {/* Icon-only on phones, so it and Settlement calendar still fit on
             the title row. */}
-        <span className="hidden sm:inline">Looking for a transaction?</span>
+        <span className="hidden sm:inline">Check transaction status</span>
       </Button>
 
       {session.id > 0 && (
