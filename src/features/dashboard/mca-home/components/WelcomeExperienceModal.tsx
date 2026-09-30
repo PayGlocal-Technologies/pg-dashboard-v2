@@ -63,7 +63,15 @@ const FADE = { duration: 0.25, ease: [0.33, 0.88, 0.22, 1] as const };
  * MCA_DASHBOARD_GUIDE_STEPS walkthrough the floating guide button runs. The
  * parent owns that GuideTour instance.
  */
-export function WelcomeExperienceModal({ onStartTour }: { onStartTour: () => void }) {
+export function WelcomeExperienceModal({
+  onStartTour,
+  onSettled,
+}: {
+  onStartTour: () => void;
+  /** Called once the modal has decided whether to show (true = it is opening),
+   *  so the dashboard can hold back its other first-visit prompt meanwhile. */
+  onSettled?: (shown: boolean) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
 
@@ -71,10 +79,12 @@ export function WelcomeExperienceModal({ onStartTour }: { onStartTour: () => voi
     // Deferred so setState isn't synchronous in the effect body, and so the
     // dashboard gets a beat to paint first.
     const timer = window.setTimeout(() => {
-      if (!hasSeen()) setOpen(true);
+      const shown = !hasSeen();
+      if (shown) setOpen(true);
+      onSettled?.(shown);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [onSettled]);
 
   const isLast = step === SLIDES.length - 1;
   const slide = SLIDES[step]!;

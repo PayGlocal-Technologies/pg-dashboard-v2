@@ -1,16 +1,39 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { IconButton } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 
+function hasDismissed(key: string): boolean {
+  try {
+    return localStorage.getItem(key) === "1";
+  } catch {
+    // Storage blocked (private mode, site data off): treat as dismissed rather
+    // than show it on every single visit, same as WelcomeExperienceModal.
+    return true;
+  }
+}
+
+function markDismissed(key: string): void {
+  try {
+    localStorage.setItem(key, "1");
+  } catch {
+    // Nothing to do; see hasDismissed.
+  }
+}
+
 /**
  * A closable intro banner for the top of a feature page (Invoice
  * Management, Client Management): full-width artwork with the heading and
- * one line of copy over its blank left side, and an × that hides it until
- * the page is next loaded. Same build as the dashboard's promo banner.
+ * one line of copy over its blank left side, and an × that hides it. Same
+ * build as the dashboard's promo banner.
+ *
+ * Without `storageKey` the × only hides it until the page is next loaded.
+ * With one, closing it is remembered in this browser, so it keeps showing
+ * until the merchant closes it once and never after. Bump the key when the
+ * banner's message changes, so it shows again.
  *
  * `aspectClassName` sets the banner's shape as a literal Tailwind class (e.g.
  * "aspect-4680/892"). Match the artwork to show it whole, or go shorter to
@@ -22,14 +45,32 @@ export function PageIntroBanner({
   aspectClassName,
   title,
   description,
+  storageKey,
 }: {
   image: string;
   aspectClassName: string;
   /** A string, or a node when the heading needs a set line break. */
   title: ReactNode;
   description: string;
+  storageKey?: string;
 }) {
-  const [visible, setVisible] = useState(true);
+  // With a storageKey it starts hidden, since the server render can't read
+  // localStorage, and appears after mount only if it hasn't been dismissed.
+  // Starting visible would flash it for a merchant who already closed it.
+  const [visible, setVisible] = useState(!storageKey);
+
+  useEffect(() => {
+    if (!storageKey) return;
+    // Deferred, not a synchronous setState in the effect body (CLAUDE.md).
+    const timer = window.setTimeout(() => setVisible(!hasDismissed(storageKey)), 0);
+    return () => window.clearTimeout(timer);
+  }, [storageKey]);
+
+  const close = (): void => {
+    if (storageKey) markDismissed(storageKey);
+    setVisible(false);
+  };
+
   if (!visible) return null;
 
   return (
@@ -61,7 +102,7 @@ export function PageIntroBanner({
         aria-label="Close banner"
         variant="ghost"
         size="sm"
-        onClick={() => setVisible(false)}
+        onClick={close}
         className="absolute right-3 top-3 h-7 w-7 min-h-0 min-w-0 rounded-full bg-card/80 text-muted-foreground backdrop-blur-sm hover:bg-card hover:text-foreground"
       >
         <Icon name="x" size={14} />

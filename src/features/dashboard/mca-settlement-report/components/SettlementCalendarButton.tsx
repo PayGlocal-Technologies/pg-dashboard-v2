@@ -240,10 +240,18 @@ function HolidayList({
   );
 }
 
+/** Stable empty default, so the settled-day map below isn't rebuilt on every
+ *  render while no rows are passed. */
+const NO_ROWS: SettlementRow[] = [];
+
 interface SettlementCalendarButtonProps {
   /** Which product's settlements to mark as "settled" on the grid, differs
-   * by active product context, see useProductContext.ts. */
-  rows: SettlementRow[];
+   * by active product context, see useProductContext.ts.
+   *
+   * OUT OF SCOPE: past settled days are not shown for now, so neither caller
+   * passes this and the grid marks none. Pass rows again (and un-comment the
+   * "Settled" legend entry below) to bring them back. */
+  rows?: SettlementRow[];
   /** Today, and the next-settlement figures derived from it. Passed in rather
    * than recomputed here because the page already holds them for its own
    * bank-holiday banner (useSettlementCalendar), and both must agree. */
@@ -255,7 +263,7 @@ interface SettlementCalendarButtonProps {
 }
 
 export function SettlementCalendarButton({
-  rows,
+  rows = NO_ROWS,
   todayKey,
   nextSettlementDate,
   nextSettlementReason,
@@ -374,8 +382,10 @@ export function SettlementCalendarButton({
                   </p>
                   <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300/90">
                     {nextSettlementReason ? `${nextSettlementReason} · ` : ""}
-                    Next settlement: {formatShortDate(nextSettlementDate)} · in{" "}
-                    {daysUntilNextSettlement} days
+                    {nextSettlementSkippedDays}{" "}
+                    {nextSettlementSkippedDays === 1 ? "non-working day" : "non-working days"}{" "}
+                    skipped · Next settlement: {formatShortDate(nextSettlementDate)} · in{" "}
+                    {daysUntilNextSettlement} {daysUntilNextSettlement === 1 ? "day" : "days"}
                   </p>
                 </div>
               </div>
@@ -446,10 +456,12 @@ export function SettlementCalendarButton({
               </div>
 
               <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                {/* OUT OF SCOPE: past settled days are not shown for now, see
+                    the `rows` prop.
                 <span className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
                   Settled
-                </span>
+                </span> */}
                 <span className="flex items-center gap-1.5">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
                   Holiday

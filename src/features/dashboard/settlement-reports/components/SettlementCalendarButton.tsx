@@ -374,8 +374,10 @@ export function SettlementCalendarButton({
                   </p>
                   <p className="mt-0.5 text-[11px] text-amber-800 dark:text-amber-300/90">
                     {nextSettlementReason ? `${nextSettlementReason} · ` : ""}
-                    Next settlement: {formatShortDate(nextSettlementDate)} · in{" "}
-                    {daysUntilNextSettlement} days
+                    {nextSettlementSkippedDays}{" "}
+                    {nextSettlementSkippedDays === 1 ? "non-working day" : "non-working days"}{" "}
+                    skipped · Next settlement: {formatShortDate(nextSettlementDate)} · in{" "}
+                    {daysUntilNextSettlement} {daysUntilNextSettlement === 1 ? "day" : "days"}
                   </p>
                 </div>
               </div>
