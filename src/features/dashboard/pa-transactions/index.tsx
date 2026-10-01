@@ -32,30 +32,37 @@ export function PaTransactionsFeature() {
   // time range vs. its table's date filter.
   const [timeframe, setTimeframe] = useState<TotalVolumeTimeframe>("ytd");
   const metrics = transactionsMetricsByTimeframe[timeframe];
+  // The table swaps a transaction's full page in place; the page brings its
+  // own title and Back row, and the metrics have nothing to say about it.
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
-      <PageHeader
-        title="Transactions"
-        actions={
-          <TimeRangeTabs
-            options={totalVolumeTimeframes.map((t) => ({ value: t.id, label: t.label }))}
-            value={timeframe}
-            onValueChange={setTimeframe}
-            label="Metrics time range"
-          />
-        }
-      />
+      {!detailsOpen && (
+        <PageHeader
+          title="Transactions"
+          actions={
+            <TimeRangeTabs
+              options={totalVolumeTimeframes.map((t) => ({ value: t.id, label: t.label }))}
+              value={timeframe}
+              onValueChange={setTimeframe}
+              label="Metrics time range"
+            />
+          }
+        />
+      )}
 
       {isPAEnabled ? (
         <MidGuard productType="PA">
-          <TransactionStatCards
-            timeframe={timeframe}
-            totalVolumeLabel={formatCurrency(metrics.totalVolume, "INR")}
-            metrics={metrics}
-            trendCharts={transactionsTrendChartsByTimeframe[timeframe]}
-          />
-          <PaTransactionTable />
+          {!detailsOpen && (
+            <TransactionStatCards
+              timeframe={timeframe}
+              totalVolumeLabel={formatCurrency(metrics.totalVolume, "INR")}
+              metrics={metrics}
+              trendCharts={transactionsTrendChartsByTimeframe[timeframe]}
+            />
+          )}
+          <PaTransactionTable onDetailsOpenChange={setDetailsOpen} />
         </MidGuard>
       ) : (
         <div className="bg-card rounded-xl border border-border p-10 text-center">
