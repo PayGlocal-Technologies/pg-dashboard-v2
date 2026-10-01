@@ -189,6 +189,13 @@ export function McaTransactionTable({
   // takes precedence over the rows.find lookup so the details page can show
   // a transaction the table itself never fetched.
   const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
+  // The transaction the drawer/page was opened on, held as the object itself
+  // (pg-dashboard's `currentRecord`), not only as an id to find in `rows`.
+  // `rows` is the filtered page: uploading an invoice moves a transaction out
+  // of the default "Invoice pending" view, so after the refetch the id lookup
+  // finds nothing and the drawer went blank. This copy is the fallback, and
+  // is replaced with a fresh one after an upload (handleInvoiceSubmitted).
+  const [detailsRecord, setDetailsRecord] = useState<McaTransaction | null>(null);
   const { downloadFirc } = useFircDownload();
 
   const body = buildTxnRequestBody(
@@ -212,6 +219,12 @@ export function McaTransactionTable({
   // existing data leaves it false and shows only in isFetching — which is
   // what the Refresh button reflects, since otherwise pressing it did
   // nothing visible.
+  // One-off lookup of a single transaction by gid, see handleInvoiceSubmitted.
+  const { mutate: lookupTransaction } = usePost<McaTransactionsResponse, TableReqBody>(
+    mcaTxnSearchApi(urlMid),
+    { invalidateQueries: false }
+  );
+
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     McaTransactionsResponse,
     TableReqBody
@@ -266,7 +279,10 @@ export function McaTransactionTable({
       };
 
   // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
-  const detailsRow = detailsOverrideRow ?? rows.find((r) => r.gid === detailsRowId) ?? null;
+  const detailsRow =
+    detailsOverrideRow ??
+    rows.find((r) => r.gid === detailsRowId) ??
+    (detailsRecord?.gid === detailsRowId ? detailsRecord : null);
 
   const onSearch = (v: string) => {
     setSearch(v);
@@ -283,6 +299,7 @@ export function McaTransactionTable({
   // untouched for the whole time the drawer is open and after it closes.
   const openDetails = (row: McaTransaction) => {
     setDetailsOverrideRow(null);
+    setDetailsRecord(row);
     setDetailsRowId(row.gid);
     setDrawerOpen(true);
   };
@@ -294,6 +311,7 @@ export function McaTransactionTable({
   // point the table actually leaves the screen and Back has to restore it.
   const expandToPage = (row: McaTransaction) => {
     if (contentEl) setScrollPosition(contentEl.scrollTop);
+    setDetailsRecord(row);
     setDetailsRowId(row.gid);
     setDrawerOpen(false);
     setDetailsOpen(true);
@@ -362,6 +380,28 @@ export function McaTransactionTable({
   };
 
   const handleInvoiceSubmitted = (row: McaTransaction) => {
+    // pg-dashboard's refetch-from-details: look the one transaction up by its
+    // gid and swap the open view onto that fresh copy, so its status (and
+    // with it the action card) moves on even after it leaves the filtered
+    // list below. Same search endpoint and MID scoping as the table, with the
+    // gid as the query; matched on gid exactly rather than taking row 0.
+    lookupTransaction(
+      buildTxnRequestBody(
+        {},
+        { searchQuery: row.gid, selectedMid: midFilter, pageLimit: 9, from: 0 }
+      ),
+      {
+        onSuccess: (res) => {
+          const fresh = res?.data?.data?.find((r) => r.gid === row.gid);
+          if (!fresh) return;
+          setDetailsRecord((current) => (current?.gid === fresh.gid ? fresh : current));
+          setDetailsOverrideRow((current) => (current?.gid === fresh.gid ? fresh : current));
+        },
+        // The held copy keeps the view up; the timeline and documents below
+        // refresh on their own, so a failed lookup costs nothing visible.
+        onError: () => undefined,
+      }
+    );
     void refetch();
     void queryClient.invalidateQueries({ queryKey: ["mca-txn-timeline", row.gid] });
     void queryClient.invalidateQueries({

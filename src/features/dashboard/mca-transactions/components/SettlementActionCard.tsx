@@ -2,9 +2,15 @@
 
 import { Alert, AlertDescription, Button, Card, CardContent } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { useGet } from "@/lib/api/hooks";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
+import { mcaTxnTimelineApi } from "@/features/dashboard/mca-transactions/services";
+import { isInvoiceUploadAwaited } from "@/features/dashboard/mca-transactions/timeline/buildSettlementTimeline";
 import { UploadInvoiceForm } from "@/features/dashboard/mca-transactions/components/UploadInvoiceForm";
-import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
+import type {
+  McaTransaction,
+  TimelineApiResponse,
+} from "@/features/dashboard/mca-transactions/types";
 
 // Same reversal set TransactionDetailsPage/SettlementTimelineSection use —
 // once funds have gone back there is nothing left to do about this
@@ -32,10 +38,35 @@ interface SettlementActionCardProps {
  */
 export function SettlementActionCard({ row, onUploaded }: SettlementActionCardProps) {
   const { downloadFirc, isDownloading: isFircDownloading } = useFircDownload();
+  // Same query (same key) the timeline section already runs, so this reads
+  // its cache rather than firing a second request.
+  const {
+    data: timelineData,
+    isPending: isTimelinePending,
+    isError: isTimelineError,
+  } = useGet<TimelineApiResponse>(["mca-txn-timeline", row.gid], mcaTxnTimelineApi(row.gid), {
+    enabled: !!row.gid,
+  });
 
   if (REVERSED_STATUSES.has(row.externalStatus)) return null;
 
-  if (row.externalStatus === "DOCUMENT_PENDING") {
+  // The upload form shows only while the timeline is actually waiting on an
+  // invoice, pg-dashboard's own rule (see isInvoiceUploadAwaited). The row's
+  // status alone isn't enough: right after a submit it can still read
+  // DOCUMENT_PENDING (a held copy, or a backend that updates it a beat
+  // later), and the form would come back with the same file ready to submit
+  // twice. Nothing renders while the timeline loads, as in pg-dashboard. If
+  // the timeline call fails outright, the status alone decides, so a timeline
+  // outage can never block an upload.
+  const awaitingInvoice = isTimelineError
+    ? true
+    : !isTimelinePending &&
+      isInvoiceUploadAwaited(
+        timelineData?.data?.timeLineEvents,
+        timelineData?.data?.multipleTimelineEvents
+      );
+
+  if (row.externalStatus === "DOCUMENT_PENDING" && awaitingInvoice) {
     return (
       <section>
         <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
