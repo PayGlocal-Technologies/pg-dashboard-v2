@@ -12,6 +12,7 @@ const KIND_LABEL: Record<EtaJourneyDay["kind"], string> = {
   weekend: "Weekend",
   holiday: "Bank holiday",
   arrives: "Arrives",
+  "same-day": "Sent & arrives",
 };
 
 /** The dot for each kind of day. Days the payment waits through (weekends,
@@ -23,6 +24,7 @@ const NODE_CLASS: Record<EtaJourneyDay["kind"], string> = {
   weekend: "h-2 w-2 bg-muted-foreground/30",
   holiday: "h-2.5 w-2.5 bg-amber-500 ring-4 ring-amber-500/15",
   arrives: "h-3.5 w-3.5 bg-primary ring-4 ring-primary/15",
+  "same-day": "h-3.5 w-3.5 bg-primary ring-4 ring-primary/15",
 };
 
 /**
@@ -49,7 +51,7 @@ export function PaymentEtaJourney({ days }: { days: EtaJourneyDay[] }) {
       />
       {days.map((day) => {
         const { weekday, day: dayLabel } = formatTrackDay(day.date);
-        const isEnd = day.kind === "sent" || day.kind === "arrives";
+        const isEnd = day.kind === "sent" || day.kind === "arrives" || day.kind === "same-day";
         return (
           <li
             key={day.date}
@@ -73,7 +75,7 @@ export function PaymentEtaJourney({ days }: { days: EtaJourneyDay[] }) {
             <span
               className={cn(
                 "mt-1.5 px-1 text-[11px] leading-tight",
-                day.kind === "arrives" && "font-semibold text-primary",
+                (day.kind === "arrives" || day.kind === "same-day") && "font-semibold text-primary",
                 day.kind === "sent" && "font-medium text-foreground",
                 day.kind === "holiday" && "font-medium text-amber-700 dark:text-amber-400",
                 (day.kind === "transit" || day.kind === "weekend") && "text-muted-foreground"

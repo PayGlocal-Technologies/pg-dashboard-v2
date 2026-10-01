@@ -4,18 +4,17 @@ import { useState } from "react";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { PaymentEtaModal } from "@/features/dashboard/mca-transactions/payment-eta/components/PaymentEtaModal";
-import { ETA_SAMPLE_INITIATED_DATE } from "@/features/dashboard/mca-transactions/payment-eta/constants";
 import {
   todayDateKey,
   type EtaFormValues,
 } from "@/features/dashboard/mca-transactions/payment-eta/eta";
 
-const INITIAL_VALUES: EtaFormValues = {
-  initiatedDate: ETA_SAMPLE_INITIATED_DATE,
-  currency: "USD",
-  accountId: "",
-  paymentMode: "",
-};
+/** A fresh check: sent today, nothing else picked. The currency starts empty
+ *  because only the merchant's own currencies are offered, which the form
+ *  only knows once the accounts read returns. */
+function initialValuesFor(todayKey: string): EtaFormValues {
+  return { initiatedDate: todayKey, currency: "", accountId: "", paymentMode: "" };
+}
 
 /**
  * "Check transaction status" (opens the payment ETA check), beside Settlement calendar in the Transactions header.
@@ -50,7 +49,7 @@ export function PaymentEtaButton() {
           key={session.id}
           open={open}
           onOpenChange={setOpen}
-          initialValues={INITIAL_VALUES}
+          initialValues={initialValuesFor(session.todayKey)}
           todayKey={session.todayKey}
         />
       )}

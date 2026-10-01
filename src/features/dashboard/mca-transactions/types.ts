@@ -594,3 +594,22 @@ export interface SettledCurrencyTrendResponse {
   message?: string;
   errors?: unknown;
 }
+
+/** One account from GET /mca-invoice/{mid}/get-suggested-account-by-currency. */
+export interface SuggestedAccount {
+  accountId: string;
+  accountNumber: string;
+  /** e.g. "VIRTUAL". */
+  accountNumberType: string;
+  accountHolderName: string;
+  bankName: string;
+  bankAddress: string;
+  bankCountry: string;
+  currency: string;
+  routingCode: string;
+}
+
+export interface SuggestedAccountsByCurrencyResponse {
+  message?: string;
+  data?: { suggestedAccounts?: SuggestedAccount[] | null } | null;
+}

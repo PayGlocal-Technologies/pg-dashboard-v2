@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { UseMutateFunction } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGet, usePost, usePut } from "@/lib/api/hooks";
@@ -22,7 +22,7 @@ import {
   secureSettlementDetailsApi,
   sendNewEmailOtpApi,
   settlementDetailsApi,
-  updateAccountDetailsApi,
+  updateSettlementDetailsApi,
   verifyNewEmailApi,
   verifyOldEmailApi,
 } from "@/features/dashboard/settings/services";
@@ -32,7 +32,6 @@ import {
   type PurposeCodeOption,
 } from "@/lib/purposeCodes";
 import type {
-  AccountDetailsUpdatePayload,
   BusinessData,
   BusinessDataResponse,
   ChangeEmailCommit,
@@ -47,6 +46,8 @@ import type {
   PurposeCodesResponse,
   SettlementData,
   SettlementDataResponse,
+  SettlementUpdatePayload,
+  SettlementUpdateResponse,
 } from "@/features/dashboard/settings/types";
 
 /** The onboarding id every merchant-profile settings endpoint is scoped by.
@@ -238,29 +239,69 @@ export function useSettlementLastChanged(): { lastChangedDate: string | null; is
   };
 }
 
-/** The merchant id (profile.mid) the account-details update endpoint is scoped
- *  by. Distinct from the onboarding id the read endpoints use. Empty string
- *  until the profile resolves — callers gate the Save action on it. */
+/** The merchant id (profile.mid) the merchant-scoped endpoints (logo upload)
+ *  take. Distinct from the onboarding id the profile reads use. Empty string
+ *  until the profile resolves; callers gate their action on it. */
 function useMerchantId(): string {
   return useApp((s) => s.profile?.mid) ?? "";
 }
 
-/** Update the settlement bank account (number + IFSC) via
- *  PUT /gcc/v2/merchants/{merchantId}/account-details. Plain JSON body, no JWE.
- *  Invalidates both masked/unmasked settlement reads on success so the card
- *  reflects the new account. `canEdit` is false until the merchant id resolves. */
+/** True when a settlement-update response is a failure despite arriving as a
+ *  success: any `*_ERROR` status (REQUEST_ERROR, CONFIG_ERROR, ...). */
+function isFailedSettlementUpdate(res: SettlementUpdateResponse | undefined): boolean {
+  return !!res?.status && res.status.toUpperCase().endsWith("_ERROR");
+}
+
+const SETTLEMENT_UPDATE_FALLBACK_ERROR = "Failed to update bank account.";
+
+/**
+ * Update the settlement bank account via
+ * PUT /gcc/v3/merchants/profile/{onboardingId}/settlement, plain JSON
+ * `{ accountNumber, ifscCode }`.
+ *
+ * `updateAccount` resolves only on a real success and rejects with the
+ * backend's own message otherwise (invalid IFSC, cooldown still running, bank
+ * verification failed), including a failure that comes back as HTTP 2xx (see
+ * SettlementUpdateResponse). Either way the settlement reads are refetched
+ * afterwards: on success they carry the new account and lastUpdatedTime (so
+ * the 30-day lock starts), and on a cooldown error they bring the lock the
+ * card didn't know about yet. `canEdit` is false until the onboarding id
+ * resolves.
+ */
 export function useUpdateAccountDetails(): {
-  updateAccount: UseMutateFunction<unknown, Error, AccountDetailsUpdatePayload>;
+  updateAccount: (payload: SettlementUpdatePayload) => Promise<SettlementUpdateResponse>;
   isSaving: boolean;
   canEdit: boolean;
 } {
-  const merchantId = useMerchantId();
   const onbId = useOnboardingId();
-  const { mutate, isPending } = usePut<unknown, AccountDetailsUpdatePayload>(
-    updateAccountDetailsApi(merchantId),
-    { invalidateQueries: [["settings-settlement", onbId]] }
+  const queryClient = useQueryClient();
+  const { mutateAsync, isPending } = usePut<SettlementUpdateResponse, SettlementUpdatePayload>(
+    updateSettlementDetailsApi(onbId),
+    // Refetched below on both outcomes instead.
+    { invalidateQueries: false }
   );
-  return { updateAccount: mutate, isSaving: isPending, canEdit: !!merchantId };
+
+  const updateAccount = useCallback(
+    async (payload: SettlementUpdatePayload): Promise<SettlementUpdateResponse> => {
+      try {
+        const res = await mutateAsync(payload);
+        if (isFailedSettlementUpdate(res)) {
+          throw new Error(res?.message || SETTLEMENT_UPDATE_FALLBACK_ERROR);
+        }
+        return res;
+      } catch (err) {
+        // handleApiError rejects with the response body (message included),
+        // not always an Error instance; normalise so callers read one shape.
+        const message = (err as { message?: string } | null)?.message;
+        throw new Error(message || SETTLEMENT_UPDATE_FALLBACK_ERROR);
+      } finally {
+        void queryClient.invalidateQueries({ queryKey: ["settings-settlement", onbId] });
+      }
+    },
+    [mutateAsync, queryClient, onbId]
+  );
+
+  return { updateAccount, isSaving: isPending, canEdit: !!onbId };
 }
 
 /** Upload the merchant's checkout logo via

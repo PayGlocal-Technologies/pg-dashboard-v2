@@ -1,14 +1,15 @@
 "use client";
 
-import { Button, Separator, StatusBadge } from "@/components/ui";
+import { Button, Separator, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { PaymentEtaSummary } from "@/features/dashboard/mca-transactions/payment-eta/components/PaymentEtaSummary";
 import { PaymentEtaJourney } from "@/features/dashboard/mca-transactions/payment-eta/components/PaymentEtaJourney";
 import { PaymentEtaTooltip } from "@/features/dashboard/mca-transactions/payment-eta/components/PaymentEtaTooltip";
+import { ETA_SUPPORT_EMAIL } from "@/features/dashboard/mca-transactions/payment-eta/constants";
 import {
-  ETA_ACCOUNTS,
-  ETA_SUPPORT_EMAIL,
-} from "@/features/dashboard/mca-transactions/payment-eta/constants";
+  useEtaAccounts,
+  useEtaHolidays,
+} from "@/features/dashboard/mca-transactions/payment-eta/hooks";
 import {
   estimateFor,
   etaStatus,
@@ -66,7 +67,8 @@ function RouteEstimate({ estimate, todayKey }: { estimate: EtaEstimate; todayKey
       </p>
       <p className="mt-1 text-[13px] text-muted-foreground">
         via <span className="font-medium text-foreground">{estimate.label}</span> · usually{" "}
-        {estimate.window}, Mon–Fri
+        {estimate.window}
+        {estimate.anyDay ? ", any day" : ", Mon–Fri"}
       </p>
 
       <Separator className="my-5" />
@@ -93,12 +95,25 @@ export function PaymentEtaResult({
   onDone: () => void;
 }) {
   const mode = values.paymentMode || "unknown";
-  const estimates = routesFor(mode).map((route) => estimateFor(route, values.initiatedDate));
+  // The form only lets a complete set through (etaBlocker), so a currency is set.
+  const currency = values.currency || "USD";
+  // That currency's live bank holidays around the sent date.
+  const {
+    holidays,
+    isLoading: isHolidaysLoading,
+    isError: isHolidaysError,
+  } = useEtaHolidays(currency, values.initiatedDate);
+  // Only the chosen currency's own rails: "I don't know" quotes each of them.
+  const estimates = routesFor(mode, values.currency).map((route) =>
+    estimateFor(route, values.initiatedDate, holidays)
+  );
   const allOverdue =
     estimates.length > 0 &&
     estimates.every((e) => etaStatus(e.expectedDate, todayKey) === "overdue");
 
-  const account = ETA_ACCOUNTS.find((a) => a.id === values.accountId);
+  // Same cached list the form picked from (same query key), so no new request.
+  const { accounts } = useEtaAccounts(values.currency);
+  const account = accounts.find((a) => a.id === values.accountId);
   const sent = formatTrackDay(values.initiatedDate);
   const summary = [values.currency, account?.accountType, `Sent ${sent.weekday}, ${sent.day}`]
     .filter(Boolean)
@@ -109,9 +124,25 @@ export function PaymentEtaResult({
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 pb-6 sm:px-8">
         <PaymentEtaSummary text={summary} />
 
-        {estimates.map((estimate) => (
-          <RouteEstimate key={estimate.route} estimate={estimate} todayKey={todayKey} />
-        ))}
+        {/* No estimate until the holidays are in: a date computed without them
+            could move once they arrive. */}
+        {isHolidaysLoading ? (
+          estimates.map((estimate) => (
+            <Shimmer key={estimate.route} className="h-56 w-full rounded-2xl" />
+          ))
+        ) : (
+          <>
+            {isHolidaysError && (
+              <p className="flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
+                <Icon name="alert-circle" size={14} className="mt-0.5 shrink-0" aria-hidden />
+                We couldn&apos;t check bank holidays, so this estimate counts weekends only.
+              </p>
+            )}
+            {estimates.map((estimate) => (
+              <RouteEstimate key={estimate.route} estimate={estimate} todayKey={todayKey} />
+            ))}
+          </>
+        )}
       </div>
 
       <div className="flex flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">

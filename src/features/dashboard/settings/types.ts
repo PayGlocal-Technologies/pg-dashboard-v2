@@ -92,13 +92,25 @@ export interface SettlementDataResponse {
   data?: SettlementData | null;
 }
 
-/** PUT body for updating the settlement bank account. Endpoint:
- *  PUT /gcc/v2/merchants/{merchantId}/account-details — note the key is
- *  `number` (not `accountNumber`), and it is scoped by merchant id, not
- *  onboarding id. `ifscCode` must resolve via IFSC lookup or the API 4xxs. */
-export interface AccountDetailsUpdatePayload {
-  number: string;
+/** PUT /gcc/v3/merchants/profile/{onboardingId}/settlement body. */
+export interface SettlementUpdatePayload {
+  accountNumber: string;
   ifscCode: string;
+}
+
+/**
+ * Its response. Success is `{ message }` alone. Failures carry `status` and
+ * `reasonCode` with the message to show:
+ *   - "Invalid IFSC code"                                REQUEST_ERROR / GL-400-001
+ *   - "You can next update your bank account on <date>." REQUEST_ERROR / GL-400-001
+ *   - "Account verification failed, please check ..."    CONFIG_ERROR  / GL-201-020
+ * The last one's reason code is in the 2xx family, so it may come back with a
+ * 2xx HTTP status; the body's `status`, not the HTTP code, decides success.
+ */
+export interface SettlementUpdateResponse {
+  message?: string;
+  status?: string;
+  reasonCode?: string;
 }
 
 export interface ContactData {

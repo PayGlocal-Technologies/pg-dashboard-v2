@@ -91,18 +91,20 @@ export function SettlementAccountCard({
 
   const form = useForm({
     defaultValues: { number: "", ifscCode: "" },
-    onSubmit: ({ value }) => {
-      updateAccount(
-        { number: value.number.trim(), ifscCode: value.ifscCode.trim().toUpperCase() },
-        {
-          onSuccess: () => {
-            toast.success("Bank account updated successfully.");
-            setEditing(false);
-            setMasked(true); // refetch the masked read the invalidation just cleared
-          },
-          onError: (err: Error) => toast.error(err.message || "Failed to update bank account."),
-        }
-      );
+    onSubmit: async ({ value }) => {
+      try {
+        await updateAccount({
+          accountNumber: value.number.trim(),
+          ifscCode: value.ifscCode.trim().toUpperCase(),
+        });
+        toast.success("Bank account updated successfully.");
+        setEditing(false);
+        setMasked(true); // back to the masked read, which the update just refetched
+      } catch (err) {
+        // The backend's own wording: invalid IFSC, the date the cooldown ends,
+        // or the bank verification failure. The form stays open to fix it.
+        toast.error(err instanceof Error ? err.message : "Failed to update bank account.");
+      }
     },
   });
 
