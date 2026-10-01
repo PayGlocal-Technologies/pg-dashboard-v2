@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
 import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/icon";
@@ -39,6 +38,7 @@ import { reorderColumns } from "@/lib/utils/columns";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
+import { useDrawerMorph } from "@/components/common/drawer-morph/useDrawerMorph";
 import { downloadBlob } from "@/lib/utils/format";
 import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
@@ -184,6 +184,17 @@ export function McaTransactionTable({
   const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const morphControls = useDrawerMorph({
+    id: "mca-transaction",
+    // main's p-6, plus the page's Back/Collapse row (h-9 + mb-2).
+    pageAnchorOffset: 68,
+    contentEl,
+    showPage: (open) => {
+      setDetailsOpen(open);
+      onDetailsOpenChange?.(open);
+    },
+    setDrawerOpen,
+  });
   // Set when navigating to a linked transaction that isn't part of the
   // table's own currently-fetched page (see openLinkedTransaction below) —
   // takes precedence over the rows.find lookup so the details page can show
@@ -301,6 +312,7 @@ export function McaTransactionTable({
     setDetailsOverrideRow(null);
     setDetailsRecord(row);
     setDetailsRowId(row.gid);
+    morphControls.reset();
     setDrawerOpen(true);
   };
 
@@ -309,16 +321,21 @@ export function McaTransactionTable({
   // renders exactly what the drawer was showing. The table's scroll position
   // is captured here (rather than when the drawer opened) because this is the
   // point the table actually leaves the screen and Back has to restore it.
+  //
+  // Animated, the drawer grows into the page first and the page only mounts
+  // once it has landed (useDrawerMorph).
   const expandToPage = (row: McaTransaction) => {
     if (contentEl) setScrollPosition(contentEl.scrollTop);
     setDetailsRecord(row);
     setDetailsRowId(row.gid);
+    if (morphControls.expand()) return;
     setDrawerOpen(false);
     setDetailsOpen(true);
     onDetailsOpenChange?.(true);
   };
 
   const closeDetails = () => {
+    morphControls.reset();
     setDetailsOpen(false);
     setDetailsOverrideRow(null);
     onDetailsOpenChange?.(false);
@@ -330,7 +347,11 @@ export function McaTransactionTable({
   // showing, including one reached via Linked Transactions, stays showing;
   // the scroll-restore effect below puts the table back where expandToPage
   // found it, same as if Expand had never been clicked.
+  //
+  // Animated, the drawer first fades in over the page at its size; the table
+  // swaps back in beneath it and the drawer shrinks away (useDrawerMorph).
   const collapseToDrawer = () => {
+    if (morphControls.collapse()) return;
     setDetailsOpen(false);
     setDrawerOpen(true);
     onDetailsOpenChange?.(false);
@@ -575,34 +596,6 @@ export function McaTransactionTable({
     </>
   );
 
-  // The details page replaces the table in place (same component instance,
-  // same closed-over search/filter/page state) rather than overlaying it —
-  // this is what makes Back restore the table's previous state for free.
-  //
-  // Expand swaps the drawer for this full page in the same frame, which read
-  // as an abrupt jump. A short fade + rise on mount lets the page ease in as
-  // the drawer slides away over it, so the two motions blend into one
-  // handoff rather than a hard cut. Delayed a touch so it starts after the
-  // drawer has begun sliding out, not on the same frame.
-  if (detailsOpen && detailsRow) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.08 }}
-      >
-        <TransactionDetailsPage
-          row={detailsRow}
-          onBack={closeDetails}
-          onCollapse={collapseToDrawer}
-          onUploaded={handleInvoiceSubmitted}
-          onOpenTransaction={openLinkedTransaction}
-          isPartnerUser={isPartnerUser}
-        />
-      </motion.div>
-    );
-  }
-
   // Tab bar: page-level navigation. An underline-style shortcut onto the same
   // status filter state as the "Invoice Pending" option inside the Status
   // flyout, not a separate filter axis. Written once and mounted on both
@@ -721,9 +714,26 @@ export function McaTransactionTable({
     onPageChange: setPage,
   } as const;
 
-  return (
-    <div className="flex flex-col gap-4">
-      {/* mb-4 below lg, giving 32px (this margin plus the flex gap) between
+  // The details page replaces the table in place (same component instance,
+  // same closed-over search/filter/page state) rather than overlaying it —
+  // this is what makes Back restore the table's previous state for free.
+  //
+  // The swap itself is never animated: with motion on, it only ever happens
+  // while the drawer covers the whole content area (see handleMorphStep), so
+  // the drawer's grow/fade/shrink is the one motion the merchant sees.
+  const content =
+    detailsOpen && detailsRow ? (
+      <TransactionDetailsPage
+        row={detailsRow}
+        onBack={closeDetails}
+        onCollapse={collapseToDrawer}
+        onUploaded={handleInvoiceSubmitted}
+        onOpenTransaction={openLinkedTransaction}
+        isPartnerUser={isPartnerUser}
+      />
+    ) : (
+      <div className="flex flex-col gap-4">
+        {/* mb-4 below lg, giving 32px (this margin plus the flex gap) between
           the analytics summary and the transaction section below it, against
           the 8px between the carousel and its indicator: a clear break
           between the summary metrics and the transaction data, without the
@@ -731,37 +741,37 @@ export function McaTransactionTable({
           at lg, the same breakpoint TransactionsAnalyticsCarousel itself
           switches from the carousel (with its indicator) to the plain grid,
           where the flex gap alone matches the previous spacing. */}
-      {analyticsSection && (
-        <div className="mb-4 lg:mb-0" data-guide="mca-txn-analytics">
-          {analyticsSection}
-        </div>
-      )}
+        {analyticsSection && (
+          <div className="mb-4 lg:mb-0" data-guide="mca-txn-analytics">
+            {analyticsSection}
+          </div>
+        )}
 
-      {/* Desktop (lg+): the full table, columns and all, on the card surface
+        {/* Desktop (lg+): the full table, columns and all, on the card surface
           DataTableCard draws — tab bar, toolbar, grid and pager sharing one
           bordered box with the dividers every other table on the app uses. */}
-      <DataTableCard<McaTransaction>
-        className="hidden lg:block"
-        tabs={tabBar}
-        toolbar={desktopControls}
-        columns={columns}
-        data={tableRows}
-        isLoading={isPending}
-        rowKey={(row) => row.gid}
-        emptyTitle={emptyCopy.title}
-        emptyDescription={emptyCopy.description}
-        emptyState={emptyPanel}
-        errorState={errorPanel}
-        // The whole row opens the details drawer, through DataTable's
-        // row-level handler rather than a wrapper inside every cell.
-        // Clicks landing on the row's own buttons and menus are
-        // skipped by it, so each still does only its own job.
-        onRowClick={openDetails}
-        pagination={pagination}
-        maxBodyHeight="none"
-      />
+        <DataTableCard<McaTransaction>
+          className="hidden lg:block"
+          tabs={tabBar}
+          toolbar={desktopControls}
+          columns={columns}
+          data={tableRows}
+          isLoading={isPending}
+          rowKey={(row) => row.gid}
+          emptyTitle={emptyCopy.title}
+          emptyDescription={emptyCopy.description}
+          emptyState={emptyPanel}
+          errorState={errorPanel}
+          // The whole row opens the details drawer, through DataTable's
+          // row-level handler rather than a wrapper inside every cell.
+          // Clicks landing on the row's own buttons and menus are
+          // skipped by it, so each still does only its own job.
+          onRowClick={openDetails}
+          pagination={pagination}
+          maxBodyHeight="none"
+        />
 
-      {/* Tablet + mobile (below lg): a vertical list of transaction cards
+        {/* Tablet + mobile (below lg): a vertical list of transaction cards
           instead of table columns/header, under the same tab bar and the
           compact control row. `tableRows` is already just this
           server-paginated page's rows, so this reads it directly rather than
@@ -769,32 +779,32 @@ export function McaTransactionTable({
 
           No Reorder Columns at either width: there's no table to reorder
           columns on below lg, just the card list. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
-        <div className="border-b border-border px-4 pt-3">{tabBar}</div>
-        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
-          {compactControls}
+        <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+          <div className="border-b border-border px-4 pt-3">{tabBar}</div>
+          <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+            {compactControls}
+          </div>
+          <DataCardList<McaTransaction>
+            bordered={false}
+            rows={tableRows}
+            rowKey={(row) => row.gid}
+            isLoading={isPending}
+            renderCard={(row) => <TransactionCard row={row} onOpenDetails={openDetails} />}
+            renderSkeleton={() => <TransactionCardSkeleton />}
+            emptyState={
+              <PlaceholderState
+                variant="empty-table"
+                size="sm"
+                title={emptyCopy.title}
+                description={emptyCopy.description}
+              />
+            }
+            errorState={errorPanel}
+            pagination={pagination}
+          />
         </div>
-        <DataCardList<McaTransaction>
-          bordered={false}
-          rows={tableRows}
-          rowKey={(row) => row.gid}
-          isLoading={isPending}
-          renderCard={(row) => <TransactionCard row={row} onOpenDetails={openDetails} />}
-          renderSkeleton={() => <TransactionCardSkeleton />}
-          emptyState={
-            <PlaceholderState
-              variant="empty-table"
-              size="sm"
-              title={emptyCopy.title}
-              description={emptyCopy.description}
-            />
-          }
-          errorState={errorPanel}
-          pagination={pagination}
-        />
-      </div>
 
-      {/* Upload Invoice now opens the details page's inline upload flow
+        {/* Upload Invoice now opens the details page's inline upload flow
           instead of this modal — commented out, not deleted, so it can be
           restored.
       <UploadInvoiceModal
@@ -804,16 +814,23 @@ export function McaTransactionTable({
         onUploaded={handleInvoiceSubmitted}
       />
       */}
+      </div>
+    );
 
+  return (
+    <>
+      {content}
       <TransactionDetailsDrawer
         row={detailsRow}
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
+        onOpenChange={morphControls.onDrawerOpenChange}
         onExpand={expandToPage}
         onUploaded={handleInvoiceSubmitted}
         onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}
+        morph={morphControls.morph}
+        onMorphStep={morphControls.onMorphStep}
       />
-    </div>
+    </>
   );
 }

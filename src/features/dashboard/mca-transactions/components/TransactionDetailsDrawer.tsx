@@ -16,6 +16,11 @@ import { CopyableText } from "@/components/common/CopyableText";
 import { truncateMiddle } from "@/lib/utils/format";
 import { TransactionDetailsContent } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
+import { IDLE_MORPH, type DrawerMorph } from "@/components/common/drawer-morph/drawerMorph";
+import {
+  useDrawerMorphTarget,
+  type DrawerMorphStep,
+} from "@/components/common/drawer-morph/useDrawerMorph";
 import { GuideTour } from "@/components/common/guide/GuideTour";
 import { isGuideCompleted, markGuideCompleted } from "@/components/common/guide/storage";
 import {
@@ -32,6 +37,9 @@ interface TransactionDetailsDrawerProps {
   onUploaded?: (row: McaTransaction) => void;
   onOpenTransaction: (row: McaTransaction) => void;
   isPartnerUser: boolean;
+  /** Expand/Collapse morph state, owned by the table (see useDrawerMorph). */
+  morph?: DrawerMorph;
+  onMorphStep?: (step: DrawerMorphStep) => void;
 }
 
 export function TransactionDetailsDrawer({
@@ -42,7 +50,15 @@ export function TransactionDetailsDrawer({
   onUploaded,
   onOpenTransaction,
   isPartnerUser,
+  morph = IDLE_MORPH,
+  onMorphStep,
 }: TransactionDetailsDrawerProps) {
+  const { morphing, pageLayout, panelProps, bodyProps } = useDrawerMorphTarget(
+    morph,
+    open,
+    onMorphStep
+  );
+
   // Below md this becomes a bottom sheet instead of a right-side drawer, via
   // flux-ui's own Drawer side="bottom" (which supplies the inset-x-0/bottom-0
   // placement, the rounded-t-2xl top corners, the max-h-[85vh] cap, and the
@@ -115,6 +131,7 @@ export function TransactionDetailsDrawer({
           "[&>button:last-child]:hidden",
           !isBottomSheet && "w-full sm:w-[32rem] sm:max-w-[92vw]"
         )}
+        {...panelProps}
       >
         <DrawerTitle asChild>
           <VisuallyHidden>Transaction details</VisuallyHidden>
@@ -130,58 +147,80 @@ export function TransactionDetailsDrawer({
             pinned left even when row is momentarily null, e.g. mid
             close-animation, since there's nothing to push right at that
             point. */}
-        <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
-          <div className="flex shrink-0 items-center gap-1">
-            <IconButton
-              aria-label="Close"
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
+        <div className="flex min-h-0 w-full flex-1 flex-col">
+          <DrawerHeader data-morph-header className="flex shrink-0 items-center gap-2 py-3">
+            {/* Out of the way for the whole morph: mid-motion they would be
+                controls for a panel that is busy becoming something else. */}
+            <div
+              className={cn(
+                "flex shrink-0 items-center gap-1 transition-opacity duration-150",
+                morphing && "pointer-events-none opacity-0"
+              )}
             >
-              <Icon name="x" className="h-4 w-4" />
-            </IconButton>
-            {/* Not rendered at all as a bottom sheet (rather than hidden with
+              <IconButton
+                aria-label="Close"
+                variant="ghost"
+                size="sm"
+                onClick={() => onOpenChange(false)}
+              >
+                <Icon name="x" className="h-4 w-4" />
+              </IconButton>
+              {/* Not rendered at all as a bottom sheet (rather than hidden with
                 a class): there is no expanded view in the mobile flow, which
                 is card to sheet and back, so the action has nothing to point
                 at there. Close stays the only way out, same interaction as
                 everywhere else. */}
-            {!isBottomSheet && (
-              <span data-guide="mca-txn-detail-expand" className="inline-flex">
-                <IconButton
-                  aria-label="Expand to full page"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (row) onExpand(row);
-                  }}
-                >
-                  <Icon name="expand" className="h-4 w-4" />
-                </IconButton>
-              </span>
+              {!isBottomSheet && (
+                <span data-guide="mca-txn-detail-expand" className="inline-flex">
+                  <IconButton
+                    aria-label="Expand to full page"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      // The coach-mark points at this button; using it is
+                      // the lesson learned, and its dim layer would otherwise
+                      // sit over the whole morph.
+                      if (tourOpen) closeTour();
+                      if (row) onExpand(row);
+                    }}
+                  >
+                    <Icon name="expand" className="h-4 w-4" />
+                  </IconButton>
+                </span>
+              )}
+            </div>
+            {row && (
+              <CopyableText
+                value={row.gid}
+                displayValue={truncateMiddle(row.gid, 10, 6)}
+                valueClassName="min-w-0 truncate text-muted-foreground"
+                className={cn(
+                  "ml-auto min-w-0 transition-opacity duration-150",
+                  morphing && "pointer-events-none opacity-0"
+                )}
+              />
             )}
-          </div>
-          {row && (
-            <CopyableText
-              value={row.gid}
-              displayValue={truncateMiddle(row.gid, 10, 6)}
-              valueClassName="min-w-0 truncate text-muted-foreground"
-              className="ml-auto min-w-0"
-            />
-          )}
-        </DrawerHeader>
+          </DrawerHeader>
 
-        {/* Only this region scrolls, so the header's close/expand stay
+          {/* Only this region scrolls, so the header's close/expand stay
             reachable however long the content runs. */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          {row && (
-            <TransactionDetailsContent
-              row={row}
-              onUploaded={onUploaded}
-              onOpenTransaction={onOpenTransaction}
-              isPartnerUser={isPartnerUser}
-              layout="drawer"
-            />
-          )}
+          <div className="min-h-0 flex-1 overflow-y-auto p-6" {...bodyProps}>
+            {/* The page's own cap and centring (mca-transactions/index.tsx), so
+                on a wide screen the content drifts to the centre as the panel
+                grows and lands where the page puts it. No effect at rest: the
+                drawer is far narrower than the cap. */}
+            <div className="mx-auto max-w-[1400px]">
+              {row && (
+                <TransactionDetailsContent
+                  row={row}
+                  onUploaded={onUploaded}
+                  onOpenTransaction={onOpenTransaction}
+                  isPartnerUser={isPartnerUser}
+                  layout={pageLayout ? "page" : "drawer"}
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         {/* First-open coach-mark pointing at the expand-to-full-page action. */}
