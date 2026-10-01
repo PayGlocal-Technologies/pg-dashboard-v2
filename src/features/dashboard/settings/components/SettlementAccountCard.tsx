@@ -52,7 +52,15 @@ const COMPACT_ERROR = "text-xs";
  *  - Recently changed: Edit stays visible but inert, a tooltip says how many
  *    days are left, and the panel adds the countdown and the support email.
  */
-export function SettlementAccountCard({ lastChangedDate }: { lastChangedDate: string | null }) {
+export function SettlementAccountCard({
+  lastChangedDate,
+  isPolicyLoading = false,
+}: {
+  lastChangedDate: string | null;
+  /** True until lastUpdatedTime has loaded. Edit stays inert meanwhile, so it
+   *  can't be opened in the moment before a lock is known to apply. */
+  isPolicyLoading?: boolean;
+}) {
   // Eye toggle, exactly as pg-dashboard's SettlementDetails: masked reads the
   // /settlement endpoint, unmasked swaps to /settlement-details. Starts masked.
   const [masked, setMasked] = useState(true);
@@ -68,11 +76,11 @@ export function SettlementAccountCard({ lastChangedDate }: { lastChangedDate: st
     return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
   });
   const policy = settlementChangePolicy(lastChangedDate, todayKey);
-  const locked = !policy.isEditable;
+  const locked = !isPolicyLoading && !policy.isEditable;
   const remaining = formatDayCount(policy.daysUntilEditable);
   // Something beyond the rule itself to say: the countdown while locked, or
   // that a lock has just run out.
-  const hasMore = locked || policy.windowJustEnded;
+  const hasMore = !isPolicyLoading && (locked || policy.windowJustEnded);
   const [policyOpen, setPolicyOpen] = useState(false);
 
   // The secure endpoint returns the full number under `accountNumber`, the
@@ -269,7 +277,7 @@ export function SettlementAccountCard({ lastChangedDate }: { lastChangedDate: st
                 variant="link"
                 size="sm"
                 onClick={startEditing}
-                disabled={!canEdit}
+                disabled={!canEdit || isPolicyLoading}
                 leftIcon={<Icon name="pencil" size={13} aria-hidden />}
                 className="h-auto min-h-0 gap-1.5 p-0 text-[13px] font-medium"
               >

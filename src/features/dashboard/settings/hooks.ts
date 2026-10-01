@@ -8,6 +8,7 @@ import { useApp } from "@/stores/useApp";
 import { getPublicKey } from "@/features/auth/helpers";
 import { useEncryptPayload, type EncryptedPayload } from "@/features/auth/hooks";
 import { EMAIL_CHANGE_COMPLETED_STATUS } from "@/features/dashboard/settings/constants";
+import { dateKeyFromEpochMillis } from "@/features/dashboard/settings/settlementChangePolicy";
 import {
   businessDetailsApi,
   contactDetailsApi,
@@ -212,6 +213,29 @@ export function useSettlementDetails(masked: boolean): {
     { enabled: !!onbId }
   );
   return { settlement: data?.data ?? null, isLoading: !!onbId && isPending, isError };
+}
+
+/**
+ * When the settlement account was last changed (local YYYY-MM-DD, or null if
+ * never), from `lastUpdatedTime` on the masked settlement read
+ * (GET /v3/merchants/profile/{onbId}/settlement).
+ *
+ * Same query key as the card's own default (masked) read, so this shares that
+ * request rather than adding one. An update invalidates it (see
+ * useUpdateAccountDetails), so the new timestamp, and with it the lock,
+ * arrives right after a change. A failed read settles to "never changed".
+ */
+export function useSettlementLastChanged(): { lastChangedDate: string | null; isLoading: boolean } {
+  const onbId = useOnboardingId();
+  const { data, isPending } = useGet<SettlementDataResponse>(
+    ["settings-settlement", onbId, true],
+    settlementDetailsApi(onbId),
+    { enabled: !!onbId }
+  );
+  return {
+    lastChangedDate: dateKeyFromEpochMillis(data?.data?.lastUpdatedTime),
+    isLoading: !!onbId && isPending,
+  };
 }
 
 /** The merchant id (profile.mid) the account-details update endpoint is scoped

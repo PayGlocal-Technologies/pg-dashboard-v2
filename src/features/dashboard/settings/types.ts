@@ -81,6 +81,11 @@ export interface SettlementData {
    *  form binds this key (its field is literally named `accountNumber`), which
    *  is why the two endpoints return the number under different keys. */
   accountNumber?: string | null;
+  /** When the settlement account was last changed, epoch milliseconds as a
+   *  string (e.g. "1790762925003"). Returned by the masked /settlement read
+   *  (GET /v3/merchants/profile/{onbId}/settlement). Drives
+   *  the once-every-30-days change rule, see settlementChangePolicy. */
+  lastUpdatedTime?: string | null;
 }
 
 export interface SettlementDataResponse {
