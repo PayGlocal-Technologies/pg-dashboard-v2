@@ -1,6 +1,6 @@
 "use client";
 
-import { useForm } from "@tanstack/react-form";
+import { useForm, useStore } from "@tanstack/react-form";
 import {
   Button,
   DatePicker,
@@ -15,13 +15,15 @@ import {
 import { Icon } from "@/components/icon";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import {
-  ETA_ACCOUNTS,
-  ETA_CURRENCIES,
-  ETA_PAYMENT_MODES,
   ETA_SUPPORT_EMAIL,
+  etaPaymentModesFor,
   type EtaCurrency,
   type EtaPaymentMode,
 } from "@/features/dashboard/mca-transactions/payment-eta/constants";
+import {
+  useEtaAccounts,
+  useEtaCurrencies,
+} from "@/features/dashboard/mca-transactions/payment-eta/hooks";
 import {
   etaBlocker,
   type EtaFormValues,
@@ -50,6 +52,28 @@ export function PaymentEtaForm({
       if (etaBlocker(value) === null) onSubmit(value);
     },
   });
+
+  // Accounts and modes both depend on the currency, so both read it live.
+  const currency = useStore(form.store, (s) => s.values.currency);
+  const { currencies, isLoading: isCurrenciesLoading, isError: isCurrenciesError } =
+    useEtaCurrencies();
+  const {
+    accounts,
+    isLoading: isAccountsLoading,
+    isError: isAccountsError,
+  } = useEtaAccounts(currency);
+  const paymentModes = etaPaymentModesFor(currency);
+
+  let currencyPlaceholder = "Select currency";
+  if (isCurrenciesLoading) currencyPlaceholder = "Loading currencies…";
+  else if (isCurrenciesError) currencyPlaceholder = "Couldn't load your currencies";
+  else if (currencies.length === 0) currencyPlaceholder = "No accounts to check";
+
+  let accountPlaceholder = "Select account";
+  if (!currency) accountPlaceholder = "Select a currency first";
+  else if (isAccountsLoading) accountPlaceholder = "Loading accounts…";
+  else if (isAccountsError) accountPlaceholder = "Couldn't load accounts";
+  else if (accounts.length === 0) accountPlaceholder = `No ${currency} accounts found`;
 
   return (
     <form
@@ -88,13 +112,22 @@ export function PaymentEtaForm({
               <FieldLabel htmlFor="eta-currency">Payment currency</FieldLabel>
               <Select
                 value={field.state.value}
-                onValueChange={(v) => field.handleChange(v as EtaCurrency)}
+                onValueChange={(v) => {
+                  if (v === field.state.value) return;
+                  field.handleChange(v as EtaCurrency);
+                  // The account and the mode both belong to a currency, so a
+                  // new currency clears them rather than keeping a USD account
+                  // or an ACH mode against, say, GBP.
+                  form.setFieldValue("accountId", "");
+                  form.setFieldValue("paymentMode", "");
+                }}
+                disabled={currencies.length === 0}
               >
                 <SelectTrigger id="eta-currency" className={FIELD_TRIGGER}>
-                  <SelectValue />
+                  <SelectValue placeholder={currencyPlaceholder} />
                 </SelectTrigger>
                 <SelectContent>
-                  {ETA_CURRENCIES.map((c) => (
+                  {currencies.map((c) => (
                     <SelectItem key={c.code} value={c.code}>
                       <span className="flex items-center gap-2">
                         <CountryFlag iso2={c.iso2} alt="" />
@@ -110,15 +143,19 @@ export function PaymentEtaForm({
 
         <form.Field name="accountId">
           {(field) => {
-            const selected = ETA_ACCOUNTS.find((a) => a.id === field.state.value);
+            const selected = accounts.find((a) => a.id === field.state.value);
             return (
               <Field>
                 <FieldLabel htmlFor="eta-account">Which account did you share?</FieldLabel>
-                <Select value={field.state.value} onValueChange={field.handleChange}>
+                <Select
+                  value={field.state.value}
+                  onValueChange={field.handleChange}
+                  disabled={accounts.length === 0}
+                >
                   <SelectTrigger id="eta-account" className={FIELD_TRIGGER}>
                     {/* One line in the closed field; the full three-line row is
                         for choosing, in the list. */}
-                    <SelectValue placeholder="Select account">
+                    <SelectValue placeholder={accountPlaceholder}>
                       {selected && (
                         <span className="flex min-w-0 items-center gap-2">
                           <Icon
@@ -136,7 +173,7 @@ export function PaymentEtaForm({
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    {ETA_ACCOUNTS.map((account) => (
+                    {accounts.map((account) => (
                       <SelectItem key={account.id} value={account.id} className="py-2">
                         <span className="flex items-start gap-3">
                           <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
@@ -149,9 +186,11 @@ export function PaymentEtaForm({
                             <span className="block text-xs text-muted-foreground">
                               {account.accountType}
                             </span>
-                            <span className="block text-xs tabular-nums text-muted-foreground">
-                              Account number: {account.maskedNumber}
-                            </span>
+                            {account.maskedNumber && (
+                              <span className="block text-xs tabular-nums text-muted-foreground">
+                                Account number: {account.maskedNumber}
+                              </span>
+                            )}
                           </span>
                         </span>
                       </SelectItem>
@@ -167,15 +206,18 @@ export function PaymentEtaForm({
           {(field) => (
             <Field>
               <FieldLabel htmlFor="eta-mode">Mode of payment</FieldLabel>
+              {/* The rails this currency's account receives over, see
+                  ETA_ROUTES_BY_CURRENCY. */}
               <Select
                 value={field.state.value}
                 onValueChange={(v) => field.handleChange(v as EtaPaymentMode)}
+                disabled={!currency}
               >
                 <SelectTrigger id="eta-mode" className={FIELD_TRIGGER}>
-                  <SelectValue placeholder="Select mode" />
+                  <SelectValue placeholder={currency ? "Select mode" : "Select a currency first"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {ETA_PAYMENT_MODES.map((mode) => (
+                  {paymentModes.map((mode) => (
                     <SelectItem key={mode.value} value={mode.value}>
                       {mode.label}
                     </SelectItem>

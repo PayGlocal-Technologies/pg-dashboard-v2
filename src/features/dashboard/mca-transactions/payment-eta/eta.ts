@@ -1,44 +1,52 @@
 import {
-  ETA_BANK_HOLIDAYS,
+  ETA_ROUTES,
+  ETA_ROUTES_BY_CURRENCY,
   type EtaCurrency,
   type EtaPaymentMode,
+  type EtaRoute,
 } from "@/features/dashboard/mca-transactions/payment-eta/constants";
+
+export type { EtaRoute };
 
 /** Everything the merchant tells the form. Empty strings mean "not chosen". */
 export interface EtaFormValues {
   /** YYYY-MM-DD */
   initiatedDate: string;
-  currency: EtaCurrency;
+  /** Empty until picked. Only currencies the merchant holds an account in are
+   *  offered (see useEtaCurrencies). */
+  currency: EtaCurrency | "";
   accountId: string;
   paymentMode: EtaPaymentMode | "";
 }
 
 /** Why Continue is off, derived from the values so the form and the button
  *  can never disagree. `unsupported-mode` is the one shown inline. */
-export type EtaBlocker = "missing-date" | "missing-account" | "missing-mode" | "unsupported-mode";
+export type EtaBlocker =
+  | "missing-date"
+  | "missing-currency"
+  | "missing-account"
+  | "missing-mode"
+  | "unsupported-mode";
 
 export function etaBlocker(values: EtaFormValues): EtaBlocker | null {
   if (!values.initiatedDate) return "missing-date";
+  if (!values.currency) return "missing-currency";
   if (!values.accountId) return "missing-account";
   if (!values.paymentMode) return "missing-mode";
   if (values.paymentMode === "other") return "unsupported-mode";
   return null;
 }
 
-/** A route the result can quote an ETA for. */
-export type EtaRoute = "ach" | "fedwire";
-
-const ROUTES: Record<EtaRoute, { label: string; maxDays: number; window: string }> = {
-  ach: { label: "ACH", maxDays: 2, window: "1–2 business days" },
-  fedwire: { label: "FEDWIRE", maxDays: 1, window: "1 business day" },
-};
-
-/** The routes a mode resolves to: "I don't know" quotes both. */
-export function routesFor(mode: EtaPaymentMode): EtaRoute[] {
-  if (mode === "ach") return ["ach"];
-  if (mode === "fedwire") return ["fedwire"];
-  if (mode === "unknown") return ["ach", "fedwire"];
-  return [];
+/** The routes a mode resolves to, within the currency's own rails: one rail
+ *  quotes just that one, "I don't know" quotes every rail the currency's
+ *  account receives over, and "Others" (or a rail that isn't the currency's,
+ *  which only a stale value could produce) quotes none. */
+export function routesFor(mode: EtaPaymentMode, currency: EtaCurrency | ""): EtaRoute[] {
+  if (!currency) return [];
+  const rails = ETA_ROUTES_BY_CURRENCY[currency];
+  if (mode === "unknown") return rails;
+  if (mode === "other") return [];
+  return rails.includes(mode) ? [mode] : [];
 }
 
 export interface EtaEstimate {
@@ -46,6 +54,8 @@ export interface EtaEstimate {
   label: string;
   /** e.g. "1–2 business days" */
   window: string;
+  /** Instant rail that runs every day, weekends included. */
+  anyDay: boolean;
   /** YYYY-MM-DD, the latest day the payment should land. */
   expectedDate: string;
   /** Weekday bank holidays the walk stepped over, each adding a day. */
@@ -59,7 +69,9 @@ export interface EtaEstimate {
 export interface EtaJourneyDay {
   /** YYYY-MM-DD */
   date: string;
-  kind: "sent" | "transit" | "weekend" | "holiday" | "arrives";
+  /** "same-day": sent and lands on this one day (an instant rail, or a
+   *  same-day rail sent on a business day). */
+  kind: "sent" | "transit" | "weekend" | "holiday" | "arrives" | "same-day";
   /** Set on a holiday. */
   holidayName?: string;
 }
@@ -79,20 +91,48 @@ function toKey(date: Date): string {
  * days have passed. Weekends never count; a bank holiday on a weekday is
  * skipped and recorded, since that is the "+1 day" the result explains.
  */
+/** One bank holiday, YYYY-MM-DD local date. */
+export interface EtaHoliday {
+  date: string;
+  name: string;
+}
+
 function addBusinessDays(
   startKey: string,
-  businessDays: number
+  businessDays: number,
+  holidayList: EtaHoliday[],
+  anyDay = false
 ): {
   dateKey: string;
   holidaysSkipped: { date: string; name: string }[];
   journey: EtaJourneyDay[];
 } {
-  const holidays = new Map(ETA_BANK_HOLIDAYS.map((h) => [h.date, h.name]));
-  const cursor = parseKey(startKey);
+  const holidays = new Map(holidayList.map((h) => [h.date, h.name]));
   const holidaysSkipped: { date: string; name: string }[] = [];
+
+  // Instant rails run every day: it lands the day it was sent.
+  if (anyDay) {
+    return { dateKey: startKey, holidaysSkipped, journey: [{ date: startKey, kind: "same-day" }] };
+  }
+
+  const isBusinessDay = (key: string): boolean => {
+    const day = parseKey(key).getDay();
+    return day !== 0 && day !== 6 && !holidays.has(key);
+  };
+
+  // Same-day rails: it lands the day it was sent if that is a business day,
+  // otherwise on the next one, after the weekend or holiday it waits through.
+  if (businessDays === 0 && isBusinessDay(startKey)) {
+    return { dateKey: startKey, holidaysSkipped, journey: [{ date: startKey, kind: "same-day" }] };
+  }
+
+  const cursor = parseKey(startKey);
   const journey: EtaJourneyDay[] = [{ date: startKey, kind: "sent" }];
+  // A same-day rail sent on a non-business day still needs one business day
+  // to come round, so it walks like a one-day rail from here.
+  const target = Math.max(1, businessDays);
   let counted = 0;
-  while (counted < businessDays) {
+  while (counted < target) {
     cursor.setDate(cursor.getDate() + 1);
     const key = toKey(cursor);
     const day = cursor.getDay();
@@ -107,18 +147,31 @@ function addBusinessDays(
       continue;
     }
     counted += 1;
-    journey.push({ date: key, kind: counted === businessDays ? "arrives" : "transit" });
+    journey.push({ date: key, kind: counted === target ? "arrives" : "transit" });
   }
   return { dateKey: toKey(cursor), holidaysSkipped, journey };
 }
 
-export function estimateFor(route: EtaRoute, initiatedDate: string): EtaEstimate {
-  const spec = ROUTES[route];
-  const { dateKey, holidaysSkipped, journey } = addBusinessDays(initiatedDate, spec.maxDays);
+/** `holidays`: the payment currency's bank holidays around `initiatedDate`,
+ *  from the live calendar (see useEtaHolidays). Instant rails ignore them. */
+export function estimateFor(
+  route: EtaRoute,
+  initiatedDate: string,
+  holidays: EtaHoliday[]
+): EtaEstimate {
+  const spec = ETA_ROUTES[route];
+  const anyDay = !!spec.anyDay;
+  const { dateKey, holidaysSkipped, journey } = addBusinessDays(
+    initiatedDate,
+    spec.maxDays,
+    holidays,
+    anyDay
+  );
   return {
     route,
     label: spec.label,
     window: spec.window,
+    anyDay,
     expectedDate: dateKey,
     holidaysSkipped,
     journey,
