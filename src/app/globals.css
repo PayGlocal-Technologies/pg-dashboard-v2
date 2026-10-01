@@ -223,6 +223,21 @@ select {
   -webkit-backdrop-filter: none;
 }
 
+/* ─── Drawer ↔ page morph ────────────────────────────────────────────────────
+   McaTransactionTable sets data-drawer-morph on <html> while the details
+   drawer grows into the page or shrinks back, and the drawer's overlay (the
+   Radix sibling before the panel, which useDrawerMorphTarget marks
+   data-morph-panel; `~`, not `+`, since other portals such as the feedback
+   widget can mount between the two) must stay off the sidebar and header
+   for that time. !important because it has to win over the overlay's own
+   fade keyframes, which otherwise own its opacity while they run. */
+[data-drawer-morph] .fixed.inset-0.z-50[data-state]:has(~ [data-morph-panel]) {
+  transition: opacity 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+[data-drawer-morph="clear"] .fixed.inset-0.z-50[data-state]:has(~ [data-morph-panel]) {
+  opacity: 0 !important;
+}
+
 /* ─── Enter/exit animations ──────────────────────────────────────────────────
    Flux's Drawer (and Blanket) components emit `animate-in`, `animate-out`,
    `fade-in-0`, `fade-out-0`, `slide-in-from-*` and `slide-out-to-*` classes

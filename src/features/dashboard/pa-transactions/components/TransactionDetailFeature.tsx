@@ -60,16 +60,6 @@ interface TransactionDetailFeatureProps {
 export function TransactionDetailFeature({ transactionId }: TransactionDetailFeatureProps) {
   const router = useRouter();
   const transaction = useTransactionDetail((s) => s.transaction);
-  const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
-  // Session-issued refunds not yet folded into transaction.refunds (see
-  // useRefundEvents), merged with the transaction's own refunds inside
-  // deriveTransactionDetail for every refundable/refunded-amount calculation
-  // below.
-  const refundEvents = useRefundEvents(
-    (s) => s.eventsByTransactionId[transaction?.gid ?? ""] ?? EMPTY_REFUND_EVENTS
-  );
-  const addRefundEvent = useRefundEvents((s) => s.addRefundEvent);
-  const [refundOpen, setRefundOpen] = useState(false);
 
   if (!transaction || transaction.gid !== transactionId) {
     return (
@@ -91,6 +81,88 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
       </div>
     );
   }
+
+  return (
+    <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
+      <TransactionDetailView
+        transaction={transaction}
+        onBack={() => router.push(LIST_PATH)}
+        className="page-enter"
+      />
+    </div>
+  );
+}
+
+interface TransactionDetailViewProps {
+  transaction: PaTransaction;
+  onBack: () => void;
+  /** Present when the page is the Transactions list's expanded drawer, which
+   *  can shrink back into it (see PaTransactionTable). */
+  onCollapse?: () => void;
+  className?: string;
+}
+
+/**
+ * The full transaction page: title, Back (and Collapse, when expanded from the
+ * drawer in place), then the body. Rendered by the route above and in place by
+ * PaTransactionTable, so the two can never drift apart.
+ */
+export function TransactionDetailView({
+  transaction,
+  onBack,
+  onCollapse,
+  className,
+}: TransactionDetailViewProps) {
+  return (
+    <div className={cn("mx-auto max-w-[1400px] space-y-5", className)}>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">{PAGE_TITLE}</h1>
+
+      <div className="flex items-center gap-4">
+        <Button
+          type="button"
+          variant="link"
+          leftIcon={<Icon name="chevron-left" size={14} />}
+          onClick={onBack}
+          className="h-auto w-fit gap-1 p-0 text-sm font-medium"
+        >
+          {BACK_LABEL}
+        </Button>
+        {onCollapse && (
+          <Button
+            type="button"
+            variant="link"
+            leftIcon={<Icon name="shrink" size={14} />}
+            onClick={onCollapse}
+            className="h-auto w-fit gap-1 p-0 text-sm font-medium text-muted-foreground hover:bg-transparent hover:text-foreground hover:no-underline focus-visible:no-underline"
+          >
+            Collapse
+          </Button>
+        )}
+      </div>
+
+      <TransactionDetailBody transaction={transaction} />
+    </div>
+  );
+}
+
+/**
+ * Everything below the page's Back row: summary, timeline, breakdowns and
+ * details in two columns, and the refund dialog. Its root is the morph anchor:
+ * the drawer renders this same body while it grows into the page, and lines
+ * the two copies up on it (see useDrawerMorph).
+ */
+export function TransactionDetailBody({ transaction }: { transaction: PaTransaction }) {
+  const router = useRouter();
+  const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
+  // Session-issued refunds not yet folded into transaction.refunds (see
+  // useRefundEvents), merged with the transaction's own refunds inside
+  // deriveTransactionDetail for every refundable/refunded-amount calculation
+  // below.
+  const refundEvents = useRefundEvents(
+    (s) => s.eventsByTransactionId[transaction.gid ?? ""] ?? EMPTY_REFUND_EVENTS
+  );
+  const addRefundEvent = useRefundEvents((s) => s.addRefundEvent);
+  const [refundOpen, setRefundOpen] = useState(false);
 
   const detail = deriveTransactionDetail(transaction, refundEvents);
   // The one combined status badge (see getDisplayStatus's own doc comment),
@@ -245,7 +317,7 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
     }
 
     const reasonLabel = reason.replace(/_/g, " ");
-    const transactionId = transaction!.gid ?? "";
+    const transactionId = transaction.gid ?? "";
 
     // A child financial event on this same transaction, keyed by its own
     // gid, never a new merchant-facing transaction ID, see useRefundEvents.
@@ -270,16 +342,16 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
     // children (see buildLinkedChildRows), each opens its own dedicated
     // detail view, never this same parent page again, see
     // RefundDetailFeature/DisputeDetailFeature.
-    setStoredTransaction(transaction!);
+    setStoredTransaction(transaction);
     if (row.linkedRecordType === "refund") {
       router.push(
-        `/pa-transactions/${encodeURIComponent(transaction!.gid ?? "")}/refunds/${encodeURIComponent(row.linkedRecordId ?? "")}`
+        `/pa-transactions/${encodeURIComponent(transaction.gid ?? "")}/refunds/${encodeURIComponent(row.linkedRecordId ?? "")}`
       );
       return;
     }
     if (row.linkedRecordType === "dispute") {
       router.push(
-        `/pa-transactions/${encodeURIComponent(transaction!.gid ?? "")}/disputes/${encodeURIComponent(row.linkedRecordId ?? "")}`
+        `/pa-transactions/${encodeURIComponent(transaction.gid ?? "")}/disputes/${encodeURIComponent(row.linkedRecordId ?? "")}`
       );
       return;
     }
@@ -291,119 +363,105 @@ export function TransactionDetailFeature({ transactionId }: TransactionDetailFea
   }
 
   return (
-    <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
-      <div className="page-enter mx-auto max-w-[1400px] space-y-5">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">{PAGE_TITLE}</h1>
-
-        <Button
-          type="button"
-          variant="link"
-          leftIcon={<Icon name="chevron-left" size={14} />}
-          onClick={() => router.push(LIST_PATH)}
-          className="h-auto w-fit gap-1 p-0 text-sm font-medium"
-        >
-          {BACK_LABEL}
-        </Button>
-
-        {/* Amount, currency, status, date/time and payment method, then
-         * charged-to, sits directly on the page background, no card. */}
-        <div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <p className="flex items-baseline gap-2 text-4xl font-bold tracking-tight text-foreground tabular-nums">
-                {formatCurrency(amount, currency)}
-                <span className="text-base font-medium text-muted-foreground">{currency}</span>
-              </p>
-              <StatusBadgeWithTooltip
-                variant={statusMeta.variant}
-                label={statusMeta.label}
-                trailIcon={statusMeta.trailIcon}
-                tooltip={statusMeta.tooltip}
-                size="sm"
-              />
-            </div>
-            {canRefund && (
-              <Button type="button" variant="outline" size="sm" onClick={() => setRefundOpen(true)}>
-                Issue Refund
-              </Button>
-            )}
+    <div data-morph-anchor className="space-y-5">
+      {/* Amount, currency, status, date/time and payment method, then
+       * charged-to, sits directly on the page background, no card. */}
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <p className="flex items-baseline gap-2 text-4xl font-bold tracking-tight text-foreground tabular-nums">
+              {formatCurrency(amount, currency)}
+              <span className="text-base font-medium text-muted-foreground">{currency}</span>
+            </p>
+            <StatusBadgeWithTooltip
+              variant={statusMeta.variant}
+              label={statusMeta.label}
+              trailIcon={statusMeta.trailIcon}
+              tooltip={statusMeta.tooltip}
+              size="sm"
+            />
           </div>
-
-          {/* Same text-[13px] font-medium text-foreground as TransactionPaymentMethod's
-           * own text and the Transactions table's Date & Time column, so nothing
-           * in this row reads lighter/heavier than anything else. */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground">
-            <span>{formattedDateTime}</span>
-            <Separator orientation="vertical" className="h-3.5" />
-            <TransactionPaymentMethod row={transaction} />
-          </div>
-
-          {isDisputed ? (
-            <>
-              <p className="mt-4 text-sm text-muted-foreground">
-                Charged to <span className="font-semibold text-foreground/85">{name}</span>
-              </p>
-              <Separator className="mt-4" />
-            </>
-          ) : (
-            <>
-              <Separator className="my-4" />
-              <p className="text-sm text-muted-foreground">
-                Charged to <span className="font-semibold text-foreground/85">{name}</span>
-              </p>
-            </>
+          {canRefund && (
+            <Button type="button" variant="outline" size="sm" onClick={() => setRefundOpen(true)}>
+              Issue Refund
+            </Button>
           )}
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
-          {/* Left column */}
-          <div className="flex flex-col gap-4">
-            {settlementDetailsSection}
+        {/* Same text-[13px] font-medium text-foreground as TransactionPaymentMethod's
+         * own text and the Transactions table's Date & Time column, so nothing
+         * in this row reads lighter/heavier than anything else. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground">
+          <span>{formattedDateTime}</span>
+          <Separator orientation="vertical" className="h-3.5" />
+          <TransactionPaymentMethod row={transaction} />
+        </div>
 
-            {!isDisputed && <ReferAndEarnBanner />}
+        {isDisputed ? (
+          <>
+            <p className="mt-4 text-sm text-muted-foreground">
+              Charged to <span className="font-semibold text-foreground/85">{name}</span>
+            </p>
+            <Separator className="mt-4" />
+          </>
+        ) : (
+          <>
+            <Separator className="my-4" />
+            <p className="text-sm text-muted-foreground">
+              Charged to <span className="font-semibold text-foreground/85">{name}</span>
+            </p>
+          </>
+        )}
+      </div>
 
-            {showFeedback && <ProductFeedback key={transaction.gid} />}
+      <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
+        {/* Left column */}
+        <div className="flex flex-col gap-4">
+          {settlementDetailsSection}
 
-            {amountBreakdownSection}
+          {!isDisputed && <ReferAndEarnBanner />}
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Linked Transactions</SectionLabel>
-              <LinkedTransactionsSection
-                transactions={linkedTransactions}
-                onViewDetails={goToDetail}
-              />
-            </div>
-          </div>
+          {showFeedback && <ProductFeedback key={transaction.gid} />}
 
-          {/* Right column, sticky */}
-          <div className="flex flex-col gap-4 lg:sticky lg:top-4">
-            {paymentDetailsSection}
+          {amountBreakdownSection}
 
-            {customerDetailsSection}
-
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Status Notes</SectionLabel>
-              <Card
-                className={cn(
-                  "gap-5 p-5",
-                  statusMeta.variant === "danger" && "border-red-200 dark:border-red-900/50"
-                )}
-              >
-                <DetailRow label="Reason" value={detail.statusReason} />
-                {detail.errorCode && <DetailRow label="Error Code" value={detail.errorCode} />}
-              </Card>
-            </div>
+          <div className="flex flex-col gap-2">
+            <SectionLabel>Linked Transactions</SectionLabel>
+            <LinkedTransactionsSection
+              transactions={linkedTransactions}
+              onViewDetails={goToDetail}
+            />
           </div>
         </div>
 
-        <IssueRefundDialog
-          open={refundOpen}
-          onOpenChange={setRefundOpen}
-          currency={currency}
-          refundableAmount={refundableAmount}
-          onSubmit={handleIssueRefund}
-        />
+        {/* Right column, sticky */}
+        <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+          {paymentDetailsSection}
+
+          {customerDetailsSection}
+
+          <div className="flex flex-col gap-2">
+            <SectionLabel>Status Notes</SectionLabel>
+            <Card
+              className={cn(
+                "gap-5 p-5",
+                statusMeta.variant === "danger" && "border-red-200 dark:border-red-900/50"
+              )}
+            >
+              <DetailRow label="Reason" value={detail.statusReason} />
+              {detail.errorCode && <DetailRow label="Error Code" value={detail.errorCode} />}
+            </Card>
+          </div>
+        </div>
       </div>
+
+      <IssueRefundDialog
+        open={refundOpen}
+        onOpenChange={setRefundOpen}
+        currency={currency}
+        refundableAmount={refundableAmount}
+        onSubmit={handleIssueRefund}
+      />
     </div>
   );
 }

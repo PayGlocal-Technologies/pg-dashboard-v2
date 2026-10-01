@@ -443,7 +443,7 @@ export function TransactionDetailsContent({
     // settlement BATCH's details still join the stack once settlement is
     // done (isSettled).
     return (
-      <div className="space-y-4">
+      <div data-morph-anchor className="space-y-4">
         {summary}
         <SettlementActionCard row={row} onUploaded={onUploaded} />
         <SettlementTimelineSection row={row} />
@@ -466,7 +466,7 @@ export function TransactionDetailsContent({
   const timelineRow = 1;
 
   return (
-    <div className="relative z-10">
+    <div data-morph-anchor className="relative z-10">
       {/* Transaction summary — full-width page header, standalone, no card,
           sitting above the 2-column layout entirely (not part of either
           column). The primary focal point of the page. Transaction Date

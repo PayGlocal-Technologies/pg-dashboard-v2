@@ -23,6 +23,12 @@ import { LinkedTransactionsSection } from "@/features/dashboard/pa-transactions/
 import { SettlementDetailsBody } from "@/features/dashboard/pa-transactions/components/SettlementDetailsBody";
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
+import { TransactionDetailBody } from "@/features/dashboard/pa-transactions/components/TransactionDetailFeature";
+import { IDLE_MORPH, type DrawerMorph } from "@/components/common/drawer-morph/drawerMorph";
+import {
+  useDrawerMorphTarget,
+  type DrawerMorphStep,
+} from "@/components/common/drawer-morph/useDrawerMorph";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
@@ -37,15 +43,29 @@ interface TransactionDetailsDrawerProps {
   transaction: PaTransaction | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Grows the drawer into the full page in place. Without it, Expand opens
+   *  the transaction's own route instead. */
+  onExpand?: (transaction: PaTransaction) => void;
+  /** Expand/Collapse morph state, owned by the table (see useDrawerMorph). */
+  morph?: DrawerMorph;
+  onMorphStep?: (step: DrawerMorphStep) => void;
 }
 
 export function TransactionDetailsDrawer({
   transaction,
   open,
   onOpenChange,
+  onExpand,
+  morph = IDLE_MORPH,
+  onMorphStep,
 }: TransactionDetailsDrawerProps) {
   const router = useRouter();
   const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
+  const { morphing, pageLayout, panelProps, bodyProps } = useDrawerMorphTarget(
+    morph,
+    open,
+    onMorphStep
+  );
 
   if (!transaction) return null;
 
@@ -100,13 +120,26 @@ export function TransactionDetailsDrawer({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="flex w-full flex-col gap-0 p-0 sm:w-[460px] [&>button]:hidden">
+      <DrawerContent
+        className="flex w-full flex-col gap-0 p-0 sm:w-[460px] [&>button]:hidden"
+        {...panelProps}
+      >
         {/* Custom top bar, Close + Expand on the left (matches the reference
          * layout rather than the library's default top-right close button,
          * which is hidden via [&>button]), truncated Transaction ID chip on
          * the right so it's visible without scrolling the body. */}
-        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <div className="flex items-center gap-1">
+        <div
+          data-morph-header
+          className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3"
+        >
+          {/* Out of the way for the whole morph: mid-motion they would be
+              controls for a panel that is busy becoming something else. */}
+          <div
+            className={cn(
+              "flex items-center gap-1 transition-opacity duration-150",
+              morphing && "pointer-events-none opacity-0"
+            )}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -119,7 +152,7 @@ export function TransactionDetailsDrawer({
             <Button
               type="button"
               variant="ghost"
-              onClick={() => goToDetail(transaction)}
+              onClick={() => (onExpand ? onExpand(transaction) : goToDetail(transaction))}
               aria-label="Expand"
               className="h-8 w-8 min-h-0 min-w-0 rounded-md p-0 text-muted-foreground"
             >
@@ -127,7 +160,12 @@ export function TransactionDetailsDrawer({
             </Button>
           </div>
 
-          <div className="flex flex-col items-end gap-1">
+          <div
+            className={cn(
+              "flex flex-col items-end gap-1 transition-opacity duration-150",
+              morphing && "pointer-events-none opacity-0"
+            )}
+          >
             <p className="text-[11px] text-muted-foreground">Transaction ID</p>
             <div className="flex min-w-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1.5">
               <span
@@ -149,138 +187,150 @@ export function TransactionDetailsDrawer({
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <div className="flex flex-col gap-4">
-            {/* Amount, currency, status, date/time and payment method, then
-             * charged-to, all grouped into one hero card. */}
-            <Card className="gap-0 p-4">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <p className="flex items-baseline gap-1.5 text-2xl font-bold tracking-tight text-foreground tabular-nums">
-                  {formatCurrency(amount, currency)}
-                  <span className="text-sm font-medium text-muted-foreground">{currency}</span>
-                </p>
-                <StatusBadgeWithTooltip
-                  variant={statusMeta.variant}
-                  label={statusMeta.label}
-                  trailIcon={statusMeta.trailIcon}
-                  tooltip={statusMeta.tooltip}
-                  size="sm"
-                />
-              </div>
+        <div className="flex-1 overflow-y-auto px-4 py-4" {...bodyProps}>
+          {/* The page's own cap and centring (TransactionDetailView), so on a
+              wide screen the content drifts to the centre as the panel grows
+              and lands where the page puts it. No effect at rest. */}
+          <div className="mx-auto max-w-[1400px]">
+            {pageLayout ? (
+              <TransactionDetailBody transaction={transaction} />
+            ) : (
+              <div data-morph-anchor className="flex flex-col gap-4">
+                {/* Amount, currency, status, date/time and payment method, then
+                 * charged-to, all grouped into one hero card. */}
+                <Card className="gap-0 p-4">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <p className="flex items-baseline gap-1.5 text-2xl font-bold tracking-tight text-foreground tabular-nums">
+                      {formatCurrency(amount, currency)}
+                      <span className="text-sm font-medium text-muted-foreground">{currency}</span>
+                    </p>
+                    <StatusBadgeWithTooltip
+                      variant={statusMeta.variant}
+                      label={statusMeta.label}
+                      trailIcon={statusMeta.trailIcon}
+                      tooltip={statusMeta.tooltip}
+                      size="sm"
+                    />
+                  </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span>{datePart}</span>
-                {timePart && (
-                  <>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>{datePart}</span>
+                    {timePart && (
+                      <>
+                        <Separator orientation="vertical" className="h-3" />
+                        <span>{timePart}</span>
+                      </>
+                    )}
                     <Separator orientation="vertical" className="h-3" />
-                    <span>{timePart}</span>
-                  </>
-                )}
-                <Separator orientation="vertical" className="h-3" />
-                <TransactionPaymentMethod row={transaction} />
-              </div>
+                    <TransactionPaymentMethod row={transaction} />
+                  </div>
 
-              <Separator className="my-3" />
+                  <Separator className="my-3" />
 
-              <p className="text-sm text-muted-foreground">
-                Charged to <span className="font-semibold text-foreground">{name}</span>
-              </p>
-            </Card>
-
-            {/* Settlement details */}
-            <div className="flex flex-col gap-1.5">
-              <SectionLabel>Settlement Details</SectionLabel>
-              <Card className="gap-0 p-3.5">
-                <SettlementDetailsBody
-                  settlement={detail.settlement}
-                  onViewSettlement={goToSettlement}
-                />
-              </Card>
-            </div>
-
-            {/* Amount breakdown */}
-            {detail.amountBreakdown && (
-              <div className="flex flex-col gap-1.5">
-                <SectionLabel>Amount Breakdown</SectionLabel>
-                <Card className="gap-0 p-3.5">
-                  <AmountBreakdownBody
-                    amountReceived={detail.amountBreakdown.amountReceived}
-                    fee={detail.amountBreakdown.fee}
-                    refundedAmount={detail.amountBreakdown.refundedAmount}
-                    disputedAmount={detail.amountBreakdown.disputedAmount}
-                    netAmount={detail.amountBreakdown.netAmount}
-                    currency={currency}
-                  />
+                  <p className="text-sm text-muted-foreground">
+                    Charged to <span className="font-semibold text-foreground">{name}</span>
+                  </p>
                 </Card>
+
+                {/* Settlement details */}
+                <div className="flex flex-col gap-1.5">
+                  <SectionLabel>Settlement Details</SectionLabel>
+                  <Card className="gap-0 p-3.5">
+                    <SettlementDetailsBody
+                      settlement={detail.settlement}
+                      onViewSettlement={goToSettlement}
+                    />
+                  </Card>
+                </div>
+
+                {/* Amount breakdown */}
+                {detail.amountBreakdown && (
+                  <div className="flex flex-col gap-1.5">
+                    <SectionLabel>Amount Breakdown</SectionLabel>
+                    <Card className="gap-0 p-3.5">
+                      <AmountBreakdownBody
+                        amountReceived={detail.amountBreakdown.amountReceived}
+                        fee={detail.amountBreakdown.fee}
+                        refundedAmount={detail.amountBreakdown.refundedAmount}
+                        disputedAmount={detail.amountBreakdown.disputedAmount}
+                        netAmount={detail.amountBreakdown.netAmount}
+                        currency={currency}
+                      />
+                    </Card>
+                  </div>
+                )}
+
+                {/* Customer details */}
+                <div className="flex flex-col gap-1.5">
+                  <SectionLabel>Customer Details</SectionLabel>
+                  <Card className="gap-0 p-3.5">
+                    <div className="flex flex-col gap-4">
+                      <DetailRow label="Customer Name" value={name} />
+                      <DetailRow
+                        label="Email ID"
+                        value={transaction.encEmailId ?? "Not available"}
+                      />
+                      <DetailRow label="Phone Number" value={detail.customerPhone} />
+                      <div>
+                        <p className="text-xs text-muted-foreground">Address</p>
+                        <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground/85">
+                          {detail.customerAddress}
+                        </p>
+                      </div>
+                      {detail.comments && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Comments</p>
+                          <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground/85">
+                            {detail.comments}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+
+                <ReferAndEarnBanner />
+
+                {/* Payment details */}
+                <div className="flex flex-col gap-1.5">
+                  <SectionLabel>Payment Details</SectionLabel>
+                  <Card className="gap-0 p-3.5">
+                    <div className="flex flex-col gap-4">
+                      <DetailRow label="Merchant Transaction ID" value={detail.merchantTxnId} />
+                      <DetailRow label="Payment Category" value={detail.paymentCategory} />
+                      {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
+                      <DetailRow label="Issuer" value={detail.issuerBank} />
+                    </div>
+                  </Card>
+                </div>
+
+                {showFeedback && <ProductFeedback key={transaction.gid} />}
+
+                {/* Status notes */}
+                <div className="flex flex-col gap-1.5">
+                  <SectionLabel>Status Notes</SectionLabel>
+                  <Card
+                    className={cn(
+                      "gap-4 p-3.5",
+                      statusMeta.variant === "danger" && "border-red-200 dark:border-red-900/50"
+                    )}
+                  >
+                    <DetailRow label="Reason" value={detail.statusReason} />
+                    {detail.errorCode && <DetailRow label="Error Code" value={detail.errorCode} />}
+                  </Card>
+                </div>
+
+                {/* Linked transactions, other transactions from this customer,
+                 * plus any refunds issued against this one */}
+                <div className="flex flex-col gap-1.5">
+                  <SectionLabel>Linked Transactions</SectionLabel>
+                  <LinkedTransactionsSection
+                    transactions={linkedTransactions}
+                    onViewDetails={goToDetail}
+                  />
+                </div>
               </div>
             )}
-
-            {/* Customer details */}
-            <div className="flex flex-col gap-1.5">
-              <SectionLabel>Customer Details</SectionLabel>
-              <Card className="gap-0 p-3.5">
-                <div className="flex flex-col gap-4">
-                  <DetailRow label="Customer Name" value={name} />
-                  <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />
-                  <DetailRow label="Phone Number" value={detail.customerPhone} />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Address</p>
-                    <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground/85">
-                      {detail.customerAddress}
-                    </p>
-                  </div>
-                  {detail.comments && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Comments</p>
-                      <p className="mt-0.5 text-[13px] font-semibold leading-snug text-foreground/85">
-                        {detail.comments}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            </div>
-
-            <ReferAndEarnBanner />
-
-            {/* Payment details */}
-            <div className="flex flex-col gap-1.5">
-              <SectionLabel>Payment Details</SectionLabel>
-              <Card className="gap-0 p-3.5">
-                <div className="flex flex-col gap-4">
-                  <DetailRow label="Merchant Transaction ID" value={detail.merchantTxnId} />
-                  <DetailRow label="Payment Category" value={detail.paymentCategory} />
-                  {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
-                  <DetailRow label="Issuer" value={detail.issuerBank} />
-                </div>
-              </Card>
-            </div>
-
-            {showFeedback && <ProductFeedback key={transaction.gid} />}
-
-            {/* Status notes */}
-            <div className="flex flex-col gap-1.5">
-              <SectionLabel>Status Notes</SectionLabel>
-              <Card
-                className={cn(
-                  "gap-4 p-3.5",
-                  statusMeta.variant === "danger" && "border-red-200 dark:border-red-900/50"
-                )}
-              >
-                <DetailRow label="Reason" value={detail.statusReason} />
-                {detail.errorCode && <DetailRow label="Error Code" value={detail.errorCode} />}
-              </Card>
-            </div>
-
-            {/* Linked transactions, other transactions from this customer,
-             * plus any refunds issued against this one */}
-            <div className="flex flex-col gap-1.5">
-              <SectionLabel>Linked Transactions</SectionLabel>
-              <LinkedTransactionsSection
-                transactions={linkedTransactions}
-                onViewDetails={goToDetail}
-              />
-            </div>
           </div>
         </div>
       </DrawerContent>
