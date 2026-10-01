@@ -9,7 +9,9 @@ import type { CommissionCycle, CommissionStatus } from "@/features/dashboard/com
 /**
  * Columns for the partner Commissions table, drawn with the same cell styles
  * as the Multi-Currency Accounts transactions table (amount + currency code,
- * StatusBadge, labelled outline row action).
+ * StatusBadge, labelled outline row action). Default order: Transaction
+ * Amount, Commission Earned, Transaction Count, Transaction Period, Status,
+ * then the statement download.
  */
 
 const STATUS_META: Record<
@@ -55,12 +57,16 @@ export function buildCommissionColumns({
 }): Column<CommissionCycle>[] {
   return [
     {
-      key: "period",
-      header: "Transaction Period",
-      minWidth: 220,
-      render: (row) => (
-        <span className="text-[13px] text-foreground whitespace-nowrap">{formatPeriod(row)}</span>
-      ),
+      key: "transactionAmount",
+      header: "Transaction Amount",
+      minWidth: 160,
+      render: (row) => <Inr amount={row.transactionAmount} />,
+    },
+    {
+      key: "commissionEarned",
+      header: "Commission Earned",
+      minWidth: 160,
+      render: (row) => <Inr amount={row.commissionEarned} />,
     },
     {
       key: "transactionCount",
@@ -73,16 +79,12 @@ export function buildCommissionColumns({
       ),
     },
     {
-      key: "transactionAmount",
-      header: "Transaction Amount",
-      minWidth: 160,
-      render: (row) => <Inr amount={row.transactionAmount} />,
-    },
-    {
-      key: "commissionEarned",
-      header: "Commission Earned",
-      minWidth: 160,
-      render: (row) => <Inr amount={row.commissionEarned} />,
+      key: "period",
+      header: "Transaction Period",
+      minWidth: 220,
+      render: (row) => (
+        <span className="text-[13px] text-foreground whitespace-nowrap">{formatPeriod(row)}</span>
+      ),
     },
     {
       key: "status",
