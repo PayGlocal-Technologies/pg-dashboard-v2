@@ -7,6 +7,10 @@
  */
 import {
   Activity,
+  Facebook,
+  Instagram,
+  Save,
+  Youtube,
   AlertCircle,
   AlertTriangle,
   Angry,
@@ -302,6 +306,13 @@ export const ICONS = {
   "recurring-outlined": RecurringOutlined as unknown as LucideIcon,
   "link-custom-outlined": LinkCustomOutlined as unknown as LucideIcon,
   "link-green-filled": LinkGreenFilled as unknown as LucideIcon,
+
+  // ─── Branding Studio ───────────────────────────────────────────────────────
+  // Save branding, and the social row in the email preview's footer.
+  save: Save,
+  facebook: Facebook,
+  instagram: Instagram,
+  youtube: Youtube,
 
   // ─── Echo ──────────────────────────────────────────────────────────────────
   // The assistant's own mark, used for the sidebar entry, the header button

@@ -23,6 +23,7 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
  * list. Add a route here in the same commit you add its page.tsx.
  */
 export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
+  "/branding-studio",
   "/client-management",
   "/dashboard",
   // /dispute-management is deliberately absent, though the page exists and the
@@ -101,6 +102,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/mca-settlement-report": ["settlement", "UTR", "payout", "reports"],
   "/settlement-report": ["settlement", "UTR", "payout", "reports"],
   "/mca-links": ["payment link", "share link"],
+  "/branding-studio": ["branding", "brand colour", "logo", "checkout theme", "font"],
   "/sku-management": ["product", "HSN", "SAC", "catalogue"],
   "/team-management": ["teams", "users", "roles", "invite", "permissions"],
   "/client-management": ["clients", "customers", "buyers", "payers"],

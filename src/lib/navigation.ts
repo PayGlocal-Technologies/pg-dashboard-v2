@@ -223,6 +223,13 @@ export const regularNavigation: NavGroup[] = [
         ],
       },
       {
+        label: "Branding Studio",
+        href: "/branding-studio",
+        icon: "palette",
+        badge: "NEW",
+        permission: [],
+      },
+      {
         label: "Scheduler",
         href: "/scheduler",
         icon: "clock",
