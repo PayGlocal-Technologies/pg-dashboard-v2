@@ -1,14 +1,6 @@
 /** Settlement account details can be changed once in this many days. */
 export const SETTLEMENT_CHANGE_INTERVAL_DAYS = 30;
 
-/**
- * MOCK: when the settlement account was last changed (YYYY-MM-DD), or null if
- * it never has been. No endpoint returns this yet (the /settlement read is
- * only the account number and IFSC), so the 30-day lock is mock-driven until
- * one does. Set to null, or to a date more than 30 days back, to see the
- * editable state.
- */
-export const MOCK_SETTLEMENT_LAST_CHANGED_DATE: string | null = "2026-09-28";
 
 function parseKey(key: string): Date {
   const [y, m, d] = key.split("-").map(Number);
@@ -18,6 +10,18 @@ function parseKey(key: string): Date {
 function toKey(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/**
+ * The API's `lastUpdatedTime` (epoch milliseconds, as a string) as the local
+ * YYYY-MM-DD the 30-day rule counts from. Null when absent, empty or not a
+ * number, which reads as "never changed", the same as no date at all.
+ */
+export function dateKeyFromEpochMillis(value: string | number | null | undefined): string | null {
+  if (value === null || value === undefined || value === "") return null;
+  const millis = Number(value);
+  if (!Number.isFinite(millis) || millis <= 0) return null;
+  return toKey(new Date(millis));
 }
 
 export interface SettlementChangePolicy {
