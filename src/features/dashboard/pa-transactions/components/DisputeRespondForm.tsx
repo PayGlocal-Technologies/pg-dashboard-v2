@@ -286,7 +286,7 @@ export function DisputeRespondForm({
       <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="flex flex-col gap-5">
           {mode === "partial" && (
-            <Card className="gap-2 p-5">
+            <Card className="shadow-none gap-2 p-5">
               <Label htmlFor="contest-amount" className="text-sm font-semibold text-foreground">
                 Amount you&apos;re contesting
               </Label>
@@ -311,7 +311,7 @@ export function DisputeRespondForm({
             </Card>
           )}
 
-          <Card className="gap-3 p-5">
+          <Card className="shadow-none gap-3 p-5">
             <p className="text-sm font-semibold text-foreground">
               Why do you want to contest this?
             </p>
@@ -338,7 +338,7 @@ export function DisputeRespondForm({
             )}
           </Card>
 
-          <Card className="gap-0 p-5">
+          <Card className="shadow-none gap-0 p-5">
             <h2 className="text-lg font-bold text-foreground">Submit Supporting Evidence</h2>
             <Separator className="my-3" />
             <p className="text-sm text-muted-foreground">

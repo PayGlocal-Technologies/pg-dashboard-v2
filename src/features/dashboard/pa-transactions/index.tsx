@@ -5,7 +5,6 @@ import { PageHeader } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
 import { MidGuard } from "@/components/common/MidGuard";
 import { TimeRangeTabs } from "@/components/common/TimeRangeTabs";
-import { formatCurrency } from "@/lib/utils/format";
 import { PaTransactionTable } from "@/features/dashboard/pa-transactions/components/PaTransactionTable";
 import { TransactionStatCards } from "@/features/dashboard/pa-transactions/components/TransactionStatCards";
 import { PA_PRODUCT_FLAGS, SEGMENT_PA } from "@/features/dashboard/pa-transactions/constants";
@@ -32,30 +31,36 @@ export function PaTransactionsFeature() {
   // time range vs. its table's date filter.
   const [timeframe, setTimeframe] = useState<TotalVolumeTimeframe>("ytd");
   const metrics = transactionsMetricsByTimeframe[timeframe];
+  // While one transaction's full page is open, it replaces everything below
+  // the nav: the header and metrics scope the list, not a single payment.
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
-      <PageHeader
-        title="Transactions"
-        actions={
-          <TimeRangeTabs
-            options={totalVolumeTimeframes.map((t) => ({ value: t.id, label: t.label }))}
-            value={timeframe}
-            onValueChange={setTimeframe}
-            label="Metrics time range"
-          />
-        }
-      />
+      {!detailsOpen && (
+        <PageHeader
+          title="Transactions"
+          actions={
+            <TimeRangeTabs
+              options={totalVolumeTimeframes.map((t) => ({ value: t.id, label: t.label }))}
+              value={timeframe}
+              onValueChange={setTimeframe}
+              label="Metrics time range"
+            />
+          }
+        />
+      )}
 
       {isPAEnabled ? (
         <MidGuard productType="PA">
-          <TransactionStatCards
-            timeframe={timeframe}
-            totalVolumeLabel={formatCurrency(metrics.totalVolume, "INR")}
-            metrics={metrics}
-            trendCharts={transactionsTrendChartsByTimeframe[timeframe]}
-          />
-          <PaTransactionTable />
+          {!detailsOpen && (
+            <TransactionStatCards
+              timeframe={timeframe}
+              metrics={metrics}
+              trendCharts={transactionsTrendChartsByTimeframe[timeframe]}
+            />
+          )}
+          <PaTransactionTable onDetailsOpenChange={setDetailsOpen} />
         </MidGuard>
       ) : (
         <div className="bg-card rounded-xl border border-border p-10 text-center">

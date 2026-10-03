@@ -397,7 +397,7 @@ export function DisputeDetailFeature({
 
             <div className="flex flex-col gap-2">
               <SectionLabel>Timeline</SectionLabel>
-              <Card className="gap-0 p-5">
+              <Card className="shadow-none gap-0 p-5">
                 <PaymentTimeline steps={timelineSteps} />
               </Card>
             </div>
@@ -407,7 +407,7 @@ export function DisputeDetailFeature({
             {detail.amountBreakdown && (
               <div className="flex flex-col gap-2">
                 <SectionLabel>Payment Breakdown</SectionLabel>
-                <Card className="gap-0 p-5">
+                <Card className="shadow-none gap-0 p-5">
                   <AmountBreakdownBody
                     amountReceived={detail.amountBreakdown.amountReceived}
                     fee={detail.amountBreakdown.fee}
@@ -438,7 +438,7 @@ export function DisputeDetailFeature({
 
             <div className="flex flex-col gap-2">
               <SectionLabel>Payment Details</SectionLabel>
-              <Card className="gap-0 p-5">
+              <Card className="shadow-none gap-0 p-5">
                 <div className="flex flex-col gap-5">
                   <div className="group">
                     <p className="text-xs text-muted-foreground">Transaction ID</p>
@@ -461,7 +461,7 @@ export function DisputeDetailFeature({
 
             <div className="flex flex-col gap-2">
               <SectionLabel>Customer Details</SectionLabel>
-              <Card className="gap-0 p-5">
+              <Card className="shadow-none gap-0 p-5">
                 <div className="flex flex-col gap-5">
                   <DetailRow label="Customer Name" value={name} />
                   <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />

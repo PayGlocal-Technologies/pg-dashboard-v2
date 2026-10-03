@@ -165,7 +165,7 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2">
               <SectionLabel>Timeline</SectionLabel>
-              <Card className="gap-0 p-5">
+              <Card className="shadow-none gap-0 p-5">
                 <PaymentTimeline steps={buildRefundOnlyTimelineSteps(refund, currency)} />
               </Card>
             </div>
@@ -182,7 +182,7 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
           <div className="flex flex-col gap-4 lg:sticky lg:top-4">
             <div className="flex flex-col gap-2">
               <SectionLabel>Refund Details</SectionLabel>
-              <Card className="gap-0 p-5">
+              <Card className="shadow-none gap-0 p-5">
                 <div className="flex flex-col gap-5">
                   <div className="group">
                     <p className="text-xs text-muted-foreground">Refund ID</p>

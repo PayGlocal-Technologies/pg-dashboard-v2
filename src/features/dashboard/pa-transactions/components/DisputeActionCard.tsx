@@ -48,7 +48,7 @@ export function DisputeActionCard({
   onContest,
 }: DisputeActionCardProps) {
   return (
-    <Card className="gap-0 p-5">
+    <Card className="shadow-none gap-0 p-5">
       <h2 className="text-base font-bold text-foreground">{merchantLabel}</h2>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         <Badge variant="secondary" size="sm" square className="font-mono">

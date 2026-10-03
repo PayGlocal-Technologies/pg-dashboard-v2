@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, type ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Card } from "@/components/ui";
+import { Card, Separator } from "@/components/ui";
 import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -50,6 +50,17 @@ export interface PaymentLinkMetricCardProps {
   emptyTitle?: string;
   emptyDescription?: string;
   className?: string;
+  /** "full" (default, as Payment Links shows it): both axes and gridlines.
+   *  "x": the period labels along the bottom only. "none": a bare line. */
+  axes?: "full" | "x" | "none";
+  /** Arrow direction, when it differs from good/bad: for a metric where a
+   *  fall is good (refunds), it points down and still reads green.
+   *  Defaults to `trendPositive`. */
+  trendUp?: boolean;
+  /** "trending" (default) or plain up/down arrows. */
+  trendIcon?: "trending" | "arrow";
+  /** Supporting figures under the chart, one label/value row each. */
+  details?: { label: string; value: ReactNode }[];
 }
 
 export function PaymentLinkMetricCard({
@@ -65,7 +76,14 @@ export function PaymentLinkMetricCard({
   emptyTitle = "No data in this period",
   emptyDescription = "This metric is charted here as activity comes in.",
   className,
+  axes = "full",
+  trendUp,
+  trendIcon = "trending",
+  details,
 }: PaymentLinkMetricCardProps) {
+  const up = trendUp ?? trendPositive;
+  const arrow =
+    trendIcon === "arrow" ? (up ? "arrow-up" : "arrow-down") : up ? "trending-up" : "trending-down";
   const isEmpty = data.length === 0 || data.every((d) => !d.y);
   const gradientId = `payment-link-metric-fill-${useId().replace(/[:]/g, "")}`;
 
@@ -88,7 +106,7 @@ export function PaymentLinkMetricCard({
               : "text-red-600 dark:text-red-400"
           )}
         >
-          <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
+          <Icon name={arrow} size={13} aria-hidden />
           <RollingNumber value={trendLabel} className="tabular-nums" />
         </div>
       </div>
@@ -112,8 +130,9 @@ export function PaymentLinkMetricCard({
                   <stop offset="100%" stopColor={accentColor} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid horizontal={DotGridLine} vertical={false} />
+              {axes === "full" && <CartesianGrid horizontal={DotGridLine} vertical={false} />}
               <XAxis
+                hide={axes === "none"}
                 dataKey="x"
                 axisLine={false}
                 tickLine={false}
@@ -122,6 +141,7 @@ export function PaymentLinkMetricCard({
                 height={20}
               />
               <YAxis
+                hide={axes !== "full"}
                 axisLine={false}
                 tickLine={false}
                 width={36}
@@ -142,6 +162,20 @@ export function PaymentLinkMetricCard({
           </ResponsiveContainer>
         )}
       </div>
+
+      {details && details.length > 0 && (
+        <>
+          <Separator />
+          <dl className="space-y-1.5">
+            {details.map((d) => (
+              <div key={d.label} className="flex items-baseline justify-between gap-3 text-[13px]">
+                <dt className="text-muted-foreground">{d.label}</dt>
+                <dd className="font-semibold tabular-nums text-foreground">{d.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      )}
     </Card>
   );
 }

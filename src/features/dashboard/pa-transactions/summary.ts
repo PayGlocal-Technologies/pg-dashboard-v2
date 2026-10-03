@@ -175,6 +175,8 @@ export interface TransactionsMetrics {
   netVolumeTrendPct: number;
   transactionCount: number;
   transactionCountTrendPct: number;
+  /** Failed payment attempts in the period. */
+  failedCount: number;
   /** Successful attempts / (successful + failed attempts) * 100. */
   successRate: number;
   /** Percentage-point difference vs the prior period, not a relative % change. */
@@ -220,6 +222,7 @@ function deriveMetrics(raw: RawPeriodMetrics): TransactionsMetrics {
     netVolumeTrendPct: pctChange(netVolume, raw.netVolumePrev),
     transactionCount: raw.transactionCount,
     transactionCountTrendPct: pctChange(raw.transactionCount, raw.transactionCountPrev),
+    failedCount: raw.failedCount,
     successRate,
     successRateTrendPct: round(successRate - successRatePrev, 1),
     refundAmount: raw.refundAmount,

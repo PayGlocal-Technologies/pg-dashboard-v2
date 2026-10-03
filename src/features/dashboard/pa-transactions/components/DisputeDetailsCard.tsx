@@ -24,7 +24,7 @@ export function DisputeDetailsCard({ dispute, transaction, currency }: DisputeDe
   return (
     <div className="flex flex-col gap-2">
       <SectionLabel>Dispute Details</SectionLabel>
-      <Card className="gap-0 p-5">
+      <Card className="shadow-none gap-0 p-5">
         <div className="flex flex-col gap-5">
           <DetailRow label="Dispute ID" value={dispute.disputeId} />
           <DetailRow

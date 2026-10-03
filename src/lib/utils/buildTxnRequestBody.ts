@@ -50,7 +50,12 @@ export function buildTxnRequestBody(
     fieldSearch.irmProcessStatus = filters.irmProcessStatus;
   }
 
-  // Currency filter (MCA)
+  // PA order status. UNCONFIRMED field name; see TxnFilterValues.orderStatus.
+  if (filters.orderStatus?.length) {
+    fieldSearch.orderStatus = filters.orderStatus;
+  }
+
+  // Currency filter (MCA; PA sends it here too, field name UNCONFIRMED for PA)
   if (filters.currency?.length) {
     fieldSearch.currency = filters.currency;
   }

@@ -41,7 +41,7 @@ export function DisputeStatusNoticeCard({
   action,
 }: DisputeStatusNoticeCardProps) {
   return (
-    <Card className="gap-0 p-5">
+    <Card className="shadow-none gap-0 p-5">
       <div className="flex items-start gap-3">
         <span
           className={cn(

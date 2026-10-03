@@ -46,6 +46,12 @@ export interface TxnFilterValues {
    */
   irmMappingStatus?: string[];
   irmProcessStatus?: string[];
+  /**
+   * PA order status (AUTHORIZED / REVERSED / CAPTURED). UNCONFIRMED: sent
+   * under `fieldSearch.orderStatus`, a name not yet checked against
+   * pg-dashboard's tableRequestbodyBuilder.
+   */
+  orderStatus?: string[];
   startTime?: number;
   endTime?: number;
 }
