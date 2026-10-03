@@ -2,14 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import {
-  Button,
-  ColumnManager,
-  DataCardList,
-  DataTableCard,
-  PageHeader,
-  type MonthRange,
-} from "@/components/ui";
+import { Button, ColumnManager, DataCardList, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -18,8 +11,9 @@ import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import {
   AmountFilterChip,
   FilterChipGroup,
-  MonthRangeFilterChip,
+  DateRangeFilterChip,
   type AmountRangeValue,
+  type DateRangeValue,
 } from "@/components/common/filters/FilterChips";
 import { reorderColumns } from "@/lib/utils/columns";
 import { buildCommissionColumns, formatPeriod } from "@/features/dashboard/commissions/columns";
@@ -71,13 +65,20 @@ const FIXED_COLUMN_KEYS = ["commissionEarned", "status"];
 
 const EMPTY_AMOUNT: AmountRangeValue = { min: "", max: "" };
 
-const monthOf = (row: CommissionCycle) => row.periodStart.slice(0, 7);
+const EMPTY_PERIOD: DateRangeValue = { from: "", to: "" };
 
-/** The months the data spans, as the Transaction period chip's bounds and its
- *  default (everything). Rows are newest first. */
-function dataMonthSpan(rows: CommissionCycle[]): MonthRange {
-  const months = rows.map(monthOf).sort();
-  return { start: months[0] ?? "", end: months[months.length - 1] ?? "" };
+/** The earliest day any cycle covers: the Transaction period calendar's
+ *  lower limit. YYYY-MM-DD keys sort as dates. */
+function earliestCycleDay(rows: CommissionCycle[]): string {
+  return rows.map((r) => r.periodStart).sort()[0] ?? "";
+}
+
+/** Today as YYYY-MM-DD: the calendar's upper limit. Capping at the last
+ *  cycle's end instead opened the calendar on a month with every day off. */
+function todayKey(): string {
+  const now = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
 export function CommissionsFeature() {
@@ -87,9 +88,12 @@ export function CommissionsFeature() {
 
   const [tab, setTab] = useState<ViewTab>("all");
   const [search, setSearch] = useState("");
-  const span = useMemo(() => dataMonthSpan(rows), [rows]);
-  const monthsWithData = useMemo(() => new Set(rows.map(monthOf)), [rows]);
-  const [period, setPeriod] = useState<MonthRange>(span);
+  const earliest = useMemo(() => earliestCycleDay(rows), [rows]);
+  // Read once on mount (a lazy initializer, not during render).
+  const [today] = useState(todayKey);
+  // Empty = all periods, the page's opening state; the chip's own clear
+  // returns here.
+  const [period, setPeriod] = useState<DateRangeValue>(EMPTY_PERIOD);
   const [amount, setAmount] = useState<AmountRangeValue>(EMPTY_AMOUNT);
 
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
@@ -102,8 +106,10 @@ export function CommissionsFeature() {
     return rows.filter((row) => {
       if (tab === "processing" && row.status !== "PROCESSING") return false;
       if (tab === "released" && row.status !== "RELEASED") return false;
-      const month = monthOf(row);
-      if (month < period.start || month > period.end) return false;
+      // A cycle is in the period if any of its days are: it ends on or after
+      // the period's start and starts on or before its end.
+      if (period.from && row.periodEnd < period.from) return false;
+      if (period.to && row.periodStart > period.to) return false;
       if (min !== null && row.commissionEarned < min) return false;
       if (max !== null && row.commissionEarned > max) return false;
       if (query) {
@@ -123,8 +129,8 @@ export function CommissionsFeature() {
   const isFiltered =
     tab !== "all" ||
     !!search.trim() ||
-    period.start !== span.start ||
-    period.end !== span.end ||
+    !!period.from ||
+    !!period.to ||
     !!amount.min ||
     !!amount.max;
   const emptyCopy = isFiltered ? NO_MATCH_COPY : EMPTY_COPY;
@@ -176,14 +182,14 @@ export function CommissionsFeature() {
   // chip's popover never opens on its hidden twin.
   const renderFilterChips = () => (
     <FilterChipGroup className="flex flex-wrap items-center gap-1.5">
-      <MonthRangeFilterChip
+      <DateRangeFilterChip
         chipKey="transaction-period"
         label="Transaction period"
-        bounds={span}
         value={period}
-        defaultRange={span}
-        monthsWithData={monthsWithData}
         onChange={setPeriod}
+        min={earliest}
+        max={today}
+        align="start"
       />
       <AmountFilterChip label="Commission amount" value={amount} onChange={setAmount} />
     </FilterChipGroup>
@@ -290,8 +296,9 @@ export function CommissionsFeature() {
       {/* The table, with "How commissions work" as a vertical column on
           its right from xl (sticky, so it stays beside the rows as they
           scroll), or above it on narrower screens. Closed, the table has the
-          full width, exactly as before. */}
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+          full width, exactly as before. The gap between them is the panel's
+          own (see CommissionHowItWorks), so it opens and closes with it. */}
+      <div className="flex flex-col xl:flex-row xl:items-start">
         <div className="min-w-0 flex-1 space-y-4">
           <DataTableCard<CommissionCycle>
             className="hidden lg:block"
@@ -342,11 +349,7 @@ export function CommissionsFeature() {
             />
           </div>
         </div>
-        <CommissionHowItWorks
-          open={showHowItWorks}
-          onClose={() => setShowHowItWorks(false)}
-          className="order-first xl:sticky xl:top-4 xl:order-none xl:w-[22rem] xl:shrink-0"
-        />
+        <CommissionHowItWorks open={showHowItWorks} onClose={() => setShowHowItWorks(false)} />
       </div>
     </div>
   );

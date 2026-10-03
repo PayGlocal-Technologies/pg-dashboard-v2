@@ -33,18 +33,19 @@ export const INTERNATIONAL_BRANDS = [
   "Other credit cards",
 ] as const;
 
-export const DOMESTIC_NETWORKS = [
-  { value: "VISA", label: "Visa" },
-  { value: "MASTERCARD", label: "Mastercard" },
-  { value: "RUPAY", label: "RuPay" },
-  { value: "AMEX", label: "American Express" },
-  { value: "DINERS", label: "Diners" },
-];
-
-export const CARD_TYPES = [
-  { value: "DEBIT", label: "Debit" },
-  { value: "CREDIT", label: "Credit" },
-];
+/**
+ * The brands a Domestic card fee can be set for, as the production Create
+ * Deal drawer lists them. TODO(integration): confirm against pg-dashboard;
+ * "Indian network cards" is read from a truncated label ("Indian net…").
+ */
+export const DOMESTIC_CARD_BRANDS = [
+  "American Express",
+  "Diners",
+  "Discover",
+  "Indian network cards",
+  "Other credit cards",
+  "Other debit cards",
+] as const;
 
 export const DEAL_LABEL_MAX = 50;
 

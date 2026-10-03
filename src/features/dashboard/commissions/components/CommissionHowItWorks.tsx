@@ -1,9 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { IconButton, Separator, StatusBadge } from "@/components/ui";
+import { IconButton, Separator, StatusBadge, useBreakpoint } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn } from "@/lib/utils";
 import { commissionStatusMeta } from "@/features/dashboard/commissions/columns";
 import type { CommissionStatus } from "@/features/dashboard/commissions/types";
 
@@ -102,46 +101,73 @@ function CommissionStatuses() {
   );
 }
 
+/** One soft deceleration for every part of the open and close, so the
+ *  table, the space the panel takes and the panel's own fade all move as one. */
+const EASE = [0.32, 0.72, 0, 1] as const;
+const DURATION = 0.36;
+
+/** Panel width beside the table, plus the 1rem gap to it. */
+const SIDE_WIDTH = "23rem";
+
 /**
  * "How commissions work": an in-page column, not a modal or drawer. No
- * overlay, no scroll lock, nothing dimmed. The page lays it out (beside the
- * table on wide screens, above it otherwise); it takes no space while
- * closed, and fades in with a short slide from the right (~200ms ease-out).
+ * overlay, no scroll lock, nothing dimmed. Beside the table from xl, above
+ * it below that; it takes no space while closed.
+ *
+ * The space it occupies is what animates (its width beside the table, its
+ * height above it), so the table eases aside and back instead of snapping
+ * to its new size. The panel inside keeps a fixed width throughout, so its
+ * text never rewraps mid-animation, and it fades and slides in just behind
+ * the space opening up. The gap to the table lives inside that space, so
+ * nothing jumps when it finishes closing.
  */
-export function CommissionHowItWorks({
-  open,
-  onClose,
-  className,
-}: {
-  open: boolean;
-  onClose: () => void;
-  className?: string;
-}) {
+export function CommissionHowItWorks({ open, onClose }: { open: boolean; onClose: () => void }) {
   const reduceMotion = useReducedMotion();
-  const transition = { duration: reduceMotion ? 0 : 0.2, ease: "easeOut" } as const;
+  const { isAbove } = useBreakpoint();
+  const beside = isAbove("xl");
+  const duration = reduceMotion ? 0 : DURATION;
+
+  const collapsed = beside ? { width: 0 } : { height: 0 };
+  const expanded = beside ? { width: SIDE_WIDTH } : { height: "auto" };
+  const hiddenPanel = beside ? { opacity: 0, x: 16 } : { opacity: 0, y: 8 };
 
   return (
     <AnimatePresence initial={false}>
       {open && (
-        <motion.aside
-          key="how-it-works"
-          id={HOW_IT_WORKS_ID}
-          aria-label="How commissions work"
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 12 }}
-          transition={transition}
-          className={cn("rounded-2xl border border-border bg-card p-5 shadow-xs", className)}
+        <motion.div
+          key={beside ? "beside" : "above"}
+          initial={collapsed}
+          animate={expanded}
+          exit={collapsed}
+          transition={{ duration, ease: EASE }}
+          className="order-first shrink-0 overflow-hidden xl:sticky xl:top-4 xl:order-none"
         >
-          <CommissionHowItWorksHeader onClose={onClose} />
-          <CommissionProcessSteps />
-          <Separator className="my-5" />
-          <CommissionStatuses />
-          <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
-            <span className="font-medium text-foreground">Need help with your commission?</span>{" "}
-            Contact your PayGlocal account manager or support.
-          </p>
-        </motion.aside>
+          <div className={beside ? "w-[23rem] pl-4" : "pb-4"}>
+            <motion.aside
+              id={HOW_IT_WORKS_ID}
+              aria-label="How commissions work"
+              initial={hiddenPanel}
+              animate={{ opacity: 1, x: 0, y: 0 }}
+              exit={hiddenPanel}
+              transition={{
+                duration: reduceMotion ? 0 : DURATION * 0.8,
+                ease: EASE,
+                // Open: follow the space a beat behind. Close: fade first.
+                delay: reduceMotion ? 0 : 0.06,
+              }}
+              className="rounded-2xl border border-border bg-card p-5 shadow-xs"
+            >
+              <CommissionHowItWorksHeader onClose={onClose} />
+              <CommissionProcessSteps />
+              <Separator className="my-5" />
+              <CommissionStatuses />
+              <p className="mt-5 text-xs leading-relaxed text-muted-foreground">
+                <span className="font-medium text-foreground">Need help with your commission?</span>{" "}
+                Contact your PayGlocal account manager or support.
+              </p>
+            </motion.aside>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );

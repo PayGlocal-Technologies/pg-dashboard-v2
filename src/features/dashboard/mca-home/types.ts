@@ -143,6 +143,9 @@ export interface McaStatCardData {
   /** Trend row (colored icon + "X% vs last month"). Mutually exclusive with
    *  captionLabel: exactly one of the two is set per stat. */
   trendPct?: number;
+  /** What the trend compares against, after the percentage. Defaults to
+   *  "vs last month", which is what every MCA dashboard stat says. */
+  comparisonLabel?: string;
   /** Plain muted caption shown instead of the trend row, for stats that
    *  aren't a month-over-month comparison (e.g. "Settles Jul 3, 12:00AM IST"). */
   captionLabel?: string;

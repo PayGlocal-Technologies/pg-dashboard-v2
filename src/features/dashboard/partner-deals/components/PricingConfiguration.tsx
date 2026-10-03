@@ -29,8 +29,12 @@ import {
 } from "@/features/dashboard/partner-deals/components/FeeControls";
 import { cn } from "@/lib/utils";
 import { SectionHeading } from "@/features/dashboard/partner-deals/components/DealDetailsSection";
-import { CARD_TYPES, DOMESTIC_NETWORKS } from "@/features/dashboard/partner-deals/constants";
-import { feeError, requiredChoiceError } from "@/features/dashboard/partner-deals/validation";
+import { DOMESTIC_CARD_BRANDS } from "@/features/dashboard/partner-deals/constants";
+import {
+  cardBrandError,
+  DEAL_FIELD_IDS,
+  feeError,
+} from "@/features/dashboard/partner-deals/validation";
 import type { DealForm } from "@/features/dashboard/partner-deals/form";
 import type {
   DomesticCardFeeRow,
@@ -60,12 +64,12 @@ function Subsection({
   helper: string;
   children: ReactNode;
 }) {
+  // A compact module header: a small icon beside the title, the helper under
+  // it, no tinted band or icon disc. The card is the module boundary.
   return (
     <Card className="gap-0 overflow-hidden p-0 shadow-none">
-      <div className="flex items-start gap-3 px-5 pt-5 pb-4">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-          <Icon name={icon} size={15} aria-hidden />
-        </span>
+      <div className="flex items-start gap-2.5 px-5 pt-4 pb-3">
+        <Icon name={icon} size={15} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden />
         <div className="min-w-0 space-y-0.5">
           <h3 className="text-[14px] font-semibold text-foreground">{title}</h3>
           <p className="text-[12.5px] text-muted-foreground">{helper}</p>
@@ -138,7 +142,7 @@ export function GlobalAccountsSection({ form }: { form: DealForm }) {
       title="Global Accounts"
       helper="Fees applied per transaction on global accounts."
     >
-      <div className="px-5 pb-5">
+      <div className="px-5 pb-4">
         <FeePair form={form} base="global" idPrefix="global" />
       </div>
     </Subsection>
@@ -193,6 +197,7 @@ export function InternationalPaymentSection({ form }: { form: DealForm }) {
           {(field) => (
             <div>
               <FeeInput
+                id={DEAL_FIELD_IDS.internationalFee(row.index)}
                 value={field.state.value}
                 onChange={field.handleChange}
                 onBlur={field.handleBlur}
@@ -213,7 +218,7 @@ export function InternationalPaymentSection({ form }: { form: DealForm }) {
     <Subsection
       icon="credit-card"
       title="International Payment Processing"
-      helper="Set fee type and amount for each card network."
+      helper="Set the fee type and amount for each card network."
     >
       <div className="border-t border-border">
         <DataTable
@@ -231,119 +236,80 @@ export function InternationalPaymentSection({ form }: { form: DealForm }) {
 
 // ── C. Domestic Payment Processing ──────────────────────────────────────────
 
+/** A fresh card fee row: no brand yet, percentage, nothing to pay on top. */
 const EMPTY_CARD_ROW: Omit<DomesticCardFeeRow, "rowId"> = {
-  network: "",
-  cardType: "",
+  brand: "",
   feeType: "PERCENTAGE",
-  fee: "",
+  fee: "0",
 };
-
-function ChoiceSelect({
-  value,
-  onChange,
-  options,
-  placeholder,
-  ariaLabel,
-  invalid,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  options: { value: string; label: string }[];
-  placeholder: string;
-  ariaLabel: string;
-  invalid?: boolean;
-}) {
-  return (
-    <Select value={value} onValueChange={onChange}>
-      <SelectTrigger
-        className={cn("w-full", COMPACT_CONTROL)}
-        aria-label={ariaLabel}
-        aria-invalid={invalid || undefined}
-      >
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 export function DomesticPaymentSection({ form }: { form: DealForm }) {
   const customise = useStore(form.store, (s) => s.values.domestic.customiseCards);
   const cards = useStore(form.store, (s) => s.values.domestic.cards);
   // Row keys, handed out in event handlers only (never during render).
   const nextRowId = useRef(0);
+  const newRowId = () => {
+    nextRowId.current += 1;
+    return `card-${nextRowId.current}`;
+  };
 
   function addRow() {
-    nextRowId.current += 1;
-    form.pushFieldValue("domestic.cards", {
-      ...EMPTY_CARD_ROW,
-      rowId: `card-${nextRowId.current}`,
-    });
+    form.pushFieldValue("domestic.cards", { ...EMPTY_CARD_ROW, rowId: newRowId() });
   }
 
   function setCustomise(next: boolean) {
     form.setFieldValue("domestic.customiseCards", next);
-    // Opening it for the first time starts with one row to fill in.
-    if (next && cards.length === 0) addRow();
+    // The first time it's switched on, start with one row per brand at 0,
+    // as production does, so the partner edits fees rather than building
+    // the list. Rows are kept if it's switched off and on again.
+    if (next && cards.length === 0) {
+      form.setFieldValue(
+        "domestic.cards",
+        DOMESTIC_CARD_BRANDS.map((brand) => ({ ...EMPTY_CARD_ROW, brand, rowId: newRowId() }))
+      );
+    }
   }
 
   const columns: Column<DomesticCardFeeRow & { index: number }>[] = [
     {
-      key: "network",
-      header: "Network",
-      minWidth: 160,
+      key: "brand",
+      header: "Brand",
+      minWidth: 190,
       render: (row) => (
         <form.Field
-          name={`domestic.cards[${row.index}].network`}
+          name={`domestic.cards[${row.index}].brand`}
           validators={{
-            onChange: ({ value }) => requiredChoiceError(value, "network"),
-            onSubmit: ({ value }) => requiredChoiceError(value, "network"),
+            onChange: ({ value }) =>
+              cardBrandError(
+                value,
+                cards.slice(0, row.index).map((c) => c.brand)
+              ),
+            onSubmit: ({ value }) =>
+              cardBrandError(
+                value,
+                cards.slice(0, row.index).map((c) => c.brand)
+              ),
           }}
         >
           {(field) => (
             <div>
-              <ChoiceSelect
-                value={field.state.value}
-                onChange={field.handleChange}
-                options={DOMESTIC_NETWORKS}
-                placeholder="Network"
-                ariaLabel="Card network"
-                invalid={field.state.meta.errors.length > 0}
-              />
-              <CellError message={field.state.meta.errors[0]} />
-            </div>
-          )}
-        </form.Field>
-      ),
-    },
-    {
-      key: "cardType",
-      header: "Card type",
-      minWidth: 130,
-      render: (row) => (
-        <form.Field
-          name={`domestic.cards[${row.index}].cardType`}
-          validators={{
-            onChange: ({ value }) => requiredChoiceError(value, "card type"),
-            onSubmit: ({ value }) => requiredChoiceError(value, "card type"),
-          }}
-        >
-          {(field) => (
-            <div>
-              <ChoiceSelect
-                value={field.state.value}
-                onChange={field.handleChange}
-                options={CARD_TYPES}
-                placeholder="Type"
-                ariaLabel="Card type"
-                invalid={field.state.meta.errors.length > 0}
-              />
+              <Select value={field.state.value} onValueChange={field.handleChange}>
+                <SelectTrigger
+                  id={DEAL_FIELD_IDS.cardBrand(row.rowId)}
+                  className={cn("w-full", COMPACT_CONTROL)}
+                  aria-label={`Card fee ${row.index + 1} brand`}
+                  aria-invalid={field.state.meta.errors.length > 0 || undefined}
+                >
+                  <SelectValue placeholder="Select brand" />
+                </SelectTrigger>
+                <SelectContent>
+                  {DOMESTIC_CARD_BRANDS.map((brand) => (
+                    <SelectItem key={brand} value={brand}>
+                      {brand}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <CellError message={field.state.meta.errors[0]} />
             </div>
           )}
@@ -353,14 +319,14 @@ export function DomesticPaymentSection({ form }: { form: DealForm }) {
     {
       key: "feeType",
       header: "Fee type",
-      minWidth: 150,
+      minWidth: 160,
       render: (row) => (
         <form.Field name={`domestic.cards[${row.index}].feeType`}>
           {(field) => (
             <FeeTypeSelect
               value={field.state.value}
               onChange={field.handleChange}
-              ariaLabel="Card fee type"
+              ariaLabel={`${row.brand || `Card fee ${row.index + 1}`} fee type`}
               compact
             />
           )}
@@ -370,7 +336,7 @@ export function DomesticPaymentSection({ form }: { form: DealForm }) {
     {
       key: "fee",
       header: "Fee",
-      minWidth: 130,
+      minWidth: 140,
       render: (row) => (
         <form.Field
           name={`domestic.cards[${row.index}].fee`}
@@ -382,12 +348,13 @@ export function DomesticPaymentSection({ form }: { form: DealForm }) {
           {(field) => (
             <div>
               <FeeInput
+                id={DEAL_FIELD_IDS.cardFee(row.rowId)}
                 value={field.state.value}
                 onChange={field.handleChange}
                 onBlur={field.handleBlur}
                 feeType={row.feeType}
                 invalid={field.state.meta.errors.length > 0}
-                ariaLabel="Card fee"
+                ariaLabel={`${row.brand || `Card fee ${row.index + 1}`} fee`}
                 compact
               />
               <CellError message={field.state.meta.errors[0]} />
@@ -399,16 +366,17 @@ export function DomesticPaymentSection({ form }: { form: DealForm }) {
     {
       key: "remove",
       header: "",
-      minWidth: 48,
+      minWidth: 52,
       render: (row) => (
         <div className="flex justify-end">
           <IconButton
-            aria-label="Remove card fee"
-            variant="ghost"
+            aria-label={`Remove ${row.brand || `card fee ${row.index + 1}`}`}
+            variant="outline"
             size="sm"
             onClick={() => form.removeFieldValue("domestic.cards", row.index)}
+            className="text-primary"
           >
-            <Icon name="trash-2" className="h-3.5 w-3.5" />
+            <Icon name="minus" className="h-3.5 w-3.5" />
           </IconButton>
         </div>
       ),
@@ -421,8 +389,8 @@ export function DomesticPaymentSection({ form }: { form: DealForm }) {
       title="Domestic Payment Processing"
       helper="Platform fee and optional per-card brand pricing."
     >
-      <div className="space-y-3 px-5 pb-5">
-        <p className="text-[13px] font-medium text-foreground">Platform fee</p>
+      <div className="space-y-3 px-5 pb-4">
+        <p className="text-[13px] font-medium text-foreground">Platform Fee</p>
         <FeePair form={form} base="domestic.platform" idPrefix="domestic-platform" />
       </div>
 
@@ -443,8 +411,8 @@ export function DomesticPaymentSection({ form }: { form: DealForm }) {
         />
       </div>
 
-      {/* Progressive disclosure: the card grid only exists while the toggle
-          is on. Rows are kept if it's switched off and on again. */}
+      {/* Progressive disclosure: the brand grid only exists while the toggle
+          is on. */}
       <AnimatePresence initial={false}>
         {customise && (
           <motion.div
@@ -470,14 +438,14 @@ export function DomesticPaymentSection({ form }: { form: DealForm }) {
                   No card fees yet. The platform fee applies to every card.
                 </p>
               )}
-              <div className="px-5 py-3">
+              <div className="border-t border-dashed border-border px-5 py-3">
                 <Button
                   type="button"
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
                   onClick={addRow}
-                  className="-ml-2 h-auto min-h-0 py-1 text-[12.5px]"
+                  className="w-full text-primary hover:text-primary"
                 >
                   Add card fee
                 </Button>
@@ -495,7 +463,7 @@ export function PricingConfiguration({ form }: { form: DealForm }) {
     <section className="space-y-4">
       <SectionHeading
         title="Pricing configuration"
-        description="Configure fees for global accounts, international cards, and domestic payments."
+        description="Configure the fees that will apply to businesses using this referral deal."
       />
       <div className="space-y-4">
         <GlobalAccountsSection form={form} />

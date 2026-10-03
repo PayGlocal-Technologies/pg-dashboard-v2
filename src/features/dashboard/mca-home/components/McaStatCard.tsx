@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { Card, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -8,9 +9,12 @@ import type { McaStatCardData } from "@/features/dashboard/mca-home/types";
 interface McaStatCardProps {
   data: McaStatCardData;
   isLoading?: boolean;
+  /** Drawn in place of the sparkline strip when given (e.g. the Partner
+   *  Dashboard's per-product split). The MCA dashboard never passes one. */
+  footer?: ReactNode;
 }
 
-export function McaStatCard({ data, isLoading = false }: McaStatCardProps) {
+export function McaStatCard({ data, isLoading = false, footer }: McaStatCardProps) {
   const hasTrend = data.trendPct !== undefined;
   const positive = hasTrend && data.trendPct! >= 0;
   const sparkData = (data.spark ?? []).map((v, i) => ({ i, v }));
@@ -47,7 +51,7 @@ export function McaStatCard({ data, isLoading = false }: McaStatCardProps) {
               {hasTrend ? (
                 <>
                   {positive ? "+" : ""}
-                  {data.trendPct}% vs last month
+                  {data.trendPct}% {data.comparisonLabel ?? "vs last month"}
                 </>
               ) : (
                 data.captionLabel
@@ -56,30 +60,34 @@ export function McaStatCard({ data, isLoading = false }: McaStatCardProps) {
           </div>
         </div>
       )}
-      {/* The strip keeps its height with no series, so a card without one
-          still lines up with its neighbours in the grid. */}
-      <div className="mt-auto h-12 w-full pt-3">
-        {sparkData.length > 0 && (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-              <defs>
-                <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={data.accentColor} stopOpacity={0.25} />
-                  <stop offset="100%" stopColor={data.accentColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <Area
-                type="monotone"
-                dataKey="v"
-                stroke={data.accentColor}
-                strokeWidth={2}
-                fill={`url(#${gradId})`}
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+      {footer ? (
+        <div className="mt-auto pt-3">{footer}</div>
+      ) : (
+        /* The strip keeps its height with no series, so a card without one
+          still lines up with its neighbours in the grid. */
+        <div className="mt-auto h-12 w-full pt-3">
+          {sparkData.length > 0 && (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={sparkData} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={data.accentColor} stopOpacity={0.25} />
+                    <stop offset="100%" stopColor={data.accentColor} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey="v"
+                  stroke={data.accentColor}
+                  strokeWidth={2}
+                  fill={`url(#${gradId})`}
+                  dot={false}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      )}
     </Card>
   );
 }

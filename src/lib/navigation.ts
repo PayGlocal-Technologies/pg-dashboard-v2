@@ -339,6 +339,7 @@ export const mcaNavigation: NavGroup[] = [
 // partnerNavigation below, which is the whole app for a partner *account*.
 //
 // Built so far: /refer-and-earn, /team-management, and as design mocks on
+// sample data /partner-dashboard (Home),
 // sample data /transaction-overview, /commission and /partner-deals-dashboard
 // (with /partner-deals-dashboard/create). The other hrefs match
 // partnerNavigation's where it has one, and /pricing is a placeholder;
@@ -347,7 +348,7 @@ export const mcaNavigation: NavGroup[] = [
 export const partnersNavigation: NavGroup[] = [
   {
     label: "Overview",
-    items: [{ label: "Home", href: "/refer-and-earn", icon: "layout-grid", permission: [] }],
+    items: [{ label: "Home", href: "/partner-dashboard", icon: "layout-grid", permission: [] }],
   },
   {
     label: "Merchant",

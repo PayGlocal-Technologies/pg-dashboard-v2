@@ -36,7 +36,7 @@ const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
   // lands on /dashboard, rather than on one of its inner feature tables.
   { label: "Payments", href: "/pa-dashboard", context: "PA" },
   { label: "Multi-Currency Accounts", href: "/mca-dashboard", context: "PACB" },
-  { label: "Partners", href: "/refer-and-earn", context: "PARTNERS" },
+  { label: "Partners", href: "/partner-dashboard", context: "PARTNERS" },
 ] as const;
 
 // OUT OF SCOPE — Create button hidden for now. Flip back to true to restore.
