@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { Button, Card, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
-import { ReferAndEarnBanner } from "@/components/common/ReferAndEarnBanner";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import {
@@ -401,8 +400,6 @@ export function DisputeDetailFeature({
                 <PaymentTimeline steps={timelineSteps} />
               </Card>
             </div>
-
-            <ReferAndEarnBanner />
 
             {detail.amountBreakdown && (
               <div className="flex flex-col gap-2">
