@@ -130,7 +130,7 @@ export const regularNavigation: NavGroup[] = [
     label: "Finance",
     items: [
       {
-        label: "Settlement Reports",
+        label: "Settlements",
         href: "/settlement-report",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
@@ -426,7 +426,7 @@ export const globalNavigation: NavGroup[] = [
     label: "Finance",
     items: [
       {
-        label: "Settlement Reports",
+        label: "Settlements",
         href: "/settlement-report",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],

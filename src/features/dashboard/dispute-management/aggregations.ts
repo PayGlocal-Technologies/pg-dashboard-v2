@@ -1,16 +1,16 @@
 import { sumAmounts } from "@/features/dashboard/pa-transactions/financial/money";
 import type { DisputeRawStatus, DisputeRow } from "@/features/dashboard/dispute-management/types";
 
-/** 5-bucket grouping for the Dispute Overview donut/stat cards, centralized
- * here instead of re-derived in each caller. NEEDS_RESPONSE/
- * MORE_EVIDENCE_NEEDED/REOPENED all fold into "needsAction" (all three mean
- * the merchant must act). ACCEPTED is its own bucket, deliberately never
- * folded into "lost"/CHARGED_BACK, the status-vocabulary spec's own note:
- * "Accepted is reported separately from Charged back so win-rate stays
- * honest. A merchant who accepted forty disputes has not lost forty
- * arguments." EXPIRED folds into "lost" since the spec treats it as a
- * charged-back money outcome. */
-export type DisputeOverviewBucketKey = "needsAction" | "inReview" | "won" | "lost" | "accepted";
+/** 4-bucket grouping for the Dispute Overview card, centralized here instead
+ * of re-derived in each caller. NEEDS_RESPONSE/MORE_EVIDENCE_NEEDED/REOPENED
+ * all fold into "needsAction" (all three mean the merchant must act).
+ *
+ * Final outcomes are Won or Lost, by who they favoured (see
+ * disputeStatus.ts): CLEARED is "won"; CHARGED_BACK, ACCEPTED and EXPIRED
+ * all favoured the customer and fold into "lost". This supersedes the
+ * status-vocabulary spec's earlier separate "Accepted" bucket, by the
+ * merchant's own call; the raw statuses still keep them apart. */
+export type DisputeOverviewBucketKey = "needsAction" | "inReview" | "won" | "lost";
 
 export const DISPUTE_OVERVIEW_BUCKETS: {
   key: DisputeOverviewBucketKey;
@@ -19,9 +19,8 @@ export const DISPUTE_OVERVIEW_BUCKETS: {
 }[] = [
   { key: "needsAction", label: "Action required", color: "#f59e0b" },
   { key: "inReview", label: "In review", color: "#3b82f6" },
-  { key: "won", label: "Cleared", color: "#10b981" },
-  { key: "lost", label: "Charged back", color: "#ef4444" },
-  { key: "accepted", label: "Accepted", color: "#a855f7" },
+  { key: "won", label: "Won", color: "#10b981" },
+  { key: "lost", label: "Lost", color: "#ef4444" },
 ];
 
 function bucketForStatus(status: DisputeRawStatus): DisputeOverviewBucketKey {
@@ -35,10 +34,9 @@ function bucketForStatus(status: DisputeRawStatus): DisputeOverviewBucketKey {
     case "CLEARED":
       return "won";
     case "CHARGED_BACK":
+    case "ACCEPTED":
     case "EXPIRED":
       return "lost";
-    case "ACCEPTED":
-      return "accepted";
     default:
       return "needsAction";
   }
@@ -49,7 +47,6 @@ export interface DisputeOverviewCounts {
   inReview: number;
   won: number;
   lost: number;
-  accepted: number;
 }
 
 /** Number of disputes per status bucket. Rows with a missing/unrecognized
@@ -61,7 +58,6 @@ export function getDisputeCounts(disputes: DisputeRow[] | undefined | null): Dis
     inReview: 0,
     won: 0,
     lost: 0,
-    accepted: 0,
   };
   for (const row of disputes ?? []) {
     if (!row?.status) continue;
@@ -72,7 +68,7 @@ export function getDisputeCounts(disputes: DisputeRow[] | undefined | null): Dis
 
 export function getTotalDisputeCount(disputes: DisputeRow[] | undefined | null): number {
   const counts = getDisputeCounts(disputes);
-  return counts.needsAction + counts.inReview + counts.won + counts.lost + counts.accepted;
+  return counts.needsAction + counts.inReview + counts.won + counts.lost;
 }
 
 /** The currency held by the most disputes in the given list (ties broken by
@@ -106,7 +102,6 @@ export interface DisputeOverviewAmounts {
   inReview: number;
   won: number;
   lost: number;
-  accepted: number;
   /** The single currency every amount above is expressed in, see
    * getDominantCurrency. Falls back to "INR" (formatCurrency's own default)
    * when the list is empty or no row has a currency. */
@@ -130,7 +125,6 @@ export function getDisputeAmounts(
     inReview: [],
     won: [],
     lost: [],
-    accepted: [],
   };
   let excludedCount = 0;
 
@@ -149,7 +143,6 @@ export function getDisputeAmounts(
     inReview: sumAmounts(totals.inReview),
     won: sumAmounts(totals.won),
     lost: sumAmounts(totals.lost),
-    accepted: sumAmounts(totals.accepted),
     currency,
     excludedCount,
   };
@@ -157,11 +150,5 @@ export function getDisputeAmounts(
 
 export function getTotalDisputeAmount(disputes: DisputeRow[] | undefined | null): number {
   const amounts = getDisputeAmounts(disputes);
-  return sumAmounts([
-    amounts.needsAction,
-    amounts.inReview,
-    amounts.won,
-    amounts.lost,
-    amounts.accepted,
-  ]);
+  return sumAmounts([amounts.needsAction, amounts.inReview, amounts.won, amounts.lost]);
 }

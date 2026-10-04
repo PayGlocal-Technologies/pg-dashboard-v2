@@ -1,18 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Bar,
-  BarChart,
-  Cell,
-  LabelList,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { Card } from "@/components/ui";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { PillToggle } from "@/components/common/PillToggle";
 import { formatCurrency } from "@/lib/utils";
 import {
@@ -26,9 +15,12 @@ import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
 
 type OverviewMetric = "count" | "amount";
 
+// Amount first (and the default below): the money at stake is the figure
+// that actually drives what a merchant does next, count is the secondary
+// "how many" breakdown you switch to afterward, not the other way round.
 const METRIC_OPTIONS = [
-  { value: "count", label: "Count" },
   { value: "amount", label: "Amount" },
+  { value: "count", label: "Count" },
 ] as const satisfies { value: OverviewMetric; label: string }[];
 
 interface OverviewRow {
@@ -36,62 +28,52 @@ interface OverviewRow {
   label: string;
   color: string;
   value: number;
-}
-
-function OverviewTooltip({
-  active,
-  payload,
-  metric,
-  currency,
-}: {
-  active?: boolean;
-  payload?: readonly { payload: OverviewRow }[];
-  metric: OverviewMetric;
-  currency: string;
-}) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0]?.payload;
-  if (!row) return null;
-  return (
-    <div className="rounded-lg border border-border bg-card px-3 py-2 text-xs shadow-md">
-      <p className="font-medium text-muted-foreground">{row.label}</p>
-      <p className="font-semibold tabular-nums text-foreground">
-        {metric === "count"
-          ? `${row.value} dispute${row.value === 1 ? "" : "s"}`
-          : `${formatCurrency(row.value, currency)} disputed`}
-      </p>
-    </div>
-  );
+  /** Share of the total, 0-1; sizes the bar segment. */
+  share: number;
 }
 
 interface DisputeOverviewCardProps {
   disputes: DisputeRow[];
 }
 
-/** Count answers "how many disputes do I have", Amount answers "how much
- * money is at stake", both read off the same underlying rows, switched via
- * a compact toggle rather than two separate cards. Horizontal bars (not the
- * previous donut) so status categories are easy to compare on either metric,
- * see getDisputeCounts/getDisputeAmounts for the centralized aggregation. */
+/**
+ * How the disputed total breaks down by status, by amount or by count.
+ *
+ * One proportional bar (the parts of the total, side by side) over a compact
+ * 2 x 2 legend: each cell is dot + status, with the value under it. Every
+ * status keeps its cell even at zero, so switching Amount / Count never
+ * changes the card's height. Values are visible text, never hover-only, and
+ * each cell names its status, so nothing relies on colour alone.
+ */
 export function DisputeOverviewCard({ disputes }: DisputeOverviewCardProps) {
-  const [metric, setMetric] = useState<OverviewMetric>("count");
+  const [metric, setMetric] = useState<OverviewMetric>("amount");
 
   const counts = getDisputeCounts(disputes);
   const amounts = getDisputeAmounts(disputes);
   const totalCount = getTotalDisputeCount(disputes);
   const totalAmount = getTotalDisputeAmount(disputes);
+  const total = metric === "count" ? totalCount : totalAmount;
 
-  const rows: OverviewRow[] = DISPUTE_OVERVIEW_BUCKETS.map((bucket) => ({
-    key: bucket.key,
-    label: bucket.label,
-    color: bucket.color,
-    value: metric === "count" ? counts[bucket.key] : amounts[bucket.key],
-  }));
+  const rows: OverviewRow[] = DISPUTE_OVERVIEW_BUCKETS.map((bucket) => {
+    const value = metric === "count" ? counts[bucket.key] : amounts[bucket.key];
+    return {
+      key: bucket.key,
+      label: bucket.label,
+      color: bucket.color,
+      value,
+      share: total > 0 ? value / total : 0,
+    };
+  });
+
+  const formatValue = (value: number) =>
+    metric === "count"
+      ? `${value} ${value === 1 ? "dispute" : "disputes"}`
+      : formatCurrency(value, amounts.currency);
 
   const isEmpty = disputes.length === 0;
 
   return (
-    <Card className="flex h-full flex-col gap-3 p-5">
+    <Card className="flex h-full flex-col gap-4 p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-foreground">Dispute overview</h2>
         <PillToggle
@@ -102,81 +84,67 @@ export function DisputeOverviewCard({ disputes }: DisputeOverviewCardProps) {
         />
       </div>
 
-      {isEmpty ? (
-        <PlaceholderState
-          variant="no-metric-data"
-          size="sm"
-          title="No disputes in this period"
-          description="If a customer disputes a payment, it will be counted here by status."
-          className="flex-1 justify-center py-0"
-        />
-      ) : (
-        <>
-          <div>
-            <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
-              {metric === "count" ? totalCount : formatCurrency(totalAmount, amounts.currency)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {metric === "count" ? "Total disputes" : "Total disputed"}
-            </p>
-          </div>
+      {/* Centred in whatever height the row's tallest sibling gives this
+          card, so there's never a blank band under the legend. Empty keeps
+          this same layout at zero, the bar drawn as a dashed track (the MCA
+          dashboard's empty-chart idea), so the card never changes height. */}
+      <div className="flex flex-1 flex-col justify-center gap-3.5">
+        <div>
+          <p className="text-2xl font-bold tracking-tight text-foreground tabular-nums">
+            {metric === "count" ? totalCount : formatCurrency(totalAmount, amounts.currency)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {isEmpty
+              ? "No disputes in this period"
+              : metric === "count"
+                ? "Total disputes"
+                : "Total disputed"}
+          </p>
+        </div>
 
-          {/* Chart values are always rendered as visible text (see LabelList
-           * below), never exposed only on hover, and every bar keeps its own
-           * label text, so nothing here depends on colour alone. This SVG is
-           * a decorative rendering of that same data, screen readers get the
-           * sr-only list instead. */}
-          <div className="min-h-0 flex-1" aria-hidden="true">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={rows}
-                layout="vertical"
-                margin={{ top: 0, right: 44, left: 0, bottom: 0 }}
-                barCategoryGap="28%"
-              >
-                <XAxis type="number" domain={[0, "dataMax"]} hide />
-                <YAxis
-                  type="category"
-                  dataKey="label"
-                  width={84}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 11, fill: "var(--chart-tick)" }}
+        {/* The whole = 100% of the bar; each status takes its share. A 2px
+              gap separates segments, and a zero-value status draws nothing.
+              Decorative: the legend below carries the same figures as text. */}
+        {isEmpty ? (
+          <div
+            className="h-2.5 w-full rounded-full border border-dashed border-muted-foreground/40"
+            aria-hidden="true"
+          />
+        ) : (
+          <div
+            className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full"
+            aria-hidden="true"
+          >
+            {rows
+              .filter((row) => row.value > 0)
+              .map((row) => (
+                <span
+                  key={row.key}
+                  className="h-full first:rounded-l-full last:rounded-r-full"
+                  style={{ flexGrow: row.share, flexBasis: 0, backgroundColor: row.color }}
                 />
-                <Tooltip
-                  content={<OverviewTooltip metric={metric} currency={amounts.currency} />}
-                  cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-                />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={14} isAnimationActive={false}>
-                  {rows.map((row) => (
-                    <Cell key={row.key} fill={row.color} />
-                  ))}
-                  <LabelList
-                    dataKey="value"
-                    position="right"
-                    formatter={(v: unknown) => {
-                      const n = typeof v === "number" ? v : 0;
-                      return metric === "count" ? String(n) : formatCurrency(n, amounts.currency);
-                    }}
-                    style={{ fontSize: 12, fontWeight: 600, fill: "var(--foreground)" }}
-                  />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+              ))}
           </div>
+        )}
 
-          <ul className="sr-only">
-            {rows.map((row) => (
-              <li key={row.key}>
-                {row.label}:{" "}
-                {metric === "count"
-                  ? `${row.value} dispute${row.value === 1 ? "" : "s"}`
-                  : formatCurrency(row.value, amounts.currency)}
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+        <ul className="grid grid-cols-2 gap-x-6 gap-y-3">
+          {rows.map((row) => (
+            <li key={row.key} className="min-w-0">
+              <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: row.color }}
+                  aria-hidden="true"
+                />
+                <span className="truncate">{row.label}</span>
+              </span>
+              <p className="mt-0.5 truncate pl-3.5 text-[15px] font-semibold tabular-nums text-foreground">
+                {formatValue(row.value)}
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
     </Card>
   );
 }

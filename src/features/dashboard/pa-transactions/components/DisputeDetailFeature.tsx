@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { Button, Card, Separator } from "@/components/ui";
+import { Button, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
@@ -20,29 +18,23 @@ import {
 } from "@/features/dashboard/pa-transactions/deriveTransactionDetail";
 import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
 import {
+  DetailBackLink,
   DetailRow,
-  SectionLabel,
+  DetailSection,
 } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import { AmountBreakdownBody } from "@/features/dashboard/pa-transactions/components/AmountBreakdownBody";
 import { LinkedTransactionsSection } from "@/features/dashboard/pa-transactions/components/LinkedTransactionsSection";
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
-import { DisputeActionCard } from "@/features/dashboard/pa-transactions/components/DisputeActionCard";
-import { DisputeStatusNoticeCard } from "@/features/dashboard/pa-transactions/components/DisputeStatusNoticeCard";
-import type { DisputeFormStep } from "@/features/dashboard/pa-transactions/components/DisputeFormTimelineCard";
+import { DisputeStatusCard } from "@/features/dashboard/pa-transactions/components/DisputeStatusCard";
 import { DisputeDetailsCard } from "@/features/dashboard/pa-transactions/components/DisputeDetailsCard";
 import { DisputeAcceptChoice } from "@/features/dashboard/pa-transactions/components/DisputeAcceptChoice";
-import {
-  DisputeRespondForm,
-  type DisputeRespondMode,
-} from "@/features/dashboard/pa-transactions/components/DisputeRespondForm";
+import { DisputeRespondForm } from "@/features/dashboard/pa-transactions/components/DisputeRespondForm";
 import { PaymentTimeline } from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
 import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/components/timelineStepFormatting";
 import { deriveDisputeOnlyTimelineSteps } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
 import { getDisputeDetailLinkedRows } from "@/features/dashboard/pa-transactions/linkedChildRecords";
-import { formatNow } from "@/features/dashboard/pa-transactions/formatNow";
-import { withDisputeStatus } from "@/features/dashboard/pa-transactions/withDisputeStatus";
-import { useDisputeResolutions } from "@/stores/useDisputeResolutions";
+import { useDisputeResolutionFlow } from "@/features/dashboard/pa-transactions/useDisputeResolutionFlow";
 import { useRefundEvents } from "@/stores/useRefundEvents";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { RefundEvent } from "@/features/dashboard/pa-transactions/financial/types";
@@ -54,17 +46,23 @@ export type DisputeDetailOrigin = "transactions" | "dispute-management";
 
 const ORIGIN_COPY: Record<
   DisputeDetailOrigin,
-  { listPath: string; backLabel: string; notFoundHint: string }
+  { listPath: string; backLabel: string; notFoundHint: string; pageTitle: string }
 > = {
+  // Reached from the Transactions list — this page is one status a
+  // transaction can be in, not a separate "Dispute" object as far as the
+  // merchant is concerned there, so the title stays "Transaction Details"
+  // like every other pa-transactions detail page, never the word "Dispute".
   transactions: {
     listPath: "/pa-transactions",
     backLabel: "Back to Transactions",
     notFoundHint: "Open this dispute from the Transactions list to view its details.",
+    pageTitle: "Transaction Details",
   },
   "dispute-management": {
     listPath: "/dispute-management",
     backLabel: "Back to Dispute Management",
     notFoundHint: "Open this dispute from the Dispute Management list to view its details.",
+    pageTitle: "Dispute Details",
   },
 };
 
@@ -96,17 +94,23 @@ export function DisputeDetailFeature({
   const refundEvents = useRefundEvents(
     (s) => s.eventsByTransactionId[transaction?.gid ?? ""] ?? EMPTY_REFUND_EVENTS
   );
-  const resolveDispute = useDisputeResolutions((s) => s.resolveDispute);
-
-  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
-  const [disputeScreen, setDisputeScreen] = useState<"detail" | "respond">("detail");
-  const [respondMode, setRespondMode] = useState<DisputeRespondMode>("contest");
-  const [submittedDocuments, setSubmittedDocuments] = useState<string[]>([]);
 
   const dispute =
     transaction?.gid === transactionId
       ? transaction.disputes?.find((d) => d.id === disputeId)
       : undefined;
+
+  // Called unconditionally (rules of hooks), even on the not-found branch
+  // below — its own useState calls must run every render regardless, the
+  // fallback transaction/amount/currency below are only ever read once
+  // `dispute` is confirmed to exist, past that branch.
+  const flow = useDisputeResolutionFlow({
+    transaction: transaction ?? ({ gid: transactionId } as PaTransaction),
+    disputeId,
+    amount: dispute?.amount ?? 0,
+    currency: dispute?.currency || transaction?.txnCurrency || "INR",
+    onAccepted: () => router.push(LIST_PATH),
+  });
 
   if (!transaction || transaction.gid !== transactionId || !dispute) {
     return (
@@ -136,7 +140,6 @@ export function DisputeDetailFeature({
   // getDisplayStatus on the parent page), reuses the dispute-status
   // vocabulary directly (status/disputeStatus.ts), never the transaction's.
   const statusMeta = getDisputeStatusMeta(dispute.status);
-  const isUnderBankReview = dispute.reviewPhase === "BANK_REVIEW";
   const name = customerName(transaction) || "Unknown customer";
   const formattedDateTime = formatDisplayDateTime(dispute.raisedOn) ?? "Not available";
 
@@ -154,86 +157,6 @@ export function DisputeDetailFeature({
     respondBy: dispute.respondBy ?? dispute.raisedOn,
   };
 
-  // "Needs response" covers a freshly raised dispute awaiting accept/contest,
-  // and REOPENED (a cleared dispute the bank came back on, the merchant must
-  // respond again the same way). MORE_EVIDENCE_NEEDED also needs the
-  // merchant to act, but is its own distinct notice (re-upload, not a
-  // first-time accept/contest choice), so it's excluded here and handled in
-  // its own branch below.
-  const disputeAwaitingDecision =
-    dispute.status === "NEEDS_RESPONSE" || dispute.status === "REOPENED";
-
-  const underReviewSteps: DisputeFormStep[] | undefined =
-    dispute.status === "UNDER_REVIEW"
-      ? [
-          {
-            label: "Chargeback",
-            description: formatDisplayDateTime(dispute.raisedOn) ?? dispute.raisedOn,
-            state: "complete",
-          },
-          {
-            label: "Merchant Response",
-            description: "Upload supporting documents before the response deadline.",
-            state: "complete",
-          },
-          {
-            label: "Evidence Submitted",
-            description: "Your supporting evidence has been received and queued for review.",
-            state: "complete",
-          },
-          {
-            label: "PayGlocal Review",
-            description: isUnderBankReview
-              ? "Your evidence was reviewed and a representation was prepared for the issuing bank."
-              : "PayGlocal will review your evidence and prepare a representation for submission to the issuing bank.",
-            state: isUnderBankReview ? "complete" : "current",
-          },
-          {
-            label: "Bank Review",
-            description:
-              "The issuing bank may take up to approximately 60 business days to review the submitted evidence and issue a decision.",
-            state: isUnderBankReview ? "current" : "locked",
-          },
-          {
-            label: "Final Decision",
-            description:
-              "If the decision is in your favour, the dispute will close successfully. Otherwise, depending on the card network's process, the case may proceed to Pre-Arbitration.",
-            state: "locked",
-          },
-          { label: "Closed", description: "", state: "locked" },
-        ]
-      : undefined;
-
-  function backToDisputeDetails() {
-    setDisputeScreen("detail");
-  }
-
-  function handleConfirmAcceptFull() {
-    resolveDispute(transaction!.gid ?? "", "ACCEPTED");
-    setStoredTransaction(
-      withDisputeStatus(transaction!, disputeId, "ACCEPTED", undefined, formatNow(new Date()))
-    );
-    toast.success("Dispute accepted", {
-      description: `${formatCurrency(amount, currency)} ${currency} has been refunded to the cardholder.`,
-    });
-    router.push(LIST_PATH);
-  }
-
-  function handleAcceptDispute() {
-    setAcceptDialogOpen(true);
-  }
-
-  function handleContestDispute() {
-    setRespondMode("contest");
-    setDisputeScreen("respond");
-  }
-
-  function handleLearnMore() {
-    toast.message("Learn how to respond to disputes", {
-      description: "This action isn't wired up yet.",
-    });
-  }
-
   function goToLinked(row: PaTransaction) {
     setStoredTransaction(transaction!);
     if (row.linkedRecordType === "refund") {
@@ -245,25 +168,15 @@ export function DisputeDetailFeature({
     router.push(`/pa-transactions/${encodeURIComponent(row.gid ?? "")}`);
   }
 
-  if (disputeScreen === "respond") {
+  if (flow.disputeScreen === "respond") {
     return (
       <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
         <DisputeRespondForm
-          mode={respondMode}
+          mode={flow.respondMode}
           disputedAmount={amount}
           currency={currency}
-          onBack={backToDisputeDetails}
-          onSubmit={(documentNames) => {
-            resolveDispute(transaction!.gid ?? "", "UNDER_REVIEW");
-            setStoredTransaction(
-              withDisputeStatus(transaction!, disputeId, "UNDER_REVIEW", documentNames)
-            );
-            setSubmittedDocuments(documentNames);
-            toast.success("Documents uploaded", {
-              description: "Your dispute is now under review.",
-            });
-            setDisputeScreen("detail");
-          }}
+          onBack={flow.backToDetail}
+          onSubmit={flow.handleRespondSubmit}
         />
       </div>
     );
@@ -279,206 +192,128 @@ export function DisputeDetailFeature({
 
   return (
     <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
-      <div className="page-enter mx-auto max-w-350 space-y-5">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Dispute Details</h1>
+      <div className="page-enter mx-auto max-w-350 space-y-5 overflow-x-hidden">
+        <DetailBackLink label={backLabel} onClick={() => router.push(LIST_PATH)} />
 
-        <Button
-          type="button"
-          variant="link"
-          leftIcon={<Icon name="chevron-left" size={14} />}
-          onClick={() => router.push(LIST_PATH)}
-          className="h-auto w-fit gap-1 p-0 text-sm font-medium"
-        >
-          {backLabel}
-        </Button>
-
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="flex items-baseline gap-2 text-4xl font-bold tracking-tight text-foreground tabular-nums">
+        {/* Summary, straight on the page like the MCA details page. */}
+        <div className="pb-4">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span className="text-[34px] font-semibold tabular-nums text-foreground">
               {formatCurrency(amount, currency)}
-              <span className="text-base font-medium text-muted-foreground">{currency}</span>
-            </p>
+            </span>
             <StatusBadgeWithTooltip
+              size="md"
               variant={statusMeta.variant}
               label={statusMeta.label}
               trailIcon={statusMeta.trailIcon}
               tooltip={statusMeta.tooltip}
-              size="sm"
             />
             {dispute.disputePhase && (
               <StatusBadgeWithTooltip
+                size="md"
                 variant="muted"
                 label={DISPUTE_PHASE_META[dispute.disputePhase].label}
                 tooltip={DISPUTE_PHASE_META[dispute.disputePhase].description}
-                size="sm"
               />
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] font-medium text-foreground">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
             <span>{formattedDateTime}</span>
             <Separator orientation="vertical" className="h-3.5" />
             <TransactionPaymentMethod row={transaction} />
           </div>
-
-          <p className="mt-4 text-sm text-muted-foreground">
-            Charged to <span className="font-semibold text-foreground/85">{name}</span>
+          <p className="mt-1.5 text-[13px] text-muted-foreground">
+            Charged to <span className="font-medium text-foreground">{name}</span>
           </p>
-          <Separator className="mt-4" />
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Dispute</SectionLabel>
-              {disputeAwaitingDecision ? (
-                <DisputeActionCard
-                  merchantLabel={disputeDetail.merchantLabel}
-                  reasonCode={dispute.reasonCode}
-                  reason={dispute.reason}
-                  description={dispute.description}
-                  onLearnMore={handleLearnMore}
-                  onAccept={handleAcceptDispute}
-                  onContest={handleContestDispute}
-                />
-              ) : dispute.status === "CLEARED" ? (
-                <DisputeStatusNoticeCard
-                  icon="check-circle"
-                  iconClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  title="Dispute cleared"
-                  description="You successfully contested this dispute, the disputed amount stays with you. This dispute is now closed."
-                />
-              ) : dispute.status === "ACCEPTED" ? (
-                <DisputeStatusNoticeCard
-                  icon="check-circle"
-                  iconClassName="bg-muted text-muted-foreground"
-                  title="Dispute closed"
-                  description="You accepted this dispute and a refund was initiated to the cardholder. This dispute is now closed."
-                />
-              ) : dispute.status === "CHARGED_BACK" ? (
-                <DisputeStatusNoticeCard
-                  icon="alert-triangle"
-                  iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-                  title="Dispute charged back"
-                  description="The bank ruled in the cardholder's favour. This dispute is now closed and the disputed amount was charged back."
-                />
-              ) : dispute.status === "EXPIRED" ? (
-                <DisputeStatusNoticeCard
-                  icon="alert-triangle"
-                  iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-                  title="Dispute expired"
-                  description="The response deadline passed without a reply. This dispute is now closed and treated as a chargeback."
-                />
-              ) : dispute.status === "MORE_EVIDENCE_NEEDED" ? (
-                <DisputeStatusNoticeCard
-                  icon="alert-triangle"
-                  iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-                  title="More evidence needed"
-                  description="We need more information to investigate this dispute. Please upload additional documents to submit more supporting evidence."
-                  documents={dispute.documents}
-                  action={{ label: "Upload documents", onClick: handleContestDispute }}
-                />
-              ) : (
-                <DisputeStatusNoticeCard
-                  icon="clock"
-                  iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-                  title={isUnderBankReview ? "Bank is reviewing your evidence" : "Under review"}
-                  description={
-                    isUnderBankReview
-                      ? "Bank is reviewing the evidence. We'll notify you when we have a decision from the bank."
-                      : "Your documents have been submitted and will be reviewed."
-                  }
-                  documents={submittedDocuments.length > 0 ? submittedDocuments : dispute.documents}
-                  steps={underReviewSteps}
-                />
-              )}
-            </div>
+        {/* Same 3:1 split and spacing as the MCA details page. */}
+        <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[3fr_1fr] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-6">
+            <section>
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Dispute
+              </h3>
+              <DisputeStatusCard
+                dispute={dispute}
+                disputeDetail={disputeDetail}
+                onAccept={flow.handleAcceptDispute}
+                onContest={flow.handleContestDispute}
+                submittedDocuments={flow.submittedDocuments}
+              />
+            </section>
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Timeline</SectionLabel>
-              <Card className="shadow-none gap-0 p-5">
-                <PaymentTimeline steps={timelineSteps} />
-              </Card>
-            </div>
+            <DetailSection title="Timeline">
+              <PaymentTimeline steps={timelineSteps} />
+            </DetailSection>
 
             {detail.amountBreakdown && (
-              <div className="flex flex-col gap-2">
-                <SectionLabel>Payment Breakdown</SectionLabel>
-                <Card className="shadow-none gap-0 p-5">
-                  <AmountBreakdownBody
-                    amountReceived={detail.amountBreakdown.amountReceived}
-                    fee={detail.amountBreakdown.fee}
-                    refundedAmount={detail.amountBreakdown.refundedAmount}
-                    disputedAmount={detail.amountBreakdown.disputedAmount}
-                    netAmount={detail.amountBreakdown.netAmount}
-                    currency={transaction.txnCurrency ?? currency}
-                  />
-                </Card>
-              </div>
+              <DetailSection title="Payment Breakdown">
+                <AmountBreakdownBody
+                  amountReceived={detail.amountBreakdown.amountReceived}
+                  fee={detail.amountBreakdown.fee}
+                  refundedAmount={detail.amountBreakdown.refundedAmount}
+                  disputedAmount={detail.amountBreakdown.disputedAmount}
+                  netAmount={detail.amountBreakdown.netAmount}
+                  currency={transaction.txnCurrency ?? currency}
+                />
+              </DetailSection>
             )}
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Linked Transactions</SectionLabel>
+            <section>
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Linked Transactions
+              </h3>
               <LinkedTransactionsSection
                 transactions={linkedTransactions}
                 onViewDetails={goToLinked}
               />
-            </div>
+            </section>
           </div>
 
-          <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+          <div className="flex min-w-0 flex-col gap-6 lg:sticky lg:top-4">
             <DisputeDetailsCard
               dispute={disputeDetail}
               transaction={transaction}
               currency={currency}
             />
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Payment Details</SectionLabel>
-              <Card className="shadow-none gap-0 p-5">
-                <div className="flex flex-col gap-5">
-                  <div className="group">
-                    <p className="text-xs text-muted-foreground">Transaction ID</p>
-                    <div className="mt-0.5">
-                      <CopyableCell
-                        value={truncateId(transaction.gid ?? "Not available")}
-                        copyValue={transaction.gid ?? ""}
-                        label="Transaction ID"
-                        monospace
-                        className="font-semibold text-foreground/85"
-                      />
-                    </div>
-                  </div>
-                  <DetailRow label="Payment Category" value={detail.paymentCategory} />
-                  {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
-                  <DetailRow label="Issuer" value={detail.issuerBank} />
-                </div>
-              </Card>
-            </div>
+            <DetailSection title="Payment Details">
+              <DetailRow
+                label="Transaction ID"
+                value={
+                  <span className="group">
+                    <CopyableCell
+                      value={truncateId(transaction.gid ?? "Not available")}
+                      copyValue={transaction.gid ?? ""}
+                      label="Transaction ID"
+                      monospace
+                      className="font-medium text-foreground"
+                    />
+                  </span>
+                }
+              />
+              <DetailRow label="Payment Category" value={detail.paymentCategory} />
+              {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
+              <DetailRow label="Issuer" value={detail.issuerBank} />
+            </DetailSection>
 
-            <div className="flex flex-col gap-2">
-              <SectionLabel>Customer Details</SectionLabel>
-              <Card className="shadow-none gap-0 p-5">
-                <div className="flex flex-col gap-5">
-                  <DetailRow label="Customer Name" value={name} />
-                  <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />
-                  <DetailRow label="Phone Number" value={detail.customerPhone} />
-                </div>
-              </Card>
-            </div>
+            <DetailSection title="Customer Details">
+              <DetailRow label="Customer Name" value={name} />
+              <DetailRow label="Email ID" value={transaction.encEmailId ?? "Not available"} />
+              <DetailRow label="Phone Number" value={detail.customerPhone} />
+            </DetailSection>
           </div>
         </div>
 
         <DisputeAcceptChoice
-          open={acceptDialogOpen}
-          onOpenChange={setAcceptDialogOpen}
+          open={flow.acceptDialogOpen}
+          onOpenChange={flow.setAcceptDialogOpen}
           amount={amount}
           currency={currency}
-          onAcceptFull={handleConfirmAcceptFull}
-          onAcceptPartially={() => {
-            setRespondMode("partial");
-            setDisputeScreen("respond");
-          }}
+          onAcceptFull={flow.handleConfirmAcceptFull}
+          onAcceptPartially={flow.handleAcceptPartially}
         />
       </div>
     </div>

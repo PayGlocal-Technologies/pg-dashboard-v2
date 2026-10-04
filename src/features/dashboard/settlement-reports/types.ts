@@ -39,7 +39,16 @@ export interface SettlementRow {
    *  download. Optional because the summary endpoint does not return it yet —
    *  see FfmsSettlementSummaryRow.merchantId. */
   merchantId?: string;
+  /** MOCK ONLY (Payments "Settlements" design): the settlement's own id and
+   *  whether it has been paid out yet. Neither settlement API returns them —
+   *  see mock-data.ts's settlementRows. Absent on live rows, and the columns
+   *  that read them render a dash. */
+  settlementId?: string;
+  status?: SettlementStatus;
 }
+
+/** MOCK ONLY, see SettlementRow.status. */
+export type SettlementStatus = "PROCESSING" | "SETTLED";
 
 export interface SparklinePoint {
   x: string;

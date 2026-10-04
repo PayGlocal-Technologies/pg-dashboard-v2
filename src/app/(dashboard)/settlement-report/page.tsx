@@ -3,7 +3,7 @@ import { type Metadata } from "next";
 import { SettlementReportsFeature } from "@/features/dashboard/settlement-reports";
 
 export const metadata: Metadata = {
-  title: "Settlement Reports",
+  title: "Settlements",
 };
 
 // Fixed to PA: this is the path the Home and Payments nav trees link to.

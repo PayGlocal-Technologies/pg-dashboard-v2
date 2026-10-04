@@ -4,6 +4,7 @@ import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Card, Separator } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 
 interface RecoveredTrendPoint {
   x: string;
@@ -34,65 +35,91 @@ interface AmountRecoveredCardProps {
   recoveredLabel: string;
   trendPct: number;
   data: RecoveredTrendPoint[];
+  /** Nothing in the selected period: ₹0 over the platform's empty chart
+   *  (dotted grid, flat dashed line), same height as when there is data. */
+  isEmpty?: boolean;
 }
 
-export function AmountRecoveredCard({ recoveredLabel, trendPct, data }: AmountRecoveredCardProps) {
+export function AmountRecoveredCard({
+  recoveredLabel,
+  trendPct,
+  data,
+  isEmpty = false,
+}: AmountRecoveredCardProps) {
   const trendPositive = trendPct >= 0;
+  const label = isEmpty ? "₹0" : recoveredLabel;
 
   return (
     <Card className="flex h-full flex-col gap-3 p-5">
       <h2 className="text-sm font-semibold text-foreground">Amount Recovered</h2>
 
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold tracking-tight text-emerald-600 tabular-nums dark:text-emerald-400">
-          {recoveredLabel}
+        <span
+          className={cn(
+            "text-2xl font-bold tracking-tight tabular-nums",
+            isEmpty ? "text-foreground" : "text-emerald-600 dark:text-emerald-400"
+          )}
+        >
+          {label}
         </span>
         <span className="text-sm text-muted-foreground">Recovered</span>
       </div>
 
-      <div className="h-20 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-            <defs>
-              <linearGradient id="amount-recovered-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Tooltip content={<AmountRecoveredTooltip />} />
-            <Area
-              type="monotone"
-              dataKey="y"
-              stroke="#10b981"
-              strokeWidth={2}
-              fill="url(#amount-recovered-fill)"
-              dot={false}
-              activeDot={{ r: 5, strokeWidth: 0, fill: "#10b981" }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+      <div className="relative h-20 w-full">
+        {isEmpty ? (
+          <EmptyAxesChart
+            labels={EMPTY_AXIS_LABELS.month}
+            title="No recoveries in this period"
+            hideAxes
+          />
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+              <defs>
+                <linearGradient id="amount-recovered-fill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} />
+                  <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Tooltip content={<AmountRecoveredTooltip />} />
+              <Area
+                type="monotone"
+                dataKey="y"
+                stroke="#10b981"
+                strokeWidth={2}
+                fill="url(#amount-recovered-fill)"
+                dot={false}
+                activeDot={{ r: 5, strokeWidth: 0, fill: "#10b981" }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        )}
       </div>
 
-      <div
-        className={cn(
-          "flex items-center gap-1 text-xs font-medium",
-          trendPositive
-            ? "text-emerald-600 dark:text-emerald-400"
-            : "text-red-600 dark:text-red-400"
-        )}
-      >
-        <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
-        <span className="tabular-nums">
-          {trendPositive ? "+" : ""}
-          {trendPct}% vs previous month
-        </span>
-      </div>
+      {isEmpty ? (
+        <p className="text-xs font-medium text-muted-foreground">No change vs previous month</p>
+      ) : (
+        <div
+          className={cn(
+            "flex items-center gap-1 text-xs font-medium",
+            trendPositive
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-red-600 dark:text-red-400"
+          )}
+        >
+          <Icon name={trendPositive ? "trending-up" : "trending-down"} size={13} aria-hidden />
+          <span className="tabular-nums">
+            {trendPositive ? "+" : ""}
+            {trendPct}% vs previous month
+          </span>
+        </div>
+      )}
 
       <Separator />
 
       <p className="text-xs text-muted-foreground">
-        <span className="font-semibold text-primary">PayGlocal</span> helped recover{" "}
-        {recoveredLabel} in disputed payments this month
+        <span className="font-semibold text-primary">PayGlocal</span> helped recover {label} in
+        disputed payments this month
       </p>
     </Card>
   );

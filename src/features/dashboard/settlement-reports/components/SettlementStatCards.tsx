@@ -112,6 +112,19 @@ interface SettlementStatCardsProps {
    * before they can be bundled into this upcoming settlement. */
   pendingInvoiceCount?: number;
   onUploadInvoice?: () => void;
+  /** Show the previous and upcoming amounts in full (₹1,24,890.50) rather
+   *  than compact (₹1.25L). Payments sets it; MCA keeps the compact form. */
+  fullAmounts?: boolean;
+}
+
+/** A card's headline amount, compact unless the caller asks for it in full. */
+function HeadlineAmount({ amount, full }: { amount: number; full: boolean }) {
+  const className = "block text-2xl font-bold tracking-tight text-foreground tabular-nums";
+  return full ? (
+    <span className={className}>{formatCurrency(amount, "INR")}</span>
+  ) : (
+    <CompactAmount amount={amount} currency="INR" className={className} />
+  );
 }
 
 export function SettlementStatCards({
@@ -136,6 +149,7 @@ export function SettlementStatCards({
   upcomingSettlementTimeLabel,
   pendingInvoiceCount,
   onUploadInvoice,
+  fullAmounts = false,
 }: SettlementStatCardsProps) {
   return (
     <div className="grid gap-3 lg:grid-cols-12 lg:items-stretch">
@@ -208,11 +222,7 @@ export function SettlementStatCards({
             )}
           </div>
 
-          <CompactAmount
-            amount={previousSettledAmount}
-            currency="INR"
-            className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-          />
+          <HeadlineAmount amount={previousSettledAmount} full={fullAmounts} />
           <p className="text-xs text-muted-foreground">
             {previousSettledDateLabel}
             {previousSettledTimeLabel ? `, ${previousSettledTimeLabel}` : ""} ·{" "}
@@ -228,11 +238,7 @@ export function SettlementStatCards({
           </span>
           <p className="text-[13px] font-medium text-primary">Upcoming settlement</p>
           {upcomingSettlementAmount !== null ? (
-            <CompactAmount
-              amount={upcomingSettlementAmount}
-              currency="INR"
-              className="block text-2xl font-bold tracking-tight text-foreground tabular-nums"
-            />
+            <HeadlineAmount amount={upcomingSettlementAmount} full={fullAmounts} />
           ) : (
             <span className="block text-2xl font-bold tracking-tight text-foreground tabular-nums">
               —

@@ -70,6 +70,8 @@ function parseFormattedDate(value?: string): number | undefined {
  * deriveTransactionDetail's generic status-keyed fallback to guess, that
  * fallback exists for real API data with no structured dispute of its own,
  * not for dispute-management rows, which already have one. */
+const PAGE_SIZE = 8;
+
 export function toPaTransaction(row: DisputeRow): PaTransaction {
   const reasonMeta = getDisputeReasonMeta(row.reason);
   return {
@@ -96,6 +98,7 @@ export function toPaTransaction(row: DisputeRow): PaTransaction {
         status: row.status,
         raisedOn: row.disputedOn,
         respondBy: row.respondBy,
+        documents: row.documents,
       },
     ],
   };
@@ -131,6 +134,18 @@ export function DisputeManagementFeature() {
   const [disputedDate, setDisputedDate] = useState<TransactionDateTimeValue | undefined>(undefined);
   const [columnOrder, setColumnOrder] = useState<string[]>(DISPUTE_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+  // The table's page, tied to the filters it was chosen under: any change to
+  // the tab, search or a filter goes back to page 1 (derived, not reset in an
+  // effect), so a later page can't be left showing an empty list.
+  const filterKey = JSON.stringify([
+    statusSegment,
+    search,
+    statusFilter,
+    reason,
+    amountRange,
+    disputedDate,
+  ]);
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
 
   // Drives only the metrics cards below, the table keeps its own separate
   // "Disputed Date" filter chip, same split as the Transactions page's
@@ -274,6 +289,10 @@ export function DisputeManagementFeature() {
     });
   }, [filteredRows, showRespondBy]);
 
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const page = Math.min(pageState.key === filterKey ? pageState.page : 1, pageCount);
+  const pageRows = sortedRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     // Full-bleed background matching the cards below, rather than the app
     // shell's default grey (see (dashboard)/layout.tsx), same treatment as
@@ -370,23 +389,16 @@ export function DisputeManagementFeature() {
             </div>
           }
           columns={columns}
-          data={sortedRows}
-          // Reuses `hasActive` — the same boolean the Clear button above is
-          // gated on — so a filtered-to-nothing result says so instead of
-          // claiming the merchant has never had a dispute. No CTA either
-          // way: disputes are raised by customers, not created here.
-          emptyTitle={
-            hasActive ? "No disputes match these filters" : "Keep track of disputes and chargebacks"
-          }
-          emptyDescription={
-            hasActive
-              ? "Try a wider date range, or clear a filter to see more."
-              : "If a customer disputes a payment, it appears here with the evidence to submit and the date it's due by."
-          }
+          data={pageRows}
+          emptyTitle="No disputes yet"
+          emptyDescription="Disputed payments will appear here as they come in."
           rowKey={(row) => row.disputeId}
           pagination={{
-            mode: "client",
-            pageSize: 8,
+            mode: "page",
+            page,
+            pageSize: PAGE_SIZE,
+            total: sortedRows.length,
+            onPageChange: (next) => setPageState({ key: filterKey, page: next }),
           }}
           rowAction={(row) => (
             <Button

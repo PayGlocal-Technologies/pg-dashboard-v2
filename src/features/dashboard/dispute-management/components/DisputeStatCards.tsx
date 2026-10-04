@@ -32,6 +32,7 @@ export function DisputeStatCards({
         recoveredLabel={recoveredLabel}
         trendPct={recoveredTrendPct}
         data={recoveredTrend}
+        isEmpty={disputes.length === 0}
       />
       <DisputeReasonsCard breakdown={reasonBreakdown} />
     </div>

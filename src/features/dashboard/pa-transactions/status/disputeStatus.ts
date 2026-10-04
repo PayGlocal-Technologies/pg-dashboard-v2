@@ -5,9 +5,14 @@ import type { DisputeEventStatus } from "@/features/dashboard/pa-transactions/fi
  * term (status-vocabulary spec §18). NEEDS_RESPONSE covers both "just
  * raised" and "documents still needed before responding", the same
  * merchant-facing state ("the clock is running, you must act") that used to
- * be split across DISPUTED/NEEDS_ACTION. ACCEPTED is tracked separately
- * from CHARGED_BACK so win-rate reporting stays honest: a merchant who
- * accepted a dispute did not lose an argument, see withDisputeStatus. */
+ * be split across DISPUTED/NEEDS_ACTION.
+ *
+ * Final outcomes are shown to the merchant as just Won or Lost: anything
+ * that went in the merchant's favour is Won (CLEARED), anything that went in
+ * the customer's favour is Lost (CHARGED_BACK, ACCEPTED, EXPIRED). The raw
+ * statuses stay distinct underneath, and the tooltip says which way it was
+ * lost, so a merchant who accepted a dispute can still tell that apart from
+ * one they argued and lost (and any future win-rate figure can too). */
 export const DISPUTE_STATUS_META: Record<DisputeEventStatus, StatusMeta> = {
   NEEDS_RESPONSE: {
     label: "Needs response",
@@ -17,10 +22,30 @@ export const DISPUTE_STATUS_META: Record<DisputeEventStatus, StatusMeta> = {
   UNDER_REVIEW: { label: "Under review", variant: "info", trailIcon: "clock" },
   MORE_EVIDENCE_NEEDED: { label: "More evidence needed", variant: "warning", trailIcon: "alert" },
   REOPENED: { label: "Reopened", variant: "warning" },
-  CLEARED: { label: "Cleared", variant: "success", trailIcon: "check" },
-  CHARGED_BACK: { label: "Charged back", variant: "danger", trailIcon: "x" },
-  ACCEPTED: { label: "Accepted", variant: "danger" },
-  EXPIRED: { label: "Expired", variant: "danger" },
+  CLEARED: {
+    label: "Won",
+    variant: "success",
+    trailIcon: "check",
+    tooltip: "Ruled in your favour. The disputed amount stays with you.",
+  },
+  CHARGED_BACK: {
+    label: "Lost",
+    variant: "danger",
+    trailIcon: "x",
+    tooltip: "Ruled in the customer's favour. The disputed amount was charged back.",
+  },
+  ACCEPTED: {
+    label: "Lost",
+    variant: "danger",
+    trailIcon: "x",
+    tooltip: "You accepted this dispute. The amount was returned to the customer.",
+  },
+  EXPIRED: {
+    label: "Lost",
+    variant: "danger",
+    trailIcon: "x",
+    tooltip: "The response deadline passed, so it closed in the customer's favour.",
+  },
 };
 
 /** A dispute still needs a decision or is being worked (NEEDS_RESPONSE,
