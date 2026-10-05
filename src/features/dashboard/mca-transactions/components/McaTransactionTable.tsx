@@ -38,6 +38,7 @@ import { reorderColumns } from "@/lib/utils/columns";
 // import { UploadInvoiceModal } from "@/features/dashboard/mca-transactions/components/UploadInvoiceModal";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
+import { ReportDownloadDrawer, type ReportWindow } from "@/components/common/ReportDownloadDrawer";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import { downloadBlob } from "@/lib/utils/format";
 import { useSearchParams } from "next/navigation";
@@ -436,6 +437,7 @@ export function McaTransactionTable({
       invalidateQueries: false,
       onSuccess: (blob) => {
         downloadBlob(blob, `transactions-${new Date().toISOString().slice(0, 10)}.xlsx`);
+        setIsReportDrawerOpen(false);
       },
       onError: (error) => {
         toast.error(error.message || "Couldn't generate the report. Please try again.");
@@ -443,16 +445,17 @@ export function McaTransactionTable({
     }
   );
 
-  /**
-   * Export, built the way pg-dashboard builds it.
-   *
-   * The date window is the one piece of the table's state that travels: it is
-   * what production's report drawer carries across too (setReportRange seeds it
-   * from the table's own date filter). The rest of the filters deliberately do
-   * not go — see REPORT_PAGE_LIMIT. With no date filter set this sends a plain
-   * "DEFAULT" body, which is what production sends when its drawer is left on
-   * an empty range.
-   */
+  // Report opens the "Generate report" drawer, as pg-dashboard's does, rather
+  // than downloading straight away: the window is picked there (pre-filled
+  // from the table's date filter, which is what production's setReportRange
+  // carries across). The download route rejects a body with no time range
+  // (GL-400-001), which is what the old direct download sent whenever the
+  // table had no date filter applied.
+  const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
+  // Bumped on every open so the drawer remounts and re-seeds from whatever
+  // the table's date filter is at that moment.
+  const [reportDrawerKey, setReportDrawerKey] = useState(0);
+
   const handleReport = () => {
     if (!reportMid) {
       toast.error("Couldn't generate the report", {
@@ -460,21 +463,25 @@ export function McaTransactionTable({
       });
       return;
     }
+    setReportDrawerKey((k) => k + 1);
+    setIsReportDrawerOpen(true);
+  };
 
-    // Millis, as production's dateRange branch sends (formatEpochMillis), and
-    // as this table's own search body already does.
-    const startTime =
-      relativeWindow?.startTime ?? (dateRange.from ? toStartOfDayMs(dateRange.from) : undefined);
-    const endTime =
-      relativeWindow?.endTime ?? (dateRange.to ? toEndOfDayMs(dateRange.to) : undefined);
-    const hasTimeRange = !!(startTime && endTime);
-
+  /**
+   * Export, built the way pg-dashboard builds it: `buildRequestBody({ date },
+   * "")` with only the drawer's window, i.e. `{ pageLimit: 15, from: 0,
+   * fieldOrSearch: {}, startTime, endTime, searchFilterType:
+   * "DEFAULT_TIME_RANGE" }` in millis. The rest of the table's filters
+   * deliberately do not go (see REPORT_PAGE_LIMIT).
+   */
+  const generateReport = ({ startTime, endTime }: ReportWindow) => {
     downloadReport({
       pageLimit: REPORT_PAGE_LIMIT,
       from: 0,
       fieldOrSearch: {},
-      ...(hasTimeRange && { startTime, endTime }),
-      searchFilterType: hasTimeRange ? "DEFAULT_TIME_RANGE" : "DEFAULT",
+      startTime,
+      endTime,
+      searchFilterType: "DEFAULT_TIME_RANGE",
     } as TableReqBody);
   };
 
@@ -804,6 +811,16 @@ export function McaTransactionTable({
         onUploaded={handleInvoiceSubmitted}
       />
       */}
+
+      <ReportDownloadDrawer
+        key={reportDrawerKey}
+        open={isReportDrawerOpen}
+        onOpenChange={setIsReportDrawerOpen}
+        initialDateRange={dateRange}
+        initialRelativeRange={relativeRange}
+        isGenerating={isReportPending}
+        onGenerate={generateReport}
+      />
 
       <TransactionDetailsDrawer
         row={detailsRow}

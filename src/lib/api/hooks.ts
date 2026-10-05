@@ -9,7 +9,7 @@ import {
   type UseQueryOptions,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import type { AxiosError } from "axios";
+import { AxiosError } from "axios";
 import { api } from "@/lib/api/axios";
 import { handleApiError } from "@/lib/api/handleApiError";
 import { useApp } from "@/stores/useApp";
@@ -129,6 +129,7 @@ function useApiMutation<TData, TVariables, TError = Error, TOnMutateResult = unk
 
         return res.data;
       } catch (error) {
+        if (download) await readBlobErrorBody(error);
         return handleApiError(error as AxiosError);
       }
     },
@@ -275,6 +276,26 @@ export function usePostQuery<TData = unknown, TVariables = unknown, TError = Err
 }
 
 // ─── Mutation hooks ────────────────────────────────────────────────────────────
+
+/**
+ * A `download: true` request asks axios for a Blob, and axios applies that to
+ * error responses too, so a failed export's JSON envelope arrives as a Blob
+ * and handleApiError can't read its `message` (it fell back to "Request
+ * failed with status code 500" in place of e.g. "No data available to
+ * generate Excel"). Parses the Blob back into the envelope, in place, when it
+ * holds JSON; anything else is left untouched.
+ */
+async function readBlobErrorBody(error: unknown): Promise<void> {
+  if (!(error instanceof AxiosError)) return;
+  const data: unknown = error.response?.data;
+  if (!(data instanceof Blob)) return;
+  try {
+    const parsed: unknown = JSON.parse(await data.text());
+    if (parsed && typeof parsed === "object") error.response!.data = parsed;
+  } catch {
+    // Not JSON (e.g. an HTML error page): keep the generic message.
+  }
+}
 
 export function usePost<
   TData = unknown,

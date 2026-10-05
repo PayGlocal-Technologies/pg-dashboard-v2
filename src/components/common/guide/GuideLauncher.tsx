@@ -63,9 +63,13 @@ export function GuideLauncher({
 
   return (
     <>
-      {/* Persistent launcher — below the tour overlay (z-120) but above app
-          chrome. During the first-visit highlight the dim leaves a hole here,
-          so this button shows through and stays clickable. */}
+      {/* Persistent launcher — above app chrome (the mobile sidebar is z-40)
+          but below flux's overlays (Drawer/Dialog and their backdrop are
+          z-50), so an open drawer or modal covers it instead of having it
+          float over its footer buttons; it was z-[60] and sat on top of
+          every drawer's primary action. Still below the tour overlay
+          (z-120): during the first-visit highlight the dim leaves a hole
+          here, so this button shows through and stays clickable. */}
       <Button
         type="button"
         variant="primary"
@@ -74,7 +78,7 @@ export function GuideLauncher({
         aria-label="Open the guided tour for this screen"
         onClick={startTour}
         leftIcon={<Icon name="sparkles" className="h-4 w-4" aria-hidden />}
-        className="fixed bottom-6 right-6 z-[60] rounded-full shadow-lg"
+        className="fixed bottom-6 right-6 z-[45] rounded-full shadow-lg"
       >
         Guide
       </Button>
