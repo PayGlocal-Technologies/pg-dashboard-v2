@@ -51,6 +51,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/platforms",
   "/mca-receipts",
   "/refer-and-earn",
+  "/scheduler",
   "/settlement-report",
   "/sku-management",
   "/team-management",
@@ -113,6 +114,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
     "autopay",
     "subscription",
   ],
+  "/scheduler": ["SI", "standing instruction", "recurring", "retry", "projected revenue"],
   "/team-management": ["teams", "users", "roles", "invite", "permissions"],
   "/client-management": ["clients", "customers", "buyers", "payers"],
   // Reached from the Header's "Partners" tab, which is the word merchants
