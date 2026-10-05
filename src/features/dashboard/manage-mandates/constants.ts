@@ -49,6 +49,5 @@ export const MANDATE_PERMISSIONS = {
 /** Columns a mandate row is unreadable without; the Columns picker can't hide them. */
 export const MANDATE_FIXED_COLUMNS = ["maskedMandateId", "mandateStatus"];
 
-
 /** Where Contact us points when the product isn't enabled. */
 export const MANDATES_SUPPORT_EMAIL = "merchant.support@payglocal.in";

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button, ColumnManager, DataCardList, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -61,7 +61,6 @@ import { PauseMandateDialog } from "@/features/dashboard/manage-mandates/compone
 import { ActivateMandateDialog } from "@/features/dashboard/manage-mandates/components/ActivateMandateDialog";
 import { DisableMandateDialog } from "@/features/dashboard/manage-mandates/components/DisableMandateDialog";
 import { MandateHistoryDrawer } from "@/features/dashboard/manage-mandates/components/MandateHistoryDrawer";
-import { SiTransactionsDrawer } from "@/features/dashboard/manage-mandates/components/SiTransactionsDrawer";
 import type { Mandate } from "@/features/dashboard/manage-mandates/types";
 
 /**
@@ -83,6 +82,7 @@ export function ManageMandatesTable() {
 
   // Seeded from ?q= so the header's global search can hand an id straight to
   // this table. Read once on mount.
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [statuses, setStatuses] = useState<string[]>([]);
@@ -104,7 +104,6 @@ export function ManageMandatesTable() {
   const [activateRow, setActivateRow] = useState<Mandate | null>(null);
   const [disableRow, setDisableRow] = useState<Mandate | null>(null);
   const [historyRow, setHistoryRow] = useState<Mandate | null>(null);
-  const [siRow, setSiRow] = useState<Mandate | null>(null);
   const [initiateTxn, setInitiateTxn] = useState<PaTransaction | null>(null);
   const [initiateTxnOpen, setInitiateTxnOpen] = useState(false);
 
@@ -158,6 +157,12 @@ export function ManageMandatesTable() {
       }
     );
 
+  // An SI's payments: pg-dashboard's PA transactions table searched by the SI
+  // ID. Here that is the Transactions page itself, which takes its search from
+  // ?q= (the hand-off global search uses), across the merchant's PA MIDs.
+  const openSiTransactions = (row: Mandate) =>
+    router.push(`/pa-transactions?q=${encodeURIComponent(row.siId)}`);
+
   const hasNarrowingFilters =
     !!search.trim() ||
     statuses.length > 0 ||
@@ -185,7 +190,7 @@ export function ManageMandatesTable() {
   const canDownload = !isGuestUser && !!scopeMid && access(MANDATE_PERMISSIONS.report);
 
   const baseColumns = buildMandateColumns({
-    onOpenSiTransactions: setSiRow,
+    onOpenSiTransactions: openSiTransactions,
     onOpenInitiateTransaction: openInitiateTransaction,
   });
   const columns = reorderColumns(baseColumns, columnOrder).filter(
@@ -373,7 +378,7 @@ export function ManageMandatesTable() {
             <MandateCard
               row={row}
               actions={renderActions(row)}
-              onOpenSiTransactions={setSiRow}
+              onOpenSiTransactions={openSiTransactions}
               onOpenInitiateTransaction={openInitiateTransaction}
             />
           )}
@@ -404,7 +409,6 @@ export function ManageMandatesTable() {
         row={historyRow}
         onOpenChange={(open) => !open && setHistoryRow(null)}
       />
-      <SiTransactionsDrawer row={siRow} onOpenChange={(open) => !open && setSiRow(null)} />
       <TransactionDetailsDrawer
         transaction={initiateTxn}
         open={initiateTxnOpen}

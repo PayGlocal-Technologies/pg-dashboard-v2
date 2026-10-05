@@ -24,8 +24,8 @@ function text(value: string | null | undefined) {
 /**
  * pg-dashboard's mandate columns, every one of them, in its order and under
  * its headers (sentence-cased to match this app). SI ID opens the SI's
- * transactions and Initiate transaction GID the payment that set the mandate
- * up, as there. Which columns show is the merchant's call (Columns picker).
+ * transactions (on the Transactions page) and Initiate transaction GID the
+ * payment that set the mandate up, as there. Which columns show is the merchant's call (Columns picker).
  */
 export function buildMandateColumns({
   onOpenSiTransactions,
