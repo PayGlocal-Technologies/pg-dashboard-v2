@@ -7,7 +7,7 @@ import { Icon, type IconName } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { formatCurrency } from "@/lib/utils/format";
-import { PaLinkedTransactionsTable } from "@/features/dashboard/pa-transactions/components/PaLinkedTransactionsTable";
+import { PaymentButtonTransactionsTable } from "@/features/dashboard/payment-button/components/PaymentButtonTransactionsTable";
 import { DisablePaymentButtonDialog } from "@/features/dashboard/payment-button/components/DisablePaymentButtonDialog";
 import { formatButtonAmount } from "@/features/dashboard/payment-button/helpers";
 import { PaymentButtonStatusBadge } from "@/features/dashboard/payment-button/columns";
@@ -69,7 +69,7 @@ function BackToList() {
  * Linked transactions are PA transactions, scoped to this button's MID and
  * searched by its id the way pg-dashboard lists them (CardsTable with
  * `selectedCurrentMid` + `searchQuery`), drawn on the MCA Transactions table's
- * layout (see PaLinkedTransactionsTable).
+ * layout (see PaymentButtonTransactionsTable).
  *
  * The button is read through the list endpoint: pg-dashboard has no
  * single-button endpoint that returns its status and dates (GET
@@ -217,11 +217,7 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
         </div>
       </Card>
 
-      <PaLinkedTransactionsTable
-        mid={button.mid}
-        searchQuery={button.buttonId}
-        emptyDescription="Each payment taken through this button lands here with its status and method."
-      />
+      <PaymentButtonTransactionsTable mid={button.mid} buttonId={button.buttonId} />
 
       <DisablePaymentButtonDialog
         row={pendingDisable}
