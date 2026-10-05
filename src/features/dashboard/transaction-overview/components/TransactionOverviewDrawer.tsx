@@ -17,6 +17,7 @@ import {
   useBreakpoint,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { MerchantLink } from "@/features/dashboard/merchant-portfolio/components/MerchantLink";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
 import {
@@ -316,7 +317,7 @@ function DetailsContent({ row }: { row: PartnerTransaction }) {
         <DetailRow label={isMca ? "Remitter name" : "Customer name"} value={row.customerName} />
         {!isMca && <DetailRow label="Email" value={row.email} />}
         <DetailRow label="Country" value={<CountryCell iso2={row.country} />} />
-        <DetailRow label="Merchant ID" value={row.merchantId} />
+        <DetailRow label="Merchant" value={<MerchantLink merchantId={row.merchantId} />} />
       </Section>
     </div>
   );

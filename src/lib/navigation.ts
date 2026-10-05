@@ -355,7 +355,13 @@ export const partnersNavigation: NavGroup[] = [
     items: [
       { label: "Merchant Activation", href: "/my-merchants", icon: "users", permission: [] },
       {
-        label: "Transaction Overview",
+        label: "Merchant Portfolio",
+        href: "/merchant-portfolio",
+        icon: "line-chart",
+        permission: [],
+      },
+      {
+        label: "Transactions",
         href: "/transaction-overview",
         icon: "repeat",
         permission: ["getTxnSearchResults"],
@@ -403,6 +409,12 @@ export const partnerNavigation: NavGroup[] = [
     label: "Merchant",
     items: [
       { label: "Merchant Activation", href: "/my-merchants", icon: "users", permission: [] },
+      {
+        label: "Merchant Portfolio",
+        href: "/merchant-portfolio",
+        icon: "line-chart",
+        permission: [],
+      },
       {
         label: "Transactions",
         href: "/mca-transactions",

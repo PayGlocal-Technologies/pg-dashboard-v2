@@ -11,6 +11,7 @@ import {
   PaymentMethodCell,
 } from "@/features/dashboard/pa-transactions/columns";
 import { MCA_CURRENCY_FILTERS } from "@/features/dashboard/mca-transactions/constants";
+import { MerchantLink } from "@/features/dashboard/merchant-portfolio/components/MerchantLink";
 import type {
   PartnerTransaction,
   TransactionRail,
@@ -88,7 +89,7 @@ export const FIXED_COLUMN_KEYS = ["amount", "status", "createdAt"];
 
 type Col = Column<PartnerTransaction>;
 
-const amountColumn: Col = {
+export const amountColumn: Col = {
   key: "amount",
   header: "Amount",
   minWidth: 135,
@@ -103,7 +104,7 @@ const amountColumn: Col = {
   ),
 };
 
-const statusColumn: Col = {
+export const statusColumn: Col = {
   key: "status",
   header: "Status",
   minWidth: 170,
@@ -113,7 +114,7 @@ const statusColumn: Col = {
   },
 };
 
-const paymentMethodColumn: Col = {
+export const paymentMethodColumn: Col = {
   key: "paymentMethod",
   header: "Payment method",
   minWidth: 145,
@@ -164,14 +165,13 @@ const remitterNameColumn: Col = {
 
 const merchantIdColumn: Col = {
   key: "merchantId",
-  header: "Merchant ID",
-  minWidth: 145,
-  render: (row) => (
-    <span className="text-[13px] text-muted-foreground whitespace-nowrap">{row.merchantId}</span>
-  ),
+  header: "Merchant",
+  minWidth: 170,
+  // The merchant's name and ID, opening its Merchant Portfolio page.
+  render: (row) => <MerchantLink merchantId={row.merchantId} showId />,
 };
 
-const transactionIdColumn: Col = {
+export const transactionIdColumn: Col = {
   key: "transactionId",
   header: "Transaction ID",
   minWidth: 170,
@@ -180,7 +180,7 @@ const transactionIdColumn: Col = {
   ),
 };
 
-const dateColumn: Col = {
+export const dateColumn: Col = {
   key: "createdAt",
   header: "Date & Time",
   minWidth: 150,
