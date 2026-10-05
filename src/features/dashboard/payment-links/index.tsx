@@ -10,7 +10,6 @@ import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { paymentLinkColumns } from "@/features/dashboard/payment-links/columns";
-import { PaymentLinksStatCards } from "@/features/dashboard/payment-links/components/PaymentLinksStatCards";
 import { PaymentLinkDetailsModal } from "@/features/dashboard/payment-links/components/PaymentLinkDetailsModal";
 import { CreatePaymentLinkModal } from "@/features/dashboard/payment-links/components/CreatePaymentLinkModal";
 import {
@@ -22,17 +21,10 @@ import {
   type AmountRangeValue,
 } from "@/features/dashboard/payment-links/components/PaymentLinksAmountFilter";
 import {
-  PaymentLinksMetricsPeriodFilter,
-  type MetricsPeriod,
-} from "@/features/dashboard/payment-links/components/PaymentLinksMetricsPeriodFilter";
-import {
   PAYMENT_LINKS_PAGE_LIMIT,
   PAYMENT_LINK_STATUS_FILTERS,
 } from "@/features/dashboard/payment-links/constants";
-import {
-  paymentLinkRows as initialPaymentLinkRows,
-  paymentLinksMetricsByPeriod,
-} from "@/features/dashboard/payment-links/mock-data";
+import { paymentLinkRows as initialPaymentLinkRows } from "@/features/dashboard/payment-links/mock-data";
 import type { PaymentLinkRow } from "@/features/dashboard/payment-links/types";
 
 // TODO(integration): this screen is mock data only (see mock-data.ts). Wire it
@@ -105,11 +97,6 @@ export function PaymentLinksFeature() {
           "Create a link, send it to your customer, and collect payment without building a checkout.",
       };
 
-  // Metrics-section time period, deliberately independent of the table's own
-  // search/status/amount/currency/dateFilter filters above (see mock-data.ts).
-  const [metricsPeriod, setMetricsPeriod] = useState<MetricsPeriod>("today");
-  const metricsSnapshot = paymentLinksMetricsByPeriod[metricsPeriod];
-
   const [detailsRow, setDetailsRow] = useState<PaymentLinkRow | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -157,27 +144,9 @@ export function PaymentLinksFeature() {
         }
       />
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-foreground">Metrics</h2>
-          <PaymentLinksMetricsPeriodFilter value={metricsPeriod} onChange={setMetricsPeriod} />
-        </div>
-
-        <PaymentLinksStatCards
-          totalAmountLabel={formatCurrency(metricsSnapshot.totalAmountCollected, "USD")}
-          totalAmountTrendPct={metricsSnapshot.totalAmountTrendPct}
-          totalAmountChartData={metricsSnapshot.totalAmountChart}
-          totalLinks={metricsSnapshot.totalLinks}
-          totalLinksTodayLabel={metricsSnapshot.totalLinksLabel}
-          totalLinksChartData={metricsSnapshot.totalLinksChart}
-          paidLinks={metricsSnapshot.paidLinks}
-          paidLinksTodayLabel={metricsSnapshot.paidLinksLabel}
-          paidLinksChartData={metricsSnapshot.paidLinksChart}
-          activeLinks={metricsSnapshot.activeLinks}
-          activeLinksTodayLabel={metricsSnapshot.activeLinksLabel}
-          activeLinksChartData={metricsSnapshot.activeLinksChart}
-        />
-      </div>
+      {/* No metrics section: there is no payment links analytics endpoint
+          yet, and the cards that were here drew static figures as if they
+          were the merchant's. They come back with real data. */}
 
       {/* Single cohesive card: title, status tabs, then the filter bar, all
        * sharing one border/rounded container, the table sits directly

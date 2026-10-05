@@ -43,16 +43,3 @@ export const DISPUTE_REASONS = [
 ] as const;
 
 export const DISPUTE_REASON_OPTIONS = DISPUTE_REASONS.map((r) => ({ value: r, label: r }));
-
-/** Drives the metrics cards only (see DisputeManagementFeature), same
- * "period selector scoped to the stat cards, not the table" split as the
- * Transactions page's own timeframe tabs vs. its table's own date filter. */
-export const DISPUTE_TIMEFRAMES = [
-  { value: "today", label: "Today" },
-  { value: "1w", label: "1W" },
-  { value: "1m", label: "1M" },
-  { value: "3m", label: "3M" },
-  { value: "ytd", label: "YTD" },
-] as const;
-
-export type DisputeTimeframe = (typeof DISPUTE_TIMEFRAMES)[number]["value"];
