@@ -16,7 +16,7 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { withBasePath } from "@/constants/basePath";
-import { brandBackdropStyle } from "@/lib/utils/brandBackdrop";
+import { brandBackdropStyle, INVOICE_PREVIEW_BACKDROP } from "@/lib/utils/brandBackdrop";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
@@ -220,7 +220,7 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
           // A wash layered under the image (not `opacity` on this div)
           // lightens the image itself without touching the foreground
           // content's own opacity.
-          style={brandBackdropStyle(55)}
+          style={brandBackdropStyle(55, INVOICE_PREVIEW_BACKDROP)}
         >
           <div className="space-y-4 p-4 md:p-6">
             <div className="flex items-center justify-between">
@@ -1761,7 +1761,7 @@ function InvoiceEditor({
           // A wash layered under the image (not `opacity` on this div)
           // lightens the image itself without touching the foreground
           // content's own opacity.
-          style={brandBackdropStyle(55)}
+          style={brandBackdropStyle(55, INVOICE_PREVIEW_BACKDROP)}
         >
           <div className="space-y-4 p-4 md:p-6" data-guide="invoice-preview">
             <InvoicePreviewSidebar

@@ -11,6 +11,9 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -130,10 +133,17 @@ export const PurposeCodeCombobox = forwardRef<PurposeCodeComboboxHandle, Purpose
             )}
           >
             {selected ? (
-              <span className="min-w-0 flex-1 truncate">
-                <span className="font-medium">{selected.code}</span>
-                <span className="text-muted-foreground"> {selected.description}</span>
-              </span>
+              // Long descriptions truncate in the field, so hovering the
+              // value shows the whole one, the same as the list rows below.
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="min-w-0 flex-1 truncate">
+                    <span className="font-medium">{selected.code}</span>
+                    <span className="text-muted-foreground"> {selected.description}</span>
+                  </span>
+                </TooltipTrigger>
+                {!open && <PurposeCodeTooltipContent option={selected} />}
+              </Tooltip>
             ) : (
               <span className="flex items-center gap-2">
                 <Icon
@@ -177,6 +187,21 @@ export const PurposeCodeCombobox = forwardRef<PurposeCodeComboboxHandle, Purpose
   }
 );
 PurposeCodeCombobox.displayName = "PurposeCodeCombobox";
+
+/** The full code and description, wrapped rather than truncated. */
+function PurposeCodeTooltipContent({
+  option,
+  side = "top",
+}: {
+  option: PurposeCodeOption;
+  side?: "top" | "right";
+}) {
+  return (
+    <TooltipContent side={side} align="start" className="max-w-80 text-xs leading-relaxed">
+      <span className="font-semibold">{option.code}</span> {option.description}
+    </TooltipContent>
+  );
+}
 
 function ComboboxList({
   id,
@@ -256,8 +281,25 @@ function ComboboxList({
                 selected={i === highlightedIndex || p.code === value}
                 onSelect={() => onSelect(p.code)}
               >
-                <span className="font-medium">{p.code}</span>
-                <span className="truncate text-muted-foreground">{p.description}</span>
+                {/* Rows truncate long descriptions to one line, so hovering a
+                    row shows the full description beside the list.
+
+                    The tooltip sits on this inner span, never on CommandItem
+                    itself: flux's CommandItem spreads its props after its own
+                    `onClick={onSelect}`, so wrapping it in
+                    `TooltipTrigger asChild` injects the tooltip's onClick over
+                    onSelect and the row can no longer be picked. The span
+                    fills the row (flex-1), and its clicks bubble up to
+                    CommandItem untouched. */}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="font-medium">{p.code}</span>
+                      <span className="truncate text-muted-foreground">{p.description}</span>
+                    </span>
+                  </TooltipTrigger>
+                  <PurposeCodeTooltipContent option={p} side="right" />
+                </Tooltip>
               </CommandItem>
             ))}
           </CommandGroup>

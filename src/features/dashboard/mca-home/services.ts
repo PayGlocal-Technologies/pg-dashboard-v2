@@ -1,4 +1,4 @@
-import { BASE_URL_V3 } from "@/api";
+import { BASE_URL_V1, BASE_URL_V3 } from "@/api";
 
 // Endpoint URL builders only — no fetch/axios logic here. Paths are copied
 // verbatim from pg-dashboard's src/features/dashboard/services.ts, which is the
@@ -96,3 +96,15 @@ export const mcaNeedsAttentionApi = (merchantId: string, limit?: number): string
   const base = `${BASE_URL_V3}/mca-invoice/${encodeURIComponent(merchantId)}/needs-attention`;
   return limit === undefined ? base : `${base}?limit=${limit}`;
 };
+
+/**
+ * Registers the merchant's interest in the payment gateway (cards, Apple Pay,
+ * Google Pay checkout) from the dashboard promo banner. No request body: the
+ * backend emails the merchant's account manager. 400s when the merchant isn't
+ * found or has no account manager assigned yet, with a merchant-readable
+ * `message` in both cases.
+ */
+export const paymentGatewayInterestApi = (ucicId: string): string =>
+  ucicId
+    ? `${BASE_URL_V1}/merchants/${encodeURIComponent(ucicId)}/offers/payment-gateway/interest`
+    : "";
