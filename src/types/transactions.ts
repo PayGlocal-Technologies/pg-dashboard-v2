@@ -46,6 +46,13 @@ export interface TxnFilterValues {
    */
   irmMappingStatus?: string[];
   irmProcessStatus?: string[];
+  /**
+   * Generic `fieldSearch.status`, which the link and invoice searches filter
+   * on. Distinct from `externalStatus` above, the transaction tables' own
+   * status key — pg-dashboard's tableRequestbodyBuilder reads
+   * `newFilters.status` into `fieldSearch.status` separately from it.
+   */
+  status?: string[];
   startTime?: number;
   endTime?: number;
 }

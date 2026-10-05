@@ -47,7 +47,7 @@ const CREATE_ITEMS = [
   {
     label: "Invoice link",
     icon: "file-text" as const,
-    href: "/payment-products/invoice-links?create=1",
+    href: "/invoice-links/create",
   },
   {
     label: "Payment link",
