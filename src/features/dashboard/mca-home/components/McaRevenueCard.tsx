@@ -132,7 +132,7 @@ type PerformanceMetric = "collected" | "net-volume" | "payments";
 
 /** `info` is the ⓘ tooltip beside the selected metric. Net volume's wording
  *  follows how the product defines it elsewhere (successful volume minus
- *  refunds, see pa-transactions/summary.ts); revenue-trend's own contract
+ *  refunds); revenue-trend's own contract
  *  does not spell it out. */
 const METRIC_OPTIONS: {
   value: PerformanceMetric;
