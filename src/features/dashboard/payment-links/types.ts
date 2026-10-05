@@ -18,8 +18,3 @@ export interface PaymentLinkRow {
   expiresAt: string;
   notifyVia: string[];
 }
-
-export interface SparklinePoint {
-  x: string;
-  y: number;
-}

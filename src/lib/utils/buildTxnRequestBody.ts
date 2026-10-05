@@ -55,6 +55,12 @@ export function buildTxnRequestBody(
     fieldSearch.currency = filters.currency;
   }
 
+  // Generic status filter — the key the invoice/payment/MCA link searches use,
+  // as opposed to externalStatus above.
+  if (filters.status?.length) {
+    fieldSearch.status = filters.status;
+  }
+
   // Country filter (client list) — names, not codes. Same key pg-dashboard's
   // tableRequestbodyBuilder writes for its client-list country dropdown.
   if (filters.country?.length) {

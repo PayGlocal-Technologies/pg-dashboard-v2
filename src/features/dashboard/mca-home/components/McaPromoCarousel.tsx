@@ -7,6 +7,7 @@ import { AppImage } from "@/components/common/AppImage";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { usePaymentGatewayInterest } from "@/features/dashboard/mca-home/hooks";
 
 const AUTO_MS = 6500;
 
@@ -19,7 +20,12 @@ interface PromoSlide {
   headline: React.ReactNode;
   body: string;
   ctaLabel: string;
-  href: string;
+  /** Where the CTA navigates. Omitted on a slide whose CTA runs `action`
+   *  instead. */
+  href?: string;
+  /** "pg-interest": the CTA notifies the merchant's account manager (see
+   *  usePaymentGatewayInterest) rather than navigating anywhere. */
+  action?: "pg-interest";
 }
 
 const SLIDES: PromoSlide[] = [
@@ -32,7 +38,9 @@ const SLIDES: PromoSlide[] = [
     headline: "Add international and domestic cards checkout without a second onboarding",
     body: "Accept international payments through cards, Apple Pay and Google Pay, all through one payment gateway.",
     ctaLabel: "Learn more",
-    href: "/multi-currency",
+    // Used to navigate to /multi-currency; now registers the merchant's
+    // interest with their account manager and confirms with a toast.
+    action: "pg-interest",
   },
   {
     id: "refer-and-earn",
@@ -66,6 +74,7 @@ const SLIDES: PromoSlide[] = [
 export function McaPromoCarousel() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
+  const { registerInterest, isPending: isRegisteringInterest } = usePaymentGatewayInterest();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -79,7 +88,7 @@ export function McaPromoCarousel() {
 
   return (
     <div
-      className="relative isolate aspect-4680/1132 w-full overflow-hidden rounded-2xl border border-border/70"
+      className="@container relative isolate aspect-4680/1132 w-full overflow-hidden rounded-2xl border border-border/70"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -126,11 +135,22 @@ export function McaPromoCarousel() {
               />
             )}
 
-            <div className="absolute inset-y-0 left-0 flex w-1/2 flex-col justify-center gap-2 px-6 py-5 sm:gap-2.5 sm:px-10">
-              <h2 className="text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl">
+            {/* The banner keeps a fixed aspect ratio, so it gets shorter as it
+                narrows; fixed text sizes then overflowed its bottom edge on
+                smaller screens. Font sizes, padding and gaps are in container
+                width units (cqw) instead, sized so the banner at ~1190px wide
+                (full width on a laptop) renders exactly as before (24px
+                headline, 16px body, 40px side padding) and the text shrinks
+                in step with the artwork below that. Lines wrap at the same
+                words at every width, since everything scales together. The
+                clamps stop the headline going below 14px; the body copy hides
+                on banners narrower than 48rem, where it would drop below a
+                readable size and no longer fit. */}
+            <div className="absolute inset-y-0 left-0 flex w-1/2 flex-col justify-center gap-[0.84cqw] px-[3.36cqw] py-[1.68cqw]">
+              <h2 className="text-[clamp(0.875rem,2.02cqw,1.5rem)] font-bold leading-snug tracking-tight text-foreground">
                 {slide.headline}
               </h2>
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
+              <p className="max-w-[37.6cqw] text-[clamp(0.8125rem,1.345cqw,1rem)] leading-relaxed text-muted-foreground @max-3xl:hidden">
                 {slide.body}
               </p>
               <Button
@@ -141,7 +161,11 @@ export function McaPromoCarousel() {
                 // so the headline stays the loudest thing on the slide.
                 rightIcon={<Icon name="arrow-right" size={13} aria-hidden />}
                 className="mt-1 h-auto min-h-0 w-fit gap-1.5 p-0 text-[11px] font-semibold uppercase tracking-[0.08em]"
-                onClick={() => router.push(slide.href)}
+                isLoading={slide.action === "pg-interest" && isRegisteringInterest}
+                onClick={() => {
+                  if (slide.action === "pg-interest") registerInterest();
+                  else if (slide.href) router.push(slide.href);
+                }}
               >
                 {slide.ctaLabel}
               </Button>
