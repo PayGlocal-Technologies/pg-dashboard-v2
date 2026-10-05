@@ -14,9 +14,9 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
 /**
  * Routes that actually have a page under src/app/(dashboard).
  *
- * navigation.ts still lists ~11 hrefs whose pages were never built in v2
+ * navigation.ts still lists ~10 hrefs whose pages were never built in v2
  * (/configure, /payment-products, /invoice-links,
- * /invoice-download, /shipping-bill-regularisation, /key-management-system,
+ * /invoice-download, /shipping-bill-regularisation,
  * and the five partner routes). The
  * sidebar links to them anyway, but a *search result* that 404s reads as a
  * broken feature rather than an unfinished one, so search filters against this
@@ -35,6 +35,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/echo",
   "/edpms",
   "/irm-repository",
+  "/key-management-system",
   "/manage-mandates",
   "/mca-dashboard",
   "/mca-invoices",
@@ -104,6 +105,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/settlement-report": ["settlement", "UTR", "payout", "reports"],
   "/mca-links": ["payment link", "share link"],
   "/sku-management": ["product", "HSN", "SAC", "catalogue"],
+  "/key-management-system": ["API key", "RSA", "certificate", "kid", "salt", "encryption", "KMS"],
   "/manage-mandates": [
     "mandate",
     "SI",
