@@ -14,8 +14,8 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
 /**
  * Routes that actually have a page under src/app/(dashboard).
  *
- * navigation.ts still lists ~13 hrefs whose pages were never built in v2
- * (/configure, /payment-products, /invoice-links, /manage-mandates,
+ * navigation.ts still lists ~12 hrefs whose pages were never built in v2
+ * (/configure, /payment-products, /manage-mandates,
  * /invoice-download, /shipping-bill-regularisation, /key-management-system,
  * /scheduler, and the five partner routes). The
  * sidebar links to them anyway, but a *search result* that 404s reads as a
@@ -34,6 +34,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/ebrc-generation",
   "/echo",
   "/edpms",
+  "/invoice-links",
   "/irm-repository",
   "/mca-dashboard",
   "/mca-invoices",
@@ -100,6 +101,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/pa-transactions": ["txn", "transaction ID", "GID", "payments", "orders"],
   "/mca-settlement-report": ["settlement", "UTR", "payout", "reports"],
   "/settlement-report": ["settlement", "UTR", "payout", "reports"],
+  "/invoice-links": ["invoice link", "invoice", "collect", "due"],
   "/mca-links": ["payment link", "share link"],
   "/sku-management": ["product", "HSN", "SAC", "catalogue"],
   "/team-management": ["teams", "users", "roles", "invite", "permissions"],

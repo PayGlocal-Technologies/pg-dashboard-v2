@@ -107,7 +107,9 @@ export const regularNavigation: NavGroup[] = [
           { label: "Receipts", href: "/mca-receipts", permission: [], product: "PACB" },
           { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
           { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
-          { label: "Invoice Links", href: "/invoice-links", permission: [] },
+          // Tagged PA: pg-dashboard's midMap routes page="INVOICE" to paMids,
+          // so this has nothing to show a PACB-only merchant.
+          { label: "Invoice Links", href: "/invoice-links", permission: [], product: "PA" },
           { label: "Payment Button", href: "/payment-button", permission: [] },
         ],
       },
