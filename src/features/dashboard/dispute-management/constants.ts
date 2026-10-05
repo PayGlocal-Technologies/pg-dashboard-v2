@@ -1,41 +1,48 @@
 import type { DisputeRawStatus } from "@/features/dashboard/dispute-management/types";
 
+/**
+ * The list's tabs. Action required covers everything waiting on the
+ * merchant: a new dispute or escalation (at any stage) and a request for
+ * more documents. Won and Lost are the final outcomes (disputeStatus.ts).
+ */
 export const DISPUTE_STATUS_SEGMENTS = [
   { value: "action-required", label: "Action required" },
-  { value: "under-review", label: "Under review" },
-  { value: "more-evidence-needed", label: "More evidence needed" },
-  { value: "reopened", label: "Reopened" },
   { value: "all", label: "All disputes" },
-  // Final outcomes, as the merchant sees them: Won (in their favour) or
-  // Lost (in the customer's), see disputeStatus.ts.
+  { value: "under-review", label: "Under review" },
   { value: "won", label: "Won" },
   { value: "lost", label: "Lost" },
 ] as const;
 
 export type DisputeStatusSegment = (typeof DISPUTE_STATUS_SEGMENTS)[number]["value"];
 
-/** Raw statuses behind each segment (mirrors STATUS_BUCKET_RAW_VALUES's
- * pattern in paColumns.tsx). "all" has no entry, it means no filter. */
+/** Raw statuses behind each tab. "all" has no entry, it means no filter. */
 export const DISPUTE_SEGMENT_RAW_STATUSES: Record<
   Exclude<DisputeStatusSegment, "all">,
   DisputeRawStatus[]
 > = {
-  "action-required": ["NEEDS_RESPONSE"],
+  "action-required": ["NEEDS_RESPONSE", "MORE_EVIDENCE_NEEDED", "REOPENED"],
   "under-review": ["UNDER_REVIEW"],
-  "more-evidence-needed": ["MORE_EVIDENCE_NEEDED"],
-  reopened: ["REOPENED"],
   won: ["CLEARED"],
   lost: ["CHARGED_BACK", "ACCEPTED", "EXPIRED"],
 };
 
-/** Segments whose rows still need a merchant response, the only ones the
- * table's "Respond by" column applies to. Under review disputes already had
- * evidence submitted, so they have no response deadline left to show. */
-export const RESPOND_BY_SEGMENTS: DisputeStatusSegment[] = [
-  "action-required",
-  "more-evidence-needed",
-  "reopened",
+/** The Status filter chip's options: each status the merchant sees, so
+ *  Insufficient documents can be picked out of Action required. */
+export const DISPUTE_STATUS_FILTERS: { value: string; label: string; raw: DisputeRawStatus[] }[] = [
+  { value: "action-required", label: "Action required", raw: ["NEEDS_RESPONSE", "REOPENED"] },
+  {
+    value: "insufficient-documents",
+    label: "Insufficient documents",
+    raw: ["MORE_EVIDENCE_NEEDED"],
+  },
+  { value: "under-review", label: "Under review", raw: ["UNDER_REVIEW"] },
+  { value: "won", label: "Won", raw: ["CLEARED"] },
+  { value: "lost", label: "Lost", raw: ["CHARGED_BACK", "ACCEPTED", "EXPIRED"] },
 ];
+
+/** Tabs whose rows still have a response deadline, the only ones the table's
+ *  "Respond by" column applies to. */
+export const RESPOND_BY_SEGMENTS: DisputeStatusSegment[] = ["action-required"];
 
 export const DISPUTE_REASONS = [
   "Fraudulent",

@@ -422,17 +422,22 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
         state: "current",
       });
     } else if (activeDispute.status === "MORE_EVIDENCE_NEEDED") {
-      steps.push({ id, label: "More evidence needed", state: "current" });
+      steps.push({ id, label: "Insufficient documents", state: "current" });
     } else if (activeDispute.status === "REOPENED") {
       // The bank came back on a previously cleared dispute — same
       // respond-by-a-deadline shape as a fresh NEEDS_RESPONSE, just with its
       // own label.
-      steps.push({ id, label: "Reopened", state: "current", respondBy: activeDispute.respondBy });
+      steps.push({
+        id,
+        label: "Action required",
+        state: "current",
+        respondBy: activeDispute.respondBy,
+      });
     } else {
       // NEEDS_RESPONSE: the clock is running, merchant must accept/contest.
       steps.push({
         id,
-        label: "Needs response",
+        label: "Action required",
         state: "current",
         respondBy: activeDispute.respondBy,
       });

@@ -1,3 +1,8 @@
+import {
+  ARBITRATION_FEE,
+  WITHDRAWAL_FEE,
+  formatFee,
+} from "@/features/dashboard/pa-transactions/status/disputeStages";
 import { Dialog, DialogContent, DialogTitle, Separator } from "@/components/ui";
 import type { DisputeEventStatus } from "@/features/dashboard/pa-transactions/financial/types";
 
@@ -16,7 +21,7 @@ interface StageGuide {
  * below rather than only explaining the one status in isolation. */
 const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
   NEEDS_RESPONSE: {
-    title: "Needs response",
+    title: "Action required",
     paragraphs: [
       "A cardholder has disputed this payment and asked their bank to reverse it. You now have until the response deadline shown above to either accept the dispute or contest it with evidence.",
       "Accepting refunds the disputed amount to the cardholder immediately and closes the case. Contesting means uploading supporting evidence (an invoice, proof of delivery, an authorization record) for PayGlocal and then the issuing bank to review.",
@@ -24,7 +29,7 @@ const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
     ],
   },
   REOPENED: {
-    title: "Reopened",
+    title: "Action required",
     paragraphs: [
       "This dispute was previously cleared in your favor, but the cardholder's bank has come back and reopened it. This usually happens when the cardholder or their bank isn't satisfied with the first outcome and is preparing to push the case further.",
       "You'll need to respond again, the same as a fresh dispute: accept it, or contest it with evidence, before the new deadline shown above.",
@@ -40,7 +45,7 @@ const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
     ],
   },
   MORE_EVIDENCE_NEEDED: {
-    title: "More evidence needed",
+    title: "Insufficient documents",
     paragraphs: [
       "PayGlocal reviewed the evidence you submitted and found it wasn't sufficient to make the case to the issuing bank on your behalf.",
       "You'll need to upload additional documents before the new deadline shown above. Common gaps are a clearer proof of delivery, an authorization record that specifically covers this transaction, or your refund/cancellation policy if the reason involves a cancellation.",
@@ -51,7 +56,7 @@ const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
     title: "Dispute cleared",
     paragraphs: [
       "The issuing bank reviewed the evidence and ruled in your favor. The disputed amount stays with you and this dispute is now closed.",
-      "It's uncommon but possible for the cardholder's bank to come back and reopen the case later (see the Reopened status), otherwise there's nothing further to do here.",
+      "It's uncommon but possible for the cardholder's bank to come back and reopen the case later (it then needs your action again), otherwise there's nothing further to do here.",
     ],
   },
   CHARGED_BACK: {
@@ -72,7 +77,7 @@ const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
     title: "Dispute expired",
     paragraphs: [
       "The response deadline passed without a reply, so the dispute defaulted to a loss, the same outcome as being charged back, but caused by a missed deadline rather than a bank decision.",
-      "Always accept or contest a live dispute before its deadline (see the Needs response/More evidence needed statuses) to avoid this outcome.",
+      "Always accept or contest a live dispute before its deadline (see the Action required and Insufficient documents statuses) to avoid this outcome.",
     ],
   },
 };
@@ -84,17 +89,15 @@ const ESCALATION_LADDER = [
   {
     label: "Dispute",
     description:
-      "The customer has raised a dispute. Respond before the deadline, or it may close automatically in the customer's favour.",
+      "The customer has raised a dispute. Accept it, or contest it with evidence before the deadline. Not responding closes it in the customer's favour.",
   },
   {
     label: "Pre-arbitration",
-    description:
-      "The bank reviews the dispute again. This stage carries higher risk and potential fees, so your response and documents are critical.",
+    description: `If the bank rules against you, it can escalate to pre-arbitration. Accept now to avoid further escalation, or submit additional evidence. The bank may take up to 60 business days to decide.`,
   },
   {
     label: "Arbitration",
-    description:
-      "The final level of review. You must respond within 24 hours, and no further appeals are allowed after this stage.",
+    description: `The final stage: no new documents can be added. Withdraw (a ${formatFee(WITHDRAWAL_FEE)} withdrawal fee may apply), or let the bank make a final decision; if it goes against you, a ${formatFee(ARBITRATION_FEE)} arbitration fee is charged.`,
   },
 ];
 

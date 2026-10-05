@@ -47,6 +47,12 @@ const ISSUER_BANKS = [
   "Axis Bank",
   "State Bank of India",
   "Kotak Mahindra Bank",
+  "Punjab National Bank",
+  "Bank of Baroda",
+  "Yes Bank",
+  "IndusInd Bank",
+  "IDFC First Bank",
+  "Federal Bank",
 ];
 const SETTLEMENT_ACCOUNTS = ["HDFC ****4521", "ICICI ****7789", "Axis ****3312"];
 const ADDRESS_POOL = [

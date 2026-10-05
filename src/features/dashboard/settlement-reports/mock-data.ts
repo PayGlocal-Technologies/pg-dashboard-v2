@@ -653,6 +653,14 @@ export function mockPreviousSettlement() {
     grossAmount: detail?.grossAmount,
     tax: detail?.gstDeduction,
     fee: detail?.deductionAmount,
+    // The payments it settles, by the currency the customer paid in. The
+    // settlement itself always lands in INR.
+    currencySplit: [
+      { currency: "INR", pct: 58 },
+      { currency: "USD", pct: 28 },
+      { currency: "GBP", pct: 9 },
+      { currency: "EUR", pct: 5 },
+    ],
   };
 }
 

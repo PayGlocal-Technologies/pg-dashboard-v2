@@ -26,6 +26,7 @@ import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { Button, ColumnManager, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import type { TableReqBody } from "@/types/transactions";
 import {
   formatCurrency,
@@ -33,7 +34,7 @@ import {
   formatWeekdayDate,
   formatWeekdayName,
 } from "@/lib/utils/format";
-import { SegmentedTabs } from "@/components/common/SegmentedTabs";
+import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import type { SettlementSchedule } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { SettlementCalendarButton } from "@/features/dashboard/settlement-reports/components/SettlementCalendarButton";
 import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementCycleInfoPanel";
@@ -91,6 +92,10 @@ const SETTLEMENT_PAGE_LIMIT = 50;
 function setScrollTop(el: HTMLElement, value: number): void {
   el.scrollTop = value;
 }
+
+/** The compact outline style of the Transactions table's toolbar actions. */
+const TOOLBAR_BUTTON_CLASS =
+  "h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground";
 
 /** The Payments table's two views: payouts still on their way, and paid. */
 const SETTLEMENT_STATUS_TABS = [
@@ -367,6 +372,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
+  const isFetching = isMca ? ffmsQuery.isFetching : paQuery.isFetching;
 
   /**
    * Which empty state applies. The old copy said "No settlements yet"
@@ -545,13 +551,6 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                       hasUpcomingHoliday={calendar.hasUpcomingHoliday}
                     />
                   </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-                  >
-                    Export
-                  </Button>
                 </>
               }
             />
@@ -596,24 +595,25 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                     upcomingSettlementAmount={upcomingSettlementAmount}
                     upcomingSettlementTimeLabel={upcomingSettlementLabel}
                     fullAmounts={!isMca}
+                    combinedLayout={!isMca}
+                    previousSettledCurrencySplit={mockPrev?.currencySplit}
                     pendingInvoiceCount={upcomingPendingInvoiceCount}
                     onUploadInvoice={() => router.push("/mca-transactions")}
                   />
                 </div>
 
                 <DataTableCard<SettlementRow>
-                  title={showPayoutDetails ? "All settlements" : undefined}
                   tabs={
                     showPayoutDetails ? (
-                      <SegmentedTabs
-                        options={SETTLEMENT_STATUS_TABS}
+                      <UnderlineTabs
+                        tabs={SETTLEMENT_STATUS_TABS}
                         value={statusTab}
-                        onChange={(v) => setStatusTab(v as SettlementStatus)}
+                        onValueChange={(v) => setStatusTab(v as SettlementStatus)}
                       />
                     ) : undefined
                   }
                   toolbar={
-                    <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2">
                       <RotatingSearchInput
                         value={search}
                         onSearch={onSearch}
@@ -622,16 +622,33 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                             ? ["Settlement ID", "UTR number", "Settlement date"]
                             : ["Settlement date", "Merchant ID"]
                         }
-                        className="min-w-40 max-w-xs flex-1"
+                        className="w-40 sm:w-56"
                       />
 
-                      <div className="hidden sm:block h-4 w-px bg-border" />
-
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
                       </div>
 
+                      {/* Refresh / Columns, the Transactions table's action row.
+                      No Report: settlement reports only download per date
+                      (the row's Download), there is no whole-list endpoint. */}
                       <div className="ml-auto flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          leftIcon={
+                            <Icon
+                              name="refresh"
+                              className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+                            />
+                          }
+                          onClick={() => void refetch()}
+                          disabled={isFetching}
+                          className={TOOLBAR_BUTTON_CLASS}
+                        >
+                          Refresh
+                        </Button>
                         <ColumnManager
                           columns={columnDefs}
                           order={effectiveColumnOrder}

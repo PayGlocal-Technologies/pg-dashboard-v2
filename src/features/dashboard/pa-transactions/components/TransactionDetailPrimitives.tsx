@@ -18,7 +18,8 @@ export function SectionLabel({ children }: { children: ReactNode }) {
 }
 
 interface DetailRowProps {
-  label: string;
+  /** Usually text; a node when the label carries an ⓘ explanation. */
+  label: ReactNode;
   value: ReactNode;
 }
 

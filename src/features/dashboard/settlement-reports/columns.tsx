@@ -10,6 +10,8 @@ import { Icon } from "@/components/icon";
 import { formatDayMonth, formatWeekdayName } from "@/lib/utils/format";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CopyableCell } from "@/components/common/CopyableCell";
+import { mockPaSettlementView } from "@/features/dashboard/settlement-reports/mock-data";
+import { SettlementBreakupRow } from "@/features/dashboard/settlement-reports/components/SettlementStatCards";
 import type {
   SettlementRow,
   SettlementStatus,
@@ -26,6 +28,48 @@ export const SETTLEMENT_STATUS_META: Record<
 };
 
 const dash = <span className="text-[13px] text-muted-foreground">—</span>;
+
+/**
+ * The info icon beside a settlement's amount: hover or focus it for the
+ * breakup (gross, deductions, net), as on the previous-settled card. MOCK:
+ * the breakup comes from mockPaSettlementView, so it shows only on rows that
+ * carry a settlement id (the Payments design's mock rows).
+ */
+function AmountBreakup({ row }: { row: SettlementRow }) {
+  const view = row.settlementId ? mockPaSettlementView(row) : null;
+  if (!view) return null;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label="Settlement breakup"
+          onClick={(e) => e.stopPropagation()}
+          className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
+        >
+          <Icon name="info" size={12} />
+        </Button>
+      </TooltipTrigger>
+      {/* The same popup as the Previous settled card's Settlement breakup. */}
+      <TooltipContent side="bottom" align="start" className="w-56 space-y-1.5 p-3">
+        <SettlementBreakupRow
+          label="Gross amount"
+          value={formatCurrency(view.grossAmount, "INR")}
+        />
+        <SettlementBreakupRow label="Tax" value={`−${formatCurrency(view.gst, "INR")}`} />
+        <SettlementBreakupRow label="Fee" value={`−${formatCurrency(view.platformFee, "INR")}`} />
+        <div className="border-t border-border pt-1.5">
+          <SettlementBreakupRow
+            label="Net amount"
+            value={formatCurrency(row.amount, "INR")}
+            emphasis
+          />
+        </div>
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 /**
  * A Processing payout's UTR: the bank issues it only once the money goes out,
@@ -79,13 +123,23 @@ export function settlementColumnDefs(
    *  Number (mock-only for now, see SettlementRow.settlementId). */
   withPayoutDetails = false
 ): { key: string; label: string }[] {
+  // Payments: amount and its state first, then how to trace it (UTR), what
+  // it covers, its own ID, and when.
+  if (withPayoutDetails) {
+    return [
+      { key: "amount", label: "Amount" },
+      { key: "status", label: "Status" },
+      { key: "utr", label: "UTR Number" },
+      { key: "transactionCount", label: "Transactions" },
+      ...(showMerchantId ? [{ key: "merchantId", label: "Merchant ID" }] : []),
+      { key: "settlementId", label: "Settlement ID" },
+      { key: "date", label: "Date & Time" },
+    ];
+  }
   return [
-    ...(withPayoutDetails ? [{ key: "settlementId", label: "Settlement ID" }] : []),
     { key: "amount", label: "Amount" },
-    ...(withPayoutDetails ? [{ key: "status", label: "Status" }] : []),
     { key: "transactionCount", label: "Transactions" },
     ...(showMerchantId ? [{ key: "merchantId", label: "Merchant ID" }] : []),
-    ...(withPayoutDetails ? [{ key: "utr", label: "UTR Number" }] : []),
     { key: "date", label: "Date" },
   ];
 }
@@ -97,7 +151,7 @@ export function settlementColumnOrder(
   return settlementColumnDefs(showMerchantId, withPayoutDetails).map((d) => d.key);
 }
 
-function buildColumn(key: string): Column<SettlementRow> | null {
+function buildColumn(key: string, withPayoutDetails = false): Column<SettlementRow> | null {
   switch (key) {
     case "merchantId":
       return {
@@ -181,11 +235,19 @@ function buildColumn(key: string): Column<SettlementRow> | null {
         key: "amount",
         header: "Amount",
         minWidth: 140,
-        align: "right",
+        // Leads the Payments row, left-aligned like the Transactions table.
+        align: withPayoutDetails ? "left" : "right",
         cellClassName: "pl-5",
         render: (row) => (
-          <span className="whitespace-nowrap font-semibold text-foreground tabular-nums">
-            {formatCurrency(row.amount, row.currency)}
+          <span className="inline-flex items-center gap-1.5">
+            {/* Amount then its currency code, as the Transactions table. */}
+            <span className="flex items-baseline gap-1.5">
+              <span className="whitespace-nowrap text-[13px] font-semibold text-foreground tabular-nums">
+                {formatCurrency(row.amount, row.currency)}
+              </span>
+              <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
+            </span>
+            <AmountBreakup row={row} />
           </span>
         ),
       };
@@ -203,7 +265,7 @@ function buildColumn(key: string): Column<SettlementRow> | null {
     case "date":
       return {
         key: "date",
-        header: "Date",
+        header: withPayoutDetails ? "Date & Time" : "Date",
         minWidth: 150,
         render: (row) => (
           <span className="whitespace-nowrap text-[13px] text-muted-foreground">
@@ -240,7 +302,7 @@ export function buildSettlementColumns({
       continue;
     }
     if (hiddenColumns?.has(key)) continue;
-    const col = buildColumn(key);
+    const col = buildColumn(key, withPayoutDetails);
     if (col) cols.push(col);
   }
 

@@ -1,4 +1,4 @@
-import { Button, Card, Separator } from "@/components/ui";
+import { Button, Callout, CalloutTitle, Card, Separator } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
@@ -41,6 +41,9 @@ interface DisputeStatusNoticeCardProps {
    * shown for every status this card renders, not just an awaiting-decision
    * one — the same "Learn more" entry point DisputeActionCard already has. */
   onLearnMore?: () => void;
+  /** A boxed note under the description, e.g. the red "What this means"
+   *  when a fee has been charged. */
+  callout?: { tone: "error" | "warning" | "info"; title: string; points: string[] };
 }
 
 /** Replaces DisputeActionCard in the same slot once there is nothing left
@@ -56,6 +59,7 @@ export function DisputeStatusNoticeCard({
   documents,
   action,
   onLearnMore,
+  callout,
 }: DisputeStatusNoticeCardProps) {
   return (
     // Only a notice that asks for something (e.g. more evidence) gets the
@@ -92,6 +96,22 @@ export function DisputeStatusNoticeCard({
           </div>
         </div>
       </div>
+
+      {callout && (
+        <Callout variant={callout.tone} className="mt-4">
+          <Icon name="alert-triangle" size={16} aria-hidden className="mt-0.5 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <CalloutTitle className="text-sm font-semibold">{callout.title}</CalloutTitle>
+            <div className="mt-1 text-sm leading-relaxed opacity-90">
+              <ul className="list-disc space-y-0.5 pl-4 text-[13px]">
+                {callout.points.map((p) => (
+                  <li key={p}>{p}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </Callout>
+      )}
 
       {documents && documents.length > 0 && (
         <>

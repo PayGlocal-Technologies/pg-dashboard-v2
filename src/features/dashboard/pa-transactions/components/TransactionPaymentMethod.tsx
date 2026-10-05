@@ -1,5 +1,6 @@
 import { Icon, type IconName } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
+import { BankLogo, findBank } from "@/components/common/BankLogo";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
 // Payment method cell, moved from paColumns.tsx verbatim (same logo maps,
@@ -93,6 +94,10 @@ export function PaymentMethodLogo({ row }: { row: PaTransaction }) {
   if (instrument && PAYMENT_METHOD_ICONS[instrument]) {
     return <MethodImage src={STATIC_BASE + PAYMENT_METHOD_ICONS[instrument]} alt={instrument} />;
   }
+  // Net banking that names its bank ("NETBANKING_HDFC", by IFSC prefix or
+  // name) shows that bank's logo; plain "NETBANKING" keeps the bank glyph.
+  const netBank = instrument?.startsWith("NETBANKING_") ? instrument.slice(11) : undefined;
+  if (netBank && findBank(netBank)) return <BankLogo name={netBank} className="h-5 w-8" />;
   if (glyphKey) return <MethodGlyph name={PAYMENT_METHOD_GLYPHS[glyphKey]!} />;
   return <FallbackBrand brand={row.cardBrand} />;
 }

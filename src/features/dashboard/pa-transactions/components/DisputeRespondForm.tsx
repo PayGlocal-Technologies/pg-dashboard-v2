@@ -112,7 +112,10 @@ interface DisputeRespondFormProps {
    * TransactionDetailFeature's "Under review" notice). Object URLs handed
    * off this way become the caller's to eventually revoke — this form
    * itself only revokes ones that were never submitted. */
-  onSubmit: (documents: SubmittedDocument[]) => void;
+  onSubmit: (documents: SubmittedDocument[], contestAmount?: number) => void;
+  /** The escalation round, for the heading: a pre-arbitration contest is
+   *  "additional evidence". */
+  stage?: "CHARGEBACK" | "PRE_ARBITRATION" | "ARBITRATION";
 }
 
 /** Second screen for both "Accept partially" and "Contest dispute", same
@@ -124,6 +127,7 @@ export function DisputeRespondForm({
   currency,
   onBack,
   onSubmit,
+  stage = "CHARGEBACK",
 }: DisputeRespondFormProps) {
   const [contestAmount, setContestAmount] = useState("");
   const [reason, setReason] = useState<ContestReason | "">("");
@@ -282,12 +286,18 @@ export function DisputeRespondForm({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            {mode === "partial" ? "Accept partially" : "Contest dispute"}
+            {mode === "partial"
+              ? "Accept partially"
+              : stage === "PRE_ARBITRATION"
+                ? "Submit additional evidence"
+                : "Contest dispute"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {mode === "partial"
               ? "Refund part of the disputed amount and contest the rest with supporting evidence."
-              : "Provide supporting evidence to contest this dispute."}
+              : stage === "PRE_ARBITRATION"
+                ? "Submit additional evidence for the bank to review before arbitration."
+                : "Provide supporting evidence to contest this dispute."}
           </p>
         </div>
         <Button
@@ -297,7 +307,10 @@ export function DisputeRespondForm({
           disabled={!canSubmit}
           onClick={() => {
             submittedRef.current = true;
-            onSubmit(files.map((f) => ({ name: f.file.name, previewUrl: f.previewUrl })));
+            onSubmit(
+              files.map((f) => ({ name: f.file.name, previewUrl: f.previewUrl })),
+              mode === "partial" && amountEntered ? contestAmountValue : undefined
+            );
           }}
         >
           Submit documents

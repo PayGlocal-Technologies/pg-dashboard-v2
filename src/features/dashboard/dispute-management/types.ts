@@ -1,3 +1,8 @@
+import type {
+  DisputeEvent,
+  DisputeReviewPhase,
+} from "@/features/dashboard/pa-transactions/financial/types";
+
 /** Same 8-status vocabulary already established for disputed PA transactions,
  * see status/disputeStatus.ts's DISPUTE_STATUS_META. */
 export type DisputeRawStatus =
@@ -18,7 +23,8 @@ export type DisputeResolution =
   | "NO_RESPONSE" // merchant never responded, closed for the customer
   | "CONTESTED" // merchant submitted evidence, the bank decided
   | "CUSTOMER_DROPPED" // customer withdrew the dispute
-  | "ACCEPTED"; // merchant accepted it and refunded
+  | "ACCEPTED" // merchant accepted it and refunded
+  | "WITHDRAWN"; // merchant withdrew at arbitration (status ACCEPTED)
 
 export interface DisputeRow {
   disputeId: string;
@@ -65,6 +71,12 @@ export interface DisputeRow {
   documents?: string[];
   /** See DisputeResolution. */
   resolution?: DisputeResolution;
+  /** Under review only: where the evidence is (see DisputeReviewPhase). */
+  reviewPhase?: DisputeReviewPhase;
+  /** Arbitration only: whether withdrawing carries a withdrawal fee. */
+  withdrawalFeeApplies?: boolean;
+  /** A fee charged on closing (arbitration loss or withdrawal). */
+  appliedFee?: DisputeEvent["appliedFee"];
 }
 
 // TODO(integration): this feature is mock-data only, see mockRows.ts. Wire up

@@ -139,11 +139,8 @@ import {
 import { AmazonLogo } from "@/components/icon/AmazonLogo";
 import { DeelLogo } from "@/components/icon/DeelLogo";
 import { FreelancerLogo } from "@/components/icon/FreelancerLogo";
-import { AxisLogo } from "@/components/icon/AxisLogo";
-import { HdfcLogo } from "@/components/icon/HdfcLogo";
-import { KotakLogo } from "@/components/icon/KotakLogo";
-import { SbiLogo } from "@/components/icon/SbiLogo";
-import { IciciLogo } from "@/components/icon/IciciLogo";
+import { HdfcBankLogo } from "@/components/icon/banks/HdfcBankLogo";
+import { IcicBankLogo } from "@/components/icon/banks/IcicBankLogo";
 import { LinkCustomOutlined } from "@/components/icon/LinkCustomOutlined";
 import { LinkGreenFilled } from "@/components/icon/LinkGreenFilled";
 import { EchoMark } from "@/components/icon/EchoMark";
@@ -300,11 +297,10 @@ export const ICONS = {
   "amazon-logo": AmazonLogo as unknown as LucideIcon,
   "deel-logo": DeelLogo as unknown as LucideIcon,
   "freelancer-logo": FreelancerLogo as unknown as LucideIcon,
-  "axis-logo": AxisLogo as unknown as LucideIcon,
-  "hdfc-logo": HdfcLogo as unknown as LucideIcon,
-  "kotak-logo": KotakLogo as unknown as LucideIcon,
-  "sbi-logo": SbiLogo as unknown as LucideIcon,
-  "icici-logo": IciciLogo as unknown as LucideIcon,
+  // From the indian-banks library (banks/); other banks load on demand via
+  // BankLogo rather than sitting in this app-wide map.
+  "hdfc-logo": HdfcBankLogo as unknown as LucideIcon,
+  "icici-logo": IcicBankLogo as unknown as LucideIcon,
   "mdr-offer": MdrOfferIcon as unknown as LucideIcon,
   "toptal-logo": ToptalLogo as unknown as LucideIcon,
   "upwork-logo": UpworkLogo as unknown as LucideIcon,

@@ -1,6 +1,16 @@
 "use client";
 
-import { Button, Card, DataTableCard, Separator, StatusBadge, type Column } from "@/components/ui";
+import {
+  Button,
+  Card,
+  DataTableCard,
+  Separator,
+  StatusBadge,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  type Column,
+} from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
@@ -22,43 +32,90 @@ import type { SettlementRow } from "@/features/dashboard/settlement-reports/type
 /** Payments listed in the drawer before "View all" hands off to the page. */
 const DRAWER_PAYMENT_PREVIEW = 5;
 
-function BreakupRow({
-  label,
-  value,
-  indent,
-  negative,
-  emphasis,
-}: {
-  label: string;
-  value: number;
-  indent?: boolean;
-  negative?: boolean;
-  emphasis?: boolean;
-}) {
+/** What each figure means, on the ⓘ beside its label. */
+const HELP = {
+  settlementId:
+    "A unique ID PayGlocal creates for this settlement when it is initiated. Quote it when you contact support about this payout.",
+  utr: "The Unique Transaction Reference your bank assigns once the money reaches your account. Use it to find this payout in your bank statement.",
+  payments: "The total value of the captured payments included in this settlement.",
+  gst: "Goods and Services Tax charged on PayGlocal's platform fee.",
+  platformFee:
+    "PayGlocal's fee for processing the payments in this settlement, after any discounts.",
+} as const;
+
+/** An ⓘ that explains the label it sits beside, on hover or focus. */
+function InfoTip({ label, text }: { label: string; text: string }) {
   return (
-    <div className={cn("flex items-center justify-between gap-4", indent && "pl-3")}>
-      <span
-        className={cn(
-          indent ? "text-[13px]" : "text-sm",
-          emphasis ? "font-semibold text-foreground" : "text-muted-foreground"
-        )}
-      >
-        {label}
-      </span>
-      <span
-        className={cn(
-          "tabular-nums",
-          indent ? "text-[13px]" : "text-sm",
-          emphasis
-            ? "font-semibold text-foreground"
-            : negative
-              ? "font-medium text-red-600 dark:text-red-400"
-              : "font-medium text-foreground/85"
-        )}
-      >
-        {negative ? "-" : ""}
-        {formatCurrency(value, "INR")}
-      </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          aria-label={`About ${label}`}
+          className="h-4 w-4 min-h-0 min-w-0 shrink-0 rounded-full p-0 text-muted-foreground/70 hover:text-muted-foreground"
+        >
+          <Icon name="info" size={12} />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top" className="max-w-64 text-xs leading-relaxed">
+        {text}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+/** A Details label with its explanation. */
+function LabelWithInfo({ label, help }: { label: string; help: string }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      {label}
+      <InfoTip label={label} text={help} />
+    </span>
+  );
+}
+
+/**
+ * One group of the Amount Breakdown: a header line carrying the group's
+ * total, then the lines that make it up, indented and quieter. Gross, then
+ * Deductions, then the Net result, so the sum reads top to bottom.
+ */
+function BreakupGroup({
+  title,
+  total,
+  tone = "default",
+  lines = [],
+}: {
+  title: string;
+  total: number;
+  tone?: "default" | "negative";
+  lines?: { label: string; value: number; help: string }[];
+}) {
+  const negative = tone === "negative";
+  const money = (n: number) => `${negative ? "−" : ""}${formatCurrency(n, "INR")}`;
+  return (
+    <div className="flex flex-col gap-2.5 px-5 py-4">
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-sm font-semibold text-foreground">{title}</span>
+        <span
+          className={cn(
+            "text-sm font-semibold tabular-nums",
+            negative ? "text-red-600 dark:text-red-400" : "text-foreground"
+          )}
+        >
+          {money(total)}
+        </span>
+      </div>
+      {lines.map((line) => (
+        <div key={line.label} className="flex items-center justify-between gap-4 pl-4">
+          <span className="inline-flex items-center gap-1 text-[13px] text-muted-foreground">
+            {line.label}
+            <InfoTip label={line.label} text={line.help} />
+          </span>
+          <span className="text-[13px] tabular-nums text-muted-foreground">
+            {money(line.value)}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -211,7 +268,7 @@ export function SettlementDetailsContent({
       <Card className="shadow-none gap-0 p-5">
         <div className="grid grid-cols-2 gap-5">
           <DetailRow
-            label="Settlement ID"
+            label={<LabelWithInfo label="Settlement ID" help={HELP.settlementId} />}
             value={
               settlement.settlementId ? (
                 <CopyableCell
@@ -227,7 +284,7 @@ export function SettlementDetailsContent({
             }
           />
           <DetailRow
-            label="UTR number"
+            label={<LabelWithInfo label="UTR number" help={HELP.utr} />}
             value={
               utr ? (
                 <CopyableCell
@@ -260,21 +317,31 @@ export function SettlementDetailsContent({
   const breakdown = view && (
     <section className="flex flex-col gap-2">
       <SectionLabel>Amount Breakdown</SectionLabel>
-      <Card className="shadow-none gap-0 p-5">
-        <div className="flex flex-col gap-3">
-          <BreakupRow label="Gross settlement" value={view.grossAmount} emphasis />
-          <BreakupRow label="Payments" value={view.grossAmount} indent />
-          <BreakupRow label="Deductions" value={deductions} negative />
-          <BreakupRow label="Goods and services tax (GST)" value={view.gst} indent negative />
-          <BreakupRow
-            label="Platform fee charged on payments"
-            value={view.platformFee}
-            indent
-            negative
-          />
-          <div className="border-t border-border pt-3">
-            <BreakupRow label="Net settlement" value={settlement.amount} emphasis />
-          </div>
+      <Card className="shadow-none gap-0 divide-y divide-border p-0">
+        <BreakupGroup
+          title="Gross settlement"
+          total={view.grossAmount}
+          lines={[{ label: "Payments", value: view.grossAmount, help: HELP.payments }]}
+        />
+        <BreakupGroup
+          title="Deductions"
+          total={deductions}
+          tone="negative"
+          lines={[
+            { label: "Goods and services tax (GST)", value: view.gst, help: HELP.gst },
+            {
+              label: "Platform fee charged on payments",
+              value: view.platformFee,
+              help: HELP.platformFee,
+            },
+          ]}
+        />
+        {/* The result, set apart: what reached (or will reach) the account. */}
+        <div className="flex items-center justify-between gap-4 rounded-b-xl bg-muted/40 px-5 py-4">
+          <span className="text-[15px] font-bold text-foreground">Net settlement</span>
+          <span className="text-[15px] font-bold tabular-nums text-foreground">
+            {formatCurrency(settlement.amount, "INR")}
+          </span>
         </div>
       </Card>
     </section>

@@ -12,12 +12,23 @@ import type { DisputeFormStep } from "@/features/dashboard/pa-transactions/compo
 import type { DisputeDetail } from "@/features/dashboard/pa-transactions/deriveTransactionDetail";
 import type { DisputeEvent } from "@/features/dashboard/pa-transactions/financial/types";
 import { getMockDocumentPreviewUrl } from "@/features/dashboard/pa-transactions/mockDocumentPreview";
+import { DisputeEscalationCard } from "@/features/dashboard/pa-transactions/components/DisputeEscalationCard";
+import { formatCurrency } from "@/lib/utils";
+import {
+  STAGE_COPY,
+  formatFee,
+  reviewPhaseOf,
+  stageOf,
+  underReviewMessage,
+} from "@/features/dashboard/pa-transactions/status/disputeStages";
 
 export interface DisputeStatusCardProps {
   dispute: DisputeEvent;
   disputeDetail: DisputeDetail;
   onAccept: () => void;
   onContest: () => void;
+  /** Arbitration only: close the case for the customer. */
+  onWithdraw?: () => void;
   /** Session-only re-upload override (see DisputeDetailFeature's own
    * submittedDocuments state), falls back to dispute.documents when unset. */
   submittedDocuments?: SubmittedDocument[];
@@ -46,68 +57,98 @@ export function DisputeStatusCard({
   disputeDetail,
   onAccept,
   onContest,
+  onWithdraw,
   submittedDocuments,
 }: DisputeStatusCardProps) {
-  // Owned right here rather than threaded in from either caller — the
-  // explainer content is keyed off `dispute.status` alone (see
-  // DisputeStageGuideDialog), so there's nothing page-specific for
-  // TransactionDetailFeature/DisputeDetailFeature to supply.
   const [guideOpen, setGuideOpen] = useState(false);
   const openGuide = () => setGuideOpen(true);
 
-  // "Needs response" covers a freshly raised dispute awaiting accept/
-  // contest, and REOPENED (a cleared dispute the bank came back on, the
-  // merchant must respond again the same way). MORE_EVIDENCE_NEEDED also
-  // needs the merchant to act, but is its own distinct notice (re-upload,
-  // not a first-time accept/contest choice), handled in its own branch.
+  const stage = stageOf(dispute);
+  const stageCopy = STAGE_COPY[stage];
+  const money = formatCurrency(dispute.amount, dispute.currency);
+  const support = "Have questions? Contact us at support@payglocal.in.";
   const disputeAwaitingDecision =
     dispute.status === "NEEDS_RESPONSE" || dispute.status === "REOPENED";
-  const isUnderBankReview = dispute.reviewPhase === "BANK_REVIEW";
+  const documents =
+    submittedDocuments && submittedDocuments.length > 0
+      ? submittedDocuments
+      : asDocuments(dispute.documents);
 
-  const underReviewSteps: DisputeFormStep[] | undefined =
-    dispute.status === "UNDER_REVIEW"
-      ? [
-          {
-            label: "Chargeback",
-            description: formatDisplayDateTime(dispute.raisedOn) ?? dispute.raisedOn,
-            state: "complete",
-          },
-          {
-            label: "Merchant Response",
-            description: "Upload supporting documents before the response deadline.",
-            state: "complete",
-          },
-          {
-            label: "Evidence Submitted",
-            description: "Your supporting evidence has been received and queued for review.",
-            state: "complete",
-          },
-          {
-            label: "PayGlocal Review",
-            description: isUnderBankReview
-              ? "Your evidence was reviewed and a representation was prepared for the issuing bank."
-              : "PayGlocal will review your evidence and prepare a representation for submission to the issuing bank.",
-            state: isUnderBankReview ? "complete" : "current",
-          },
-          {
-            label: "Bank Review",
-            description:
-              "The issuing bank may take up to approximately 60 business days to review the submitted evidence and issue a decision.",
-            state: isUnderBankReview ? "current" : "locked",
-          },
-          {
-            label: "Final Decision",
-            description:
-              "If the decision is in your favour, the dispute will close successfully. Otherwise, depending on the card network's process, the case may proceed to Pre-Arbitration.",
-            state: "locked",
-          },
-          { label: "Closed", description: "", state: "locked" },
-        ]
-      : undefined;
+  // "Dispute progress" while under review, per the "Pre-arb and arb"
+  // design: submitted, PayGlocal's review (or, at arbitration, preparing the
+  // representation from what was already submitted), the bank's review, and
+  // what happens either way.
+  const phase = reviewPhaseOf(dispute);
+  const submittedOn = dispute.evidenceSubmittedOn
+    ? (formatDisplayDateTime(dispute.evidenceSubmittedOn) ?? dispute.evidenceSubmittedOn)
+    : undefined;
+  const underReviewSteps: DisputeFormStep[] = [
+    {
+      label: stage === "ARBITRATION" ? "Contest confirmed" : "Documents submitted",
+      description:
+        stage === "ARBITRATION"
+          ? "You chose to continue to arbitration. No new documents are needed."
+          : submittedOn
+            ? `Submitted on ${submittedOn}.`
+            : "Your supporting evidence has been received.",
+      state: "complete",
+    },
+    {
+      label: stage === "ARBITRATION" ? "Representation" : "PayGlocal review",
+      description:
+        phase === "BANK_REVIEW"
+          ? "Your evidence was reviewed and sent to the customer's bank."
+          : phase === "APPROVED"
+            ? "Your documents were approved. We're creating a representation document for bank review."
+            : stage === "ARBITRATION"
+              ? "We're creating a representation document for bank review."
+              : "We're reviewing your evidence to create a representation document for bank review.",
+      state: phase === "BANK_REVIEW" ? "complete" : "current",
+    },
+    {
+      label: "Bank review",
+      description:
+        phase === "BANK_REVIEW"
+          ? `The bank is reviewing your dispute now. This may take ${stageCopy.bankReviewTime}.`
+          : `The bank may take ${stageCopy.bankReviewTime} to make a final decision.`,
+      state: phase === "BANK_REVIEW" ? "current" : "locked",
+    },
+    {
+      label: "Final decision",
+      description: `If the decision is in your favour, the dispute will be closed. ${stageCopy.ifLost}`,
+      state: "locked",
+    },
+  ];
+
+  const feeCallout = dispute.appliedFee
+    ? {
+        tone: "error" as const,
+        title: "What this means",
+        points:
+          dispute.appliedFee.kind === "ARBITRATION"
+            ? [
+                `A ${formatFee(dispute.appliedFee)} arbitration fee has been applied and will be settled from your account`,
+                "Arbitration decisions are final and cannot be re-contested",
+              ]
+            : [
+                `A ${formatFee(dispute.appliedFee)} withdrawal fee has been applied and will be settled from your account`,
+              ],
+      }
+    : undefined;
 
   let card;
 
-  if (disputeAwaitingDecision) {
+  if (disputeAwaitingDecision && stage !== "CHARGEBACK") {
+    card = (
+      <DisputeEscalationCard
+        dispute={dispute}
+        onAccept={onAccept}
+        onWithdraw={onWithdraw ?? onAccept}
+        onContest={onContest}
+        onLearnMore={openGuide}
+      />
+    );
+  } else if (disputeAwaitingDecision) {
     card = (
       <DisputeActionCard
         merchantLabel={disputeDetail.merchantLabel}
@@ -125,7 +166,19 @@ export function DisputeStatusCard({
         icon="check-circle"
         iconClassName="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
         title="Dispute won"
-        description="You successfully contested this dispute, the disputed amount stays with you. This dispute is now closed."
+        description={`You've won this dispute. The disputed amount of ${money} stays with you, and this dispute is now closed.`}
+        documents={documents}
+        onLearnMore={openGuide}
+      />
+    );
+  } else if (dispute.status === "ACCEPTED" && dispute.withdrawn) {
+    card = (
+      <DisputeStatusNoticeCard
+        icon="alert-triangle"
+        iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
+        title="Dispute withdrawn"
+        description={`You've withdrawn this dispute. ${money} was returned to the customer and settled from your account. ${support}`}
+        callout={feeCallout}
         onLearnMore={openGuide}
       />
     );
@@ -134,8 +187,8 @@ export function DisputeStatusCard({
       <DisputeStatusNoticeCard
         icon="alert-triangle"
         iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-        title="Dispute lost"
-        description="You accepted this dispute and a refund was initiated to the cardholder. This dispute is now closed."
+        title="Dispute accepted"
+        description={`You've accepted this dispute. ${money} was returned to the customer and settled from your account. ${support}`}
         onLearnMore={openGuide}
       />
     );
@@ -145,7 +198,9 @@ export function DisputeStatusCard({
         icon="alert-triangle"
         iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
         title="Dispute lost"
-        description="The bank ruled in the cardholder's favour. This dispute is now closed and the disputed amount was charged back."
+        description={`You've lost this dispute. ${money} was returned to the customer and settled from your account. ${support}`}
+        callout={feeCallout}
+        documents={documents}
         onLearnMore={openGuide}
       />
     );
@@ -155,7 +210,7 @@ export function DisputeStatusCard({
         icon="alert-triangle"
         iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
         title="Dispute lost"
-        description="The response deadline passed without a reply. This dispute is now closed and treated as a chargeback."
+        description={`You lost this dispute because there was no response before the deadline. ${money} was returned to the customer and settled from your account. ${support}`}
         onLearnMore={openGuide}
       />
     );
@@ -164,7 +219,7 @@ export function DisputeStatusCard({
       <DisputeStatusNoticeCard
         icon="alert-triangle"
         iconClassName="bg-red-500/10 text-red-600 dark:text-red-400"
-        title="More evidence needed"
+        title="Insufficient documents"
         description="We need more information to investigate this dispute. Please upload additional documents to submit more supporting evidence."
         documents={asDocuments(dispute.documents)}
         action={{ label: "Upload documents", onClick: onContest }}
@@ -172,21 +227,31 @@ export function DisputeStatusCard({
       />
     );
   } else {
+    const accepted =
+      dispute.acceptedAmount !== undefined
+        ? {
+            tone: "info" as const,
+            title: "Partially accepted",
+            points: [
+              `${formatCurrency(dispute.acceptedAmount, dispute.currency)} has been accepted and will be returned to the customer`,
+              `The remaining ${formatCurrency(dispute.amount - dispute.acceptedAmount, dispute.currency)} is still under dispute`,
+            ],
+          }
+        : undefined;
     card = (
       <DisputeStatusNoticeCard
         icon="clock"
         iconClassName="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-        title={isUnderBankReview ? "Bank is reviewing your evidence" : "Under review"}
-        description={
-          isUnderBankReview
-            ? "Bank is reviewing the evidence. We'll notify you when we have a decision from the bank."
-            : "Your documents have been submitted and will be reviewed."
+        title={
+          phase === "BANK_REVIEW"
+            ? "Bank is reviewing your evidence"
+            : phase === "APPROVED"
+              ? "Evidence approved"
+              : "Under review"
         }
-        documents={
-          submittedDocuments && submittedDocuments.length > 0
-            ? submittedDocuments
-            : asDocuments(dispute.documents)
-        }
+        description={underReviewMessage(dispute)}
+        callout={accepted}
+        documents={documents}
         steps={underReviewSteps}
         onLearnMore={openGuide}
       />

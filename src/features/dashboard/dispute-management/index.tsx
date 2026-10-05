@@ -29,6 +29,7 @@ import { DisputeStatCards } from "@/features/dashboard/dispute-management/compon
 import { MOCK_DISPUTE_ROWS } from "@/features/dashboard/dispute-management/mockRows";
 import {
   DISPUTE_SEGMENT_RAW_STATUSES,
+  DISPUTE_STATUS_FILTERS,
   DISPUTE_STATUS_SEGMENTS,
   DISPUTE_TIMEFRAMES,
   RESPOND_BY_SEGMENTS,
@@ -45,9 +46,7 @@ import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/dispu
  * raw-status mapping (e.g. "Action required" covers both DISPUTED and
  * NEEDS_ACTION) instead of a second copy of that vocabulary, "All disputes"
  * excluded since it isn't a real status to filter by. */
-const STATUS_FILTER_OPTIONS = DISPUTE_STATUS_SEGMENTS.filter(
-  (segment) => segment.value !== "all"
-).map((segment) => ({ value: segment.value, label: segment.label }));
+const STATUS_FILTER_OPTIONS = DISPUTE_STATUS_FILTERS.map(({ value, label }) => ({ value, label }));
 
 /** "08/08/2026, 10:22:15" -> epoch ms, same shape as PaTransaction's
  * formattedCreationDateTime, this feature's mock rows generate it the
@@ -99,6 +98,20 @@ export function toPaTransaction(row: DisputeRow): PaTransaction {
         raisedOn: row.disputedOn,
         respondBy: row.respondBy,
         documents: row.documents,
+        // The list's escalation round, so the detail page offers that
+        // stage's own choices (see status/disputeStages.ts).
+        disputePhase: row.disputePhase === "DISPUTE" ? "CHARGEBACK" : row.disputePhase,
+        reviewPhase: row.reviewPhase,
+        withdrawalFeeApplies: row.withdrawalFeeApplies,
+        withdrawn: row.resolution === "WITHDRAWN",
+        appliedFee: row.appliedFee,
+        resolvedOn:
+          row.status === "CLEARED" ||
+          row.status === "CHARGED_BACK" ||
+          row.status === "ACCEPTED" ||
+          row.status === "EXPIRED"
+            ? row.disputedOn
+            : undefined,
       },
     ],
   };
@@ -127,7 +140,7 @@ export function DisputeManagementFeature() {
   }, [resolutionByGid]);
 
   const [search, setSearch] = useState("");
-  const [statusSegment, setStatusSegment] = useState<DisputeStatusSegment>("all");
+  const [statusSegment, setStatusSegment] = useState<DisputeStatusSegment>("action-required");
   const [statusFilter, setStatusFilter] = useState<string[] | undefined>(undefined);
   const [reason, setReason] = useState<string | undefined>(undefined);
   const [amountRange, setAmountRange] = useState<AmountRangeValue | undefined>(undefined);
@@ -208,10 +221,8 @@ export function DisputeManagementFeature() {
       if (
         statusFilter &&
         statusFilter.length > 0 &&
-        !statusFilter.some((segmentValue) =>
-          DISPUTE_SEGMENT_RAW_STATUSES[
-            segmentValue as Exclude<DisputeStatusSegment, "all">
-          ].includes(row.status)
+        !statusFilter.some((value) =>
+          DISPUTE_STATUS_FILTERS.find((f) => f.value === value)?.raw.includes(row.status)
         )
       ) {
         return false;

@@ -3,14 +3,23 @@ import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
 // TODO(integration): replace with the real chargeback-search endpoint once
 // available, see the TODO in types.ts.
 //
-// A full matrix for reviewing the design: every status and closed outcome,
-// once in each stage (Dispute -> Pre-arbitration -> Arbitration, per the
-// Disputes workflow PDF). Arbitration has no "Reopened" row: it is the final
-// level, with no further appeals. `stage` keeps the step wording for
+// A full matrix for reviewing the design: every status and closed outcome a
+// stage allows (Dispute -> Pre-arbitration -> Arbitration, per the Disputes
+// workflow PDF). Dispute and Pre-arbitration: Action required, Insufficient
+// documents, Under review, Won, Lost. Arbitration, the final level: Action
+// required, Under review, Won, Lost. An escalation is a new stage starting at
+// Action required, not a status of its own.
+//
+// Per the "Pre-arb and arb" design: a contested loss at Dispute or
+// Pre-arbitration escalates to the next stage rather than closing, so those
+// stages close as Lost only by Accepted or No response. Arbitration is
+// final: Withdrawn (with or without a withdrawal fee) or Lost after contest
+// (with or without the arbitration fee). Under review rows cover each place
+// the evidence can be: with PayGlocal, approved, with the bank. `stage` keeps the step wording for
 // reference; the table shows `disputePhase` as its Stage column.
 export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
   // ── Stage: Dispute ─────────────────────────────────────────────────────
-  // Needs response
+  // Action required
   {
     disputeId: "du_dis01",
     txnGid: "gl_o-demo001dineed",
@@ -45,8 +54,30 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "DISPUTE",
     stage: "Evidence submitted to PayGlocal",
     documents: ["invoice.pdf", "proof_of_delivery.jpg"],
+    reviewPhase: "PAYGLOCAL_REVIEW",
   },
-  // More evidence needed
+
+  // Under review · with the bank
+  {
+    disputeId: "du_dis02b",
+    txnGid: "gl_o-demo002diundeb",
+    status: "UNDER_REVIEW",
+    amount: 4210,
+    currency: "USD",
+    reason: "Product not received",
+    customerName: "Rhea Kapoor",
+    email: "rhea.kapoor@example.com",
+    cardBrand: "MASTERCARD",
+    maskedCardNumber: "XXXXXXXXXXXX9981",
+    paymentInstrument: "CARDS",
+    disputedOn: "04/10/2026, 12:07:00",
+    disputePhase: "DISPUTE",
+    stage: "Evidence submitted to PayGlocal",
+    documents: ["invoice.pdf", "proof_of_delivery.jpg"],
+    reviewPhase: "BANK_REVIEW",
+  },
+
+  // Insufficient documents
   {
     disputeId: "du_dis03",
     txnGid: "gl_o-demo003dimore",
@@ -64,24 +95,6 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "DISPUTE",
     stage: "Documents insufficient, re-upload required",
     documents: ["invoice.pdf", "proof_of_delivery.jpg"],
-  },
-  // Reopened
-  {
-    disputeId: "du_dis04",
-    txnGid: "gl_o-demo004direop",
-    status: "REOPENED",
-    amount: 320,
-    currency: "EUR",
-    reason: "Subscription cancelled",
-    customerName: "Lucas Ferreira",
-    email: "lucas.ferreira@example.com",
-    cardBrand: "AMEX",
-    maskedCardNumber: "XXXXXXXXXXXX6603",
-    paymentInstrument: "CARDS",
-    disputedOn: "03/10/2026, 09:21:00",
-    respondBy: "10/10/2026, 09:00:00",
-    disputePhase: "DISPUTE",
-    stage: "Reopened by the issuing bank",
   },
   // Won · Contested
   {
@@ -120,25 +133,6 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "DISPUTE",
     stage: "Withdrawn by the customer",
   },
-  // Lost · Contested
-  {
-    disputeId: "du_dis07",
-    txnGid: "gl_o-demo007dichar",
-    status: "CHARGED_BACK",
-    resolution: "CONTESTED",
-    amount: 5822,
-    currency: "INR",
-    reason: "Product not received",
-    customerName: "Meera Subramaniam",
-    email: "meera.subramaniam@example.com",
-    cardBrand: "VISA",
-    maskedCardNumber: "XXXXXXXXXXXX4821",
-    paymentInstrument: "CARDS",
-    disputedOn: "02/10/2026, 09:42:00",
-    disputePhase: "DISPUTE",
-    stage: "Lost after bank review",
-    documents: ["invoice.pdf", "proof_of_delivery.jpg"],
-  },
   // Lost · Accepted
   {
     disputeId: "du_dis08",
@@ -176,7 +170,7 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     stage: "Auto-closed, no response",
   },
   // ── Stage: Pre-arbitration ─────────────────────────────────────────────
-  // Needs response
+  // Action required
   {
     disputeId: "du_pre10",
     txnGid: "gl_o-demo010prneed",
@@ -211,8 +205,10 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "PRE_ARBITRATION",
     stage: "Pre-arbitration: Evidence submitted to PayGlocal",
     documents: ["invoice.pdf", "proof_of_delivery.jpg"],
+    reviewPhase: "APPROVED",
   },
-  // More evidence needed
+
+  // Insufficient documents
   {
     disputeId: "du_pre12",
     txnGid: "gl_o-demo012prmore",
@@ -230,24 +226,6 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "PRE_ARBITRATION",
     stage: "Pre-arbitration: Documents insufficient, re-upload required",
     documents: ["invoice.pdf", "proof_of_delivery.jpg"],
-  },
-  // Reopened
-  {
-    disputeId: "du_pre13",
-    txnGid: "gl_o-demo013prreop",
-    status: "REOPENED",
-    amount: 320,
-    currency: "EUR",
-    reason: "Duplicate charge",
-    customerName: "Tanvi Desai",
-    email: "tanvi.desai@example.com",
-    cardBrand: "VISA",
-    maskedCardNumber: "XXXXXXXXXXXX4821",
-    paymentInstrument: "CARDS",
-    disputedOn: "30/09/2026, 09:24:00",
-    respondBy: "07/10/2026, 09:00:00",
-    disputePhase: "PRE_ARBITRATION",
-    stage: "Pre-arbitration: Reopened by the issuing bank",
   },
   // Won · Contested
   {
@@ -286,25 +264,6 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "PRE_ARBITRATION",
     stage: "Pre-arbitration: Withdrawn by the customer",
   },
-  // Lost · Contested
-  {
-    disputeId: "du_pre16",
-    txnGid: "gl_o-demo016prchar",
-    status: "CHARGED_BACK",
-    resolution: "CONTESTED",
-    amount: 6155,
-    currency: "INR",
-    reason: "Fraudulent",
-    customerName: "Karan Shah",
-    email: "karan.shah@example.com",
-    cardBrand: "AMEX",
-    maskedCardNumber: "XXXXXXXXXXXX6603",
-    paymentInstrument: "CARDS",
-    disputedOn: "29/09/2026, 09:45:00",
-    disputePhase: "PRE_ARBITRATION",
-    stage: "Pre-arbitration: Lost after bank review",
-    documents: ["invoice.pdf", "proof_of_delivery.jpg"],
-  },
   // Lost · Accepted
   {
     disputeId: "du_pre17",
@@ -342,7 +301,7 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     stage: "Pre-arbitration: Auto-closed, no response",
   },
   // ── Stage: Arbitration ─────────────────────────────────────────────────
-  // Needs response
+  // Action required
   {
     disputeId: "du_arb19",
     txnGid: "gl_o-demo019arneed",
@@ -352,6 +311,26 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     reason: "Subscription cancelled",
     customerName: "Fatima Zahra",
     email: "fatima.zahra@example.com",
+    cardBrand: "VISA",
+    maskedCardNumber: "XXXXXXXXXXXX4821",
+    paymentInstrument: "CARDS",
+    disputedOn: "05/10/2026, 08:30:00",
+    respondBy: "06/10/2026, 08:30:00",
+    disputePhase: "ARBITRATION",
+    stage: "Arbitration: Dispute raised",
+    withdrawalFeeApplies: true,
+  },
+
+  // Action required · no withdrawal fee
+  {
+    disputeId: "du_arb19b",
+    txnGid: "gl_o-demo019arneedb",
+    status: "NEEDS_RESPONSE",
+    amount: 7420,
+    currency: "INR",
+    reason: "Subscription cancelled",
+    customerName: "Nikhil Rao",
+    email: "nikhil.rao@example.com",
     cardBrand: "VISA",
     maskedCardNumber: "XXXXXXXXXXXX4821",
     paymentInstrument: "CARDS",
@@ -377,26 +356,9 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "ARBITRATION",
     stage: "Arbitration: Evidence submitted to PayGlocal",
     documents: ["invoice.pdf", "proof_of_delivery.jpg"],
+    reviewPhase: "BANK_REVIEW",
   },
-  // More evidence needed
-  {
-    disputeId: "du_arb21",
-    txnGid: "gl_o-demo021armore",
-    status: "MORE_EVIDENCE_NEEDED",
-    amount: 9730,
-    currency: "INR",
-    reason: "Fraudulent",
-    customerName: "Chloe Martin",
-    email: "chloe.martin@example.com",
-    cardBrand: "RUPAY",
-    maskedCardNumber: "XXXXXXXXXXXX7719",
-    paymentInstrument: "CARDS",
-    disputedOn: "05/10/2026, 10:30:00",
-    respondBy: "06/10/2026, 10:30:00",
-    disputePhase: "ARBITRATION",
-    stage: "Arbitration: Documents insufficient, re-upload required",
-    documents: ["invoice.pdf", "proof_of_delivery.jpg"],
-  },
+
   // Won · Contested
   {
     disputeId: "du_arb22",
@@ -452,13 +414,34 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputePhase: "ARBITRATION",
     stage: "Arbitration: Lost after bank review",
     documents: ["invoice.pdf", "proof_of_delivery.jpg"],
+    appliedFee: { kind: "ARBITRATION", amount: 800, currency: "USD" },
   },
-  // Lost · Accepted
+
+  // Lost · Contested · no arbitration fee
+  {
+    disputeId: "du_arb24b",
+    txnGid: "gl_o-demo024archarb",
+    status: "CHARGED_BACK",
+    resolution: "CONTESTED",
+    amount: 3650,
+    currency: "USD",
+    reason: "Subscription cancelled",
+    customerName: "Emma Brooks",
+    email: "emma.brooks@example.com",
+    cardBrand: "MASTERCARD",
+    maskedCardNumber: "XXXXXXXXXXXX3382",
+    paymentInstrument: "CARDS",
+    disputedOn: "27/09/2026, 15:41:00",
+    disputePhase: "ARBITRATION",
+    stage: "Arbitration: Lost after bank review",
+    documents: ["invoice.pdf", "proof_of_delivery.jpg"],
+  },
+  // Lost · Withdrawn · withdrawal fee
   {
     disputeId: "du_arb25",
     txnGid: "gl_o-demo025aracce",
     status: "ACCEPTED",
-    resolution: "ACCEPTED",
+    resolution: "WITHDRAWN",
     amount: 6488,
     currency: "INR",
     reason: "Other reason",
@@ -470,23 +453,25 @@ export const MOCK_DISPUTE_ROWS: DisputeRow[] = [
     disputedOn: "26/09/2026, 09:48:00",
     disputePhase: "ARBITRATION",
     stage: "Arbitration: Accepted and refunded",
+    appliedFee: { kind: "WITHDRAWAL", amount: 200, currency: "USD" },
   },
-  // Lost · No response
+
+  // Lost · Withdrawn · no withdrawal fee
   {
-    disputeId: "du_arb26",
-    txnGid: "gl_o-demo026arexpi",
-    status: "EXPIRED",
-    resolution: "NO_RESPONSE",
-    amount: 410,
-    currency: "GBP",
-    reason: "Fraudulent",
-    customerName: "Aisha Bello",
-    email: "aisha.bello@example.com",
-    cardBrand: "MASTERCARD",
-    maskedCardNumber: "XXXXXXXXXXXX9981",
+    disputeId: "du_arb25b",
+    txnGid: "gl_o-demo025aracceb",
+    status: "ACCEPTED",
+    resolution: "WITHDRAWN",
+    amount: 2780,
+    currency: "INR",
+    reason: "Other reason",
+    customerName: "Lucas Moreau",
+    email: "lucas.moreau@example.com",
+    cardBrand: "VISA",
+    maskedCardNumber: "XXXXXXXXXXXX4821",
     paymentInstrument: "CARDS",
-    disputedOn: "26/09/2026, 12:55:00",
+    disputedOn: "26/09/2026, 09:48:00",
     disputePhase: "ARBITRATION",
-    stage: "Arbitration: Auto-closed, no response",
+    stage: "Arbitration: Accepted and refunded",
   },
 ];

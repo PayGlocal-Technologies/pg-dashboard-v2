@@ -1,8 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui";
 import { PaymentLinkMetricCard } from "@/features/dashboard/payment-links/components/PaymentLinkMetricCard";
 import { useSettlementCalendar } from "@/features/dashboard/settlement-reports/hooks";
-import { formatDayMonth } from "@/lib/utils/format";
+import { parseDateKey } from "@/lib/utils/format";
 import type {
   TransactionsMetrics,
   TransactionsTrendCharts,
@@ -49,8 +51,16 @@ export function TransactionStatCards({
   // The next PA settlement date, from the live bank-holiday calendar. Date
   // only; there is no amount for it here.
   const { nextSettlement, isLoading: isCalendarLoading } = useSettlementCalendar();
+  const router = useRouter();
+  // In full ("6 October 2026"), beside its label rather than at the far end.
   const nextSettlementDate =
-    !isCalendarLoading && nextSettlement?.date ? formatDayMonth(nextSettlement.date) : "—";
+    !isCalendarLoading && nextSettlement?.date
+      ? parseDateKey(nextSettlement.date).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
+      : "—";
 
   // One colour per card, from the app's chart palette (the same four these
   // cards used before): each trend reads as its own metric at a glance.
@@ -96,7 +106,22 @@ export function TransactionStatCards({
         trendLabel={pctLabel(metrics.netVolumeTrendPct, comparison)}
         trendPositive={metrics.netVolumeTrendPct >= 0}
         data={trendCharts.netVolume}
-        details={[{ label: "Next settlement", value: nextSettlementDate }]}
+        details={[
+          {
+            label: "Next settlement",
+            inlineValue: nextSettlementDate,
+            value: (
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => router.push("/settlement-report")}
+                className="h-auto min-h-0 p-0 text-[13px] font-medium"
+              >
+                View details
+              </Button>
+            ),
+          },
+        ]}
       />
 
       <PaymentLinkMetricCard

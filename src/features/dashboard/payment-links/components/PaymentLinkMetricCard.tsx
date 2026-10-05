@@ -60,7 +60,9 @@ export interface PaymentLinkMetricCardProps {
   /** "trending" (default) or plain up/down arrows. */
   trendIcon?: "trending" | "arrow";
   /** Supporting figures under the chart, one label/value row each. */
-  details?: { label: string; value: ReactNode }[];
+  /** A label, then (optionally) a value set beside it on the left, then a
+   *  right-aligned value or action. */
+  details?: { label: string; inlineValue?: ReactNode; value: ReactNode }[];
 }
 
 export function PaymentLinkMetricCard({
@@ -169,7 +171,12 @@ export function PaymentLinkMetricCard({
           <dl className="space-y-1.5">
             {details.map((d) => (
               <div key={d.label} className="flex items-baseline justify-between gap-3 text-[13px]">
-                <dt className="text-muted-foreground">{d.label}</dt>
+                <dt className="text-muted-foreground">
+                  {d.label}
+                  {d.inlineValue && (
+                    <span className="ml-2 font-semibold text-foreground">{d.inlineValue}</span>
+                  )}
+                </dt>
                 <dd className="font-semibold tabular-nums text-foreground">{d.value}</dd>
               </div>
             ))}

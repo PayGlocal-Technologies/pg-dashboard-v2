@@ -34,7 +34,11 @@ export function StatusBadgeWithTooltip({
   return (
     <TooltipProvider delayDuration={200}>
       <Tooltip>
-        <TooltipTrigger asChild>{badge}</TooltipTrigger>
+        {/* StatusBadge doesn't pass the trigger's handlers through, so it is
+            wrapped in a span that does; otherwise the tooltip never opens. */}
+        <TooltipTrigger asChild>
+          <span className="inline-flex">{badge}</span>
+        </TooltipTrigger>
         <TooltipContent side="top" className="text-xs">
           {tooltip}
         </TooltipContent>

@@ -1,9 +1,12 @@
 import { Badge, type Column, StatusBadge } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
-import { TransactionAmount } from "@/features/dashboard/pa-transactions/components/TransactionAmount";
-import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import { PaymentMethodLogo } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { cn, formatCurrency } from "@/lib/utils";
 import { formatDisplayDateTime } from "@/features/dashboard/pa-transactions/paColumns";
 import { parseFormattedTimestamp } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
+import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
+import { formatFee } from "@/features/dashboard/pa-transactions/status/disputeStages";
 import { DISPUTE_STATUS_META } from "@/features/dashboard/pa-transactions/status/disputeStatus";
 import type { DisputeResolution, DisputeRow } from "@/features/dashboard/dispute-management/types";
 
@@ -15,6 +18,7 @@ const RESOLUTION_LABEL: Record<DisputeResolution, string> = {
   CONTESTED: "Contested",
   CUSTOMER_DROPPED: "Customer dropped",
   ACCEPTED: "Accepted",
+  WITHDRAWN: "Withdrawn",
 };
 
 /** When a row has no explicit resolution, the most likely one for its status. */
@@ -35,19 +39,29 @@ function statusMeta(row: DisputeRow) {
   const meta = DISPUTE_STATUS_META[row.status];
   const resolution = row.resolution ?? DEFAULT_RESOLUTION[row.status];
   if (!resolution) return meta;
-  return { ...meta, label: `${meta.label} · ${RESOLUTION_LABEL[resolution]}` };
+  // The chip says just Won or Lost; how it got there, and any fee charged,
+  // is the tooltip.
+  const why =
+    resolution === "WITHDRAWN"
+      ? "You withdrew at arbitration. The amount was returned to the customer."
+      : (meta.tooltip ?? "");
+  const fee = row.appliedFee
+    ? ` ${row.appliedFee.kind === "ARBITRATION" ? "Arbitration" : "Withdrawal"} fee of ${formatFee(row.appliedFee)} charged.`
+    : "";
+  return {
+    ...meta,
+    tooltip: `${meta.label} · ${RESOLUTION_LABEL[resolution]}. ${why}${fee}`.trim(),
+  };
 }
 
-// Same single-line "D MMM 'YY, hh:mm AM/PM" format and font/color
-// (text-[12px] font-medium text-foreground) as every column in the
-// Transactions table, so the two tables read identically.
+// Same type treatment as the Transactions table: the amount in bold, every
+// supporting value (reason, email, method digits, dates) in regular-weight
+// muted 13px, so the two tables read identically.
+const MUTED_CELL = "whitespace-nowrap text-[13px] text-muted-foreground";
+
 function DateTimeCell({ value }: { value?: string }) {
   const formatted = formatDisplayDateTime(value);
-  return (
-    <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
-      {formatted ?? "N/A"}
-    </span>
-  );
+  return <span className={cn(MUTED_CELL, "tabular-nums")}>{formatted ?? "N/A"}</span>;
 }
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
@@ -77,10 +91,42 @@ export function formatRespondByCountdown(value: string | undefined, nowMs: numbe
 }
 
 function DeadlineCell({ value, nowMs }: { value?: string; nowMs: number }) {
+  const label = formatRespondByCountdown(value, nowMs);
+  // Same size and weight as every other cell; a deadline inside a day (or
+  // past) is marked by colour only.
+  const urgent = label === "Overdue" || label.endsWith("hours left") || label.endsWith("hour left");
   return (
-    <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
-      {formatRespondByCountdown(value, nowMs)}
+    <span className={cn(MUTED_CELL, "tabular-nums", urgent && "text-red-600 dark:text-red-400")}>
+      {label}
     </span>
+  );
+}
+
+/** The Transactions table's Customer Email flag: the currency's country
+ *  (INR → India, USD → US, EUR → EU). */
+function flagIso2(currency?: string): string | undefined {
+  const c = (currency?.trim() || "INR").toUpperCase();
+  if (c.length !== 3) return undefined;
+  return c === "EUR" ? "EU" : c.slice(0, 2);
+}
+
+/** Payment method as the Transactions table shows it: the logo, then the
+ *  card's last four (or the method's name) in muted monospace. */
+function PaymentMethodCellView({ row }: { row: DisputeRow }) {
+  const last4 = row.maskedCardNumber?.replace(/x/gi, "").trim();
+  const instrument = row.paymentInstrument?.toUpperCase() ?? "";
+  const text = last4
+    ? `••• ${last4}`
+    : instrument.includes("UPI")
+      ? "UPI"
+      : instrument.startsWith("NETBANKING")
+        ? "Net Banking"
+        : "•••••••";
+  return (
+    <div className="flex items-center gap-1.5">
+      <PaymentMethodLogo row={row} />
+      <span className="whitespace-nowrap font-mono text-[13px] text-muted-foreground">{text}</span>
+    </div>
   );
 }
 
@@ -153,7 +199,14 @@ function buildColumn(key: string): Column<DisputeRow> | null {
         // Left-aligned (not "right") and padded to match the toolbar above
         // it, same fix as the Transactions table's Amount column.
         cellClassName: "pl-5",
-        render: (row) => <TransactionAmount amount={row.amount} currency={row.currency} />,
+        render: (row) => (
+          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
+            <span className="text-[13px] font-semibold tabular-nums text-foreground">
+              {formatCurrency(row.amount, row.currency)}
+            </span>
+            <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
+          </div>
+        ),
       };
     case "status":
       return {
@@ -162,8 +215,16 @@ function buildColumn(key: string): Column<DisputeRow> | null {
         // Fits the longest chip, "Won · Customer dropped", on one line.
         minWidth: 200,
         render: (row) => {
-          const { label, variant, trailIcon } = statusMeta(row);
-          return <StatusBadge variant={variant} label={label} trailIcon={trailIcon} size="sm" />;
+          const { label, variant, trailIcon, tooltip } = statusMeta(row);
+          return (
+            <StatusBadgeWithTooltip
+              variant={variant}
+              label={label}
+              trailIcon={trailIcon}
+              tooltip={tooltip}
+              size="sm"
+            />
+          );
         },
       };
     case "disputePhase":
@@ -178,29 +239,31 @@ function buildColumn(key: string): Column<DisputeRow> | null {
         key: "reason",
         header: "Reason",
         minWidth: 160,
-        render: (row) => (
-          <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
-            {row.reason}
-          </span>
-        ),
+        render: (row) => <span className={MUTED_CELL}>{row.reason}</span>,
       };
     case "paymentMethod":
       return {
         key: "paymentMethod",
         header: "Payment method",
         minWidth: 145,
-        render: (row) => <TransactionPaymentMethod row={row} />,
+        render: (row) => <PaymentMethodCellView row={row} />,
       };
     case "customerEmail":
       return {
         key: "customerEmail",
         header: "Customer email",
         minWidth: 190,
-        render: (row) => (
-          <span className="whitespace-nowrap text-[12px] font-medium text-foreground lowercase">
-            {row.email}
-          </span>
-        ),
+        render: (row) => {
+          const iso2 = flagIso2(row.currency);
+          return (
+            <span className="flex items-center gap-2 whitespace-nowrap">
+              {iso2 && <CountryFlag iso2={iso2} alt="" />}
+              <span className="text-[13px] lowercase text-muted-foreground">
+                {row.email || "—"}
+              </span>
+            </span>
+          );
+        },
       };
     case "disputedOn":
       return {

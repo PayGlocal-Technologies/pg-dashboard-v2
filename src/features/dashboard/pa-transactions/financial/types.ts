@@ -99,13 +99,29 @@ export interface DisputeEvent {
    * "PAYGLOCAL_REVIEW", PayGlocal's own internal review immediately after
    * submission, before a representation is forwarded to the issuing bank.
    * Set by withDisputeStatus whenever a fresh submission restarts review. */
-  reviewPhase?: "PAYGLOCAL_REVIEW" | "BANK_REVIEW";
+  reviewPhase?: DisputeReviewPhase;
   /** The dispute's broader stage in the card-network process, separate from
    * `reviewPhase` (a narrower PayGlocal-vs-bank detail only meaningful
    * during UNDER_REVIEW). Shown as its own badge, never merged into the
    * status, see status/disputeStatus.ts's DISPUTE_PHASE_META. */
   disputePhase?: "INQUIRY" | "CHARGEBACK" | "PRE_ARBITRATION" | "ARBITRATION";
+  /** Arbitration only: whether withdrawing now carries a withdrawal fee
+   *  (the card network decides). See status/disputeStages.ts. */
+  withdrawalFeeApplies?: boolean;
+  /** The merchant withdrew at arbitration (status ACCEPTED). */
+  withdrawn?: boolean;
+  /** A fee actually charged on closing: the arbitration fee on a loss at
+   *  arbitration, or the withdrawal fee. */
+  appliedFee?: { kind: "ARBITRATION" | "WITHDRAWAL"; amount: number; currency: string };
+  /** A partial accept: the part returned to the customer; the rest stays
+   *  contested. */
+  acceptedAmount?: number;
 }
+
+/** Where the evidence is while a dispute is Under review: with PayGlocal,
+ *  approved by PayGlocal (a representation is being prepared), or with the
+ *  customer's bank. */
+export type DisputeReviewPhase = "PAYGLOCAL_REVIEW" | "APPROVED" | "BANK_REVIEW";
 
 export type TimelineEventType =
   | "PAYMENT_INITIATED"
@@ -150,7 +166,7 @@ export interface TimelineStepData {
   /** Only present on a successful-refund step that isn't the transaction's
    * first, see deriveTimelineSteps. */
   isAdditionalRefund?: boolean;
-  /** Only present on the trailing "Needs response"/"Reopened" step. */
+  /** Only present on the trailing "Action required" step. */
   respondBy?: string;
   /** Only present on the trailing "Settlement in progress" step. */
   expectedOnDate?: string;

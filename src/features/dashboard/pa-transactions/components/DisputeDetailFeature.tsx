@@ -35,7 +35,13 @@ import { DisputeStatusCard } from "@/features/dashboard/pa-transactions/componen
 import { DisputeDetailsCard } from "@/features/dashboard/pa-transactions/components/DisputeDetailsCard";
 import { DisputeAcceptChoice } from "@/features/dashboard/pa-transactions/components/DisputeAcceptChoice";
 import { DisputeRespondForm } from "@/features/dashboard/pa-transactions/components/DisputeRespondForm";
-import { PaymentTimeline } from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
+import { DisputeConfirmDialog } from "@/features/dashboard/pa-transactions/components/DisputeConfirmDialog";
+import { formatFee, stageOf } from "@/features/dashboard/pa-transactions/status/disputeStages";
+import {
+  PaymentTimeline,
+  type TimelineStep,
+} from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
+import type { DisputeEvent } from "@/features/dashboard/pa-transactions/financial/types";
 import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/components/timelineStepFormatting";
 import { deriveDisputeOnlyTimelineSteps } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
 import { getDisputeDetailLinkedRows } from "@/features/dashboard/pa-transactions/linkedChildRecords";
@@ -79,6 +85,49 @@ interface DisputeDetailFeatureProps {
   origin?: DisputeDetailOrigin;
 }
 
+/**
+ * The dispute's own timeline, plus the escalation steps the "Pre-arb and
+ * arb" design shows: the move to pre-arbitration or arbitration, a partial
+ * accept, a withdrawal (instead of a plain "Dispute lost"), and any fee
+ * charged on closing.
+ */
+function withEscalationSteps(steps: TimelineStep[], dispute: DisputeEvent): TimelineStep[] {
+  const stage = stageOf(dispute);
+  const out = [...steps];
+  const raisedAt = formatDisplayDateTime(dispute.raisedOn) ?? dispute.raisedOn;
+  if (stage !== "CHARGEBACK") {
+    const at = out.findIndex((st) => st.id?.startsWith("dispute-raised-"));
+    out.splice(at === -1 ? 0 : at + 1, 0, {
+      id: `stage-${stage}`,
+      label: `Dispute moved to ${stage === "ARBITRATION" ? "arbitration" : "pre-arbitration"}`,
+      description: raisedAt,
+      state: "danger",
+    });
+  }
+  if (dispute.acceptedAmount !== undefined) {
+    const at = out.findIndex((st) => st.id?.startsWith("evidence-submitted-"));
+    out.splice(at === -1 ? out.length : at, 0, {
+      id: "partially-accepted",
+      label: "Dispute partially accepted",
+      description: `${formatCurrency(dispute.acceptedAmount, dispute.currency)} returned to the customer`,
+      state: "complete",
+    });
+  }
+  if (dispute.withdrawn) {
+    const at = out.findIndex((st) => st.id?.startsWith("dispute-accepted-"));
+    if (at !== -1) out[at] = { ...out[at]!, label: "Dispute withdrawn" };
+  }
+  if (dispute.appliedFee) {
+    out.push({
+      id: "fee-charged",
+      label: `${dispute.appliedFee.kind === "ARBITRATION" ? "Arbitration" : "Withdrawal"} fee charged`,
+      description: `${formatFee(dispute.appliedFee)} settled from your account`,
+      state: "danger",
+    });
+  }
+  return out;
+}
+
 /** Full-page detail view for a single dispute, a child financial event of
  * `transactionId` (see PaTransaction.disputes), never an independent
  * payment of its own. Distinct from the parent transaction's own page
@@ -114,7 +163,9 @@ export function DisputeDetailFeature({
     disputeId,
     amount: dispute?.amount ?? 0,
     currency: dispute?.currency || transaction?.txnCurrency || "INR",
-    onAccepted: () => router.push(LIST_PATH),
+    dispute,
+    // No onAccepted redirect: the page shows the closed "Dispute accepted"
+    // state, as the "Pre-arb and arb" design does.
   });
 
   if (!transaction || transaction.gid !== transactionId || !dispute) {
@@ -178,6 +229,7 @@ export function DisputeDetailFeature({
       <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
         <DisputeRespondForm
           mode={flow.respondMode}
+          stage={stageOf(dispute)}
           disputedAmount={amount}
           currency={currency}
           onBack={flow.backToDetail}
@@ -189,10 +241,13 @@ export function DisputeDetailFeature({
 
   const linkedTransactions = getDisputeDetailLinkedRows(transaction);
 
-  const timelineSteps = formatTimelineSteps(
-    deriveDisputeOnlyTimelineSteps(detail.financials, disputeId),
-    currency,
-    () => {}
+  const timelineSteps = withEscalationSteps(
+    formatTimelineSteps(
+      deriveDisputeOnlyTimelineSteps(detail.financials, disputeId),
+      currency,
+      () => {}
+    ),
+    dispute
   );
 
   return (
@@ -223,6 +278,37 @@ export function DisputeDetailFeature({
             )}
           </div>
 
+          {(dispute.appliedFee || dispute.acceptedAmount !== undefined) && (
+            <div className="mt-2 inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-md border border-border px-2.5 py-1 text-[13px] text-foreground/85">
+              <span>
+                Disputed amount:{" "}
+                <span className="font-medium tabular-nums">{formatCurrency(amount, currency)}</span>
+              </span>
+              {dispute.acceptedAmount !== undefined && (
+                <>
+                  <Separator orientation="vertical" className="h-3.5" />
+                  <span>
+                    Accepted amount:{" "}
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(dispute.acceptedAmount, currency)}
+                    </span>
+                  </span>
+                </>
+              )}
+              {dispute.appliedFee && (
+                <>
+                  <Separator orientation="vertical" className="h-3.5" />
+                  <span>
+                    {dispute.appliedFee.kind === "ARBITRATION" ? "Penalty fee" : "Withdrawal fee"}:{" "}
+                    <span className="font-medium tabular-nums text-red-600 dark:text-red-400">
+                      {formatFee(dispute.appliedFee)}
+                    </span>
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px] text-muted-foreground">
             <span>{formattedDateTime}</span>
             <Separator orientation="vertical" className="h-3.5" />
@@ -245,6 +331,7 @@ export function DisputeDetailFeature({
                 disputeDetail={disputeDetail}
                 onAccept={flow.handleAcceptDispute}
                 onContest={flow.handleContestDispute}
+                onWithdraw={flow.handleWithdrawDispute}
                 submittedDocuments={flow.submittedDocuments}
               />
             </section>
@@ -329,6 +416,17 @@ export function DisputeDetailFeature({
             </DetailSection>
           </div>
         </div>
+
+        <DisputeConfirmDialog
+          kind={flow.confirmKind}
+          open={flow.confirmOpen}
+          onOpenChange={flow.setConfirmOpen}
+          amount={amount}
+          currency={currency}
+          respondBy={dispute.respondBy}
+          withdrawalFeeApplies={dispute.withdrawalFeeApplies}
+          onConfirm={flow.handleConfirmed}
+        />
 
         <DisputeAcceptChoice
           open={flow.acceptDialogOpen}

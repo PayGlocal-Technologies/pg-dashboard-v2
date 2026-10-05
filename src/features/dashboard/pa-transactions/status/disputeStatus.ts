@@ -15,13 +15,24 @@ import type { DisputeEventStatus } from "@/features/dashboard/pa-transactions/fi
  * one they argued and lost (and any future win-rate figure can too). */
 export const DISPUTE_STATUS_META: Record<DisputeEventStatus, StatusMeta> = {
   NEEDS_RESPONSE: {
-    label: "Needs response",
+    label: "Action required",
     variant: "warning",
     tooltip: "Accept or contest before the deadline",
   },
   UNDER_REVIEW: { label: "Under review", variant: "info", trailIcon: "clock" },
-  MORE_EVIDENCE_NEEDED: { label: "More evidence needed", variant: "warning", trailIcon: "alert" },
-  REOPENED: { label: "Reopened", variant: "warning" },
+  MORE_EVIDENCE_NEEDED: {
+    label: "Insufficient documents",
+    variant: "warning",
+    trailIcon: "alert",
+    tooltip: "PayGlocal needs more documents before the dispute can continue",
+  },
+  // No longer a status of its own: a dispute that comes back reads as
+  // Action required again, at its new stage. Kept for compatibility.
+  REOPENED: {
+    label: "Action required",
+    variant: "warning",
+    tooltip: "Accept or contest before the deadline",
+  },
   CLEARED: {
     label: "Won",
     variant: "success",
@@ -84,15 +95,17 @@ export const DISPUTE_PHASE_META: Record<DisputePhase, { label: string; descripti
     description: "Bank asking questions. No money held yet.",
   },
   CHARGEBACK: {
-    label: "Chargeback",
-    description: "Formal claim. Money held.",
+    label: "Dispute",
+    description: "The first round. Accept, or contest with evidence before the deadline.",
   },
   PRE_ARBITRATION: {
     label: "Pre-arbitration",
-    description: "The dispute cleared and the bank came back.",
+    description:
+      "The customer's bank escalated after reviewing your evidence. Accept, or submit additional evidence.",
   },
   ARBITRATION: {
     label: "Arbitration",
-    description: "The card network decides. Losing carries a significant fee.",
+    description:
+      "The final stage. Withdraw, or let the bank decide; losing carries an arbitration fee.",
   },
 };

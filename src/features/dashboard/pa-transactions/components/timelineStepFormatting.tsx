@@ -79,8 +79,7 @@ function describeTimelineStep(
     case "Dispute accepted":
     case "Dispute expired":
       return amountLabel ? `${amountLabel} · ${when}` : when;
-    case "Needs response":
-    case "Reopened":
+    case "Action required":
       return step.respondBy
         ? `Respond by ${formatDisplayDateTime(step.respondBy) ?? step.respondBy}`
         : undefined;
@@ -88,7 +87,7 @@ function describeTimelineStep(
       return "Evidence submitted, awaiting the card network's decision";
     case "Bank review":
       return "Bank is reviewing the evidence. We'll notify you when we have a decision from the bank.";
-    case "More evidence needed":
+    case "Insufficient documents":
       return "We need more information to investigate this dispute. Please upload additional documents to submit more supporting evidence.";
     default:
       return when;
