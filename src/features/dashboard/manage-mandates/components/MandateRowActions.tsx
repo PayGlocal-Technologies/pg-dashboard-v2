@@ -42,9 +42,7 @@ export function MandateRowActions({
           variant="ghost"
           size="sm"
           aria-label={`Actions for mandate ${row.maskedMandateId}`}
-          // Card fill and border: it floats over the row's last cells (see
-          // the table), so it has to cover the text beneath it.
-          className="h-7 w-7 min-h-0 min-w-0 rounded-md border border-border bg-card p-0 text-muted-foreground shadow-sm hover:bg-card hover:text-foreground"
+          className="h-7 w-7 min-h-0 min-w-0 rounded-md p-0 text-muted-foreground hover:text-foreground"
         >
           <Icon name="more-horizontal" className="h-4 w-4" />
         </Button>

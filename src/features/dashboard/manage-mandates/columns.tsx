@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { type Column, StatusBadge, formatTimestamp } from "@/components/ui";
 import { LinkedId } from "@/features/dashboard/manage-mandates/components/LinkedId";
 import {
@@ -30,9 +31,11 @@ function text(value: string | null | undefined) {
 export function buildMandateColumns({
   onOpenSiTransactions,
   onOpenInitiateTransaction,
+  renderActions,
 }: {
   onOpenSiTransactions: (row: Mandate) => void;
   onOpenInitiateTransaction: (row: Mandate) => void;
+  renderActions: (row: Mandate) => ReactNode;
 }): Column<Mandate>[] {
   return [
     { key: "mid", header: "Merchant ID", minWidth: 150, render: (row) => text(row.mid) },
@@ -141,6 +144,21 @@ export function buildMandateColumns({
       header: "Expiry time",
       minWidth: 170,
       render: (row) => text(formatTimestamp(row.mandateExpiryTime)),
+    },
+    {
+      // Keyed "action" so reorderColumns keeps it last, and pinned to the
+      // right edge so the row's menu is in reach however far the grid is
+      // scrolled. Its left edge is a 1px rule plus a soft shadow where the
+      // scrolling cells pass under it, both as box-shadows: a border on a
+      // sticky cell stays behind with the collapsed table borders.
+      key: "action",
+      header: "Actions",
+      minWidth: 80,
+      // `mandate-actions` marks the cells for the table's sticky-cell fills
+      // (see ManageMandatesTable).
+      cellClassName:
+        "mandate-actions sticky right-0 z-[2] shadow-[inset_1px_0_0_var(--border),-6px_0_8px_-6px_rgba(0,0,0,0.12)]",
+      render: renderActions,
     },
   ];
 }

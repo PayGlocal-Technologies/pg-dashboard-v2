@@ -189,18 +189,6 @@ export function ManageMandatesTable() {
 
   const canDownload = !isGuestUser && !!scopeMid && access(MANDATE_PERMISSIONS.report);
 
-  const baseColumns = buildMandateColumns({
-    onOpenSiTransactions: openSiTransactions,
-    onOpenInitiateTransaction: openInitiateTransaction,
-  });
-  const columns = reorderColumns(baseColumns, columnOrder).filter(
-    (col) => !hiddenColumns.includes(col.key)
-  );
-  const reorderableColumns = baseColumns.map((c) => ({
-    key: c.key,
-    label: typeof c.header === "string" ? c.header : c.key,
-  }));
-
   const renderActions = (row: Mandate) => (
     <MandateRowActions
       row={row}
@@ -211,6 +199,19 @@ export function ManageMandatesTable() {
       onViewHistory={setHistoryRow}
     />
   );
+
+  const baseColumns = buildMandateColumns({
+    onOpenSiTransactions: openSiTransactions,
+    onOpenInitiateTransaction: openInitiateTransaction,
+    renderActions,
+  });
+  const columns = reorderColumns(baseColumns, columnOrder).filter(
+    (col) => !hiddenColumns.includes(col.key)
+  );
+  // Actions holds the row's controls, not data: never offered to reorder or hide.
+  const reorderableColumns = baseColumns
+    .filter((c) => c.key !== "action")
+    .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
 
   // Written as a function so each surface mounts its own chip group: both are
   // in the DOM at once (CSS picks one), and a shared group would open the
@@ -333,11 +334,20 @@ export function ManageMandatesTable() {
 
   return (
     <>
-      {/* Desktop (lg+). The overflow menu rides `rowAction`: flux floats it
-          over the row's right edge on hover, which keeps it reachable however
-          far the wide grid is scrolled. */}
+      {/* Desktop (lg+). The Actions column is sticky (see buildMandateColumns),
+          so its cells need opaque fills or the grid would show through as it
+          scrolls under them. Each is the colour the row already has there,
+          made solid: the header band (muted/35 over the card), a row, and a
+          hovered row (muted/40). */}
       <DataTableCard<Mandate>
-        className="hidden lg:block"
+        // Written out in full: Tailwind only generates classes it can read
+        // literally, so the cell marker can't be interpolated here.
+        className={cn(
+          "hidden lg:block",
+          "[&_th.mandate-actions]:bg-[color-mix(in_srgb,var(--muted)_35%,var(--card))]",
+          "[&_td.mandate-actions]:bg-card",
+          "[&_tr:hover_td.mandate-actions]:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))]"
+        )}
         toolbar={desktopControls}
         columns={columns}
         data={rows}
@@ -354,7 +364,6 @@ export function ManageMandatesTable() {
           />
         }
         errorState={errorState}
-        rowAction={renderActions}
         pagination={pagination}
         tableLayout="content"
         maxBodyHeight="none"
