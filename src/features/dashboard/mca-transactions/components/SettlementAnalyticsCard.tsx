@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Button,
   Card,
   CardHeader,
   CardContent,
@@ -11,6 +12,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { currencySymbol, formatNextSettlementDate, formatSharePct } from "@/lib/utils/format";
@@ -45,6 +47,15 @@ const TIMEFRAME_BY_RANGE: Record<TimeRange, string> = {
   year: "ytd",
 };
 
+/** How the selected period reads inside a sentence ("Total amount collected,
+ *  this month", "GBP is a small second currency this month"). */
+const PERIOD_PHRASE: Record<TimeRange, string> = {
+  today: "today",
+  week: "this week",
+  month: "this month",
+  year: "year to date",
+};
+
 /** Account currency → display label + flag ISO2. REST_OF_WORLD has no flag. */
 const ACCOUNT_META: Record<string, { label: string; iso2: string }> = {
   USD: { label: "USD Account", iso2: "US" },
@@ -62,12 +73,12 @@ function accountMeta(currency: string): { label: string; iso2: string } {
   return ACCOUNT_META[currency] ?? { label: `${currency} Account`, iso2: "" };
 }
 
-/** Currencies that don't get their own bar — their amount + count are folded
+/** Currencies that don't get their own row — their amount + count are folded
  *  into REST_OF_WORLD instead. */
 const FOLD_INTO_REST = new Set(["AED", "SGD"]);
 
 /** Collapse AED + SGD into the REST_OF_WORLD bucket, leaving every other
- *  currency as its own bar. */
+ *  currency as its own row. */
 function foldRestOfWorld(accounts: SettledAccountRow[]): SettledAccountRow[] {
   const kept: SettledAccountRow[] = [];
   let restAmount = 0;
@@ -92,7 +103,7 @@ function foldRestOfWorld(accounts: SettledAccountRow[]): SettledAccountRow[] {
   return kept;
 }
 
-/** Compact ₹ for the narrow bar-value column (amounts share one reporting
+/** Compact ₹ for the row value columns (amounts share one reporting
  *  currency — they sum to totalAmount). */
 function formatBarAmount(amount: number): string {
   if (amount >= 10_000_000) return `₹${(amount / 10_000_000).toFixed(2)}Cr`;
@@ -101,8 +112,7 @@ function formatBarAmount(amount: number): string {
   return `₹${Math.round(amount)}`;
 }
 
-/** "$8,377,994" for large native amounts, "A$308.09" for sub-thousand ones —
- *  matches how the reference design varies decimal precision by magnitude.
+/** "$8,377,994" for large native amounts, "A$308.09" for sub-thousand ones.
  *  Null when the row carries no native figure, which is the rest-of-world
  *  bucket: it folds several currencies together, so no single symbol or total
  *  describes it. */
@@ -118,22 +128,28 @@ function formatNativeAmount(currency: string, nativeAmount: number | undefined):
   return `${currencySymbol(currency)}${formatted}`;
 }
 
-/** "USD Account" → "USD"; "Rest of world" is left as-is (it has no trailing
- *  " Account" to strip). The chip grid names the same account the full label
- *  already does — this only shortens how it reads in a compact chip. */
+/** "USD Account" → "USD"; "Rest of world" is left as-is. */
 function shortAccountLabel(label: string): string {
   return label.replace(/ Account$/, "");
 }
 
-/**
- * Settlement analytics for the Transactions page: a headline KPI beside the
- * amount/count toggle, over a ranked per-account bar list.
- *
- * The time-range control used to live in this card's own header; it's now
- * owned by TransactionsAnalyticsCarousel instead, sitting above the whole
- * Analytics section since it's meant to drive every card in it, so this
- * component just takes the chosen range as a prop.
- */
+/** "US Dollar" for "USD", from the browser's own currency names; the
+ *  rest-of-world bucket reads "Several currencies". */
+function currencyName(code: string): string {
+  if (code === "REST_OF_WORLD") return "Several currencies";
+  try {
+    return new Intl.DisplayNames(["en"], { type: "currency" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+/** The average INR rate a row was converted at: its INR amount over its
+ *  native amount. Null for the rest-of-world bucket (no native amount). */
+function averageRate(row: AccountBarRowData): number | null {
+  if (!row.currencyAmount || row.currencyAmount <= 0) return null;
+  return row.amount / row.currencyAmount;
+}
 
 interface AccountBarRowData {
   accountId: string;
@@ -141,13 +157,12 @@ interface AccountBarRowData {
   iso2: string;
   value: number;
   valueLabel: string;
-  /** The settlement in this account's own currency, for the subtext under the
-   *  reporting-currency figure. Independent of `value`/`valueLabel`, which
-   *  switch to a transaction count in count mode. Absent on the rest-of-world
-   *  bucket, which has no single native currency. */
+  /** The settlement in this account's own currency. Independent of
+   *  `value`/`valueLabel`, which switch to a transaction count in count mode.
+   *  Absent on the rest-of-world bucket, which has no single native
+   *  currency. */
   currencyAmount?: number;
-  /** Settled amount in the reporting currency (INR), whatever the mode —
-   *  count mode's subtext shows it in place of the native figure. */
+  /** Settled amount in the reporting currency (INR), whatever the mode. */
   amount: number;
 }
 
@@ -181,182 +196,128 @@ function ModeValue({
   );
 }
 
-/** The line under a currency's figure: its native-currency amount in amount
- *  mode ("$8,377,993"), or the INR amount in count mode, since a transaction
- *  count has no currency of its own. Null for the rest-of-world bucket in
- *  amount mode, which has no single native currency. */
-function currencySubLabel(row: AccountBarRowData, isAmountMode: boolean): string | null {
-  return isAmountMode
-    ? formatNativeAmount(row.accountId, row.currencyAmount)
-    : formatBarAmount(row.amount);
-}
-
-/** One currency's row in the two-column list used past six currencies,
- *  styled like the dashboard Transactions card's 7+ tier: flag, bold
- *  currency code with its share of total beneath it on the left; the INR
- *  amount with its native-currency amount beneath it on the right, and a
- *  hairline rule under each row (set by the caller via `className`). */
-function CurrencyChip({
-  row,
-  sharePct,
-  isAmountMode,
-  index,
-  className,
-}: {
-  row: AccountBarRowData;
-  sharePct: number;
-  isAmountMode: boolean;
-  /** Row position in its own list — staggers this chip's sweep-in a beat
-   *  after the one above it, so a mode switch reads as the whole list
-   *  resettling top-to-bottom rather than every value changing at once. */
-  index: number;
-  className?: string;
-}) {
-  // Amount mode's subtext is the native-currency figure ("$8,377,993");
-  // count mode has no native-currency reading of its own (a transaction
-  // count has no currency), so it shows the same INR amount the amount-mode
-  // headline uses instead of leaving that line blank — same placement
-  // either way, just which figure fills it.
-  const subLabel = currencySubLabel(row, isAmountMode);
-  const delay = Math.min(index, 8) * 0.04;
-  return (
-    <li className={cn("flex items-center gap-2.5 py-2.5", className)}>
-      <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-7 w-7 shrink-0" />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-semibold text-foreground">
-          {shortAccountLabel(row.label)}
-        </span>
-        <span className="block text-[11px] tabular-nums text-muted-foreground">
-          {formatSharePct(sharePct)} of total
-        </span>
-      </span>
-      <span className="shrink-0 overflow-hidden text-right">
-        <ModeValue
-          isAmountMode={isAmountMode}
-          delay={delay}
-          className="text-sm font-semibold text-foreground"
-        >
-          {row.valueLabel}
-        </ModeValue>
-        {subLabel && (
-          <motion.span
-            key={isAmountMode ? "native" : "inr"}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: delay + 0.06, ease: "easeOut" }}
-            className="block truncate text-[11px] text-muted-foreground"
-          >
-            {subLabel}
-          </motion.span>
+/** Small round flag; the rest-of-world bucket (no ISO2) gets a globe. */
+function RowFlag({ row, className }: { row: AccountBarRowData; className?: string }) {
+  if (!row.iso2) {
+    return (
+      <span
+        className={cn(
+          "flex shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground",
+          className
         )}
+        aria-hidden
+      >
+        <Icon name="globe" className="h-3.5 w-3.5" />
       </span>
-    </li>
-  );
-}
-
-/** Per-rank bar colours, the same sequence the dashboard Transactions card
- *  (McaInvoiceOriginsCard) uses for its 3-6 market tier. */
-const BAR_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-];
-
-/** One currency: nothing to compare, so no list. Mirrors the dashboard
- *  Transactions card's 1-market hero: flag and name, the figure, then the
- *  decorative trend glyph filling the space a chart would. The figure is the
- *  row's own reporting-currency value (as in every other tier), with its
- *  native-currency amount beneath it. Settled-by-account returns no series
- *  and no trend figure, so the glyph takes its default (rising) shape. */
-function SingleCurrency({ row, isAmountMode }: { row: AccountBarRowData; isAmountMode: boolean }) {
-  const subLabel = currencySubLabel(row, isAmountMode);
+    );
+  }
   return (
-    <div className="flex h-full flex-col justify-center gap-4">
-      <div>
-        <div className="flex items-center gap-2.5">
-          <CountryFlagAvatar iso2={row.iso2} countryName={row.label} className="h-8 w-8 shrink-0" />
-          <p className="text-sm text-muted-foreground">
-            {shortAccountLabel(row.label)}, your only currency
-          </p>
-        </div>
-        <div className="mt-2 flex flex-wrap items-baseline gap-2.5">
-          <ModeValue
-            isAmountMode={isAmountMode}
-            className="text-[2rem] font-bold leading-none tracking-tight text-foreground"
-          >
-            {row.valueLabel}
-          </ModeValue>
-          {subLabel && <span className="text-sm text-muted-foreground">{subLabel}</span>}
-        </div>
-      </div>
-      <DecorativeTrendGlyph />
-    </div>
+    <CountryFlagAvatar
+      iso2={row.iso2}
+      countryName={row.label}
+      className={cn("shrink-0", className)}
+    />
   );
 }
 
-/** Two currencies: side by side, each with its own figure. Still no bars —
- *  two numbers is a comparison read faster than two bars. */
-function DuoCurrencies({
+/** Two series colours: the split bar's segments and the matching row dots. */
+const SPLIT_COLORS = ["var(--chart-1)", "var(--chart-2)"];
+
+/** Two currencies: a split bar (with a minimum sliver so the small side stays
+ *  visible) over two compact rows, plus a plain-language note when one side
+ *  is 95% or more. No trend line: two near-identical curves where one is
+ *  thousands of times the other said nothing. */
+function TwoCurrencies({
   rows,
   totalValue,
   isAmountMode,
+  timeRange,
 }: {
   rows: AccountBarRowData[];
   totalValue: number;
   isAmountMode: boolean;
+  timeRange: TimeRange;
 }) {
+  const [a, b] = rows as [AccountBarRowData, AccountBarRowData];
+  const shareA = totalValue > 0 ? a.value / totalValue : 0;
+  const shareB = totalValue > 0 ? b.value / totalValue : 0;
   return (
-    <div className="grid grid-cols-2 gap-6 py-2">
-      {rows.map((row, index) => {
-        const subLabel = currencySubLabel(row, isAmountMode);
-        return (
-          <div key={row.accountId} className="min-w-0">
-            <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
-              <CountryFlagAvatar
-                iso2={row.iso2}
-                countryName={row.label}
-                className="h-7 w-7 shrink-0"
-              />
-              <span className="truncate">{shortAccountLabel(row.label)}</span>
-              <span className="ml-auto shrink-0 text-xs tabular-nums">
-                {formatSharePct(totalValue > 0 ? row.value / totalValue : 0)}
-              </span>
-            </div>
-            <ModeValue
-              isAmountMode={isAmountMode}
-              delay={index * 0.04}
-              className="mt-2 text-[1.75rem] font-bold leading-none tracking-tight text-foreground"
+    <div className="space-y-3">
+      <div
+        className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-muted"
+        role="img"
+        aria-label={`${shortAccountLabel(a.label)} ${formatSharePct(shareA)}, ${shortAccountLabel(b.label)} ${formatSharePct(shareB)}`}
+      >
+        <span
+          className="block h-full"
+          style={{ flex: `${shareA} 1 0`, background: SPLIT_COLORS[0] }}
+        />
+        <span
+          className="block h-full min-w-1.5"
+          style={{ flex: `${shareB} 0 0`, background: SPLIT_COLORS[1] }}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {rows.map((row, i) => {
+          const rate = averageRate(row);
+          const native = formatNativeAmount(row.accountId, row.currencyAmount);
+          const detail =
+            isAmountMode && native
+              ? `${native}${rate ? ` at ₹${rate.toFixed(2)}` : ""}`
+              : currencyName(row.accountId);
+          return (
+            <div
+              key={row.accountId}
+              className="flex items-center gap-3 rounded-xl border border-border px-3.5 py-3"
             >
-              {row.valueLabel}
-            </ModeValue>
-            {subLabel && (
-              <span className="mt-1.5 block truncate text-xs text-muted-foreground">
-                {subLabel}
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: SPLIT_COLORS[i] }}
+                aria-hidden
+              />
+              <RowFlag row={row} className="h-7 w-7" />
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold text-foreground">
+                  {shortAccountLabel(row.label)}
+                </span>
+                <span className="block truncate text-xs tabular-nums text-muted-foreground">
+                  {detail}
+                </span>
               </span>
-            )}
-            {/* The decorative glyph the dashboard's Transactions card uses
-                for its 1-market hero. Settled-by-account returns no series
-                and no trend figure at all, so it takes the glyph's default
-                (rising) shape rather than a direction read from data. */}
-            <div className="mt-3">
-              <DecorativeTrendGlyph />
+              <span className="ml-auto shrink-0 text-right">
+                <ModeValue
+                  isAmountMode={isAmountMode}
+                  delay={i * 0.04}
+                  className="text-base font-semibold text-foreground"
+                >
+                  {row.valueLabel}
+                </ModeValue>
+                <span className="block text-xs tabular-nums text-muted-foreground">
+                  {formatSharePct(totalValue > 0 ? row.value / totalValue : 0)}
+                </span>
+              </span>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+
+      {shareA >= 0.95 && (
+        <p className="rounded-lg bg-primary/10 px-3.5 py-2.5 text-sm text-foreground">
+          Almost all of {isAmountMode ? "your collections" : "your payments"} (
+          {formatSharePct(shareA)}) came in {shortAccountLabel(a.label)}.{" "}
+          {shortAccountLabel(b.label)} is a small second currency {PERIOD_PHRASE[timeRange]}.
+        </p>
+      )}
     </div>
   );
 }
 
-/** Three to six currencies: comparison is now the job, so ranked bars
- *  return. Bars are measured against the top currency (it fills the track)
- *  and keep a visible stub however small, since a dominant USD share (99%+
- *  is typical) would otherwise leave every other track looking empty — the
- *  share column carries the exact figure. Rows sit further apart when there
- *  are fewer of them. */
+/** Three to six currencies: comparison is now the job, so ranked bars, sorted
+ *  by size, measured against the top currency (it fills the track), each
+ *  with a visible stub however small. The native amount (amount mode) or the
+ *  currency name (count mode) sits beside the code so a row can be tied back
+ *  to its invoices. */
 function RankedCurrencyBars({
   rows,
   totalValue,
@@ -368,46 +329,42 @@ function RankedCurrencyBars({
 }) {
   const topValue = rows[0]?.value ?? 0;
   return (
-    <div className={cn("flex flex-col py-1", rows.length <= 4 ? "gap-4" : "gap-2.5")}>
+    <div className="flex flex-col gap-3">
       {rows.map((row, index) => {
         const widthPct = Math.max(topValue > 0 ? (row.value / topValue) * 100 : 0, 1.5);
-        const subLabel = currencySubLabel(row, isAmountMode);
+        const detail = isAmountMode
+          ? (formatNativeAmount(row.accountId, row.currencyAmount) ?? currencyName(row.accountId))
+          : currencyName(row.accountId);
         return (
-          <div key={row.accountId} className="flex items-center gap-3.5">
-            <span className="flex w-28 min-w-0 shrink-0 items-center gap-2">
-              <CountryFlagAvatar
-                iso2={row.iso2}
-                countryName={row.label}
-                className="h-6 w-6 shrink-0"
-              />
-              <span className="truncate text-sm text-foreground">
+          <div
+            key={row.accountId}
+            className="grid grid-cols-[7.5rem_1fr_6rem] items-center gap-3.5 sm:grid-cols-[11rem_1fr_4rem_6.5rem]"
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <RowFlag row={row} className="h-6 w-6" />
+              <span className="text-sm font-semibold text-foreground">
                 {shortAccountLabel(row.label)}
               </span>
+              <span className="hidden truncate text-xs tabular-nums text-muted-foreground sm:block">
+                {detail}
+              </span>
             </span>
-            <span className="h-2.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <span className="h-2.5 overflow-hidden rounded-full bg-muted">
               <span
-                className="block h-full rounded-full transition-[width] duration-300 ease-out"
-                style={{
-                  width: `${widthPct}%`,
-                  backgroundColor: BAR_COLORS[index % BAR_COLORS.length],
-                }}
+                className="block h-full rounded-full bg-primary transition-[width] duration-300 ease-out"
+                style={{ width: `${widthPct}%` }}
               />
             </span>
-            <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+            <span className="hidden text-right text-xs tabular-nums text-muted-foreground sm:block">
               {formatSharePct(totalValue > 0 ? row.value / totalValue : 0)}
             </span>
-            <span className="w-24 shrink-0 overflow-hidden text-right">
-              <ModeValue
-                isAmountMode={isAmountMode}
-                delay={Math.min(index, 8) * 0.04}
-                className="text-sm font-semibold text-foreground"
-              >
-                {row.valueLabel}
-              </ModeValue>
-              {subLabel && (
-                <span className="block truncate text-[11px] text-muted-foreground">{subLabel}</span>
-              )}
-            </span>
+            <ModeValue
+              isAmountMode={isAmountMode}
+              delay={Math.min(index, 8) * 0.04}
+              className="text-right text-sm font-semibold text-foreground"
+            >
+              {row.valueLabel}
+            </ModeValue>
           </div>
         );
       })}
@@ -415,6 +372,116 @@ function RankedCurrencyBars({
   );
 }
 
+/** Rows shown before "Show all" in the 7+ tier; the rest fold into one. */
+const COLLAPSED_ROWS = 5;
+
+/** Seven or more currencies: bars stop earning their space, so a two-column
+ *  list. By default the top five show and the rest collapse into one "N other
+ *  currencies" row, with a button to expand. */
+function CurrencyList({
+  rows,
+  totalValue,
+  isAmountMode,
+}: {
+  rows: AccountBarRowData[];
+  totalValue: number;
+  isAmountMode: boolean;
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const shown = showAll ? rows : rows.slice(0, COLLAPSED_ROWS);
+  const tail = rows.slice(COLLAPSED_ROWS);
+  const tailValue = tail.reduce((sum, r) => sum + r.value, 0);
+  const tailLabel = isAmountMode ? formatBarAmount(tailValue) : tailValue.toLocaleString("en-IN");
+
+  return (
+    <div>
+      <ul className="grid grid-cols-1 gap-x-9 sm:grid-cols-2">
+        {shown.map((row, index) => {
+          const native = isAmountMode
+            ? formatNativeAmount(row.accountId, row.currencyAmount)
+            : null;
+          return (
+            <li
+              key={row.accountId}
+              className="flex items-center gap-3 border-b border-border/60 py-2.5"
+            >
+              <RowFlag row={row} className="h-7 w-7" />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold text-foreground">
+                  {shortAccountLabel(row.label)}
+                </span>
+                <span className="block text-xs tabular-nums text-muted-foreground">
+                  {formatSharePct(totalValue > 0 ? row.value / totalValue : 0)} of total
+                </span>
+              </span>
+              <span className="shrink-0 text-right">
+                <ModeValue
+                  isAmountMode={isAmountMode}
+                  delay={Math.min(index, 8) * 0.04}
+                  className="text-sm font-semibold text-foreground"
+                >
+                  {row.valueLabel}
+                </ModeValue>
+                {native && (
+                  <span className="block text-xs tabular-nums text-muted-foreground">{native}</span>
+                )}
+              </span>
+            </li>
+          );
+        })}
+        {!showAll && tail.length > 0 && (
+          <li className="flex items-center gap-3 border-b border-border/60 py-2.5">
+            <span
+              className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground"
+              aria-hidden
+            >
+              <Icon name="globe" className="h-3.5 w-3.5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-muted-foreground">
+                {tail.length} other currencies
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {tail.map((r) => shortAccountLabel(r.label)).join(", ")}
+              </span>
+            </span>
+            <span className="shrink-0 text-sm font-semibold tabular-nums text-foreground">
+              {tailLabel}
+            </span>
+          </li>
+        )}
+      </ul>
+      {tail.length > 0 && (
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="mt-2 h-auto min-h-0 p-0"
+          aria-expanded={showAll}
+          onClick={() => setShowAll((v) => !v)}
+        >
+          {showAll ? "Show fewer" : `Show all ${rows.length} currencies`}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * "Total amount collected" analytics card on the Transactions page (the file
+ * name is a leftover). Header: the period total beside the amount/count
+ * toggle, with a context line beneath. Body, by currency count:
+ *   - 1: no breakdown (it would repeat the total); the native amount and
+ *     average rate move into the context line, and a decorative trend glyph
+ *     fills the space a chart would (settled-by-account has no daily series).
+ *   - 2: split bar + two compact rows, and a note when one is 95%+.
+ *   - 3-6: ranked bars with share and value.
+ *   - 7+: two-column list, top five plus one collapsed row, expandable.
+ *
+ * BACKEND GAP: the reference design also shows a trend against the previous
+ * period beside the total and a daily chart for one currency. The endpoint
+ * returns neither, so neither is shown.
+ */
 export function SettlementAnalyticsCard({
   className,
   timeRange,
@@ -423,14 +490,15 @@ export function SettlementAnalyticsCard({
   /** Chosen by TransactionsAnalyticsCarousel's section-level control. */
   timeRange: TimeRange;
 }) {
-  const [mode, setMode] = useState<AnalyticsMode>("amount");
-  const isAmountMode = mode === "amount";
-  // nextSettlement date still comes from the overview; the KPI + bars are the
-  // settled-by-account endpoint, per the selected timeframe.
+  // nextSettlement date still comes from the overview; the KPI + breakdown are
+  // the settled-by-account endpoint, per the selected timeframe.
   const { overview } = useMcaOverview();
   const { settled, isLoading } = useSettledByAccount(TIMEFRAME_BY_RANGE[timeRange]);
 
-  const accountRows = foldRestOfWorld(settled?.accounts ?? [])
+  const [mode, setMode] = useState<AnalyticsMode>("amount");
+  const isAmountMode = mode === "amount";
+
+  const accountRows: AccountBarRowData[] = foldRestOfWorld(settled?.accounts ?? [])
     .map((account) => {
       const meta = accountMeta(account.currency);
       return {
@@ -447,43 +515,31 @@ export function SettlementAnalyticsCard({
     })
     .sort((a, b) => b.value - a.value);
 
-  // Denominator for every chip's share: the sum of the SAME rows the grid
-  // renders, not `settledValue`/`settledCount` below. Those come straight off
-  // the overview endpoint and can differ from the per-account total by
-  // whatever rounding or reporting-currency conversion sits between the two.
-  // Summing the rows actually being drawn is what keeps each row's "% of
-  // total" consistent with the others.
+  // Denominator for every share: the sum of the SAME rows rendered, not the
+  // endpoint's totals, so the shares stay consistent with each other.
   const totalValue = accountRows.reduce((sum, row) => sum + row.value, 0);
 
   const settledValue = settled?.totalAmount ?? 0;
   const settledCount = settled?.totalCount ?? 0;
 
-  // Last settled used to sit beside this as its own row; removed at the
-  // design's request rather than replaced, so this is the only date shown
-  // now. Omitted, not shown as a placeholder, when the backend has no date.
+  // Omitted, not shown as a placeholder, when the backend has no date.
   const nextSettlementLabel = overview?.nextSettlementDate
     ? `Next settlement${overview?.isTodayHoliday ? " (bank holiday)" : ""}: ${formatNextSettlementDate(overview.nextSettlementDate)}`
     : null;
 
+  const only = accountRows.length === 1 ? accountRows[0]! : null;
+  const onlyRate = only ? averageRate(only) : null;
+  const onlyNative = only ? formatNativeAmount(only.accountId, only.currencyAmount) : null;
+
   return (
     <Card size="sm" className={cn("w-full", className)}>
-      {/* KPI (+ next settlement) on the left, Amount collected/No. of
-          transactions on the right: stacked below sm (CardHeader's own
-          default is two auto rows, so with no column override the toggle
-          just falls onto its own row under the KPI, full width via the Tabs
-          classes below), side by side from sm up. This is the slot the
-          time-range control used to occupy before it moved out to the whole
-          Analytics section (see TransactionsAnalyticsCarousel). */}
+      {/* KPI on the left, Amount collected/No. of transactions on the right:
+          stacked below sm, side by side from sm up. */}
       <CardHeader className="gap-3 sm:grid-cols-[1fr_auto] sm:gap-0">
         <div>
-          {/* Label belongs to the KPI beneath it, not the other way round:
-              it introduces the number rather than captioning it after the
-              fact, the same order OutstandingAmountCard and SavedAmountCard
-              both use for their own KPI blocks. Light/regular weight, not
-              bold — matches SavedAmountCard's own label style, which every
-              KPI card header on this page was brought in line with. */}
           <p className="text-sm font-normal text-muted-foreground">
-            {isAmountMode ? "Total amount collected" : "Total transactions"}
+            {isAmountMode ? "Total amount collected" : "Total transactions"},{" "}
+            {PERIOD_PHRASE[timeRange]}
           </p>
           <div className="mt-1 flex flex-wrap items-baseline gap-2">
             {isLoading ? (
@@ -518,22 +574,41 @@ export function SettlementAnalyticsCard({
                     </motion.p>
                   )}
                 </AnimatePresence>
-                {/* Visually subordinate to the KPI (muted, smaller, on the
-                    same baseline rather than its own row) and wraps beneath
-                    it naturally on narrow widths via the flex-wrap above. */}
                 {nextSettlementLabel && (
                   <span className="text-sm text-muted-foreground">{nextSettlementLabel}</span>
                 )}
               </>
             )}
           </div>
+
+          {/* Context line: for one currency, what the total was in that
+              currency and the average rate it was converted at; for several,
+              how they were combined. */}
+          {!isLoading && accountRows.length > 0 && (
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              {only ? (
+                <>
+                  <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-muted px-2.5 text-xs font-medium text-foreground">
+                    <RowFlag row={only} className="h-4 w-4" />
+                    All in {shortAccountLabel(only.label)}
+                  </span>
+                  <span className="tabular-nums">
+                    {isAmountMode
+                      ? onlyNative &&
+                        `${onlyNative}${onlyRate ? ` converted at an average ₹${onlyRate.toFixed(2)}` : ""}`
+                      : `Every payment ${PERIOD_PHRASE[timeRange]} was in ${shortAccountLabel(only.label)}`}
+                  </span>
+                </>
+              ) : (
+                <span>
+                  Across {accountRows.length} currencies, converted to INR at each settlement&apos;s
+                  rate
+                </span>
+              )}
+            </p>
+          )}
         </div>
 
-        {/* w-full/flex-1: fills whatever width this column ends up with
-            (the whole card below sm where the header stacks, just this
-            column's auto width from sm up) rather than hugging its own
-            trigger text, unlike the time-range control that used to sit
-            here. */}
         <div className="sm:justify-self-end">
           <Tabs value={mode} onValueChange={(v) => setMode(v as AnalyticsMode)}>
             <TabsList className="w-full">
@@ -550,32 +625,10 @@ export function SettlementAnalyticsCard({
 
       {/* flex-1: when className carries h-full (see TransactionsAnalyticsCarousel,
           which stretches this card to match the grid row's height at lg and
-          up), CardHeader keeps its own intrinsic height and this region
-          absorbs whatever's left. */}
+          up), this region absorbs whatever's left. Floored at min-h-32 so the
+          empty state doesn't grow or shrink the whole row against Documents
+          Pending beside it. */}
       <CardContent className="flex flex-1 flex-col gap-3">
-        {/* Currency breakdown, laid out by currency count (see the tiers
-            below).
-
-            Still no forced height matching against Total settled (see the
-            history above — that cross-card coupling is what caused the
-            "resizes dramatically on timeframe change" bug in the first
-            place).
-
-            This section IS floored at a shared min-height (below), though —
-            unlike that removed Total-settled coupling, this floor doesn't
-            reach into another card. It exists because this card sits beside
-            Documents Pending in the same grid row (see
-            TransactionsAnalyticsCarousel's `lg:h-full` on both), which
-            stretches both to match whichever is taller. Left unfloored, the
-            empty-state illustration (~250px: icon + title + description)
-            ran noticeably taller than a loaded 1-4 currency breakdown
-            (~100-150px), so switching to a period with no settlements — or
-            back — visibly grew or shrank the whole row, not just this
-            card's own content. The floor is sized to the common loaded
-            case (a handful of currencies) so the illustration shrinks to
-            match it instead of the other way around; it doesn't reserve
-            room for some worst-case list the way the old min-h-70 floor
-            this replaced once did for a hypothetical 5-currency case. */}
         <div className="min-h-32">
           {isLoading ? (
             <div className="space-y-4">
@@ -588,9 +641,6 @@ export function SettlementAnalyticsCard({
               </div>
             </div>
           ) : accountRows.length === 0 ? (
-            // The same empty chart as Total settled beneath it, so the two
-            // cards read alike when a period has nothing. This card is about
-            // money coming in, so the copy says so (not "settled").
             <div className="relative h-40">
               <EmptyAxesChart
                 labels={EMPTY_AXIS_LABELS[timeRange]}
@@ -602,55 +652,36 @@ export function SettlementAnalyticsCard({
                 description="As payments come in, this breaks the total down by the currency each one arrived in."
               />
             </div>
+          ) : only ? (
+            // One currency: a breakdown would repeat the total, so the space
+            // becomes the trend. Decorative only: there's no daily series.
+            <DecorativeTrendGlyph />
           ) : (
-            accountRows.length > 0 && (
-              <div className="space-y-3">
-                {/* Same uppercase/tracked micro-label PaymentDetailsSection and
-                  every other section heading in this feature already uses
-                  (see TransactionDetailsPage), rather than the plain small
-                  label this had before — one more thing that read as
-                  slightly off-house-style on review. */}
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Currency breakdown
-                </p>
-
-                {/* Four tiers by currency count, matching the Transactions
-                  card on the dashboard (McaInvoiceOriginsCard): one currency
-                  is a hero figure, two sit side by side, three to six are
-                  ranked bars, and past six bars stop earning their space so
-                  it drops to a plain two-column list. Every tier renders
-                  every currency, so the old five-row cap and its Show more
-                  are gone. */}
-                {accountRows.length === 1 ? (
-                  <SingleCurrency row={accountRows[0]!} isAmountMode={isAmountMode} />
-                ) : accountRows.length === 2 ? (
-                  <DuoCurrencies
-                    rows={accountRows}
-                    totalValue={totalValue}
-                    isAmountMode={isAmountMode}
-                  />
-                ) : accountRows.length <= 6 ? (
-                  <RankedCurrencyBars
-                    rows={accountRows}
-                    totalValue={totalValue}
-                    isAmountMode={isAmountMode}
-                  />
-                ) : (
-                  <ul className="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-                    {accountRows.map((row, index) => (
-                      <CurrencyChip
-                        key={row.accountId}
-                        row={row}
-                        isAmountMode={isAmountMode}
-                        index={index}
-                        sharePct={totalValue > 0 ? row.value / totalValue : 0}
-                        className="border-b border-border/60 py-2"
-                      />
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )
+            <div className="space-y-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                By currency
+              </p>
+              {accountRows.length === 2 ? (
+                <TwoCurrencies
+                  rows={accountRows}
+                  totalValue={totalValue}
+                  isAmountMode={isAmountMode}
+                  timeRange={timeRange}
+                />
+              ) : accountRows.length <= 6 ? (
+                <RankedCurrencyBars
+                  rows={accountRows}
+                  totalValue={totalValue}
+                  isAmountMode={isAmountMode}
+                />
+              ) : (
+                <CurrencyList
+                  rows={accountRows}
+                  totalValue={totalValue}
+                  isAmountMode={isAmountMode}
+                />
+              )}
+            </div>
           )}
         </div>
       </CardContent>

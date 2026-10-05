@@ -23,6 +23,18 @@ const TIMEFRAMES: { value: InvoiceOriginTimeframe; label: string }[] = [
   { value: "3M", label: "3M" },
 ];
 
+/** How the selected window reads inside a sentence ("...a small second
+ *  market in the last month"). */
+const PERIOD_PHRASE: Record<InvoiceOriginTimeframe, string> = {
+  "1W": "in the last week",
+  "1M": "in the last month",
+  "3M": "in the last 3 months",
+};
+
+/** The two-market tier's series colours: split bar segments, row dots and
+ *  the globe highlights. */
+const SPLIT_COLORS = ["var(--chart-1)", "var(--chart-2)"];
+
 const TIMEFRAME_DAYS: Record<InvoiceOriginTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
 
 /**
@@ -256,7 +268,8 @@ export function McaInvoiceOriginsCard() {
 
   const globeHighlights = rows.map((origin, i) => ({
     countryCode: origin.countryCode,
-    color: BAR_COLORS[i % BAR_COLORS.length]!,
+    // Two markets: the globe matches the split bar's two colours.
+    color: rows.length === 2 ? SPLIT_COLORS[i]! : BAR_COLORS[i % BAR_COLORS.length]!,
     countryName: origin.countryName,
     flag: origin.flag,
     amountLabel: formatAmount(origin.amount, currency),
@@ -390,40 +403,79 @@ export function McaInvoiceOriginsCard() {
                 <DecorativeTrendGlyph positive={(totalInvoicedTrendPct ?? 0) >= 0} />
               </div>
             ) : rows.length === 2 ? (
-              <div className="flex h-full flex-col justify-center gap-4">
-                <div className="grid grid-cols-2 gap-6">
-                  {rows.map((origin) => {
-                    const pct = rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0;
-                    return (
-                      <div key={origin.countryCode} className="min-w-0">
-                        <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
+              // Same two-item layout as the Transactions page's Total amount
+              // collected card: a split bar (the smaller side keeps a minimum
+              // sliver), two compact rows, and a plain-language note when one
+              // market is 95% or more. No per-market trend glyphs: two
+              // near-identical curves where one is thousands of times the
+              // other said nothing.
+              (() => {
+                const [a, b] = rows as [OriginRow, OriginRow];
+                const shareA = rowsAmountSum > 0 ? a.amount / rowsAmountSum : 0;
+                const shareB = rowsAmountSum > 0 ? b.amount / rowsAmountSum : 0;
+                return (
+                  <div className="flex h-full flex-col justify-center gap-3">
+                    <div
+                      className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-muted"
+                      role="img"
+                      aria-label={`${a.countryName} ${formatSharePct(shareA)}, ${b.countryName} ${formatSharePct(shareB)}`}
+                    >
+                      <span
+                        className="block h-full"
+                        style={{ flex: `${shareA} 1 0`, background: SPLIT_COLORS[0] }}
+                      />
+                      <span
+                        className="block h-full min-w-1.5"
+                        style={{ flex: `${shareB} 0 0`, background: SPLIT_COLORS[1] }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
+                      {rows.map((origin, i) => (
+                        <div
+                          key={origin.countryCode}
+                          className="flex items-center gap-3 rounded-xl border border-border px-3.5 py-3"
+                        >
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ background: SPLIT_COLORS[i] }}
+                            aria-hidden
+                          />
                           <CountryFlagAvatar
                             iso2={origin.countryCode}
                             countryName={origin.countryName}
                             className="h-7 w-7 shrink-0"
                           />
-                          <span className="truncate">{origin.countryName}</span>
-                          <span className="ml-auto shrink-0 text-xs tabular-nums">
-                            {formatSharePct(pct)}
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-foreground">
+                              {origin.countryName}
+                            </span>
+                            <span className="block text-xs tabular-nums text-muted-foreground">
+                              {origin.invoiceCount.toLocaleString("en-IN")} transaction
+                              {origin.invoiceCount === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                          <span className="ml-auto shrink-0 text-right">
+                            <span className="block text-base font-semibold tabular-nums text-foreground">
+                              {formatCurrencyShort(origin.amount, currency)}
+                            </span>
+                            <span className="block text-xs tabular-nums text-muted-foreground">
+                              {formatSharePct(i === 0 ? shareA : shareB)}
+                            </span>
                           </span>
                         </div>
-                        <p className="mt-2 text-[1.75rem] font-bold leading-none tracking-tight text-foreground tabular-nums">
-                          {formatCurrencyShort(origin.amount, currency)}
-                        </p>
-                        {/* Same decorative glyph as the 1-market hero, and
-                            for the same reason: the endpoint has no daily
-                            series, per market or otherwise. Its direction
-                            follows the period's overall trend, the only
-                            trend figure the endpoint returns. */}
-                        <div className="mt-3">
-                          <DecorativeTrendGlyph positive={(totalInvoicedTrendPct ?? 0) >= 0} />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <MdrWaiverCallout />
-              </div>
+                      ))}
+                    </div>
+                    {shareA >= 0.95 && (
+                      <p className="rounded-lg bg-primary/10 px-3.5 py-2.5 text-sm text-foreground">
+                        Almost all of your volume ({formatSharePct(shareA)}) came from{" "}
+                        {a.countryName}. {b.countryName} is a small second market{" "}
+                        {PERIOD_PHRASE[timeframe]}.
+                      </p>
+                    )}
+                    <MdrWaiverCallout />
+                  </div>
+                );
+              })()
             ) : rows.length <= 6 ? (
               <div className={cn("flex flex-col", rows.length <= 4 ? "gap-5" : "gap-3")}>
                 {rows.map((origin, i) => {
