@@ -53,6 +53,12 @@ export interface TxnFilterValues {
    * `newFilters.status` into `fieldSearch.status` separately from it.
    */
   status?: string[];
+  /**
+   * PA order status (AUTHORIZED / REVERSED / CAPTURED). UNCONFIRMED: sent
+   * under `fieldSearch.orderStatus`, a name not yet checked against
+   * pg-dashboard's tableRequestbodyBuilder.
+   */
+  orderStatus?: string[];
   startTime?: number;
   endTime?: number;
 }
