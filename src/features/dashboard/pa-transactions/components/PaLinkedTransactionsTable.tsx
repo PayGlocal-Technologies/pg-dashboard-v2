@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils";
 import { usePostQuery } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
+import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { paTxnSearchApi } from "@/features/dashboard/pa-transactions/services";
@@ -123,18 +124,19 @@ function PaTxnCard({ row, onOpen }: { row: PaTransaction; onOpen: (row: PaTransa
 }
 
 /**
- * A payment button's transactions, on the MCA Transactions table's layout:
+ * The PA transactions behind one record (a payment button, a mandate), on the
+ * MCA Transactions table's layout:
  * tabs across the top, a search box with filter chips, Refresh / Columns /
  * Report on the right, and a card list below `lg`.
  *
  * The data is PA, since payment buttons are a PA product. It is the PA search
  * scoped the way pg-dashboard scopes its embedded CardsTable: the button's MID
- * as the merchant filter, and the button id as the full-text query. The chips
+ * as the merchant filter, and the record's id as the full-text query. The chips
  * are the filters that search supports (pg-dashboard's CARDS_TABLE_FILTERS):
  * Date, Status, Payment method, Country. There is no Currency chip, because
  * PA search has no currency filter.
  *
- * Because the button id already occupies the full-text query, the search box
+ * Because the record's id already occupies the full-text query, the search box
  * narrows the loaded page client-side instead: a second query would replace
  * the first rather than narrow it.
  *
@@ -142,14 +144,19 @@ function PaTxnCard({ row, onOpen }: { row: PaTransaction; onOpen: (row: PaTransa
  * request-then-poll flow (`/reports/txn/download` + `/reports/txn/status`),
  * which this app has not ported yet.
  */
-export function PaymentButtonTransactionsTable({
+export function PaLinkedTransactionsTable({
   mid,
-  buttonId,
+  searchQuery,
+  emptyDescription = "Each payment linked here lands in this list with its status and method.",
 }: {
   mid: string;
-  buttonId: string;
+  /** What links the transactions to the record: its id, as the full-text query. */
+  searchQuery: string;
+  /** The first-time empty state's line, in the record's own words. */
+  emptyDescription?: string;
 }) {
   const router = useRouter();
+  const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
   const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
   // Partners address the search by MID in the path; everyone else sends "".
   const { urlMid } = useResolvedMids("PA");
@@ -179,7 +186,7 @@ export function PaymentButtonTransactionsTable({
       endTime: relativeWindow?.endTime ?? (dateRange.to ? toEndOfDayMs(dateRange.to) : undefined),
     },
     {
-      searchQuery: buttonId,
+      searchQuery,
       selectedMid: { key: "merchantId", value: [mid] },
       pageLimit: TRANSACTIONS_PAGE_LIMIT,
       from: (page - 1) * TRANSACTIONS_PAGE_LIMIT,
@@ -190,7 +197,7 @@ export function PaymentButtonTransactionsTable({
     PaTransactionsResponse,
     TableReqBody
   >(
-    ["payment-button-transactions", mid, buttonId],
+    ["pa-linked-transactions", mid, searchQuery],
     paTxnSearchApi(urlMid),
     body,
     { staleTime: 0 },
@@ -236,12 +243,16 @@ export function PaymentButtonTransactionsTable({
       }
     : {
         title: "No payments yet",
-        description:
-          "Each payment taken through this button lands here with its status and method.",
+        description: emptyDescription,
       };
 
+  // The details route reads the transaction from the store (it has no fetch of
+  // its own), so it must be put there before navigating, or the page opens on
+  // "Transaction not found".
   const openTransaction = (row: PaTransaction) => {
-    if (row.gid) router.push(`/pa-transactions/${encodeURIComponent(row.gid)}`);
+    if (!row.gid) return;
+    setStoredTransaction(row);
+    router.push(`/pa-transactions/${encodeURIComponent(row.gid)}`);
   };
 
   const handleRefresh = async () => {

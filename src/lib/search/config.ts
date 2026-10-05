@@ -14,8 +14,8 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
 /**
  * Routes that actually have a page under src/app/(dashboard).
  *
- * navigation.ts still lists ~13 hrefs whose pages were never built in v2
- * (/configure, /payment-products, /invoice-links, /manage-mandates,
+ * navigation.ts still lists ~12 hrefs whose pages were never built in v2
+ * (/configure, /payment-products, /invoice-links,
  * /invoice-download, /shipping-bill-regularisation, /key-management-system,
  * /scheduler, and the five partner routes). The
  * sidebar links to them anyway, but a *search result* that 404s reads as a
@@ -35,6 +35,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/echo",
   "/edpms",
   "/irm-repository",
+  "/manage-mandates",
   "/mca-dashboard",
   "/mca-invoices",
   "/mca-links",
@@ -102,6 +103,14 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/settlement-report": ["settlement", "UTR", "payout", "reports"],
   "/mca-links": ["payment link", "share link"],
   "/sku-management": ["product", "HSN", "SAC", "catalogue"],
+  "/manage-mandates": [
+    "mandate",
+    "SI",
+    "standing instruction",
+    "recurring",
+    "autopay",
+    "subscription",
+  ],
   "/team-management": ["teams", "users", "roles", "invite", "permissions"],
   "/client-management": ["clients", "customers", "buyers", "payers"],
   // Reached from the Header's "Partners" tab, which is the word merchants
