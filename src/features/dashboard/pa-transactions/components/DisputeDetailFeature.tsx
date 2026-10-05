@@ -24,7 +24,12 @@ import {
 } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import { AmountBreakdownBody } from "@/features/dashboard/pa-transactions/components/AmountBreakdownBody";
 import { LinkedTransactionsSection } from "@/features/dashboard/pa-transactions/components/LinkedTransactionsSection";
-import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import {
+  CardNetworkLogo,
+  PaymentCategoryLogo,
+  TransactionPaymentMethod,
+} from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import { BankName } from "@/components/common/BankLogo";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { DisputeStatusCard } from "@/features/dashboard/pa-transactions/components/DisputeStatusCard";
 import { DisputeDetailsCard } from "@/features/dashboard/pa-transactions/components/DisputeDetailsCard";
@@ -294,9 +299,27 @@ export function DisputeDetailFeature({
                   </span>
                 }
               />
-              <DetailRow label="Payment Category" value={detail.paymentCategory} />
-              {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
-              <DetailRow label="Issuer" value={detail.issuerBank} />
+              <DetailRow
+                label="Payment Category"
+                value={
+                  <span className="inline-flex items-center gap-2">
+                    <PaymentCategoryLogo row={transaction} />
+                    {detail.paymentCategory}
+                  </span>
+                }
+              />
+              {detail.cardType && (
+                <DetailRow
+                  label="Card Type"
+                  value={
+                    <span className="inline-flex items-center gap-2">
+                      <CardNetworkLogo brand={detail.cardType} />
+                      {detail.cardType}
+                    </span>
+                  }
+                />
+              )}
+              <DetailRow label="Issuer" value={<BankName name={detail.issuerBank} />} />
             </DetailSection>
 
             <DetailSection title="Customer Details">

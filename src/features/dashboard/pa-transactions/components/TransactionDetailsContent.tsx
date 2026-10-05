@@ -23,7 +23,12 @@ import {
   type RefundSubmission,
 } from "@/features/dashboard/pa-transactions/components/IssueRefundDialog";
 import { LinkedTransactionsSection } from "@/features/dashboard/pa-transactions/components/LinkedTransactionsSection";
-import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import {
+  CardNetworkLogo,
+  PaymentCategoryLogo,
+  TransactionPaymentMethod,
+} from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import { BankName } from "@/components/common/BankLogo";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { PaymentTimeline } from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
 import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/components/timelineStepFormatting";
@@ -262,9 +267,27 @@ export function TransactionDetailsContent({
               />
             </div>
           </div>
-          <DetailRow label="Payment Category" value={detail.paymentCategory} />
-          {detail.cardType && <DetailRow label="Card Type" value={detail.cardType} />}
-          <DetailRow label="Issuer" value={detail.issuerBank} />
+          <DetailRow
+            label="Payment Category"
+            value={
+              <span className="inline-flex items-center gap-2">
+                <PaymentCategoryLogo row={transaction} />
+                {detail.paymentCategory}
+              </span>
+            }
+          />
+          {detail.cardType && (
+            <DetailRow
+              label="Card Type"
+              value={
+                <span className="inline-flex items-center gap-2">
+                  <CardNetworkLogo brand={detail.cardType} />
+                  {detail.cardType}
+                </span>
+              }
+            />
+          )}
+          <DetailRow label="Issuer" value={<BankName name={detail.issuerBank} />} />
         </div>
       </Card>
     </section>
