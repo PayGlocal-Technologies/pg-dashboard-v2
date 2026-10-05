@@ -223,8 +223,8 @@ export {
   type SegmentedTabOption,
 } from "@payglocal_ui/flux-ui";
 
-// flux dropped `SingleSelect` in 0.3.x (only SingleSelectFilterChip remains),
-// but six screens still use it, so it lives here now. Same name and same props,
-// so no call site changed.
-export { SingleSelect } from "@/components/ui/single-select";
-export type { SingleSelectOption, SingleSelectProps } from "@/components/ui/single-select";
+export {
+  SingleSelect,
+  type SingleSelectOption,
+  type SingleSelectProps,
+} from "@payglocal_ui/flux-ui";
