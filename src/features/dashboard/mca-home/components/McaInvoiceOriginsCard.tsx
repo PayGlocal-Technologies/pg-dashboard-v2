@@ -396,20 +396,28 @@ export function McaInvoiceOriginsCard() {
                     const pct = rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0;
                     return (
                       <div key={origin.countryCode} className="min-w-0">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-2.5 text-sm text-muted-foreground">
                           <CountryFlagAvatar
                             iso2={origin.countryCode}
                             countryName={origin.countryName}
-                            className="h-6 w-6 shrink-0"
+                            className="h-7 w-7 shrink-0"
                           />
                           <span className="truncate">{origin.countryName}</span>
-                          <span className="ml-auto shrink-0 tabular-nums">
+                          <span className="ml-auto shrink-0 text-xs tabular-nums">
                             {formatSharePct(pct)}
                           </span>
                         </div>
-                        <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground tabular-nums">
+                        <p className="mt-2 text-[1.75rem] font-bold leading-none tracking-tight text-foreground tabular-nums">
                           {formatCurrencyShort(origin.amount, currency)}
                         </p>
+                        {/* Same decorative glyph as the 1-market hero, and
+                            for the same reason: the endpoint has no daily
+                            series, per market or otherwise. Its direction
+                            follows the period's overall trend, the only
+                            trend figure the endpoint returns. */}
+                        <div className="mt-3">
+                          <DecorativeTrendGlyph positive={(totalInvoicedTrendPct ?? 0) >= 0} />
+                        </div>
                       </div>
                     );
                   })}
@@ -420,14 +428,20 @@ export function McaInvoiceOriginsCard() {
               <div className={cn("flex flex-col", rows.length <= 4 ? "gap-5" : "gap-3")}>
                 {rows.map((origin, i) => {
                   const pct = rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0;
-                  // Every bar gets a visible stub, however small its share —
-                  // a market that's genuinely 0.01% of volume still ran real
-                  // transactions, and an empty-looking track reads as "no
-                  // data" rather than "very little".
-                  const widthPct = Math.max(pct * 100, 1.5);
+                  // Bars are ranked against the top market (it fills the
+                  // track), not against the total, and every bar gets a
+                  // visible stub however small: a market that's genuinely
+                  // 0.01% of volume still ran real transactions, and an
+                  // empty-looking track reads as "no data" rather than
+                  // "very little". The share column carries the exact figure.
+                  const topAmount = rows[0]!.amount;
+                  const widthPct = Math.max(
+                    topAmount > 0 ? (origin.amount / topAmount) * 100 : 0,
+                    1.5
+                  );
                   return (
-                    <div key={origin.countryCode} className="flex items-center gap-3">
-                      <span className="flex w-32 min-w-0 shrink-0 items-center gap-2">
+                    <div key={origin.countryCode} className="flex items-center gap-3.5">
+                      <span className="flex w-38 min-w-0 shrink-0 items-center gap-2">
                         <CountryFlagAvatar
                           iso2={origin.countryCode}
                           countryName={origin.countryName}
@@ -449,7 +463,7 @@ export function McaInvoiceOriginsCard() {
                       <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                         {formatSharePct(pct)}
                       </span>
-                      <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                      <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
                         {formatCurrencyShort(origin.amount, currency)}
                       </span>
                     </div>
@@ -457,18 +471,16 @@ export function McaInvoiceOriginsCard() {
                 })}
               </div>
             ) : (
-              <ul className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                {rows.map((origin, i) => (
-                  <li key={origin.countryCode} className="flex items-center gap-3 py-1">
-                    <span
-                      className="h-8 w-1 shrink-0 rounded-sm"
-                      style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
-                      aria-hidden="true"
-                    />
+              <ul className="grid grid-cols-1 gap-x-8 @2xl:grid-cols-2">
+                {rows.map((origin) => (
+                  <li
+                    key={origin.countryCode}
+                    className="flex items-center gap-3 border-b border-border/60 py-2"
+                  >
                     <CountryFlagAvatar
                       iso2={origin.countryCode}
                       countryName={origin.countryName}
-                      className="h-8 w-8 shrink-0"
+                      className="h-7 w-7 shrink-0"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-foreground">
