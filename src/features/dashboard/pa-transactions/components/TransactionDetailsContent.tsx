@@ -29,6 +29,7 @@ import {
   TransactionPaymentMethod,
 } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
+import { BankName } from "@/components/common/BankLogo";
 import { PaymentTimeline } from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
 import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/components/timelineStepFormatting";
 import { validateRefund } from "@/features/dashboard/pa-transactions/financial/deriveFinancials";
@@ -278,7 +279,7 @@ export function TransactionDetailsContent({
               }
             />
           )}
-          <DetailRow label="Issuer" value={detail.issuerBank} />
+          <DetailRow label="Issuer" value={<BankName name={detail.issuerBank} />} />
         </div>
       </Card>
     </section>
