@@ -74,10 +74,10 @@ function describeTimelineStep(
       );
     case "Evidence submitted":
       return when;
-    case "Dispute cleared":
-    case "Dispute charged back":
+    case "Dispute won":
+    case "Dispute lost":
+    case "Dispute withdrawn":
     case "Dispute accepted":
-    case "Dispute expired":
       return amountLabel ? `${amountLabel} · ${when}` : when;
     case "Action required":
       return step.respondBy

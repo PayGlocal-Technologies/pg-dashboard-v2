@@ -73,3 +73,56 @@ export function CopyableDetailRow({
     </div>
   );
 }
+
+/**
+ * A details-page section: the uppercase label outside, one flat card inside.
+ * The MCA page's "title outside + card inside" module, so every section on
+ * both products has the same spacing, surface and padding.
+ */
+export function DetailSection({
+  title,
+  children,
+  className,
+  cardClassName,
+}: {
+  title: string;
+  children: ReactNode;
+  className?: string;
+  cardClassName?: string;
+}) {
+  return (
+    <section className={className}>
+      <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
+      <Card size="sm" className={cn("shadow-none", cardClassName)}>
+        <CardContent className="space-y-4">{children}</CardContent>
+      </Card>
+    </section>
+  );
+}
+
+/**
+ * Surface for a card that asks the merchant to do something (Accept / Contest
+ * a dispute, upload more evidence): the same faint white-to-blue wash as the
+ * MCA "Upload invoice" action card, so actionable cards are recognisable on
+ * every details page. Informational cards stay plain.
+ */
+export const ACTION_CARD_CLASS =
+  "shadow-none border-blue-100 bg-linear-to-br from-white via-white to-blue-100/70 dark:border-blue-900/40 dark:from-card dark:via-card dark:to-blue-950/40";
+
+/** The details page's Back link, styled as on the MCA page. */
+export function DetailBackLink({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
+      onClick={onClick}
+      className="w-fit pl-0 text-primary hover:text-primary-hover"
+    >
+      {label}
+    </Button>
+  );
+}

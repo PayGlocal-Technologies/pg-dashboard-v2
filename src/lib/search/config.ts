@@ -26,9 +26,9 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/client-management",
   "/dashboard",
   // /dispute-management is deliberately absent, though the page exists and the
-  // nav links to it from both the Payments and global-tenant trees. It still
-  // renders MOCK_DISPUTE_ROWS, so a search result would promise a feature the
-  // data does not yet back. Re-add it here (and its keywords below) once the
+  // nav links to it from both the Payments and global-tenant trees. It has no
+  // data source yet (the chargeback API is not wired), so a search result
+  // would promise a feature the data does not yet back. Re-add it here (and its keywords below) once the
   // list is server-backed.
   "/ebrc",
   "/ebrc-generation",
