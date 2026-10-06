@@ -252,6 +252,10 @@ interface SettlementCalendarButtonProps {
   nextSettlementReason: string | null;
   nextSettlementSkippedDays: number;
   hasUpcomingHoliday: boolean;
+  /** Controlled open state, so something outside the button (the page's
+   *  bank-holiday banner) can open the popover. Uncontrolled when omitted. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function SettlementCalendarButton({
@@ -261,9 +265,16 @@ export function SettlementCalendarButton({
   nextSettlementReason,
   nextSettlementSkippedDays,
   hasUpcomingHoliday,
+  open: openProp,
+  onOpenChange,
 }: SettlementCalendarButtonProps) {
   const { year: todayYear, month: todayMonth } = todayParts(todayKey);
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = openProp ?? uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (openProp === undefined) setUncontrolledOpen(next);
+    onOpenChange?.(next);
+  };
   const [viewYear, setViewYear] = useState(todayYear);
   const [viewMonth, setViewMonth] = useState(todayMonth);
   const [selectedDateKey, setSelectedDateKey] = useState(todayKey);
@@ -296,12 +307,14 @@ export function SettlementCalendarButton({
     if (!open) return;
     function handleMouseDown(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
+        // Inline rather than setOpen, which is rebuilt every render.
+        if (openProp === undefined) setUncontrolledOpen(false);
+        onOpenChange?.(false);
       }
     }
     document.addEventListener("mousedown", handleMouseDown);
     return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, [open]);
+  }, [open, openProp, onOpenChange]);
 
   const cells = buildMonthGrid(viewYear, viewMonth);
   const detail = getDayDetail(selectedDateKey, settledRowByDate, holidayMap, nextSettlementDate);
@@ -332,7 +345,7 @@ export function SettlementCalendarButton({
         type="button"
         variant="outline"
         size="sm"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(!open)}
         leftIcon={<Icon name="calendar-days" className="h-3.5 w-3.5" />}
         /* The badge rides in the rightIcon slot, inside the button's own flex
          * row, rather than as an absolutely positioned corner dot. It used to

@@ -16,8 +16,11 @@ import { formatDayMonth, formatWeekdayDate } from "@/lib/utils/format";
  * nothing while the calendar loads, so it never flashes in and out.
  *
  * The × hides it until the page is next loaded.
+ *
+ * "View calendar" goes to the MCA settlement report by default; a page that
+ * already shows the calendar passes `onViewCalendar` to open it in place.
  */
-export function SettlementHolidayBanner() {
+export function SettlementHolidayBanner({ onViewCalendar }: { onViewCalendar?: () => void } = {}) {
   const router = useRouter();
   const { upcomingSchedule: upcoming, isLoading } = useSettlementCalendar();
   const [dismissed, setDismissed] = useState(false);
@@ -55,7 +58,7 @@ export function SettlementHolidayBanner() {
         type="button"
         variant="link"
         size="sm"
-        onClick={() => router.push("/mca-settlement-report")}
+        onClick={() => (onViewCalendar ? onViewCalendar() : router.push("/mca-settlement-report"))}
         className="hidden h-auto min-h-0 shrink-0 p-0 text-xs font-semibold text-amber-900 underline-offset-2 hover:underline sm:inline-flex dark:text-amber-200"
       >
         View calendar
