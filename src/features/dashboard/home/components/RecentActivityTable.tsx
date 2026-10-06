@@ -259,7 +259,7 @@ export function RecentActivityTable({
         size="sm"
         className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
         onClick={() =>
-          router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-report")
+          router.push(tab === "transactions" ? "/mca-transactions" : "/settlements")
         }
       >
         View all

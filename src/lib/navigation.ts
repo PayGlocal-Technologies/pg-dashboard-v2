@@ -38,7 +38,7 @@ export const homeNavigation: NavGroup[] = [
     label: "Overview",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: "layout-grid", permission: [] },
-      { label: "Reports", href: "/settlement-report", icon: "file-text", permission: [] },
+      { label: "Reports", href: "/settlements", icon: "file-text", permission: [] },
       {
         label: "Settings",
         href: "/settings",
@@ -133,7 +133,7 @@ export const regularNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/settlement-report",
+        href: "/settlements",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
       },
@@ -429,7 +429,7 @@ export const globalNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/settlement-report",
+        href: "/settlements",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
       },
