@@ -602,15 +602,133 @@ function buildRow(seed: SettlementSeed): SettlementRow {
   };
 }
 
-/** PA settlement rows, newest first. */
-export const settlementRows: SettlementRow[] = PA_SETTLEMENT_SEEDS.map(buildRow).sort((a, b) =>
-  b.id.localeCompare(a.id)
-);
+/** A stable, made-up settlement id for a date, e.g. "stl_a1b2c3d4". */
+function mockSettlementId(date: string): string {
+  let h = 0;
+  for (const ch of date) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `stl_${h.toString(36).padStart(8, "0").slice(-8)}`;
+}
+
+/**
+ * PA settlement rows, newest first.
+ *
+ * MOCK, off-contract: the Payments "Settlements" design also shows a
+ * settlement id, a Processing/Settled status and the payout UTR, none of which
+ * either settlement API returns. The newest settlement (the upcoming one, same
+ * amount as settlementSummary.upcomingSettlement) is still Processing and has
+ * no UTR yet; every earlier one is Settled with its UTR.
+ */
+export const settlementRows: SettlementRow[] = PA_SETTLEMENT_SEEDS.map(buildRow)
+  .sort((a, b) => b.id.localeCompare(a.id))
+  .map((row, i) => ({
+    ...row,
+    settlementId: mockSettlementId(row.id),
+    status: i === 0 ? ("PROCESSING" as const) : ("SETTLED" as const),
+    utrNumbers:
+      i === 0 ? [] : [`UTR${row.id.slice(2).replace(/-/g, "")}${String(i).padStart(4, "0")}`],
+  }));
 
 /** PACB settlement rows, newest first. */
 export const mcaSettlementRows: SettlementRow[] = MCA_SETTLEMENT_SEEDS.map(buildRow).sort((a, b) =>
   b.id.localeCompare(a.id)
 );
+
+/**
+ * MOCK: the Payments "Previous settled" card, read off the latest Settled row
+ * above so the card, its breakup and the table always agree. The breakup is
+ * that settlement's own (mockSettlementDetailResponse). None of this has an
+ * endpoint: the live overview gives amount, date and count only.
+ */
+export function mockPreviousSettlement() {
+  const row = settlementRows.find((r) => r.status === "SETTLED");
+  if (!row) return null;
+  const detail = mockSettlementDetailResponse(row.merchantId ?? "", row.id)?.data;
+  return {
+    amount: row.amount,
+    // The plain YYYY-MM-DD key (row.date is a full timestamp), the same
+    // shape the overview's previousSettlement.settlementDate carries.
+    settlementDate: row.id,
+    transactionCount: row.transactionCount,
+    utrNumber: row.utrNumbers?.[0],
+    grossAmount: detail?.grossAmount,
+    tax: detail?.gstDeduction,
+    fee: detail?.deductionAmount,
+    // The payments it settles, by the currency the customer paid in. The
+    // settlement itself always lands in INR.
+    currencySplit: [
+      { currency: "INR", pct: 58 },
+      { currency: "USD", pct: 28 },
+      { currency: "GBP", pct: 9 },
+      { currency: "EUR", pct: 5 },
+    ],
+  };
+}
+
+/** One payment inside a Payments settlement, as the details view lists it. */
+export interface MockPaSettlementPayment {
+  id: string;
+  /** ISO timestamp, when the payment was captured. */
+  createdAt: string;
+  method: "UPI" | "Card" | "Net Banking";
+  gross: number;
+  deductions: number;
+  net: number;
+}
+
+/** A Payments settlement in full, for the details drawer and page. */
+export interface MockPaSettlementView {
+  account: SettlementAccount;
+  grossAmount: number;
+  gst: number;
+  platformFee: number;
+  payments: MockPaSettlementPayment[];
+}
+
+const PA_PAYMENT_METHODS: MockPaSettlementPayment["method"][] = ["UPI", "Card", "Net Banking"];
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * MOCK: everything the Payments settlement details show beyond the row: the
+ * gross/GST/fee breakup (this settlement's own, from
+ * mockSettlementDetailResponse), the account it landed in, and one line per
+ * payment. The payments split the settlement evenly, the last one absorbing
+ * the rounding, so they always sum to the totals above them. Payment ids are
+ * made up and open nothing.
+ */
+export function mockPaSettlementView(row: SettlementRow): MockPaSettlementView | null {
+  const detail = mockSettlementDetailResponse(row.merchantId ?? "", row.id)?.data;
+  if (!detail) return null;
+  const count = Math.max(1, row.transactionCount);
+  const deductionsTotal = round2(detail.gstDeduction + detail.deductionAmount);
+  const per = (total: number) => round2(total / count);
+  const start = new Date(`${row.paymentReceivedAt.slice(0, 10)}T11:35:00+05:30`).getTime();
+  const tag = (row.settlementId ?? row.id).replace(/^stl_/, "");
+  const payments = Array.from({ length: count }, (_, i): MockPaSettlementPayment => {
+    const last = i === count - 1;
+    const gross = last
+      ? round2(detail.grossAmount - per(detail.grossAmount) * (count - 1))
+      : per(detail.grossAmount);
+    const deductions = last
+      ? round2(deductionsTotal - per(deductionsTotal) * (count - 1))
+      : per(deductionsTotal);
+    return {
+      id: `pay_${tag}_${String(i + 1).padStart(2, "0")}`,
+      createdAt: new Date(start + i * 7 * 60 * 1000).toISOString(),
+      method: PA_PAYMENT_METHODS[i % PA_PAYMENT_METHODS.length]!,
+      gross,
+      deductions,
+      net: round2(gross - deductions),
+    };
+  });
+  return {
+    account: detail.settlementAccount,
+    grossAmount: detail.grossAmount,
+    gst: detail.gstDeduction,
+    platformFee: detail.deductionAmount,
+    payments,
+  };
+}
 
 /** The mock list for a product — see SHOW_MOCK_SETTLEMENTS in index.tsx. */
 export function mockSettlementRowsFor(isMca: boolean): SettlementRow[] {
