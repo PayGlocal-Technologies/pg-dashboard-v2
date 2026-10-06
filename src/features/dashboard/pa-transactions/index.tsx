@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { PageHeader } from "@/components/ui";
 import { useApp } from "@/stores/useApp";
 import { MidGuard } from "@/components/common/MidGuard";
@@ -17,16 +18,20 @@ export function PaTransactionsFeature() {
   const isPAEnabled =
     pgProducts.includes(SEGMENT_PA) || PA_PRODUCT_FLAGS.some((flag) => pgProducts.includes(flag));
 
+  // While one transaction's full page is open, it replaces everything below
+  // the nav: the header scopes the list, not a single payment.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
       {/* No metrics section: there is no PA analytics endpoint yet, and the
           cards that were here drew static figures as if they were the
           merchant's. They come back with real data. */}
-      <PageHeader title="Transactions" />
+      {!detailsOpen && <PageHeader title="Transactions" />}
 
       {isPAEnabled ? (
         <MidGuard productType="PA">
-          <PaTransactionTable />
+          <PaTransactionTable onDetailsOpenChange={setDetailsOpen} />
         </MidGuard>
       ) : (
         <div className="bg-card rounded-xl border border-border p-10 text-center">

@@ -1,14 +1,13 @@
 "use client";
 
-import { formatTimestamp } from "@/lib/utils/format";
+import { formatDateTime, formatTimestamp, parseApiDateTime } from "@/lib/utils/format";
 import { type Column, StatusBadge } from "@/components/ui";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
-import { TransactionCustomerCell } from "@/features/dashboard/pa-transactions/components/TransactionCustomerCell";
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { TransactionAmount } from "@/features/dashboard/pa-transactions/components/TransactionAmount";
 import { TransactionId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { getRefundedAmount } from "@/features/dashboard/pa-transactions/financial/deriveFinancials";
-import { derivePaymentBucket } from "@/features/dashboard/pa-transactions/status/paymentBucket";
+import { derivePaymentOutcome } from "@/features/dashboard/pa-transactions/status/paymentBucket";
 import {
   deriveTransactionStatusChip,
   TRANSACTION_STATUS_META,
@@ -41,8 +40,15 @@ function lookupStatusMeta(raw: string | undefined, meta: Record<string, StatusMe
 export type TransactionStatusBucket = "success" | "refunded" | "failed" | "pending" | "disputed";
 
 const BUCKET_BY_STATUS_KEY: Record<TransactionStatusKey, TransactionStatusBucket> = {
-  IN_FLIGHT: "pending",
+  // The three "still going" chips group under the one "Pending" filter
+  // pill — each still gets its own distinct chip in the table itself (see
+  // TRANSACTION_STATUS_META), this is only the coarser segment used to
+  // filter by.
+  PROCESSING: "pending",
+  AUTHORISED: "pending",
+  SENT_FOR_CAPTURE: "pending",
   FAILED: "failed",
+  CANCELLED: "failed",
   EXPIRED: "failed",
   SUCCESS: "success",
   REFUND_IN_PROGRESS: "refunded",
@@ -66,7 +72,7 @@ export function getDisplayStatusBucket(transaction: PaTransaction): TransactionS
 
 function deriveStatusKey(transaction: PaTransaction): TransactionStatusKey {
   return deriveTransactionStatusChip({
-    paymentBucket: derivePaymentBucket(transaction.externalStatus),
+    paymentOutcome: derivePaymentOutcome(transaction.externalStatus),
     originalAmount: parseFloat(transaction.totalAmount ?? "0"),
     refundedAmount: getRefundedAmount(transaction.refunds ?? []),
     hasProcessingRefund: (transaction.refunds ?? []).some((r) => r.status === "PROCESSING"),
@@ -117,6 +123,7 @@ export const STATUS_BUCKET_RAW_VALUES: Record<
     "ISSUER_DECLINE",
     "GENERAL_DECLINE",
     "CUSTOMER_CANCELLED",
+    "CANCELLED",
     "AUTHENTICATION_TIMEOUT",
     "AUTHENTICATION_FAILED",
     "SYSTEM_ERROR",
@@ -149,6 +156,13 @@ export function formatDisplayDateTime(value?: string): string | null {
   // month table. It is the shared formatter now: same output, but it also reads
   // the shapes this one could not (epoch millis, ISO, no-comma separators), so
   // an endpoint that changes its form does not silently render "N/A".
+  //
+  // The API's own "DD/MM/YYYY HH:mm:ss" (with or without a comma) is read by
+  // parseApiDateTime first: left to the generic parser, a comma form either
+  // fails outright or, for day 12 or lower, is read month-first and shows
+  // the wrong date. Anything else (ISO, epoch) still goes through it.
+  const apiDate = parseApiDateTime(value);
+  if (apiDate) return formatDateTime(apiDate);
   return formatTimestamp(value, "") || null;
 }
 
@@ -177,7 +191,6 @@ export const PA_TRANSACTION_COLUMN_DEFS: { key: string; label: string }[] = [
   { key: "amount", label: "Amount" },
   { key: "status", label: "Status" },
   { key: "paymentMethod", label: "Payment Method" },
-  { key: "customerName", label: "Customer Name" },
   { key: "customerEmail", label: "Customer Email" },
   { key: "transactionId", label: "Transaction ID" },
   { key: "dateTime", label: "Date & Time" },
@@ -187,13 +200,6 @@ export const PA_TRANSACTION_COLUMN_ORDER: string[] = PA_TRANSACTION_COLUMN_DEFS.
 
 function buildColumn(key: string): Column<PaTransaction> | null {
   switch (key) {
-    case "customerName":
-      return {
-        key: "customerName",
-        header: "Customer Name",
-        minWidth: 180,
-        render: (row) => <TransactionCustomerCell name={customerName(row)} />,
-      };
     case "customerEmail":
       return {
         key: "customerEmail",

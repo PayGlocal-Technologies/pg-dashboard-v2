@@ -1,4 +1,5 @@
 import { Icon, type IconName } from "@/components/icon";
+import { AppImage } from "@/components/common/AppImage";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
 // Payment method cell, moved from paColumns.tsx verbatim (same logo maps,
@@ -39,8 +40,16 @@ const PAYMENT_METHOD_GLYPHS: Record<string, IconName> = {
 function MethodImage({ src, alt }: { src: string; alt: string }) {
   return (
     <span className="inline-flex items-center justify-center w-8 h-5 rounded bg-muted border border-border overflow-hidden">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt={alt} className="h-3.5 w-5 object-contain" />
+      {/* Absolute STATIC_BASE URL with no remotePatterns, so unoptimized with
+          explicit dimensions, per CLAUDE.md. */}
+      <AppImage
+        src={src}
+        alt={alt}
+        width={20}
+        height={14}
+        unoptimized
+        className="h-3.5 w-5 object-contain"
+      />
     </span>
   );
 }
@@ -61,30 +70,45 @@ function FallbackBrand({ brand }: { brand?: string }) {
   );
 }
 
-export function TransactionPaymentMethod({ row }: { row: PaTransaction }) {
+/** A card network's logo (Visa, Mastercard, RuPay…), the same artwork the
+ *  payment-method cells use. Falls back to the brand's initials. */
+export function CardNetworkLogo({ brand }: { brand?: string }) {
+  const path = brand ? CARD_BRAND_LOGO_MAPPER[brand.toUpperCase()] : undefined;
+  return path ? (
+    <MethodImage src={STATIC_BASE + path} alt={brand!} />
+  ) : (
+    <FallbackBrand brand={brand} />
+  );
+}
+
+/** Just the payment method's logo: the card network for a card, else the
+ *  instrument's own (UPI, Google Pay, Apple Pay), else a glyph. */
+export function PaymentMethodLogo({ row }: { row: PaTransaction }) {
   const instrument = row.paymentInstrument?.toUpperCase();
-  const last4 = row.maskedCardNumber?.replaceAll("x", "").replaceAll("X", "").trim();
   // Some instrument values carry a suffix (e.g. a specific bank for
   // NETBANKING), matched by prefix same as the label logic below.
   const glyphKey =
     instrument && Object.keys(PAYMENT_METHOD_GLYPHS).find((key) => instrument.startsWith(key));
-
-  let logo: React.ReactNode;
-
-  if (row.maskedCardNumber && row.cardBrand) {
-    const path = CARD_BRAND_LOGO_MAPPER[row.cardBrand.toUpperCase()];
-    logo = path ? (
-      <MethodImage src={STATIC_BASE + path} alt={row.cardBrand} />
-    ) : (
-      <FallbackBrand brand={row.cardBrand} />
-    );
-  } else if (instrument && PAYMENT_METHOD_ICONS[instrument]) {
-    logo = <MethodImage src={STATIC_BASE + PAYMENT_METHOD_ICONS[instrument]} alt={instrument} />;
-  } else if (glyphKey) {
-    logo = <MethodGlyph name={PAYMENT_METHOD_GLYPHS[glyphKey]!} />;
-  } else {
-    logo = <FallbackBrand brand={row.cardBrand} />;
+  if (row.maskedCardNumber && row.cardBrand) return <CardNetworkLogo brand={row.cardBrand} />;
+  if (instrument && PAYMENT_METHOD_ICONS[instrument]) {
+    return <MethodImage src={STATIC_BASE + PAYMENT_METHOD_ICONS[instrument]} alt={instrument} />;
   }
+  if (glyphKey) return <MethodGlyph name={PAYMENT_METHOD_GLYPHS[glyphKey]!} />;
+  return <FallbackBrand brand={row.cardBrand} />;
+}
+
+/** The payment category's logo for a details row: a card glyph for cards
+ *  (the network's own logo sits on the Card Type row beside it), else the
+ *  method's logo (UPI, Google Pay, Apple Pay, net banking, wallet). */
+export function PaymentCategoryLogo({ row }: { row: PaTransaction }) {
+  if (row.maskedCardNumber && row.cardBrand) return <MethodGlyph name="credit-card" />;
+  return <PaymentMethodLogo row={row} />;
+}
+
+export function TransactionPaymentMethod({ row }: { row: PaTransaction }) {
+  const instrument = row.paymentInstrument?.toUpperCase();
+  const last4 = row.maskedCardNumber?.replaceAll("x", "").replaceAll("X", "").trim();
+  const logo = <PaymentMethodLogo row={row} />;
 
   return (
     <div className="flex items-center gap-1.5">
