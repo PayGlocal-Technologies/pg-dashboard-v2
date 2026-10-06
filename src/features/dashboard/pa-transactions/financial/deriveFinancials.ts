@@ -94,21 +94,6 @@ export function getNetAmount(amountReceived: number, fee: number, refundedAmount
   return subtractAmounts(subtractAmounts(amountReceived, fee), refundedAmount);
 }
 
-// ── Currency guard ───────────────────────────────────────────────────────────
-// Never aggregate amounts across different currencies (Section 30). Every
-// function above is only ever called with a single transaction's own event
-// arrays, which should already share one currency, this is the explicit
-// check for the one place a mismatch could otherwise slip in unnoticed: a
-// new refund/dispute/settlement event being recorded against a transaction.
-
-export function assertSameCurrency(transactionCurrency: string, eventCurrency: string): void {
-  if (transactionCurrency !== eventCurrency) {
-    throw new Error(
-      `Currency mismatch: transaction is ${transactionCurrency}, event is ${eventCurrency}`
-    );
-  }
-}
-
 // ── Refund validation ────────────────────────────────────────────────────────
 // Rejects any refund whose amount, combined with refunds already COMPLETED
 // or still PROCESSING, would exceed the refundable amount (Section 6).
@@ -144,38 +129,4 @@ export function validateRefund(
     };
   }
   return { ok: true };
-}
-
-// Transaction status derivation now lives in status/transactionStatus.ts's
-// deriveTransactionStatusChip, the single source of truth both the table
-// chip and TransactionFinancials.derivedTransactionStatus read (previously
-// this file had a second, parallel state machine here that could disagree
-// with paColumns.tsx's own combining logic for resolved disputes).
-
-// ── Child-event reference validation ────────────────────────────────────────
-// Every refund/dispute/settlement event must reference the transaction it
-// actually belongs to (Section 37's "invalid child-transaction reference"
-// edge case), and no two events of the same kind for a transaction may share
-// an ID (Section 37's "duplicate child event IDs" edge case).
-
-export function validateChildEventReference(
-  expectedTransactionId: string,
-  event: { transactionId: string }
-): ValidationResult {
-  if (event.transactionId !== expectedTransactionId) {
-    return {
-      ok: false,
-      reason: `Event references transaction "${event.transactionId}", expected "${expectedTransactionId}".`,
-    };
-  }
-  return { ok: true };
-}
-
-export function hasDuplicateEventIds(events: { id: string }[]): boolean {
-  const seen = new Set<string>();
-  for (const event of events) {
-    if (seen.has(event.id)) return true;
-    seen.add(event.id);
-  }
-  return false;
 }

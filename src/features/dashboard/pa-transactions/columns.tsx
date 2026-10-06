@@ -2,10 +2,11 @@
 
 import type React from "react";
 import { AppImage } from "@/components/common/AppImage";
+import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { cn } from "@/lib/utils";
-import { formatCurrency, formatTimestamp } from "@/lib/utils/format";
+import { formatCurrency, formatTimestamp, truncateMiddle } from "@/lib/utils/format";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
@@ -14,7 +15,7 @@ type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrail
 const PA_STATUS_META: Record<string, StatusMeta> = {
   SUCCESS: { label: "Success", variant: "success", trailIcon: "check" },
   SENT_FOR_CAPTURE: { label: "Sent for capture", variant: "success", trailIcon: "check" },
-  AUTHORIZED: { label: "Authorized", variant: "warning" },
+  AUTHORIZED: { label: "Authorised", variant: "warning" },
   REVERSED: { label: "Reversed", variant: "success", trailIcon: "check" },
   INPROGRESS: { label: "In progress", variant: "warning" },
   IN_PROGRESS: { label: "In progress", variant: "warning" },
@@ -24,8 +25,8 @@ const PA_STATUS_META: Record<string, StatusMeta> = {
   AUTH_REVERSAL_STARTED: { label: "Auth reversal", variant: "warning" },
   ISSUER_DECLINE: { label: "Issuer decline", variant: "danger", trailIcon: "x" },
   GENERAL_DECLINE: { label: "General decline", variant: "danger", trailIcon: "x" },
-  CUSTOMER_CANCELLED: { label: "Cancelled", variant: "danger", trailIcon: "x" },
-  AUTHENTICATION_TIMEOUT: { label: "Auth timeout", variant: "danger", trailIcon: "x" },
+  CUSTOMER_CANCELLED: { label: "Customer cancelled", variant: "danger", trailIcon: "x" },
+  AUTHENTICATION_TIMEOUT: { label: "Authentication timeout", variant: "danger", trailIcon: "x" },
   SYSTEM_ERROR: { label: "System error", variant: "danger", trailIcon: "x" },
   REQUEST_ERROR: { label: "Request error", variant: "danger", trailIcon: "x" },
   CONFIG_ERROR: { label: "Config error", variant: "danger", trailIcon: "x" },
@@ -37,7 +38,7 @@ const PA_STATUS_META: Record<string, StatusMeta> = {
   STEP_UP: { label: "Step up", variant: "warning" },
 };
 
-function getStatusMeta(raw?: string): StatusMeta {
+export function getStatusMeta(raw?: string): StatusMeta {
   if (!raw) return { label: "Unknown", variant: "muted" };
   const key = raw.toUpperCase().replace(/ /g, "_");
   return PA_STATUS_META[key] ?? { label: raw.replace(/_/g, " ").toLowerCase(), variant: "muted" };
@@ -121,6 +122,22 @@ function PaymentMethodCell({ row }: { row: PaTransaction }) {
   );
 }
 
+// ── Customer flag ─────────────────────────────────────────────────────────────
+/**
+ * The flag beside a customer's email: their country (`iso2Code`, the same
+ * field PA's country filter searches) when the row has one, else the
+ * transaction currency's country, since ISO 4217 codes lead with it (USD →
+ * US, INR → IN; EUR has the EU flag), INR when that is missing too.
+ */
+function flagIso2(row: PaTransaction): string | undefined {
+  const country = row.iso2Code?.trim();
+  if (country && /^[A-Za-z]{2}$/.test(country)) return country.toUpperCase();
+  // INR when unset, the same default the Amount column shows it in.
+  const currency = (row.txnCurrency?.trim() || "INR").toUpperCase();
+  if (currency.length !== 3) return undefined;
+  return currency === "EUR" ? "EU" : currency.slice(0, 2);
+}
+
 // ── Column definitions ────────────────────────────────────────────────────────
 export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] {
   const cols: Column<PaTransaction>[] = [
@@ -128,12 +145,11 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
       key: "totalAmount",
       header: "Amount",
       minWidth: 135,
-      align: "right",
       render: (row) => {
         const currency = row.txnCurrency ?? "INR";
         const amount = parseFloat(row.totalAmount ?? "0");
         return (
-          <div className="flex items-baseline gap-1.5 whitespace-nowrap justify-end">
+          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
             <span className="font-semibold text-foreground tabular-nums text-[13px]">
               {formatCurrency(amount, currency)}
             </span>
@@ -153,53 +169,46 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
     },
     {
       key: "paymentInstrument",
-      header: "Payment method",
+      header: "Payment Method",
       minWidth: 145,
       render: (row) => <PaymentMethodCell row={row} />,
     },
     {
-      key: "customerName",
-      header: "Customer name",
-      minWidth: 145,
+      key: "encEmailId",
+      header: "Customer Email",
+      minWidth: 210,
       render: (row) => {
-        const name = [row.firstName ?? row.billToFirstName, row.lastName ?? row.billToLastName]
-          .filter(Boolean)
-          .join(" ")
-          .trim();
+        const iso2 = flagIso2(row);
         return (
-          <span className="text-[13px] font-medium text-foreground whitespace-nowrap">
-            {name || "—"}
+          <span className="flex items-center gap-2 whitespace-nowrap">
+            {iso2 && <CountryFlag iso2={iso2} alt="" />}
+            <span className="text-[13px] text-muted-foreground lowercase">
+              {row.encEmailId ?? "—"}
+            </span>
           </span>
         );
       },
-    },
-    {
-      key: "encEmailId",
-      header: "Email",
-      minWidth: 185,
-      render: (row) => (
-        <span className="text-[13px] text-muted-foreground whitespace-nowrap lowercase">
-          {row.encEmailId ?? "—"}
-        </span>
-      ),
     },
     {
       key: "gid",
       header: "Transaction ID",
       minWidth: 155,
       render: (row) => (
+        // Shortened in the middle (the full ID is in the title tooltip and the
+        // details view), so the column stays narrow.
         <span
+          title={row.gid}
           className={cn(
-            "text-[13px] font-mono text-primary/70 hover:text-primary transition-colors cursor-pointer whitespace-nowrap"
+            "text-[13px] font-mono text-muted-foreground transition-colors whitespace-nowrap"
           )}
         >
-          {row.gid ?? "—"}
+          {row.gid ? truncateMiddle(row.gid, 4, 4) : "—"}
         </span>
       ),
     },
     {
       key: "formattedCreationDateTime",
-      header: "Date and time",
+      header: "Date & Time",
       minWidth: 150,
       // Sent as `DD/MM/YYYY HH:mm:ss`. Rendering it straight through left this
       // one column reading in a form nothing else in either app uses.
@@ -214,7 +223,7 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
   if (!isPartnerUser) return cols;
 
   // Insert Merchant ID column before Transaction ID for partner users
-  cols.splice(5, 0, {
+  cols.splice(4, 0, {
     key: "merchantId",
     header: "Merchant ID",
     minWidth: 145,
