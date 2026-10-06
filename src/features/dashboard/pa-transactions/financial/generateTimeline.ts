@@ -392,8 +392,8 @@ export function deriveTimelineSteps(financials: TransactionFinancials): Timeline
         break;
       case "FUNDS_WITHDRAWN":
       case "FUNDS_REINSTATED":
-        // Already communicated by the Dispute cleared/charged back/
-        // accepted/expired step immediately above (same moment), not its
+        // Already communicated by the Dispute won/lost step immediately
+        // above (same moment), not its
         // own step in this timeline.
         break;
     }
