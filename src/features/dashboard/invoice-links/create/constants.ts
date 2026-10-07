@@ -8,6 +8,8 @@
  * upstream; changing it is a separate, explicit decision.
  */
 
+import type { InvoiceMerchantLogo } from "@/features/dashboard/invoice-links/create/types";
+
 export const EXTENDED_ALNUM_PATTERN = /^[a-zA-Z0-9!#$%&^*()_,\-.:;=?:~ ]*$/;
 export const EXTENDED_ALNUM_PATTERN_MESSAGE =
   "can only contain letters, numbers, spaces, and ! # $ % & ^ * ( ) _ , - . : ; = ? ~";
@@ -86,3 +88,6 @@ export const LOGO_ACCEPT_ATTR = LOGO_ACCEPTED_MIMES.join(",");
 
 /** Upstream's limit, unchanged. */
 export const LOGO_MAX_MB = 100;
+
+/** The create body's `merchantLogo` when no logo was uploaded: gcc's empty pair. */
+export const NO_MERCHANT_LOGO: InvoiceMerchantLogo = { name: "", fileExtension: "" };

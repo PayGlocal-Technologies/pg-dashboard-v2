@@ -45,6 +45,7 @@ import {
   FALLBACK_CURRENCIES,
   LOGO_EXTENSION_BY_MIME,
   LOGO_MAX_MB,
+  NO_MERCHANT_LOGO,
 } from "@/features/dashboard/invoice-links/create/constants";
 import { fromApiTemplate } from "@/features/dashboard/invoice-links/create/helpers";
 import type {
@@ -59,6 +60,7 @@ import type {
   InvoiceDraftResponse,
   InvoiceLinkTemplate,
   InvoiceLogoResponse,
+  InvoiceMerchantLogo,
   MerchantAdditionalInfoResponse,
   TemplateListResponse,
   TemplateResponse,
@@ -159,10 +161,18 @@ export function useMerchantShortName(mid: string): string {
  * b) Leg 1 fires when the merchant actually picks a file, not on mount.
  *    Upstream POSTs for a presigned slot every time the editor opens, whether
  *    or not a logo is ever chosen. Same result, one fewer request.
+ *
+ * `merchantLogo` is what the create body tells the backend, as gcc's
+ * getMerchantLogo does: `{ name: mid, fileExtension }` once a logo has been
+ * uploaded here, the empty pair otherwise. Only an upload in this editor
+ * fills it, as only gcc's `type: 'merchant'` does, not the stored logo shown
+ * on open. It is filled after the S3 PUT succeeds (gcc fills it before), so a
+ * failed upload never names an object that is not there.
  */
 export function useInvoiceLogo(mid: string) {
   const [localPreview, setLocalPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadedExtension, setUploadedExtension] = useState<string | null>(null);
 
   const { data: additionalInfo } = useGet<MerchantAdditionalInfoResponse>(
     ["invoice-merchant-logo", mid],
@@ -237,6 +247,7 @@ export function useInvoiceLogo(mid: string) {
         if (previous) URL.revokeObjectURL(previous);
         return URL.createObjectURL(file);
       });
+      setUploadedExtension(fileExtension);
       toast.success("Logo uploaded successfully");
     } catch (error) {
       toast.error((error as Error)?.message || "Failed to upload logo");
@@ -245,7 +256,10 @@ export function useInvoiceLogo(mid: string) {
     }
   }
 
-  return { displayUrl, upload, isUploading };
+  const merchantLogo: InvoiceMerchantLogo =
+    uploadedExtension && mid ? { name: mid, fileExtension: uploadedExtension } : NO_MERCHANT_LOGO;
+
+  return { displayUrl, upload, isUploading, merchantLogo };
 }
 
 /** Country options for both address sections. */

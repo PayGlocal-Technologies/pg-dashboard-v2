@@ -363,6 +363,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     displayUrl: logoUrl,
     upload: uploadLogo,
     isUploading: isLogoUploading,
+    merchantLogo,
   } = useInvoiceLogo(mid);
 
   // Derived state, not synced state: `edits` holds only what the merchant has
@@ -633,20 +634,29 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     };
 
     if (isEditingIssued) {
-      editInvoice(buildInvoiceRequest(values, items, undefined, countryCode), handlers);
+      editInvoice(
+        buildInvoiceRequest(values, items, undefined, countryCode, merchantLogo),
+        handlers
+      );
       return;
     }
 
     if (recipients.length === 1) {
       createInvoice(
-        buildInvoiceRequest(values, items, customerFromRecipient(recipients[0]), countryCode),
+        buildInvoiceRequest(
+          values,
+          items,
+          customerFromRecipient(recipients[0]),
+          countryCode,
+          merchantLogo
+        ),
         handlers
       );
       return;
     }
 
     const sent = recipients;
-    createBatch(buildBulkInvoiceRequest(values, items, sent, countryCode), {
+    createBatch(buildBulkInvoiceRequest(values, items, sent, countryCode, merchantLogo), {
       onSuccess: (res) => setBatch({ results: res?.data?.results ?? [], recipients: sent }),
       onError: (error: Error) => toast.error(error?.message || "Failed to create links"),
     });
@@ -664,7 +674,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
         : customerFromRecipient(EMPTY_RECIPIENT)
       : undefined;
     saveTickedItemsToSku();
-    saveDraft(buildInvoiceRequest(values, items, customer, countryCode), {
+    saveDraft(buildInvoiceRequest(values, items, customer, countryCode, merchantLogo), {
       onSuccess: () => {
         toast.success("Draft saved");
         router.push("/invoice-links");
