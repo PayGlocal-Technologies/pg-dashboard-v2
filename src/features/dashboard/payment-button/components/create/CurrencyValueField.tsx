@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
  * common exception and gets the EU flag. Anything else falls back to the
  * first country the map lists for the currency.
  */
-function currencyFlagIso2(
+export function currencyFlagIso2(
   currency: string,
   countryCurrencyMap: { currencyCode: string; iso2CountryCode: string }[]
 ): string {

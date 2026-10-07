@@ -50,6 +50,9 @@ function reorderWithSelectFirst(
  *  naming, and they are production's own list verbatim. */
 const IRM_SEARCH_WORDS = ["IRM Number", "Remitter Name", "Purpose Code"];
 
+/** Columns picking an IRM needs, so the column editor cannot hide them. */
+const FIXED_COLUMN_KEYS = ["irmNumber", "availableAmount"];
+
 const MAPPING_STATUS_VARIANT: Record<MappingStatus, "muted" | "warning" | "success"> = {
   UNMAPPED: "warning",
   // Both mid-states read the same: some of the remittance is spoken for, none
@@ -89,6 +92,7 @@ export function SelectIrmsStep({
   const [mappingFilter, setMappingFilter] = useState<MappingStatus[]>([]);
   const [processFilter, setProcessFilter] = useState<ProcessStatus[]>([]);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
 
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(EBRC_PAGE_SIZE);
@@ -210,7 +214,9 @@ export function SelectIrmsStep({
     { key: "adCode", header: "AD Code", minWidth: 100, render: (row) => row.adCode },
   ];
 
-  const orderedColumns = reorderWithSelectFirst(columns, columnOrder);
+  const orderedColumns = reorderWithSelectFirst(columns, columnOrder).filter(
+    (c) => !hiddenColumns.includes(c.key)
+  );
   const reorderableColumns = columns
     .filter((c) => c.key !== "select")
     .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
@@ -276,7 +282,14 @@ export function SelectIrmsStep({
               columns={reorderableColumns}
               order={currentColumnOrder}
               onOrderChange={setColumnOrder}
-              onReset={() => setColumnOrder(null)}
+              onReset={() => {
+                setColumnOrder(null);
+                setHiddenColumns([]);
+              }}
+              hiddenKeys={hiddenColumns}
+              onHiddenKeysChange={setHiddenColumns}
+              fixedKeys={FIXED_COLUMN_KEYS}
+              fixedReason="Always shown. Picking an IRM needs its number and the amount still available."
             />
           </div>
         </div>

@@ -53,7 +53,10 @@ export function validateContactEmail(value: string): string | undefined {
  */
 export function validatePhone(countryIso2: string, number: string): string | undefined {
   const digits = number.replace(/\D/g, "");
-  if (!countryIso2 || !digits) return "Enter a valid phone number";
+  // Optional: nothing typed is fine. Once a number is typed it must be a real
+  // one with its dial code, since the two are stored as one string.
+  if (!digits) return undefined;
+  if (!countryIso2) return "Select a country code for this number";
   // Loose on purpose: national numbering plans run from 7 to 12 digits and
   // this form has no libphonenumber to check a real one against, so the rule
   // only rejects lengths no country uses.

@@ -19,52 +19,108 @@ import {
 } from "@/features/dashboard/invoice-links/create/constants";
 import type {
   AddressValues,
+  ApiInvoiceTemplate,
   DiscountType,
+  InvoiceBulkCreateRequest,
   InvoiceCreateRequest,
+  InvoiceCustomer,
   InvoiceFormValues,
   InvoiceLineItem,
+  InvoiceLinkTemplate,
+  InvoiceRecipient,
+  TemplateLineItem,
+  TemplateWriteBody,
+  WireAddress,
 } from "@/features/dashboard/invoice-links/create/types";
+import type { Client } from "@/features/dashboard/client-management/types";
+// The template store is shared with MCA invoices, whose editor reads a theme
+// off every template. A template first saved here gets that editor's default
+// rather than none, so it opens there exactly as a fresh MCA template would.
+import { DEFAULT_THEME_METADATA } from "@/features/dashboard/create-invoice/constants";
 
 // ── Totals ───────────────────────────────────────────────────────────────────
-// Ported expression-for-expression from upstream helpers.ts (getAmount,
-// getSubTotalAmount, getDiscountAmount, getTotalAmount). The `|| 0` on getAmount
-// is load-bearing: an empty ppu/qty makes the product NaN, and upstream relies
-// on that falling through to 0 rather than propagating into the subtotal.
+// Exact decimal arithmetic in hundredths, matching the backend's check
+// (invoiceValidation.json + validateCalculations), which rejects the whole
+// link on a one-cent difference:
+//
+//   item amount = itemPrice × quantity + GST, the GST portion rounded HALF_UP
+//                 to 2 places;
+//   totalAmount = Σ item amounts − discountPercent% − discountAmount.
+//
+// Floats were used before (`a * b … .toFixed(2)`), which rounds the whole line
+// rather than the GST portion and is not HALF_UP on half-cent values.
 
-/** Line amount, GST included: ppu × qty + (ppu × qty × tax%). */
+/** A decimal string as an integer scaled by 10^places, rounded HALF_UP. "12.345", 2 → 1235. */
+function toScaled(value: string, places: number): number {
+  const match = /^\s*(\d*)(?:\.(\d*))?\s*$/.exec(value ?? "");
+  if (!match || (!match[1] && !match[2])) return 0;
+  const whole = match[1] || "0";
+  const fraction = match[2] ?? "";
+  const kept = (fraction + "0".repeat(places)).slice(0, places);
+  const scaled = Number(whole) * 10 ** places + Number(kept || "0");
+  // HALF_UP on the first dropped digit.
+  return fraction.length > places && Number(fraction[places]) >= 5 ? scaled + 1 : scaled;
+}
+
+/** a ÷ b for non-negative integers, rounded HALF_UP. */
+function divideHalfUp(a: number, b: number): number {
+  return Math.floor((2 * a + b) / (2 * b));
+}
+
+/** A typed amount normalised to 2 places, HALF_UP: "3.5" → "3.50". */
+function fromCentsString(value: string): string {
+  return fromCents(toScaled(value, 2));
+}
+
+/** Hundredths → "12.34". */
+function fromCents(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+/** A line's amount in hundredths: price × qty, plus its GST rounded HALF_UP. */
+function lineCents(ppu: string, qty: string, tax: string): number {
+  const base = toScaled(ppu, 2) * toScaled(qty, 0);
+  // Tax as basis points (18 → 1800, 12.5 → 1250), so the GST is base × bp / 10000.
+  const gst = divideHalfUp(base * toScaled(tax || "0", 2), 10000);
+  return base + gst;
+}
+
+/** Line amount, GST included, exactly as the backend computes it. */
 export function getAmount(ppu: string, qty: string, tax: string): number {
-  const ppuNum = Number(ppu);
-  const qtyNum = Number(qty);
-  const taxNum = Number(tax);
-  return ppuNum * qtyNum + (ppuNum * qtyNum * taxNum) / 100 || 0;
+  return lineCents(ppu, qty, tax) / 100;
 }
 
-/** Sum of every line's GST-inclusive amount. */
+/** Sum of every line's GST-inclusive amount — the same figures sent as each `amount`. */
 export function getSubTotalAmount(items: InvoiceLineItem[]): number {
-  return items.reduce((acc, item) => acc + getAmount(item.ppu, item.qty, item.tax ?? "0"), 0);
+  return items.reduce((acc, item) => acc + lineCents(item.ppu, item.qty, item.tax ?? "0"), 0) / 100;
 }
 
+/**
+ * The discount taken off the subtotal, as "0.00". A percentage is computed on
+ * the subtotal and rounded HALF_UP to 2 places; a fixed discount is the amount.
+ */
 export function getDiscountAmount(
   subTotalAmount: string,
   discount: string,
   discountType: DiscountType
 ): string {
-  const discountNum = Number(discount);
-  const subTotalAmountNum = Number(subTotalAmount);
-  const discountAmount =
-    discountType === "percentage" ? (subTotalAmountNum * discountNum) / 100 : discountNum || 0;
-  return discountAmount.toFixed(2);
+  const subCents = toScaled(subTotalAmount, 2);
+  const cents =
+    discountType === "percentage"
+      ? divideHalfUp(subCents * toScaled(discount || "0", 2), 10000)
+      : toScaled(discount || "0", 2);
+  return fromCents(cents);
 }
 
-/** Subtotal less discount. */
+/** Subtotal less discount, never below zero. */
 export function getTotalAmount(
   items: InvoiceLineItem[],
   discount: string,
   discountType: DiscountType
 ): string {
   const subTotalAmount = getSubTotalAmount(items).toFixed(2);
-  const discountAmount = getDiscountAmount(subTotalAmount, discount, discountType);
-  return (Number(subTotalAmount) - Number(discountAmount)).toFixed(2) || "0.00";
+  const discountCents = toScaled(getDiscountAmount(subTotalAmount, discount, discountType), 2);
+  return fromCents(Math.max(0, toScaled(subTotalAmount, 2) - discountCents));
 }
 
 /**
@@ -91,105 +147,509 @@ export function getFormattedDueDate(value: string): string | null {
 export function generateMerchantReference(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  // Upper-case, as gcc-ui-temp's generateUuid(16).toUpperCase().
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
 }
 
 // ── Request body ─────────────────────────────────────────────────────────────
+
+/** The customer as the single-customer form holds it (edit of an issued invoice). */
+export function customerFromValues(values: InvoiceFormValues): InvoiceCustomer {
+  return {
+    fullName: values.fullName,
+    emailId: values.emailId,
+    callingCode: values.callingCode,
+    phoneNumber: values.phoneNumber,
+    billing: values.billing,
+    shipping: values.shipping,
+    shippingSameAsBilling: values.shippingSameAsBilling,
+  };
+}
+
+/** A picked recipient in the same shape, so both feed one builder. */
+export function customerFromRecipient(recipient: InvoiceRecipient): InvoiceCustomer {
+  return {
+    fullName: recipient.fullName,
+    emailId: recipient.emailId,
+    callingCode: recipient.callingCode,
+    phoneNumber: recipient.phoneNumber,
+    billing: recipient.billing,
+    shipping: recipient.shipping ?? emptyAddress(),
+    shippingSameAsBilling: !recipient.shipping,
+  };
+}
+
+/** Name → wire value for `addressCountry`. gcc-ui-temp sends the ISO2 code. */
+export type CountryCodeOf = (country: string) => string;
+
+const sameValue: CountryCodeOf = (country) => country;
+
+/**
+ * Everything in the body that is the invoice itself, shared by every client in
+ * a batch. Shaped like gcc-ui-temp's getRequestBody (features/Invoice/helper.js),
+ * the source of truth for invoice links:
+ *
+ *  - optional text goes as null when empty (`memo`, `additionalInfo`), never "":
+ *    the backend length-checks it, so "" is an invalid field;
+ *  - `businessName` is left out when there is none, as gcc's untouched field is;
+ *  - except the discount, which follows pg-dashboard: `discountAmount` is always
+ *    the computed amount, plus `discountPercent` for a percentage (see below);
+ *  - an item's `itemCode` and `gstPercentage` are left out when blank, as gcc's
+ *    rows carry only the columns that were filled.
+ */
+function buildInvoiceRequestData(
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[]
+): InvoiceCreateRequest["invoiceRequestData"] {
+  const subTotal = getSubTotalAmount(items).toFixed(2);
+  const total = getTotalAmount(items, values.discount || "0", values.discountType);
+  const discount = values.discount.trim();
+  const hasTax = items.some((item) => Number(item.tax) > 0);
+  const memo = values.memo.trim();
+  const note = values.merchantNote.trim();
+
+  return {
+    // One per press. In a multi-client create this sits in the shared
+    // `invoiceRequestData`, so every link in the batch carries it; the backend
+    // makes it unique per generated link, as it does the invoice id's -1, -2
+    // (agreed 2026-10-07 after "Too many request with same merchant Reference
+    // Id" failed the second link). Do not try to vary it here: `clients[]` has
+    // nowhere to carry a per-client reference.
+    merchantReferenceId: generateMerchantReference(),
+    invoiceItems: items.map((item) => {
+      const code = item.itemCode.trim();
+      return {
+        itemDescription: item.description || "",
+        ...(code ? { itemCode: code } : {}),
+        itemPrice: item.ppu || "0",
+        quantity: item.qty || "0",
+        // With `gst` on, the backend parses every row's gstPercentage as a
+        // number, so a row without one is a null-pointer failure ("Cannot
+        // invoke String.toCharArray() because val is null"). gcc-ui-temp never
+        // hits that, because its GST column makes the rate required on every
+        // row; lines here can mix taxed and untaxed, so an untaxed row sends
+        // "0", as pg-dashboard always did. With no tax anywhere it is left out.
+        ...(hasTax ? { gstPercentage: Number(item.tax) > 0 ? item.tax : "0" } : {}),
+        amount: getAmount(item.ppu || "0", item.qty || "0", item.tax || "0").toFixed(2),
+      };
+    }),
+    memo: memo || null,
+    additionalInfo: note || null,
+    totalAmount: total,
+    subTotalAmount: subTotal,
+    // gcc sends the same computed figure twice, under two names.
+    amountDue: total,
+    txnCurrency: values.txnCurrency || "INR",
+    formattedDueDate: getFormattedDueDate(values.dueDate),
+    invoiceId: values.invoiceNo || null,
+    gst: hasTax,
+    // The backend computes totalAmount = Σ items − discountPercent% −
+    // discountAmount, applying BOTH, so exactly one of them may carry the
+    // discount: a percentage goes in discountPercent with discountAmount "0";
+    // a fixed discount goes in discountAmount. discountAmount and
+    // extraChargeAmount are required fields — "0", never blank or null, when
+    // unused (a missing discountAmount fails field validation).
+    discountAmount:
+      discount && values.discountType === "fixed" ? fromCentsString(discount) : "0",
+    ...(discount && values.discountType === "percentage" ? { discountPercent: discount } : {}),
+    // Ignored by the backend's total check today, so it is never part of
+    // totalAmount; invoice links have no extra charges anyway.
+    extraChargeAmount: "0",
+    merchantLogo: { name: "", fileExtension: "" },
+    additionalEmailId: [],
+  };
+}
+
+/** A two-letter ISO code, which is the only thing `addressCountry` accepts. */
+const ISO2 = /^[A-Za-z]{2}$/;
+
+/**
+ * An address in the wire vocabulary (`addressStreet1` …), with only the fields
+ * that hold something, or null when none do. Billing and shipping use the same
+ * keys in gcc-ui-temp; the country is sent as its ISO2 code.
+ *
+ * The code comes from the address itself when it carries one (a client-book
+ * client), else from looking the name up. A country that still is not a code
+ * is left out rather than sent as a name: every address field is optional on
+ * an invoice link, and a name is rejected as an invalid field, failing the link.
+ */
+function toWireAddress(address: AddressValues, countryCode: CountryCodeOf): WireAddress | null {
+  const resolved = address.countryIso2 || (address.country ? countryCode(address.country) : "");
+  const entries: [keyof WireAddress, string][] = [
+    ["addressStreet1", address.streetAddress],
+    ["addressStreet2", address.landmark],
+    ["addressCountry", ISO2.test(resolved) ? resolved.toUpperCase() : ""],
+    ["addressState", address.state],
+    ["addressCity", address.city],
+    ["addressPostalCode", address.zipcode],
+  ];
+  const filled = entries.filter(([, value]) => !!value?.trim());
+  return filled.length > 0
+    ? (Object.fromEntries(filled.map(([key, value]) => [key, value.trim()])) as WireAddress)
+    : null;
+}
+
+/** The three customer objects for one recipient, as gcc-ui-temp builds them. */
+function buildCustomerParts(
+  customer: InvoiceCustomer,
+  countryCode: CountryCodeOf
+): Pick<InvoiceCreateRequest, "plCustomerData" | "plBillingData" | "plShippingData"> {
+  const billing = toWireAddress(customer.billing, countryCode);
+  // gcc splits the name: the first word, then the rest.
+  const [firstName = "", ...rest] = customer.fullName.trim().split(/\s+/);
+
+  return {
+    plCustomerData: {
+      fullName: customer.fullName || null,
+      emailId: customer.emailId || null,
+      callingCode: customer.callingCode || null,
+      phoneNumber: customer.phoneNumber || null,
+      expiry: 6,
+    },
+
+    plBillingData: {
+      ...(billing ?? {}),
+      firstName: firstName || null,
+      lastName: rest.join(" ") || null,
+      callingCode: customer.callingCode || null,
+      phoneNumber: customer.phoneNumber || null,
+      emailId: customer.emailId || null,
+    },
+
+    // Same keys as billing. Pre-gcc this sent the raw form object
+    // (`streetAddress`, `country`, … and a stray `shippingSameAsBilling` flag),
+    // pg-dashboard's shape, which the endpoint rejects as invalid fields.
+    plShippingData: customer.shippingSameAsBilling
+      ? billing
+      : toWireAddress(customer.shipping, countryCode),
+  };
+}
 
 /**
  * Builds the create/edit/draft body. One builder for all three, exactly as
  * upstream has it — the three endpoints take the same shape and differ only in
  * URL and verb.
  *
- * Every hardcoded value below (`businessName: ""`, `extraChargeAmount: "0.00"`,
- * the empty `merchantLogo`, `expiry: 6`, `siTxn: false`, …) is upstream's, not
- * an invention here.
+ * The constants (`expiry: 6`, `siTxn: false`, the empty `merchantLogo`, …)
+ * are gcc-ui-temp's, as is everything left out when empty.
+ *
+ * `customer` defaults to the single-customer form fields, which is the edit
+ * path; create passes the one picked recipient instead.
  */
 export function buildInvoiceRequest(
   values: InvoiceFormValues,
-  items: InvoiceLineItem[]
+  items: InvoiceLineItem[],
+  customer: InvoiceCustomer = customerFromValues(values),
+  countryCode: CountryCodeOf = sameValue
 ): InvoiceCreateRequest {
-  const subTotal = getSubTotalAmount(items).toFixed(2);
-  const total = getTotalAmount(items, values.discount || "0", values.discountType);
-
   return {
-    invoiceRequestData: {
-      merchantReferenceId: generateMerchantReference(),
-      invoiceItems: items.map((item) => ({
-        itemDescription: item.description || "",
-        itemCode: item.itemCode || null,
-        itemPrice: item.ppu || "0",
-        quantity: item.qty || "0",
-        gstPercentage: item.tax || "0",
-        amount: getAmount(item.ppu || "0", item.qty || "0", item.tax || "0").toFixed(2),
-      })),
-      memo: values.memo || "",
-      additionalInfo: values.merchantNote || "",
-      totalAmount: total,
-      subTotalAmount: subTotal,
-      // Upstream sends the same computed figure twice, under two names.
-      amountDue: total,
-      txnCurrency: values.txnCurrency || "INR",
-      formattedDueDate: getFormattedDueDate(values.dueDate),
-      invoiceId: values.invoiceNo || null,
-      gst: items.some((item) => !!item.tax && item.tax !== "0" && Number(item.tax) !== 0),
-      businessName: "",
-      discountPercent: values.discountType === "percentage" ? values.discount || null : null,
-      discountAmount: getDiscountAmount(subTotal, values.discount || "0", values.discountType),
-      extraChargeAmount: "0.00",
-      merchantLogo: { name: "", fileExtension: "" },
-      additionalEmailId: [],
-    },
-
-    plCustomerData: {
-      fullName: values.fullName || null,
-      emailId: values.emailId || null,
-      callingCode: values.callingCode || null,
-      phoneNumber: values.phoneNumber || null,
-      expiry: 6,
-    },
-
-    plBillingData: {
-      addressStreet1: values.billing.streetAddress || "",
-      addressStreet2: values.billing.landmark || "",
-      addressCountry: values.billing.country || "",
-      addressState: values.billing.state || "",
-      addressCity: values.billing.city || "",
-      addressPostalCode: values.billing.zipcode || "",
-      // Upstream copies the customer's full name into firstName and leaves
-      // lastName empty rather than splitting it.
-      firstName: values.fullName || "",
-      lastName: "",
-      callingCode: values.callingCode || null,
-      phoneNumber: values.phoneNumber || "",
-      emailId: values.emailId || "",
-    },
-
-    // SOURCE DEFECT, PRESERVED DELIBERATELY.
-    //
-    // Upstream:
-    //   plShippingData:
-    //     (values?.billingDetails?.shippingSameAsBilling && values?.billingDetails) ||
-    //     values?.shippingDetails || null
-    //
-    // so this field carries the RAW form object — `streetAddress`, `landmark`,
-    // `country`, … and, in the same-as-billing case, a stray
-    // `shippingSameAsBilling` boolean — while plBillingData above is remapped to
-    // the `addressStreet1`/… vocabulary the API documents. The shipping address
-    // is therefore in a different shape from the billing one in every branch.
-    //
-    // Ported byte-identical so this sends exactly what production sends. Raised
-    // as a defect separately; do not "fix" it here without confirming what the
-    // endpoint actually accepts, because a tolerant backend would start storing
-    // different data the moment the shape changed.
-    plShippingData: values.shippingSameAsBilling
-      ? { ...values.billing, shippingSameAsBilling: true }
-      : { ...values.shipping },
-
+    invoiceRequestData: buildInvoiceRequestData(values, items),
+    ...buildCustomerParts(customer, countryCode),
     siTxn: false,
     collectByGlobalAltPay: false,
     merchantCustomPayload: null,
   };
+}
+
+/**
+ * The multi-client body: one `invoiceRequestData`, identical for everyone, and
+ * one customer triple per client. The backend fans it out into one link per
+ * client and suffixes the invoice id with -1, -2, … in this array's order.
+ */
+export function buildBulkInvoiceRequest(
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[],
+  recipients: InvoiceRecipient[],
+  countryCode: CountryCodeOf = sameValue
+): InvoiceBulkCreateRequest {
+  return {
+    invoiceRequestData: buildInvoiceRequestData(values, items),
+    clients: recipients.map((recipient) =>
+      buildCustomerParts(customerFromRecipient(recipient), countryCode)
+    ),
+    siTxn: false,
+    collectByGlobalAltPay: false,
+    merchantCustomPayload: null,
+  };
+}
+
+// ── Recipients ───────────────────────────────────────────────────────────────
+
+/**
+ * The six fields an address form shows, as strings. Read through this rather
+ * than Object.values: an address can also carry `countryIso2`, which is
+ * optional (undefined for most) and is not a field the merchant fills.
+ */
+export function addressFieldValues(address: AddressValues): string[] {
+  return [
+    address.streetAddress,
+    address.landmark,
+    address.country,
+    address.state,
+    address.city,
+    address.zipcode,
+  ].map((value) => value ?? "");
+}
+
+function sameAddress(a: AddressValues, b: AddressValues): boolean {
+  return (Object.keys(a) as (keyof AddressValues)[]).every(
+    (key) => (a[key] ?? "").trim().toLowerCase() === (b[key] ?? "").trim().toLowerCase()
+  );
+}
+
+/**
+ * A client-book record as an invoice recipient.
+ *
+ * The business name is the name on the invoice, as the MCA editor's Bill-to
+ * card shows it, with the contact person as the fallback. A shipping address
+ * that is blank or identical to billing collapses to "same as billing", which
+ * is how the single-customer form would have sent it.
+ */
+export function clientToRecipient(client: Client): InvoiceRecipient {
+  const billing: AddressValues = {
+    streetAddress: client.addressLine ?? "",
+    landmark: client.addressLine2 ?? "",
+    country: client.countryName ?? "",
+    countryIso2: client.countryIso2 || undefined,
+    state: client.state ?? "",
+    city: client.city ?? "",
+    zipcode: client.zipcode ?? "",
+  };
+  const shipping: AddressValues = {
+    streetAddress: client.shippingAddressLine ?? "",
+    landmark: client.shippingAddressLine2 ?? "",
+    country: client.shippingCountryName ?? "",
+    countryIso2: client.shippingCountryIso2 || undefined,
+    state: client.shippingState ?? "",
+    city: client.shippingCity ?? "",
+    zipcode: client.shippingZipcode ?? "",
+  };
+  const hasOwnShipping =
+    addressFieldValues(shipping).some((v) => v.trim()) && !sameAddress(billing, shipping);
+
+  return {
+    key: client.id,
+    clientId: client.id,
+    fullName: client.businessName || client.primaryContactName,
+    contactName: client.primaryContactName,
+    emailId: client.email,
+    callingCode: client.phoneDialCode,
+    phoneNumber: client.phoneNumber,
+    billing,
+    shipping: hasOwnShipping ? shipping : null,
+  };
+}
+
+/** One line per thing that would stop this recipient's link being created. */
+export function validateRecipient(recipient: InvoiceRecipient): string[] {
+  const issues = [
+    validateFullName(recipient.fullName),
+    validateEmail(recipient.emailId),
+    validatePhone(recipient.phoneNumber),
+    ...Object.values(validateAddress(recipient.billing)),
+    ...(recipient.shipping ? Object.values(validateAddress(recipient.shipping)) : []),
+  ];
+  return issues.filter((issue): issue is string => !!issue);
+}
+
+// ── Templates ────────────────────────────────────────────────────────────────
+
+/** "yyyy-mm-dd" for a local date. Call from handlers, never during render. */
+export function localDateKey(date: Date): string {
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function dateKeyToUtc(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return Date.UTC(y, (m ?? 1) - 1, d ?? 1);
+}
+
+/** Whole days from `from` to `to`, both "yyyy-mm-dd". */
+function daysBetween(from: string, to: string): number {
+  return Math.round((dateKeyToUtc(to) - dateKeyToUtc(from)) / DAY_MS);
+}
+
+function addDays(key: string, days: number): string {
+  const date = new Date(dateKeyToUtc(key) + days * DAY_MS);
+  return date.toISOString().slice(0, 10);
+}
+
+/** "3 items · USD · due in 30 days", for the picker. */
+function describeTemplate(template: ApiInvoiceTemplate): string {
+  const count = template.lineItems?.length ?? 0;
+  const parts = [`${count} item${count === 1 ? "" : "s"}`];
+  if (template.currency) parts.push(template.currency);
+  if (template.dueTermDays != null) {
+    parts.push(template.dueTermDays === 0 ? "due today" : `due in ${template.dueTermDays} days`);
+  }
+  return parts.join(" · ");
+}
+
+export function fromApiTemplate(template: ApiInvoiceTemplate): InvoiceLinkTemplate {
+  return {
+    id: template.templateId,
+    name: template.name,
+    description: describeTemplate(template),
+    savedAt: template.savedAt,
+    lastUsedAt: template.lastUsedAt,
+    raw: template,
+  };
+}
+
+/** Number → the string the grid holds; absent stays empty rather than "0". */
+const numberToField = (value: number | null | undefined): string =>
+  value == null || Number.isNaN(Number(value)) ? "" : String(value);
+
+/**
+ * A (hydrated) template, as the editor's patch.
+ *
+ * Carries the reusable parts only: line items, currency, discount, memo and
+ * note, and the due date resolved from the template's term against today.
+ * Never the customer or the invoice number. Line items keep their `skuId`, so
+ * saving the invoice back as a template keeps them live.
+ *
+ * HSN/SAC lands in the item code column, since that is the only code an
+ * invoice-link line has.
+ */
+export function applyTemplate(
+  template: ApiInvoiceTemplate,
+  todayKey: string
+): { patch: Partial<InvoiceFormValues>; items: InvoiceLineItem[] } {
+  const items: InvoiceLineItem[] = (template.lineItems ?? []).map((line, index) => ({
+    key: `tpl-${template.templateId}-${index}`,
+    description: line.name || line.description || "",
+    itemCode: line.hsn || line.sac || "",
+    ppu: numberToField(line.unitPrice),
+    qty: numberToField(line.quantity),
+    tax: numberToField(line.gstRate) || "0",
+    ...(line.skuId ? { skuId: line.skuId } : {}),
+    ...(line.type ? { itemType: line.type } : {}),
+  }));
+
+  const discountType: DiscountType = template.discount?.type === "fixed" ? "fixed" : "percentage";
+
+  const patch: Partial<InvoiceFormValues> = {
+    discountType,
+    discount: template.discount?.value ?? "",
+    memo: template.memo ?? "",
+    merchantNote: template.notes ?? "",
+    ...(template.currency ? { txnCurrency: template.currency } : {}),
+    ...(template.dueTermDays != null ? { dueDate: addDays(todayKey, template.dueTermDays) } : {}),
+  };
+
+  const emptyRow: InvoiceLineItem = {
+    key: "item-0",
+    description: "",
+    itemCode: "",
+    ppu: "",
+    qty: "",
+    tax: "0",
+  };
+  return { patch, items: items.length > 0 ? items : [emptyRow] };
+}
+
+function toTemplateLineItem(item: InvoiceLineItem): TemplateLineItem {
+  const isService = item.itemType === "SERVICE";
+  return {
+    // With a skuId the backend re-reads name, price and code from the catalogue
+    // on every GET. The values are still sent: they are what a read falls back
+    // to if the SKU is ever deleted.
+    ...(item.skuId ? { skuId: item.skuId } : {}),
+    name: item.description,
+    description: item.description,
+    // The templates API reads `type` as a GOOD/SERVICE enum, so "" is a 400
+    // ("monthly" template, 2026-10-07). The MCA editor never sends it empty: its
+    // item dialog requires the choice. An invoice-link line only carries a
+    // type when it came from the SKU catalogue, so an untyped manual line is
+    // saved as a GOOD — with its code in `hsn`, exactly as before.
+    type: item.itemType || "GOOD",
+    quantity: Number(item.qty) || 0,
+    unitPrice: Number(item.ppu) || 0,
+    gstRate: Number(item.tax) || 0,
+    hsn: isService ? "" : item.itemCode,
+    ...(isService ? { sac: item.itemCode } : {}),
+  };
+}
+
+/**
+ * The editor → a template body.
+ *
+ * `previous` is the stored template when overwriting one. Its fields are
+ * spread first and only this editor's are laid over them, so a template made
+ * in the MCA editor keeps its branding, bank account, tax, LUT and recurrence
+ * when it is updated from here. A brand-new template gets the same neutral
+ * values the MCA editor would give one with nothing set.
+ */
+export function toTemplateWriteBody(
+  name: string,
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[],
+  todayKey: string,
+  previous?: ApiInvoiceTemplate
+): TemplateWriteBody {
+  const subTotal = getSubTotalAmount(items).toFixed(2);
+  const dueTermDays =
+    values.dueDate && daysBetween(todayKey, values.dueDate) >= 0
+      ? daysBetween(todayKey, values.dueDate)
+      : undefined;
+
+  const base: TemplateWriteBody = previous
+    ? { ...previous }
+    : {
+        name,
+        bankAccountReference: null,
+        isGstInvoice: false,
+        themeMetadata: { ...DEFAULT_THEME_METADATA },
+        tax: {},
+        lut: "",
+        logoEnabled: false,
+        signatureEnabled: false,
+      };
+  // The MCA editor always sends `tax` with its derived `taxAmount`, never `{}`.
+  // Invoice links have no invoice-level tax, so it is always zero; a stored
+  // template's own tax fields are kept.
+  base.tax = { ...((base.tax as Record<string, unknown> | undefined) ?? {}), taxAmount: "0.00" };
+  // Server-managed, and the term is this editor's to set or clear.
+  delete base.templateId;
+  delete base.savedAt;
+  delete base.lastUsedAt;
+  delete base.dueTermDays;
+
+  return {
+    ...base,
+    name,
+    currency: values.txnCurrency,
+    lineItems: items.map(toTemplateLineItem),
+    discount: {
+      ...(previous?.discount ?? {}),
+      value: values.discount || undefined,
+      type: values.discountType,
+      discountAmount: getDiscountAmount(subTotal, values.discount || "0", values.discountType),
+    },
+    memo: values.memo,
+    notes: values.merchantNote,
+    // Omitted rather than null when there is no due date, which is how the
+    // MCA editor says "no term"; 0 is a real term ("due today").
+    ...(dueTermDays != null ? { dueTermDays } : {}),
+  };
+}
+
+/** Whether there is anything on the invoice worth saving as a template. */
+export function hasTemplatableContent(
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[]
+): boolean {
+  return (
+    items.some((item) => item.description.trim() || item.ppu.trim()) ||
+    !!values.memo.trim() ||
+    !!values.merchantNote.trim()
+  );
 }
 
 // ── Field validation ─────────────────────────────────────────────────────────
@@ -214,14 +674,16 @@ export function validateDueDate(value: string): string | undefined {
 
 export function validateFullName(value: string): string | undefined {
   if (!value?.trim()) return "Please enter the Full Name";
-  if (value.length > NAME_MAX_LENGTH) return `Full Name must be at most ${NAME_MAX_LENGTH} characters`;
+  if (value.length > NAME_MAX_LENGTH)
+    return `Full Name must be at most ${NAME_MAX_LENGTH} characters`;
   return undefined;
 }
 
 export function validateEmail(value: string): string | undefined {
   if (!value?.trim()) return "Please enter the Email ID";
   if (!EMAIL_PATTERN.test(value)) return "Please enter a valid Email ID";
-  if (value.length > EMAIL_MAX_LENGTH) return `Email ID must be at most ${EMAIL_MAX_LENGTH} characters`;
+  if (value.length > EMAIL_MAX_LENGTH)
+    return `Email ID must be at most ${EMAIL_MAX_LENGTH} characters`;
   return undefined;
 }
 
@@ -248,7 +710,9 @@ export function validateDiscount(value: string, discountType: DiscountType): str
 }
 
 /** Address fields are all optional upstream; only length and charset are checked. */
-export function validateAddress(values: AddressValues): Partial<Record<keyof AddressValues, string>> {
+export function validateAddress(
+  values: AddressValues
+): Partial<Record<keyof AddressValues, string>> {
   const errors: Partial<Record<keyof AddressValues, string>> = {};
 
   if (values.streetAddress) {

@@ -287,7 +287,9 @@ function LineItemBody({
     <>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
         <Field>
-          <FieldLabel>Item type</FieldLabel>
+          <FieldLabel>
+            Item type <span className="text-destructive">*</span>
+          </FieldLabel>
           <RadioGroup
             value={values.type}
             onValueChange={(next) =>
@@ -361,7 +363,9 @@ function LineItemBody({
         >
           <PopoverAnchor asChild>
             <Field>
-              <FieldLabel htmlFor="line-item-name">Item name</FieldLabel>
+              <FieldLabel htmlFor="line-item-name">
+                Item name <span className="text-destructive">*</span>
+              </FieldLabel>
               <Input
                 id="line-item-name"
                 autoFocus
@@ -441,7 +445,9 @@ function LineItemBody({
 
         <div className="grid grid-cols-2 gap-3">
           <Field>
-            <FieldLabel htmlFor="line-item-rate">{isHourly ? "Rate per hour" : "Rate"}</FieldLabel>
+            <FieldLabel htmlFor="line-item-rate">
+              {isHourly ? "Rate per hour" : "Rate"} <span className="text-destructive">*</span>
+            </FieldLabel>
             <InputGroup className="shadow-none">
               <InputGroupAddon>
                 <InputGroupText>{currencySymbol}</InputGroupText>
@@ -464,7 +470,9 @@ function LineItemBody({
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="line-item-qty">{isHourly ? "Hours" : "Quantity"}</FieldLabel>
+            <FieldLabel htmlFor="line-item-qty">
+              {isHourly ? "Hours" : "Quantity"} <span className="text-destructive">*</span>
+            </FieldLabel>
             {isHourly ? (
               <InputGroup className="shadow-none">
                 <InputGroupInput
@@ -509,10 +517,11 @@ function LineItemBody({
         <Field>
           <FieldLabel htmlFor="line-item-hsn">
             {isService ? "SAC code" : "HSN code"}
-            {/* Dropped rather than swapped for a required marker: every other
-              required field in this dialog carries no marker, so the suffix
-              going away is what "required" looks like here. */}
-            {!values.saveAsSku && (
+            {/* Required only while the item is being saved to the catalogue,
+              which rejects an item with no tax code. */}
+            {values.saveAsSku ? (
+              <span className="text-destructive"> *</span>
+            ) : (
               <span className="font-normal text-muted-foreground"> (optional)</span>
             )}
           </FieldLabel>

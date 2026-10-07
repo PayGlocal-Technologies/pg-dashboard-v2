@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -31,6 +32,7 @@ import {
   useClientContractUpload,
   useClientContractView,
   useClientCountryMap,
+  useClientMidScope,
   useClients,
   useCreateClient,
   useUpdateClient,
@@ -44,6 +46,7 @@ import type { Client, ClientFormValues } from "@/features/dashboard/client-manag
 import {
   CLIENT_PAGE_LIMIT,
   CLIENT_SEARCH_HINTS,
+  FIXED_COLUMN_KEYS,
   countryOptionsFromMap,
   currencyForCountry,
 } from "@/features/dashboard/client-management/constants";
@@ -77,9 +80,19 @@ interface ClientTableProps {
    *  the page header while every row this creates lives down here. */
   addClientOpen: boolean;
   onAddClientOpenChange: (open: boolean) => void;
+  /** The page's Add client opener, taking the MID the merchant picked ("" when
+   *  there was nothing to ask). The empty state's own button goes through it,
+   *  behind the same MID question as the header. */
+  onAddClient: (mid: string) => void;
 }
 
-export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTableProps) {
+export function ClientTable({
+  addClientOpen,
+  onAddClientOpenChange,
+  onAddClient,
+}: ClientTableProps) {
+  const { needsMidChoice, midOptions } = useClientMidScope();
+
   // The id of the client being edited, or null when the form is in Add mode.
   //
   // An id rather than the row, because the form is populated from the by-id
@@ -97,6 +110,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // null until the merchant actually drags a column, at which point DataTable
   // renders that order instead of buildClientColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
 
   // The client whose details are being viewed. A row opens the drawer,
   // Expand widens it into the full page in place of the table, Collapse and
@@ -226,7 +240,9 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   };
 
   const baseColumns = buildClientColumns();
-  const columns = reorderColumns(baseColumns, columnOrder);
+  const columns = reorderColumns(baseColumns, columnOrder).filter(
+    (c) => !hiddenColumns.includes(c.key)
+  );
   const reorderableColumns = baseColumns.map((c) => ({
     key: c.key,
     label: typeof c.header === "string" ? c.header : c.key,
@@ -247,14 +263,15 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   /** Only the first-time state gets the action — the fix for an empty search
    *  is a different search, not a new client. */
   const emptyAction = hasNarrowingFilters ? undefined : (
-    <Button
-      type="button"
+    <MidScopedAction
+      label="Add client"
+      icon="plus"
       variant="primary"
-      leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-      onClick={() => onAddClientOpenChange(true)}
-    >
-      Add client
-    </Button>
+      size="md"
+      needsMidChoice={needsMidChoice}
+      midOptions={midOptions}
+      onRun={onAddClient}
+    />
   );
 
   // Shared verbatim between the desktop and tablet/mobile control rows below
@@ -351,7 +368,14 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
                       columns={reorderableColumns}
                       order={currentColumnOrder}
                       onOrderChange={setColumnOrder}
-                      onReset={() => setColumnOrder(null)}
+                      onReset={() => {
+                        setColumnOrder(null);
+                        setHiddenColumns([]);
+                      }}
+                      hiddenKeys={hiddenColumns}
+                      onHiddenKeysChange={setHiddenColumns}
+                      fixedKeys={FIXED_COLUMN_KEYS}
+                      fixedReason="Always shown. A client row is unreadable without the business name."
                     />
                   </div>
                 </div>

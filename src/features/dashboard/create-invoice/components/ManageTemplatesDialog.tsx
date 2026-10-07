@@ -8,6 +8,16 @@ import { TEMPLATE_NAME_MAX_LENGTH } from "@/features/dashboard/create-invoice/co
 import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
 
 /**
+ * The fields this dialog reads. Narrower than InvoiceTemplate so the invoice
+ * links editor, which shares the template store but not the MCA editor's
+ * snapshot shape, can list its own templates here too.
+ */
+type TemplateListEntry = Pick<
+  InvoiceTemplate,
+  "id" | "name" | "description" | "savedAt" | "lastUsedAt"
+>;
+
+/**
  * Edit, rename and delete saved templates.
  *
  * Edit hands off to the invoice workflow — this dialog only ever touches a
@@ -27,7 +37,7 @@ export function ManageTemplatesDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  templates: InvoiceTemplate[];
+  templates: TemplateListEntry[];
   /**
    * True while a rename or delete is in flight.
    *
@@ -46,7 +56,7 @@ export function ManageTemplatesDialog({
   const [renameValue, setRenameValue] = useState("");
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
-  const startRename = (template: InvoiceTemplate) => {
+  const startRename = (template: TemplateListEntry) => {
     setPendingDeleteId(null);
     setRenamingId(template.id);
     setRenameValue(template.name);

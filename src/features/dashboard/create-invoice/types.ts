@@ -152,6 +152,8 @@ export interface LineItemSuggestion {
   hsn: string | null;
   name: string;
   type: string | null;
+  /** The catalogue SKU this item is, when it is one. get-line-items now returns it. */
+  skuId?: string | null;
 }
 
 export type LineItemsResponse = BaseResponse<{ lineItems: LineItemSuggestion[] }>;

@@ -1674,6 +1674,8 @@ function InvoiceEditor({
                 onApply={handleApplyTemplate}
                 onDetach={handleDetachTemplate}
                 onManage={() => setManageTemplatesOpen(true)}
+                canSave={hasTemplatableContent}
+                onSave={() => setSaveTemplateOpen(true)}
               />
             </div>
 

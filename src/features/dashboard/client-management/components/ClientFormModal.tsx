@@ -620,7 +620,7 @@ function ClientFormBody({
               {(field) => (
                 <Field>
                   <FieldLabel htmlFor="client-phone-number">
-                    <RequiredMark /> Primary contact number
+                    Primary contact number
                   </FieldLabel>
                   <div className="grid gap-2 sm:grid-cols-[minmax(0,11rem)_minmax(0,1fr)]">
                     <form.Field name="phoneCountry">

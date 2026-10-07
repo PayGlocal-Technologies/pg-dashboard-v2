@@ -14,38 +14,37 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+// Presentational date formatting, borrowed the same way ChipField is.
 import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
-import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
+import type { InvoiceLinkTemplate } from "@/features/dashboard/invoice-links/create/types";
 
 /**
- * "Start from a template". Always shown, even with no templates saved, so a
- * merchant knows the feature exists; that empty state offers the first save
- * (the same dialog as the header's "Save as template").
+ * "Start from a template", the invoice-link copy of the MCA editor's template
+ * card (create-invoice's InvoiceTemplatePicker), over the same template store.
  *
- * Nova's template card, above the first section of the form. One departure,
- * because this one is wired to a form that already has content in it:
- * applying a template over a part-filled invoice asks first. Nova overwrites
- * silently, which is survivable in a mock and is not here: this editor
- * autosaves 1.2s later, so a mis-click is persisted before it can be undone.
+ * Always shown, even with no templates saved, so a merchant knows the feature
+ * exists; that empty state offers the first save, as the MCA editor's does.
+ * Choosing hands the template up; the parent decides whether to confirm first
+ * (ApplyTemplateConfirm below), because "Edit" in the manage dialog reaches the
+ * same apply and must ask the same question.
  */
-export function InvoiceTemplatePicker({
+export function TemplatePicker({
   templates,
   isReady,
+  isApplying,
   activeTemplateId,
-  hasContent,
-  onApply,
+  onChoose,
   onDetach,
   onManage,
   canSave,
   onSave,
 }: {
-  templates: InvoiceTemplate[];
+  templates: InvoiceLinkTemplate[];
   isReady: boolean;
-  /** The template this invoice was built from, if any. */
+  /** True while the chosen template is being read fresh from the server. */
+  isApplying: boolean;
   activeTemplateId: string | null;
-  /** True when the form already holds items or notes worth protecting. */
-  hasContent: boolean;
-  onApply: (template: InvoiceTemplate) => void;
+  onChoose: (template: InvoiceLinkTemplate) => void;
   /** Unlinks from the active template. Never touches the invoice's contents. */
   onDetach: () => void;
   onManage: () => void;
@@ -55,23 +54,12 @@ export function InvoiceTemplatePicker({
   onSave: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pendingTemplate, setPendingTemplate] = useState<InvoiceTemplate | null>(null);
 
   const active = templates.find((template) => template.id === activeTemplateId) ?? null;
 
-
-  const choose = (template: InvoiceTemplate) => {
+  const choose = (template: InvoiceLinkTemplate) => {
     setPickerOpen(false);
-    if (hasContent) {
-      setPendingTemplate(template);
-      return;
-    }
-    onApply(template);
-  };
-
-  const confirmApply = () => {
-    if (pendingTemplate) onApply(pendingTemplate);
-    setPendingTemplate(null);
+    onChoose(template);
   };
 
   return (
@@ -126,10 +114,7 @@ export function InvoiceTemplatePicker({
             <Button
               type="button"
               variant="outline"
-              // The chevron rides in `rightIcon` so flux renders it as a real
-              // sibling of the children wrapper; `[&>span]:min-w-0` is what lets
-              // that wrapper shrink, so a long template name truncates instead
-              // of pushing the chevron out of the button.
+              disabled={isApplying}
               className="h-auto w-full justify-between px-3.5 py-2.5 text-left shadow-none [&>span]:min-w-0 [&>span]:flex-1"
               rightIcon={
                 <Icon
@@ -141,7 +126,7 @@ export function InvoiceTemplatePicker({
             >
               <span className="block min-w-0">
                 <span className="block truncate text-[13.5px] font-medium text-foreground">
-                  {active ? active.name : "No template"}
+                  {isApplying ? "Applying template…" : active ? active.name : "No template"}
                 </span>
                 <span className="block truncate text-[12px] font-normal text-muted-foreground">
                   {active
@@ -153,13 +138,6 @@ export function InvoiceTemplatePicker({
           </PopoverTrigger>
 
           <PopoverContent align="start" className="w-[22rem] p-1.5">
-            {/* Detach. Sits at the top of the list, ticked when nothing is
-                active, so the whole popover reads as one radio group whose first
-                option is "none" — which is where a reader looks for it.
-
-                It clears the link and nothing else: the items, totals, notes and
-                branding stay exactly as they are. That is why it needs no
-                confirmation, unlike applying a template over live content. */}
             <Button
               type="button"
               variant="ghost"
@@ -191,13 +169,6 @@ export function InvoiceTemplatePicker({
             <Separator className="my-1" />
 
             {templates.map((template) => (
-              // flux's Button wraps ALL its children in one plain <span>, so
-              // `justify-between` on the button itself would only ever see that
-              // one wrapper and a block child inside it would break the line.
-              // Anything needing internal layout therefore passes exactly one
-              // child that carries the flex, and `[&>span]` lets the wrapper
-              // shrink so the name can truncate. Same shape as
-              // PaymentDetailsSection's account rows.
               <Button
                 key={template.id}
                 type="button"
@@ -227,41 +198,59 @@ export function InvoiceTemplatePicker({
           </PopoverContent>
         </Popover>
       )}
-
-      <Dialog
-        open={!!pendingTemplate}
-        onOpenChange={(open) => {
-          if (!open) setPendingTemplate(null);
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogTitle>Apply &ldquo;{pendingTemplate?.name}&rdquo;?</DialogTitle>
-          <p className="mt-2 text-[13px] text-muted-foreground">
-            This replaces the items, totals, receiving account, notes and branding on this invoice
-            with the template&apos;s. The client, invoice number and dates stay as they are.
-          </p>
-          {pendingTemplate && (
-            <p className="mt-3 rounded-lg bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
-              {pendingTemplate.description}
-              {formatEpochDay(pendingTemplate.savedAt) &&
-                ` · saved ${formatEpochDay(pendingTemplate.savedAt)}`}
-            </p>
-          )}
-          <div className="mt-5 flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => setPendingTemplate(null)}
-            >
-              Cancel
-            </Button>
-            <Button type="button" variant="primary" size="sm" onClick={confirmApply}>
-              Apply template
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
+  );
+}
+
+/**
+ * "Apply over what is already here?" Shown only when the invoice has content,
+ * because applying replaces the line items.
+ */
+export function ApplyTemplateConfirm({
+  template,
+  onCancel,
+  onConfirm,
+}: {
+  template: InvoiceLinkTemplate | null;
+  onCancel: () => void;
+  onConfirm: (template: InvoiceLinkTemplate) => void;
+}) {
+  const pendingTemplate = template;
+  return (
+    <Dialog
+      open={!!pendingTemplate}
+      onOpenChange={(open) => {
+        if (!open) onCancel();
+      }}
+    >
+      <DialogContent className="max-w-md">
+        <DialogTitle>Apply &ldquo;{pendingTemplate?.name}&rdquo;?</DialogTitle>
+        <p className="mt-2 text-[13px] text-muted-foreground">
+          This replaces the line items, currency, discount, memo and note on this invoice with the
+          template&apos;s, and sets the due date from its payment term. The clients and the invoice
+          number stay as they are.
+        </p>
+        {pendingTemplate && (
+          <p className="mt-3 rounded-lg bg-muted/40 px-3 py-2 text-[12px] text-muted-foreground">
+            {pendingTemplate.description}
+            {formatEpochDay(pendingTemplate.savedAt) &&
+              ` · saved ${formatEpochDay(pendingTemplate.savedAt)}`}
+          </p>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => pendingTemplate && onConfirm(pendingTemplate)}
+          >
+            Apply template
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

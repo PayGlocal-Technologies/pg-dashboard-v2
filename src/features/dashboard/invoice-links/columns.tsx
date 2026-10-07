@@ -143,7 +143,9 @@ export function buildInvoiceLinkRowActions(
     actions.push({
       key: "updateStatus",
       label: isOfflinePaid ? "View Proof Documents" : "Update Status",
-      icon: isOfflinePaid ? "file-text" : "upload",
+      // A check, not an upload arrow: the action marks the invoice paid, and
+      // attaching proof is only how it does that.
+      icon: isOfflinePaid ? "file-text" : "badge-check",
       disabled: !canTouchDocuments,
       onSelect: () => handlers.onUpdateStatus(row, isOfflinePaid),
     });
@@ -207,14 +209,14 @@ export function buildInvoiceLinkColumns(opts?: {
       key: "id",
       header: "Invoice ID",
       minWidth: 170,
-      render: (row) => <CopyableCell value={row.id} label="Invoice ID" monospace />,
+      render: (row) => <CopyableCell value={row.id} label="Invoice ID" />,
     },
     {
       key: "plId",
       header: "PL ID",
       minWidth: 170,
       render: (row) =>
-        row.plId ? <CopyableCell value={row.plId} label="PL ID" monospace /> : <span>-</span>,
+        row.plId ? <CopyableCell value={row.plId} label="PL ID" /> : <span>-</span>,
     },
     {
       key: "totalAmount",
