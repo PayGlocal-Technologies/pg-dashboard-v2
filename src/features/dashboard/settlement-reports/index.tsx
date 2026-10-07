@@ -1,14 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { useReducedMotion } from "framer-motion";
-import {
-  DrawerExpandMorph,
-  drawerRect,
-  elementRect,
-  type DrawerMorph,
-} from "@/components/common/DrawerExpandMorph";
-import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
+import { useMemo, useState } from "react";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
 import {
   SettlementDetailsDrawer,
   SettlementDrawerBody,
@@ -86,13 +79,6 @@ import type {
 } from "@/features/dashboard/settlement-reports/types";
 
 const SETTLEMENT_PAGE_LIMIT = 50;
-
-// Sets scrollTop via a standalone function since the element comes from
-// useContentAreaElement, and React Compiler's lint forbids mutating a
-// hook-returned value directly.
-function setScrollTop(el: HTMLElement, value: number): void {
-  el.scrollTop = value;
-}
 
 /** The compact outline style of the Transactions table's toolbar actions. */
 const TOOLBAR_BUTTON_CLASS =
@@ -416,77 +402,19 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // The same flow as a transaction's details: a row opens the drawer, Expand
   // opens it out into a page that replaces everything below the nav, and
   // Collapse / Back return. The settlement is held as the row itself.
-  const contentEl = useContentAreaElement();
-  const reduceMotion = useReducedMotion();
-  const slotRef = useRef<HTMLDivElement>(null);
-  const [detailRow, setDetailRow] = useState<SettlementRow | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [pageOpen, setPageOpen] = useState(false);
-  const [morph, setMorph] = useState<DrawerMorph | null>(null);
-  const [instantDrawer, setInstantDrawer] = useState(false);
-  const [scrollPosition, setScrollPosition] = useState(0);
-
-  const openDetails = (row: SettlementRow) => {
-    setDetailRow(row);
-    setInstantDrawer(false);
-    setDrawerOpen(true);
-  };
-  const onDrawerOpenChange = (open: boolean) => {
-    if (!open) setInstantDrawer(false);
-    setDrawerOpen(open);
-  };
-  const showPage = () => {
-    setPageOpen(true);
-    if (contentEl) setScrollTop(contentEl, 0);
-  };
-  const hidePage = () => setPageOpen(false);
-  const pageRect = () => {
-    const slot = elementRect(slotRef.current);
-    return {
-      top: slot.top + (contentEl ? contentEl.scrollTop : window.scrollY),
-      left: slot.left,
-      width: slot.width,
-    };
-  };
-  const expandToPage = () => {
-    if (contentEl) setScrollPosition(contentEl.scrollTop);
-    if (reduceMotion) {
-      setDrawerOpen(false);
-      showPage();
-      return;
-    }
-    setInstantDrawer(true);
-    setMorph({
-      kind: "expand",
-      from: drawerRect(SETTLEMENT_DRAWER_WIDTH_PX),
-      to: elementRect(contentEl),
-      page: pageRect(),
-    });
-    setDrawerOpen(false);
-  };
-  const collapseToDrawer = () => {
-    if (reduceMotion) {
-      hidePage();
-      setDrawerOpen(true);
-      return;
-    }
-    const slot = elementRect(slotRef.current);
-    setInstantDrawer(true);
-    setMorph({
-      kind: "collapse",
-      from: elementRect(contentEl),
-      to: drawerRect(SETTLEMENT_DRAWER_WIDTH_PX),
-      page: { top: slot.top, left: slot.left, width: slot.width },
-    });
-  };
-  const backToList = () => {
-    hidePage();
-    setDetailRow(null);
-  };
-  // Puts the list back where it was once it is back in the page's place.
-  useEffect(() => {
-    if (!pageOpen && contentEl) setScrollTop(contentEl, scrollPosition);
-  }, [pageOpen, contentEl, scrollPosition]);
+  const {
+    record: detailRow,
+    pageOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: openDetails,
+    onDrawerOpenChange,
+    expand: expandToPage,
+    collapse: collapseToDrawer,
+    back: backToList,
+    morphLayer,
+  } = useDrawerExpand<SettlementRow>({ drawerWidthPx: SETTLEMENT_DRAWER_WIDTH_PX });
 
   const upcoming = calendar.upcomingSchedule;
 
@@ -780,32 +708,24 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
       )}
       {/* One stable slot for the hand-off layer, so swapping list and page
           under it never remounts it. */}
-      {morph && detailRow && (
-        <DrawerExpandMorph
-          key={morph.kind}
-          morph={morph}
-          drawerWidthPx={SETTLEMENT_DRAWER_WIDTH_PX}
-          drawerContent={
-            <SettlementDrawerBody
-              settlement={detailRow}
-              onClose={() => {}}
-              onExpand={() => {}}
-              onDownload={() => {}}
-            />
-          }
-          pageContent={
-            <SettlementDetailsPage
-              settlement={detailRow}
-              onBack={() => {}}
-              onCollapse={() => {}}
-              onDownload={() => {}}
-            />
-          }
-          onCovered={hidePage}
-          onArrive={morph.kind === "expand" ? showPage : () => setDrawerOpen(true)}
-          onDone={() => setMorph(null)}
-        />
-      )}
+      {morphLayer((settlement) => ({
+        drawer: (
+          <SettlementDrawerBody
+            settlement={settlement}
+            onClose={() => {}}
+            onExpand={() => {}}
+            onDownload={() => {}}
+          />
+        ),
+        page: (
+          <SettlementDetailsPage
+            settlement={settlement}
+            onBack={() => {}}
+            onCollapse={() => {}}
+            onDownload={() => {}}
+          />
+        ),
+      }))}
     </MidGuard>
   );
 }

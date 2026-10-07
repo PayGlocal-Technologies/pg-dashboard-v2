@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import {
   CountryFilterChip,
   FilterChipGroup,
@@ -18,7 +17,12 @@ import {
   ClientCard,
   ClientCardSkeleton,
 } from "@/features/dashboard/client-management/components/ClientCardList";
-import { ClientDetailsDrawer } from "@/features/dashboard/client-management/components/ClientDetailsDrawer";
+import {
+  CLIENT_DRAWER_WIDTH_PX,
+  ClientDetailsDrawer,
+  ClientDrawerBody,
+} from "@/features/dashboard/client-management/components/ClientDetailsDrawer";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
 import { ClientDetailsPage } from "@/features/dashboard/client-management/components/ClientDetailsPage";
 import { ClientFormModal } from "@/features/dashboard/client-management/components/ClientFormModal";
 import {
@@ -43,14 +47,6 @@ import {
   countryOptionsFromMap,
   currencyForCountry,
 } from "@/features/dashboard/client-management/constants";
-
-// Sets scrollTop via a standalone function (rather than inline in a handler)
-// since the element comes from useContentAreaElement, and React Compiler's
-// lint forbids mutating a hook-returned value directly. Same helper, same
-// reason, as McaTransactionTable's.
-function restoreScrollTop(el: HTMLElement, value: number): void {
-  el.scrollTop = value;
-}
 
 /**
  * The Country chip, in a `FilterChipGroup` of its own rather than one shared
@@ -84,9 +80,6 @@ interface ClientTableProps {
 }
 
 export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTableProps) {
-  const contentEl = useContentAreaElement();
-  const [scrollPosition, setScrollPosition] = useState(0);
-
   // The id of the client being edited, or null when the form is in Add mode.
   //
   // An id rather than the row, because the form is populated from the by-id
@@ -105,15 +98,24 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // renders that order instead of buildClientColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
 
-  // The client whose details are being viewed. Held as an id (not the row) so
-  // it survives the source list changing underneath it once a real endpoint
-  // replaces MOCK_CLIENTS. The drawer and the expanded page are two
-  // presentations of that same selection, so they share it: drawerOpen and
-  // detailsOpen are mutually exclusive — a row click opens the drawer, and
-  // Expand hands the same client off to the page.
-  const [detailsId, setDetailsId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
+  // The client whose details are being viewed. A row opens the drawer,
+  // Expand widens it into the full page in place of the table, Collapse and
+  // Back return (see useDrawerExpand). Only its id is read from the held row,
+  // so the by-id fetch below always shows the latest record.
+  const {
+    record: detailsRecord,
+    pageOpen: detailsOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: openDetails,
+    onDrawerOpenChange,
+    expand: expandToPage,
+    collapse: collapseToDrawer,
+    back: closeDetails,
+    morphLayer,
+  } = useDrawerExpand<Client>({ drawerWidthPx: CLIENT_DRAWER_WIDTH_PX });
+  const detailsId = detailsRecord?.id ?? null;
 
   // Both filters and the page are request inputs, so the rows that arrive are
   // exactly the rows to draw and totalCount always describes the same set they
@@ -223,45 +225,6 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
     onAddClientOpenChange(open);
   };
 
-  // Clicking a row opens the drawer, not the full page. The table stays
-  // mounted underneath it, so filters, paging, and scroll are untouched for
-  // the whole time the drawer is open and after it closes.
-  const openDetails = (row: { id: string }) => {
-    setDetailsId(row.id);
-    setDrawerOpen(true);
-  };
-
-  // Expand hands the drawer's current client off to the full page. detailsId
-  // already holds that selection, so the page renders exactly what the drawer
-  // was showing. The table's scroll position is captured here (rather than
-  // when the drawer opened) because this is the point the table actually
-  // leaves the screen and Back has to restore it.
-  const expandToPage = (client: { id: string }) => {
-    if (contentEl) setScrollPosition(contentEl.scrollTop);
-    setDetailsId(client.id);
-    setDrawerOpen(false);
-    setDetailsOpen(true);
-  };
-
-  // Collapse reverses Expand: closes the full page and reopens the same client
-  // in the drawer. Deliberately doesn't touch detailsId, so whichever client
-  // was showing stays showing, and the scroll-restore effect below puts the
-  // table back where expandToPage found it.
-  const collapseToDrawer = () => {
-    setDetailsOpen(false);
-    setDrawerOpen(true);
-  };
-
-  // Restores the table's scroll position after the details page unmounts and
-  // the table re-renders in its place — deferred to an effect (rather than set
-  // inline in the handler) so it runs after the table's own content is back in
-  // the DOM, not while the details page is still on screen.
-  useEffect(() => {
-    if (!detailsOpen && contentEl) {
-      restoreScrollTop(contentEl, scrollPosition);
-    }
-  }, [detailsOpen, contentEl, scrollPosition]);
-
   const baseColumns = buildClientColumns();
   const columns = reorderColumns(baseColumns, columnOrder);
   const reorderableColumns = baseColumns.map((c) => ({
@@ -327,181 +290,201 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
 
   // The details page replaces the table in place (same component instance,
   // same closed-over search/filter/page state) rather than overlaying it —
-  // this is what makes Back restore the table's previous state for free, the
-  // same arrangement McaTransactionTable uses for transactions.
-  if (detailsOpen && detailsRow) {
-    return (
-      <ClientDetailsPage
-        client={detailsRow}
-        onBack={() => setDetailsOpen(false)}
-        onCollapse={collapseToDrawer}
-      />
-    );
-  }
+  // this is what makes Back restore the table's previous state for free.
+  const detailsPage =
+    detailsOpen && detailsRow ? (
+      <ClientDetailsPage client={detailsRow} onBack={closeDetails} onCollapse={collapseToDrawer} />
+    ) : null;
 
   return (
     // Two surfaces, one visible at a time: the table card from `lg` up, the
     // card list below it. CSS decides, not a media-query hook — a hook has to
     // guess on the server, so one cohort sees the wrong layout on first paint.
+    // Both sit in one stable slot with the details page, which takes their
+    // place when expanded.
     <>
-      {/* Desktop (lg+): search, filter chips, and the column manager share one
+      <div ref={slotRef}>
+        {detailsPage ?? (
+          <>
+            {/* Desktop (lg+): search, filter chips, and the column manager share one
           toolbar row, the manager pushed right via ml-auto. */}
-      <DataTableCard
-        className="hidden lg:block"
-        toolbar={
-          <div className="flex flex-wrap items-center gap-2">
-            <RotatingSearchInput
-              value={search}
-              onSearch={(v) => {
-                setSearch(v);
-                setPage(1);
-              }}
-              words={CLIENT_SEARCH_HINTS}
-              ariaLabel="Search clients by business name, contact name, or email"
-              className="w-40 sm:w-56"
-            />
+            <DataTableCard
+              className="hidden lg:block"
+              toolbar={
+                <div className="flex flex-wrap items-center gap-2">
+                  <RotatingSearchInput
+                    value={search}
+                    onSearch={(v) => {
+                      setSearch(v);
+                      setPage(1);
+                    }}
+                    words={CLIENT_SEARCH_HINTS}
+                    ariaLabel="Search clients by business name, contact name, or email"
+                    className="w-40 sm:w-56"
+                  />
 
-            <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
+                  <div className="flex flex-wrap items-center gap-1.5">{renderFilterChips()}</div>
 
-            <div className="ml-auto flex items-center gap-2">
-              {/* Every mutation already invalidates the client list, so this is for
+                  <div className="ml-auto flex items-center gap-2">
+                    {/* Every mutation already invalidates the client list, so this is for
               changes made elsewhere — another tab, or another member of the team.
               Spinning on isFetching (not isLoading) is what makes a press over
               existing rows visibly do something. */}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                aria-label="Refresh clients"
-                disabled={isFetching}
-                leftIcon={
-                  <Icon
-                    name="refresh"
-                    className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
-                  />
-                }
-                onClick={refetch}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-              >
-                Refresh
-              </Button>
-              <ColumnManager
-                columns={reorderableColumns}
-                order={currentColumnOrder}
-                onOrderChange={setColumnOrder}
-                onReset={() => setColumnOrder(null)}
-              />
-            </div>
-          </div>
-        }
-        columns={columns}
-        data={pageRows}
-        rowKey={(row) => row.id}
-        isLoading={isLoading}
-        // The whole row opens the details view, through DataTable's row-level
-        // handler rather than a wrapper inside every cell. Clicks on the row's
-        // own buttons and menus are skipped by it, so each still does only its
-        // own job.
-        onRowClick={openDetails}
-        // The drawn first-run state, kept from before the card.
-        emptyState={
-          <PlaceholderState
-            variant="empty-table"
-            title={emptyTitle}
-            description={emptyDescription}
-            action={emptyAction}
-            className="py-16"
-          />
-        }
-        emptyTitle={emptyTitle}
-        emptyDescription={emptyDescription}
-        pagination={{
-          mode: "page",
-          page,
-          pageSize: CLIENT_PAGE_LIMIT,
-          total: totalCount,
-          onPageChange: setPage,
-        }}
-        tableLayout="content"
-        // The page scrolls; this grid grows with its rows.
-        maxBodyHeight="none"
-        // Edit rides the rowAction slot rather than a column of its own — the
-        // same arrangement, and the same button treatment, as the Upload Invoice
-        // action on the client's transactions table. Revealed on row hover and on
-        // keyboard focus within the row, pinned right while the columns scroll
-        // under it, and out of the way of column reordering.
-        rowAction={(row) => (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="pencil" className="h-3 w-3" />}
-            onClick={(e) => {
-              // The action floats over the row, whose own click opens the
-              // details drawer — without this, editing would open both.
-              e.stopPropagation();
-              onEditClient(row);
-            }}
-            className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
-          >
-            Edit
-          </Button>
-        )}
-      />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      aria-label="Refresh clients"
+                      disabled={isFetching}
+                      leftIcon={
+                        <Icon
+                          name="refresh"
+                          className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+                        />
+                      }
+                      onClick={refetch}
+                      className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                    >
+                      Refresh
+                    </Button>
+                    <ColumnManager
+                      columns={reorderableColumns}
+                      order={currentColumnOrder}
+                      onOrderChange={setColumnOrder}
+                      onReset={() => setColumnOrder(null)}
+                    />
+                  </div>
+                </div>
+              }
+              columns={columns}
+              data={pageRows}
+              rowKey={(row) => row.id}
+              isLoading={isLoading}
+              // The whole row opens the details view, through DataTable's row-level
+              // handler rather than a wrapper inside every cell. Clicks on the row's
+              // own buttons and menus are skipped by it, so each still does only its
+              // own job.
+              onRowClick={openDetails}
+              // The drawn first-run state, kept from before the card.
+              emptyState={
+                <PlaceholderState
+                  variant="empty-table"
+                  title={emptyTitle}
+                  description={emptyDescription}
+                  action={emptyAction}
+                  className="py-16"
+                />
+              }
+              emptyTitle={emptyTitle}
+              emptyDescription={emptyDescription}
+              pagination={{
+                mode: "page",
+                page,
+                pageSize: CLIENT_PAGE_LIMIT,
+                total: totalCount,
+                onPageChange: setPage,
+              }}
+              tableLayout="content"
+              // The page scrolls; this grid grows with its rows.
+              maxBodyHeight="none"
+              // Edit rides the rowAction slot rather than a column of its own — the
+              // same arrangement, and the same button treatment, as the Upload Invoice
+              // action on the client's transactions table. Revealed on row hover and on
+              // keyboard focus within the row, pinned right while the columns scroll
+              // under it, and out of the way of column reordering.
+              rowAction={(row) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Icon name="pencil" className="h-3 w-3" />}
+                  onClick={(e) => {
+                    // The action floats over the row, whose own click opens the
+                    // details drawer — without this, editing would open both.
+                    e.stopPropagation();
+                    onEditClient(row);
+                  }}
+                  className="h-auto min-h-0 gap-1 rounded-md bg-card px-2 py-1 text-[11px] whitespace-nowrap shadow-sm"
+                >
+                  Edit
+                </Button>
+              )}
+            />
 
-      {/* Tablet + mobile (below lg): the same page's rows as cards, in their
+            {/* Tablet + mobile (below lg): the same page's rows as cards, in their
           own copy of the same surface — its own toolbar, since a column
           manager has no table to act on down here. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
-        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
-          <RotatingSearchInput
-            value={search}
-            onSearch={(v) => {
-              setSearch(v);
-              setPage(1);
-            }}
-            words={CLIENT_SEARCH_HINTS}
-            ariaLabel="Search clients by business name, contact name, or email"
-            className="min-w-0 flex-1"
-          />
-          <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
-            {renderFilterChips()}
-          </div>
-        </div>
+            <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+              <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+                <RotatingSearchInput
+                  value={search}
+                  onSearch={(v) => {
+                    setSearch(v);
+                    setPage(1);
+                  }}
+                  words={CLIENT_SEARCH_HINTS}
+                  ariaLabel="Search clients by business name, contact name, or email"
+                  className="min-w-0 flex-1"
+                />
+                <div className="scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto">
+                  {renderFilterChips()}
+                </div>
+              </div>
 
-        <DataCardList
-          bordered={false}
-          rows={pageRows}
-          rowKey={(row) => row.id}
-          renderCard={(row) => <ClientCard row={row} onOpenDetails={openDetails} />}
-          renderSkeleton={() => <ClientCardSkeleton />}
-          isLoading={isLoading}
-          emptyState={
-            <PlaceholderState
-              variant="empty-table"
-              size="sm"
-              title={emptyTitle}
-              description={emptyDescription}
-              action={emptyAction}
-            />
-          }
-          pagination={{
-            mode: "page",
-            page,
-            pageSize: CLIENT_PAGE_LIMIT,
-            total: totalCount,
-            onPageChange: setPage,
-          }}
-        />
+              <DataCardList
+                bordered={false}
+                rows={pageRows}
+                rowKey={(row) => row.id}
+                renderCard={(row) => <ClientCard row={row} onOpenDetails={openDetails} />}
+                renderSkeleton={() => <ClientCardSkeleton />}
+                isLoading={isLoading}
+                emptyState={
+                  <PlaceholderState
+                    variant="empty-table"
+                    size="sm"
+                    title={emptyTitle}
+                    description={emptyDescription}
+                    action={emptyAction}
+                  />
+                }
+                pagination={{
+                  mode: "page",
+                  page,
+                  pageSize: CLIENT_PAGE_LIMIT,
+                  total: totalCount,
+                  onPageChange: setPage,
+                }}
+              />
+            </div>
+          </>
+        )}
       </div>
       {/* Rendered alongside the table (not in place of it) so closing it leaves
           the table's search, filters, and page exactly as they were. */}
       <ClientDetailsDrawer
         client={detailsRow}
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        onExpand={expandToPage}
+        onOpenChange={onDrawerOpenChange}
+        onExpand={() => expandToPage()}
+        instant={instantDrawer}
       />
+      {/* The drawer's and the page's real insides for the hand-off (inert,
+          so the handlers never fire). */}
+      {morphLayer(() => {
+        if (!detailsRow) return { drawer: null, page: null };
+        return {
+          drawer: (
+            <ClientDrawerBody
+              client={detailsRow}
+              onClose={() => {}}
+              onExpand={() => {}}
+              invoiceStatuses={[]}
+              onInvoiceStatusesChange={() => {}}
+            />
+          ),
+          page: <ClientDetailsPage client={detailsRow} onBack={() => {}} onCollapse={() => {}} />,
+        };
+      })}
 
       {/* One form serving both Add and Edit — the field model is the same, so
           `editing` is the only thing that distinguishes them. */}

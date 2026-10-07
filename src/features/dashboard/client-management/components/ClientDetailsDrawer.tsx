@@ -17,12 +17,18 @@ import { ClientInvoicesSection } from "@/features/dashboard/client-management/co
 import { useClientContractView } from "@/features/dashboard/client-management/hooks";
 import type { Client } from "@/features/dashboard/client-management/types";
 
+/** The drawer's width on sm+, shared with the expand/collapse hand-off. */
+export const CLIENT_DRAWER_WIDTH_PX = 512;
+
 interface ClientDetailsDrawerProps {
   client: Client | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   /** Opens the full-page view for the same client. */
   onExpand: (client: Client) => void;
+  /** Skip the slide in/out while DrawerExpandMorph covers the drawer, so it
+   *  can appear or vanish under the hand-off in one frame. */
+  instant?: boolean;
 }
 
 /**
@@ -38,14 +44,13 @@ export function ClientDetailsDrawer({
   open,
   onOpenChange,
   onExpand,
+  instant = false,
 }: ClientDetailsDrawerProps) {
   // A breakpoint read here can't cause a hydration mismatch: with open=false
   // Radix renders no portal and no content at all, so `side` has no effect on
   // the DOM until a row is clicked, which is client-only by definition.
   const { isBelow } = useBreakpoint();
   const isBottomSheet = isBelow("md");
-
-  const { viewContract } = useClientContractView();
 
   // Which invoice statuses the ledger below is narrowed to. Held here rather
   // than inside the ledger so the drawer keeps the merchant's choice across a
@@ -73,77 +78,105 @@ export function ClientDetailsDrawer({
       <DrawerContent
         className={cn(
           "[&>button:last-child]:hidden",
-          !isBottomSheet && "w-full sm:w-[32rem] sm:max-w-[92vw]"
+          !isBottomSheet && "w-full sm:w-[32rem] sm:max-w-[92vw]",
+          instant && "data-[state=closed]:animate-none! data-[state=open]:animate-none!"
         )}
       >
         <DrawerTitle asChild>
           <VisuallyHidden>Client details</VisuallyHidden>
         </DrawerTitle>
 
-        {/* Close and Expand grouped together on the left, adjacent to one
-            another — the same header composition, components, and sizes as the
-            transaction drawer's. Nothing sits opposite them: the client id the
-            transaction drawer's header counterpart shows is deliberately not
-            surfaced anywhere in Client Management. */}
-        <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
-          <div className="flex shrink-0 items-center gap-1">
-            <IconButton
-              aria-label="Close"
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-            >
-              <Icon name="x" className="h-4 w-4" />
-            </IconButton>
-            {/* Not rendered at all as a bottom sheet (rather than hidden with a
-                class): there is no expanded view in the mobile flow, which is
-                card to sheet and back, so the action has nothing to point at
-                there — same rule the transaction drawer follows. */}
-            {!isBottomSheet && (
-              <IconButton
-                aria-label="Expand to full page"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (client) onExpand(client);
-                }}
-              >
-                <Icon name="expand" className="h-4 w-4" />
-              </IconButton>
-            )}
-          </div>
-        </DrawerHeader>
-
-        {/* Only this region scrolls, so the header's close/expand stay
-            reachable however long the content runs — which it does, since the
-            drawer carries the metrics and the invoice ledger as well as the
-            detail sections. Sections scroll rather than being dropped. */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          {client && (
-            <ClientDetailsContent
-              client={client}
-              layout="drawer"
-              onViewContract={
-                client.contract?.fileId
-                  ? () => viewContract({ clientId: client.id, rowMid: client.mid })
-                  : undefined
-              }
-              // The invoice ledger, which is the one table this view carries —
-              // production shows a client's invoices here and the invoice search
-              // filters by clientId outright, so these really are this client's
-              // invoices. Its own overflow-x-auto is what lets a five-column
-              // table live in a 32rem column.
-              ledgerSlot={
-                <ClientInvoicesSection
-                  clientId={client.id}
-                  statuses={invoiceStatuses}
-                  onStatusesChange={setInvoiceStatuses}
-                />
-              }
-            />
-          )}
-        </div>
+        {client && (
+          <ClientDrawerBody
+            client={client}
+            onClose={() => onOpenChange(false)}
+            onExpand={isBottomSheet ? undefined : () => onExpand(client)}
+            invoiceStatuses={invoiceStatuses}
+            onInvoiceStatusesChange={setInvoiceStatuses}
+          />
+        )}
       </DrawerContent>
     </Drawer>
+  );
+}
+
+/**
+ * The drawer's insides: Close and Expand on the left, then the scrolling
+ * details, metrics and invoice ledger. Also what the expand/collapse hand-off
+ * shows in the drawer's place (see DrawerExpandMorph). No Expand when
+ * `onExpand` is omitted (the mobile bottom sheet has no full page).
+ */
+export function ClientDrawerBody({
+  client,
+  onClose,
+  onExpand,
+  invoiceStatuses,
+  onInvoiceStatusesChange,
+}: {
+  client: Client;
+  onClose: () => void;
+  onExpand?: () => void;
+  invoiceStatuses: string[];
+  onInvoiceStatusesChange: (next: string[]) => void;
+}) {
+  const { viewContract } = useClientContractView();
+
+  return (
+    <>
+      {/* Close and Expand grouped together on the left, adjacent to one
+        another — the same header composition, components, and sizes as the
+        transaction drawer's. Nothing sits opposite them: the client id the
+        transaction drawer's header counterpart shows is deliberately not
+        surfaced anywhere in Client Management. */}
+      <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
+        <div className="flex shrink-0 items-center gap-1">
+          <IconButton aria-label="Close" variant="ghost" size="sm" onClick={onClose}>
+            <Icon name="x" className="h-4 w-4" />
+          </IconButton>
+          {/* Not rendered at all as a bottom sheet (rather than hidden with a
+            class): there is no expanded view in the mobile flow, which is
+            card to sheet and back, so the action has nothing to point at
+            there — same rule the transaction drawer follows. */}
+          {onExpand && (
+            <IconButton
+              aria-label="Expand to full page"
+              variant="ghost"
+              size="sm"
+              onClick={onExpand}
+            >
+              <Icon name="expand" className="h-4 w-4" />
+            </IconButton>
+          )}
+        </div>
+      </DrawerHeader>
+
+      {/* Only this region scrolls, so the header's close/expand stay
+        reachable however long the content runs — which it does, since the
+        drawer carries the metrics and the invoice ledger as well as the
+        detail sections. Sections scroll rather than being dropped. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <ClientDetailsContent
+          client={client}
+          layout="drawer"
+          onViewContract={
+            client.contract?.fileId
+              ? () => viewContract({ clientId: client.id, rowMid: client.mid })
+              : undefined
+          }
+          // The invoice ledger, which is the one table this view carries —
+          // production shows a client's invoices here and the invoice search
+          // filters by clientId outright, so these really are this client's
+          // invoices. Its own overflow-x-auto is what lets a five-column
+          // table live in a 32rem column.
+          ledgerSlot={
+            <ClientInvoicesSection
+              clientId={client.id}
+              statuses={invoiceStatuses}
+              onStatusesChange={onInvoiceStatusesChange}
+            />
+          }
+        />
+      </div>
+    </>
   );
 }

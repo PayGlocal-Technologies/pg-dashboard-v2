@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { motion } from "framer-motion";
+import { useState, type ReactNode } from "react";
 import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { Icon } from "@/components/icon";
@@ -37,7 +36,12 @@ import { reorderColumns } from "@/lib/utils/columns";
 // kept commented out (not deleted) alongside the modal's usage below.
 // import { UploadInvoiceModal } from "@/features/dashboard/mca-transactions/components/UploadInvoiceModal";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
-import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
+import {
+  MCA_DRAWER_WIDTH_PX,
+  TransactionDetailsDrawer,
+  TransactionDrawerBody,
+} from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
 import { ReportDownloadDrawer, type ReportWindow } from "@/components/common/ReportDownloadDrawer";
 import { useFircDownload } from "@/features/dashboard/mca-transactions/hooks";
 import { downloadBlob } from "@/lib/utils/format";
@@ -128,7 +132,6 @@ export function McaTransactionTable({
   const profileMid = useApp((s) => s.profile?.mid) ?? "";
   const contentEl = useContentAreaElement();
   const queryClient = useQueryClient();
-  const [scrollPosition, setScrollPosition] = useState(0);
 
   // Seeded from ?q= so the header's global search can hand a transaction ID
   // straight to this table. Read once on mount; the URL is not kept in sync as
@@ -178,25 +181,33 @@ export function McaTransactionTable({
   // const [uploadRowId, setUploadRowId] = useState<string | null>(null);
   // const [uploadOpen, setUploadOpen]   = useState(false);
 
-  // detailsRowId identifies which transaction is being viewed; the drawer and
-  // the full page are two presentations of that same selection, so they share
-  // it. drawerOpen and detailsOpen are mutually exclusive: a row click opens
-  // the drawer, and Expand hands the same transaction off to the page.
-  const [detailsRowId, setDetailsRowId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  // Set when navigating to a linked transaction that isn't part of the
-  // table's own currently-fetched page (see openLinkedTransaction below) —
-  // takes precedence over the rows.find lookup so the details page can show
-  // a transaction the table itself never fetched.
-  const [detailsOverrideRow, setDetailsOverrideRow] = useState<McaTransaction | null>(null);
-  // The transaction the drawer/page was opened on, held as the object itself
-  // (pg-dashboard's `currentRecord`), not only as an id to find in `rows`.
-  // `rows` is the filtered page: uploading an invoice moves a transaction out
-  // of the default "Invoice pending" view, so after the refetch the id lookup
-  // finds nothing and the drawer went blank. This copy is the fallback, and
-  // is replaced with a fresh one after an upload (handleInvoiceSubmitted).
-  const [detailsRecord, setDetailsRecord] = useState<McaTransaction | null>(null);
+  // Details: a row opens the drawer, Expand widens it into the full page in
+  // place of the table, Collapse and Back return (see useDrawerExpand). The
+  // transaction is held as the object itself (pg-dashboard's
+  // `currentRecord`), not an id to find in `rows`: uploading an invoice moves
+  // it out of the default "Invoice pending" view, so the id lookup would find
+  // nothing after the refetch. It is replaced with a fresh copy after an
+  // upload (handleInvoiceSubmitted) and swapped for a linked transaction
+  // (openLinkedTransaction). The page also hides the page header above, so it
+  // lands from the slot's parent.
+  const {
+    record: detailsRecord,
+    setRecord: setDetailsRecord,
+    pageOpen: detailsOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: openDetails,
+    onDrawerOpenChange,
+    expand: expandToPage,
+    collapse: collapseToDrawer,
+    back: closeDetails,
+    morphLayer,
+  } = useDrawerExpand<McaTransaction>({
+    drawerWidthPx: MCA_DRAWER_WIDTH_PX,
+    measureFrom: "parent",
+    onPageOpenChange: onDetailsOpenChange,
+  });
   const { downloadFirc } = useFircDownload();
 
   const body = buildTxnRequestBody(
@@ -280,10 +291,11 @@ export function McaTransactionTable({
       };
 
   // const uploadRow = rows.find((r) => r.gid === uploadRowId) ?? null;
-  const detailsRow =
-    detailsOverrideRow ??
-    rows.find((r) => r.gid === detailsRowId) ??
-    (detailsRecord?.gid === detailsRowId ? detailsRecord : null);
+  // The fetched row when it's on this page (freshest after a refetch), else
+  // the held copy.
+  const detailsRow = detailsRecord
+    ? (rows.find((r) => r.gid === detailsRecord.gid) ?? detailsRecord)
+    : null;
 
   const onSearch = (v: string) => {
     setSearch(v);
@@ -295,48 +307,6 @@ export function McaTransactionTable({
   //   setUploadOpen(true);
   // };
 
-  // Clicking a row opens the drawer, not the full page. The table stays
-  // mounted underneath it, so filters, sorting, pagination, and scroll are
-  // untouched for the whole time the drawer is open and after it closes.
-  const openDetails = (row: McaTransaction) => {
-    setDetailsOverrideRow(null);
-    setDetailsRecord(row);
-    setDetailsRowId(row.gid);
-    setDrawerOpen(true);
-  };
-
-  // Expand hands the drawer's current transaction off to the full page.
-  // detailsRowId/detailsOverrideRow already hold that selection, so the page
-  // renders exactly what the drawer was showing. The table's scroll position
-  // is captured here (rather than when the drawer opened) because this is the
-  // point the table actually leaves the screen and Back has to restore it.
-  const expandToPage = (row: McaTransaction) => {
-    if (contentEl) setScrollPosition(contentEl.scrollTop);
-    setDetailsRecord(row);
-    setDetailsRowId(row.gid);
-    setDrawerOpen(false);
-    setDetailsOpen(true);
-    onDetailsOpenChange?.(true);
-  };
-
-  const closeDetails = () => {
-    setDetailsOpen(false);
-    setDetailsOverrideRow(null);
-    onDetailsOpenChange?.(false);
-  };
-
-  // Collapse reverses Expand: closes the full page and reopens the same
-  // transaction in the drawer. Deliberately doesn't touch detailsRowId or
-  // detailsOverrideRow (unlike closeDetails), so whichever transaction was
-  // showing, including one reached via Linked Transactions, stays showing;
-  // the scroll-restore effect below puts the table back where expandToPage
-  // found it, same as if Expand had never been clicked.
-  const collapseToDrawer = () => {
-    setDetailsOpen(false);
-    setDrawerOpen(true);
-    onDetailsOpenChange?.(false);
-  };
-
   // Passed through as onOpenTransaction to TransactionDetailsPage/Drawer:
   // swaps the currently shown transaction in place, in whichever view is
   // open (drawer or page), rather than closing back to the table first. Not
@@ -347,24 +317,13 @@ export function McaTransactionTable({
   // case such an entry point surfaces a transaction outside the table's own
   // fetched page.
   const openLinkedTransaction = (row: McaTransaction) => {
-    setDetailsOverrideRow(row);
-    setDetailsRowId(row.gid);
+    setDetailsRecord(row);
     // Only meaningful for the full page, where contentEl is what scrolls and
     // a new transaction should start at the top. The drawer scrolls its own
     // container, so touching contentEl there would move the background
     // table instead.
     if (detailsOpen && contentEl) restoreScrollTop(contentEl, 0);
   };
-
-  // Restores the table's scroll position after the details page unmounts and
-  // the table re-renders in its place — deferred to an effect (rather than
-  // set inline in closeDetails) so it runs after the table's own content is
-  // back in the DOM, not while the details page is still on screen.
-  useEffect(() => {
-    if (!detailsOpen && contentEl) {
-      restoreScrollTop(contentEl, scrollPosition);
-    }
-  }, [detailsOpen, contentEl, scrollPosition]);
 
   // The invoice upload is a real mutation, so the server is the authority on
   // what the transaction's status became — this refetches rather than
@@ -396,7 +355,6 @@ export function McaTransactionTable({
           const fresh = res?.data?.data?.find((r) => r.gid === row.gid);
           if (!fresh) return;
           setDetailsRecord((current) => (current?.gid === fresh.gid ? fresh : current));
-          setDetailsOverrideRow((current) => (current?.gid === fresh.gid ? fresh : current));
         },
         // The held copy keeps the view up; the timeline and documents below
         // refresh on their own, so a failed lookup costs nothing visible.
@@ -585,30 +543,17 @@ export function McaTransactionTable({
   // The details page replaces the table in place (same component instance,
   // same closed-over search/filter/page state) rather than overlaying it —
   // this is what makes Back restore the table's previous state for free.
-  //
-  // Expand swaps the drawer for this full page in the same frame, which read
-  // as an abrupt jump. A short fade + rise on mount lets the page ease in as
-  // the drawer slides away over it, so the two motions blend into one
-  // handoff rather than a hard cut. Delayed a touch so it starts after the
-  // drawer has begun sliding out, not on the same frame.
-  if (detailsOpen && detailsRow) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: "easeOut", delay: 0.08 }}
-      >
-        <TransactionDetailsPage
-          row={detailsRow}
-          onBack={closeDetails}
-          onCollapse={collapseToDrawer}
-          onUploaded={handleInvoiceSubmitted}
-          onOpenTransaction={openLinkedTransaction}
-          isPartnerUser={isPartnerUser}
-        />
-      </motion.div>
-    );
-  }
+  const detailsPage =
+    detailsOpen && detailsRow ? (
+      <TransactionDetailsPage
+        row={detailsRow}
+        onBack={closeDetails}
+        onCollapse={collapseToDrawer}
+        onUploaded={handleInvoiceSubmitted}
+        onOpenTransaction={openLinkedTransaction}
+        isPartnerUser={isPartnerUser}
+      />
+    ) : null;
 
   // Tab bar: page-level navigation. An underline-style shortcut onto the same
   // status filter state as the "Invoice Pending" option inside the Status
@@ -729,8 +674,13 @@ export function McaTransactionTable({
   } as const;
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* mb-4 below lg, giving 32px (this margin plus the flex gap) between
+    <>
+      {/* One stable slot for the table and the page to take turns in, so the
+          hand-off layer can measure where the page lands. */}
+      <div ref={slotRef}>
+        {detailsPage ?? (
+          <div className="flex flex-col gap-4">
+            {/* mb-4 below lg, giving 32px (this margin plus the flex gap) between
           the analytics summary and the transaction section below it, against
           the 8px between the carousel and its indicator: a clear break
           between the summary metrics and the transaction data, without the
@@ -738,37 +688,37 @@ export function McaTransactionTable({
           at lg, the same breakpoint TransactionsAnalyticsCarousel itself
           switches from the carousel (with its indicator) to the plain grid,
           where the flex gap alone matches the previous spacing. */}
-      {analyticsSection && (
-        <div className="mb-4 lg:mb-0" data-guide="mca-txn-analytics">
-          {analyticsSection}
-        </div>
-      )}
+            {analyticsSection && (
+              <div className="mb-4 lg:mb-0" data-guide="mca-txn-analytics">
+                {analyticsSection}
+              </div>
+            )}
 
-      {/* Desktop (lg+): the full table, columns and all, on the card surface
+            {/* Desktop (lg+): the full table, columns and all, on the card surface
           DataTableCard draws — tab bar, toolbar, grid and pager sharing one
           bordered box with the dividers every other table on the app uses. */}
-      <DataTableCard<McaTransaction>
-        className="hidden lg:block"
-        tabs={tabBar}
-        toolbar={desktopControls}
-        columns={columns}
-        data={tableRows}
-        isLoading={isPending}
-        rowKey={(row) => row.gid}
-        emptyTitle={emptyCopy.title}
-        emptyDescription={emptyCopy.description}
-        emptyState={emptyPanel}
-        errorState={errorPanel}
-        // The whole row opens the details drawer, through DataTable's
-        // row-level handler rather than a wrapper inside every cell.
-        // Clicks landing on the row's own buttons and menus are
-        // skipped by it, so each still does only its own job.
-        onRowClick={openDetails}
-        pagination={pagination}
-        maxBodyHeight="none"
-      />
+            <DataTableCard<McaTransaction>
+              className="hidden lg:block"
+              tabs={tabBar}
+              toolbar={desktopControls}
+              columns={columns}
+              data={tableRows}
+              isLoading={isPending}
+              rowKey={(row) => row.gid}
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
+              emptyState={emptyPanel}
+              errorState={errorPanel}
+              // The whole row opens the details drawer, through DataTable's
+              // row-level handler rather than a wrapper inside every cell.
+              // Clicks landing on the row's own buttons and menus are
+              // skipped by it, so each still does only its own job.
+              onRowClick={openDetails}
+              pagination={pagination}
+              maxBodyHeight="none"
+            />
 
-      {/* Tablet + mobile (below lg): a vertical list of transaction cards
+            {/* Tablet + mobile (below lg): a vertical list of transaction cards
           instead of table columns/header, under the same tab bar and the
           compact control row. `tableRows` is already just this
           server-paginated page's rows, so this reads it directly rather than
@@ -776,29 +726,32 @@ export function McaTransactionTable({
 
           No Reorder Columns at either width: there's no table to reorder
           columns on below lg, just the card list. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
-        <div className="border-b border-border px-4 pt-3">{tabBar}</div>
-        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
-          {compactControls}
-        </div>
-        <DataCardList<McaTransaction>
-          bordered={false}
-          rows={tableRows}
-          rowKey={(row) => row.gid}
-          isLoading={isPending}
-          renderCard={(row) => <TransactionCard row={row} onOpenDetails={openDetails} />}
-          renderSkeleton={() => <TransactionCardSkeleton />}
-          emptyState={
-            <PlaceholderState
-              variant="empty-table"
-              size="sm"
-              title={emptyCopy.title}
-              description={emptyCopy.description}
-            />
-          }
-          errorState={errorPanel}
-          pagination={pagination}
-        />
+            <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+              <div className="border-b border-border px-4 pt-3">{tabBar}</div>
+              <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+                {compactControls}
+              </div>
+              <DataCardList<McaTransaction>
+                bordered={false}
+                rows={tableRows}
+                rowKey={(row) => row.gid}
+                isLoading={isPending}
+                renderCard={(row) => <TransactionCard row={row} onOpenDetails={openDetails} />}
+                renderSkeleton={() => <TransactionCardSkeleton />}
+                emptyState={
+                  <PlaceholderState
+                    variant="empty-table"
+                    size="sm"
+                    title={emptyCopy.title}
+                    description={emptyCopy.description}
+                  />
+                }
+                errorState={errorPanel}
+                pagination={pagination}
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Upload Invoice now opens the details page's inline upload flow
@@ -825,12 +778,39 @@ export function McaTransactionTable({
       <TransactionDetailsDrawer
         row={detailsRow}
         open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        onExpand={expandToPage}
+        onOpenChange={onDrawerOpenChange}
+        onExpand={() => expandToPage()}
         onUploaded={handleInvoiceSubmitted}
         onOpenTransaction={openLinkedTransaction}
         isPartnerUser={isPartnerUser}
+        instant={instantDrawer}
       />
-    </div>
+
+      {/* The drawer's and the page's real insides for the hand-off (inert,
+          so the handlers never fire). */}
+      {morphLayer((record) => {
+        const row = rows.find((r) => r.gid === record.gid) ?? record;
+        return {
+          drawer: (
+            <TransactionDrawerBody
+              row={row}
+              onClose={() => {}}
+              onExpand={() => {}}
+              onOpenTransaction={() => {}}
+              isPartnerUser={isPartnerUser}
+            />
+          ),
+          page: (
+            <TransactionDetailsPage
+              row={row}
+              onBack={() => {}}
+              onCollapse={() => {}}
+              onOpenTransaction={() => {}}
+              isPartnerUser={isPartnerUser}
+            />
+          ),
+        };
+      })}
+    </>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { animate, motion, useMotionTemplate, useMotionValue } from "framer-motion";
+import { animate, motion, useMotionTemplate, useMotionValue, useTransform } from "framer-motion";
 
 export interface MorphRect {
   top: number;
@@ -22,13 +22,14 @@ export interface DrawerMorph {
   page: { top: number; left: number; width: number };
 }
 
-/** An even ease-in-out: a steady horizontal glide, no jump at the start. */
-const EASE = [0.4, 0, 0.2, 1] as const;
-const MOVE = 0.48;
+/** Fast out, soft landing: the panel commits to the move straight away and
+ *  settles gently into the page area, rather than gliding at an even pace. */
+const EASE = [0.32, 0.72, 0, 1] as const;
+const MOVE = 0.6;
 /** The small vertical step between the drawer (full height) and the page
  *  area (below the header), kept short and off the main sweep so the motion
  *  reads as horizontal rather than diagonal. */
-const VERTICAL = 0.16;
+const VERTICAL = 0.22;
 /** The drawer overlay's own fade (flux-ui's animate-in/out default). */
 const OVERLAY_FADE = 0.15;
 /** How long the layer holds after landing, over the now-identical real view,
@@ -61,17 +62,20 @@ function insets(r: MorphRect) {
 type Stage = "prep" | "move" | "settle";
 
 /**
- * The drawer ⇄ full-page hand-off. A full-viewport layer, clipped to exactly
- * the drawer's rect, opens out to the page area (expand) or closes back down
- * to it (collapse). It carries both views at their real on-screen positions:
- * the drawer's content where the drawer sits, and the page where the page
- * lays out. Neither moves; the opening clip reveals one as the other fades,
- * so it reads as the drawer itself opening into the page, with no blank
- * surface at any point.
+ * The drawer ⇄ full-page hand-off. The drawer itself widens into the page:
+ * its left edge slides across to the page area's (and its top steps up to the
+ * area's top), and both views travel with that edge. The drawer's content
+ * rides out to the left as it fades; the page's content rides in from the
+ * drawer's position as it fades up, landing exactly where the real page lays
+ * out. Collapse is the same motion in reverse.
+ *
+ * Built as one full-viewport layer clipped to the panel's rect, with the two
+ * contents moved by transforms, so nothing re-lays out per frame however heavy
+ * the page is.
  *
  * The real drawer opens or closes instantly underneath (the caller sets it to
  * skip its slide) and the real page swaps in or out under the layer, which
- * looks identical at that moment; the layer then fades off.
+ * looks identical at that moment; the layer then goes.
  *
  * Callbacks: `onCovered` (collapse: the layer now shows the page, so the real
  * one can go), `onArrive` (swap in what's underneath: the page, or the real
@@ -129,6 +133,14 @@ export function DrawerExpandMorph({
   const bottom = useMotionValue(start.bottom);
   const left = useMotionValue(start.left);
   const clipPath = useMotionTemplate`inset(${top}px ${right}px ${bottom}px ${left}px)`;
+
+  // The panel's left edge in viewport px, and how far each view has travelled
+  // with it: the drawer's content from where the drawer sits, the page's from
+  // where it lands (the page area's left edge, reached at the end of an
+  // expand and at the start of a collapse).
+  const areaLeft = expanding ? morph.to.left : morph.from.left;
+  const drawerShift = useTransform(left, (l) => l - drawer.left);
+  const pageShift = useTransform(left, (l) => l - areaLeft);
 
   useEffect(() => {
     if (stage !== "move") return;
@@ -198,38 +210,56 @@ export function DrawerExpandMorph({
         className="fixed inset-0 z-[61] overflow-hidden bg-background will-change-[clip-path]"
         style={{ clipPath }}
       >
-        {/* The page, where it lays out, fading in as the clip opens (or out
-            as it closes). */}
+        {/* The page, riding in on the panel's left edge and fading up (or
+            out, on a collapse) as it goes. */}
         <motion.div
-          className="absolute"
-          style={{ top: morph.page.top, left: morph.page.left, width: morph.page.width }}
+          className="absolute will-change-transform"
+          style={{
+            top: morph.page.top,
+            left: morph.page.left,
+            width: morph.page.width,
+            x: pageShift,
+          }}
           initial={{ opacity: expanding ? 0 : 1 }}
           animate={{ opacity: expanding || stage === "prep" ? 1 : 0 }}
-          // Overlapped with the drawer's fade, so there is never a moment
-          // showing neither.
+          // Starts once the drawer's content is on its way out, so the two
+          // never sit on top of each other at full strength.
           transition={
             expanding
-              ? { duration: MOVE * 0.5, ease: "easeOut" }
-              : { duration: MOVE * 0.55, ease: "easeIn" }
+              ? { duration: MOVE * 0.55, delay: MOVE * 0.18, ease: "easeOut" }
+              : { duration: MOVE * 0.5, ease: "easeIn" }
           }
         >
           {pageContent}
         </motion.div>
-        {/* The drawer's content, where the drawer sits. */}
+        {/* The drawer's content, travelling with the same edge. */}
         <motion.div
-          className="absolute flex flex-col border-l border-border bg-card"
-          style={{ top: drawer.top, left: drawer.left, width: drawerWidth, height: drawer.height }}
+          className="absolute flex flex-col bg-card will-change-transform"
+          style={{
+            top: drawer.top,
+            left: drawer.left,
+            width: drawerWidth,
+            height: drawer.height,
+            x: drawerShift,
+          }}
           initial={{ opacity: expanding ? 1 : 0 }}
           animate={{ opacity: expanding ? 0 : stage === "prep" ? 0 : 1 }}
           transition={
             expanding
-              ? { duration: MOVE * 0.45, ease: "easeIn" }
-              : { duration: MOVE * 0.45, delay: MOVE * 0.2, ease: "easeOut" }
+              ? { duration: MOVE * 0.4, ease: "easeIn" }
+              : { duration: MOVE * 0.45, delay: MOVE * 0.35, ease: "easeOut" }
           }
         >
           {drawerContent}
         </motion.div>
       </motion.div>
+      {/* The panel's moving edge: the drawer's border and shadow, carried
+          across so the panel reads as one surface sliding, not a mask. */}
+      <motion.div
+        aria-hidden
+        className="pointer-events-none fixed z-[62] w-px bg-border shadow-[-12px_0_32px_rgba(15,23,42,0.12)]"
+        style={{ left: 0, x: left, top, bottom }}
+      />
     </>,
     document.body
   );

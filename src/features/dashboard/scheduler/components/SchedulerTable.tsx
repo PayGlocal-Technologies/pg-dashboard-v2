@@ -18,7 +18,14 @@ import {
 } from "@/components/common/filters/FilterChips";
 import { cn } from "@/lib/utils";
 import useNewPermissions from "@/hooks/useNewPermissions";
-import { TransactionDetailsDrawer } from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
+import {
+  PA_DRAWER_WIDTH_PX,
+  TransactionDetailsDrawer,
+  TransactionDrawerBody,
+} from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
+import { TransactionDetailsPage } from "@/features/dashboard/pa-transactions/components/TransactionDetailsPage";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
+import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 import { useTransactionLookup } from "@/features/dashboard/pa-transactions/useTransactionLookup";
 import {
   buildExecutedColumns,
@@ -100,7 +107,22 @@ export function SchedulerTable() {
   );
   const { retry, retryingIds } = useSchedulerRetry(mid, () => void refetch());
   const { download, isDownloading } = useSchedulerReport(mid);
-  const lookup = useTransactionLookup();
+  // A payment's details: the drawer, which Expand widens into the full page
+  // in place of the table (see useDrawerExpand).
+  const {
+    record: detailsRecord,
+    pageOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: openDetails,
+    onDrawerOpenChange,
+    expand,
+    collapse,
+    back,
+    morphLayer,
+  } = useDrawerExpand<PaTransaction>({ drawerWidthPx: PA_DRAWER_WIDTH_PX });
+  const lookup = useTransactionLookup(openDetails);
 
   // An SI's payments: the Transactions page searched by the SI ID (it takes
   // its search from ?q=), as Manage Mandates does.
@@ -277,95 +299,130 @@ export function SchedulerTable() {
 
   return (
     <>
-      {/* Desktop (lg+). The Actions column is sticky, so its cells need opaque
+      {/* One slot for the table and the expanded page to take turns in, so
+          the hand-off lands the page exactly here. */}
+      <div ref={slotRef}>
+        {pageOpen && detailsRecord ? (
+          <TransactionDetailsPage
+            transaction={detailsRecord}
+            onBack={back}
+            onCollapse={collapse}
+            backLabel="Back to Scheduler"
+          />
+        ) : (
+          <>
+            {/* Desktop (lg+). The Actions column is sticky, so its cells need opaque
           fills or the grid would show through as it scrolls under them: the
           header band (muted/35 over the card), a row, and a hovered row
           (muted/40). Written out in full, Tailwind reads classes literally. */}
-      <DataTableCard<SchedulerTxn>
-        className={cn(
-          "hidden lg:block",
-          "[&_th.scheduler-actions]:bg-[color-mix(in_srgb,var(--muted)_35%,var(--card))]",
-          "[&_td.scheduler-actions]:bg-card",
-          "[&_tr:hover_td.scheduler-actions]:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))]"
-        )}
-        tabs={tabBar}
-        toolbar={
-          isExecuted ? (
-            <div className="flex flex-wrap items-center gap-2">
-              {renderChips("flex flex-wrap items-center gap-1.5")}
-              <div className="ml-auto flex items-center gap-2">
-                {refreshButton}
-                {reportButton}
-              </div>
-            </div>
-          ) : undefined
-        }
-        columns={columns}
-        data={rows}
-        rowKey={rowKey}
-        isLoading={isLoading}
-        emptyTitle={emptyCopy.title}
-        emptyDescription={emptyCopy.description}
-        emptyState={
-          <PlaceholderState
-            variant="empty-table"
-            title={emptyCopy.title}
-            description={emptyCopy.description}
-            className="py-16"
-          />
-        }
-        errorState={errorState}
-        pagination={pagination}
-        tableLayout="content"
-        maxBodyHeight="none"
-      />
+            <DataTableCard<SchedulerTxn>
+              className={cn(
+                "hidden lg:block",
+                "[&_th.scheduler-actions]:bg-[color-mix(in_srgb,var(--muted)_35%,var(--card))]",
+                "[&_td.scheduler-actions]:bg-card",
+                "[&_tr:hover_td.scheduler-actions]:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))]"
+              )}
+              tabs={tabBar}
+              toolbar={
+                isExecuted ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    {renderChips("flex flex-wrap items-center gap-1.5")}
+                    <div className="ml-auto flex items-center gap-2">
+                      {refreshButton}
+                      {reportButton}
+                    </div>
+                  </div>
+                ) : undefined
+              }
+              columns={columns}
+              data={rows}
+              rowKey={rowKey}
+              isLoading={isLoading}
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
+              emptyState={
+                <PlaceholderState
+                  variant="empty-table"
+                  title={emptyCopy.title}
+                  description={emptyCopy.description}
+                  className="py-16"
+                />
+              }
+              errorState={errorState}
+              pagination={pagination}
+              tableLayout="content"
+              maxBodyHeight="none"
+            />
 
-      {/* Tablet + mobile (below lg): the same page's rows as cards. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
-        <div className="border-b border-border px-4 pt-3">{tabBar}</div>
-        {isExecuted && (
-          <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
-            <div className="flex items-center justify-end gap-2">
-              {refreshButton}
-              {reportButton}
+            {/* Tablet + mobile (below lg): the same page's rows as cards. */}
+            <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+              <div className="border-b border-border px-4 pt-3">{tabBar}</div>
+              {isExecuted && (
+                <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+                  <div className="flex items-center justify-end gap-2">
+                    {refreshButton}
+                    {reportButton}
+                  </div>
+                  {renderChips(
+                    "scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto"
+                  )}
+                </div>
+              )}
+              <DataCardList<SchedulerTxn>
+                bordered={false}
+                rows={rows}
+                rowKey={rowKey}
+                isLoading={isLoading}
+                renderCard={(row) => (
+                  <SchedulerCard
+                    row={row}
+                    view={view}
+                    isRetrying={retryingIds.includes(row.schedulerId)}
+                    onRetry={retry}
+                    onOpenSiTransactions={openSiTransactions}
+                    onOpenTransaction={openTransaction}
+                  />
+                )}
+                renderSkeleton={() => <SchedulerCardSkeleton />}
+                emptyState={
+                  <PlaceholderState
+                    variant="empty-table"
+                    size="sm"
+                    title={emptyCopy.title}
+                    description={emptyCopy.description}
+                  />
+                }
+                errorState={errorState}
+                pagination={pagination}
+              />
             </div>
-            {renderChips("scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto")}
-          </div>
+          </>
         )}
-        <DataCardList<SchedulerTxn>
-          bordered={false}
-          rows={rows}
-          rowKey={rowKey}
-          isLoading={isLoading}
-          renderCard={(row) => (
-            <SchedulerCard
-              row={row}
-              view={view}
-              isRetrying={retryingIds.includes(row.schedulerId)}
-              onRetry={retry}
-              onOpenSiTransactions={openSiTransactions}
-              onOpenTransaction={openTransaction}
-            />
-          )}
-          renderSkeleton={() => <SchedulerCardSkeleton />}
-          emptyState={
-            <PlaceholderState
-              variant="empty-table"
-              size="sm"
-              title={emptyCopy.title}
-              description={emptyCopy.description}
-            />
-          }
-          errorState={errorState}
-          pagination={pagination}
-        />
       </div>
 
       <TransactionDetailsDrawer
-        transaction={lookup.transaction}
-        open={lookup.open}
-        onOpenChange={lookup.setOpen}
+        transaction={detailsRecord}
+        open={drawerOpen}
+        onOpenChange={onDrawerOpenChange}
+        onExpand={expand}
+        instant={instantDrawer}
       />
+      {/* The drawer's and the page's real insides for the hand-off (inert,
+          so the handlers never fire). */}
+      {morphLayer((transaction) => ({
+        drawer: (
+          <TransactionDrawerBody transaction={transaction} onClose={() => {}} onExpand={() => {}} />
+        ),
+        page: (
+          <TransactionDetailsPage
+            transaction={transaction}
+            onBack={() => {}}
+            onCollapse={() => {}}
+            backLabel="Back to Scheduler"
+            decorative
+          />
+        ),
+      }))}
     </>
   );
 }
