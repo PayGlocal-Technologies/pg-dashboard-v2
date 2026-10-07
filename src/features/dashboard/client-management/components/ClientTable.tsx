@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ColumnManager, Button, DataCardList, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { cn } from "@/lib/utils";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
@@ -27,6 +28,7 @@ import {
   useClientContractUpload,
   useClientContractView,
   useClientCountryMap,
+  useClientMidScope,
   useClients,
   useCreateClient,
   useUpdateClient,
@@ -82,9 +84,18 @@ interface ClientTableProps {
    *  the page header while every row this creates lives down here. */
   addClientOpen: boolean;
   onAddClientOpenChange: (open: boolean) => void;
+  /** The page's Add client opener, taking the MID the merchant picked ("" when
+   *  there was nothing to ask). The empty state's own button goes through it,
+   *  behind the same MID question as the header. */
+  onAddClient: (mid: string) => void;
 }
 
-export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTableProps) {
+export function ClientTable({
+  addClientOpen,
+  onAddClientOpenChange,
+  onAddClient,
+}: ClientTableProps) {
+  const { needsMidChoice, midOptions } = useClientMidScope();
   const contentEl = useContentAreaElement();
   const [scrollPosition, setScrollPosition] = useState(0);
 
@@ -288,14 +299,15 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   /** Only the first-time state gets the action — the fix for an empty search
    *  is a different search, not a new client. */
   const emptyAction = hasNarrowingFilters ? undefined : (
-    <Button
-      type="button"
+    <MidScopedAction
+      label="Add client"
+      icon="plus"
       variant="primary"
-      leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-      onClick={() => onAddClientOpenChange(true)}
-    >
-      Add client
-    </Button>
+      size="md"
+      needsMidChoice={needsMidChoice}
+      midOptions={midOptions}
+      onRun={onAddClient}
+    />
   );
 
   // Shared verbatim between the desktop and tablet/mobile control rows below

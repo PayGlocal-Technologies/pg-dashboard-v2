@@ -25,6 +25,27 @@ export interface InvoiceLineItem {
   skuId?: string;
   /** The SKU's GOOD / SERVICE type, which decides whether the code is HSN or SAC. */
   itemType?: string;
+  /**
+   * Ticked in the item dialog: once the invoice link is created, the line is
+   * imported into SKU management. Client-only — the invoice payload has no such
+   * field (buildInvoiceRequest maps items field by field, so it never leaks).
+   */
+  saveAsSku?: boolean;
+}
+
+/**
+ * Body of POST /v3/sku/{mid}/import/previous-items, the call create-invoice
+ * makes for its own "Save to SKU catalogue" lines. Field-for-field the same.
+ */
+export interface SkuImportRequest {
+  items: {
+    name: string;
+    type: string | null;
+    hsnSac: string;
+    unitPrice: string;
+    currency: string | null;
+    description: null;
+  }[];
 }
 
 export type DiscountType = "percentage" | "fixed";
@@ -33,7 +54,14 @@ export type DiscountType = "percentage" | "fixed";
 export interface AddressValues {
   streetAddress: string;
   landmark: string;
+  /** The country's name, as the address form shows it. */
   country: string;
+  /**
+   * The country's ISO2 code when it is already known — set for a client from
+   * the client book, whose record carries it. Preferred over looking the name
+   * up, because the client book and this form name some countries differently.
+   */
+  countryIso2?: string;
   state: string;
   city: string;
   zipcode: string;
@@ -95,21 +123,33 @@ export interface InvoiceCustomer {
 
 // ── Request ──────────────────────────────────────────────────────────────────
 
+/** One line on the wire. `itemCode` / `gstPercentage` are left out when blank, as gcc-ui-temp does. */
 export interface InvoiceItemPayload {
   itemDescription: string;
-  itemCode: string | null;
+  itemCode?: string;
   itemPrice: string;
   quantity: string;
-  gstPercentage: string;
+  gstPercentage?: string;
   amount: string;
+}
+
+/** An address on the wire: billing and shipping share these keys. Empty fields are left out. */
+export interface WireAddress {
+  addressStreet1?: string;
+  addressStreet2?: string;
+  /** ISO2 country code, e.g. "GB". */
+  addressCountry?: string;
+  addressState?: string;
+  addressCity?: string;
+  addressPostalCode?: string;
 }
 
 export interface InvoiceCreateRequest {
   invoiceRequestData: {
     merchantReferenceId: string;
     invoiceItems: InvoiceItemPayload[];
-    memo: string;
-    additionalInfo: string;
+    memo: string | null;
+    additionalInfo: string | null;
     totalAmount: string | null;
     subTotalAmount: string;
     amountDue: string | null;
@@ -117,10 +157,11 @@ export interface InvoiceCreateRequest {
     formattedDueDate: string | null;
     invoiceId: string | null;
     gst: boolean;
-    businessName: string;
-    discountPercent: string | null;
-    discountAmount: string;
-    extraChargeAmount: string;
+    businessName?: string;
+    /** Sent only for a percentage discount. */
+    discountPercent?: string;
+    /** Sent only for a fixed discount: the amount typed. */
+    discountAmount?: string;
     merchantLogo: { name: string; fileExtension: string };
     additionalEmailId: string[];
   };
@@ -131,27 +172,15 @@ export interface InvoiceCreateRequest {
     phoneNumber: string | null;
     expiry: number;
   };
-  plBillingData: {
-    addressStreet1: string;
-    addressStreet2: string;
-    addressCountry: string;
-    addressState: string;
-    addressCity: string;
-    addressPostalCode: string;
-    firstName: string;
-    lastName: string;
+  plBillingData: WireAddress & {
+    firstName: string | null;
+    lastName: string | null;
     callingCode: string | null;
-    phoneNumber: string;
-    emailId: string;
+    phoneNumber: string | null;
+    emailId: string | null;
   };
-  /**
-   * NOTE: upstream sends this as the RAW form object — `streetAddress`,
-   * `landmark`, `country`… plus a stray `shippingSameAsBilling` boolean — while
-   * plBillingData above is remapped to `addressStreet1`/… That asymmetry is a
-   * source defect, carried verbatim on purpose so this sends byte-identical
-   * bodies to production. See helpers.ts buildInvoiceRequest.
-   */
-  plShippingData: Record<string, unknown> | null;
+  /** Same keys as billing (gcc-ui-temp); null when there is no shipping address. */
+  plShippingData: WireAddress | null;
   siTxn: boolean;
   collectByGlobalAltPay: boolean;
   merchantCustomPayload: null;

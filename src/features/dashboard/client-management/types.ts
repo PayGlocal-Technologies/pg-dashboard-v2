@@ -212,8 +212,9 @@ export interface ClientApiRecord {
   name: string;
   email: string;
   /** One string, dial code included. v2 holds the code and the number apart so
-   *  the table can group every row's digits identically. */
-  number: string;
+   *  the table can group every row's digits identically. Null for a client
+   *  saved without a phone number, which is now allowed. */
+  number: string | null;
   websiteLink?: string;
   /**
    * The client's country, as a top-level convenience field — pg-dashboard's list
@@ -283,7 +284,8 @@ export interface ClientMutationPayload {
   /** Sent because pg-dashboard's checkbox is a registered form field. */
   sameAsBusinessName: boolean;
   email: string;
-  number: string;
+  /** Null when the merchant gave no number: the field is optional. */
+  number: string | null;
   websiteLink: string | null;
   /** An API enum code — see CLIENT_BUSINESS_TYPES, not a display label. */
   type: string;

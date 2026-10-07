@@ -266,13 +266,19 @@ export function RecipientsSection({
                   )}
                 </CommandEmpty>
               ) : (
-                <CommandGroup>
+                // A small gap between rows, so a hovered row never butts
+                // against its neighbour.
+                <CommandGroup className="space-y-0.5">
                   {clients.map((client) => {
                     const isSelected = selectedIds.has(client.id);
                     return (
+                      // No `selected` fill: this list is multi-select, and
+                      // CommandItem's fill is meant for a single pick — two
+                      // picked rows in a row merged into one grey block. The
+                      // checkmark says what is picked; grey is for hover only.
+                      // aria-selected still carries the state.
                       <CommandItem
                         key={client.id}
-                        selected={isSelected}
                         aria-selected={isSelected}
                         onSelect={() => toggle(client)}
                         className="gap-3"

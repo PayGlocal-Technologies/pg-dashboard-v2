@@ -57,7 +57,6 @@ export function TemplatePicker({
 
   const active = templates.find((template) => template.id === activeTemplateId) ?? null;
 
-
   const choose = (template: InvoiceLinkTemplate) => {
     setPickerOpen(false);
     onChoose(template);

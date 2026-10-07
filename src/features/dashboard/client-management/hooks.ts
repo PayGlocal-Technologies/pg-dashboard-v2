@@ -5,8 +5,9 @@ import { toast } from "sonner";
 import { useZohoPullSync } from "@/features/dashboard/zoho-integration/hooks";
 import { COUNTRIES } from "@/components/ui";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
-import { useScopeId } from "@/lib/hooks/useScopeId";
+import type { PacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { useApp } from "@/stores/useApp";
+import { useAccountSetup } from "@/stores/useAccountSetup";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { buildS3Headers } from "@/features/dashboard/mca-transactions/useInvoiceUpload";
 import {
@@ -67,7 +68,7 @@ import type { TableReqBody } from "@/types/transactions";
  * `phoneNumber` rather than guessing — a wrong dial code silently changes a
  * phone number.
  */
-function splitPhone(raw: string, countryIso2: string): { dialCode: string; number: string } {
+function splitPhone(raw: string | null, countryIso2: string): { dialCode: string; number: string } {
   const value = (raw ?? "").trim();
   if (!value.startsWith("+")) return { dialCode: "", number: value };
 
@@ -297,7 +298,10 @@ export function toClientApiPayload(
     // as its own picker, and production's field accepts a "+"-prefixed number too
     // (it carries no format rule, only `required`), so this is strictly more
     // information in the same shape rather than a different one.
-    number: `${dialCodeOf(values.phoneCountry)}${values.phoneNumber.replace(/\D/g, "")}`,
+    // Optional: null when no number was typed, never a bare dial code like "+91".
+    number: values.phoneNumber.replace(/\D/g, "")
+      ? `${dialCodeOf(values.phoneCountry)}${values.phoneNumber.replace(/\D/g, "")}`
+      : null,
     websiteLink: emptyToNull(values.website),
     // Already an API enum code, not a label — see CLIENT_BUSINESS_TYPES. This is
     // what the 400 was: v2 offered business types of its own devising and sent
@@ -402,21 +406,109 @@ export function toClientFormValues(client: Client): ClientFormValues {
 // ── MID resolution ──────────────────────────────────────────────────────────
 
 /**
- * The client book's merchant id, which every one of its endpoints takes as a path
- * segment for every user — not just partners. Resolved by the shared useScopeId,
- * so it matches every other path-scoped id in the app.
+ * Every MID the client book spans: Global Fund Transfer (PACB) and Card
+ * Payments (PA) alike, PACB first, no duplicates.
  *
- * `midFilter` comes back alongside it for the search body's own filter, whose key
- * is **`mid`**, not `merchantId` — see useClients.
+ * Client management used to be PACB-only, through the shared PACB resolvers.
+ * The backend now grants MCA_INVOICE (clients, templates, SKUs) to PA merchants
+ * too, and invoice links bill from the same client book, so it resolves its own
+ * MIDs here over both products — the same rule SKU management uses.
+ */
+function useClientMids(): string[] {
+  const paCbMids = useApp((s) => s.paCbMids);
+  const paMids = useApp((s) => s.paMids);
+  return useMemo(() => [...new Set([...paCbMids, ...paMids])], [paCbMids, paMids]);
+}
+
+/**
+ * The client book's merchant id, which every one of its endpoints takes as a path
+ * segment for every user — not just partners. Same rule as useScopeId, over both
+ * products' MIDs:
+ *
+ *   - partner user                  -> the profile MID
+ *   - a MID selected (PA or PACB)   -> that MID
+ *   - single-MID account            -> its first MID, else the profile MID
+ *   - multi-MID, nothing selected   -> the UCIC id (whole-account roll-up)
+ *
+ * `midFilter` is the search body's own filter, whose key is **`mid`**, not
+ * `merchantId` (see useClients): the selected MID alone, or every PACB and PA
+ * MID when none is selected. Never "not-applicable" any more: a Card Payments
+ * MID is now a valid client-book scope.
+ *
+ * Not ready until the merchant-products call has answered: the MID lists and
+ * `isMultiMidUser` arrive with it, and a list fetched before then would go out
+ * scoped to nothing.
  */
 export function useClientPathMid() {
-  const { midFilter, guardState } = useResolvedMids("PACB");
-  // The path id comes from the shared resolver: product MID, selected MID, or
-  // the UCIC id for a multi-MID account with nothing selected. midFilter and
-  // guardState still come from useResolvedMids, which answers the different
-  // question of which MIDs go in a search *body*.
-  const { scopeId: mid, isReady } = useScopeId("PACB");
-  return { mid, midFilter, isReady, guardState };
+  const profile = useApp((s) => s.profile);
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
+  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  const productsLoaded = useApp((s) => !!s.merchantEnabledProducts);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+  const mids = useClientMids();
+
+  return useMemo(() => {
+    const profileMid = profile?.mid ?? "";
+    const guardState = "ready" as const;
+
+    // Partners carry their MID in the path and filter nothing in the body.
+    if (isPartnerUser) {
+      return {
+        mid: profileMid,
+        midFilter: undefined,
+        isReady: !!profileMid,
+        isResolving: false,
+        guardState,
+      };
+    }
+
+    const isSelectedOwn = !!selectedMid && mids.includes(selectedMid);
+    // An account with neither PA nor PACB MIDs falls back to its profile MID,
+    // as useResolvedMids does.
+    const filterMids = isSelectedOwn
+      ? [selectedMid]
+      : mids.length > 0
+        ? mids
+        : profileMid
+          ? [profileMid]
+          : [];
+    const midFilter = filterMids.length > 0 ? { key: "merchantId", value: filterMids } : undefined;
+
+    const mid = isSelectedOwn
+      ? selectedMid
+      : !isMultiMidUser
+        ? mids[0] || profileMid
+        : (profile?.ucicId ?? "");
+
+    return {
+      mid,
+      midFilter,
+      isReady: productsLoaded && !!mid && !!midFilter,
+      // Still waiting on the MID lists: callers show loading, not "no clients".
+      isResolving: !productsLoaded,
+      guardState,
+    };
+  }, [profile, isPartnerUser, isMultiMidUser, productsLoaded, selectedMid, mids]);
+}
+
+/**
+ * "Which account is this for?" for Add client, over every PA and PACB MID. A
+ * client belongs to one MID, so with several and none selected the merchant
+ * picks first. Same shape as usePacbMidScope, which this replaces here.
+ */
+export function useClientMidScope(): PacbMidScope {
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+  const mids = useClientMids();
+
+  return {
+    needsMidChoice:
+      !isPartnerUser && mids.length > 1 && !(selectedMid && mids.includes(selectedMid)),
+    midOptions: mids,
+    // Same tint usePacbMidScope uses, so the sidebar chip is never blank.
+    selectMid: (mid: string) => setSelectedMidDetails({ mid, color: "#E5B5FF" }),
+  };
 }
 
 // ── Reference data ──────────────────────────────────────────────────────────
@@ -545,7 +637,7 @@ export function useClients({ search, countries, page }: ClientsArgs): {
   guardState: "ready" | "not-applicable";
   refetch: () => void;
 } {
-  const { mid, midFilter, isReady, guardState } = useClientPathMid();
+  const { mid, midFilter, isReady, isResolving, guardState } = useClientPathMid();
   const countryMap = useClientCountryMap();
 
   // Stable across renders as long as its inputs are — usePostQuery folds the body
@@ -592,7 +684,7 @@ export function useClients({ search, countries, page }: ClientsArgs): {
   return {
     clients,
     totalCount: data?.data?.totalCount ?? 0,
-    isLoading: isReady && isPending,
+    isLoading: isResolving || (isReady && isPending),
     isFetching,
     isError,
     guardState,

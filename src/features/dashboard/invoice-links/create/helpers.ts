@@ -30,6 +30,7 @@ import type {
   InvoiceRecipient,
   TemplateLineItem,
   TemplateWriteBody,
+  WireAddress,
 } from "@/features/dashboard/invoice-links/create/types";
 import type { Client } from "@/features/dashboard/client-management/types";
 // The template store is shared with MCA invoices, whose editor reads a theme
@@ -103,7 +104,10 @@ export function getFormattedDueDate(value: string): string | null {
 export function generateMerchantReference(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
-  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  // Upper-case, as gcc-ui-temp's generateUuid(16).toUpperCase().
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0"))
+    .join("")
+    .toUpperCase();
 }
 
 // ── Request body ─────────────────────────────────────────────────────────────
@@ -134,47 +138,110 @@ export function customerFromRecipient(recipient: InvoiceRecipient): InvoiceCusto
   };
 }
 
-/** Everything in the body that is the invoice itself, shared by every client in a batch. */
+/** Name → wire value for `addressCountry`. gcc-ui-temp sends the ISO2 code. */
+export type CountryCodeOf = (country: string) => string;
+
+const sameValue: CountryCodeOf = (country) => country;
+
+/**
+ * Everything in the body that is the invoice itself, shared by every client in
+ * a batch. Shaped like gcc-ui-temp's getRequestBody (features/Invoice/helper.js),
+ * the source of truth for invoice links:
+ *
+ *  - optional text goes as null when empty (`memo`, `additionalInfo`), never "":
+ *    the backend length-checks it, so "" is an invalid field;
+ *  - `businessName` is left out when there is none, as gcc's untouched field is;
+ *  - only the discount that applies is sent: `discountPercent` for a percentage,
+ *    `discountAmount` (the typed amount) for a fixed one;
+ *  - no `extraChargeAmount`, which gcc never sends;
+ *  - an item's `itemCode` and `gstPercentage` are left out when blank, as gcc's
+ *    rows carry only the columns that were filled.
+ */
 function buildInvoiceRequestData(
   values: InvoiceFormValues,
   items: InvoiceLineItem[]
 ): InvoiceCreateRequest["invoiceRequestData"] {
   const subTotal = getSubTotalAmount(items).toFixed(2);
   const total = getTotalAmount(items, values.discount || "0", values.discountType);
+  const discount = values.discount.trim();
+  const hasTax = items.some((item) => Number(item.tax) > 0);
+  const memo = values.memo.trim();
+  const note = values.merchantNote.trim();
 
   return {
     merchantReferenceId: generateMerchantReference(),
-    invoiceItems: items.map((item) => ({
-      itemDescription: item.description || "",
-      itemCode: item.itemCode || null,
-      itemPrice: item.ppu || "0",
-      quantity: item.qty || "0",
-      gstPercentage: item.tax || "0",
-      amount: getAmount(item.ppu || "0", item.qty || "0", item.tax || "0").toFixed(2),
-    })),
-    memo: values.memo || "",
-    additionalInfo: values.merchantNote || "",
+    invoiceItems: items.map((item) => {
+      const code = item.itemCode.trim();
+      return {
+        itemDescription: item.description || "",
+        ...(code ? { itemCode: code } : {}),
+        itemPrice: item.ppu || "0",
+        quantity: item.qty || "0",
+        // With `gst` on, the backend parses every row's gstPercentage as a
+        // number, so a row without one is a null-pointer failure ("Cannot
+        // invoke String.toCharArray() because val is null"). gcc-ui-temp never
+        // hits that, because its GST column makes the rate required on every
+        // row; lines here can mix taxed and untaxed, so an untaxed row sends
+        // "0", as pg-dashboard always did. With no tax anywhere it is left out.
+        ...(hasTax ? { gstPercentage: Number(item.tax) > 0 ? item.tax : "0" } : {}),
+        amount: getAmount(item.ppu || "0", item.qty || "0", item.tax || "0").toFixed(2),
+      };
+    }),
+    memo: memo || null,
+    additionalInfo: note || null,
     totalAmount: total,
     subTotalAmount: subTotal,
-    // Upstream sends the same computed figure twice, under two names.
+    // gcc sends the same computed figure twice, under two names.
     amountDue: total,
     txnCurrency: values.txnCurrency || "INR",
     formattedDueDate: getFormattedDueDate(values.dueDate),
     invoiceId: values.invoiceNo || null,
-    gst: items.some((item) => !!item.tax && item.tax !== "0" && Number(item.tax) !== 0),
-    businessName: "",
-    discountPercent: values.discountType === "percentage" ? values.discount || null : null,
-    discountAmount: getDiscountAmount(subTotal, values.discount || "0", values.discountType),
-    extraChargeAmount: "0.00",
+    gst: hasTax,
+    ...(discount && values.discountType === "percentage" ? { discountPercent: discount } : {}),
+    ...(discount && values.discountType === "fixed" ? { discountAmount: discount } : {}),
     merchantLogo: { name: "", fileExtension: "" },
     additionalEmailId: [],
   };
 }
 
-/** The three customer objects for one recipient. */
+/** A two-letter ISO code, which is the only thing `addressCountry` accepts. */
+const ISO2 = /^[A-Za-z]{2}$/;
+
+/**
+ * An address in the wire vocabulary (`addressStreet1` …), with only the fields
+ * that hold something, or null when none do. Billing and shipping use the same
+ * keys in gcc-ui-temp; the country is sent as its ISO2 code.
+ *
+ * The code comes from the address itself when it carries one (a client-book
+ * client), else from looking the name up. A country that still is not a code
+ * is left out rather than sent as a name: every address field is optional on
+ * an invoice link, and a name is rejected as an invalid field, failing the link.
+ */
+function toWireAddress(address: AddressValues, countryCode: CountryCodeOf): WireAddress | null {
+  const resolved = address.countryIso2 || (address.country ? countryCode(address.country) : "");
+  const entries: [keyof WireAddress, string][] = [
+    ["addressStreet1", address.streetAddress],
+    ["addressStreet2", address.landmark],
+    ["addressCountry", ISO2.test(resolved) ? resolved.toUpperCase() : ""],
+    ["addressState", address.state],
+    ["addressCity", address.city],
+    ["addressPostalCode", address.zipcode],
+  ];
+  const filled = entries.filter(([, value]) => !!value?.trim());
+  return filled.length > 0
+    ? (Object.fromEntries(filled.map(([key, value]) => [key, value.trim()])) as WireAddress)
+    : null;
+}
+
+/** The three customer objects for one recipient, as gcc-ui-temp builds them. */
 function buildCustomerParts(
-  customer: InvoiceCustomer
+  customer: InvoiceCustomer,
+  countryCode: CountryCodeOf
 ): Pick<InvoiceCreateRequest, "plCustomerData" | "plBillingData" | "plShippingData"> {
+  const billing = toWireAddress(customer.billing, countryCode);
+  // gcc splits the name: the first word, then the rest.
+  const [firstName = "", ...rest] = customer.fullName.trim().split(/\s+/);
+
   return {
     plCustomerData: {
       fullName: customer.fullName || null,
@@ -185,42 +252,20 @@ function buildCustomerParts(
     },
 
     plBillingData: {
-      addressStreet1: customer.billing.streetAddress || "",
-      addressStreet2: customer.billing.landmark || "",
-      addressCountry: customer.billing.country || "",
-      addressState: customer.billing.state || "",
-      addressCity: customer.billing.city || "",
-      addressPostalCode: customer.billing.zipcode || "",
-      // Upstream copies the customer's full name into firstName and leaves
-      // lastName empty rather than splitting it.
-      firstName: customer.fullName || "",
-      lastName: "",
+      ...(billing ?? {}),
+      firstName: firstName || null,
+      lastName: rest.join(" ") || null,
       callingCode: customer.callingCode || null,
-      phoneNumber: customer.phoneNumber || "",
-      emailId: customer.emailId || "",
+      phoneNumber: customer.phoneNumber || null,
+      emailId: customer.emailId || null,
     },
 
-    // SOURCE DEFECT, PRESERVED DELIBERATELY.
-    //
-    // Upstream:
-    //   plShippingData:
-    //     (values?.billingDetails?.shippingSameAsBilling && values?.billingDetails) ||
-    //     values?.shippingDetails || null
-    //
-    // so this field carries the RAW form object — `streetAddress`, `landmark`,
-    // `country`, … and, in the same-as-billing case, a stray
-    // `shippingSameAsBilling` boolean — while plBillingData above is remapped to
-    // the `addressStreet1`/… vocabulary the API documents. The shipping address
-    // is therefore in a different shape from the billing one in every branch.
-    //
-    // Ported byte-identical so this sends exactly what production sends. Raised
-    // as a defect separately; do not "fix" it here without confirming what the
-    // endpoint actually accepts, because a tolerant backend would start storing
-    // different data the moment the shape changed. A client picked from the
-    // client book goes through the same mapping, so every path agrees.
+    // Same keys as billing. Pre-gcc this sent the raw form object
+    // (`streetAddress`, `country`, … and a stray `shippingSameAsBilling` flag),
+    // pg-dashboard's shape, which the endpoint rejects as invalid fields.
     plShippingData: customer.shippingSameAsBilling
-      ? { ...customer.billing, shippingSameAsBilling: true }
-      : { ...customer.shipping },
+      ? billing
+      : toWireAddress(customer.shipping, countryCode),
   };
 }
 
@@ -229,9 +274,8 @@ function buildCustomerParts(
  * upstream has it — the three endpoints take the same shape and differ only in
  * URL and verb.
  *
- * Every hardcoded value below (`businessName: ""`, `extraChargeAmount: "0.00"`,
- * the empty `merchantLogo`, `expiry: 6`, `siTxn: false`, …) is upstream's, not
- * an invention here.
+ * The constants (`expiry: 6`, `siTxn: false`, the empty `merchantLogo`, …)
+ * are gcc-ui-temp's, as is everything left out when empty.
  *
  * `customer` defaults to the single-customer form fields, which is the edit
  * path; create passes the one picked recipient instead.
@@ -239,11 +283,12 @@ function buildCustomerParts(
 export function buildInvoiceRequest(
   values: InvoiceFormValues,
   items: InvoiceLineItem[],
-  customer: InvoiceCustomer = customerFromValues(values)
+  customer: InvoiceCustomer = customerFromValues(values),
+  countryCode: CountryCodeOf = sameValue
 ): InvoiceCreateRequest {
   return {
     invoiceRequestData: buildInvoiceRequestData(values, items),
-    ...buildCustomerParts(customer),
+    ...buildCustomerParts(customer, countryCode),
     siTxn: false,
     collectByGlobalAltPay: false,
     merchantCustomPayload: null,
@@ -258,11 +303,14 @@ export function buildInvoiceRequest(
 export function buildBulkInvoiceRequest(
   values: InvoiceFormValues,
   items: InvoiceLineItem[],
-  recipients: InvoiceRecipient[]
+  recipients: InvoiceRecipient[],
+  countryCode: CountryCodeOf = sameValue
 ): InvoiceBulkCreateRequest {
   return {
     invoiceRequestData: buildInvoiceRequestData(values, items),
-    clients: recipients.map((recipient) => buildCustomerParts(customerFromRecipient(recipient))),
+    clients: recipients.map((recipient) =>
+      buildCustomerParts(customerFromRecipient(recipient), countryCode)
+    ),
     siTxn: false,
     collectByGlobalAltPay: false,
     merchantCustomPayload: null,
@@ -270,6 +318,22 @@ export function buildBulkInvoiceRequest(
 }
 
 // ── Recipients ───────────────────────────────────────────────────────────────
+
+/**
+ * The six fields an address form shows, as strings. Read through this rather
+ * than Object.values: an address can also carry `countryIso2`, which is
+ * optional (undefined for most) and is not a field the merchant fills.
+ */
+export function addressFieldValues(address: AddressValues): string[] {
+  return [
+    address.streetAddress,
+    address.landmark,
+    address.country,
+    address.state,
+    address.city,
+    address.zipcode,
+  ].map((value) => value ?? "");
+}
 
 function sameAddress(a: AddressValues, b: AddressValues): boolean {
   return (Object.keys(a) as (keyof AddressValues)[]).every(
@@ -290,6 +354,7 @@ export function clientToRecipient(client: Client): InvoiceRecipient {
     streetAddress: client.addressLine ?? "",
     landmark: client.addressLine2 ?? "",
     country: client.countryName ?? "",
+    countryIso2: client.countryIso2 || undefined,
     state: client.state ?? "",
     city: client.city ?? "",
     zipcode: client.zipcode ?? "",
@@ -298,12 +363,13 @@ export function clientToRecipient(client: Client): InvoiceRecipient {
     streetAddress: client.shippingAddressLine ?? "",
     landmark: client.shippingAddressLine2 ?? "",
     country: client.shippingCountryName ?? "",
+    countryIso2: client.shippingCountryIso2 || undefined,
     state: client.shippingState ?? "",
     city: client.shippingCity ?? "",
     zipcode: client.shippingZipcode ?? "",
   };
   const hasOwnShipping =
-    Object.values(shipping).some((v) => v.trim()) && !sameAddress(billing, shipping);
+    addressFieldValues(shipping).some((v) => v.trim()) && !sameAddress(billing, shipping);
 
   return {
     key: client.id,
@@ -439,7 +505,12 @@ function toTemplateLineItem(item: InvoiceLineItem): TemplateLineItem {
     ...(item.skuId ? { skuId: item.skuId } : {}),
     name: item.description,
     description: item.description,
-    type: item.itemType ?? "",
+    // The templates API reads `type` as a GOOD/SERVICE enum, so "" is a 400
+    // ("monthly" template, 2026-10-07). The MCA editor never sends it empty: its
+    // item dialog requires the choice. An invoice-link line only carries a
+    // type when it came from the SKU catalogue, so an untyped manual line is
+    // saved as a GOOD — with its code in `hsn`, exactly as before.
+    type: item.itemType || "GOOD",
     quantity: Number(item.qty) || 0,
     unitPrice: Number(item.ppu) || 0,
     gstRate: Number(item.tax) || 0,
@@ -482,6 +553,10 @@ export function toTemplateWriteBody(
         logoEnabled: false,
         signatureEnabled: false,
       };
+  // The MCA editor always sends `tax` with its derived `taxAmount`, never `{}`.
+  // Invoice links have no invoice-level tax, so it is always zero; a stored
+  // template's own tax fields are kept.
+  base.tax = { ...((base.tax as Record<string, unknown> | undefined) ?? {}), taxAmount: "0.00" };
   // Server-managed, and the term is this editor's to set or clear.
   delete base.templateId;
   delete base.savedAt;

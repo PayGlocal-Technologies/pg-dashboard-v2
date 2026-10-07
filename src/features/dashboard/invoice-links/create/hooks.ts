@@ -18,6 +18,14 @@ import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { useInvoiceLinkMidScope } from "@/features/dashboard/invoice-links/hooks";
 import {
+  getLineItemsApi,
+  skuImportPreviousItemsApi,
+} from "@/features/dashboard/create-invoice/services";
+import type {
+  LineItemSuggestion,
+  LineItemsResponse,
+} from "@/features/dashboard/create-invoice/types";
+import {
   clientByIdApi,
   clientSearchApi,
   countryCurrencyMapApi,
@@ -56,6 +64,8 @@ import type {
   TemplateResponse,
   TemplateWriteBody,
   TemplateWriteResponse,
+  SkuImportRequest,
+  InvoiceLineItem,
 } from "@/features/dashboard/invoice-links/create/types";
 
 /**
@@ -274,6 +284,64 @@ export function useInvoiceDraft(mid: string, invoiceId: string | undefined) {
     invoiceDraftApi(mid, invoiceId),
     { enabled: !!mid && !!invoiceId }
   );
+}
+
+/**
+ * Imports the lines ticked "Save to SKU catalogue" into SKU management. Same
+ * endpoint, body and fire-and-forget handling as pg-dashboard's create-invoice,
+ * which imports when the merchant leaves its Items step — before, and
+ * regardless of, the invoice being created. A failure is reported with the
+ * server's reason; `onImported` lets the caller un-tick what was saved. SKU management accepts
+ * PA MIDs as well as PACB ones, so the invoice link's own MID is used.
+ */
+export function useImportItemsToSku(mid: string) {
+  const { mutate } = usePost<unknown, SkuImportRequest>(skuImportPreviousItemsApi(mid), {
+    invalidateQueries: false,
+  });
+
+  return (items: InvoiceLineItem[], currency: string, onImported?: () => void) => {
+    const skuItems = items
+      .filter((item) => item.saveAsSku && item.description.trim())
+      .map((item) => ({
+        name: item.description.trim(),
+        type: item.itemType || null,
+        hsnSac: item.itemCode.trim(),
+        unitPrice: item.ppu,
+        currency: currency || null,
+        description: null,
+      }));
+    if (skuItems.length === 0) return;
+
+    mutate(
+      { items: skuItems },
+      {
+        onSuccess: () => {
+          toast.success(
+            `${skuItems.length} item${skuItems.length === 1 ? "" : "s"} saved to your SKU catalogue.`
+          );
+          onImported?.();
+        },
+        onError: (error: Error) =>
+          toast.error("Couldn't save items to the SKU catalogue", { description: error.message }),
+      }
+    );
+  };
+}
+
+/**
+ * The item picker's suggestions: the same `get-line-items` endpoint
+ * create-invoice uses (GET /v3/mca-invoice/{mid}/get-line-items?currency=),
+ * addressed to the invoice link's own MID and currency.
+ */
+export function useLineItemSuggestions(mid: string, currency: string): LineItemSuggestion[] {
+  const url = getLineItemsApi(mid, currency || undefined);
+  const { data } = useGet<LineItemsResponse>(
+    ["invoice-link-line-items", mid, currency],
+    url,
+    undefined,
+    { enabled: !!url }
+  );
+  return data?.data?.lineItems ?? [];
 }
 
 /** POST create. */

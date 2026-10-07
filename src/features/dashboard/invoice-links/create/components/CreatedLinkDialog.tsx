@@ -10,8 +10,8 @@ import { SuccessTick } from "@/components/common/SuccessTick";
  *
  * Upstream's CreatedLinkDrawer: a tick, the copyable link, "Copy Invoice Link"
  * and "View all Invoice Links". Copy text is upstream's verbatim. Closing it
- * navigates to the list, which is where upstream's `router.back()` lands from
- * the create route anyway, and is unambiguous from the edit route too.
+ * leaves the merchant in the editor; "View all Invoice Links" is the one way
+ * to the list (upstream's close navigated back instead).
  */
 export function CreatedLinkDialog({
   open,
