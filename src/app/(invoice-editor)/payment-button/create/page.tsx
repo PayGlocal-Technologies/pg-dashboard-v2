@@ -1,14 +1,15 @@
-import { Suspense } from "react";
-import { CreatePaymentButtonFeature } from "@/features/dashboard/payment-button/components/create/CreatePaymentButtonFeature";
+import { redirect } from "next/navigation";
 
-// In the (invoice-editor) group for its full-screen shell: no sidebar or
-// header, the editor's own header carries the close back to /payment-button.
-// Suspense because the editor reads ?mid= (the account picked on the list)
-// via useSearchParams.
-export default function CreatePaymentButtonPage() {
-  return (
-    <Suspense>
-      <CreatePaymentButtonFeature />
-    </Suspense>
+// Create a payment button now opens as a modal over the list. This route stays
+// for links into it (the header search, bookmarks) and hands off to the list
+// with ?create=1, keeping the account picked there as ?mid=.
+export default async function CreatePaymentButtonPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ mid?: string }>;
+}) {
+  const { mid } = await searchParams;
+  redirect(
+    mid ? `/payment-button?create=1&mid=${encodeURIComponent(mid)}` : "/payment-button?create=1"
   );
 }
