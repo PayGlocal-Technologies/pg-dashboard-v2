@@ -121,13 +121,6 @@ export const regularNavigation: NavGroup[] = [
         icon: "file-text",
         permission: ["getInvoices", "downloadInvoice"],
       },
-      {
-        label: "Regularise Bills",
-        href: "/shipping-bill-regularisation",
-        icon: "file-text",
-        // pg-dashboard's own gate for Regularise Bills (Sidebar/constants.ts).
-        permission: ["billRegularization"],
-      },
     ],
   },
   {
@@ -233,8 +226,8 @@ export const mcaNavigation: NavGroup[] = [
           { label: "IRM Repository", href: "/irm-repository", permission: [] },
         ],
       },
-      // This tree's name for the Payments tree's Regularise Bills, so it takes
-      // the same billRegularization gate pg-dashboard puts on that entry.
+      // MCA's name for pg-dashboard's Regularise Bills, so it takes the same
+      // billRegularization gate pg-dashboard puts on that entry.
       { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: ["billRegularization"] },
       // /mca-receipts, labelled for what an MCA merchant comes here for: the GST
       // invoices PayGlocal raises against them. MCA-only, so the Payments tree

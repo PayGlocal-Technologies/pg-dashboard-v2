@@ -16,7 +16,7 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
  *
  * navigation.ts still lists ~10 hrefs whose pages were never built in v2
  * (/configure, /payment-products, /invoice-links,
- * /invoice-download, /shipping-bill-regularisation,
+ * /invoice-download,
  * and the five partner routes). The
  * sidebar links to them anyway, but a *search result* that 404s reads as a
  * broken feature rather than an unfinished one, so search filters against this
