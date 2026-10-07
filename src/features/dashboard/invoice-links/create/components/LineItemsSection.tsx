@@ -14,6 +14,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SingleSelect,
+  type SingleSelectOption,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -142,6 +144,15 @@ export function LineItemsSection({
   const [addSeed, setAddSeed] = useState<string | undefined>(undefined);
 
   const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
+  const currencyOptions = useMemo<SingleSelectOption[]>(
+    () =>
+      currencies.map((option) => ({
+        value: option.value,
+        label: option.value,
+        icon: <CountryFlag iso2={currencyFlagIso2(option.value, countryCurrencyMap)} />,
+      })),
+    [currencies, countryCurrencyMap]
+  );
   const suggestions = useLineItemSuggestions(mid, currency);
   const matchingSuggestions = useMemo(
     () => filterLineItemSuggestions(suggestions, addQuery),
@@ -245,32 +256,21 @@ export function LineItemsSection({
 
         {/* create-invoice's currency select: flag and code. The flag comes
             from the shared currency → country rule (currencyFlagIso2), since
-            the invoice-link currency list carries no country. */}
-        <Select value={currency} onValueChange={onCurrencyChange}>
-          <SelectTrigger
-            className="h-9 w-32 gap-1.5 px-3 text-[13px] shadow-none"
-            aria-label="Invoice currency"
-          >
-            <SelectValue placeholder="Currency">
-              {currency && (
-                <span className="flex items-center gap-1.5">
-                  <CountryFlag iso2={currencyFlagIso2(currency, countryCurrencyMap)} />
-                  {currency}
-                </span>
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent side="bottom" avoidCollisions={false} className="shadow-none">
-            {currencies.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                <span className="flex items-center gap-2">
-                  <CountryFlag iso2={currencyFlagIso2(option.value, countryCurrencyMap)} />
-                  {option.value}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+            the invoice-link currency list carries no country. flux's
+            SingleSelect rather than Select, because Radix Select cannot host
+            a search box and the currency list is long; its default match is
+            the code, case-insensitive. */}
+        <SingleSelect
+          id="invoice-currency"
+          value={currency}
+          onChange={onCurrencyChange}
+          options={currencyOptions}
+          placeholder="Currency"
+          showSearch
+          searchPlaceholder="Search…"
+          emptyText="No currency matches that search."
+          className="h-9 w-32 px-3 text-[13px] shadow-none"
+        />
       </div>
 
       {items.length > 0 ? (
