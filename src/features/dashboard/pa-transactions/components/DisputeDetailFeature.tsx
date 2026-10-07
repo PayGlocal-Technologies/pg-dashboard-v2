@@ -320,7 +320,7 @@ export function DisputeDetailFeature({
             <TransactionPaymentMethod row={transaction} />
           </div>
           <p className="mt-1.5 text-[13px] text-muted-foreground">
-            Charged to <span className="font-medium text-foreground">{name}</span>
+            Disputed by <span className="font-medium text-foreground">{name}</span>
           </p>
         </div>
 
