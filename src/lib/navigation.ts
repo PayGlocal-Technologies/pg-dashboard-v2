@@ -160,6 +160,21 @@ export const regularNavigation: NavGroup[] = [
       },
     ],
   },
+  {
+    // The MCA tree's Administration group, same labels, icons and permissions:
+    // the client book already spans PA and PACB MIDs (see useClientMids), and
+    // the SKU catalogue feeds PA Invoice Links too.
+    label: "Administration",
+    items: [
+      {
+        label: "Client management",
+        href: "/client-management",
+        icon: "users",
+        permission: ["getAllMcaClient"],
+      },
+      { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
+    ],
+  },
 ];
 
 // ─── MCA navigation ────────────────────────────────────────────────────────────

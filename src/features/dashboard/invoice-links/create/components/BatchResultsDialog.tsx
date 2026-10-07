@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Button, Dialog, DialogContent, DialogTitle, StatusBadge } from "@/components/ui";
+import { Button, Card, Dialog, DialogContent, DialogTitle, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import type {
   InvoiceBulkResult,
@@ -65,35 +65,44 @@ export function BatchResultsDialog({
             const recipient = recipients[index];
             const link = result.data?.paymentLink;
             return (
-              <li key={`${result.invoiceId}-${index}`} className="flex items-start gap-3 px-6 py-3">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-[13px] font-medium text-foreground">
-                    {recipient?.fullName || `Client ${index + 1}`}
-                  </p>
-                  <p className="truncate text-[12px] text-muted-foreground">{result.invoiceId}</p>
-                  {!result.success && result.errorMessage ? (
-                    <p className="mt-0.5 text-[12px] text-destructive">{result.errorMessage}</p>
-                  ) : null}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
+              <li key={`${result.invoiceId}-${index}`} className="px-6 py-3">
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-[13px] font-medium text-foreground">
+                      {recipient?.fullName || `Client ${index + 1}`}
+                    </p>
+                    <p className="truncate text-[12px] text-muted-foreground">{result.invoiceId}</p>
+                    {!result.success && result.errorMessage ? (
+                      <p className="mt-0.5 text-[12px] text-destructive">{result.errorMessage}</p>
+                    ) : null}
+                  </div>
                   <StatusBadge
                     size="sm"
                     variant={result.success ? "success" : "danger"}
                     label={result.success ? "Created" : "Failed"}
                   />
-                  {link ? (
+                </div>
+                {/* The link itself, shown the way CreatedLinkDialog shows a single
+                    one, so the copy button sits next to what it copies. Truncated
+                    to keep each row one line; the full URL is on hover. */}
+                {link ? (
+                  <Card className="mt-2 flex-row items-center gap-2 py-1 pr-1 pl-3">
+                    <p className="min-w-0 flex-1 truncate text-[12.5px] text-primary" title={link}>
+                      {link}
+                    </p>
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
                       aria-label={`Copy link for ${recipient?.fullName || result.invoiceId}`}
-                      className="h-7 w-7 p-0"
+                      leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
+                      className="h-7 shrink-0 px-2 text-[12px]"
                       onClick={() => void copy(link)}
                     >
-                      <Icon name="copy" className="h-3.5 w-3.5" />
+                      Copy
                     </Button>
-                  ) : null}
-                </div>
+                  </Card>
+                ) : null}
               </li>
             );
           })}

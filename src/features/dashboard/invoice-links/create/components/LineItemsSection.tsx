@@ -47,8 +47,25 @@ import {
   type LineItemValues,
 } from "@/features/dashboard/invoice-links/create/components/LineItemDialog";
 
-/** Grid template shared by the header and every row. Same as create-invoice's. */
-const GRID = "20px minmax(160px,1fr) 56px 96px 88px 48px";
+/**
+ * The rows' layout, decided by the width of the table itself (a container
+ * query) rather than the viewport: the editor shares the screen with the
+ * preview, so a wide window can still leave this table narrow.
+ *
+ * From @lg up it is one line per item, the same columns as create-invoice's
+ * (grip | description | qty | rate | total | actions), with the description
+ * free to shrink so the fixed columns are never cut off. Below that, each item
+ * takes two lines: grip, description and actions on top; qty, rate and total
+ * underneath, each labelled since the header row is hidden.
+ */
+const HEADER_GRID = "hidden @lg:grid @lg:grid-cols-[20px_minmax(0,1fr)_56px_96px_88px_48px]";
+const ROW_GRID =
+  "grid grid-cols-[20px_56px_96px_minmax(0,1fr)_48px] gap-y-2 @lg:grid-cols-[20px_minmax(0,1fr)_56px_96px_88px_48px] @lg:gap-y-0";
+/** Undoes the narrow layout's explicit placement, so @lg auto-places in DOM order. */
+const WIDE_AUTO = "@lg:col-span-1 @lg:col-start-auto @lg:row-start-auto";
+/** Qty / Rate labels for the narrow layout, where the header row is hidden. */
+const NARROW_LABEL =
+  "mb-1 block text-[10px] font-semibold uppercase tracking-wide text-muted-foreground @lg:hidden";
 
 /** Same text-styled action as create-invoice's "Add discount" / "Add line item". */
 const ADD_ACTION_CLASS =
@@ -257,10 +274,12 @@ export function LineItemsSection({
       </div>
 
       {items.length > 0 ? (
-        <div className="overflow-hidden rounded-lg border border-border">
+        <div className="@container overflow-hidden rounded-lg border border-border">
           <div
-            className="grid items-center gap-x-3 border-b border-border bg-muted/40 py-2 pl-3 pr-2"
-            style={{ gridTemplateColumns: GRID }}
+            className={cn(
+              HEADER_GRID,
+              "items-center gap-x-3 border-b border-border bg-muted/40 py-2 pl-3 pr-2"
+            )}
           >
             <span />
             <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -311,15 +330,25 @@ export function LineItemsSection({
                       if (moved) reordered.splice(to, 0, moved);
                       onChange(reordered);
                     }}
-                    className="group grid cursor-grab items-center gap-x-3 py-2.5 pl-3 pr-2 transition-colors hover:bg-muted/30 active:cursor-grabbing"
-                    style={{ gridTemplateColumns: GRID }}
+                    className={cn(
+                      ROW_GRID,
+                      "group cursor-grab items-center gap-x-3 py-2.5 pl-3 pr-2 transition-colors hover:bg-muted/30 active:cursor-grabbing"
+                    )}
                   >
                     <Icon
                       name="grip-vertical"
-                      className="h-3.5 w-3.5 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground"
+                      className={cn(
+                        "col-start-1 row-start-1 h-3.5 w-3.5 shrink-0 text-muted-foreground/50 group-hover:text-muted-foreground",
+                        WIDE_AUTO
+                      )}
                     />
 
-                    <div className="min-w-0 overflow-hidden pr-2">
+                    <div
+                      className={cn(
+                        "col-span-3 col-start-2 row-start-1 min-w-0 overflow-hidden pr-2",
+                        WIDE_AUTO
+                      )}
+                    >
                       <p className="truncate text-[13px] font-medium text-foreground">
                         {item.description || "Untitled item"}
                       </p>
@@ -352,35 +381,57 @@ export function LineItemsSection({
                       </div>
                     </div>
 
-                    <Input
-                      inputMode="numeric"
-                      aria-label={`Quantity for ${item.description || "item"}`}
-                      aria-invalid={!!rowErrors.qty || undefined}
-                      value={item.qty}
-                      onChange={(e) => patchItem(item.key, { qty: e.target.value })}
-                      className="h-7 px-2 text-center text-[13px] shadow-none"
-                    />
+                    <div className={cn("col-start-2 row-start-2", WIDE_AUTO)}>
+                      <span aria-hidden className={NARROW_LABEL}>
+                        Qty
+                      </span>
+                      <Input
+                        inputMode="numeric"
+                        aria-label={`Quantity for ${item.description || "item"}`}
+                        aria-invalid={!!rowErrors.qty || undefined}
+                        value={item.qty}
+                        onChange={(e) => patchItem(item.key, { qty: e.target.value })}
+                        className="h-7 px-2 text-center text-[13px] shadow-none"
+                      />
+                    </div>
 
-                    <Input
-                      inputMode="decimal"
-                      aria-label={`Rate for ${item.description || "item"}`}
-                      aria-invalid={!!rowErrors.ppu || undefined}
-                      value={item.ppu}
-                      onChange={(e) => patchItem(item.key, { ppu: e.target.value })}
-                      className="h-7 px-2 text-[13px] shadow-none"
-                    />
+                    <div className={cn("col-start-3 row-start-2", WIDE_AUTO)}>
+                      <span aria-hidden className={NARROW_LABEL}>
+                        Rate ({currencySymbol})
+                      </span>
+                      <Input
+                        inputMode="decimal"
+                        aria-label={`Rate for ${item.description || "item"}`}
+                        aria-invalid={!!rowErrors.ppu || undefined}
+                        value={item.ppu}
+                        onChange={(e) => patchItem(item.key, { ppu: e.target.value })}
+                        className="h-7 px-2 text-[13px] shadow-none"
+                      />
+                    </div>
 
-                    <span className="text-right text-[13px] font-semibold tabular-nums text-foreground">
+                    <span
+                      className={cn(
+                        "col-span-2 col-start-4 row-start-2 self-end pb-1 text-right text-[13px] font-semibold tabular-nums text-foreground @lg:self-center @lg:pb-0",
+                        WIDE_AUTO
+                      )}
+                    >
                       {formatMoney(currencySymbol, getAmount(item.ppu, item.qty, item.tax || "0"))}
                     </span>
 
-                    <div className="flex items-center justify-end gap-1">
+                    {/* Hover-revealed only in the wide layout: the narrow one is
+                        what touch screens get, and they have no hover. */}
+                    <div
+                      className={cn(
+                        "col-start-5 row-start-1 flex items-center justify-end gap-1 self-start @lg:self-center",
+                        WIDE_AUTO
+                      )}
+                    >
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         aria-label="Edit line item"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                        className="h-6 w-6 p-0 @lg:opacity-0 @lg:group-hover:opacity-100 @lg:focus-visible:opacity-100"
                         onClick={() => openEdit(item.key)}
                       >
                         <Icon name="pencil" className="h-3 w-3" />
@@ -390,7 +441,7 @@ export function LineItemsSection({
                         variant="ghost"
                         size="sm"
                         aria-label="Remove line item"
-                        className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+                        className="h-6 w-6 p-0 @lg:opacity-0 @lg:group-hover:opacity-100 @lg:focus-visible:opacity-100"
                         onClick={() => onChange(items.filter((row) => row.key !== item.key))}
                       >
                         <Icon name="trash-2" className="h-3 w-3" />
