@@ -66,21 +66,3 @@ export function ProductSplit({
     </div>
   );
 }
-
-/** The legend for the splits, beside the period control. */
-export function ProductLegend() {
-  return (
-    <div className="flex items-center gap-3 text-[11.5px] text-muted-foreground">
-      {(["pa", "mca"] as const).map((k) => (
-        <span key={k} className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: PRODUCT_COLOURS[k] }}
-          />
-          {k === "pa" ? "Payment gateway (PA)" : "Multi-currency account (MCA)"}
-        </span>
-      ))}
-    </div>
-  );
-}

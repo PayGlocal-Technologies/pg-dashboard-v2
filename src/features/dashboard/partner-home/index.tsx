@@ -11,14 +11,11 @@ import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { McaDashboardAurora } from "@/features/dashboard/mca-home/components/McaDashboardAurora";
 import { McaStatCard } from "@/features/dashboard/mca-home/components/McaStatCard";
 import { OnboardingPipelineCard } from "@/features/dashboard/partner-home/components/OnboardingPipelineCard";
-import { NextPayoutCard } from "@/features/dashboard/partner-home/components/NextPayoutCard";
+import { PreviousPayoutCard } from "@/features/dashboard/partner-home/components/PreviousPayoutCard";
 import { ReferralLinksCard } from "@/features/dashboard/partner-home/components/ReferralLinksCard";
 import { TopMerchantsCard } from "@/features/dashboard/partner-home/components/TopMerchantsCard";
-import {
-  ProductLegend,
-  ProductSplit,
-} from "@/features/dashboard/partner-home/components/ProductSplit";
-import { dayMonth, inr } from "@/features/dashboard/partner-home/format";
+import { ProductSplit } from "@/features/dashboard/partner-home/components/ProductSplit";
+import { inr } from "@/features/dashboard/partner-home/format";
 import {
   PARTNER_DASHBOARD_MOCK,
   type ActionItem,
@@ -65,8 +62,9 @@ function useGreeting() {
 /**
  * DESIGN MOCK: the Partner Dashboard (Partners → Home). An operating view,
  * in the MCA dashboard's own components and layout: how the business is
- * doing (KPIs), who needs the partner (pipeline and actions), what they'll
- * be paid (next payout), which merchants earn most, and how to bring more.
+ * doing (KPIs), who needs the partner (pipeline and actions), how to bring
+ * more (referral links), what they were last paid, and which merchants earn
+ * most.
  */
 export function PartnerDashboardFeature() {
   const router = useRouter();
@@ -80,14 +78,11 @@ export function PartnerDashboardFeature() {
   const summary = data.summary[period];
   const attention = data.actionItems.length;
 
-  // One line of context from the data: who needs the partner, then money.
+  // One line of context from the data: who needs the partner.
   const lead =
     attention > 0
       ? `${attention} ${attention === 1 ? "merchant needs" : "merchants need"} your attention.`
       : `You have ${data.onboarding.live} live ${data.onboarding.live === 1 ? "merchant" : "merchants"}.`;
-  const payoutLine = data.nextPayout
-    ? ` Your next payout of ${inr(data.nextPayout.amount)} is due on ${dayMonth(data.nextPayout.date)}.`
-    : "";
 
   function handleAction(item: ActionItem) {
     // MOCK: no partner action endpoints yet; confirms what would happen.
@@ -156,7 +151,6 @@ export function PartnerDashboardFeature() {
           </h1>
           <p className="mt-0.5 text-[13px] text-muted-foreground">
             {lead}
-            {payoutLine}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -199,20 +193,15 @@ export function PartnerDashboardFeature() {
           {/* ── Business overview ── */}
           <section className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-              <h2 className="text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
                 Business overview
               </h2>
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-                <span className="hidden md:flex">
-                  <ProductLegend />
-                </span>
-                <TimeRangeTabs
-                  options={PERIOD_OPTIONS}
-                  value={period}
-                  onValueChange={setPeriod}
-                  label="Business overview period"
-                />
-              </div>
+              <TimeRangeTabs
+                options={PERIOD_OPTIONS}
+                value={period}
+                onValueChange={setPeriod}
+                label="Business overview period"
+              />
             </div>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {kpis.map(({ split, formatSplit, shares, ...k }) => (
@@ -231,7 +220,7 @@ export function PartnerDashboardFeature() {
               and growth (narrow, right). Top earning merchants sits under the
               pipeline rather than full width below both, so the two columns
               come out about even and neither leaves a gap under it. Below lg
-              it all stacks: pipeline, payout, referral links, top merchants. */}
+              it all stacks: pipeline, referral links, payout, top merchants. */}
           <div className="grid gap-4 lg:grid-cols-12 lg:items-start">
             <div className="contents lg:col-span-8 lg:flex lg:flex-col lg:gap-4">
               <OnboardingPipelineCard
@@ -250,18 +239,17 @@ export function PartnerDashboardFeature() {
               </div>
             </div>
             <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-4">
-              <NextPayoutCard
-                nextPayout={data.nextPayout}
-                previousPayouts={data.previousPayouts}
-                isLoading={isLoading}
-                onViewPayouts={() => router.push(ROUTES.payouts)}
-              />
               <div ref={referralRef}>
                 <ReferralLinksCard
                   links={data.referralLinks}
                   onViewLinks={() => router.push(ROUTES.referralLinks)}
                 />
               </div>
+              <PreviousPayoutCard
+                payouts={data.previousPayouts}
+                isLoading={isLoading}
+                onViewPayouts={() => router.push(ROUTES.payouts)}
+              />
             </div>
           </div>
         </>

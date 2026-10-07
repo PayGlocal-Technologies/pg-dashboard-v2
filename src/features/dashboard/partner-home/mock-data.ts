@@ -84,7 +84,7 @@ export interface PartnerDashboardData {
   summary: Record<PartnerPeriod, PartnerSummary>;
   onboarding: OnboardingCounts;
   actionItems: ActionItem[];
-  nextPayout: Payout | null;
+  /** Paid payouts, newest first. */
   previousPayouts: Payout[];
   topMerchants: TopMerchant[];
   referralLinks: ReferralLink[];
@@ -158,18 +158,17 @@ export const PARTNER_DASHBOARD_MOCK: PartnerDashboardData = {
       action: "resend-invite",
     },
   ],
-  nextPayout: {
-    date: "2026-10-07",
-    amount: 48250,
-    status: "processing",
-    forMonth: "September",
-    breakdown: [
-      { product: "Payment Gateway", amount: 31400 },
-      { product: "MCA", amount: 16850 },
-    ],
-  },
   previousPayouts: [
-    { date: "2026-09-07", amount: 41120, status: "paid", forMonth: "August" },
+    {
+      date: "2026-09-07",
+      amount: 41120,
+      status: "paid",
+      forMonth: "August",
+      breakdown: [
+        { product: "Payment Gateway", amount: 26780 },
+        { product: "MCA", amount: 14340 },
+      ],
+    },
     { date: "2026-08-07", amount: 34600, status: "paid", forMonth: "July" },
     { date: "2026-07-07", amount: 30200, status: "paid", forMonth: "June" },
   ],

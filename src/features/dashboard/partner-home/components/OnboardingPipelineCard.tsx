@@ -42,33 +42,19 @@ export function OnboardingPipelineCard({
   onViewAll: () => void;
   onAction: (item: ActionItem) => void;
 }) {
-  const signedUpShare =
-    onboarding.invited > 0 ? Math.round((onboarding.signedUp / onboarding.invited) * 100) : 0;
-
-  // Stage tone from the app's existing status colours: neutral while moving,
-  // amber where the partner is needed, green once it earns.
+  // Plain counts, as the MCA dashboard's stat strips: only the stage that
+  // needs the partner carries a colour.
   const stages = [
-    { label: "Invited", count: onboarding.invited, hint: "Link sent", tone: "neutral" },
-    {
-      label: "Signed up",
-      count: onboarding.signedUp,
-      hint: `${signedUpShare}% of invited`,
-      tone: "neutral",
-    },
+    { label: "Invited", count: onboarding.invited, attention: false },
+    { label: "Signed up", count: onboarding.signedUp, attention: false },
     {
       label: "Documents pending",
       count: onboarding.documentsPending,
-      hint: "Needs your help",
-      tone: onboarding.documentsPending > 0 ? "warning" : "neutral",
+      attention: onboarding.documentsPending > 0,
     },
-    {
-      label: "Under review",
-      count: onboarding.underReview,
-      hint: "With PayGlocal",
-      tone: "neutral",
-    },
-    { label: "Live", count: onboarding.live, hint: "Earning commission", tone: "success" },
-  ] as const;
+    { label: "Under review", count: onboarding.underReview, attention: false },
+    { label: "Live", count: onboarding.live, attention: false },
+  ];
 
   // Oldest stall first: the longest wait is the one most likely to be lost.
   const items = [...actionItems].sort((a, b) => b.waitingDays - a.waitingDays);
@@ -93,35 +79,25 @@ export function OnboardingPipelineCard({
         </Button>
       </div>
 
-      <ol className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        {stages.map((stage) => (
+      <ol className="mt-4 grid grid-cols-2 gap-y-3 sm:grid-cols-5">
+        {stages.map((stage, i) => (
           <li
             key={stage.label}
-            className={cn(
-              // Five stages in a 2-up grid leave Live alone on its row; it
-              // takes the full row there instead of a half-empty one.
-              "rounded-lg border px-3 py-2.5 last:col-span-2 sm:last:col-span-1",
-              stage.tone === "warning" && "border-amber-500/30 bg-amber-500/10",
-              stage.tone === "success" && "border-emerald-500/30 bg-emerald-500/10",
-              stage.tone === "neutral" && "border-border bg-muted/40"
-            )}
+            className={cn("min-w-0 pr-3", i > 0 && "sm:border-l sm:border-border sm:pl-4")}
           >
+            <p className="truncate text-xs text-muted-foreground">{stage.label}</p>
             {isLoading ? (
-              <Shimmer className="h-6 w-10" />
+              <Shimmer className="mt-1 h-6 w-10" />
             ) : (
               <p
                 className={cn(
-                  "text-xl font-bold tabular-nums",
-                  stage.tone === "warning" && "text-amber-700 dark:text-amber-400",
-                  stage.tone === "success" && "text-emerald-700 dark:text-emerald-400",
-                  stage.tone === "neutral" && "text-foreground"
+                  "mt-0.5 text-xl font-bold tabular-nums",
+                  stage.attention ? "text-amber-700 dark:text-amber-400" : "text-foreground"
                 )}
               >
                 {stage.count}
               </p>
             )}
-            <p className="mt-1 text-[12.5px] font-medium text-foreground">{stage.label}</p>
-            <p className="text-[11px] text-muted-foreground">{stage.hint}</p>
           </li>
         ))}
       </ol>
@@ -137,7 +113,6 @@ export function OnboardingPipelineCard({
             </Badge>
           )}
         </h3>
-        {items.length > 1 && <p className="text-[11px] text-muted-foreground">Oldest first</p>}
       </div>
 
       {isLoading ? (

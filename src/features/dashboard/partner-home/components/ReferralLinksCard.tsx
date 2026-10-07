@@ -42,7 +42,7 @@ export function ReferralLinksCard({
     <Card className="gap-0 p-5">
       <h2 className="text-sm font-semibold text-foreground">Bring more merchants</h2>
       <p className="mt-0.5 text-xs text-muted-foreground">
-        You have one referral link per product. Share the one that fits what your merchant needs.
+        One referral link per product.
       </p>
 
       <ul className="mt-3">
