@@ -39,45 +39,88 @@ import type { Client } from "@/features/dashboard/client-management/types";
 import { DEFAULT_THEME_METADATA } from "@/features/dashboard/create-invoice/constants";
 
 // ── Totals ───────────────────────────────────────────────────────────────────
-// Ported expression-for-expression from upstream helpers.ts (getAmount,
-// getSubTotalAmount, getDiscountAmount, getTotalAmount). The `|| 0` on getAmount
-// is load-bearing: an empty ppu/qty makes the product NaN, and upstream relies
-// on that falling through to 0 rather than propagating into the subtotal.
+// Exact decimal arithmetic in hundredths, matching the backend's check
+// (invoiceValidation.json + validateCalculations), which rejects the whole
+// link on a one-cent difference:
+//
+//   item amount = itemPrice × quantity + GST, the GST portion rounded HALF_UP
+//                 to 2 places;
+//   totalAmount = Σ item amounts − discountPercent% − discountAmount.
+//
+// Floats were used before (`a * b … .toFixed(2)`), which rounds the whole line
+// rather than the GST portion and is not HALF_UP on half-cent values.
 
-/** Line amount, GST included: ppu × qty + (ppu × qty × tax%). */
+/** A decimal string as an integer scaled by 10^places, rounded HALF_UP. "12.345", 2 → 1235. */
+function toScaled(value: string, places: number): number {
+  const match = /^\s*(\d*)(?:\.(\d*))?\s*$/.exec(value ?? "");
+  if (!match || (!match[1] && !match[2])) return 0;
+  const whole = match[1] || "0";
+  const fraction = match[2] ?? "";
+  const kept = (fraction + "0".repeat(places)).slice(0, places);
+  const scaled = Number(whole) * 10 ** places + Number(kept || "0");
+  // HALF_UP on the first dropped digit.
+  return fraction.length > places && Number(fraction[places]) >= 5 ? scaled + 1 : scaled;
+}
+
+/** a ÷ b for non-negative integers, rounded HALF_UP. */
+function divideHalfUp(a: number, b: number): number {
+  return Math.floor((2 * a + b) / (2 * b));
+}
+
+/** A typed amount normalised to 2 places, HALF_UP: "3.5" → "3.50". */
+function fromCentsString(value: string): string {
+  return fromCents(toScaled(value, 2));
+}
+
+/** Hundredths → "12.34". */
+function fromCents(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+/** A line's amount in hundredths: price × qty, plus its GST rounded HALF_UP. */
+function lineCents(ppu: string, qty: string, tax: string): number {
+  const base = toScaled(ppu, 2) * toScaled(qty, 0);
+  // Tax as basis points (18 → 1800, 12.5 → 1250), so the GST is base × bp / 10000.
+  const gst = divideHalfUp(base * toScaled(tax || "0", 2), 10000);
+  return base + gst;
+}
+
+/** Line amount, GST included, exactly as the backend computes it. */
 export function getAmount(ppu: string, qty: string, tax: string): number {
-  const ppuNum = Number(ppu);
-  const qtyNum = Number(qty);
-  const taxNum = Number(tax);
-  return ppuNum * qtyNum + (ppuNum * qtyNum * taxNum) / 100 || 0;
+  return lineCents(ppu, qty, tax) / 100;
 }
 
-/** Sum of every line's GST-inclusive amount. */
+/** Sum of every line's GST-inclusive amount — the same figures sent as each `amount`. */
 export function getSubTotalAmount(items: InvoiceLineItem[]): number {
-  return items.reduce((acc, item) => acc + getAmount(item.ppu, item.qty, item.tax ?? "0"), 0);
+  return items.reduce((acc, item) => acc + lineCents(item.ppu, item.qty, item.tax ?? "0"), 0) / 100;
 }
 
+/**
+ * The discount taken off the subtotal, as "0.00". A percentage is computed on
+ * the subtotal and rounded HALF_UP to 2 places; a fixed discount is the amount.
+ */
 export function getDiscountAmount(
   subTotalAmount: string,
   discount: string,
   discountType: DiscountType
 ): string {
-  const discountNum = Number(discount);
-  const subTotalAmountNum = Number(subTotalAmount);
-  const discountAmount =
-    discountType === "percentage" ? (subTotalAmountNum * discountNum) / 100 : discountNum || 0;
-  return discountAmount.toFixed(2);
+  const subCents = toScaled(subTotalAmount, 2);
+  const cents =
+    discountType === "percentage"
+      ? divideHalfUp(subCents * toScaled(discount || "0", 2), 10000)
+      : toScaled(discount || "0", 2);
+  return fromCents(cents);
 }
 
-/** Subtotal less discount. */
+/** Subtotal less discount, never below zero. */
 export function getTotalAmount(
   items: InvoiceLineItem[],
   discount: string,
   discountType: DiscountType
 ): string {
   const subTotalAmount = getSubTotalAmount(items).toFixed(2);
-  const discountAmount = getDiscountAmount(subTotalAmount, discount, discountType);
-  return (Number(subTotalAmount) - Number(discountAmount)).toFixed(2) || "0.00";
+  const discountCents = toScaled(getDiscountAmount(subTotalAmount, discount, discountType), 2);
+  return fromCents(Math.max(0, toScaled(subTotalAmount, 2) - discountCents));
 }
 
 /**
@@ -151,9 +194,8 @@ const sameValue: CountryCodeOf = (country) => country;
  *  - optional text goes as null when empty (`memo`, `additionalInfo`), never "":
  *    the backend length-checks it, so "" is an invalid field;
  *  - `businessName` is left out when there is none, as gcc's untouched field is;
- *  - only the discount that applies is sent: `discountPercent` for a percentage,
- *    `discountAmount` (the typed amount) for a fixed one;
- *  - no `extraChargeAmount`, which gcc never sends;
+ *  - except the discount, which follows pg-dashboard: `discountAmount` is always
+ *    the computed amount, plus `discountPercent` for a percentage (see below);
  *  - an item's `itemCode` and `gstPercentage` are left out when blank, as gcc's
  *    rows carry only the columns that were filled.
  */
@@ -169,6 +211,12 @@ function buildInvoiceRequestData(
   const note = values.merchantNote.trim();
 
   return {
+    // One per press. In a multi-client create this sits in the shared
+    // `invoiceRequestData`, so every link in the batch carries it; the backend
+    // makes it unique per generated link, as it does the invoice id's -1, -2
+    // (agreed 2026-10-07 after "Too many request with same merchant Reference
+    // Id" failed the second link). Do not try to vary it here: `clients[]` has
+    // nowhere to carry a per-client reference.
     merchantReferenceId: generateMerchantReference(),
     invoiceItems: items.map((item) => {
       const code = item.itemCode.trim();
@@ -197,8 +245,18 @@ function buildInvoiceRequestData(
     formattedDueDate: getFormattedDueDate(values.dueDate),
     invoiceId: values.invoiceNo || null,
     gst: hasTax,
+    // The backend computes totalAmount = Σ items − discountPercent% −
+    // discountAmount, applying BOTH, so exactly one of them may carry the
+    // discount: a percentage goes in discountPercent with discountAmount "0";
+    // a fixed discount goes in discountAmount. discountAmount and
+    // extraChargeAmount are required fields — "0", never blank or null, when
+    // unused (a missing discountAmount fails field validation).
+    discountAmount:
+      discount && values.discountType === "fixed" ? fromCentsString(discount) : "0",
     ...(discount && values.discountType === "percentage" ? { discountPercent: discount } : {}),
-    ...(discount && values.discountType === "fixed" ? { discountAmount: discount } : {}),
+    // Ignored by the backend's total check today, so it is never part of
+    // totalAmount; invoice links have no extra charges anyway.
+    extraChargeAmount: "0",
     merchantLogo: { name: "", fileExtension: "" },
     additionalEmailId: [],
   };

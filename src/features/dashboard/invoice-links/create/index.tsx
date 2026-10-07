@@ -447,7 +447,22 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
   const currencySymbol =
     currencies.find((c) => c.value === values.txnCurrency)?.symbol || values.txnCurrency;
 
-  const patch = (next: Partial<InvoiceFormValues>) => setEdits((prev) => ({ ...prev, ...next }));
+  const patch = (next: Partial<InvoiceFormValues>) => {
+    setEdits((prev) => ({ ...prev, ...next }));
+    // An edited field's error goes with the edit, so a message never sits
+    // under a field that now holds a valid value. Nested ones too: editing
+    // `billing` clears every `billing.*` error. Submit re-checks everything.
+    const touched = Object.keys(next);
+    setErrors((prev) => {
+      const stale = Object.keys(prev).filter((key) =>
+        touched.some((field) => key === field || key.startsWith(`${field}.`))
+      );
+      if (stale.length === 0) return prev;
+      const rest = { ...prev };
+      for (const key of stale) delete rest[key];
+      return rest;
+    });
+  };
 
   function validate(): boolean {
     const next: Record<string, string> = {};
@@ -924,7 +939,15 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
                     <InputGroupInput
                       id="invoice-no"
                       placeholder="Enter invoice number"
+                      // Browser autofill has nothing useful to offer for a
+                      // per-invoice number, and its tint fills the field.
+                      autoComplete="off"
                       aria-invalid={!!errors.invoiceNo}
+                      // The group draws the error border; without this the
+                      // input adds its own error ring inside it (flux's
+                      // InputGroupInput clears the input's border and focus
+                      // ring, but not its aria-invalid ring).
+                      className="aria-invalid:ring-0"
                       aria-describedby={isBatch ? "invoice-no-suffix" : undefined}
                       value={values.invoiceNo}
                       onChange={(e) => patch({ invoiceNo: e.target.value })}

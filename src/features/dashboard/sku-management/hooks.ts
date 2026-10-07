@@ -178,13 +178,16 @@ function useSkuMids(): string[] {
 
 /**
  * The catalogue's merchant id, which every one of its endpoints takes as a path
- * segment for every user — not just partners. Same rule as useScopeId, over
+ * segment for every user — not just partners. Resolved over
  * both products' MIDs:
  *
  *   - partner user                  -> the profile MID
  *   - a MID selected (PA or PACB)   -> that MID
- *   - single-MID account            -> its first MID, else the profile MID
- *   - multi-MID, nothing selected   -> the UCIC id (whole-account roll-up)
+ *   - otherwise                     -> the first PACB MID, else the first PA
+ *                                      MID, else the profile MID
+ *
+ * That is pg-dashboard's rule, not useScopeId's: no UCIC id, which the SKU
+ * endpoints reject in the path.
  *
  * `midFilter` is the search body's own filter, whose key is **`mid`**, not
  * `merchantId` (see useSkuCatalogue): the selected MID alone, or every PACB and
@@ -192,14 +195,13 @@ function useSkuMids(): string[] {
  * Payments MID is now a valid catalogue scope.
  *
  * Not ready until the merchant-products call has answered. The MID lists and
- * `isMultiMidUser` all arrive with it, so before then every account looks
+ * the multi-MID flag all arrive with it, so before then every account looks
  * single-MID with no MIDs, and a search fired in that window went out with no
  * `fieldSearch.mid` at all.
  */
 export function useSkuPathMid() {
   const profile = useApp((s) => s.profile);
   const isPartnerUser = useApp((s) => s.isPartnerUser);
-  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
   const productsLoaded = useApp((s) => !!s.merchantEnabledProducts);
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
   const mids = useSkuMids();
@@ -233,11 +235,11 @@ export function useSkuPathMid() {
     const midFilter =
       filterMids.length > 0 ? { key: "merchantId", value: filterMids } : undefined;
 
-    const mid = isSelectedOwn
-      ? selectedMid
-      : !isMultiMidUser
-        ? mids[0] || profileMid
-        : (profile?.ucicId ?? "");
+    // pg-dashboard's rule exactly — `selectedMid || pacbMids[0] ?? profile.mid`
+    // (sku-management/index.tsx) — with the PA MIDs after the PACB ones, since
+    // the page now spans both. Never the UCIC id: the SKU endpoints do not
+    // accept one in the path (confirmed by the backend, 2026-10-07).
+    const mid = isSelectedOwn ? selectedMid : mids[0] || profileMid;
 
     return {
       mid,
@@ -247,7 +249,7 @@ export function useSkuPathMid() {
       isResolving: !productsLoaded,
       guardState,
     };
-  }, [profile, isPartnerUser, isMultiMidUser, productsLoaded, selectedMid, mids]);
+  }, [profile, isPartnerUser, productsLoaded, selectedMid, mids]);
 }
 
 /**
@@ -346,12 +348,12 @@ export function useSkuCatalogue({
     const fieldSearch = buildCatalogueFieldSearch(midFilter?.value, type);
     return {
       queryString: search || undefined,
-      // A text query switches to QUERY_FILTER_TYPE. A type/mid filter with no
-      // query needs FILTER_TYPE — the backend ignores `fieldSearch` under
-      // DEFAULT, which is why clicking the Goods/Services tab returned every
-      // type. Only a bare, unfiltered request is DEFAULT. Same rule the
-      // team-management list body follows.
-      searchFilterType: search ? "QUERY_FILTER_TYPE" : fieldSearch ? "FILTER_TYPE" : "DEFAULT",
+      // pg-dashboard's rule: QUERY_FILTER_TYPE with search text, otherwise
+      // DEFAULT — including the plain load, whose MID-only `fieldSearch` used to
+      // turn it into FILTER_TYPE, which production never sends here. The
+      // Goods/Services tab has no pg-dashboard counterpart; it alone keeps
+      // FILTER_TYPE, since the backend ignores `fieldSearch.type` under DEFAULT.
+      searchFilterType: search ? "QUERY_FILTER_TYPE" : type ? "FILTER_TYPE" : "DEFAULT",
       fieldSearch,
       from: (page - 1) * pageLimit,
       pageLimit,

@@ -158,10 +158,12 @@ export interface InvoiceCreateRequest {
     invoiceId: string | null;
     gst: boolean;
     businessName?: string;
-    /** Sent only for a percentage discount. */
+    /** Sent only for a percentage discount, with discountAmount "0". */
     discountPercent?: string;
-    /** Sent only for a fixed discount: the amount typed. */
-    discountAmount?: string;
+    /** Always sent. The fixed discount's amount; "0" for a percentage or no discount. */
+    discountAmount: string;
+    /** Always "0": invoice links have no extra charges, and the backend ignores it in the total. */
+    extraChargeAmount: string;
     merchantLogo: { name: string; fileExtension: string };
     additionalEmailId: string[];
   };

@@ -113,7 +113,12 @@ export function LineItemsSection({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [discountOpen, setDiscountOpen] = useState(discount.length > 0);
+  // Opened by "+ Add discount" before a value is typed. Shown as well whenever
+  // there IS a discount, however it arrived — a template or a draft applied
+  // after mount would otherwise sit behind "+ Add discount" while the total
+  // already took it off.
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const showDiscount = discountOpen || discount.trim() !== "";
   const [addOpen, setAddOpen] = useState(false);
   const [addQuery, setAddQuery] = useState("");
   // Seeds the dialog's name when opened from "Add "…"" for an unmatched query.
@@ -439,7 +444,7 @@ export function LineItemsSection({
               <span className="tabular-nums">{formatMoney(currencySymbol, subTotal)}</span>
             </div>
 
-            {discountOpen ? (
+            {showDiscount ? (
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[13px]">
                   <div className="flex flex-1 items-center gap-1.5">
@@ -449,7 +454,7 @@ export function LineItemsSection({
                       onValueChange={(next) => onDiscountTypeChange(next as DiscountType)}
                     >
                       <SelectTrigger
-                        className="h-7 w-[6.5rem] px-2 text-[13px]"
+                        className="h-7 w-32 px-2 text-[13px]"
                         aria-label="Discount type"
                       >
                         <SelectValue />
