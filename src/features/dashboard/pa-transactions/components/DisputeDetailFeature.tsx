@@ -16,11 +16,7 @@ import {
   deriveTransactionDetail,
   type DisputeDetail,
 } from "@/features/dashboard/pa-transactions/deriveTransactionDetail";
-import {
-  getDisputeReasonMeta,
-  isFraudDispute,
-} from "@/features/dashboard/pa-transactions/disputeReasonMeta";
-import { ChargebackProtectedChip } from "@/features/dashboard/pa-transactions/components/ChargebackProtectedChip";
+import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
 import {
   DetailBackLink,
   DetailRow,
@@ -344,7 +340,6 @@ export function DisputeDetailView({
             tooltip={DISPUTE_PHASE_META[dispute.disputePhase].description}
           />
         )}
-        {isFraudDispute(dispute.reason) && <ChargebackProtectedChip />}
       </div>
 
       {(dispute.appliedFee || dispute.acceptedAmount !== undefined) && (
