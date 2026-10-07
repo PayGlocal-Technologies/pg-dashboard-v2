@@ -11,10 +11,7 @@ import {
   Card,
   Input,
   Label,
-  RadioGroup,
-  RadioGroupItem,
   Separator,
-  Textarea,
   Tooltip,
   TooltipContent,
   TooltipProvider,
@@ -38,7 +35,6 @@ interface UploadedFile {
 }
 
 export type DisputeRespondMode = "partial" | "contest";
-type ContestReason = "withdrawn" | "refunded" | "not-fraudulent" | "other";
 
 interface RecommendedDocument {
   key: string;
@@ -74,13 +70,6 @@ const RECOMMENDED_DOCUMENTS: RecommendedDocument[] = [
     label: "Other Documents",
     description: "Any other evidence that supports your case.",
   },
-];
-
-const REASON_OPTIONS: { value: ContestReason; label: string }[] = [
-  { value: "withdrawn", label: "Cardholder withdrew the dispute" },
-  { value: "refunded", label: "Cardholder already received a refund" },
-  { value: "not-fraudulent", label: "Purchase was not fraudulent" },
-  { value: "other", label: "Other reason" },
 ];
 
 /** Illustrative scoring only, not a real evidence-scoring model. There's no
@@ -130,8 +119,6 @@ export function DisputeRespondForm({
   stage = "CHARGEBACK",
 }: DisputeRespondFormProps) {
   const [contestAmount, setContestAmount] = useState("");
-  const [reason, setReason] = useState<ContestReason | "">("");
-  const [otherReason, setOtherReason] = useState("");
   const [files, setFiles] = useState<UploadedFile[]>([]);
   // Whether the (simulated) analysis has finished for the current upload
   // state. `analyzing` is derived, not its own state, this is the only
@@ -207,18 +194,17 @@ export function DisputeRespondForm({
     });
   }
 
-  // Uploading a single document is enough to enable submission, the reason
-  // and (for partial accepts) amount fields don't gate the button.
+  // Uploading a single document is enough to enable submission, the
+  // (partial accept) amount field doesn't gate the button.
   const canSubmit = filesCount > 0;
 
   // Purely for the timeline below, not used to gate canSubmit above.
   const contestAmountValue = Number(contestAmount);
   const amountEntered =
     contestAmount.trim() !== "" && contestAmountValue > 0 && contestAmountValue <= disputedAmount;
-  const reasonEntered = reason !== "" && (reason !== "other" || otherReason.trim() !== "");
 
-  // Each step's own field can be filled in any order (contest amount,
-  // reason and documents are all independently editable), so its state
+  // Each step's own field can be filled in any order (contest amount and
+  // documents are independently editable), so its state
   // reflects only its own completion, never locked behind an unrelated
   // step. "Submit for review" is the one genuinely gated step: it can only
   // be actioned once canSubmit is true (a document has been uploaded),
@@ -232,11 +218,6 @@ export function DisputeRespondForm({
             state: amountEntered ? "complete" : "current",
           },
           {
-            label: "Choose a reason",
-            description: "Tell us why you're contesting this dispute.",
-            state: reasonEntered ? "complete" : "current",
-          },
-          {
             label: "Upload supporting documents",
             description: "Add evidence like receipts, delivery proof or authorization records.",
             state: filesCount > 0 ? "complete" : "current",
@@ -248,11 +229,6 @@ export function DisputeRespondForm({
           },
         ]
       : [
-          {
-            label: "Choose a reason",
-            description: "Tell us why you're contesting this dispute.",
-            state: reasonEntered ? "complete" : "current",
-          },
           {
             label: "Upload supporting documents",
             description: "Add evidence like receipts, delivery proof or authorization records.",
@@ -344,33 +320,6 @@ export function DisputeRespondForm({
               </div>
             </Card>
           )}
-
-          <Card className="shadow-none gap-3 p-5">
-            <p className="text-sm font-semibold text-foreground">
-              Why do you want to contest this?
-            </p>
-            <RadioGroup value={reason} onValueChange={(v) => setReason(v as ContestReason)}>
-              {REASON_OPTIONS.map((opt) => (
-                <div key={opt.value} className="flex items-center gap-2.5">
-                  <RadioGroupItem value={opt.value} id={`reason-${opt.value}`} />
-                  <Label
-                    htmlFor={`reason-${opt.value}`}
-                    className="text-[13px] font-medium text-foreground/85"
-                  >
-                    {opt.label}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-            {reason === "other" && (
-              <Textarea
-                value={otherReason}
-                onChange={(e) => setOtherReason(e.target.value)}
-                placeholder="Describe your reason"
-                className="mt-1"
-              />
-            )}
-          </Card>
 
           <Card className="shadow-none gap-0 p-5">
             <h2 className="text-lg font-bold text-foreground">Submit Supporting Evidence</h2>
