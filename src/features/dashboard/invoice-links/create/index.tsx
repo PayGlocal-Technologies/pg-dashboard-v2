@@ -707,7 +707,10 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
           </SplitButton>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_46rem]">
+        {/* Preview column at 40rem, narrower than create-invoice's 46rem: an
+            invoice-link document is lighter, and the form beside it needs the
+            room more. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]">
           <div className="min-h-0 overflow-y-auto">
             <div className="mx-auto max-w-250 space-y-5 px-6 py-6 lg:px-10">
               {/* Captioned chips, the way the invoice editor opens: the two
@@ -721,7 +724,10 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
                     aria-invalid={!!errors.invoiceNo}
                     value={values.invoiceNo}
                     onChange={(e) => patch({ invoiceNo: e.target.value })}
-                    className="h-9 w-56 text-[13px] shadow-none"
+                    // Default control height, the same as the Due date picker
+                    // beside it. It used to be shrunk to h-9 here, which made
+                    // the two fields in one row visibly different sizes.
+                    className="w-56"
                   />
                   {errors.invoiceNo ? (
                     <FieldError>{errors.invoiceNo}</FieldError>
@@ -753,6 +759,8 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
                 onChoose={chooseTemplate}
                 onDetach={() => setActiveTemplateId(null)}
                 onManage={() => setManageTemplatesOpen(true)}
+                canSave={canSaveTemplate}
+                onSave={() => setSaveTemplateOpen(true)}
               />
 
               {/* ── Customer ──────────────────────────────────────────────── */}

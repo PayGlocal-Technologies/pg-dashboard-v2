@@ -22,8 +22,8 @@ import type { InvoiceLinkTemplate } from "@/features/dashboard/invoice-links/cre
  * "Start from a template", the invoice-link copy of the MCA editor's template
  * card (create-invoice's InvoiceTemplatePicker), over the same template store.
  *
- * Renders nothing once it is known there are no templates: saving the first
- * one goes through the header's split button, as it does in the MCA editor.
+ * Always shown, even with no templates saved, so a merchant knows the feature
+ * exists; that empty state offers the first save, as the MCA editor's does.
  * Choosing hands the template up; the parent decides whether to confirm first
  * (ApplyTemplateConfirm below), because "Edit" in the manage dialog reaches the
  * same apply and must ask the same question.
@@ -36,6 +36,8 @@ export function TemplatePicker({
   onChoose,
   onDetach,
   onManage,
+  canSave,
+  onSave,
 }: {
   templates: InvoiceLinkTemplate[];
   isReady: boolean;
@@ -46,12 +48,15 @@ export function TemplatePicker({
   /** Unlinks from the active template. Never touches the invoice's contents. */
   onDetach: () => void;
   onManage: () => void;
+  /** Whether the invoice holds anything worth saving as a template yet. */
+  canSave: boolean;
+  /** Opens the editor's "Save as template" dialog, from the empty state. */
+  onSave: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const active = templates.find((template) => template.id === activeTemplateId) ?? null;
 
-  if (isReady && templates.length === 0) return null;
 
   const choose = (template: InvoiceLinkTemplate) => {
     setPickerOpen(false);
@@ -83,6 +88,27 @@ export function TemplatePicker({
 
       {!isReady ? (
         <Shimmer className="h-13 w-full rounded-lg" />
+      ) : templates.length === 0 ? (
+        // Shown rather than hidden, so a merchant learns templates exist
+        // before they have one. Saving opens the same dialog as the header
+        // menu's "Save as template"; until there is something worth saving,
+        // it says what to do first instead of offering a button that can only
+        // decline.
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-3.5 py-3">
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-medium text-foreground">No templates saved yet</p>
+            <p className="text-[12px] text-muted-foreground">
+              {canSave
+                ? "Save this invoice as a template to reuse its items, currency and notes next time."
+                : "Add line items, then save this invoice as a template to reuse them next time."}
+            </p>
+          </div>
+          {canSave && (
+            <Button type="button" variant="outline" size="sm" onClick={onSave}>
+              Save as template
+            </Button>
+          )}
+        </div>
       ) : (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>

@@ -49,7 +49,7 @@ export function buildSkuColumns(
   onPriceChange: (id: string, field: SkuPriceField, next: number) => void,
   /**
    * Adds the MID column, second from the left. Only true when the merchant
-   * holds several PACB MIDs and has selected none — the one state where rows
+   * holds several MIDs (PA or PACB) and has selected none — the one state where rows
    * from different accounts sit in the same table and the row's own name is not
    * enough to tell you which account it belongs to. Same condition and same
    * position pg-dashboard uses (`hidden: !showMid`).

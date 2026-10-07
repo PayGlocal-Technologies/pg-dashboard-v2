@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { Button, ColumnManager, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { ReportDownloadDrawer, type ReportWindow } from "@/components/common/ReportDownloadDrawer";
@@ -38,6 +39,7 @@ import {
   useInvoicePreview,
 } from "@/features/dashboard/invoice-links/hooks";
 import { InvoicePreviewDrawer } from "@/features/dashboard/invoice-links/components/InvoicePreviewDrawer";
+import { ProofDocumentsDrawer } from "@/features/dashboard/invoice-links/components/ProofDocumentsDrawer";
 import { UpdateInvoiceStatusDialog } from "@/features/dashboard/invoice-links/components/UpdateInvoiceStatusDialog";
 import type { InvoiceLink } from "@/features/dashboard/invoice-links/types";
 
@@ -68,7 +70,7 @@ export function InvoiceLinkTable() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(INVOICE_LINKS_PAGE_LIMIT);
 
-  const { rows, totalCount, isPending, isError, isReady } = useInvoiceLinks(
+  const { rows, totalCount, isPending, isFetching, isError, isReady, refetch } = useInvoiceLinks(
     {
       linkId: linkId.trim() || undefined,
       status: statusFilters,
@@ -177,6 +179,13 @@ export function InvoiceLinkTable() {
     onDelete: (row: InvoiceLink) => setConfirmTarget({ row, kind: "delete" }),
   };
 
+  // Same as MCA Invoices' Refresh; gcc-ui-temp's invoice list has one too.
+  const handleRefresh = async () => {
+    const { isError: failed } = await refetch();
+    if (failed) toast.error("Couldn't refresh invoice links. Please try again.");
+    else toast.success("Invoice links updated");
+  };
+
   const runConfirmedAction = () => {
     if (!confirmTarget) return;
     const { row, kind } = confirmTarget;
@@ -252,6 +261,19 @@ export function InvoiceLinkTable() {
             </FilterChipGroup>
 
             <div className="ml-auto flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                leftIcon={
+                  <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+                }
+                onClick={() => void handleRefresh()}
+                disabled={!isReady || isFetching}
+                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+              >
+                Refresh
+              </Button>
               <ColumnManager
                 columns={reorderableColumns}
                 order={currentColumnOrder}
@@ -347,13 +369,22 @@ export function InvoiceLinkTable() {
         isLoading={isPreviewPending}
       />
 
-      {statusTarget ? (
+      {/* One row item, two surfaces: an invoice already paid offline shows
+          its proofs in a drawer, like Preview Invoice; any other opens the
+          upload dialog. */}
+      {statusTarget?.isOfflinePaid ? (
+        <ProofDocumentsDrawer
+          open
+          onOpenChange={(next) => !next && setStatusTarget(null)}
+          mid={statusTarget.mid}
+          invoiceId={statusTarget.invoiceId}
+        />
+      ) : statusTarget ? (
         <UpdateInvoiceStatusDialog
           open
           onOpenChange={(next) => !next && setStatusTarget(null)}
           mid={statusTarget.mid}
           invoiceId={statusTarget.invoiceId}
-          isOfflinePaid={statusTarget.isOfflinePaid}
         />
       ) : null}
 

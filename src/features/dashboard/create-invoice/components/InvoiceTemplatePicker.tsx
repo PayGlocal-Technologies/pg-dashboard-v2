@@ -18,9 +18,9 @@ import { formatEpochDay } from "@/features/dashboard/create-invoice/helpers";
 import type { InvoiceTemplate } from "@/features/dashboard/create-invoice/types";
 
 /**
- * "Start from a template" — renders nothing once it's known there are none
- * to start from (see the early return below), so saving the first one only
- * happens through the header's own "Save as template" action.
+ * "Start from a template". Always shown, even with no templates saved, so a
+ * merchant knows the feature exists; that empty state offers the first save
+ * (the same dialog as the header's "Save as template").
  *
  * Nova's template card, above the first section of the form. One departure,
  * because this one is wired to a form that already has content in it:
@@ -36,6 +36,8 @@ export function InvoiceTemplatePicker({
   onApply,
   onDetach,
   onManage,
+  canSave,
+  onSave,
 }: {
   templates: InvoiceTemplate[];
   isReady: boolean;
@@ -47,21 +49,16 @@ export function InvoiceTemplatePicker({
   /** Unlinks from the active template. Never touches the invoice's contents. */
   onDetach: () => void;
   onManage: () => void;
+  /** Whether the invoice holds anything worth saving as a template yet. */
+  canSave: boolean;
+  /** Opens the editor's "Save as template" dialog, from the empty state. */
+  onSave: () => void;
 }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pendingTemplate, setPendingTemplate] = useState<InvoiceTemplate | null>(null);
 
   const active = templates.find((template) => template.id === activeTemplateId) ?? null;
 
-  // No card at all once it's known there's nothing to pick from — the
-  // "no templates yet, save one" empty state used to render here regardless,
-  // but a picker for a list that's empty isn't template *selection*, so it
-  // no longer earns a place in the section until there's an actual choice
-  // to make. Saving the current invoice as a template still lives in the
-  // header's own split button, so that path isn't lost, just not repeated
-  // here. Still shown while `isReady` is false: that's "not known yet", not
-  // "known empty".
-  if (isReady && templates.length === 0) return null;
 
   const choose = (template: InvoiceTemplate) => {
     setPickerOpen(false);
@@ -102,6 +99,27 @@ export function InvoiceTemplatePicker({
 
       {!isReady ? (
         <Shimmer className="h-13 w-full rounded-lg" />
+      ) : templates.length === 0 ? (
+        // Shown rather than hidden, so a merchant learns templates exist
+        // before they have one. Saving opens the same dialog as the header
+        // menu's "Save as template"; until there is something worth saving,
+        // it says what to do first instead of offering a button that can only
+        // decline.
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-border px-3.5 py-3">
+          <div className="min-w-0">
+            <p className="text-[13.5px] font-medium text-foreground">No templates saved yet</p>
+            <p className="text-[12px] text-muted-foreground">
+              {canSave
+                ? "Save this invoice as a template to reuse its items, currency and notes next time."
+                : "Add line items, then save this invoice as a template to reuse them next time."}
+            </p>
+          </div>
+          {canSave && (
+            <Button type="button" variant="outline" size="sm" onClick={onSave}>
+              Save as template
+            </Button>
+          )}
+        </div>
       ) : (
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
