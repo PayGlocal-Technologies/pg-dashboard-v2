@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import {
+  SettlementTimelineStepper,
+  type SettlementStepStatus,
+} from "@/features/dashboard/mca-transactions/components/SettlementTimelineStepper";
 
 export type TimelineStepState = "complete" | "current" | "pending" | "danger";
 
@@ -23,7 +27,38 @@ const DOT_CLASS: Record<TimelineStepState, string> = {
   pending: "bg-muted-foreground/30",
 };
 
-export function PaymentTimeline({ steps }: { steps: TimelineStep[] }) {
+/** Each state as the MCA timeline draws it: a tick once done, a dot while in
+ *  progress, an alert where it went against the merchant. */
+const STEPPER_STATUS: Record<TimelineStepState, SettlementStepStatus> = {
+  complete: "success",
+  current: "inProgress",
+  danger: "error",
+  pending: "pending",
+};
+
+export function PaymentTimeline({
+  steps,
+  variant = "dots",
+}: {
+  steps: TimelineStep[];
+  /** "ticks": the MCA Transactions timeline (small ticks joined by a line
+   *  that fills in), used by every dispute timeline. "dots" (default): the
+   *  plain dot trail of the transaction and refund pages. */
+  variant?: "dots" | "ticks";
+}) {
+  if (variant === "ticks") {
+    // Newest first, as the dot trail below.
+    return (
+      <SettlementTimelineStepper
+        items={[...steps].reverse().map((step) => ({
+          status: STEPPER_STATUS[step.state],
+          title: step.label,
+          subtitle: step.description,
+        }))}
+      />
+    );
+  }
+
   // Callers (e.g. deriveTimelineSteps) hand these in chronological order,
   // oldest first, that's still the correct order for the underlying data.
   // Display is reversed here so the most recent event reads at the top,

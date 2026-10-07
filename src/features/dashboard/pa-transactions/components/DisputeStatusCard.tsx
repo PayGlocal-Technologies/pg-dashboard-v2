@@ -263,6 +263,7 @@ export function DisputeStatusCard({
       {card}
       <DisputeStageGuideDialog
         status={dispute.status}
+        stage={stageOf(dispute)}
         open={guideOpen}
         onOpenChange={setGuideOpen}
       />

@@ -402,7 +402,7 @@ export function DisputeDetailView({
 
   const timelineSection = (
     <DetailSection title="Timeline">
-      <PaymentTimeline steps={timelineSteps} />
+      <PaymentTimeline steps={timelineSteps} variant="ticks" />
     </DetailSection>
   );
 
@@ -513,11 +513,14 @@ export function DisputeDetailView({
           {detail.amountBreakdown && (
             <DetailSection title="Payment Breakdown">
               <AmountBreakdownBody
+                // No processing fee on a dispute's page, so the net is
+                // what was received less any refunds.
                 amountReceived={detail.amountBreakdown.amountReceived}
-                fee={detail.amountBreakdown.fee}
                 refundedAmount={detail.amountBreakdown.refundedAmount}
                 disputedAmount={detail.amountBreakdown.disputedAmount}
-                netAmount={detail.amountBreakdown.netAmount}
+                netAmount={
+                  detail.amountBreakdown.amountReceived - detail.amountBreakdown.refundedAmount
+                }
                 currency={transaction.txnCurrency ?? currency}
               />
             </DetailSection>

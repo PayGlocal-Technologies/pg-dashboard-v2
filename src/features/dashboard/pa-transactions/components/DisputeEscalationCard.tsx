@@ -40,13 +40,15 @@ function Choice({
         <Icon name={icon} size={18} aria-hidden />
       </span>
       <p className="text-sm font-semibold text-foreground">{title}</p>
-      <p className="max-w-64 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+      <p className="mb-1 max-w-64 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+      {/* Pinned to the bottom: the two choices stretch to the same height,
+       * so their buttons line up whatever each description's length. */}
       <Button
         type="button"
         variant="primary"
         size="sm"
         onClick={onAction}
-        className="mt-1 w-full max-w-60"
+        className="mt-auto w-full max-w-60"
       >
         {action}
       </Button>

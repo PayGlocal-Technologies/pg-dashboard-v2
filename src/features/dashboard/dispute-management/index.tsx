@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
 import { Button, ColumnManager, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { FilterChipGroup } from "@/components/common/filters/FilterChips";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -41,10 +43,10 @@ import {
   DISPUTE_COLUMN_DEFS,
   DISPUTE_COLUMN_ORDER,
 } from "@/features/dashboard/dispute-management/columns";
-import { DisputeReasonFilter } from "@/features/dashboard/dispute-management/components/DisputeReasonFilter";
 import { DisputeStatCards } from "@/features/dashboard/dispute-management/components/DisputeStatCards";
 import { MOCK_DISPUTE_ROWS } from "@/features/dashboard/dispute-management/mockRows";
 import {
+  DISPUTE_REASON_OPTIONS,
   DISPUTE_SEGMENT_RAW_STATUSES,
   DISPUTE_STATUS_FILTERS,
   DISPUTE_STATUS_SEGMENTS,
@@ -165,7 +167,7 @@ export function DisputeManagementFeature() {
   const [search, setSearch] = useState("");
   const [statusSegment, setStatusSegment] = useState<DisputeStatusSegment>("action-required");
   const [statusFilter, setStatusFilter] = useState<string[] | undefined>(undefined);
-  const [reason, setReason] = useState<string | undefined>(undefined);
+  const [reason, setReason] = useState<string[] | undefined>(undefined);
   const [amountRange, setAmountRange] = useState<AmountRangeValue | undefined>(undefined);
   const [disputedDate, setDisputedDate] = useState<TransactionDateTimeValue | undefined>(undefined);
   const [columnOrder, setColumnOrder] = useState<string[]>(DISPUTE_COLUMN_ORDER);
@@ -250,7 +252,7 @@ export function DisputeManagementFeature() {
       ) {
         return false;
       }
-      if (reason && row.reason !== reason) return false;
+      if (reason?.length && !reason.includes(row.reason)) return false;
       if (amountRange) {
         if (amountRange.min != null && row.amount < amountRange.min) return false;
         if (amountRange.max != null && row.amount > amountRange.max) return false;
@@ -274,7 +276,7 @@ export function DisputeManagementFeature() {
   }, [rows, statusSegment, statusFilter, reason, amountRange, disputedDate, search]);
 
   const hasActive =
-    !!statusFilter?.length || !!reason || !!amountRange || !!disputedDate || search !== "";
+    !!statusFilter?.length || !!reason?.length || !!amountRange || !!disputedDate || search !== "";
 
   const onClear = () => {
     setStatusFilter(undefined);
@@ -313,6 +315,25 @@ export function DisputeManagementFeature() {
   const [instantDrawer, setInstantDrawer] = useState(false);
   // The slot the list and the page take turns in: where the page lays out.
   const slotRef = useRef<HTMLDivElement>(null);
+
+  // Refresh. MOCK: the rows are mock data with no query behind them, so this
+  // only shows the spin and confirms. TODO(integration): call the disputes
+  // query's refetch() here, as PA Transactions does.
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (refreshTimer.current) window.clearTimeout(refreshTimer.current);
+    },
+    []
+  );
+  function handleRefresh() {
+    setRefreshing(true);
+    refreshTimer.current = window.setTimeout(() => {
+      setRefreshing(false);
+      toast.success("Disputes updated");
+    }, 600);
+  }
   // Where the list was scrolled when it left the screen, for Back/Collapse.
   const [scrollPosition, setScrollPosition] = useState(0);
 
@@ -496,7 +517,12 @@ export function DisputeManagementFeature() {
                       onChange={setStatusFilter}
                       placeholder="Status"
                     />
-                    <DisputeReasonFilter value={reason} onChange={setReason} />
+                    <MultiSelectChipFilter
+                      value={reason}
+                      options={DISPUTE_REASON_OPTIONS}
+                      onChange={setReason}
+                      placeholder="Reason"
+                    />
                     <TransactionAmountFilter value={amountRange} onChange={setAmountRange} />
                     <TransactionDateTimeFilter
                       value={disputedDate}
@@ -518,6 +544,22 @@ export function DisputeManagementFeature() {
                   )}
 
                   <div className="ml-auto flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      leftIcon={
+                        <Icon
+                          name="refresh"
+                          className={cn("h-3.5 w-3.5", refreshing && "animate-spin")}
+                        />
+                      }
+                      onClick={handleRefresh}
+                      disabled={refreshing}
+                      className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground shadow-none hover:text-foreground"
+                    >
+                      Refresh
+                    </Button>
                     <ColumnManager
                       columns={DISPUTE_COLUMN_DEFS}
                       order={columnOrder}

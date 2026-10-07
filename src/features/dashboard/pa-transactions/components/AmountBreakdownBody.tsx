@@ -33,7 +33,9 @@ function BreakupRow({ label, value, negative, emphasis }: BreakupRowProps) {
 
 interface AmountBreakdownBodyProps {
   amountReceived: number;
-  fee: number;
+  /** Omitted where the processing fee isn't relevant (a dispute's own
+   *  page): the row is hidden and netAmount must exclude it too. */
+  fee?: number;
   netAmount: number;
   currency: string;
   /** Sum of SUCCEEDED refunds only (see getRefundedAmount), the same value
@@ -60,7 +62,9 @@ export function AmountBreakdownBody({
   return (
     <div className="flex flex-col gap-3">
       <BreakupRow label="Amount Received" value={formatCurrency(amountReceived, currency)} />
-      <BreakupRow label="Fee" value={formatCurrency(fee, currency)} negative />
+      {fee !== undefined && (
+        <BreakupRow label="Fee" value={formatCurrency(fee, currency)} negative />
+      )}
       {!!refundedAmount && (
         <BreakupRow label="Refunded" value={formatCurrency(refundedAmount, currency)} negative />
       )}
