@@ -19,7 +19,11 @@ import type { TableReqBody } from "@/types/transactions";
  * GID as the query, taking the exact match. Feed `transaction` and `open` to
  * the PA TransactionDetailsDrawer.
  */
-export function useTransactionLookup() {
+export function useTransactionLookup(
+  /** Hands the match to the caller (e.g. useDrawerExpand's `open`) instead of
+   *  holding it here. */
+  onFound?: (transaction: PaTransaction) => void
+) {
   const { urlMid } = useResolvedMids("PA");
   const [transaction, setTransaction] = useState<PaTransaction | null>(null);
   const [open, setOpen] = useState(false);
@@ -38,6 +42,10 @@ export function useTransactionLookup() {
           const match = res?.data?.data?.find((txn) => txn.gid === gid);
           if (!match) {
             toast.error("Couldn't find this transaction");
+            return;
+          }
+          if (onFound) {
+            onFound(match);
             return;
           }
           setTransaction(match);

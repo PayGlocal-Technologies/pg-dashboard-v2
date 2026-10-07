@@ -119,3 +119,39 @@ export function CurrencyValueField({
     </InputGroup>
   );
 }
+
+/**
+ * The currency picker on its own, each option with its flag: the same options
+ * as CurrencyValueField's currency segment, as a full-width select for when
+ * there is no amount beside it.
+ */
+export function CurrencySelect({
+  id,
+  value,
+  currencies,
+  onValueChange,
+}: {
+  id?: string;
+  value: string;
+  currencies: string[];
+  onValueChange: (currency: string) => void;
+}) {
+  const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
+
+  return (
+    <Select value={value} onValueChange={onValueChange}>
+      <SelectTrigger id={id} className="shadow-none">
+        <SelectValue>
+          <CurrencyOption currency={value} iso2={currencyFlagIso2(value, countryCurrencyMap)} />
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        {currencies.map((code) => (
+          <SelectItem key={code} value={code}>
+            <CurrencyOption currency={code} iso2={currencyFlagIso2(code, countryCurrencyMap)} />
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}

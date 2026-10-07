@@ -15,6 +15,7 @@ export function TransactionDetailsPage({
   onBack,
   onCollapse,
   decorative = false,
+  backLabel = "Back to Transactions",
 }: {
   transaction: PaTransaction;
   /** See TransactionDetailsContent's own. */
@@ -23,6 +24,9 @@ export function TransactionDetailsPage({
   /** Omitted when the page was opened directly (a link), with no drawer to
    *  return to. */
   onCollapse?: () => void;
+  /** The Back link's text, for pages that borrow this view (Scheduler,
+   *  Manage Mandates). */
+  backLabel?: string;
 }) {
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -35,7 +39,7 @@ export function TransactionDetailsPage({
           onClick={onBack}
           className="pl-0 text-primary hover:text-primary-hover"
         >
-          Back to Transactions
+          {backLabel}
         </Button>
         {onCollapse && (
           <Button

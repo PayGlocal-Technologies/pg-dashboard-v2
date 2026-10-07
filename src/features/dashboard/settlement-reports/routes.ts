@@ -8,7 +8,7 @@ import type { NavContext } from "@/stores/useProductContext";
  * so the only thing that differs is the URL the merchant sees and which
  * sidebar item highlights.
  */
-export const SETTLEMENT_LIST_PATH = "/settlement-report";
+export const SETTLEMENT_LIST_PATH = "/settlements";
 export const MCA_SETTLEMENT_LIST_PATH = "/mca-settlement-report";
 
 /** The list route matching the active context, used for row drill-down and

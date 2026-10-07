@@ -443,15 +443,28 @@ export function TransactionDetailsContent({
     // settlement BATCH's details still join the stack once settlement is
     // done (isSettled).
     return (
-      <div className="space-y-4">
+      // data-morph-anchor / data-morph-body: where the drawer-to-page hand-off
+      // picks this stack up from, and the part below the summary, which the
+      // hand-off carries to the page's own column on its own (see
+      // DrawerExpandMorph). The vars are unset outside the hand-off.
+      <div className="space-y-4" data-morph-anchor>
         {summary}
-        <SettlementActionCard row={row} onUploaded={onUploaded} />
-        <SettlementTimelineSection row={row} />
-        {/* The settlement BATCH's own Details/Amount Breakdown: the whole
-            settlement this transaction landed in, not this transaction's own
-            record. See SettlementBatchDetailsSection's own doc for the
-            distinction from SettlementBreakdown nested in the timeline. */}
-        {isSettled && <SettlementBatchDetailsSection row={row} layout="drawer" />}
+        <div
+          className="space-y-4"
+          data-morph-body
+          style={{
+            translate: "var(--morph-body-x, 0px) var(--morph-gap, 0px)",
+            width: "var(--morph-body-w, auto)",
+          }}
+        >
+          <SettlementActionCard row={row} onUploaded={onUploaded} />
+          <SettlementTimelineSection row={row} />
+          {/* The settlement BATCH's own Details/Amount Breakdown: the whole
+              settlement this transaction landed in, not this transaction's own
+              record. See SettlementBatchDetailsSection's own doc for the
+              distinction from SettlementBreakdown nested in the timeline. */}
+          {isSettled && <SettlementBatchDetailsSection row={row} layout="drawer" />}
+        </div>
       </div>
     );
   }
@@ -466,7 +479,11 @@ export function TransactionDetailsContent({
   const timelineRow = 1;
 
   return (
-    <div className="relative z-10">
+    // data-morph-anchor / data-morph-column / data-morph-body: where the
+    // drawer's stack lands in the drawer-to-page hand-off, the column it
+    // widens to, and where its part below the summary lands (see
+    // DrawerExpandMorph).
+    <div className="relative z-10" data-morph-anchor>
       {/* Transaction summary — full-width page header, standalone, no card,
           sitting above the 2-column layout entirely (not part of either
           column). The primary focal point of the page. Transaction Date
@@ -491,7 +508,11 @@ export function TransactionDetailsContent({
             invoice-upload/FIRC action moved out, into its own card above
             it. space-y-6 matches the right column's own gap so the two
             columns' internal rhythm reads the same. */}
-        <div className={cn("space-y-6 lg:col-start-1", ROW_START_CLASS[timelineRow])}>
+        <div
+          className={cn("space-y-6 lg:col-start-1", ROW_START_CLASS[timelineRow])}
+          data-morph-column
+          data-morph-body
+        >
           <SettlementActionCard row={row} onUploaded={onUploaded} />
           <SettlementTimelineSection row={row} />
         </div>

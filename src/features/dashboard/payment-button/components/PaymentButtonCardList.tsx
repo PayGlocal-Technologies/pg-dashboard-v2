@@ -7,6 +7,7 @@ import {
   PaymentButtonStatusBadge,
 } from "@/features/dashboard/payment-button/columns";
 import { formatButtonAmount } from "@/features/dashboard/payment-button/helpers";
+import { DESIGN_ONLY_FIELDS_ENABLED } from "@/features/dashboard/payment-button/constants";
 import type { PaymentButton } from "@/features/dashboard/payment-button/types";
 
 export function PaymentButtonCardSkeleton() {
@@ -67,26 +68,43 @@ export function PaymentButtonCard({
       </div>
 
       <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <PaymentButtonAmount row={row} size="card" />
+        {DESIGN_ONLY_FIELDS_ENABLED && <PaymentButtonAmount row={row} size="card" />}
         <PaymentButtonStatusBadge status={row.status} />
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+        {/* Not in the list API (see DESIGN_ONLY_FIELDS_ENABLED). */}
+        {DESIGN_ONLY_FIELDS_ENABLED && (
+          <>
+            <div className="min-w-0">
+              <p className="text-[11px] text-muted-foreground">Successful payments</p>
+              <p className="truncate text-[12.5px] tabular-nums text-foreground">
+                {row.successfulPayments ?? "—"}
+              </p>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] text-muted-foreground">Revenue</p>
+              <p className="truncate text-[12.5px] tabular-nums text-foreground">
+                {row.revenue == null ? "—" : formatButtonAmount(row.revenue, row.currency)}
+              </p>
+            </div>
+          </>
+        )}
         <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">Successful payments</p>
-          <p className="truncate text-[12.5px] tabular-nums text-foreground">
-            {row.successfulPayments ?? "—"}
-          </p>
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">Revenue</p>
-          <p className="truncate text-[12.5px] tabular-nums text-foreground">
-            {row.revenue == null ? "—" : formatButtonAmount(row.revenue, row.currency)}
-          </p>
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] text-muted-foreground">Created at</p>
+          <p className="text-[11px] text-muted-foreground">Created On</p>
           <p className="truncate text-[12.5px] text-foreground">{formatTimestamp(row.createdAt)}</p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground">Starts On</p>
+          <p className="truncate text-[12.5px] text-foreground">
+            {row.startsOn ? formatTimestamp(row.startsOn) : "—"}
+          </p>
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted-foreground">Expires On</p>
+          <p className="truncate text-[12.5px] text-foreground">
+            {row.expiresOn ? formatTimestamp(row.expiresOn) : "—"}
+          </p>
         </div>
       </div>
     </div>

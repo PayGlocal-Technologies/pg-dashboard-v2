@@ -16,6 +16,7 @@ import {
   paymentButtonSearchApi,
   merchantCurrencyApi,
   merchantProfileApi,
+  paymentButtonApi,
 } from "@/features/dashboard/payment-button/services";
 import {
   buildLiveEmbedLines,
@@ -34,6 +35,10 @@ import type {
   PaymentButton,
   PaymentButtonListRequest,
   PaymentButtonListResponse,
+  PaymentButtonConfig,
+  PaymentButtonConfigResponse,
+  PaymentButtonEditTarget,
+  PaymentButtonScript,
 } from "@/features/dashboard/payment-button/types";
 
 /**
@@ -76,6 +81,9 @@ export function usePaymentButtons(body: PaymentButtonListRequest | null): {
   isFetching: boolean;
   isError: boolean;
   refetch: () => void;
+  /** Refetches and resolves whether it failed, for a Refresh that confirms
+   *  its outcome. */
+  refresh: () => Promise<{ failed: boolean }>;
 } {
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     PaymentButtonListResponse,
@@ -90,6 +98,7 @@ export function usePaymentButtons(body: PaymentButtonListRequest | null): {
     isFetching,
     isError,
     refetch: () => void refetch(),
+    refresh: async () => ({ failed: (await refetch()).isError }),
   };
 }
 
@@ -178,29 +187,39 @@ export function useMerchantWebsite(mid: string): string {
  * on load. Cached per button, so a second copy is instant, as pg-dashboard's
  * `lastRetrievedProductId` shortcut is.
  */
+/**
+ * A button's embed script (`GET …/download`, pg-dashboard's retrieveLinkFn),
+ * cached for five minutes so Copy code and Preview don't refetch it.
+ */
+function useFetchPaymentButtonScript() {
+  const queryClient = useQueryClient();
+  return (row: Pick<PaymentButton, "mid" | "buttonId">) =>
+    queryClient.fetchQuery({
+      queryKey: ["payment-button-script", row.mid, row.buttonId],
+      queryFn: async () => {
+        try {
+          const res = await api.get<CreatePaymentButtonResponse>(
+            downloadPaymentButtonApi(row.mid, row.buttonId)
+          );
+          return res.data;
+        } catch (error) {
+          return handleApiError(error as AxiosError);
+        }
+      },
+      staleTime: 5 * 60_000,
+    });
+}
+
 export function useCopyPaymentButtonCode(): {
   copyCode: (row: Pick<PaymentButton, "mid" | "buttonId">) => void;
   copyingId: string | null;
 } {
-  const queryClient = useQueryClient();
+  const fetchScript = useFetchPaymentButtonScript();
   const [copyingId, setCopyingId] = useState<string | null>(null);
 
   const copyCode = (row: Pick<PaymentButton, "mid" | "buttonId">) => {
-    const url = downloadPaymentButtonApi(row.mid, row.buttonId);
     setCopyingId(row.buttonId);
-    void queryClient
-      .fetchQuery({
-        queryKey: ["payment-button-script", row.mid, row.buttonId],
-        queryFn: async () => {
-          try {
-            const res = await api.get<CreatePaymentButtonResponse>(url);
-            return res.data;
-          } catch (error) {
-            return handleApiError(error as AxiosError);
-          }
-        },
-        staleTime: 5 * 60_000,
-      })
+    void fetchScript(row)
       .then((res) => {
         if (res?.data) void copyEmbedCode(embedLinesToText(buildLiveEmbedLines(res.data)));
         else toast.error("Failed to retrieve button code");
@@ -213,6 +232,23 @@ export function useCopyPaymentButtonCode(): {
 }
 
 /**
+ * How long the list's search index (`/search/wqr`) takes to reflect a write.
+ * pg-dashboard waits this long before refetching after a change; refetching
+ * straight away returns the list as it was.
+ */
+export const SEARCH_INDEX_LAG_MS = 2000;
+
+/** Refetches the list once the search index has caught up with a write. */
+export function useRefreshListAfterWrite(): () => void {
+  const queryClient = useQueryClient();
+  return () =>
+    void window.setTimeout(
+      () => void queryClient.invalidateQueries({ queryKey: [...PAYMENT_BUTTONS_QUERY_KEY] }),
+      SEARCH_INDEX_LAG_MS
+    );
+}
+
+/**
  * Disable a button. PUT, empty body, pg-dashboard's `disableLink` verbatim,
  * with its success copy. The list is refreshed 2s later, as pg-dashboard does:
  * the search index lags the write, so an immediate refetch would still show
@@ -222,7 +258,7 @@ export function useDisablePaymentButton(onDone?: () => void): {
   disable: (row: Pick<PaymentButton, "mid" | "buttonId">) => void;
   isDisabling: boolean;
 } {
-  const queryClient = useQueryClient();
+  const refreshList = useRefreshListAfterWrite();
   const { mutate, isPending } = usePut<unknown, { dynamicUrl: string }>("", {
     invalidateQueries: false,
   });
@@ -233,10 +269,7 @@ export function useDisablePaymentButton(onDone?: () => void): {
       {
         onSuccess: () => {
           toast.success("Payment Button disabled successfully");
-          window.setTimeout(
-            () => void queryClient.invalidateQueries({ queryKey: [...PAYMENT_BUTTONS_QUERY_KEY] }),
-            2000
-          );
+          refreshList();
           onDone?.();
         },
         onError: (error) => toast.error(error.message || "Failed to disable button"),
@@ -244,4 +277,57 @@ export function useDisablePaymentButton(onDone?: () => void): {
     );
 
   return { disable, isDisabling: isPending };
+}
+
+/**
+ * One button's saved settings, for Edit to start from: pg-dashboard's
+ * `productData` read, refetched each time the editor opens so it never edits a
+ * stale copy.
+ */
+export function usePaymentButtonConfig(target: PaymentButtonEditTarget | null): {
+  config: PaymentButtonConfig | null;
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+} {
+  const { data, isLoading, isError, refetch } = useGet<PaymentButtonConfigResponse>(
+    ["payment-button-config", target?.mid, target?.buttonId],
+    target ? paymentButtonApi(target.mid, target.buttonId) : "",
+    undefined,
+    { enabled: !!target, staleTime: 0, gcTime: 0 }
+  );
+  return {
+    config: data?.data?.paymentButtonData ?? null,
+    isLoading,
+    isError,
+    refetch: () => void refetch(),
+  };
+}
+
+/**
+ * Preview button code (pg-dashboard's "Preview Button Code"): fetches the
+ * button's script and holds it for PaymentButtonCodeDialog to show.
+ */
+export function usePreviewPaymentButtonCode(): {
+  preview: (row: Pick<PaymentButton, "mid" | "buttonId">) => void;
+  previewingId: string | null;
+  script: PaymentButtonScript | null;
+  close: () => void;
+} {
+  const fetchScript = useFetchPaymentButtonScript();
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [script, setScript] = useState<PaymentButtonScript | null>(null);
+
+  const preview = (row: Pick<PaymentButton, "mid" | "buttonId">) => {
+    setPreviewingId(row.buttonId);
+    void fetchScript(row)
+      .then((res) => {
+        if (res?.data) setScript(res.data);
+        else toast.error("Failed to retrieve button code");
+      })
+      .catch((error: Error) => toast.error(error.message || "Failed to retrieve button code"))
+      .finally(() => setPreviewingId(null));
+  };
+
+  return { preview, previewingId, script, close: () => setScript(null) };
 }

@@ -29,6 +29,7 @@ import {
   PaymentCategoryLogo,
   TransactionPaymentMethod,
 } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import { BankName } from "@/components/common/BankLogo";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { DisputeStatusCard } from "@/features/dashboard/pa-transactions/components/DisputeStatusCard";
 import { DisputeDetailsCard } from "@/features/dashboard/pa-transactions/components/DisputeDetailsCard";
@@ -411,7 +412,7 @@ export function DisputeDetailFeature({
                   }
                 />
               )}
-              <DetailRow label="Issuer" value={detail.issuerBank} />
+              <DetailRow label="Issuer" value={<BankName name={detail.issuerBank} />} />
             </DetailSection>
 
             <DetailSection title="Customer Details">

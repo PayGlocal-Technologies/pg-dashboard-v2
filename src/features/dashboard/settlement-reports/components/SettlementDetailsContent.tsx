@@ -352,48 +352,62 @@ export function SettlementDetailsContent({
   if (!isPage) {
     const preview = payments.slice(0, DRAWER_PAYMENT_PREVIEW);
     return (
-      <div className="flex flex-col gap-5">
+      // data-morph-*: where the drawer-to-page hand-off picks this view up
+      // (see DrawerExpandMorph). The body's vars are unset outside it.
+      <div className="flex flex-col gap-5" data-morph-anchor>
         {header}
-        {details}
-        {breakdown}
-        <section className="flex flex-col gap-2">
-          <SectionLabel>Payments in this settlement ({payments.length})</SectionLabel>
-          <Card className="shadow-none gap-0 p-0">
-            <ul className="divide-y divide-border">
-              {preview.map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
-                  <div className="min-w-0">
-                    <p className="truncate font-mono text-[12px] text-foreground">{p.id}</p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {p.method} · {formatDate(p.createdAt)}
-                    </p>
-                  </div>
-                  <span className="whitespace-nowrap text-[13px] font-semibold tabular-nums text-foreground">
-                    {formatCurrency(p.net, "INR")}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            {payments.length > preview.length && onViewAllPayments && (
-              <div className="border-t border-border px-5 py-2.5">
-                <Button
-                  type="button"
-                  variant="link"
-                  className="h-auto min-h-0 p-0 text-xs"
-                  onClick={onViewAllPayments}
-                >
-                  View all {payments.length} payments
-                </Button>
-              </div>
-            )}
-          </Card>
-        </section>
+        <div
+          className="flex flex-col gap-5"
+          data-morph-body
+          style={{
+            translate: "var(--morph-body-x, 0px) var(--morph-gap, 0px)",
+            width: "var(--morph-body-w, auto)",
+          }}
+        >
+          {details}
+          {breakdown}
+          <section className="flex flex-col gap-2">
+            <SectionLabel>Payments in this settlement ({payments.length})</SectionLabel>
+            <Card className="shadow-none gap-0 p-0">
+              <ul className="divide-y divide-border">
+                {preview.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-[12px] text-foreground">{p.id}</p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {p.method} · {formatDate(p.createdAt)}
+                      </p>
+                    </div>
+                    <span className="whitespace-nowrap text-[13px] font-semibold tabular-nums text-foreground">
+                      {formatCurrency(p.net, "INR")}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {payments.length > preview.length && onViewAllPayments && (
+                <div className="border-t border-border px-5 py-2.5">
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto min-h-0 p-0 text-xs"
+                    onClick={onViewAllPayments}
+                  >
+                    View all {payments.length} payments
+                  </Button>
+                </div>
+              )}
+            </Card>
+          </section>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    // data-morph-*: where the drawer's view lands in the drawer-to-page
+    // hand-off, its details and breakdown in the side column (see
+    // DrawerExpandMorph).
+    <div className="space-y-5" data-morph-anchor>
       {header}
       <Separator />
       <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
@@ -410,7 +424,7 @@ export function SettlementDetailsContent({
             maxBodyHeight="none"
           />
         </section>
-        <div className="flex flex-col gap-4 lg:sticky lg:top-4">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-4" data-morph-body>
           {details}
           {breakdown}
         </div>

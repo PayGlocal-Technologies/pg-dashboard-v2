@@ -64,10 +64,9 @@ export function buildSearchRegistry(
   } = {}
 ): SearchEntry[] {
   const entries: SearchEntry[] = [];
-  // First occurrence of a path wins. /mca-receipts appears three times across the
-  // trees under three labels ("Receipts" twice, "GST Invoices" once) and
-  // /team-management appears in several, so without this the dropdown would
-  // offer the same destination repeatedly.
+  // First occurrence of a path wins. /team-management and /configure appear in
+  // several trees, so without this the dropdown would offer the same
+  // destination repeatedly.
   const seen = new Set<string>();
 
   const push = (entry: Omit<SearchEntry, "keywords">): void => {

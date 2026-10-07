@@ -23,6 +23,9 @@ import {
   TXN_DETAIL_GUIDE_STEPS,
 } from "@/features/dashboard/mca-transactions/guide";
 
+/** The drawer's width on sm+, shared with the expand/collapse hand-off. */
+export const MCA_DRAWER_WIDTH_PX = 512;
+
 interface TransactionDetailsDrawerProps {
   row: McaTransaction | null;
   open: boolean;
@@ -32,6 +35,9 @@ interface TransactionDetailsDrawerProps {
   onUploaded?: (row: McaTransaction) => void;
   onOpenTransaction: (row: McaTransaction) => void;
   isPartnerUser: boolean;
+  /** Skip the slide in/out while DrawerExpandMorph covers the drawer, so it
+   *  can appear or vanish under the hand-off in one frame. */
+  instant?: boolean;
 }
 
 export function TransactionDetailsDrawer({
@@ -42,6 +48,7 @@ export function TransactionDetailsDrawer({
   onUploaded,
   onOpenTransaction,
   isPartnerUser,
+  instant = false,
 }: TransactionDetailsDrawerProps) {
   // Below md this becomes a bottom sheet instead of a right-side drawer, via
   // flux-ui's own Drawer side="bottom" (which supplies the inset-x-0/bottom-0
@@ -113,80 +120,108 @@ export function TransactionDetailsDrawer({
       <DrawerContent
         className={cn(
           "[&>button:last-child]:hidden",
-          !isBottomSheet && "w-full sm:w-[32rem] sm:max-w-[92vw]"
+          !isBottomSheet && "w-full sm:w-[32rem] sm:max-w-[92vw]",
+          instant &&
+            "drawer-instant data-[state=closed]:animate-none! data-[state=open]:animate-none!"
         )}
       >
         <DrawerTitle asChild>
           <VisuallyHidden>Transaction details</VisuallyHidden>
         </DrawerTitle>
 
-        {/* Close and Expand stay grouped together on the left, adjacent to
-            one another, same interactions as before. Transaction ID moves to
-            the far right instead (see CopyableText below): value only, no
-            label, secondary colour/size so it stays subordinate to the two
-            actions across from it, with the existing copy icon and
-            copied-feedback reused as-is rather than rebuilt. ml-auto on the
-            CopyableText (not justify-between on the row) keeps Close/Expand
-            pinned left even when row is momentarily null, e.g. mid
-            close-animation, since there's nothing to push right at that
-            point. */}
-        <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
-          <div className="flex shrink-0 items-center gap-1">
-            <IconButton
-              aria-label="Close"
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-            >
-              <Icon name="x" className="h-4 w-4" />
-            </IconButton>
-            {/* Not rendered at all as a bottom sheet (rather than hidden with
-                a class): there is no expanded view in the mobile flow, which
-                is card to sheet and back, so the action has nothing to point
-                at there. Close stays the only way out, same interaction as
-                everywhere else. */}
-            {!isBottomSheet && (
-              <span data-guide="mca-txn-detail-expand" className="inline-flex">
-                <IconButton
-                  aria-label="Expand to full page"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (row) onExpand(row);
-                  }}
-                >
-                  <Icon name="expand" className="h-4 w-4" />
-                </IconButton>
-              </span>
-            )}
-          </div>
-          {row && (
-            <CopyableText
-              value={row.gid}
-              displayValue={truncateMiddle(row.gid, 10, 6)}
-              valueClassName="min-w-0 truncate text-muted-foreground"
-              className="ml-auto min-w-0"
-            />
-          )}
-        </DrawerHeader>
-
-        {/* Only this region scrolls, so the header's close/expand stay
-            reachable however long the content runs. */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          {row && (
-            <TransactionDetailsContent
-              row={row}
-              onUploaded={onUploaded}
-              onOpenTransaction={onOpenTransaction}
-              isPartnerUser={isPartnerUser}
-              layout="drawer"
-            />
-          )}
-        </div>
+        {row && (
+          <TransactionDrawerBody
+            row={row}
+            onClose={() => onOpenChange(false)}
+            onExpand={isBottomSheet ? undefined : () => onExpand(row)}
+            onUploaded={onUploaded}
+            onOpenTransaction={onOpenTransaction}
+            isPartnerUser={isPartnerUser}
+          />
+        )}
 
         {/* First-open coach-mark pointing at the expand-to-full-page action. */}
         <GuideTour steps={TXN_DETAIL_GUIDE_STEPS} open={tourOpen} onClose={closeTour} />
       </DrawerContent>
     </Drawer>
+  );
+}
+
+/**
+ * The drawer's insides: Close and Expand on the left, the transaction ID on
+ * the right, then the scrolling details. Also what the expand/collapse
+ * hand-off shows in the drawer's place (see DrawerExpandMorph). No Expand
+ * when `onExpand` is omitted (the mobile bottom sheet has no full page).
+ */
+export function TransactionDrawerBody({
+  row,
+  onClose,
+  onExpand,
+  onUploaded,
+  onOpenTransaction,
+  isPartnerUser,
+}: {
+  row: McaTransaction;
+  onClose: () => void;
+  onExpand?: () => void;
+  onUploaded?: (row: McaTransaction) => void;
+  onOpenTransaction: (row: McaTransaction) => void;
+  isPartnerUser: boolean;
+}) {
+  return (
+    <>
+      {/* Close and Expand stay grouped together on the left, adjacent to
+        one another, same interactions as before. Transaction ID moves to
+        the far right instead (see CopyableText below): value only, no
+        label, secondary colour/size so it stays subordinate to the two
+        actions across from it, with the existing copy icon and
+        copied-feedback reused as-is rather than rebuilt. ml-auto on the
+        CopyableText (not justify-between on the row) keeps Close/Expand
+        pinned left even when row is momentarily null, e.g. mid
+        close-animation, since there's nothing to push right at that
+        point. */}
+      <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
+        <div className="flex shrink-0 items-center gap-1">
+          <IconButton aria-label="Close" variant="ghost" size="sm" onClick={onClose}>
+            <Icon name="x" className="h-4 w-4" />
+          </IconButton>
+          {/* Not rendered at all as a bottom sheet (rather than hidden with
+            a class): there is no expanded view in the mobile flow, which
+            is card to sheet and back, so the action has nothing to point
+            at there. Close stays the only way out, same interaction as
+            everywhere else. */}
+          {onExpand && (
+            <span data-guide="mca-txn-detail-expand" className="inline-flex">
+              <IconButton
+                aria-label="Expand to full page"
+                variant="ghost"
+                size="sm"
+                onClick={onExpand}
+              >
+                <Icon name="expand" className="h-4 w-4" />
+              </IconButton>
+            </span>
+          )}
+        </div>
+        <CopyableText
+          value={row.gid}
+          displayValue={truncateMiddle(row.gid, 10, 6)}
+          valueClassName="min-w-0 truncate text-muted-foreground"
+          className="ml-auto min-w-0"
+        />
+      </DrawerHeader>
+
+      {/* Only this region scrolls, so the header's close/expand stay
+        reachable however long the content runs. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <TransactionDetailsContent
+          row={row}
+          onUploaded={onUploaded}
+          onOpenTransaction={onOpenTransaction}
+          isPartnerUser={isPartnerUser}
+          layout="drawer"
+        />
+      </div>
+    </>
   );
 }
