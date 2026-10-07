@@ -26,6 +26,7 @@ import { MOCK_MCA_LINKS } from "@/features/dashboard/mca-links/mock-data";
 import {
   ACTIVE_LINK_STATUSES,
   DISABLED_LINK_STATUSES,
+  FIXED_COLUMN_KEYS,
   MCA_LINKS_PAGE_LIMIT,
   MCA_LINK_STATUS_FILTERS,
   MCA_LINK_VIEW_TABS,
@@ -73,6 +74,7 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   // null until the merchant actually drags a column, at which point
   // DataTable renders that order instead of buildMcaLinkColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   // Which of the Date/Amount/Status/Currency filter chip popovers is open,
   // if any: shared so opening one closes whichever other one was open.
   const [page, setPage] = useState(1);
@@ -180,7 +182,9 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   };
 
   const baseColumns = buildMcaLinkColumns((row) => void copyLink(row));
-  const columns = reorderColumns(baseColumns, columnOrder);
+  const columns = reorderColumns(baseColumns, columnOrder).filter(
+    (c) => !hiddenColumns.includes(c.key)
+  );
   const reorderableColumns = baseColumns
     .filter((c) => c.key !== "action")
     .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
@@ -284,7 +288,14 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
                 columns={reorderableColumns}
                 order={currentColumnOrder}
                 onOrderChange={setColumnOrder}
-                onReset={() => setColumnOrder(null)}
+                onReset={() => {
+                  setColumnOrder(null);
+                  setHiddenColumns([]);
+                }}
+                hiddenKeys={hiddenColumns}
+                onHiddenKeysChange={setHiddenColumns}
+                fixedKeys={FIXED_COLUMN_KEYS}
+                fixedReason="Always shown. A link row is unreadable without its amount and status."
               />
               <Button
                 type="button"

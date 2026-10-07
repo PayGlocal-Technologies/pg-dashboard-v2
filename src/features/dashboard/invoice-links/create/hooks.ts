@@ -1,11 +1,25 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { useGet, usePost, usePut } from "@/lib/api/hooks";
+import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
+import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
+import type { TableReqBody } from "@/types/transactions";
+// The client book's own wire → render mapping and country reference data, so a
+// client reads the same here as on the Clients page and in the MCA editor.
+import { toClient, useClientCountryMap } from "@/features/dashboard/client-management/hooks";
+import type {
+  Client,
+  ClientByIdResponse,
+  ClientSearchResponse,
+} from "@/features/dashboard/client-management/types";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { useInvoiceLinkMidScope } from "@/features/dashboard/invoice-links/hooks";
 import {
+  clientByIdApi,
+  clientSearchApi,
   countryCurrencyMapApi,
   countryStatesApi,
   createInvoiceApi,
@@ -13,23 +27,35 @@ import {
   editInvoiceApi,
   invoiceDraftApi,
   invoiceLogoApi,
+  invoiceTemplateApi,
+  invoiceTemplatesApi,
   merchantAdditionalInfoApi,
   merchantProfileApi,
 } from "@/features/dashboard/invoice-links/create/services";
 import {
+  CLIENT_PICKER_LIMIT,
   FALLBACK_CURRENCIES,
   LOGO_EXTENSION_BY_MIME,
   LOGO_MAX_MB,
 } from "@/features/dashboard/invoice-links/create/constants";
+import { fromApiTemplate } from "@/features/dashboard/invoice-links/create/helpers";
 import type {
+  ApiInvoiceTemplate,
   CountryCurrencyMapResponse,
   CountryStatesResponse,
   CurrencyMapResponse,
+  InvoiceBulkCreateRequest,
+  InvoiceBulkCreateResponse,
   InvoiceCreateRequest,
   InvoiceCreateResponse,
   InvoiceDraftResponse,
+  InvoiceLinkTemplate,
   InvoiceLogoResponse,
   MerchantAdditionalInfoResponse,
+  TemplateListResponse,
+  TemplateResponse,
+  TemplateWriteBody,
+  TemplateWriteResponse,
 } from "@/features/dashboard/invoice-links/create/types";
 
 /**
@@ -39,11 +65,16 @@ import type {
  * index.tsx:54-63) and puts it in the URL path. Note this is the single-MID
  * form of the rule — the list's `useInvoiceLinkMidFilter` sends the whole array
  * when nothing is selected, but a create can only target one MID.
+ *
+ * The fallback is only ever reached with a single eligible MID: with several
+ * and none selected, the editor's gate (InvoiceLinkEditorFeature) asks first,
+ * so this never silently picks the first of many the way upstream does.
  */
 export function useInvoiceEditorMid(): string {
   const paMids = useApp((s) => s.paMids);
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
-  return selectedMid || paMids?.[0] || "";
+  const { midOptions } = useInvoiceLinkMidScope();
+  return selectedMid || midOptions[0] || paMids?.[0] || "";
 }
 
 export interface CurrencyOption {
@@ -252,6 +283,16 @@ export function useCreateInvoice(mid: string) {
   });
 }
 
+/**
+ * POST create with `clients[]`: one link per client from one invoice. Same
+ * URL as useCreateInvoice; typed apart because the body and the answer differ.
+ */
+export function useCreateInvoiceBatch(mid: string) {
+  return usePost<InvoiceBulkCreateResponse, InvoiceBulkCreateRequest>(createInvoiceApi(mid), {
+    invalidateQueries: ["invoice-links"],
+  });
+}
+
 /** PUT edit — only for an already-issued invoice, never a draft. */
 export function useEditInvoice(mid: string) {
   return usePut<InvoiceCreateResponse, InvoiceCreateRequest>(editInvoiceApi(mid), {
@@ -273,4 +314,277 @@ export function useSaveInvoiceDraft(mid: string, invoiceId: string | undefined) 
   );
 
   return invoiceId ? update : create;
+}
+
+// ── Templates ────────────────────────────────────────────────────────────────
+
+export interface InvoiceLinkTemplates {
+  templates: InvoiceLinkTemplate[];
+  /** False while the list is loading. A failed list counts as ready and empty. */
+  isReady: boolean;
+  /** True while a create, update, rename or delete is in flight. */
+  isMutating: boolean;
+  /** True while a template is being fetched to apply. */
+  isApplying: boolean;
+  /** Creates one; the server-minted id arrives in `onSaved`. */
+  save: (body: TemplateWriteBody, onSaved: (id: string) => void) => void;
+  /** Full replace. The API has no partial update. */
+  replace: (templateId: string, body: TemplateWriteBody, onDone?: () => void) => void;
+  /** A full replace too, built from the stored template so nothing else changes. */
+  rename: (templateId: string, name: string) => void;
+  remove: (templateId: string) => void;
+  /**
+   * Reads one template fresh and hands it over. The read is the point: it is
+   * where the backend hydrates SKU-backed lines with the catalogue's current
+   * name and price, and it bumps `lastUsedAt` as a side effect, so applying a
+   * template also records the use.
+   */
+  load: (templateId: string, onLoaded: (template: ApiInvoiceTemplate) => void) => void;
+}
+
+/**
+ * The merchant's saved invoice templates, the same store the MCA invoice editor
+ * reads and writes. The query key matches that editor's so the two share one
+ * cache entry per MID.
+ */
+export function useInvoiceLinkTemplates(mid: string): InvoiceLinkTemplates {
+  const queryClient = useQueryClient();
+  const listKey = useMemo(() => ["invoice-templates", mid], [mid]);
+  const listUrl = invoiceTemplatesApi(mid);
+
+  const { data, isLoading } = useGet<TemplateListResponse>(listKey, listUrl, undefined, {
+    enabled: !!listUrl,
+    staleTime: 0,
+  });
+
+  const invalidateList = useCallback(
+    () => void queryClient.invalidateQueries({ queryKey: listKey }),
+    [queryClient, listKey]
+  );
+
+  /** Most recently used first, then most recently saved, the MCA picker's order. */
+  const templates = useMemo(() => {
+    const mapped = (data?.data?.templates ?? []).map(fromApiTemplate);
+    return mapped.sort((a, b) => {
+      const used = Number(b.lastUsedAt ?? 0) - Number(a.lastUsedAt ?? 0);
+      return used !== 0 ? used : Number(b.savedAt ?? 0) - Number(a.savedAt ?? 0);
+    });
+  }, [data]);
+
+  const { mutate: create, isPending: isCreating } = usePost<
+    TemplateWriteResponse,
+    TemplateWriteBody
+  >(listUrl, { invalidateQueries: false });
+
+  // Addressed per call through `dynamicUrl`: the id is only known at click time.
+  const { mutate: put, isPending: isReplacing } = usePut<
+    TemplateWriteResponse,
+    { dynamicUrl: string; reqBody: TemplateWriteBody }
+  >("", { invalidateQueries: false });
+
+  const { mutate: destroy, isPending: isDeleting } = useDelete<unknown, { dynamicUrl: string }>(
+    "",
+    { invalidateQueries: false }
+  );
+
+  const save = useCallback(
+    (body: TemplateWriteBody, onSaved: (id: string) => void) => {
+      create(body, {
+        onSuccess: (response) => {
+          invalidateList();
+          const templateId = response?.data?.templateId;
+          if (templateId) onSaved(templateId);
+        },
+        onError: (error) =>
+          toast.error("Couldn't save the template", { description: error.message }),
+      });
+    },
+    [create, invalidateList]
+  );
+
+  const replace = useCallback(
+    (templateId: string, body: TemplateWriteBody, onDone?: () => void) => {
+      put(
+        { dynamicUrl: invoiceTemplateApi(mid, templateId), reqBody: body },
+        {
+          onSuccess: () => {
+            invalidateList();
+            onDone?.();
+          },
+          onError: (error) =>
+            toast.error("Couldn't update the template", { description: error.message }),
+        }
+      );
+    },
+    [put, mid, invalidateList]
+  );
+
+  const rename = useCallback(
+    (templateId: string, name: string) => {
+      const existing = templates.find((template) => template.id === templateId);
+      if (!existing) return;
+      const body: TemplateWriteBody = { ...existing.raw, name };
+      delete body.templateId;
+      delete body.savedAt;
+      delete body.lastUsedAt;
+      replace(templateId, body);
+    },
+    [templates, replace]
+  );
+
+  const remove = useCallback(
+    (templateId: string) => {
+      destroy(
+        { dynamicUrl: invoiceTemplateApi(mid, templateId) },
+        {
+          onSuccess: invalidateList,
+          onError: (error) =>
+            toast.error("Couldn't delete the template", { description: error.message }),
+        }
+      );
+    },
+    [destroy, mid, invalidateList]
+  );
+
+  // The fresh read. A disabled query plus an explicit refetch from the effect's
+  // async callback, the idiom create-invoice's markUsed uses: the id is only
+  // known at click time, so it goes into state first and the read follows.
+  const [pending, setPending] = useState<{
+    id: string;
+    onLoaded: (template: ApiInvoiceTemplate) => void;
+  } | null>(null);
+
+  const { refetch: readTemplate } = useGet<TemplateResponse>(
+    ["invoice-template", mid, pending?.id ?? ""],
+    pending ? invoiceTemplateApi(mid, pending.id) : "",
+    undefined,
+    { enabled: false, staleTime: 0 }
+  );
+
+  useEffect(() => {
+    if (!pending) return;
+
+    const run = async (): Promise<void> => {
+      const result = await readTemplate();
+      const template = result.data?.data?.template;
+      if (template) pending.onLoaded(template);
+      else {
+        toast.error("Couldn't load the template", {
+          description: result.error?.message ?? "Try again in a moment.",
+        });
+      }
+      setPending(null);
+      // The lastUsedAt bump only shows in the list.
+      invalidateList();
+    };
+
+    void run();
+  }, [pending, readTemplate, invalidateList]);
+
+  const load = useCallback(
+    (templateId: string, onLoaded: (template: ApiInvoiceTemplate) => void) =>
+      setPending({ id: templateId, onLoaded }),
+    []
+  );
+
+  return {
+    templates,
+    isReady: !isLoading,
+    isMutating: isCreating || isReplacing || isDeleting,
+    isApplying: !!pending,
+    save,
+    replace,
+    rename,
+    remove,
+    load,
+  };
+}
+
+// ── Clients ──────────────────────────────────────────────────────────────────
+
+/**
+ * The client book, searched for the recipient picker.
+ *
+ * The body mirrors the Clients page's own search (client-management's
+ * useClients): `queryString` from the typed text, the MID under `mid` (not
+ * `merchantId`), and `searchFilterType: "DEFAULT"` when nothing is typed. The
+ * query key sits under ["clients"], so adding a client anywhere refreshes it.
+ */
+export function useInvoiceLinkClients(
+  mid: string,
+  search: string
+): {
+  clients: Client[];
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+  /** Reads one client by id and hands it over, for a client just created. */
+  fetchClient: (clientId: string, onLoaded: (client: Client) => void) => void;
+} {
+  const countryMap = useClientCountryMap();
+
+  const body = useMemo<TableReqBody>(() => {
+    const built = buildTxnRequestBody(
+      {},
+      {
+        searchQuery: search || undefined,
+        selectedMid: mid ? { key: "mid", value: [mid] } : undefined,
+        pageLimit: CLIENT_PICKER_LIMIT,
+        from: 0,
+      }
+    );
+    return search ? built : { ...built, searchFilterType: "DEFAULT" };
+  }, [search, mid]);
+
+  const { data, isPending, isError, refetch } = usePostQuery<ClientSearchResponse, TableReqBody>(
+    ["clients", mid, "invoice-link-picker"],
+    clientSearchApi(mid),
+    body,
+    { staleTime: 30_000 },
+    !!mid
+  );
+
+  const clients = useMemo(
+    () => (data?.data?.data ?? []).map((record) => toClient(record, countryMap)),
+    [data, countryMap]
+  );
+
+  const [pending, setPending] = useState<{
+    id: string;
+    onLoaded: (client: Client) => void;
+  } | null>(null);
+
+  const { refetch: readClient } = useGet<ClientByIdResponse>(
+    ["client", mid, pending?.id ?? ""],
+    pending ? clientByIdApi(mid, pending.id) : "",
+    undefined,
+    { enabled: false, staleTime: 0 }
+  );
+
+  useEffect(() => {
+    if (!pending) return;
+
+    const run = async (): Promise<void> => {
+      const result = await readClient();
+      const record = result.data?.data?.client;
+      if (record) pending.onLoaded(toClient(record, countryMap));
+      setPending(null);
+    };
+
+    void run();
+  }, [pending, readClient, countryMap]);
+
+  const fetchClient = useCallback(
+    (clientId: string, onLoaded: (client: Client) => void) =>
+      setPending({ id: clientId, onLoaded }),
+    []
+  );
+
+  return {
+    clients,
+    isLoading: !!mid && isPending,
+    isError,
+    refetch: () => void refetch(),
+    fetchClient,
+  };
 }

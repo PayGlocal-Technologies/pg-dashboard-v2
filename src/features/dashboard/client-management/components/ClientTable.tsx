@@ -40,6 +40,7 @@ import type { Client, ClientFormValues } from "@/features/dashboard/client-manag
 import {
   CLIENT_PAGE_LIMIT,
   CLIENT_SEARCH_HINTS,
+  FIXED_COLUMN_KEYS,
   countryOptionsFromMap,
   currencyForCountry,
 } from "@/features/dashboard/client-management/constants";
@@ -104,6 +105,7 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   // null until the merchant actually drags a column, at which point DataTable
   // renders that order instead of buildClientColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
 
   // The client whose details are being viewed. Held as an id (not the row) so
   // it survives the source list changing underneath it once a real endpoint
@@ -263,7 +265,9 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
   }, [detailsOpen, contentEl, scrollPosition]);
 
   const baseColumns = buildClientColumns();
-  const columns = reorderColumns(baseColumns, columnOrder);
+  const columns = reorderColumns(baseColumns, columnOrder).filter(
+    (c) => !hiddenColumns.includes(c.key)
+  );
   const reorderableColumns = baseColumns.map((c) => ({
     key: c.key,
     label: typeof c.header === "string" ? c.header : c.key,
@@ -389,7 +393,14 @@ export function ClientTable({ addClientOpen, onAddClientOpenChange }: ClientTabl
                 columns={reorderableColumns}
                 order={currentColumnOrder}
                 onOrderChange={setColumnOrder}
-                onReset={() => setColumnOrder(null)}
+                onReset={() => {
+                  setColumnOrder(null);
+                  setHiddenColumns([]);
+                }}
+                hiddenKeys={hiddenColumns}
+                onHiddenKeysChange={setHiddenColumns}
+                fixedKeys={FIXED_COLUMN_KEYS}
+                fixedReason="Always shown. A client row is unreadable without the business name."
               />
             </div>
           </div>

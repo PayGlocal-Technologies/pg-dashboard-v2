@@ -73,3 +73,18 @@ export interface DocumentPayload {
 export interface InvoiceDocumentMapResponse {
   data: Record<string, string>;
 }
+
+/**
+ * `verify-upload`'s answer. When not COMPLETED, `fileData` maps each file
+ * still missing to a fresh presigned PUT, plus `metaData[filename]` holding
+ * the x-amz-meta-* values that upload must carry (keys without the prefix).
+ * Shape read from gcc-ui-temp's useUploadDocsToS3, which retries from it.
+ */
+export interface InvoiceVerifyUploadResponse {
+  data?: {
+    Status?: string;
+    fileData?: Record<string, unknown> & {
+      metaData?: Record<string, Record<string, string>>;
+    };
+  };
+}

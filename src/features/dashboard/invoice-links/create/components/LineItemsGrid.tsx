@@ -68,8 +68,21 @@ export function LineItemsGrid({
   onDiscountTypeChange: (next: DiscountType) => void;
   onChange: (next: InvoiceLineItem[]) => void;
 }) {
+  // A row that came from a SKU-backed template line stays linked to the
+  // catalogue only while its name, code and price are the catalogue's. Typing
+  // over any of them makes it the merchant's own line, so the link is dropped
+  // and saving it as a template stores what they typed. Quantity and tax are
+  // per-invoice anyway, so editing them keeps the link.
   const patch = (key: string, next: Partial<InvoiceLineItem>) =>
-    onChange(items.map((item) => (item.key === key ? { ...item, ...next } : item)));
+    onChange(
+      items.map((item) => {
+        if (item.key !== key) return item;
+        const overridesSku = "description" in next || "itemCode" in next || "ppu" in next;
+        const merged = { ...item, ...next };
+        if (overridesSku && merged.skuId) delete merged.skuId;
+        return merged;
+      })
+    );
 
   const addRow = () =>
     onChange([
@@ -220,7 +233,15 @@ export function LineItemsGrid({
                   </div>
                 </div>
 
-                {firstError ? <p className="mt-1 text-[12px] text-destructive">{firstError}</p> : null}
+                {item.skuId ? (
+                  <p className="mt-1 flex items-center gap-1 text-[11.5px] text-muted-foreground">
+                    <Icon name="package" className="h-3 w-3" aria-hidden />
+                    From your SKU catalogue
+                  </p>
+                ) : null}
+                {firstError ? (
+                  <p className="mt-1 text-[12px] text-destructive">{firstError}</p>
+                ) : null}
               </div>
             );
           })}
@@ -275,9 +296,7 @@ export function LineItemsGrid({
               onChange={(e) => onDiscountChange(e.target.value)}
               className="h-9 text-[13px] shadow-none"
             />
-            {discountError ? (
-              <p className="text-[12px] text-destructive">{discountError}</p>
-            ) : null}
+            {discountError ? <p className="text-[12px] text-destructive">{discountError}</p> : null}
           </Field>
         </div>
 

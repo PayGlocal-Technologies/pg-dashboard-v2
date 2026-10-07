@@ -7,6 +7,7 @@ import { Button, ColumnManager, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
+import { ReportDownloadDrawer, type ReportWindow } from "@/components/common/ReportDownloadDrawer";
 import { ConfirmActionDialog } from "@/features/dashboard/mca-invoices/components/ConfirmActionDialog";
 import { useApp } from "@/stores/useApp";
 import {
@@ -17,24 +18,27 @@ import {
   toStartOfDayMs,
 } from "@/components/common/filters/FilterChips";
 import { reorderColumns } from "@/lib/utils/columns";
-import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { buildInvoiceLinkColumns } from "@/features/dashboard/invoice-links/columns";
 import {
+  FIXED_COLUMN_KEYS,
   INVOICE_LINKS_PAGE_LIMIT,
+  INVOICE_LINKS_PAGE_SIZE_OPTIONS,
   INVOICE_LINK_STATUS_FILTERS,
 } from "@/features/dashboard/invoice-links/constants";
 import {
+  buildInvoiceLinksReportBody,
   invoiceLinkDisableApi,
   invoiceLinkDraftApi,
   invoiceLinkRetrieveApi,
   useDeleteInvoiceDraft,
   useDisableInvoiceLink,
   useInvoiceLinks,
+  useInvoiceLinkMidScope,
   useInvoiceLinksReport,
   useInvoicePreview,
 } from "@/features/dashboard/invoice-links/hooks";
 import { InvoicePreviewDrawer } from "@/features/dashboard/invoice-links/components/InvoicePreviewDrawer";
-import { UpdateInvoiceStatusDrawer } from "@/features/dashboard/invoice-links/components/UpdateInvoiceStatusDrawer";
+import { UpdateInvoiceStatusDialog } from "@/features/dashboard/invoice-links/components/UpdateInvoiceStatusDialog";
 import type { InvoiceLink } from "@/features/dashboard/invoice-links/types";
 
 /**
@@ -60,7 +64,9 @@ export function InvoiceLinkTable() {
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(INVOICE_LINKS_PAGE_LIMIT);
 
   const { rows, totalCount, isPending, isError, isReady } = useInvoiceLinks(
     {
@@ -69,7 +75,8 @@ export function InvoiceLinkTable() {
       startTime: dateRange.from ? toStartOfDayMs(dateRange.from) : undefined,
       endTime: dateRange.to ? toEndOfDayMs(dateRange.to) : undefined,
     },
-    page
+    page,
+    pageSize
   );
 
   // Row-action surfaces. Each keeps the row it was opened from, so closing one
@@ -93,7 +100,35 @@ export function InvoiceLinkTable() {
   // Status on every non-PAID invoice — and is carried over deliberately.
   const midType = useApp((s) => s.profile?.midType) || "GLOCAL";
 
-  const { mutate: downloadReport, isPending: isReportPending } = useInvoiceLinksReport();
+  const { selectMid } = useInvoiceLinkMidScope();
+
+  const {
+    mutate: downloadReport,
+    isPending: isReportPending,
+    reportMid,
+  } = useInvoiceLinksReport();
+
+  // Report opens the shared "Generate report" drawer, as pg-dashboard's does,
+  // pre-filled from the table's Date chip (upstream's setReportRange). It is
+  // remounted on every open so it re-seeds from whatever the chip says then.
+  const [isReportDrawerOpen, setIsReportDrawerOpen] = useState(false);
+  const [reportDrawerKey, setReportDrawerKey] = useState(0);
+
+  const openReportDrawer = () => {
+    if (!reportMid) {
+      toast.error("Couldn't generate the report", {
+        description: "No merchant account is available to export from.",
+      });
+      return;
+    }
+    setReportDrawerKey((k) => k + 1);
+    setIsReportDrawerOpen(true);
+  };
+
+  const generateReport = (window: ReportWindow) =>
+    downloadReport(buildInvoiceLinksReportBody(window), {
+      onSuccess: () => setIsReportDrawerOpen(false),
+    });
   const { mutate: previewInvoice, isPending: isPreviewPending } = useInvoicePreview();
   const { mutate: disableLink, isPending: isDisabling } = useDisableInvoiceLink();
   const { mutate: deleteDraft, isPending: isDeleting } = useDeleteInvoiceDraft();
@@ -128,10 +163,14 @@ export function InvoiceLinkTable() {
     },
     // The status rides along so the editor knows whether this is an issued
     // invoice (PUT …/edit) or a draft (POST …), which is upstream's branch.
-    onEdit: (row: InvoiceLink) =>
+    // Scoped to the row's own MID first: this list spans every PA MID when
+    // none is selected, and the editor reads the invoice from one MID's path.
+    onEdit: (row: InvoiceLink) => {
+      if (row.mid) selectMid(row.mid);
       router.push(
         `/invoice-links/edit/${encodeURIComponent(row.id)}?status=${encodeURIComponent(row.status ?? "")}`
-      ),
+      );
+    },
     onUpdateStatus: (row: InvoiceLink, isOfflinePaid: boolean) =>
       setStatusTarget({ mid: row.mid, invoiceId: row.id, isOfflinePaid }),
     onDisable: (row: InvoiceLink) => setConfirmTarget({ row, kind: "disable" }),
@@ -164,7 +203,9 @@ export function InvoiceLinkTable() {
       };
 
   const baseColumns = buildInvoiceLinkColumns({ midType, handlers });
-  const columns = reorderColumns(baseColumns, columnOrder);
+  const columns = reorderColumns(baseColumns, columnOrder).filter(
+    (c) => !hiddenColumns.includes(c.key)
+  );
   // The action menu is pinned to the right edge and is not a data column, so
   // it stays out of the reorder list.
   const reorderableColumns = baseColumns
@@ -176,7 +217,9 @@ export function InvoiceLinkTable() {
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
   return (
-    <div className="space-y-4">
+    // A flex column filling what the page leaves below its header, so the card
+    // can take the remaining height (see the page's own sizing in index.tsx).
+    <div className="flex min-h-0 flex-1 flex-col">
       <DataTableCard
         toolbar={
           <div className="flex flex-wrap items-center gap-2">
@@ -213,31 +256,24 @@ export function InvoiceLinkTable() {
                 columns={reorderableColumns}
                 order={currentColumnOrder}
                 onOrderChange={setColumnOrder}
-                onReset={() => setColumnOrder(null)}
+                onReset={() => {
+                  setColumnOrder(null);
+                  setHiddenColumns([]);
+                }}
+                hiddenKeys={hiddenColumns}
+                onHiddenKeysChange={setHiddenColumns}
+                fixedKeys={FIXED_COLUMN_KEYS}
+                fixedReason="Always shown. An invoice link row is unreadable without its ID, amount and status."
               />
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={isReportPending}
                 leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-                onClick={() =>
-                  // Only the date window travels, matching upstream's report
-                  // drawer — it seeds from the table's date filter and carries
-                  // no other filter across.
-                  downloadReport(
-                    buildTxnRequestBody(
-                      {
-                        startTime: dateRange.from ? toStartOfDayMs(dateRange.from) : undefined,
-                        endTime: dateRange.to ? toEndOfDayMs(dateRange.to) : undefined,
-                      },
-                      { pageLimit: INVOICE_LINKS_PAGE_LIMIT, from: 0 }
-                    )
-                  )
-                }
+                onClick={openReportDrawer}
                 className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
               >
-                {isReportPending ? "Preparing…" : "Report"}
+                Report
               </Button>
             </div>
           </div>
@@ -245,7 +281,7 @@ export function InvoiceLinkTable() {
         columns={columns}
         data={rows}
         isLoading={isReady && isPending}
-        skeletonRows={8}
+        skeletonRows={pageSize}
         rowKey={(row) => row.id}
         emptyState={
           isError ? (
@@ -272,12 +308,33 @@ export function InvoiceLinkTable() {
         pagination={{
           mode: "page",
           page,
-          pageSize: INVOICE_LINKS_PAGE_LIMIT,
+          pageSize,
           total: totalCount,
           onPageChange: setPage,
+          pageSizeOptions: INVOICE_LINKS_PAGE_SIZE_OPTIONS,
+          onPageSizeChange: (size) => {
+            setPageSize(size);
+            setPage(1);
+          },
         }}
         tableLayout="content"
+        // Dispute management's recipe (pg-internal-v2): the card fills the
+        // page's flex column instead of capping its body at a guessed height.
+        // The DataTable (the card's last child) becomes a flex column whose
+        // scroll area takes the space left over, with the column header kept
+        // sticky. `:not(.hidden)` leaves the grid hidden when the card shows
+        // its empty or error state.
         maxBodyHeight="none"
+        className="flex min-h-0 flex-1 flex-col [&>div:last-child:not(.hidden)]:flex [&>div:last-child]:min-h-0 [&>div:last-child]:flex-1 [&>div:last-child]:flex-col [&>div:last-child>div:first-child]:min-h-0 [&>div:last-child>div:first-child]:flex-1 [&>div:last-child>div:first-child]:overflow-y-auto [&_thead]:sticky [&_thead]:top-0 [&_thead]:z-20 [&_th]:bg-card"
+      />
+
+      <ReportDownloadDrawer
+        key={reportDrawerKey}
+        open={isReportDrawerOpen}
+        onOpenChange={setIsReportDrawerOpen}
+        initialDateRange={dateRange}
+        isGenerating={isReportPending}
+        onGenerate={generateReport}
       />
 
       {/* All three rendered alongside the table, never in place of it, so
@@ -291,7 +348,7 @@ export function InvoiceLinkTable() {
       />
 
       {statusTarget ? (
-        <UpdateInvoiceStatusDrawer
+        <UpdateInvoiceStatusDialog
           open
           onOpenChange={(next) => !next && setStatusTarget(null)}
           mid={statusTarget.mid}

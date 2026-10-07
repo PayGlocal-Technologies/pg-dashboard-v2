@@ -19,11 +19,23 @@ import {
 } from "@/features/dashboard/invoice-links/create/constants";
 import type {
   AddressValues,
+  ApiInvoiceTemplate,
   DiscountType,
+  InvoiceBulkCreateRequest,
   InvoiceCreateRequest,
+  InvoiceCustomer,
   InvoiceFormValues,
   InvoiceLineItem,
+  InvoiceLinkTemplate,
+  InvoiceRecipient,
+  TemplateLineItem,
+  TemplateWriteBody,
 } from "@/features/dashboard/invoice-links/create/types";
+import type { Client } from "@/features/dashboard/client-management/types";
+// The template store is shared with MCA invoices, whose editor reads a theme
+// off every template. A template first saved here gets that editor's default
+// rather than none, so it opens there exactly as a fresh MCA template would.
+import { DEFAULT_THEME_METADATA } from "@/features/dashboard/create-invoice/constants";
 
 // ── Totals ───────────────────────────────────────────────────────────────────
 // Ported expression-for-expression from upstream helpers.ts (getAmount,
@@ -96,73 +108,96 @@ export function generateMerchantReference(): string {
 
 // ── Request body ─────────────────────────────────────────────────────────────
 
-/**
- * Builds the create/edit/draft body. One builder for all three, exactly as
- * upstream has it — the three endpoints take the same shape and differ only in
- * URL and verb.
- *
- * Every hardcoded value below (`businessName: ""`, `extraChargeAmount: "0.00"`,
- * the empty `merchantLogo`, `expiry: 6`, `siTxn: false`, …) is upstream's, not
- * an invention here.
- */
-export function buildInvoiceRequest(
+/** The customer as the single-customer form holds it (edit of an issued invoice). */
+export function customerFromValues(values: InvoiceFormValues): InvoiceCustomer {
+  return {
+    fullName: values.fullName,
+    emailId: values.emailId,
+    callingCode: values.callingCode,
+    phoneNumber: values.phoneNumber,
+    billing: values.billing,
+    shipping: values.shipping,
+    shippingSameAsBilling: values.shippingSameAsBilling,
+  };
+}
+
+/** A picked recipient in the same shape, so both feed one builder. */
+export function customerFromRecipient(recipient: InvoiceRecipient): InvoiceCustomer {
+  return {
+    fullName: recipient.fullName,
+    emailId: recipient.emailId,
+    callingCode: recipient.callingCode,
+    phoneNumber: recipient.phoneNumber,
+    billing: recipient.billing,
+    shipping: recipient.shipping ?? emptyAddress(),
+    shippingSameAsBilling: !recipient.shipping,
+  };
+}
+
+/** Everything in the body that is the invoice itself, shared by every client in a batch. */
+function buildInvoiceRequestData(
   values: InvoiceFormValues,
   items: InvoiceLineItem[]
-): InvoiceCreateRequest {
+): InvoiceCreateRequest["invoiceRequestData"] {
   const subTotal = getSubTotalAmount(items).toFixed(2);
   const total = getTotalAmount(items, values.discount || "0", values.discountType);
 
   return {
-    invoiceRequestData: {
-      merchantReferenceId: generateMerchantReference(),
-      invoiceItems: items.map((item) => ({
-        itemDescription: item.description || "",
-        itemCode: item.itemCode || null,
-        itemPrice: item.ppu || "0",
-        quantity: item.qty || "0",
-        gstPercentage: item.tax || "0",
-        amount: getAmount(item.ppu || "0", item.qty || "0", item.tax || "0").toFixed(2),
-      })),
-      memo: values.memo || "",
-      additionalInfo: values.merchantNote || "",
-      totalAmount: total,
-      subTotalAmount: subTotal,
-      // Upstream sends the same computed figure twice, under two names.
-      amountDue: total,
-      txnCurrency: values.txnCurrency || "INR",
-      formattedDueDate: getFormattedDueDate(values.dueDate),
-      invoiceId: values.invoiceNo || null,
-      gst: items.some((item) => !!item.tax && item.tax !== "0" && Number(item.tax) !== 0),
-      businessName: "",
-      discountPercent: values.discountType === "percentage" ? values.discount || null : null,
-      discountAmount: getDiscountAmount(subTotal, values.discount || "0", values.discountType),
-      extraChargeAmount: "0.00",
-      merchantLogo: { name: "", fileExtension: "" },
-      additionalEmailId: [],
-    },
+    merchantReferenceId: generateMerchantReference(),
+    invoiceItems: items.map((item) => ({
+      itemDescription: item.description || "",
+      itemCode: item.itemCode || null,
+      itemPrice: item.ppu || "0",
+      quantity: item.qty || "0",
+      gstPercentage: item.tax || "0",
+      amount: getAmount(item.ppu || "0", item.qty || "0", item.tax || "0").toFixed(2),
+    })),
+    memo: values.memo || "",
+    additionalInfo: values.merchantNote || "",
+    totalAmount: total,
+    subTotalAmount: subTotal,
+    // Upstream sends the same computed figure twice, under two names.
+    amountDue: total,
+    txnCurrency: values.txnCurrency || "INR",
+    formattedDueDate: getFormattedDueDate(values.dueDate),
+    invoiceId: values.invoiceNo || null,
+    gst: items.some((item) => !!item.tax && item.tax !== "0" && Number(item.tax) !== 0),
+    businessName: "",
+    discountPercent: values.discountType === "percentage" ? values.discount || null : null,
+    discountAmount: getDiscountAmount(subTotal, values.discount || "0", values.discountType),
+    extraChargeAmount: "0.00",
+    merchantLogo: { name: "", fileExtension: "" },
+    additionalEmailId: [],
+  };
+}
 
+/** The three customer objects for one recipient. */
+function buildCustomerParts(
+  customer: InvoiceCustomer
+): Pick<InvoiceCreateRequest, "plCustomerData" | "plBillingData" | "plShippingData"> {
+  return {
     plCustomerData: {
-      fullName: values.fullName || null,
-      emailId: values.emailId || null,
-      callingCode: values.callingCode || null,
-      phoneNumber: values.phoneNumber || null,
+      fullName: customer.fullName || null,
+      emailId: customer.emailId || null,
+      callingCode: customer.callingCode || null,
+      phoneNumber: customer.phoneNumber || null,
       expiry: 6,
     },
 
     plBillingData: {
-      addressStreet1: values.billing.streetAddress || "",
-      addressStreet2: values.billing.landmark || "",
-      addressCountry: values.billing.country || "",
-      addressState: values.billing.state || "",
-      addressCity: values.billing.city || "",
-      addressPostalCode: values.billing.zipcode || "",
+      addressStreet1: customer.billing.streetAddress || "",
+      addressStreet2: customer.billing.landmark || "",
+      addressCountry: customer.billing.country || "",
+      addressState: customer.billing.state || "",
+      addressCity: customer.billing.city || "",
+      addressPostalCode: customer.billing.zipcode || "",
       // Upstream copies the customer's full name into firstName and leaves
       // lastName empty rather than splitting it.
-      firstName: values.fullName || "",
+      firstName: customer.fullName || "",
       lastName: "",
-      callingCode: values.callingCode || null,
-      phoneNumber: values.phoneNumber || "",
-      emailId: values.emailId || "",
+      callingCode: customer.callingCode || null,
+      phoneNumber: customer.phoneNumber || "",
+      emailId: customer.emailId || "",
     },
 
     // SOURCE DEFECT, PRESERVED DELIBERATELY.
@@ -181,15 +216,307 @@ export function buildInvoiceRequest(
     // Ported byte-identical so this sends exactly what production sends. Raised
     // as a defect separately; do not "fix" it here without confirming what the
     // endpoint actually accepts, because a tolerant backend would start storing
-    // different data the moment the shape changed.
-    plShippingData: values.shippingSameAsBilling
-      ? { ...values.billing, shippingSameAsBilling: true }
-      : { ...values.shipping },
+    // different data the moment the shape changed. A client picked from the
+    // client book goes through the same mapping, so every path agrees.
+    plShippingData: customer.shippingSameAsBilling
+      ? { ...customer.billing, shippingSameAsBilling: true }
+      : { ...customer.shipping },
+  };
+}
 
+/**
+ * Builds the create/edit/draft body. One builder for all three, exactly as
+ * upstream has it — the three endpoints take the same shape and differ only in
+ * URL and verb.
+ *
+ * Every hardcoded value below (`businessName: ""`, `extraChargeAmount: "0.00"`,
+ * the empty `merchantLogo`, `expiry: 6`, `siTxn: false`, …) is upstream's, not
+ * an invention here.
+ *
+ * `customer` defaults to the single-customer form fields, which is the edit
+ * path; create passes the one picked recipient instead.
+ */
+export function buildInvoiceRequest(
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[],
+  customer: InvoiceCustomer = customerFromValues(values)
+): InvoiceCreateRequest {
+  return {
+    invoiceRequestData: buildInvoiceRequestData(values, items),
+    ...buildCustomerParts(customer),
     siTxn: false,
     collectByGlobalAltPay: false,
     merchantCustomPayload: null,
   };
+}
+
+/**
+ * The multi-client body: one `invoiceRequestData`, identical for everyone, and
+ * one customer triple per client. The backend fans it out into one link per
+ * client and suffixes the invoice id with -1, -2, … in this array's order.
+ */
+export function buildBulkInvoiceRequest(
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[],
+  recipients: InvoiceRecipient[]
+): InvoiceBulkCreateRequest {
+  return {
+    invoiceRequestData: buildInvoiceRequestData(values, items),
+    clients: recipients.map((recipient) => buildCustomerParts(customerFromRecipient(recipient))),
+    siTxn: false,
+    collectByGlobalAltPay: false,
+    merchantCustomPayload: null,
+  };
+}
+
+// ── Recipients ───────────────────────────────────────────────────────────────
+
+function sameAddress(a: AddressValues, b: AddressValues): boolean {
+  return (Object.keys(a) as (keyof AddressValues)[]).every(
+    (key) => (a[key] ?? "").trim().toLowerCase() === (b[key] ?? "").trim().toLowerCase()
+  );
+}
+
+/**
+ * A client-book record as an invoice recipient.
+ *
+ * The business name is the name on the invoice, as the MCA editor's Bill-to
+ * card shows it, with the contact person as the fallback. A shipping address
+ * that is blank or identical to billing collapses to "same as billing", which
+ * is how the single-customer form would have sent it.
+ */
+export function clientToRecipient(client: Client): InvoiceRecipient {
+  const billing: AddressValues = {
+    streetAddress: client.addressLine ?? "",
+    landmark: client.addressLine2 ?? "",
+    country: client.countryName ?? "",
+    state: client.state ?? "",
+    city: client.city ?? "",
+    zipcode: client.zipcode ?? "",
+  };
+  const shipping: AddressValues = {
+    streetAddress: client.shippingAddressLine ?? "",
+    landmark: client.shippingAddressLine2 ?? "",
+    country: client.shippingCountryName ?? "",
+    state: client.shippingState ?? "",
+    city: client.shippingCity ?? "",
+    zipcode: client.shippingZipcode ?? "",
+  };
+  const hasOwnShipping =
+    Object.values(shipping).some((v) => v.trim()) && !sameAddress(billing, shipping);
+
+  return {
+    key: client.id,
+    clientId: client.id,
+    fullName: client.businessName || client.primaryContactName,
+    contactName: client.primaryContactName,
+    emailId: client.email,
+    callingCode: client.phoneDialCode,
+    phoneNumber: client.phoneNumber,
+    billing,
+    shipping: hasOwnShipping ? shipping : null,
+  };
+}
+
+/** One line per thing that would stop this recipient's link being created. */
+export function validateRecipient(recipient: InvoiceRecipient): string[] {
+  const issues = [
+    validateFullName(recipient.fullName),
+    validateEmail(recipient.emailId),
+    validatePhone(recipient.phoneNumber),
+    ...Object.values(validateAddress(recipient.billing)),
+    ...(recipient.shipping ? Object.values(validateAddress(recipient.shipping)) : []),
+  ];
+  return issues.filter((issue): issue is string => !!issue);
+}
+
+// ── Templates ────────────────────────────────────────────────────────────────
+
+/** "yyyy-mm-dd" for a local date. Call from handlers, never during render. */
+export function localDateKey(date: Date): string {
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${mm}-${dd}`;
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function dateKeyToUtc(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return Date.UTC(y, (m ?? 1) - 1, d ?? 1);
+}
+
+/** Whole days from `from` to `to`, both "yyyy-mm-dd". */
+function daysBetween(from: string, to: string): number {
+  return Math.round((dateKeyToUtc(to) - dateKeyToUtc(from)) / DAY_MS);
+}
+
+function addDays(key: string, days: number): string {
+  const date = new Date(dateKeyToUtc(key) + days * DAY_MS);
+  return date.toISOString().slice(0, 10);
+}
+
+/** "3 items · USD · due in 30 days", for the picker. */
+function describeTemplate(template: ApiInvoiceTemplate): string {
+  const count = template.lineItems?.length ?? 0;
+  const parts = [`${count} item${count === 1 ? "" : "s"}`];
+  if (template.currency) parts.push(template.currency);
+  if (template.dueTermDays != null) {
+    parts.push(template.dueTermDays === 0 ? "due today" : `due in ${template.dueTermDays} days`);
+  }
+  return parts.join(" · ");
+}
+
+export function fromApiTemplate(template: ApiInvoiceTemplate): InvoiceLinkTemplate {
+  return {
+    id: template.templateId,
+    name: template.name,
+    description: describeTemplate(template),
+    savedAt: template.savedAt,
+    lastUsedAt: template.lastUsedAt,
+    raw: template,
+  };
+}
+
+/** Number → the string the grid holds; absent stays empty rather than "0". */
+const numberToField = (value: number | null | undefined): string =>
+  value == null || Number.isNaN(Number(value)) ? "" : String(value);
+
+/**
+ * A (hydrated) template, as the editor's patch.
+ *
+ * Carries the reusable parts only: line items, currency, discount, memo and
+ * note, and the due date resolved from the template's term against today.
+ * Never the customer or the invoice number. Line items keep their `skuId`, so
+ * saving the invoice back as a template keeps them live.
+ *
+ * HSN/SAC lands in the item code column, since that is the only code an
+ * invoice-link line has.
+ */
+export function applyTemplate(
+  template: ApiInvoiceTemplate,
+  todayKey: string
+): { patch: Partial<InvoiceFormValues>; items: InvoiceLineItem[] } {
+  const items: InvoiceLineItem[] = (template.lineItems ?? []).map((line, index) => ({
+    key: `tpl-${template.templateId}-${index}`,
+    description: line.name || line.description || "",
+    itemCode: line.hsn || line.sac || "",
+    ppu: numberToField(line.unitPrice),
+    qty: numberToField(line.quantity),
+    tax: numberToField(line.gstRate) || "0",
+    ...(line.skuId ? { skuId: line.skuId } : {}),
+    ...(line.type ? { itemType: line.type } : {}),
+  }));
+
+  const discountType: DiscountType = template.discount?.type === "fixed" ? "fixed" : "percentage";
+
+  const patch: Partial<InvoiceFormValues> = {
+    discountType,
+    discount: template.discount?.value ?? "",
+    memo: template.memo ?? "",
+    merchantNote: template.notes ?? "",
+    ...(template.currency ? { txnCurrency: template.currency } : {}),
+    ...(template.dueTermDays != null ? { dueDate: addDays(todayKey, template.dueTermDays) } : {}),
+  };
+
+  const emptyRow: InvoiceLineItem = {
+    key: "item-0",
+    description: "",
+    itemCode: "",
+    ppu: "",
+    qty: "",
+    tax: "0",
+  };
+  return { patch, items: items.length > 0 ? items : [emptyRow] };
+}
+
+function toTemplateLineItem(item: InvoiceLineItem): TemplateLineItem {
+  const isService = item.itemType === "SERVICE";
+  return {
+    // With a skuId the backend re-reads name, price and code from the catalogue
+    // on every GET. The values are still sent: they are what a read falls back
+    // to if the SKU is ever deleted.
+    ...(item.skuId ? { skuId: item.skuId } : {}),
+    name: item.description,
+    description: item.description,
+    type: item.itemType ?? "",
+    quantity: Number(item.qty) || 0,
+    unitPrice: Number(item.ppu) || 0,
+    gstRate: Number(item.tax) || 0,
+    hsn: isService ? "" : item.itemCode,
+    ...(isService ? { sac: item.itemCode } : {}),
+  };
+}
+
+/**
+ * The editor → a template body.
+ *
+ * `previous` is the stored template when overwriting one. Its fields are
+ * spread first and only this editor's are laid over them, so a template made
+ * in the MCA editor keeps its branding, bank account, tax, LUT and recurrence
+ * when it is updated from here. A brand-new template gets the same neutral
+ * values the MCA editor would give one with nothing set.
+ */
+export function toTemplateWriteBody(
+  name: string,
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[],
+  todayKey: string,
+  previous?: ApiInvoiceTemplate
+): TemplateWriteBody {
+  const subTotal = getSubTotalAmount(items).toFixed(2);
+  const dueTermDays =
+    values.dueDate && daysBetween(todayKey, values.dueDate) >= 0
+      ? daysBetween(todayKey, values.dueDate)
+      : undefined;
+
+  const base: TemplateWriteBody = previous
+    ? { ...previous }
+    : {
+        name,
+        bankAccountReference: null,
+        isGstInvoice: false,
+        themeMetadata: { ...DEFAULT_THEME_METADATA },
+        tax: {},
+        lut: "",
+        logoEnabled: false,
+        signatureEnabled: false,
+      };
+  // Server-managed, and the term is this editor's to set or clear.
+  delete base.templateId;
+  delete base.savedAt;
+  delete base.lastUsedAt;
+  delete base.dueTermDays;
+
+  return {
+    ...base,
+    name,
+    currency: values.txnCurrency,
+    lineItems: items.map(toTemplateLineItem),
+    discount: {
+      ...(previous?.discount ?? {}),
+      value: values.discount || undefined,
+      type: values.discountType,
+      discountAmount: getDiscountAmount(subTotal, values.discount || "0", values.discountType),
+    },
+    memo: values.memo,
+    notes: values.merchantNote,
+    // Omitted rather than null when there is no due date, which is how the
+    // MCA editor says "no term"; 0 is a real term ("due today").
+    ...(dueTermDays != null ? { dueTermDays } : {}),
+  };
+}
+
+/** Whether there is anything on the invoice worth saving as a template. */
+export function hasTemplatableContent(
+  values: InvoiceFormValues,
+  items: InvoiceLineItem[]
+): boolean {
+  return (
+    items.some((item) => item.description.trim() || item.ppu.trim()) ||
+    !!values.memo.trim() ||
+    !!values.merchantNote.trim()
+  );
 }
 
 // ── Field validation ─────────────────────────────────────────────────────────
@@ -214,14 +541,16 @@ export function validateDueDate(value: string): string | undefined {
 
 export function validateFullName(value: string): string | undefined {
   if (!value?.trim()) return "Please enter the Full Name";
-  if (value.length > NAME_MAX_LENGTH) return `Full Name must be at most ${NAME_MAX_LENGTH} characters`;
+  if (value.length > NAME_MAX_LENGTH)
+    return `Full Name must be at most ${NAME_MAX_LENGTH} characters`;
   return undefined;
 }
 
 export function validateEmail(value: string): string | undefined {
   if (!value?.trim()) return "Please enter the Email ID";
   if (!EMAIL_PATTERN.test(value)) return "Please enter a valid Email ID";
-  if (value.length > EMAIL_MAX_LENGTH) return `Email ID must be at most ${EMAIL_MAX_LENGTH} characters`;
+  if (value.length > EMAIL_MAX_LENGTH)
+    return `Email ID must be at most ${EMAIL_MAX_LENGTH} characters`;
   return undefined;
 }
 
@@ -248,7 +577,9 @@ export function validateDiscount(value: string, discountType: DiscountType): str
 }
 
 /** Address fields are all optional upstream; only length and charset are checked. */
-export function validateAddress(values: AddressValues): Partial<Record<keyof AddressValues, string>> {
+export function validateAddress(
+  values: AddressValues
+): Partial<Record<keyof AddressValues, string>> {
   const errors: Partial<Record<keyof AddressValues, string>> = {};
 
   if (values.streetAddress) {

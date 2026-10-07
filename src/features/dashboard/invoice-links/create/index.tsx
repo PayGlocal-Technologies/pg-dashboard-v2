@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,20 +10,36 @@ import {
   FieldError,
   FieldLabel,
   Input,
+  SplitButton,
+  SplitButtonItem,
   StatusBadge,
   Switch,
   Textarea,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
+import { SelectMidView } from "@/components/common/SelectMidView";
 // Presentational only (ui + Icon + cn), so it is safe to borrow across
 // features — the same way mca-links borrows CountryCell from mca-transactions.
 import { ChipField } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
+// Lists, renames and deletes templates; reads only id/name/description/dates,
+// so it serves the shared template store from here as well.
+import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
 import { INVOICE_LINKS_FEATURE } from "@/features/dashboard/invoice-links/constants";
+import { useInvoiceLinkMidScope } from "@/features/dashboard/invoice-links/hooks";
 import { DEFAULT_CALLING_CODE } from "@/features/dashboard/invoice-links/create/constants";
 import {
+  applyTemplate,
+  buildBulkInvoiceRequest,
   buildInvoiceRequest,
+  customerFromRecipient,
   emptyAddress,
+  hasTemplatableContent,
+  localDateKey,
+  toTemplateWriteBody,
   validateAddress,
   validateDiscount,
   validateDueDate,
@@ -32,29 +48,41 @@ import {
   validateInvoiceNo,
   validateLineItem,
   validatePhone,
+  validateRecipient,
   type LineItemErrors,
 } from "@/features/dashboard/invoice-links/create/helpers";
 import {
   useCreateInvoice,
+  useCreateInvoiceBatch,
   useEditInvoice,
   useInvoiceCurrencies,
   useInvoiceDraft,
   useInvoiceEditorMid,
+  useInvoiceLinkTemplates,
   useInvoiceLogo,
   useMerchantShortName,
   useSaveInvoiceDraft,
 } from "@/features/dashboard/invoice-links/create/hooks";
 import { AddressFields } from "@/features/dashboard/invoice-links/create/components/AddressFields";
+import { BatchResultsDialog } from "@/features/dashboard/invoice-links/create/components/BatchResultsDialog";
 import { CreatedLinkDialog } from "@/features/dashboard/invoice-links/create/components/CreatedLinkDialog";
 import { EditorSection } from "@/features/dashboard/invoice-links/create/components/EditorSection";
 import { InvoicePreview } from "@/features/dashboard/invoice-links/create/components/InvoicePreview";
 import { LineItemsGrid } from "@/features/dashboard/invoice-links/create/components/LineItemsGrid";
+import { RecipientsSection } from "@/features/dashboard/invoice-links/create/components/RecipientsSection";
+import { SaveTemplateDialog } from "@/features/dashboard/invoice-links/create/components/SaveTemplateDialog";
+import {
+  ApplyTemplateConfirm,
+  TemplatePicker,
+} from "@/features/dashboard/invoice-links/create/components/TemplatePicker";
 import type {
   AddressValues,
-  DiscountType,
+  InvoiceBulkResult,
   InvoiceDraftResponse,
   InvoiceFormValues,
   InvoiceLineItem,
+  InvoiceLinkTemplate,
+  InvoiceRecipient,
 } from "@/features/dashboard/invoice-links/create/types";
 
 function emptyItem(key: string): InvoiceLineItem {
@@ -83,6 +111,19 @@ function toDateInputValue(raw: string | null | undefined): string {
   const [dd, mm, yyyy] = raw.split(" ")[0]?.split("/") ?? [];
   return dd && mm && yyyy ? `${yyyy}-${mm}-${dd}` : "";
 }
+
+/** "Nobody picked", for the draft body and the preview's empty state. */
+const EMPTY_RECIPIENT: InvoiceRecipient = {
+  key: "",
+  clientId: null,
+  fullName: "",
+  contactName: "",
+  emailId: "",
+  callingCode: DEFAULT_CALLING_CODE,
+  phoneNumber: "",
+  billing: emptyAddress(),
+  shipping: null,
+};
 
 function emptyValues(): InvoiceFormValues {
   return {
@@ -135,6 +176,32 @@ function requestToValues(
   };
 }
 
+/**
+ * The customer a draft was saved with, as a recipient. Drafts store a
+ * customer, not a client id, so this is shown as its own row rather than
+ * matched against the client book by name or email.
+ */
+function requestToRecipients(request: DraftRequest | undefined): InvoiceRecipient[] {
+  const customer = request?.plCustomerData;
+  if (!customer?.fullName && !customer?.emailId) return [];
+  const shipping = request?.plShippingData ?? null;
+
+  return [
+    {
+      key: "draft",
+      clientId: null,
+      fullName: customer.fullName || "",
+      contactName: "",
+      emailId: customer.emailId || "",
+      callingCode: customer.callingCode || DEFAULT_CALLING_CODE,
+      phoneNumber: customer.phoneNumber || "",
+      billing: toAddress(request?.plBillingData),
+      // Same rule as requestToValues: no stored shipping name means it mirrored billing.
+      shipping: shipping?.firstName ? toAddress(shipping) : null,
+    },
+  ];
+}
+
 function requestToItems(request: DraftRequest | undefined): InvoiceLineItem[] {
   const rows = (request?.invoiceRequestData?.invoiceItems ?? []).map((it, index) => ({
     key: `item-${index}`,
@@ -168,16 +235,74 @@ function requestToItems(request: DraftRequest | undefined): InvoiceLineItem[] {
  *   invoiceId && status !== "DRAFT"  → PUT  …/edit     (an issued invoice)
  *   otherwise                        → POST …          (create, incl. issuing a draft)
  *   "Save as draft"                  → POST/PUT …/draft
+ *
+ * Creating (and issuing a draft) bills clients from the client book, one or
+ * many. One client sends the single-customer body exactly as before; several
+ * add `clients[]` to the same POST and the backend issues one link each, with
+ * -1, -2, … appended to the invoice number. Editing an issued invoice keeps
+ * the typed customer fields: it is one existing link and cannot fan out.
+ *
+ * Templates are the MCA invoice template store, shared. Applying one fills the
+ * line items, currency, discount, memo, note and due date from a fresh read of
+ * the template, which is where the backend substitutes live SKU prices.
  */
 export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) {
   const router = useRouter();
+  const { needsMidChoice, midOptions } = useInvoiceLinkMidScope();
+
+  /**
+   * The editor cannot open without knowing which account the link is for:
+   * every endpoint below puts a MID in its path, and pg-dashboard falls back
+   * to `paMids[0]`, raising the link under an account the merchant never
+   * chose. The in-app entry points (the list's Create, a row's Edit, "Edit"
+   * in Manage templates) already settle it before navigating, so this only
+   * catches the header search's ?action=create, a pasted link or a bookmark.
+   * Same gate as /create-invoice; the editor's hooks do not fire until it is
+   * answered.
+   */
+  if (needsMidChoice) {
+    return (
+      <>
+        <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Close"
+            className="h-9 w-9 shrink-0 p-0"
+            onClick={() => router.push("/invoice-links")}
+          >
+            <Icon name="x" className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            {invoiceId ? "Edit invoice link" : "Create an invoice link"}
+          </h1>
+        </header>
+        <div className="mx-auto w-full max-w-2xl px-6 py-16">
+          <SelectMidView midType="PA" midOptions={midOptions} showSidebarHint={false} />
+        </div>
+      </>
+    );
+  }
+
+  return <InvoiceLinkEditor invoiceId={invoiceId} />;
+}
+
+function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
+  // "Edit" in the list's Manage templates lands here with ?templateId=, which
+  // is applied once below. Never on an existing invoice.
+  const initialTemplateId = invoiceId ? null : searchParams.get("templateId");
   const mid = useInvoiceEditorMid();
   const currencies = useInvoiceCurrencies();
   const merchantName = useMerchantShortName(mid);
-  const { displayUrl: logoUrl, upload: uploadLogo, isUploading: isLogoUploading } =
-    useInvoiceLogo(mid);
+  const {
+    displayUrl: logoUrl,
+    upload: uploadLogo,
+    isUploading: isLogoUploading,
+  } = useInvoiceLogo(mid);
 
   // Derived state, not synced state: `edits` holds only what the merchant has
   // changed, and the rendered values are the server's draft with those laid
@@ -189,6 +314,21 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [itemErrors, setItemErrors] = useState<Record<string, LineItemErrors>>({});
   const [createdLink, setCreatedLink] = useState<string | null>(null);
+  // Null until the merchant touches the picker; until then a draft's own
+  // customer (if any) is the selection. Same derived-state idea as `edits`.
+  const [recipientsOverride, setRecipientsOverride] = useState<InvoiceRecipient[] | null>(null);
+  const [recipientsError, setRecipientsError] = useState<string | undefined>(undefined);
+  // The batch outcome, with the recipients in the order they were sent so
+  // each result can be matched to its client.
+  const [batch, setBatch] = useState<{
+    results: InvoiceBulkResult[];
+    recipients: InvoiceRecipient[];
+  } | null>(null);
+  // Which template this invoice came from, this session. Null is "none".
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [confirmTemplate, setConfirmTemplate] = useState<InvoiceLinkTemplate | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
   // Lazy initialisers, not render-time reads: the React Compiler rules ban
   // calling the clock during render.
   const [todayKey] = useState(() => new Date().toISOString().slice(0, 10));
@@ -198,14 +338,26 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
 
   const { data: draft } = useInvoiceDraft(mid, invoiceId);
   const { mutate: createInvoice, isPending: isCreating } = useCreateInvoice(mid);
+  const { mutate: createBatch, isPending: isCreatingBatch } = useCreateInvoiceBatch(mid);
   const { mutate: editInvoice, isPending: isEditing } = useEditInvoice(mid);
   const { mutate: saveDraft, isPending: isSavingDraft } = useSaveInvoiceDraft(mid, invoiceId);
+  const templateStore = useInvoiceLinkTemplates(mid);
 
   const isEditingIssued = !!invoiceId && status !== "DRAFT";
+  /** Every path but editing an issued link bills clients from the picker. */
+  const usesClientPicker = !isEditingIssued;
 
   const request = draft?.data?.["invoice-data"]?.invoiceRequest;
   const serverValues = useMemo(() => requestToValues(request, invoiceId), [request, invoiceId]);
   const serverItems = useMemo(() => requestToItems(request), [request]);
+  const serverRecipients = useMemo(() => requestToRecipients(request), [request]);
+  const recipients = recipientsOverride ?? serverRecipients;
+  const isBatch = usesClientPicker && recipients.length > 1;
+
+  const updateRecipients = (update: (prev: InvoiceRecipient[]) => InvoiceRecipient[]) => {
+    setRecipientsError(undefined);
+    setRecipientsOverride((prev) => update(prev ?? serverRecipients));
+  };
 
   const values = useMemo(() => {
     const merged = { ...serverValues, ...edits };
@@ -231,20 +383,33 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
     if (invoiceNo) next.invoiceNo = invoiceNo;
     const dueDate = validateDueDate(values.dueDate);
     if (dueDate) next.dueDate = dueDate;
-    const fullName = validateFullName(values.fullName);
-    if (fullName) next.fullName = fullName;
-    const emailId = validateEmail(values.emailId);
-    if (emailId) next.emailId = emailId;
-    const phoneNumber = validatePhone(values.phoneNumber);
-    if (phoneNumber) next.phoneNumber = phoneNumber;
     const discount = validateDiscount(values.discount, values.discountType);
     if (discount) next.discount = discount;
 
-    const billingErrors = validateAddress(values.billing);
-    Object.entries(billingErrors).forEach(([k, v]) => v && (next[`billing.${k}`] = v));
-    if (!values.shippingSameAsBilling) {
-      const shippingErrors = validateAddress(values.shipping);
-      Object.entries(shippingErrors).forEach(([k, v]) => v && (next[`shipping.${k}`] = v));
+    let recipientsOk = true;
+    if (usesClientPicker) {
+      // The per-client problems are already on screen under each client; this
+      // only has to refuse, and say so when nobody is picked at all.
+      if (recipients.length === 0) {
+        setRecipientsError("Choose at least one client");
+        recipientsOk = false;
+      } else if (recipients.some((r) => validateRecipient(r).length > 0)) {
+        recipientsOk = false;
+      }
+    } else {
+      const fullName = validateFullName(values.fullName);
+      if (fullName) next.fullName = fullName;
+      const emailId = validateEmail(values.emailId);
+      if (emailId) next.emailId = emailId;
+      const phoneNumber = validatePhone(values.phoneNumber);
+      if (phoneNumber) next.phoneNumber = phoneNumber;
+
+      const billingErrors = validateAddress(values.billing);
+      Object.entries(billingErrors).forEach(([k, v]) => v && (next[`billing.${k}`] = v));
+      if (!values.shippingSameAsBilling) {
+        const shippingErrors = validateAddress(values.shipping);
+        Object.entries(shippingErrors).forEach(([k, v]) => v && (next[`shipping.${k}`] = v));
+      }
     }
 
     const nextItemErrors: Record<string, LineItemErrors> = {};
@@ -255,7 +420,9 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
 
     setErrors(next);
     setItemErrors(nextItemErrors);
-    return Object.keys(next).length === 0 && Object.keys(nextItemErrors).length === 0;
+    return (
+      recipientsOk && Object.keys(next).length === 0 && Object.keys(nextItemErrors).length === 0
+    );
   }
 
   const onSubmit = () => {
@@ -263,20 +430,44 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
       toast.error("Check the highlighted fields and try again");
       return;
     }
-    const body = buildInvoiceRequest(values, items);
     const handlers = {
       onSuccess: (res: { data?: { paymentLink?: string } }) =>
         setCreatedLink(res?.data?.paymentLink ?? ""),
       onError: (error: Error) => toast.error(error?.message || "Failed to create link"),
     };
-    if (isEditingIssued) editInvoice(body, handlers);
-    else createInvoice(body, handlers);
+
+    if (isEditingIssued) {
+      editInvoice(buildInvoiceRequest(values, items), handlers);
+      return;
+    }
+
+    if (recipients.length === 1) {
+      createInvoice(
+        buildInvoiceRequest(values, items, customerFromRecipient(recipients[0])),
+        handlers
+      );
+      return;
+    }
+
+    const sent = recipients;
+    createBatch(buildBulkInvoiceRequest(values, items, sent), {
+      onSuccess: (res) => setBatch({ results: res?.data?.results ?? [], recipients: sent }),
+      onError: (error: Error) => toast.error(error?.message || "Failed to create links"),
+    });
   };
 
   // Upstream does not validate before saving a draft — a draft is by definition
   // incomplete — so neither does this.
+  //
+  // A draft holds one customer, so with the picker it saves the one client
+  // picked, or none; with several picked the button is held (see header).
   const onSaveDraft = () => {
-    saveDraft(buildInvoiceRequest(values, items), {
+    const customer = usesClientPicker
+      ? recipients[0]
+        ? customerFromRecipient(recipients[0])
+        : customerFromRecipient(EMPTY_RECIPIENT)
+      : undefined;
+    saveDraft(buildInvoiceRequest(values, items, customer), {
       onSuccess: () => {
         toast.success("Draft saved");
         router.push("/invoice-links");
@@ -285,7 +476,103 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
     });
   };
 
-  const isBusy = isCreating || isEditing;
+  const isBusy = isCreating || isEditing || isCreatingBatch;
+  const draftBlocked = isBatch;
+
+  // ── Templates ──────────────────────────────────────────────────────────────
+
+  const activeTemplate =
+    templateStore.templates.find((template) => template.id === activeTemplateId) ?? null;
+  const canSaveTemplate = hasTemplatableContent(values, items);
+
+  const applyChosenTemplate = (template: InvoiceLinkTemplate) => {
+    setConfirmTemplate(null);
+    loadTemplate(template);
+  };
+
+  const loadTemplate = (template: InvoiceLinkTemplate) => {
+    // Read fresh rather than applying the list row: the read is where SKU-backed
+    // lines get the catalogue's current name and price.
+    templateStore.load(template.id, (fresh) => {
+      const { patch: next, items: nextItems } = applyTemplate(fresh, localDateKey(new Date()));
+      const currencyOffered =
+        !next.txnCurrency || currencies.some((option) => option.value === next.txnCurrency);
+      if (!currencyOffered) delete next.txnCurrency;
+
+      patch(next);
+      setItemsOverride(nextItems);
+      setItemErrors({});
+      setActiveTemplateId(template.id);
+      toast.success(`Applied "${template.name}"`, {
+        description: currencyOffered
+          ? undefined
+          : `${fresh.currency} is not offered for invoice links, so the currency was left as it was.`,
+      });
+    });
+  };
+
+  const chooseTemplate = (template: InvoiceLinkTemplate) => {
+    if (canSaveTemplate) setConfirmTemplate(template);
+    else applyChosenTemplate(template);
+  };
+
+  // ?templateId= from the list's Manage templates, applied exactly once. Held
+  // until the template list and the currencies have both arrived: the first
+  // says what the id is called, the second is what the currency check reads.
+  // A fresh form has nothing to overwrite, so there is no confirm.
+  const initialTemplateHandled = useRef(false);
+  useEffect(() => {
+    if (!initialTemplateId || initialTemplateHandled.current) return;
+    if (!templateStore.isReady || currencies.length === 0) return;
+    initialTemplateHandled.current = true;
+    const template = templateStore.templates.find((t) => t.id === initialTemplateId);
+    if (template) loadTemplate(template);
+    else toast.error("Couldn't find that template", { description: "It may have been deleted." });
+  });
+
+  const handleSaveTemplate = (name: string) => {
+    templateStore.save(
+      toTemplateWriteBody(name, values, items, localDateKey(new Date())),
+      (templateId) => {
+        setActiveTemplateId(templateId);
+        setSaveTemplateOpen(false);
+        toast.success("Template saved", { description: `"${name}" is ready to reuse.` });
+      }
+    );
+  };
+
+  const handleUpdateTemplate = () => {
+    if (!activeTemplate) return;
+    templateStore.replace(
+      activeTemplate.id,
+      toTemplateWriteBody(
+        activeTemplate.name,
+        values,
+        items,
+        localDateKey(new Date()),
+        activeTemplate.raw
+      ),
+      () =>
+        toast.success("Template updated", {
+          description: `"${activeTemplate.name}" now matches this invoice.`,
+        })
+    );
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    templateStore.remove(templateId);
+    if (templateId === activeTemplateId) setActiveTemplateId(null);
+  };
+
+  // What the preview shows: the first picked client, standing in for all of
+  // them, since every link in a batch carries the same invoice.
+  const previewRecipient = usesClientPicker ? recipients[0] : undefined;
+  const previewValues: InvoiceFormValues = usesClientPicker
+    ? {
+        ...values,
+        ...customerFromRecipient(previewRecipient ?? EMPTY_RECIPIENT),
+      }
+    : values;
 
   // Counts for the collapsed sections' subtitles, so shut sections still say
   // what is inside them.
@@ -329,24 +616,95 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
             </div>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isSavingDraft || isBusy}
-            onClick={onSaveDraft}
-          >
-            {isSavingDraft ? "Saving…" : "Save as Draft"}
-          </Button>
-          <Button
-            type="button"
+          {draftBlocked ? (
+            // A draft holds one customer. Held rather than hidden, and it says
+            // why: a disabled button with no reason reads as a broken one.
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button type="button" variant="outline" size="sm" disabled>
+                    Save as Draft
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                A draft can hold one client. Keep one, or create the links now.
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSavingDraft || isBusy}
+              onClick={onSaveDraft}
+            >
+              {isSavingDraft ? "Saving…" : "Save as Draft"}
+            </Button>
+          )}
+
+          {/* The MCA editor's split button: the primary action, with the
+              template actions in its menu. Exactly one of "Save as template" or
+              "Update ⟨name⟩" is offered, depending on whether this invoice came
+              from a template. */}
+          <SplitButton
+            label={
+              isBusy
+                ? "Working…"
+                : isBatch
+                  ? `Create ${recipients.length} invoice links`
+                  : invoiceId
+                    ? "Update invoice link"
+                    : "Create invoice link"
+            }
             variant="primary"
             size="sm"
             disabled={isBusy}
             onClick={onSubmit}
+            // Squares the facing corners so the pair reads as one control; see
+            // the same className on create-invoice's SplitButton for why
+            // flux's own rounded-r-none does not take.
+            className="[&>button+button]:rounded-l-none [&>button:first-child]:rounded-r-none"
           >
-            {isBusy ? "Working…" : invoiceId ? "Update invoice link" : "Create invoice link"}
-          </Button>
+            {activeTemplate ? (
+              <>
+                <SplitButtonItem
+                  className="max-w-[18rem] truncate whitespace-nowrap"
+                  disabled={templateStore.isMutating}
+                  onClick={handleUpdateTemplate}
+                >
+                  Update &ldquo;{activeTemplate.name}&rdquo;
+                </SplitButtonItem>
+                <SplitButtonItem
+                  className="whitespace-nowrap"
+                  onClick={() => setActiveTemplateId(null)}
+                >
+                  Detach from template
+                </SplitButtonItem>
+              </>
+            ) : (
+              <SplitButtonItem
+                className="whitespace-nowrap"
+                disabled={!canSaveTemplate}
+                onClick={() => setSaveTemplateOpen(true)}
+              >
+                <span className="flex flex-col items-start">
+                  Save as template
+                  {!canSaveTemplate && (
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      Add a line item or note first
+                    </span>
+                  )}
+                </span>
+              </SplitButtonItem>
+            )}
+            <SplitButtonItem
+              className="whitespace-nowrap"
+              onClick={() => setManageTemplatesOpen(true)}
+            >
+              Manage templates
+            </SplitButtonItem>
+          </SplitButton>
         </header>
 
         <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_46rem]">
@@ -365,7 +723,14 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
                     onChange={(e) => patch({ invoiceNo: e.target.value })}
                     className="h-9 w-56 text-[13px] shadow-none"
                   />
-                  <FieldError>{errors.invoiceNo}</FieldError>
+                  {errors.invoiceNo ? (
+                    <FieldError>{errors.invoiceNo}</FieldError>
+                  ) : isBatch ? (
+                    // The backend suffixes the base number per client.
+                    <p className="text-[11.5px] text-muted-foreground">
+                      Each link gets -1, -2, … added to this number
+                    </p>
+                  ) : null}
                 </ChipField>
 
                 <ChipField label="Due date" required fieldId="due-date">
@@ -380,55 +745,74 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
                 </ChipField>
               </div>
 
+              <TemplatePicker
+                templates={templateStore.templates}
+                isReady={templateStore.isReady}
+                isApplying={templateStore.isApplying}
+                activeTemplateId={activeTemplateId}
+                onChoose={chooseTemplate}
+                onDetach={() => setActiveTemplateId(null)}
+                onManage={() => setManageTemplatesOpen(true)}
+              />
+
               {/* ── Customer ──────────────────────────────────────────────── */}
-              <EditorSection icon="user" title="Who you're billing">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="customer-name">Full name</FieldLabel>
-                    <Input
-                      id="customer-name"
-                      placeholder="Eg. John Doe"
-                      aria-invalid={!!errors.fullName}
-                      value={values.fullName}
-                      onChange={(e) => patch({ fullName: e.target.value })}
-                    />
-                    <FieldError>{errors.fullName}</FieldError>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="customer-email">Email ID</FieldLabel>
-                    <Input
-                      id="customer-email"
-                      type="email"
-                      placeholder="Eg. john.doe@example.com"
-                      aria-invalid={!!errors.emailId}
-                      value={values.emailId}
-                      onChange={(e) => patch({ emailId: e.target.value })}
-                    />
-                    <FieldError>{errors.emailId}</FieldError>
-                  </Field>
-
-                  <Field className="sm:col-span-2">
-                    <FieldLabel htmlFor="customer-phone">Phone</FieldLabel>
-                    <div className="flex gap-2">
+              {usesClientPicker ? (
+                <RecipientsSection
+                  mid={mid}
+                  recipients={recipients}
+                  onChange={updateRecipients}
+                  error={recipientsError}
+                />
+              ) : (
+                <EditorSection icon="user" title="Who you're billing">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Field>
+                      <FieldLabel htmlFor="customer-name">Full name</FieldLabel>
                       <Input
-                        aria-label="Calling code"
-                        className="w-24"
-                        value={values.callingCode}
-                        onChange={(e) => patch({ callingCode: e.target.value })}
+                        id="customer-name"
+                        placeholder="Eg. John Doe"
+                        aria-invalid={!!errors.fullName}
+                        value={values.fullName}
+                        onChange={(e) => patch({ fullName: e.target.value })}
                       />
+                      <FieldError>{errors.fullName}</FieldError>
+                    </Field>
+
+                    <Field>
+                      <FieldLabel htmlFor="customer-email">Email ID</FieldLabel>
                       <Input
-                        id="customer-phone"
-                        placeholder="Eg. 9876543211"
-                        aria-invalid={!!errors.phoneNumber}
-                        value={values.phoneNumber}
-                        onChange={(e) => patch({ phoneNumber: e.target.value })}
+                        id="customer-email"
+                        type="email"
+                        placeholder="Eg. john.doe@example.com"
+                        aria-invalid={!!errors.emailId}
+                        value={values.emailId}
+                        onChange={(e) => patch({ emailId: e.target.value })}
                       />
-                    </div>
-                    <FieldError>{errors.phoneNumber}</FieldError>
-                  </Field>
-                </div>
-              </EditorSection>
+                      <FieldError>{errors.emailId}</FieldError>
+                    </Field>
+
+                    <Field className="sm:col-span-2">
+                      <FieldLabel htmlFor="customer-phone">Phone</FieldLabel>
+                      <div className="flex gap-2">
+                        <Input
+                          aria-label="Calling code"
+                          className="w-24"
+                          value={values.callingCode}
+                          onChange={(e) => patch({ callingCode: e.target.value })}
+                        />
+                        <Input
+                          id="customer-phone"
+                          placeholder="Eg. 9876543211"
+                          aria-invalid={!!errors.phoneNumber}
+                          value={values.phoneNumber}
+                          onChange={(e) => patch({ phoneNumber: e.target.value })}
+                        />
+                      </div>
+                      <FieldError>{errors.phoneNumber}</FieldError>
+                    </Field>
+                  </div>
+                </EditorSection>
+              )}
 
               {/* ── Items, currency, discount, totals ─────────────────────── */}
               <LineItemsGrid
@@ -447,59 +831,65 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
               />
 
               {/* ── Addresses — every field optional, so it opens shut ────── */}
-              <EditorSection
-                icon="map-pin"
-                title="Billing and shipping"
-                subtitle={
-                  addressFilled ? `${addressFilled} field(s) filled in` : "Optional on an invoice link"
-                }
-                collapsible
-                defaultOpen={false}
-                forceOpen={hasAddressError}
-              >
-                <div className="space-y-4">
-                  <AddressFields
-                    idPrefix="billing"
-                    values={values.billing}
-                    errors={{
-                      streetAddress: errors["billing.streetAddress"],
-                      landmark: errors["billing.landmark"],
-                      city: errors["billing.city"],
-                      zipcode: errors["billing.zipcode"],
-                    }}
-                    onChange={(next) => patch({ billing: { ...values.billing, ...next } })}
-                  />
-
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                    <span className="text-[13px] text-foreground">
-                      Repeat for shipping address?
-                    </span>
-                    <Switch
-                      checked={values.shippingSameAsBilling}
-                      onCheckedChange={(next) => patch({ shippingSameAsBilling: next })}
+              {/* Only for the typed customer. A picked client brings its own
+                  billing and shipping address from the client book. */}
+              {usesClientPicker ? null : (
+                <EditorSection
+                  icon="map-pin"
+                  title="Billing and shipping"
+                  subtitle={
+                    addressFilled
+                      ? `${addressFilled} field(s) filled in`
+                      : "Optional on an invoice link"
+                  }
+                  collapsible
+                  defaultOpen={false}
+                  forceOpen={hasAddressError}
+                >
+                  <div className="space-y-4">
+                    <AddressFields
+                      idPrefix="billing"
+                      values={values.billing}
+                      errors={{
+                        streetAddress: errors["billing.streetAddress"],
+                        landmark: errors["billing.landmark"],
+                        city: errors["billing.city"],
+                        zipcode: errors["billing.zipcode"],
+                      }}
+                      onChange={(next) => patch({ billing: { ...values.billing, ...next } })}
                     />
-                  </div>
 
-                  {!values.shippingSameAsBilling ? (
-                    <div className="border-t border-border pt-4">
-                      <p className="mb-3 text-[13px] font-medium text-foreground">
-                        Shipping address
-                      </p>
-                      <AddressFields
-                        idPrefix="shipping"
-                        values={values.shipping}
-                        errors={{
-                          streetAddress: errors["shipping.streetAddress"],
-                          landmark: errors["shipping.landmark"],
-                          city: errors["shipping.city"],
-                          zipcode: errors["shipping.zipcode"],
-                        }}
-                        onChange={(next) => patch({ shipping: { ...values.shipping, ...next } })}
+                    <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
+                      <span className="text-[13px] text-foreground">
+                        Repeat for shipping address?
+                      </span>
+                      <Switch
+                        checked={values.shippingSameAsBilling}
+                        onCheckedChange={(next) => patch({ shippingSameAsBilling: next })}
                       />
                     </div>
-                  ) : null}
-                </div>
-              </EditorSection>
+
+                    {!values.shippingSameAsBilling ? (
+                      <div className="border-t border-border pt-4">
+                        <p className="mb-3 text-[13px] font-medium text-foreground">
+                          Shipping address
+                        </p>
+                        <AddressFields
+                          idPrefix="shipping"
+                          values={values.shipping}
+                          errors={{
+                            streetAddress: errors["shipping.streetAddress"],
+                            landmark: errors["shipping.landmark"],
+                            city: errors["shipping.city"],
+                            zipcode: errors["shipping.zipcode"],
+                          }}
+                          onChange={(next) => patch({ shipping: { ...values.shipping, ...next } })}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </EditorSection>
+              )}
 
               {/* ── Notes ─────────────────────────────────────────────────── */}
               <EditorSection
@@ -538,9 +928,14 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
           {/* Preview fills the right column, as it does in invoice management. */}
           <div className="min-h-0 overflow-y-auto bg-muted/30">
             <div className="space-y-4 p-4 md:p-6">
-              <p className="text-[13px] font-medium text-muted-foreground">Customer preview</p>
+              <p className="text-[13px] font-medium text-muted-foreground">
+                Customer preview
+                {isBatch && previewRecipient
+                  ? ` · ${previewRecipient.fullName}, and ${recipients.length - 1} more with the same invoice`
+                  : ""}
+              </p>
               <InvoicePreview
-                values={values}
+                values={previewValues}
                 items={items}
                 merchantName={merchantName}
                 currencySymbol={currencySymbol}
@@ -553,6 +948,51 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
           </div>
         </div>
       </div>
+
+      <BatchResultsDialog
+        open={batch !== null}
+        results={batch?.results ?? []}
+        recipients={batch?.recipients ?? []}
+        onOpenChange={(next) => {
+          if (!next) {
+            setBatch(null);
+            router.push("/invoice-links");
+          }
+        }}
+      />
+
+      <ApplyTemplateConfirm
+        template={confirmTemplate}
+        onCancel={() => setConfirmTemplate(null)}
+        onConfirm={applyChosenTemplate}
+      />
+
+      <SaveTemplateDialog
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        itemCount={items.length}
+        currency={values.txnCurrency}
+        hasDueDate={!!values.dueDate}
+        existingNames={templateStore.templates.map((template) => template.name)}
+        isSaving={templateStore.isMutating}
+        onSave={handleSaveTemplate}
+      />
+
+      <ManageTemplatesDialog
+        open={manageTemplatesOpen}
+        onOpenChange={setManageTemplatesOpen}
+        templates={templateStore.templates}
+        isMutating={templateStore.isMutating}
+        onRename={templateStore.rename}
+        onDelete={handleDeleteTemplate}
+        // "Edit" opens the template's content here: it is applied and linked,
+        // and the split button then offers "Update ⟨name⟩".
+        onEdit={(templateId) => {
+          setManageTemplatesOpen(false);
+          const template = templateStore.templates.find((t) => t.id === templateId);
+          if (template) chooseTemplate(template);
+        }}
+      />
 
       <CreatedLinkDialog
         open={createdLink !== null}

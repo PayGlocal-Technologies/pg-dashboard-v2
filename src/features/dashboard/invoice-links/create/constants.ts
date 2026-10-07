@@ -30,6 +30,12 @@ export const ITEM_TEXT_MAX_LENGTH = 600;
 /** Default calling code when a draft carries none. Upstream falls back to "+91". */
 export const DEFAULT_CALLING_CODE = "+91";
 
+/** How many clients the recipient picker lists per search. Typing narrows it. */
+export const CLIENT_PICKER_LIMIT = 25;
+
+/** Shared with create-invoice's TEMPLATE_NAME_MAX_LENGTH: one store, one limit. */
+export const TEMPLATE_NAME_MAX_LENGTH = 60;
+
 /** Upstream's hardcoded fallback when the currency map has not loaded. */
 export const FALLBACK_CURRENCIES = ["USD", "INR", "EUR"];
 
