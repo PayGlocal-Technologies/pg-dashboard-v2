@@ -341,7 +341,10 @@ export function SettlementDetailsContent({
   );
 
   return (
-    <div className="space-y-4">
+    // data-morph-anchor: where the drawer-to-page hand-off picks this view up
+    // and sets it down; one layout for both, so no body of its own (see
+    // DrawerExpandMorph).
+    <div className="space-y-4" data-morph-anchor>
       {/* Summary. The settlement amount is the view's identity; the date
        * beneath it is the other half of its key. No status chip and no
        * lifecycle line — a settlement only exists here once it has happened,

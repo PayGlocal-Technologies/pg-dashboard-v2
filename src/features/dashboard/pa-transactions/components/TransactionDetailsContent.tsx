@@ -335,25 +335,38 @@ export function TransactionDetailsContent({
 
   if (!isPage) {
     return (
-      <div className="flex flex-col gap-5">
+      // data-morph-*: where the drawer-to-page hand-off picks this view up
+      // (see DrawerExpandMorph). The body's vars are unset outside it.
+      <div className="flex flex-col gap-5" data-morph-anchor>
         {header}
-        {timeline}
-        {breakdown}
-        {paymentDetails}
-        {customerDetails}
-        {statusNotes}
-        {linked}
+        <div
+          className="flex flex-col gap-5"
+          data-morph-body
+          style={{
+            translate: "var(--morph-body-x, 0px) var(--morph-gap, 0px)",
+            width: "var(--morph-body-w, auto)",
+          }}
+        >
+          {timeline}
+          {breakdown}
+          {paymentDetails}
+          {customerDetails}
+          {statusNotes}
+          {linked}
+        </div>
         {refundDialog}
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
+    // data-morph-*: where the drawer's view lands in the drawer-to-page
+    // hand-off, its body in the main column (see DrawerExpandMorph).
+    <div className="space-y-5" data-morph-anchor>
       {header}
       <Separator />
       <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4" data-morph-body>
           {timeline}
           {isCaptured && !decorative && <ProductFeedback key={transaction.gid} />}
           {breakdown}
