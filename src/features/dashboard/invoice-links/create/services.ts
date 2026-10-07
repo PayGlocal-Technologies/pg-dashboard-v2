@@ -1,4 +1,4 @@
-import { BASE_URL_V1 } from "@/api";
+import { BASE_URL_V1, BASE_URL_V3 } from "@/api";
 
 /**
  * Invoice Links editor endpoints.
@@ -7,7 +7,14 @@ import { BASE_URL_V1 } from "@/api";
  * `page="INVOICE"` entries only. All on the v1 customer-data tree.
  */
 
-/** Create. POST the full request body. */
+/**
+ * Create. POST the full request body.
+ *
+ * Also the bulk path: the same URL takes an optional `clients[]`, and when it
+ * is non-empty the backend issues one link per client from one shared
+ * `invoiceRequestData`, answering with `data.results[]` instead of a single
+ * link. See buildBulkInvoiceRequest in helpers.ts.
+ */
 export const createInvoiceApi = (mid: string): string =>
   mid ? `${BASE_URL_V1}/customer-data/invoice/${mid}` : "";
 
@@ -54,3 +61,31 @@ export const invoiceLogoApi = (mid: string): string =>
 /** The merchant's currently stored logo, for display. `{ merchantLogoPublicUrl }`. */
 export const merchantAdditionalInfoApi = (mid: string): string =>
   mid ? `${BASE_URL_V1}/merchants/${mid}/additionalinfo` : "";
+
+// ── Templates and clients (shared with MCA invoices) ─────────────────────────
+//
+// Invoice links reuse the MCA invoice template and client book as-is; there are
+// no invoice-link-specific routes (backend: feature/invoice-link-templates).
+// Paths are the ones create-invoice/services.ts and client-management/
+// services.ts already call. The MID in the path is this editor's PA MID: the
+// MCA_INVOICE entitlement now covers PA contracts as well as PACB.
+
+/** GET lists this merchant's templates; POST creates one. */
+export const invoiceTemplatesApi = (mid: string): string =>
+  mid ? `${BASE_URL_V3}/mca-invoice/${mid}/templates` : "";
+
+/**
+ * One template: GET reads it (line items hydrated live from the SKU catalogue,
+ * and `lastUsedAt` bumped as a side effect), PUT replaces it wholesale, DELETE
+ * removes it.
+ */
+export const invoiceTemplateApi = (mid: string, templateId: string): string =>
+  mid && templateId ? `${invoiceTemplatesApi(mid)}/${templateId}` : "";
+
+/** Client book search. A POST, but a read. */
+export const clientSearchApi = (mid: string): string =>
+  mid ? `${BASE_URL_V3}/mca-client/${mid}/search` : "";
+
+/** One client in full, used to pick up a client just added from the picker. */
+export const clientByIdApi = (mid: string, clientId: string): string =>
+  mid && clientId ? `${BASE_URL_V3}/mca-client/${mid}/${clientId}` : "";

@@ -1,6 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
+import {
+  SettlementDetailsDrawer,
+  SettlementDrawerBody,
+  SETTLEMENT_DRAWER_WIDTH_PX,
+} from "@/features/dashboard/settlement-reports/components/SettlementDetailsDrawer";
+import { SettlementDetailsPage } from "@/features/dashboard/settlement-reports/components/SettlementDetailsPage";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useScopeId } from "@/lib/hooks/useScopeId";
@@ -12,14 +19,22 @@ import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { Button, ColumnManager, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import type { TableReqBody } from "@/types/transactions";
-import { formatDayMonth, formatWeekdayDate, formatWeekdayName } from "@/lib/utils/format";
+import {
+  formatCurrency,
+  formatDayMonth,
+  formatWeekdayDate,
+  formatWeekdayName,
+} from "@/lib/utils/format";
+import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import type { SettlementSchedule } from "@/features/dashboard/settlement-reports/calendarUtils";
+import { SettlementHolidayBanner } from "@/features/dashboard/mca-settlement-report/components/SettlementHolidayBanner";
 import { SettlementCalendarButton } from "@/features/dashboard/settlement-reports/components/SettlementCalendarButton";
 import { SettlementCycleInfoPanel } from "@/features/dashboard/settlement-reports/components/SettlementCycleInfoPanel";
-// MOCK (hidden): SettlementDetailsDialog shows the mock cycle/bank account —
-// re-enable with its usage in the header actions below.
-// import { SettlementDetailsDialog } from "@/features/dashboard/settlement-reports/components/SettlementDetailsDialog";
+// MOCK: shows the mock cycle/bank account, so it renders only outside
+// production (SHOW_MOCK_SETTLEMENTS), on the Payments page.
+import { SettlementDetailsDialog } from "@/features/dashboard/settlement-reports/components/SettlementDetailsDialog";
 import { SettlementStatCards } from "@/features/dashboard/settlement-reports/components/SettlementStatCards";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import {
@@ -37,6 +52,7 @@ import {
 } from "@/features/dashboard/settlement-reports/columns";
 import {
   mcaSettlementSummary,
+  mockPreviousSettlement,
   mockSettlementRowsFor,
   // MOCK (unused — chart has no fallback now): mcaTotalSettledChartsByTimeframe,
   settlementSummary,
@@ -59,9 +75,20 @@ import type {
   FfmsSettlementResponse,
   PaSettlementResponse,
   SettlementRow,
+  SettlementStatus,
 } from "@/features/dashboard/settlement-reports/types";
 
 const SETTLEMENT_PAGE_LIMIT = 50;
+
+/** The compact outline style of the Transactions table's toolbar actions. */
+const TOOLBAR_BUTTON_CLASS =
+  "h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground";
+
+/** The Payments table's two views: payouts still on their way, and paid. */
+const SETTLEMENT_STATUS_TABS = [
+  { value: "SETTLED", label: "Settled" },
+  { value: "PROCESSING", label: "Processing" },
+] as const satisfies readonly { value: SettlementStatus; label: string }[];
 
 /** "Tonight" only holds when today's payments are still on track for a plain
  * T+1 cutoff, once a weekend/holiday pushes the date out, name the actual day
@@ -122,6 +149,7 @@ function filterSettlementRows(rows: SettlementRow[], search: string): Settlement
   return rows.filter(
     (row) =>
       row.id.toLowerCase().includes(q) ||
+      (row.settlementId ?? "").toLowerCase().includes(q) ||
       (row.merchantId ?? "").toLowerCase().includes(q) ||
       (row.utrNumbers ?? []).some((utr) => utr.toLowerCase().includes(q))
   );
@@ -133,12 +161,18 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const activeContext = product;
   const activeProduct = toProductType(activeContext);
   const isMca = activeProduct === "PACB";
+  // The Payments "Settlements" design: Settlement ID, Status and UTR columns,
+  // the Processing/Settled tabs, and the previous payout's UTR and breakup.
+  // All mock-backed for now (see SettlementRow.settlementId), so only outside
+  // production. MCA keeps its own layout.
+  const showPayoutDetails = !isMca && SHOW_MOCK_SETTLEMENTS;
 
   // Real bank-holiday calendar (/gcc/v1/calendar). Everything date-shaped on
   // this page now derives from it: today, the next settlement, the T+1 pushout
   // behind the banner, and the calendar popover's holiday markers. Only the
   // settlement *money* below is still mock.
   const calendar = useSettlementCalendar();
+  const [calendarOpen, setCalendarOpen] = useState(false);
   // The one download path every surface on this screen goes through: both
   // tables' rows, the Previous settled card, and the detail page behind a row
   // (which calls the same hook itself). See useSettlementReportDownload.
@@ -174,6 +208,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [dateFilter, setDateFilter] = useState<SettlementDateValue | undefined>(undefined);
   const [showCycleInfo, setShowCycleInfo] = useState(false);
+  const [statusTab, setStatusTab] = useState<SettlementStatus>("SETTLED");
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   const dateFilterEnd = dateFilter
@@ -231,7 +266,12 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   // Previous settled: amount / date / count from the overview, else zeros. The
   // UTR and gross/tax/fee breakup have no endpoint and stay hidden (see below).
-  const prevSettlement = overview?.previousSettlement;
+  //
+  // MOCK (Payments, outside production): the whole card comes from the latest
+  // Settled row instead, so its UTR and breakup can show and always agree with
+  // the table. See mockPreviousSettlement.
+  const mockPrev = showPayoutDetails ? mockPreviousSettlement() : null;
+  const prevSettlement = mockPrev ?? overview?.previousSettlement;
   const previousSettledAmount = prevSettlement?.amount ?? 0;
   const previousSettledDateLabel = prevSettlement
     ? formatDayMonth(prevSettlement.settlementDate)
@@ -241,8 +281,23 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   // Upcoming settlement — live, current-state (no date range). No mock fallback:
   // we don't show a placeholder amount while it loads.
   const { upcoming: upcomingSettlementData } = useSettlementUpcoming(scopeId);
-  const upcomingSettlementAmount = upcomingSettlementData?.amount ?? null;
-  const upcomingPendingInvoiceCount = upcomingSettlementData?.pendingInvoiceCount;
+  //
+  // MOCK (Payments, outside production): the card shows the Processing row,
+  // so it matches the table (amount and its weekday + date), the same as the
+  // previous-settled card above.
+  const mockUpcoming = showPayoutDetails
+    ? (mockSettlementRowsFor(isMca).find((row) => row.status === "PROCESSING") ?? null)
+    : null;
+  const upcomingSettlementAmount = mockUpcoming
+    ? mockUpcoming.amount
+    : (upcomingSettlementData?.amount ?? null);
+  const upcomingSettlementLabel = mockUpcoming
+    ? `${formatWeekdayName(mockUpcoming.id)} · ${formatDayMonth(mockUpcoming.id)}`
+    : upcomingSettlementTimeLabel(calendar.upcomingSchedule);
+  // Invoices are an MCA step; a Payments settlement never waits on one.
+  const upcomingPendingInvoiceCount = isMca
+    ? upcomingSettlementData?.pendingInvoiceCount
+    : undefined;
 
   const onSearch = (v: string) => setSearch(v);
   const onDateFilter = (v: SettlementDateValue | undefined) => setDateFilter(v);
@@ -289,19 +344,23 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   /** Column order falls back to the default for the current column set, so
    *  toggling the Merchant ID column on cannot leave a stale order behind. */
-  const columnDefs = useMemo(() => settlementColumnDefs(showMerchantId), [showMerchantId]);
+  const columnDefs = useMemo(
+    () => settlementColumnDefs(showMerchantId, showPayoutDetails),
+    [showMerchantId, showPayoutDetails]
+  );
   const effectiveColumnOrder = useMemo(
-    () => columnOrder ?? settlementColumnOrder(showMerchantId),
-    [columnOrder, showMerchantId]
+    () => columnOrder ?? settlementColumnOrder(showMerchantId, showPayoutDetails),
+    [columnOrder, showMerchantId, showPayoutDetails]
   );
 
-  const filteredEnhancedRows = useMemo(
-    () => filterSettlementRows(enhancedRows, search),
-    [enhancedRows, search]
-  );
+  const filteredEnhancedRows = useMemo(() => {
+    const searched = filterSettlementRows(enhancedRows, search);
+    return showPayoutDetails ? searched.filter((row) => row.status === statusTab) : searched;
+  }, [enhancedRows, search, showPayoutDetails, statusTab]);
 
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
+  const isFetching = isMca ? ffmsQuery.isFetching : paQuery.isFetching;
 
   /**
    * Which empty state applies. The old copy said "No settlements yet"
@@ -339,234 +398,334 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const downloadPreviousSettledReport = () =>
     downloadSettlementReport(prevSettlement?.settlementDate ?? "");
 
+  // ── Settlement details (Payments): drawer, then the full page in place ──
+  // The same flow as a transaction's details: a row opens the drawer, Expand
+  // opens it out into a page that replaces everything below the nav, and
+  // Collapse / Back return. The settlement is held as the row itself.
+  const {
+    record: detailRow,
+    pageOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: openDetails,
+    onDrawerOpenChange,
+    expand: expandToPage,
+    collapse: collapseToDrawer,
+    back: backToList,
+    morphLayer,
+  } = useDrawerExpand<SettlementRow>({ drawerWidthPx: SETTLEMENT_DRAWER_WIDTH_PX });
+
   const upcoming = calendar.upcomingSchedule;
-  const showHolidayBanner =
-    upcoming.affectedByNonWorkingDay && upcoming.nonWorkingDayReason === "holiday";
 
   return (
     <MidGuard productType={activeProduct}>
-      <div className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden overflow-y-visible">
-        {/* BACKEND GAP, narrowed: the table, the per-date report downloads, the
-         * holiday calendar behind this banner, and the three summary cards
-         * (total settled + trend + sparkline, previous settled, upcoming
-         * settlement) are all live now. What is still mock-backed is the
-         * per-settlement detail page below, the settlement-cycle dialog's
-         * cycle/bank-account block, the held-funds card, and the previous
-         * settlement's UTR and gross/tax/fee breakup — those last are passed
-         * nowhere rather than rendered from mock-data.ts, so nothing invented
-         * reaches the screen. They stay flagged until a contract exists. */}
-        {showHolidayBanner && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-            <Icon name="alert-triangle" size={13} className="shrink-0" />
-            <p className="min-w-0 flex-1">
-              <span className="font-semibold">Upcoming bank holiday.</span> Banks are closed on{" "}
-              {formatWeekdayDate(upcoming.nonWorkingDayDate!)} for {upcoming.nonWorkingDayName}.
-              Settlements due around this date are scheduled for the next working day,{" "}
-              {formatDayMonth(upcoming.settlementDate)}.
-            </p>
-          </div>
-        )}
+      <div
+        ref={slotRef}
+        className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden overflow-y-visible"
+      >
+        {pageOpen && detailRow ? (
+          <SettlementDetailsPage
+            settlement={detailRow}
+            onBack={backToList}
+            onCollapse={collapseToDrawer}
+            onDownload={() => downloadRowReport(detailRow)}
+          />
+        ) : (
+          <>
+            {/* BACKEND GAP, narrowed: the table, the per-date report downloads, the
+             * holiday calendar behind this banner, and the three summary cards
+             * (total settled + trend + sparkline, previous settled, upcoming
+             * settlement) are all live now. What is still mock-backed is the
+             * per-settlement detail page below, the settlement-cycle dialog's
+             * cycle/bank-account block, the held-funds card, and the previous
+             * settlement's UTR and gross/tax/fee breakup — those last are passed
+             * nowhere rather than rendered from mock-data.ts, so nothing invented
+             * reaches the screen. They stay flagged until a contract exists. */}
+            {/* Same banner as the MCA screens; View calendar opens the
+                calendar in this page's header rather than navigating. */}
+            <SettlementHolidayBanner onViewCalendar={() => setCalendarOpen(true)} />
 
-        <PageHeader
-          title="Settlement Reports"
-          subtitle="Daily settlement activity and bank transfers"
-          actions={
-            <>
-              {/* MOCK (hidden for now — no settlement-summary endpoint for the
-                  cycle / bank account). Re-enable by un-commenting this and its
-                  import. */}
-              {/* <SettlementDetailsDialog
-                cycleValue={summary.cycle.value}
-                cycleFrequency={summary.cycle.frequency}
-                bankAccount={summary.bankAccount}
-                bankAccountStatus={summary.bankAccountStatus}
-              /> */}
-              <span data-guide="mca-settlement-calendar" className="inline-flex">
-                <SettlementCalendarButton
-                  rows={enhancedRows}
-                  todayKey={calendar.today}
-                  nextSettlementDate={calendar.nextSettlement.date}
-                  nextSettlementReason={calendar.nextSettlement.reason}
-                  nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
-                  hasUpcomingHoliday={calendar.hasUpcomingHoliday}
-                />
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              >
-                Export
-              </Button>
-            </>
-          }
-        />
+            <PageHeader
+              title="Settlements"
+              subtitle="Daily settlement activity and bank transfers"
+              actions={
+                <>
+                  {/* MOCK: no settlement-summary endpoint for the cycle / bank
+                  account yet, so this shows outside production only. */}
+                  {showPayoutDetails && (
+                    <SettlementDetailsDialog
+                      cycleValue={summary.cycle.value}
+                      cycleFrequency={summary.cycle.frequency}
+                      bankAccount={summary.bankAccount}
+                      bankAccountStatus={summary.bankAccountStatus}
+                    />
+                  )}
+                  <span data-guide="mca-settlement-calendar" className="inline-flex">
+                    <SettlementCalendarButton
+                      rows={enhancedRows}
+                      todayKey={calendar.today}
+                      nextSettlementDate={calendar.nextSettlement.date}
+                      nextSettlementReason={calendar.nextSettlement.reason}
+                      nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
+                      hasUpcomingHoliday={calendar.hasUpcomingHoliday}
+                      open={calendarOpen}
+                      onOpenChange={setCalendarOpen}
+                    />
+                  </span>
+                </>
+              }
+            />
 
-        <div className="flex items-start gap-4">
-          <div className="min-w-0 flex-1 space-y-4">
-            {/* Live: overview (total settled, trend, sparkline, previous
+            <div className="flex items-start gap-4">
+              <div className="min-w-0 flex-1 space-y-4">
+                {/* Live: overview (total settled, trend, sparkline, previous
                 settlement) and upcoming settlement. The previous settlement's
                 UTR and gross/tax/fee breakup have no endpoint and stay hidden —
                 see the commented props below and the note above. */}
-            <div data-guide="mca-settlement-analytics">
-              <SettlementStatCards
-                totalSettled={totalSettled}
-                totalSettledTrendPct={totalSettledTrendPct}
-                totalSettledComparisonLabel={overview?.comparisonLabel}
-                totalSettledTimeframe={settlementTimeframe}
-                onTotalSettledTimeframeChange={setSettlementTimeframe}
-                totalSettledChartData={totalSettledChartData}
-                previousSettledAmount={previousSettledAmount}
-                previousSettledDateLabel={previousSettledDateLabel}
-                previousSettledTransactionCount={previousSettledTransactionCount}
-                onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
-                onDownloadPreviousSettled={downloadPreviousSettledReport}
-                canDownloadPreviousSettled={!!prevSettlement?.settlementDate}
-                // MOCK — hidden for now (no endpoint): the previous-settlement time,
-                // UTR and gross/tax/fee breakup. Re-enable by un-commenting these
-                // and the matching blocks in SettlementStatCards.
-                // previousSettledTimeLabel={summary.previousSettled.timeLabel}
-                // previousSettledUtrNumber={summary.previousSettled.utrNumber}
-                // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
-                // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
-                // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
-                upcomingSettlementAmount={upcomingSettlementAmount}
-                upcomingSettlementTimeLabel={upcomingSettlementTimeLabel(calendar.upcomingSchedule)}
-                pendingInvoiceCount={upcomingPendingInvoiceCount}
-                onUploadInvoice={() => router.push("/mca-transactions")}
-              />
+                <div data-guide="mca-settlement-analytics">
+                  <SettlementStatCards
+                    totalSettled={totalSettled}
+                    totalSettledTrendPct={totalSettledTrendPct}
+                    totalSettledComparisonLabel={overview?.comparisonLabel}
+                    totalSettledTimeframe={settlementTimeframe}
+                    onTotalSettledTimeframeChange={setSettlementTimeframe}
+                    totalSettledChartData={totalSettledChartData}
+                    previousSettledAmount={previousSettledAmount}
+                    previousSettledDateLabel={previousSettledDateLabel}
+                    previousSettledTransactionCount={previousSettledTransactionCount}
+                    onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
+                    onDownloadPreviousSettled={downloadPreviousSettledReport}
+                    canDownloadPreviousSettled={!!prevSettlement?.settlementDate}
+                    // MOCK (Payments, outside production only): the previous
+                    // payout's time, UTR and gross/tax/fee breakup have no endpoint.
+                    previousSettledTimeLabel={
+                      mockPrev ? summary.previousSettled.timeLabel : undefined
+                    }
+                    previousSettledUtrNumber={mockPrev?.utrNumber}
+                    previousSettledGrossLabel={
+                      mockPrev?.grossAmount != null
+                        ? formatCurrency(mockPrev.grossAmount, "INR")
+                        : undefined
+                    }
+                    previousSettledTaxLabel={
+                      mockPrev?.tax != null ? formatCurrency(mockPrev.tax, "INR") : undefined
+                    }
+                    previousSettledFeeLabel={
+                      mockPrev?.fee != null ? formatCurrency(mockPrev.fee, "INR") : undefined
+                    }
+                    upcomingSettlementAmount={upcomingSettlementAmount}
+                    upcomingSettlementTimeLabel={upcomingSettlementLabel}
+                    fullAmounts={!isMca}
+                    combinedLayout={!isMca}
+                    previousSettledCurrencySplit={mockPrev?.currencySplit}
+                    pendingInvoiceCount={upcomingPendingInvoiceCount}
+                    onUploadInvoice={() => router.push("/mca-transactions")}
+                  />
+                </div>
+
+                <DataTableCard<SettlementRow>
+                  tabs={
+                    showPayoutDetails ? (
+                      <UnderlineTabs
+                        tabs={SETTLEMENT_STATUS_TABS}
+                        value={statusTab}
+                        onValueChange={(v) => setStatusTab(v as SettlementStatus)}
+                      />
+                    ) : undefined
+                  }
+                  toolbar={
+                    <div className="flex flex-wrap items-center gap-2">
+                      <RotatingSearchInput
+                        value={search}
+                        onSearch={onSearch}
+                        words={
+                          showPayoutDetails
+                            ? ["Settlement ID", "UTR number", "Settlement date"]
+                            : ["Settlement date", "Merchant ID"]
+                        }
+                        className="w-40 sm:w-56"
+                      />
+
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
+                      </div>
+
+                      {/* Refresh / Columns, the Transactions table's action row.
+                      No Report: settlement reports only download per date
+                      (the row's Download), there is no whole-list endpoint. */}
+                      <div className="ml-auto flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          leftIcon={
+                            <Icon
+                              name="refresh"
+                              className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+                            />
+                          }
+                          onClick={() => void refetch()}
+                          disabled={isFetching}
+                          className={TOOLBAR_BUTTON_CLASS}
+                        >
+                          Refresh
+                        </Button>
+                        <ColumnManager
+                          columns={columnDefs}
+                          order={effectiveColumnOrder}
+                          onOrderChange={setColumnOrder}
+                          hiddenKeys={[...hiddenColumns]}
+                          onHiddenKeysChange={(next) => setHiddenColumns(new Set(next))}
+                          onReset={onResetColumns}
+                        />
+                      </div>
+                    </div>
+                  }
+                  errorState={
+                    isError && !enhancedIsMock ? (
+                      <PlaceholderState
+                        variant="error"
+                        title="Couldn't load settlements"
+                        description="Something went wrong while fetching data."
+                        className="py-14"
+                        action={
+                          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+                            Retry
+                          </Button>
+                        }
+                      />
+                    ) : undefined
+                  }
+                  emptyState={
+                    <PlaceholderState
+                      variant="empty-table"
+                      title={emptyCopy.title}
+                      description={emptyCopy.description}
+                      className="py-14"
+                    />
+                  }
+                  columns={buildSettlementColumns({
+                    columnOrder: effectiveColumnOrder,
+                    hiddenColumns,
+                    showMerchantId,
+                    withPayoutDetails: showPayoutDetails,
+                  })}
+                  data={filteredEnhancedRows}
+                  isLoading={!enhancedIsMock && isPending}
+                  emptyTitle={emptyCopy.title}
+                  emptyDescription={emptyCopy.description}
+                  rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
+                  pagination={{ mode: "client", pageSize: 10 }}
+                  maxBodyHeight="none"
+                  // Payments: the whole row opens the details drawer; clicks on the
+                  // row's own buttons are skipped by DataTable.
+                  onRowClick={showPayoutDetails ? openDetails : undefined}
+                  rowAction={(row) => (
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => downloadRowReport(row)}
+                        leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
+                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                      >
+                        Download
+                      </Button>
+                      {/* BACKEND GAP: detail route is mock-backed (no per-settlement
+                       * detail endpoint in the old API). */}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          showPayoutDetails
+                            ? openDetails(row)
+                            : router.push(
+                                settlementDetailPath(
+                                  activeContext,
+                                  // A live summary row does not name its merchant
+                                  // yet, so the page's own scope stands in — see
+                                  // downloadRowReport, which has the same fallback.
+                                  row.merchantId || scopeId,
+                                  row.id
+                                )
+                              )
+                        }
+                        rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                      >
+                        View details
+                      </Button>
+                    </div>
+                  )}
+                />
+              </div>
+
+              {showCycleInfo && (
+                <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <SettlementCycleInfoPanel
+                    onClose={() => setShowCycleInfo(false)}
+                    // Same two live values the "Previous settled" card this panel
+                    // explains is showing, so the two can no longer disagree. The
+                    // time of day has no source (the overview returns a date, not a
+                    // timestamp) and is deliberately not passed — see the prop's
+                    // doc comment.
+                    previousSettledDateLabel={previousSettledDateLabel}
+                    previousSettledTransactionCount={previousSettledTransactionCount}
+                    upcomingSchedule={{
+                      affectedByNonWorkingDay: upcoming.affectedByNonWorkingDay,
+                      paymentReceivedDate: calendar.today,
+                      nonWorkingDayDate: upcoming.nonWorkingDayDate ?? undefined,
+                      nonWorkingDayReason: upcoming.nonWorkingDayReason ?? undefined,
+                      nonWorkingDayName: upcoming.nonWorkingDayName ?? undefined,
+                      settlementDate: upcoming.settlementDate,
+                    }}
+                  />
+                </aside>
+              )}
             </div>
 
-            <DataTableCard<SettlementRow>
-              toolbar={
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <RotatingSearchInput
-                    value={search}
-                    onSearch={onSearch}
-                    words={["Settlement date", "Merchant ID"]}
-                    className="min-w-40 max-w-xs flex-1"
-                  />
-
-                  <div className="hidden sm:block h-4 w-px bg-border" />
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
-                  </div>
-
-                  <div className="ml-auto flex items-center gap-2">
-                    <ColumnManager
-                      columns={columnDefs}
-                      order={effectiveColumnOrder}
-                      onOrderChange={setColumnOrder}
-                      hiddenKeys={[...hiddenColumns]}
-                      onHiddenKeysChange={(next) => setHiddenColumns(new Set(next))}
-                      onReset={onResetColumns}
-                    />
-                  </div>
-                </div>
-              }
-              errorState={
-                isError && !enhancedIsMock ? (
-                  <PlaceholderState
-                    variant="error"
-                    title="Couldn't load settlements"
-                    description="Something went wrong while fetching data."
-                    className="py-14"
-                    action={
-                      <Button variant="outline" size="sm" onClick={() => void refetch()}>
-                        Retry
-                      </Button>
-                    }
-                  />
-                ) : undefined
-              }
-              emptyState={
-                <PlaceholderState
-                  variant="empty-table"
-                  title={emptyCopy.title}
-                  description={emptyCopy.description}
-                  className="py-14"
-                />
-              }
-              columns={buildSettlementColumns({
-                columnOrder: effectiveColumnOrder,
-                hiddenColumns,
-                showMerchantId,
-              })}
-              data={filteredEnhancedRows}
-              isLoading={!enhancedIsMock && isPending}
-              emptyTitle={emptyCopy.title}
-              emptyDescription={emptyCopy.description}
-              rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
-              pagination={{ mode: "client", pageSize: 10 }}
-              maxBodyHeight="none"
-              rowAction={(row) => (
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => downloadRowReport(row)}
-                    leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
-                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                  >
-                    Download
-                  </Button>
-                  {/* BACKEND GAP: detail route is mock-backed (no per-settlement
-                   * detail endpoint in the old API). */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      router.push(
-                        settlementDetailPath(
-                          activeContext,
-                          // A live summary row does not name its merchant
-                          // yet, so the page's own scope stands in — see
-                          // downloadRowReport, which has the same fallback.
-                          row.merchantId || scopeId,
-                          row.id
-                        )
-                      )
-                    }
-                    rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-                    className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                  >
-                    View details
-                  </Button>
-                </div>
-              )}
-            />
-          </div>
-
-          {showCycleInfo && (
-            <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
-              <SettlementCycleInfoPanel
-                onClose={() => setShowCycleInfo(false)}
-                // Same two live values the "Previous settled" card this panel
-                // explains is showing, so the two can no longer disagree. The
-                // time of day has no source (the overview returns a date, not a
-                // timestamp) and is deliberately not passed — see the prop's
-                // doc comment.
-                previousSettledDateLabel={previousSettledDateLabel}
-                previousSettledTransactionCount={previousSettledTransactionCount}
-                upcomingSchedule={{
-                  affectedByNonWorkingDay: upcoming.affectedByNonWorkingDay,
-                  paymentReceivedDate: calendar.today,
-                  nonWorkingDayDate: upcoming.nonWorkingDayDate ?? undefined,
-                  nonWorkingDayReason: upcoming.nonWorkingDayReason ?? undefined,
-                  nonWorkingDayName: upcoming.nonWorkingDayName ?? undefined,
-                  settlementDate: upcoming.settlementDate,
-                }}
+            {/* Guide launcher — MCA settlement view only. */}
+            {isMca && (
+              <GuideLauncher
+                steps={MCA_SETTLEMENT_GUIDE_STEPS}
+                storageKey={MCA_SETTLEMENT_GUIDE_KEY}
               />
-            </aside>
-          )}
-        </div>
-
-        {/* Guide launcher — MCA settlement view only. */}
-        {isMca && (
-          <GuideLauncher steps={MCA_SETTLEMENT_GUIDE_STEPS} storageKey={MCA_SETTLEMENT_GUIDE_KEY} />
+            )}
+          </>
         )}
       </div>
+
+      {showPayoutDetails && (
+        <SettlementDetailsDrawer
+          settlement={detailRow}
+          open={drawerOpen}
+          onOpenChange={onDrawerOpenChange}
+          onExpand={expandToPage}
+          onDownload={() => detailRow && downloadRowReport(detailRow)}
+          instant={instantDrawer}
+        />
+      )}
+      {/* One stable slot for the hand-off layer, so swapping list and page
+          under it never remounts it. */}
+      {morphLayer((settlement) => ({
+        drawer: (
+          <SettlementDrawerBody
+            settlement={settlement}
+            onClose={() => {}}
+            onExpand={() => {}}
+            onDownload={() => {}}
+          />
+        ),
+        page: (
+          <SettlementDetailsPage
+            settlement={settlement}
+            onBack={() => {}}
+            onCollapse={() => {}}
+            onDownload={() => {}}
+          />
+        ),
+      }))}
     </MidGuard>
   );
 }

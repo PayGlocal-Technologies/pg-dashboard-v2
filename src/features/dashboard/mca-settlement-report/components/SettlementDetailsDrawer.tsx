@@ -14,6 +14,10 @@ import { cn, formatDate } from "@/lib/utils";
 import { SettlementDetailsContent } from "@/features/dashboard/mca-settlement-report/components/SettlementDetailFeature";
 import type { SettlementRow } from "@/features/dashboard/mca-settlement-report/types";
 
+/** The drawer's width on sm+ (36rem), shared with the expand/collapse
+ *  hand-off. */
+export const MCA_SETTLEMENT_DRAWER_WIDTH_PX = 576;
+
 interface SettlementDetailsDrawerProps {
   row: SettlementRow | null;
   open: boolean;
@@ -23,6 +27,9 @@ interface SettlementDetailsDrawerProps {
   /** The merchant to fall back to when a row does not name its own — the
    *  page's resolved scope. */
   fallbackMerchantId: string;
+  /** Skip the slide in/out while DrawerExpandMorph covers the drawer, so it
+   *  can appear or vanish under the hand-off in one frame. */
+  instant?: boolean;
 }
 
 /**
@@ -37,6 +44,7 @@ export function SettlementDetailsDrawer({
   onOpenChange,
   onExpand,
   fallbackMerchantId,
+  instant = false,
 }: SettlementDetailsDrawerProps) {
   // Below md this becomes a bottom sheet rather than a right-side drawer, via
   // flux-ui's own side="bottom", exactly as the transactions drawer does.
@@ -64,60 +72,82 @@ export function SettlementDetailsDrawer({
       <DrawerContent
         className={cn(
           "[&>button:last-child]:hidden",
-          !isBottomSheet && "w-full sm:w-[36rem] sm:max-w-[92vw]"
+          !isBottomSheet && "w-full sm:w-[36rem] sm:max-w-[92vw]",
+          instant &&
+            "drawer-instant data-[state=closed]:animate-none! data-[state=open]:animate-none!"
         )}
       >
         <DrawerTitle asChild>
           <VisuallyHidden>Settlement details</VisuallyHidden>
         </DrawerTitle>
 
-        {/* Close and Expand grouped on the left, the settlement's own date on
-            the far right: it is this settlement's identity, so it reads as the
-            drawer's subject rather than as a field. */}
-        <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
-          <div className="flex shrink-0 items-center gap-1">
-            <IconButton
-              aria-label="Close"
-              variant="ghost"
-              size="sm"
-              onClick={() => onOpenChange(false)}
-            >
-              <Icon name="x" className="h-4 w-4" />
-            </IconButton>
-            {/* Not rendered as a bottom sheet: there is no expanded view in the
-                mobile flow, so the action would point at nothing. */}
-            {!isBottomSheet && (
-              <IconButton
-                aria-label="Expand to full page"
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  if (row) onExpand(row);
-                }}
-              >
-                <Icon name="expand" className="h-4 w-4" />
-              </IconButton>
-            )}
-          </div>
-          {row && (
-            <span className="ml-auto min-w-0 truncate text-[13px] text-muted-foreground">
-              {formatDate(row.date, { month: "short", day: "2-digit", year: "numeric" })}
-            </span>
-          )}
-        </DrawerHeader>
-
-        {/* Only this region scrolls, so close and expand stay reachable however
-            long the payments table runs. */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-6">
-          {row && (
-            <SettlementDetailsContent
-              merchantId={row.merchantId || fallbackMerchantId}
-              settlementDate={row.id}
-              layout="drawer"
-            />
-          )}
-        </div>
+        {row && (
+          <SettlementDrawerBody
+            row={row}
+            fallbackMerchantId={fallbackMerchantId}
+            onClose={() => onOpenChange(false)}
+            onExpand={isBottomSheet ? undefined : () => onExpand(row)}
+          />
+        )}
       </DrawerContent>
     </Drawer>
+  );
+}
+
+/**
+ * The drawer's insides: Close and Expand on the left, the settlement's date
+ * on the right, then the scrolling details. Also what the expand/collapse
+ * hand-off shows in the drawer's place (see DrawerExpandMorph). No Expand
+ * when `onExpand` is omitted (the mobile bottom sheet has no full page).
+ */
+export function SettlementDrawerBody({
+  row,
+  fallbackMerchantId,
+  onClose,
+  onExpand,
+}: {
+  row: SettlementRow;
+  fallbackMerchantId: string;
+  onClose: () => void;
+  onExpand?: () => void;
+}) {
+  return (
+    <>
+      {/* Close and Expand grouped on the left, the settlement's own date on
+        the far right: it is this settlement's identity, so it reads as the
+        drawer's subject rather than as a field. */}
+      <DrawerHeader className="flex shrink-0 items-center gap-2 py-3">
+        <div className="flex shrink-0 items-center gap-1">
+          <IconButton aria-label="Close" variant="ghost" size="sm" onClick={onClose}>
+            <Icon name="x" className="h-4 w-4" />
+          </IconButton>
+          {/* Not rendered as a bottom sheet: there is no expanded view in the
+            mobile flow, so the action would point at nothing. */}
+          {onExpand && (
+            <IconButton
+              aria-label="Expand to full page"
+              variant="ghost"
+              size="sm"
+              onClick={onExpand}
+            >
+              <Icon name="expand" className="h-4 w-4" />
+            </IconButton>
+          )}
+        </div>
+        <span className="ml-auto min-w-0 truncate text-[13px] text-muted-foreground">
+          {formatDate(row.date, { month: "short", day: "2-digit", year: "numeric" })}
+        </span>
+      </DrawerHeader>
+
+      {/* Only this region scrolls, so close and expand stay reachable however
+        long the payments table runs. */}
+      <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <SettlementDetailsContent
+          merchantId={row.merchantId || fallbackMerchantId}
+          settlementDate={row.id}
+          layout="drawer"
+        />
+      </div>
+    </>
   );
 }

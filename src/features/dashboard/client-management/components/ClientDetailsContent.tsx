@@ -561,8 +561,10 @@ export function ClientDetailsContent({
     // to their parent's width, and DataTable's own overflow-x-auto takes over
     // inside the table where the scrolling belongs. The grid this replaced needed
     // an explicit min-w-0 on every item for that, since grid items default to
-    // min-width:auto — their content's intrinsic width.
-    <div className="space-y-6">
+    // min-width:auto — their content's intrinsic width. data-morph-anchor:
+    // where the drawer-to-page hand-off picks this view up and sets it down
+    // (see DrawerExpandMorph).
+    <div className="space-y-6" data-morph-anchor>
       <ClientIdentitySummary client={client} />
       <ClientInvoiceMetrics client={client} />
       <ClientContactSection client={client} layout={layout} onViewContract={onViewContract} />

@@ -8,7 +8,7 @@ import type { ProductType } from "@/lib/hooks/useResolvedMids";
  * Accounts). Set by the Header's tabs, read by the Sidebar (to pick the
  * short Home nav tree, the MCA tree, or the full Payments tree) and by every
  * feature that resolves mids or picks a mock dataset by product (via
- * toProductType() below), so the same URL (e.g. /settlement-report)
+ * toProductType() below), so the same URL (e.g. /settlements)
  * can render different data depending on which context the merchant last
  * selected. Defaults to "HOME", see navigation.md for the full model.
  */

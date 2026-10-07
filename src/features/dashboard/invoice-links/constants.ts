@@ -13,6 +13,12 @@ export const INVOICE_LINKS_FEATURE = "INVOICE_LINKS";
 /** PAGE_LIMIT from pg-dashboard's mca-payment-invoice-links/constants.ts:19. */
 export const INVOICE_LINKS_PAGE_LIMIT = 15;
 
+/** Rows-per-page choices, led by upstream's 15. Same set as dispute management. */
+export const INVOICE_LINKS_PAGE_SIZE_OPTIONS = [15, 25, 50, 100] as const;
+
+/** Columns an invoice link row is unreadable without, so they cannot be hidden. */
+export const FIXED_COLUMN_KEYS = ["id", "totalAmount", "status"];
+
 /**
  * Status filter options, copied from INVOICE_LINK_TABLE_FILTERS in
  * pg-dashboard/src/features/mca-payment-invoice-links/constants.ts — same

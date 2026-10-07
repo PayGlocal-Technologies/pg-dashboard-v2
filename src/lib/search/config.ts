@@ -16,7 +16,7 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
  *
  * navigation.ts still lists ~10 hrefs whose pages were never built in v2
  * (/configure, /payment-products, /invoice-links,
- * /invoice-download, /shipping-bill-regularisation,
+ * /invoice-download,
  * and the five partner routes). The
  * sidebar links to them anyway, but a *search result* that 404s reads as a
  * broken feature rather than an unfinished one, so search filters against this
@@ -26,9 +26,9 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/client-management",
   "/dashboard",
   // /dispute-management is deliberately absent, though the page exists and the
-  // nav links to it from both the Payments and global-tenant trees. It still
-  // renders MOCK_DISPUTE_ROWS, so a search result would promise a feature the
-  // data does not yet back. Re-add it here (and its keywords below) once the
+  // nav links to it from both the Payments and global-tenant trees. It has no
+  // data source yet (the chargeback API is not wired), so a search result
+  // would promise a feature the data does not yet back. Re-add it here (and its keywords below) once the
   // list is server-backed.
   "/ebrc",
   "/ebrc-generation",
@@ -53,7 +53,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/mca-receipts",
   "/refer-and-earn",
   "/scheduler",
-  "/settlement-report",
+  "/settlements",
   "/sku-management",
   "/team-management",
   // The live settings sub-pages. /settings itself only redirects, and the rest
@@ -103,7 +103,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/mca-transactions": ["txn", "transaction ID", "GID", "payments", "settled"],
   "/pa-transactions": ["txn", "transaction ID", "GID", "payments", "orders"],
   "/mca-settlement-report": ["settlement", "UTR", "payout", "reports"],
-  "/settlement-report": ["settlement", "UTR", "payout", "reports"],
+  "/settlements": ["settlement", "UTR", "payout", "reports"],
   "/invoice-links": ["invoice link", "invoice", "collect", "due"],
   "/mca-links": ["payment link", "share link"],
   "/sku-management": ["product", "HSN", "SAC", "catalogue"],
@@ -248,7 +248,7 @@ export const STANDALONE_PAGES: readonly StandalonePage[] = [
     // it and MCA merchants lost the Settlements row from both.
     //
     // PACB-only: in the Payments and Home contexts the settlement list is
-    // /settlement-report, which the nav carries itself.
+    // /settlements, which the nav carries itself.
     label: "Settlement Reports",
     path: "/mca-settlement-report",
     icon: "file-text",
@@ -350,13 +350,10 @@ export const ACTION_ENTRIES: readonly ActionEntry[] = [
   },
   {
     // Currently inert, and deliberately kept: /mca-links has a page and a route
-    // but no reachable sidebar entry, so the parent gate below never passes.
-    // The only "MCA Links" item in navigation.ts is a child of Payment Products
-    // in regularNavigation tagged product:"PACB" — but regularNavigation is the
-    // tree for the *Payments* context, where activeProduct is "PA", and the
-    // PACB context renders mcaNavigation, which has no MCA Links entry at all.
-    // So the tag can never match the tree it sits in. This row starts working
-    // the moment that nav gap is closed, and needs no change here.
+    // but no sidebar entry in any tree (regularNavigation is PA-only, and
+    // mcaNavigation has no MCA Links item), so the parent gate below never
+    // passes. This row starts working the moment mcaNavigation gains an MCA
+    // Links entry, and needs no change here.
     label: "Create link",
     parentPath: "/mca-links",
     path: "/mca-links?action=create",

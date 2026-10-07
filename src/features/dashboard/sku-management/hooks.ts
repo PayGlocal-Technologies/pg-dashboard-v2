@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
-import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
-import { useScopeId } from "@/lib/hooks/useScopeId";
+import { useApp } from "@/stores/useApp";
+import { useAccountSetup } from "@/stores/useAccountSetup";
+import type { PacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import {
   mcaCurrenciesApi,
   skuCreateApi,
@@ -160,21 +161,117 @@ export function toSkuPayloadFromProduct(
 // ── MID resolution ──────────────────────────────────────────────────────────
 
 /**
- * The catalogue's merchant id, which every one of its endpoints takes as a path
- * segment for every user — not just partners. Resolved by the shared
- * useScopeId, so it matches every other path-scoped id in the app.
+ * Every MID the catalogue spans: Global Fund Transfer (PACB) and Card Payments
+ * (PA) alike, PACB first, no duplicates.
  *
- * `midFilter` is returned alongside it for the search body's own filter, whose
- * key is **`mid`**, not `merchantId` — see useSkuCatalogue.
+ * SKU management used to be PACB-only, scoped through the shared PACB
+ * resolvers. It now serves both products (the backend grants MCA_INVOICE to PA
+ * merchants too, and invoice links bill from the same catalogue), so it
+ * resolves its own MIDs here instead of through useResolvedMids / useScopeId,
+ * which each answer for one product.
+ */
+function useSkuMids(): string[] {
+  const paCbMids = useApp((s) => s.paCbMids);
+  const paMids = useApp((s) => s.paMids);
+  return useMemo(() => [...new Set([...paCbMids, ...paMids])], [paCbMids, paMids]);
+}
+
+/**
+ * The catalogue's merchant id, which every one of its endpoints takes as a path
+ * segment for every user — not just partners. Resolved over
+ * both products' MIDs:
+ *
+ *   - partner user                  -> the profile MID
+ *   - a MID selected (PA or PACB)   -> that MID
+ *   - otherwise                     -> the first PACB MID, else the first PA
+ *                                      MID, else the profile MID
+ *
+ * That is pg-dashboard's rule, not useScopeId's: no UCIC id, which the SKU
+ * endpoints reject in the path.
+ *
+ * `midFilter` is the search body's own filter, whose key is **`mid`**, not
+ * `merchantId` (see useSkuCatalogue): the selected MID alone, or every PACB and
+ * PA MID when none is selected. Never "not-applicable" any more: a Card
+ * Payments MID is now a valid catalogue scope.
+ *
+ * Not ready until the merchant-products call has answered. The MID lists and
+ * the multi-MID flag all arrive with it, so before then every account looks
+ * single-MID with no MIDs, and a search fired in that window went out with no
+ * `fieldSearch.mid` at all.
  */
 export function useSkuPathMid() {
-  const { midFilter, guardState } = useResolvedMids("PACB");
-  // The path id comes from the shared resolver: product MID, selected MID, or
-  // the UCIC id for a multi-MID account with nothing selected. midFilter and
-  // guardState still come from useResolvedMids, which answers the different
-  // question of which MIDs go in a search *body*.
-  const { scopeId: mid, isReady } = useScopeId("PACB");
-  return { mid, midFilter, isReady, guardState };
+  const profile = useApp((s) => s.profile);
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
+  const productsLoaded = useApp((s) => !!s.merchantEnabledProducts);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+  const mids = useSkuMids();
+
+  return useMemo(() => {
+    const profileMid = profile?.mid ?? "";
+    const guardState = "ready" as const;
+
+    // Partners carry their MID in the path and filter nothing in the body,
+    // unchanged from the PACB-only resolver.
+    if (isPartnerUser) {
+      return {
+        mid: profileMid,
+        midFilter: undefined,
+        isReady: !!profileMid,
+        isResolving: false,
+        guardState,
+      };
+    }
+
+    const isSelectedOwn = !!selectedMid && mids.includes(selectedMid);
+    // An account with neither PA nor PACB MIDs falls back to its profile MID,
+    // as useResolvedMids does.
+    const filterMids = isSelectedOwn
+      ? [selectedMid]
+      : mids.length > 0
+        ? mids
+        : profileMid
+          ? [profileMid]
+          : [];
+    const midFilter =
+      filterMids.length > 0 ? { key: "merchantId", value: filterMids } : undefined;
+
+    // pg-dashboard's rule exactly — `selectedMid || pacbMids[0] ?? profile.mid`
+    // (sku-management/index.tsx) — with the PA MIDs after the PACB ones, since
+    // the page now spans both. Never the UCIC id: the SKU endpoints do not
+    // accept one in the path (confirmed by the backend, 2026-10-07).
+    const mid = isSelectedOwn ? selectedMid : mids[0] || profileMid;
+
+    return {
+      mid,
+      midFilter,
+      isReady: productsLoaded && !!mid && !!midFilter,
+      // Still waiting on the MID lists: callers show loading, not "empty".
+      isResolving: !productsLoaded,
+      guardState,
+    };
+  }, [profile, isPartnerUser, productsLoaded, selectedMid, mids]);
+}
+
+/**
+ * "Which account is this for?" for Add item and Import, over every PA and PACB
+ * MID. A new SKU belongs to exactly one MID, so with several and none
+ * selected the merchant picks first; the pick is written to the same
+ * selected-MID store the sidebar uses. Same shape as usePacbMidScope, which
+ * this replaces on this page.
+ */
+export function useSkuMidScope(): PacbMidScope {
+  const isPartnerUser = useApp((s) => s.isPartnerUser);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+  const mids = useSkuMids();
+
+  return {
+    // A partner user has one MID, carried in the path; nothing to choose.
+    needsMidChoice: !isPartnerUser && mids.length > 1 && !(selectedMid && mids.includes(selectedMid)),
+    midOptions: mids,
+    // Same tint usePacbMidScope uses, so the sidebar chip is never blank.
+    selectMid: (mid: string) => setSelectedMidDetails({ mid, color: "#E5B5FF" }),
+  };
 }
 
 /**
@@ -238,11 +335,11 @@ export function useSkuCatalogue({
   page,
   pageLimit = SKU_PAGE_LIMIT,
 }: SkuCatalogueArgs): SkuCatalogue {
-  const { mid, midFilter, isReady, guardState } = useSkuPathMid();
+  const { mid, midFilter, isReady, isResolving, guardState } = useSkuPathMid();
 
   // Stable across renders as long as its inputs are — usePostQuery folds the
   // body into the query key, so an object rebuilt every render would refetch
-  // forever. `midFilter` is memoised by useResolvedMids, so it is safe here.
+  // forever. `midFilter` is memoised by useSkuPathMid, so it is safe here.
   const body = useMemo<TableReqBody>(() => {
     // Two possible keys. `mid` is not `merchantId`: midFilter names itself
     // "merchantId" because that is what the OpenSearch txn endpoints want,
@@ -251,12 +348,12 @@ export function useSkuCatalogue({
     const fieldSearch = buildCatalogueFieldSearch(midFilter?.value, type);
     return {
       queryString: search || undefined,
-      // A text query switches to QUERY_FILTER_TYPE. A type/mid filter with no
-      // query needs FILTER_TYPE — the backend ignores `fieldSearch` under
-      // DEFAULT, which is why clicking the Goods/Services tab returned every
-      // type. Only a bare, unfiltered request is DEFAULT. Same rule the
-      // team-management list body follows.
-      searchFilterType: search ? "QUERY_FILTER_TYPE" : fieldSearch ? "FILTER_TYPE" : "DEFAULT",
+      // pg-dashboard's rule: QUERY_FILTER_TYPE with search text, otherwise
+      // DEFAULT — including the plain load, whose MID-only `fieldSearch` used to
+      // turn it into FILTER_TYPE, which production never sends here. The
+      // Goods/Services tab has no pg-dashboard counterpart; it alone keeps
+      // FILTER_TYPE, since the backend ignores `fieldSearch.type` under DEFAULT.
+      searchFilterType: search ? "QUERY_FILTER_TYPE" : type ? "FILTER_TYPE" : "DEFAULT",
       fieldSearch,
       from: (page - 1) * pageLimit,
       pageLimit,
@@ -273,7 +370,9 @@ export function useSkuCatalogue({
   return {
     products,
     totalCount: data?.data?.totalCount ?? 0,
-    isLoading: isReady && isPending,
+    // Loading covers the wait for the MID lists too, so the first-run empty
+    // state never flashes before the first search has even gone out.
+    isLoading: isResolving || (isReady && isPending),
     isFetching,
     isError,
     guardState,

@@ -106,14 +106,33 @@ function RequirementRow({
  * The count on the trigger is the point — it turns "why won't this generate"
  * into something answerable before the press, not after it.
  */
+/** The checklist's wording, for an editor whose action is not "generate an invoice". */
+export interface ReadinessCopy {
+  /** Base verb, e.g. "generate". */
+  verb: string;
+  /** Past participle, e.g. "generated". */
+  done: string;
+  /** What is being made, e.g. "this invoice". */
+  subject: string;
+}
+
+const DEFAULT_COPY: ReadinessCopy = {
+  verb: "generate",
+  done: "generated",
+  subject: "this invoice",
+};
+
 export function ReadinessChecklist({
   requirements,
   open,
   onOpenChange,
+  copy = DEFAULT_COPY,
 }: {
   requirements: InvoiceRequirement[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Defaults to create-invoice's own wording. */
+  copy?: ReadinessCopy;
 }) {
   const outstanding = requirements.filter((r) => !r.done);
   const isReady = outstanding.length === 0;
@@ -128,7 +147,7 @@ export function ReadinessChecklist({
           aria-label={
             isReady
               ? "Everything needed is filled in"
-              : `${outstanding.length} things still needed before this invoice can be generated`
+              : `${outstanding.length} things still needed before ${copy.subject} can be ${copy.done}`
           }
           // Through leftIcon, not as a child beside the label. Button wraps its
           // children in a plain non-flex <span>, and preflight renders an <svg>
@@ -160,11 +179,11 @@ export function ReadinessChecklist({
       <PopoverContent align="end" collisionPadding={8} className="w-80 p-2">
         <div className="px-2.5 pb-1 pt-1.5">
           <p className="text-[12.5px] font-semibold text-foreground">
-            {isReady ? "Ready to generate" : "Before you can generate"}
+            {isReady ? `Ready to ${copy.verb}` : `Before you can ${copy.verb}`}
           </p>
           <p className="mt-0.5 text-[11.5px] leading-snug text-muted-foreground">
             {isReady
-              ? "Everything this invoice needs is filled in."
+              ? `Everything ${copy.subject} needs is filled in.`
               : "Pick any of these to jump straight to it."}
           </p>
         </div>

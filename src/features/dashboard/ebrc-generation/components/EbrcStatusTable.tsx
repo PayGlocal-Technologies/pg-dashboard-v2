@@ -49,6 +49,9 @@ import {
  *  naming, and they are production's own list verbatim. */
 const EBRC_SEARCH_WORDS = ["Request ID", "DGFT Ack ID", "IEC Number"];
 
+/** Columns a request row is unreadable without, so the column editor cannot hide them. */
+const FIXED_COLUMN_KEYS = ["requestId", "status"];
+
 function statusVariant(status: string): "warning" | "success" | "danger" | "muted" {
   const value = status.toUpperCase();
   if (value.includes("FAIL") || value.includes("ERROR") || value.includes("REJECT"))
@@ -210,6 +213,7 @@ function RequestDetailDrawer({
 export function EbrcStatusTable() {
   const [query, setQuery] = useState("");
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [openRequest, setOpenRequest] = useState<EbrcRequestRow | null>(null);
   // The callout only means something the moment a request was actually just
   // queued. Read once, in the initializer rather than a mount effect, so no
@@ -289,7 +293,9 @@ export function EbrcStatusTable() {
     },
   ];
 
-  const orderedColumns = reorderColumns(columns, columnOrder);
+  const orderedColumns = reorderColumns(columns, columnOrder).filter(
+    (c) => !hiddenColumns.includes(c.key)
+  );
   const reorderableColumns = columns.map((c) => ({
     key: c.key,
     label: typeof c.header === "string" ? c.header : c.key,
@@ -340,7 +346,14 @@ export function EbrcStatusTable() {
               columns={reorderableColumns}
               order={currentColumnOrder}
               onOrderChange={setColumnOrder}
-              onReset={() => setColumnOrder(null)}
+              onReset={() => {
+                setColumnOrder(null);
+                setHiddenColumns([]);
+              }}
+              hiddenKeys={hiddenColumns}
+              onHiddenKeysChange={setHiddenColumns}
+              fixedKeys={FIXED_COLUMN_KEYS}
+              fixedReason="Always shown. A request row is unreadable without its request ID and status."
             />
           </div>
         </div>

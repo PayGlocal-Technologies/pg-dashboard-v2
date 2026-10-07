@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -10,20 +10,46 @@ import {
   FieldError,
   FieldLabel,
   Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+  InputGroupText,
+  SplitButton,
+  SplitButtonItem,
   StatusBadge,
   Switch,
   Textarea,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
+import { SelectMidView } from "@/components/common/SelectMidView";
 // Presentational only (ui + Icon + cn), so it is safe to borrow across
 // features — the same way mca-links borrows CountryCell from mca-transactions.
 import { ChipField } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
+import {
+  ReadinessChecklist,
+  type InvoiceRequirement,
+} from "@/features/dashboard/create-invoice/components/ReadinessChecklist";
+// Lists, renames and deletes templates; reads only id/name/description/dates,
+// so it serves the shared template store from here as well.
+import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
 import { INVOICE_LINKS_FEATURE } from "@/features/dashboard/invoice-links/constants";
+import { useInvoiceLinkMidScope } from "@/features/dashboard/invoice-links/hooks";
 import { DEFAULT_CALLING_CODE } from "@/features/dashboard/invoice-links/create/constants";
 import {
+  addressFieldValues,
+  applyTemplate,
+  buildBulkInvoiceRequest,
   buildInvoiceRequest,
+  customerFromRecipient,
   emptyAddress,
+  getTotalAmount,
+  hasTemplatableContent,
+  localDateKey,
+  toTemplateWriteBody,
   validateAddress,
   validateDiscount,
   validateDueDate,
@@ -32,45 +58,67 @@ import {
   validateInvoiceNo,
   validateLineItem,
   validatePhone,
+  validateRecipient,
   type LineItemErrors,
 } from "@/features/dashboard/invoice-links/create/helpers";
 import {
   useCreateInvoice,
+  useCreateInvoiceBatch,
   useEditInvoice,
+  useInvoiceCountries,
   useInvoiceCurrencies,
   useInvoiceDraft,
   useInvoiceEditorMid,
+  useImportItemsToSku,
+  useInvoiceLinkTemplates,
   useInvoiceLogo,
   useMerchantShortName,
   useSaveInvoiceDraft,
 } from "@/features/dashboard/invoice-links/create/hooks";
 import { AddressFields } from "@/features/dashboard/invoice-links/create/components/AddressFields";
+import { BatchResultsDialog } from "@/features/dashboard/invoice-links/create/components/BatchResultsDialog";
 import { CreatedLinkDialog } from "@/features/dashboard/invoice-links/create/components/CreatedLinkDialog";
 import { EditorSection } from "@/features/dashboard/invoice-links/create/components/EditorSection";
 import { InvoicePreview } from "@/features/dashboard/invoice-links/create/components/InvoicePreview";
-import { LineItemsGrid } from "@/features/dashboard/invoice-links/create/components/LineItemsGrid";
+import { LineItemsSection } from "@/features/dashboard/invoice-links/create/components/LineItemsSection";
+import { RecipientsSection } from "@/features/dashboard/invoice-links/create/components/RecipientsSection";
+import { SaveTemplateDialog } from "@/features/dashboard/invoice-links/create/components/SaveTemplateDialog";
+import {
+  ApplyTemplateConfirm,
+  TemplatePicker,
+} from "@/features/dashboard/invoice-links/create/components/TemplatePicker";
 import type {
   AddressValues,
-  DiscountType,
+  InvoiceBulkResult,
   InvoiceDraftResponse,
   InvoiceFormValues,
   InvoiceLineItem,
+  InvoiceLinkTemplate,
+  InvoiceRecipient,
 } from "@/features/dashboard/invoice-links/create/types";
-
-function emptyItem(key: string): InvoiceLineItem {
-  return { key, description: "", itemCode: "", ppu: "", qty: "", tax: "0" };
-}
 
 type DraftRequest = NonNullable<
   NonNullable<InvoiceDraftResponse["data"]["invoice-data"]>["invoiceRequest"]
 >;
 
 /** Accepts both vocabularies: billing comes back remapped, shipping raw. See helpers.ts. */
-function toAddress(src: Record<string, string | null> | null | undefined): AddressValues {
+/** A country name reduced to letters only, for matching across spellings. */
+function normaliseCountry(name: string): string {
+  return name.toLowerCase().replace(/[^a-z]/g, "");
+}
+
+/** ISO2 code → the country name the address form holds. Anything else passes through. */
+type CountryNameOf = (country: string) => string;
+
+function toAddress(
+  src: Record<string, string | null> | null | undefined,
+  countryName: CountryNameOf
+): AddressValues {
   return {
     streetAddress: src?.addressStreet1 ?? src?.streetAddress ?? "",
     landmark: src?.addressStreet2 ?? src?.landmark ?? "",
-    country: src?.addressCountry ?? src?.country ?? "",
+    // Stored as an ISO2 code since the gcc-shaped body; older drafts hold the name.
+    country: countryName(src?.addressCountry ?? src?.country ?? ""),
     state: src?.addressState ?? src?.state ?? "",
     city: src?.addressCity ?? src?.city ?? "",
     zipcode: src?.addressPostalCode ?? src?.zipcode ?? "",
@@ -83,6 +131,19 @@ function toDateInputValue(raw: string | null | undefined): string {
   const [dd, mm, yyyy] = raw.split(" ")[0]?.split("/") ?? [];
   return dd && mm && yyyy ? `${yyyy}-${mm}-${dd}` : "";
 }
+
+/** "Nobody picked", for the draft body and the preview's empty state. */
+const EMPTY_RECIPIENT: InvoiceRecipient = {
+  key: "",
+  clientId: null,
+  fullName: "",
+  contactName: "",
+  emailId: "",
+  callingCode: DEFAULT_CALLING_CODE,
+  phoneNumber: "",
+  billing: emptyAddress(),
+  shipping: null,
+};
 
 function emptyValues(): InvoiceFormValues {
   return {
@@ -105,9 +166,17 @@ function emptyValues(): InvoiceFormValues {
 }
 
 /** The saved invoice as form values. Pure, so it can be derived rather than synced in an effect. */
+/** Whether a stored shipping address is just the billing one again. */
+function mirrorsBilling(shipping: AddressValues, billing: AddressValues): boolean {
+  return (Object.keys(shipping) as (keyof AddressValues)[]).every(
+    (key) => !shipping[key] || shipping[key] === billing[key]
+  );
+}
+
 function requestToValues(
   request: DraftRequest | undefined,
-  invoiceId: string | undefined
+  invoiceId: string | undefined,
+  countryName: CountryNameOf
 ): InvoiceFormValues {
   if (!request) return emptyValues();
 
@@ -128,11 +197,53 @@ function requestToValues(
     emailId: customer.emailId || "",
     callingCode: customer.callingCode || DEFAULT_CALLING_CODE,
     phoneNumber: customer.phoneNumber || "",
-    billing: toAddress(request.plBillingData),
-    shipping: toAddress(shipping),
-    // Upstream's rule: no stored shipping name means it mirrored billing.
-    shippingSameAsBilling: !shipping?.firstName,
+    billing: toAddress(request.plBillingData, countryName),
+    shipping: toAddress(shipping, countryName),
+    // The gcc-shaped shipping block carries no name, so "same as billing" is
+    // read from the addresses themselves: none stored, or the billing one again.
+    shippingSameAsBilling:
+      !shipping ||
+      mirrorsBilling(
+        toAddress(shipping, countryName),
+        toAddress(request.plBillingData, countryName)
+      ),
   };
+}
+
+/**
+ * The customer a draft was saved with, as a recipient. Drafts store a
+ * customer, not a client id, so this is shown as its own row rather than
+ * matched against the client book by name or email.
+ */
+function requestToRecipients(
+  request: DraftRequest | undefined,
+  countryName: CountryNameOf
+): InvoiceRecipient[] {
+  const customer = request?.plCustomerData;
+  if (!customer?.fullName && !customer?.emailId) return [];
+  const shipping = request?.plShippingData ?? null;
+
+  return [
+    {
+      key: "draft",
+      clientId: null,
+      fullName: customer.fullName || "",
+      contactName: "",
+      emailId: customer.emailId || "",
+      callingCode: customer.callingCode || DEFAULT_CALLING_CODE,
+      phoneNumber: customer.phoneNumber || "",
+      billing: toAddress(request?.plBillingData, countryName),
+      // Same rule as requestToValues.
+      shipping:
+        !shipping ||
+        mirrorsBilling(
+          toAddress(shipping, countryName),
+          toAddress(request?.plBillingData, countryName)
+        )
+          ? null
+          : toAddress(shipping, countryName),
+    },
+  ];
 }
 
 function requestToItems(request: DraftRequest | undefined): InvoiceLineItem[] {
@@ -144,7 +255,9 @@ function requestToItems(request: DraftRequest | undefined): InvoiceLineItem[] {
     qty: it.quantity || "0",
     tax: it.gstPercentage || "0",
   }));
-  return rows.length > 0 ? rows : [emptyItem("item-0")];
+  // A new invoice starts with no rows: items are added through the dialog, and
+  // a blank placeholder row would read as an "Untitled item" already billed.
+  return rows;
 }
 
 /**
@@ -168,16 +281,89 @@ function requestToItems(request: DraftRequest | undefined): InvoiceLineItem[] {
  *   invoiceId && status !== "DRAFT"  → PUT  …/edit     (an issued invoice)
  *   otherwise                        → POST …          (create, incl. issuing a draft)
  *   "Save as draft"                  → POST/PUT …/draft
+ *
+ * Creating (and issuing a draft) bills clients from the client book, one or
+ * many. One client sends the single-customer body exactly as before; several
+ * add `clients[]` to the same POST and the backend issues one link each, with
+ * -1, -2, … appended to the invoice number. Editing an issued invoice keeps
+ * the typed customer fields: it is one existing link and cannot fan out.
+ *
+ * Templates are the MCA invoice template store, shared. Applying one fills the
+ * line items, currency, discount, memo, note and due date from a fresh read of
+ * the template, which is where the backend substitutes live SKU prices.
  */
 export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) {
   const router = useRouter();
+  const { needsMidChoice, midOptions } = useInvoiceLinkMidScope();
+
+  /**
+   * The editor cannot open without knowing which account the link is for:
+   * every endpoint below puts a MID in its path, and pg-dashboard falls back
+   * to `paMids[0]`, raising the link under an account the merchant never
+   * chose. The in-app entry points (the list's Create, a row's Edit, "Edit"
+   * in Manage templates) already settle it before navigating, so this only
+   * catches the header search's ?action=create, a pasted link or a bookmark.
+   * Same gate as /create-invoice; the editor's hooks do not fire until it is
+   * answered.
+   */
+  if (needsMidChoice) {
+    return (
+      <>
+        <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Close"
+            className="h-9 w-9 shrink-0 p-0"
+            onClick={() => router.push("/invoice-links")}
+          >
+            <Icon name="x" className="h-4 w-4" />
+          </Button>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            {invoiceId ? "Edit invoice link" : "Create an invoice link"}
+          </h1>
+        </header>
+        <div className="mx-auto w-full max-w-2xl px-6 py-16">
+          <SelectMidView midType="PA" midOptions={midOptions} showSidebarHint={false} />
+        </div>
+      </>
+    );
+  }
+
+  return <InvoiceLinkEditor invoiceId={invoiceId} />;
+}
+
+function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const status = searchParams.get("status");
+  // "Edit" in the list's Manage templates lands here with ?templateId=, which
+  // is applied once below. Never on an existing invoice.
+  const initialTemplateId = invoiceId ? null : searchParams.get("templateId");
   const mid = useInvoiceEditorMid();
   const currencies = useInvoiceCurrencies();
+  // gcc-ui-temp sends `addressCountry` as an ISO2 code; the form holds names.
+  const countries = useInvoiceCountries();
+  // Matched ignoring case and punctuation: the client book and this list do
+  // not always spell a country identically ("Korea, Republic of" vs …).
+  const countryCode = useCallback(
+    (name: string) => {
+      const key = normaliseCountry(name);
+      return countries.find((c) => normaliseCountry(c.value) === key)?.iso2 || name;
+    },
+    [countries]
+  );
+  const countryName = useCallback(
+    (value: string) => countries.find((c) => c.iso2 === value)?.value || value,
+    [countries]
+  );
   const merchantName = useMerchantShortName(mid);
-  const { displayUrl: logoUrl, upload: uploadLogo, isUploading: isLogoUploading } =
-    useInvoiceLogo(mid);
+  const {
+    displayUrl: logoUrl,
+    upload: uploadLogo,
+    isUploading: isLogoUploading,
+  } = useInvoiceLogo(mid);
 
   // Derived state, not synced state: `edits` holds only what the merchant has
   // changed, and the rendered values are the server's draft with those laid
@@ -189,6 +375,26 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [itemErrors, setItemErrors] = useState<Record<string, LineItemErrors>>({});
   const [createdLink, setCreatedLink] = useState<string | null>(null);
+  // Null until the merchant touches the picker; until then a draft's own
+  // customer (if any) is the selection. Same derived-state idea as `edits`.
+  const [recipientsOverride, setRecipientsOverride] = useState<InvoiceRecipient[] | null>(null);
+  const [recipientsError, setRecipientsError] = useState<string | undefined>(undefined);
+  // The batch outcome, with the recipients in the order they were sent so
+  // each result can be matched to its client.
+  const [batch, setBatch] = useState<{
+    results: InvoiceBulkResult[];
+    recipients: InvoiceRecipient[];
+  } | null>(null);
+  // Which template this invoice came from, this session. Null is "none".
+  const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
+  const [confirmTemplate, setConfirmTemplate] = useState<InvoiceLinkTemplate | null>(null);
+  const [saveTemplateOpen, setSaveTemplateOpen] = useState(false);
+  const [manageTemplatesOpen, setManageTemplatesOpen] = useState(false);
+  // The pending-fields checklist beside Create, as in create-invoice: shown
+  // once a press could not go through, then kept so it updates as things are
+  // filled in.
+  const [checklistRevealed, setChecklistRevealed] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   // Lazy initialisers, not render-time reads: the React Compiler rules ban
   // calling the clock during render.
   const [todayKey] = useState(() => new Date().toISOString().slice(0, 10));
@@ -198,14 +404,33 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
 
   const { data: draft } = useInvoiceDraft(mid, invoiceId);
   const { mutate: createInvoice, isPending: isCreating } = useCreateInvoice(mid);
+  const { mutate: createBatch, isPending: isCreatingBatch } = useCreateInvoiceBatch(mid);
   const { mutate: editInvoice, isPending: isEditing } = useEditInvoice(mid);
   const { mutate: saveDraft, isPending: isSavingDraft } = useSaveInvoiceDraft(mid, invoiceId);
+  const templateStore = useInvoiceLinkTemplates(mid);
+  const importItemsToSku = useImportItemsToSku(mid);
 
   const isEditingIssued = !!invoiceId && status !== "DRAFT";
+  /** Every path but editing an issued link bills clients from the picker. */
+  const usesClientPicker = !isEditingIssued;
 
   const request = draft?.data?.["invoice-data"]?.invoiceRequest;
-  const serverValues = useMemo(() => requestToValues(request, invoiceId), [request, invoiceId]);
+  const serverValues = useMemo(
+    () => requestToValues(request, invoiceId, countryName),
+    [request, invoiceId, countryName]
+  );
   const serverItems = useMemo(() => requestToItems(request), [request]);
+  const serverRecipients = useMemo(
+    () => requestToRecipients(request, countryName),
+    [request, countryName]
+  );
+  const recipients = recipientsOverride ?? serverRecipients;
+  const isBatch = usesClientPicker && recipients.length > 1;
+
+  const updateRecipients = (update: (prev: InvoiceRecipient[]) => InvoiceRecipient[]) => {
+    setRecipientsError(undefined);
+    setRecipientsOverride((prev) => update(prev ?? serverRecipients));
+  };
 
   const values = useMemo(() => {
     const merged = { ...serverValues, ...edits };
@@ -222,7 +447,22 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
   const currencySymbol =
     currencies.find((c) => c.value === values.txnCurrency)?.symbol || values.txnCurrency;
 
-  const patch = (next: Partial<InvoiceFormValues>) => setEdits((prev) => ({ ...prev, ...next }));
+  const patch = (next: Partial<InvoiceFormValues>) => {
+    setEdits((prev) => ({ ...prev, ...next }));
+    // An edited field's error goes with the edit, so a message never sits
+    // under a field that now holds a valid value. Nested ones too: editing
+    // `billing` clears every `billing.*` error. Submit re-checks everything.
+    const touched = Object.keys(next);
+    setErrors((prev) => {
+      const stale = Object.keys(prev).filter((key) =>
+        touched.some((field) => key === field || key.startsWith(`${field}.`))
+      );
+      if (stale.length === 0) return prev;
+      const rest = { ...prev };
+      for (const key of stale) delete rest[key];
+      return rest;
+    });
+  };
 
   function validate(): boolean {
     const next: Record<string, string> = {};
@@ -231,21 +471,36 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
     if (invoiceNo) next.invoiceNo = invoiceNo;
     const dueDate = validateDueDate(values.dueDate);
     if (dueDate) next.dueDate = dueDate;
-    const fullName = validateFullName(values.fullName);
-    if (fullName) next.fullName = fullName;
-    const emailId = validateEmail(values.emailId);
-    if (emailId) next.emailId = emailId;
-    const phoneNumber = validatePhone(values.phoneNumber);
-    if (phoneNumber) next.phoneNumber = phoneNumber;
     const discount = validateDiscount(values.discount, values.discountType);
     if (discount) next.discount = discount;
 
-    const billingErrors = validateAddress(values.billing);
-    Object.entries(billingErrors).forEach(([k, v]) => v && (next[`billing.${k}`] = v));
-    if (!values.shippingSameAsBilling) {
-      const shippingErrors = validateAddress(values.shipping);
-      Object.entries(shippingErrors).forEach(([k, v]) => v && (next[`shipping.${k}`] = v));
+    let recipientsOk = true;
+    if (usesClientPicker) {
+      // The per-client problems are already on screen under each client; this
+      // only has to refuse, and say so when nobody is picked at all.
+      if (recipients.length === 0) {
+        setRecipientsError("Choose at least one client");
+        recipientsOk = false;
+      } else if (recipients.some((r) => validateRecipient(r).length > 0)) {
+        recipientsOk = false;
+      }
+    } else {
+      const fullName = validateFullName(values.fullName);
+      if (fullName) next.fullName = fullName;
+      const emailId = validateEmail(values.emailId);
+      if (emailId) next.emailId = emailId;
+      const phoneNumber = validatePhone(values.phoneNumber);
+      if (phoneNumber) next.phoneNumber = phoneNumber;
+
+      const billingErrors = validateAddress(values.billing);
+      Object.entries(billingErrors).forEach(([k, v]) => v && (next[`billing.${k}`] = v));
+      if (!values.shippingSameAsBilling) {
+        const shippingErrors = validateAddress(values.shipping);
+        Object.entries(shippingErrors).forEach(([k, v]) => v && (next[`shipping.${k}`] = v));
+      }
     }
+
+    if (items.length === 0) next.items = "Add at least one item";
 
     const nextItemErrors: Record<string, LineItemErrors> = {};
     items.forEach((item) => {
@@ -255,28 +510,161 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
 
     setErrors(next);
     setItemErrors(nextItemErrors);
-    return Object.keys(next).length === 0 && Object.keys(nextItemErrors).length === 0;
+    return (
+      recipientsOk && Object.keys(next).length === 0 && Object.keys(nextItemErrors).length === 0
+    );
   }
 
+  /**
+   * "Save to SKU catalogue" lines go to the catalogue the moment the merchant
+   * submits, as pg-dashboard imports on leaving its Items step: before, and
+   * whatever the outcome of, the create. Waiting for a successful create lost
+   * them whenever the create failed. Once saved they are un-ticked, so a retry
+   * after a failed create does not import them twice.
+   */
+  const saveTickedItemsToSku = () =>
+    importItemsToSku(items, values.txnCurrency, () =>
+      setItemsOverride((prev) =>
+        (prev ?? items).map((item) => (item.saveAsSku ? { ...item, saveAsSku: false } : item))
+      )
+    );
+
+  /**
+   * What Create still needs, for the checklist beside it. Built from the same
+   * validators as validate(), so the list and the press can never disagree.
+   */
+  const requirement = (
+    id: string,
+    label: string,
+    fieldId: string | null,
+    problem: string | null | undefined,
+    met: string
+  ): InvoiceRequirement => ({ id, label, fieldId, done: !problem, detail: problem || met });
+
+  const recipientIssues = recipients.filter((r) => validateRecipient(r).length > 0).length;
+  const itemsTotal = getTotalAmount(items, values.discount || "0", values.discountType);
+  const itemRowsInvalid = items.some((item) => Object.keys(validateLineItem(item)).length > 0);
+  const billingInvalid = Object.values(validateAddress(values.billing)).some(Boolean);
+  const shippingInvalid =
+    !values.shippingSameAsBilling && Object.values(validateAddress(values.shipping)).some(Boolean);
+
+  const requirements: InvoiceRequirement[] = [
+    requirement(
+      "invoice-number",
+      "Invoice number",
+      "invoice-number",
+      validateInvoiceNo(values.invoiceNo),
+      values.invoiceNo
+    ),
+    requirement(
+      "due-date",
+      "Due date",
+      "due-date",
+      validateDueDate(values.dueDate),
+      values.dueDate
+    ),
+    usesClientPicker
+      ? requirement(
+          "recipients",
+          "Who you're billing",
+          "recipients",
+          recipients.length === 0
+            ? "Pick at least one client."
+            : recipientIssues > 0
+              ? `${recipientIssues} client${recipientIssues === 1 ? " needs" : "s need"} details completed.`
+              : null,
+          recipients.length === 1
+            ? recipients[0].fullName
+            : `${recipients.length} clients, one link each.`
+        )
+      : requirement(
+          "recipients",
+          "Who you're billing",
+          "recipients",
+          validateFullName(values.fullName) ||
+            validateEmail(values.emailId) ||
+            validatePhone(values.phoneNumber),
+          values.fullName
+        ),
+    requirement(
+      "line-items",
+      "Line items",
+      "line-items",
+      items.length === 0
+        ? "Add at least one thing you are billing for."
+        : itemRowsInvalid
+          ? "Every line needs a description, price and quantity."
+          : validateDiscount(values.discount, values.discountType),
+      `${items.length} item${items.length === 1 ? "" : "s"}, totalling ${currencySymbol}${itemsTotal}.`
+    ),
+    // Only the typed customer has an address form here; it is optional, but a
+    // half-filled one is checked.
+    ...(usesClientPicker
+      ? []
+      : [
+          requirement(
+            "address",
+            "Billing and shipping",
+            "address",
+            billingInvalid || shippingInvalid ? "Fix the highlighted address fields." : null,
+            [...addressFieldValues(values.billing), ...addressFieldValues(values.shipping)].some(
+              (v) => v.trim()
+            )
+              ? "Filled in."
+              : "Optional, left blank."
+          ),
+        ]),
+  ];
+
   const onSubmit = () => {
+    // The checklist names every outstanding item at once, each one a jump to
+    // its field, which the toast it replaces could not. The inline errors are
+    // still set by validate().
     if (!validate()) {
-      toast.error("Check the highlighted fields and try again");
+      setChecklistRevealed(true);
+      setChecklistOpen(true);
       return;
     }
-    const body = buildInvoiceRequest(values, items);
+    saveTickedItemsToSku();
     const handlers = {
       onSuccess: (res: { data?: { paymentLink?: string } }) =>
         setCreatedLink(res?.data?.paymentLink ?? ""),
       onError: (error: Error) => toast.error(error?.message || "Failed to create link"),
     };
-    if (isEditingIssued) editInvoice(body, handlers);
-    else createInvoice(body, handlers);
+
+    if (isEditingIssued) {
+      editInvoice(buildInvoiceRequest(values, items, undefined, countryCode), handlers);
+      return;
+    }
+
+    if (recipients.length === 1) {
+      createInvoice(
+        buildInvoiceRequest(values, items, customerFromRecipient(recipients[0]), countryCode),
+        handlers
+      );
+      return;
+    }
+
+    const sent = recipients;
+    createBatch(buildBulkInvoiceRequest(values, items, sent, countryCode), {
+      onSuccess: (res) => setBatch({ results: res?.data?.results ?? [], recipients: sent }),
+      onError: (error: Error) => toast.error(error?.message || "Failed to create links"),
+    });
   };
 
   // Upstream does not validate before saving a draft — a draft is by definition
   // incomplete — so neither does this.
+  //
+  // A draft holds one customer, so with the picker it saves the one client
+  // picked, or none; with several picked the button is held (see header).
   const onSaveDraft = () => {
-    saveDraft(buildInvoiceRequest(values, items), {
+    const customer = usesClientPicker
+      ? recipients[0]
+        ? customerFromRecipient(recipients[0])
+        : customerFromRecipient(EMPTY_RECIPIENT)
+      : undefined;
+    saveTickedItemsToSku();
+    saveDraft(buildInvoiceRequest(values, items, customer, countryCode), {
       onSuccess: () => {
         toast.success("Draft saved");
         router.push("/invoice-links");
@@ -285,13 +673,109 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
     });
   };
 
-  const isBusy = isCreating || isEditing;
+  const isBusy = isCreating || isEditing || isCreatingBatch;
+  const draftBlocked = isBatch;
+
+  // ── Templates ──────────────────────────────────────────────────────────────
+
+  const activeTemplate =
+    templateStore.templates.find((template) => template.id === activeTemplateId) ?? null;
+  const canSaveTemplate = hasTemplatableContent(values, items);
+
+  const applyChosenTemplate = (template: InvoiceLinkTemplate) => {
+    setConfirmTemplate(null);
+    loadTemplate(template);
+  };
+
+  const loadTemplate = (template: InvoiceLinkTemplate) => {
+    // Read fresh rather than applying the list row: the read is where SKU-backed
+    // lines get the catalogue's current name and price.
+    templateStore.load(template.id, (fresh) => {
+      const { patch: next, items: nextItems } = applyTemplate(fresh, localDateKey(new Date()));
+      const currencyOffered =
+        !next.txnCurrency || currencies.some((option) => option.value === next.txnCurrency);
+      if (!currencyOffered) delete next.txnCurrency;
+
+      patch(next);
+      setItemsOverride(nextItems);
+      setItemErrors({});
+      setActiveTemplateId(template.id);
+      toast.success(`Applied "${template.name}"`, {
+        description: currencyOffered
+          ? undefined
+          : `${fresh.currency} is not offered for invoice links, so the currency was left as it was.`,
+      });
+    });
+  };
+
+  const chooseTemplate = (template: InvoiceLinkTemplate) => {
+    if (canSaveTemplate) setConfirmTemplate(template);
+    else applyChosenTemplate(template);
+  };
+
+  // ?templateId= from the list's Manage templates, applied exactly once. Held
+  // until the template list and the currencies have both arrived: the first
+  // says what the id is called, the second is what the currency check reads.
+  // A fresh form has nothing to overwrite, so there is no confirm.
+  const initialTemplateHandled = useRef(false);
+  useEffect(() => {
+    if (!initialTemplateId || initialTemplateHandled.current) return;
+    if (!templateStore.isReady || currencies.length === 0) return;
+    initialTemplateHandled.current = true;
+    const template = templateStore.templates.find((t) => t.id === initialTemplateId);
+    if (template) loadTemplate(template);
+    else toast.error("Couldn't find that template", { description: "It may have been deleted." });
+  });
+
+  const handleSaveTemplate = (name: string) => {
+    templateStore.save(
+      toTemplateWriteBody(name, values, items, localDateKey(new Date())),
+      (templateId) => {
+        setActiveTemplateId(templateId);
+        setSaveTemplateOpen(false);
+        toast.success("Template saved", { description: `"${name}" is ready to reuse.` });
+      }
+    );
+  };
+
+  const handleUpdateTemplate = () => {
+    if (!activeTemplate) return;
+    templateStore.replace(
+      activeTemplate.id,
+      toTemplateWriteBody(
+        activeTemplate.name,
+        values,
+        items,
+        localDateKey(new Date()),
+        activeTemplate.raw
+      ),
+      () =>
+        toast.success("Template updated", {
+          description: `"${activeTemplate.name}" now matches this invoice.`,
+        })
+    );
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    templateStore.remove(templateId);
+    if (templateId === activeTemplateId) setActiveTemplateId(null);
+  };
+
+  // What the preview shows: the first picked client, standing in for all of
+  // them, since every link in a batch carries the same invoice.
+  const previewRecipient = usesClientPicker ? recipients[0] : undefined;
+  const previewValues: InvoiceFormValues = usesClientPicker
+    ? {
+        ...values,
+        ...customerFromRecipient(previewRecipient ?? EMPTY_RECIPIENT),
+      }
+    : values;
 
   // Counts for the collapsed sections' subtitles, so shut sections still say
   // what is inside them.
   const addressFilled = [
-    ...Object.values(values.billing),
-    ...(values.shippingSameAsBilling ? [] : Object.values(values.shipping)),
+    ...addressFieldValues(values.billing),
+    ...(values.shippingSameAsBilling ? [] : addressFieldValues(values.shipping)),
   ].filter((v) => v.trim()).length;
   const notesFilled = [values.memo, values.merchantNote].filter((v) => v.trim()).length;
 
@@ -329,27 +813,116 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
             </div>
           </div>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isSavingDraft || isBusy}
-            onClick={onSaveDraft}
-          >
-            {isSavingDraft ? "Saving…" : "Save as Draft"}
-          </Button>
-          <Button
-            type="button"
+          {draftBlocked ? (
+            // A draft holds one customer. Held rather than hidden, and it says
+            // why: a disabled button with no reason reads as a broken one.
+            <Tooltip delayDuration={100}>
+              <TooltipTrigger asChild>
+                <span className="inline-flex">
+                  <Button type="button" variant="outline" size="sm" disabled>
+                    Save as Draft
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                A draft can hold one client. Keep one, or create the links now.
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isSavingDraft || isBusy}
+              onClick={onSaveDraft}
+            >
+              {isSavingDraft ? "Saving…" : "Save as Draft"}
+            </Button>
+          )}
+
+          {/* Immediately left of Create, as in create-invoice: the answer to
+              the question that button raises. */}
+          {checklistRevealed && (
+            <ReadinessChecklist
+              requirements={requirements}
+              open={checklistOpen}
+              onOpenChange={setChecklistOpen}
+              copy={{
+                verb: isEditingIssued ? "update" : "create",
+                done: isEditingIssued ? "updated" : "created",
+                subject: "this invoice link",
+              }}
+            />
+          )}
+
+          {/* The MCA editor's split button: the primary action, with the
+              template actions in its menu. Exactly one of "Save as template" or
+              "Update ⟨name⟩" is offered, depending on whether this invoice came
+              from a template. */}
+          <SplitButton
+            label={
+              isBusy
+                ? "Working…"
+                : isBatch
+                  ? `Create ${recipients.length} invoice links`
+                  : invoiceId
+                    ? "Update invoice link"
+                    : "Create invoice link"
+            }
             variant="primary"
             size="sm"
             disabled={isBusy}
             onClick={onSubmit}
+            // Squares the facing corners so the pair reads as one control; see
+            // the same className on create-invoice's SplitButton for why
+            // flux's own rounded-r-none does not take.
+            className="[&>button+button]:rounded-l-none [&>button:first-child]:rounded-r-none"
           >
-            {isBusy ? "Working…" : invoiceId ? "Update invoice link" : "Create invoice link"}
-          </Button>
+            {activeTemplate ? (
+              <>
+                <SplitButtonItem
+                  className="max-w-[18rem] truncate whitespace-nowrap"
+                  disabled={templateStore.isMutating}
+                  onClick={handleUpdateTemplate}
+                >
+                  Update &ldquo;{activeTemplate.name}&rdquo;
+                </SplitButtonItem>
+                <SplitButtonItem
+                  className="whitespace-nowrap"
+                  onClick={() => setActiveTemplateId(null)}
+                >
+                  Detach from template
+                </SplitButtonItem>
+              </>
+            ) : (
+              <SplitButtonItem
+                className="whitespace-nowrap"
+                disabled={!canSaveTemplate}
+                onClick={() => setSaveTemplateOpen(true)}
+              >
+                <span className="flex flex-col items-start">
+                  Save as template
+                  {!canSaveTemplate && (
+                    <span className="text-[11px] font-normal text-muted-foreground">
+                      Add a line item or note first
+                    </span>
+                  )}
+                </span>
+              </SplitButtonItem>
+            )}
+            <SplitButtonItem
+              className="whitespace-nowrap"
+              onClick={() => setManageTemplatesOpen(true)}
+            >
+              Manage templates
+            </SplitButtonItem>
+          </SplitButton>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_46rem]">
+        {/* Preview column at 40rem, narrower than create-invoice's 46rem: an
+            invoice-link document is lighter, and the form beside it needs the
+            room more. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]">
           <div className="min-h-0 overflow-y-auto">
             <div className="mx-auto max-w-250 space-y-5 px-6 py-6 lg:px-10">
               {/* Captioned chips, the way the invoice editor opens: the two
@@ -357,15 +930,48 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
                   is on it. */}
               <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
                 <ChipField label="Invoice number" required fieldId="invoice-number">
-                  <Input
-                    id="invoice-no"
-                    placeholder="Enter invoice number"
-                    aria-invalid={!!errors.invoiceNo}
-                    value={values.invoiceNo}
-                    onChange={(e) => patch({ invoiceNo: e.target.value })}
-                    className="h-9 w-56 text-[13px] shadow-none"
-                  />
-                  <FieldError>{errors.invoiceNo}</FieldError>
+                  {/* With several clients the backend suffixes the number per
+                      link, so the input shows that suffix after the number
+                      rather than a sentence under it: it previews the result,
+                      and keeps this field the same height as Due date beside
+                      it, so the row stays aligned. */}
+                  <InputGroup className="w-56">
+                    <InputGroupInput
+                      id="invoice-no"
+                      placeholder="Enter invoice number"
+                      // Browser autofill has nothing useful to offer for a
+                      // per-invoice number, and its tint fills the field.
+                      autoComplete="off"
+                      aria-invalid={!!errors.invoiceNo}
+                      // The group draws the error border; without this the
+                      // input adds its own error ring inside it (flux's
+                      // InputGroupInput clears the input's border and focus
+                      // ring, but not its aria-invalid ring).
+                      className="aria-invalid:ring-0"
+                      aria-describedby={isBatch ? "invoice-no-suffix" : undefined}
+                      value={values.invoiceNo}
+                      onChange={(e) => patch({ invoiceNo: e.target.value })}
+                    />
+                    {isBatch ? (
+                      <InputGroupAddon align="inline-end">
+                        <Tooltip delayDuration={100}>
+                          <TooltipTrigger asChild>
+                            <InputGroupText
+                              id="invoice-no-suffix"
+                              className="cursor-help whitespace-nowrap text-[12px] text-muted-foreground"
+                            >
+                              -1, -2, …
+                            </InputGroupText>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-56">
+                            Each client gets their own link, numbered with -1, -2, … added to this
+                            invoice number.
+                          </TooltipContent>
+                        </Tooltip>
+                      </InputGroupAddon>
+                    ) : null}
+                  </InputGroup>
+                  {errors.invoiceNo ? <FieldError>{errors.invoiceNo}</FieldError> : null}
                 </ChipField>
 
                 <ChipField label="Due date" required fieldId="due-date">
@@ -380,126 +986,163 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
                 </ChipField>
               </div>
 
-              {/* ── Customer ──────────────────────────────────────────────── */}
-              <EditorSection icon="user" title="Who you're billing">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <Field>
-                    <FieldLabel htmlFor="customer-name">Full name</FieldLabel>
-                    <Input
-                      id="customer-name"
-                      placeholder="Eg. John Doe"
-                      aria-invalid={!!errors.fullName}
-                      value={values.fullName}
-                      onChange={(e) => patch({ fullName: e.target.value })}
-                    />
-                    <FieldError>{errors.fullName}</FieldError>
-                  </Field>
-
-                  <Field>
-                    <FieldLabel htmlFor="customer-email">Email ID</FieldLabel>
-                    <Input
-                      id="customer-email"
-                      type="email"
-                      placeholder="Eg. john.doe@example.com"
-                      aria-invalid={!!errors.emailId}
-                      value={values.emailId}
-                      onChange={(e) => patch({ emailId: e.target.value })}
-                    />
-                    <FieldError>{errors.emailId}</FieldError>
-                  </Field>
-
-                  <Field className="sm:col-span-2">
-                    <FieldLabel htmlFor="customer-phone">Phone</FieldLabel>
-                    <div className="flex gap-2">
-                      <Input
-                        aria-label="Calling code"
-                        className="w-24"
-                        value={values.callingCode}
-                        onChange={(e) => patch({ callingCode: e.target.value })}
-                      />
-                      <Input
-                        id="customer-phone"
-                        placeholder="Eg. 9876543211"
-                        aria-invalid={!!errors.phoneNumber}
-                        value={values.phoneNumber}
-                        onChange={(e) => patch({ phoneNumber: e.target.value })}
-                      />
-                    </div>
-                    <FieldError>{errors.phoneNumber}</FieldError>
-                  </Field>
-                </div>
-              </EditorSection>
-
-              {/* ── Items, currency, discount, totals ─────────────────────── */}
-              <LineItemsGrid
-                items={items}
-                errors={itemErrors}
-                currencies={currencies}
-                currency={values.txnCurrency}
-                currencySymbol={currencySymbol}
-                discount={values.discount}
-                discountType={values.discountType}
-                discountError={errors.discount}
-                onCurrencyChange={(next) => patch({ txnCurrency: next })}
-                onDiscountChange={(next) => patch({ discount: next })}
-                onDiscountTypeChange={(next) => patch({ discountType: next })}
-                onChange={setItemsOverride}
+              <TemplatePicker
+                templates={templateStore.templates}
+                isReady={templateStore.isReady}
+                isApplying={templateStore.isApplying}
+                activeTemplateId={activeTemplateId}
+                onChoose={chooseTemplate}
+                onDetach={() => setActiveTemplateId(null)}
+                onManage={() => setManageTemplatesOpen(true)}
+                canSave={canSaveTemplate}
+                onSave={() => setSaveTemplateOpen(true)}
               />
 
-              {/* ── Addresses — every field optional, so it opens shut ────── */}
-              <EditorSection
-                icon="map-pin"
-                title="Billing and shipping"
-                subtitle={
-                  addressFilled ? `${addressFilled} field(s) filled in` : "Optional on an invoice link"
-                }
-                collapsible
-                defaultOpen={false}
-                forceOpen={hasAddressError}
-              >
-                <div className="space-y-4">
-                  <AddressFields
-                    idPrefix="billing"
-                    values={values.billing}
-                    errors={{
-                      streetAddress: errors["billing.streetAddress"],
-                      landmark: errors["billing.landmark"],
-                      city: errors["billing.city"],
-                      zipcode: errors["billing.zipcode"],
-                    }}
-                    onChange={(next) => patch({ billing: { ...values.billing, ...next } })}
+              {/* ── Customer ──────────────────────────────────────────────── */}
+              <div data-field="recipients">
+                {usesClientPicker ? (
+                  <RecipientsSection
+                    mid={mid}
+                    recipients={recipients}
+                    onChange={updateRecipients}
+                    error={recipientsError}
                   />
+                ) : (
+                  <EditorSection icon="user" title="Who you're billing">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field>
+                        <FieldLabel htmlFor="customer-name">Full name</FieldLabel>
+                        <Input
+                          id="customer-name"
+                          placeholder="Eg. John Doe"
+                          aria-invalid={!!errors.fullName}
+                          value={values.fullName}
+                          onChange={(e) => patch({ fullName: e.target.value })}
+                        />
+                        <FieldError>{errors.fullName}</FieldError>
+                      </Field>
 
-                  <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
-                    <span className="text-[13px] text-foreground">
-                      Repeat for shipping address?
-                    </span>
-                    <Switch
-                      checked={values.shippingSameAsBilling}
-                      onCheckedChange={(next) => patch({ shippingSameAsBilling: next })}
-                    />
-                  </div>
+                      <Field>
+                        <FieldLabel htmlFor="customer-email">Email ID</FieldLabel>
+                        <Input
+                          id="customer-email"
+                          type="email"
+                          placeholder="Eg. john.doe@example.com"
+                          aria-invalid={!!errors.emailId}
+                          value={values.emailId}
+                          onChange={(e) => patch({ emailId: e.target.value })}
+                        />
+                        <FieldError>{errors.emailId}</FieldError>
+                      </Field>
 
-                  {!values.shippingSameAsBilling ? (
-                    <div className="border-t border-border pt-4">
-                      <p className="mb-3 text-[13px] font-medium text-foreground">
-                        Shipping address
-                      </p>
-                      <AddressFields
-                        idPrefix="shipping"
-                        values={values.shipping}
-                        errors={{
-                          streetAddress: errors["shipping.streetAddress"],
-                          landmark: errors["shipping.landmark"],
-                          city: errors["shipping.city"],
-                          zipcode: errors["shipping.zipcode"],
-                        }}
-                        onChange={(next) => patch({ shipping: { ...values.shipping, ...next } })}
-                      />
+                      <Field className="sm:col-span-2">
+                        <FieldLabel htmlFor="customer-phone">Phone</FieldLabel>
+                        <div className="flex gap-2">
+                          <Input
+                            aria-label="Calling code"
+                            className="w-24"
+                            value={values.callingCode}
+                            onChange={(e) => patch({ callingCode: e.target.value })}
+                          />
+                          <Input
+                            id="customer-phone"
+                            placeholder="Eg. 9876543211"
+                            aria-invalid={!!errors.phoneNumber}
+                            value={values.phoneNumber}
+                            onChange={(e) => patch({ phoneNumber: e.target.value })}
+                          />
+                        </div>
+                        <FieldError>{errors.phoneNumber}</FieldError>
+                      </Field>
                     </div>
-                  ) : null}
+                  </EditorSection>
+                )}
+              </div>
+
+              {/* ── Items, currency, discount, totals ─────────────────────── */}
+              <div data-field="line-items">
+                <LineItemsSection
+                  mid={mid}
+                  items={items}
+                  errors={itemErrors}
+                  itemsError={errors.items}
+                  currencies={currencies}
+                  currency={values.txnCurrency}
+                  currencySymbol={currencySymbol}
+                  discount={values.discount}
+                  discountType={values.discountType}
+                  discountError={errors.discount}
+                  onCurrencyChange={(next) => patch({ txnCurrency: next })}
+                  onDiscountChange={(next) => patch({ discount: next })}
+                  onDiscountTypeChange={(next) => patch({ discountType: next })}
+                  onChange={setItemsOverride}
+                />
+              </div>
+
+              {/* ── Addresses — every field optional, so it opens shut ────── */}
+              {/* Only for the typed customer. A picked client brings its own
+                  billing and shipping address from the client book. */}
+              {usesClientPicker ? null : (
+                <div data-field="address">
+                  <EditorSection
+                    icon="map-pin"
+                    title="Billing and shipping"
+                    subtitle={
+                      addressFilled
+                        ? `${addressFilled} field(s) filled in`
+                        : "Optional on an invoice link"
+                    }
+                    collapsible
+                    defaultOpen={false}
+                    forceOpen={hasAddressError}
+                  >
+                    <div className="space-y-4">
+                      <AddressFields
+                        idPrefix="billing"
+                        values={values.billing}
+                        errors={{
+                          streetAddress: errors["billing.streetAddress"],
+                          landmark: errors["billing.landmark"],
+                          city: errors["billing.city"],
+                          zipcode: errors["billing.zipcode"],
+                        }}
+                        onChange={(next) => patch({ billing: { ...values.billing, ...next } })}
+                      />
+
+                      <div className="flex items-center justify-between rounded-lg bg-muted/50 px-3 py-2.5">
+                        <span className="text-[13px] text-foreground">
+                          Repeat for shipping address?
+                        </span>
+                        <Switch
+                          checked={values.shippingSameAsBilling}
+                          onCheckedChange={(next) => patch({ shippingSameAsBilling: next })}
+                        />
+                      </div>
+
+                      {!values.shippingSameAsBilling ? (
+                        <div className="border-t border-border pt-4">
+                          <p className="mb-3 text-[13px] font-medium text-foreground">
+                            Shipping address
+                          </p>
+                          <AddressFields
+                            idPrefix="shipping"
+                            values={values.shipping}
+                            errors={{
+                              streetAddress: errors["shipping.streetAddress"],
+                              landmark: errors["shipping.landmark"],
+                              city: errors["shipping.city"],
+                              zipcode: errors["shipping.zipcode"],
+                            }}
+                            onChange={(next) =>
+                              patch({ shipping: { ...values.shipping, ...next } })
+                            }
+                          />
+                        </div>
+                      ) : null}
+                    </div>
+                  </EditorSection>
                 </div>
-              </EditorSection>
+              )}
 
               {/* ── Notes ─────────────────────────────────────────────────── */}
               <EditorSection
@@ -538,9 +1181,14 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
           {/* Preview fills the right column, as it does in invoice management. */}
           <div className="min-h-0 overflow-y-auto bg-muted/30">
             <div className="space-y-4 p-4 md:p-6">
-              <p className="text-[13px] font-medium text-muted-foreground">Customer preview</p>
+              <p className="text-[13px] font-medium text-muted-foreground">
+                Customer preview
+                {isBatch && previewRecipient
+                  ? ` · ${previewRecipient.fullName}, and ${recipients.length - 1} more with the same invoice`
+                  : ""}
+              </p>
               <InvoicePreview
-                values={values}
+                values={previewValues}
                 items={items}
                 merchantName={merchantName}
                 currencySymbol={currencySymbol}
@@ -554,14 +1202,58 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
         </div>
       </div>
 
+      <BatchResultsDialog
+        open={batch !== null}
+        results={batch?.results ?? []}
+        recipients={batch?.recipients ?? []}
+        // Closing just closes: the merchant stays in the editor, e.g. to fix a
+        // client whose link failed and try again. "View all Invoice Links"
+        // inside the dialog is the deliberate way to the list.
+        onOpenChange={(next) => {
+          if (!next) setBatch(null);
+        }}
+      />
+
+      <ApplyTemplateConfirm
+        template={confirmTemplate}
+        onCancel={() => setConfirmTemplate(null)}
+        onConfirm={applyChosenTemplate}
+      />
+
+      <SaveTemplateDialog
+        open={saveTemplateOpen}
+        onOpenChange={setSaveTemplateOpen}
+        itemCount={items.length}
+        currency={values.txnCurrency}
+        hasDueDate={!!values.dueDate}
+        existingNames={templateStore.templates.map((template) => template.name)}
+        isSaving={templateStore.isMutating}
+        onSave={handleSaveTemplate}
+      />
+
+      <ManageTemplatesDialog
+        open={manageTemplatesOpen}
+        onOpenChange={setManageTemplatesOpen}
+        templates={templateStore.templates}
+        isMutating={templateStore.isMutating}
+        onRename={templateStore.rename}
+        onDelete={handleDeleteTemplate}
+        // "Edit" opens the template's content here: it is applied and linked,
+        // and the split button then offers "Update ⟨name⟩".
+        onEdit={(templateId) => {
+          setManageTemplatesOpen(false);
+          const template = templateStore.templates.find((t) => t.id === templateId);
+          if (template) chooseTemplate(template);
+        }}
+      />
+
       <CreatedLinkDialog
         open={createdLink !== null}
         link={createdLink ?? ""}
+        // Same as the batch results: closing stays in the editor; the dialog's
+        // own button is the way to the list.
         onOpenChange={(next) => {
-          if (!next) {
-            setCreatedLink(null);
-            router.push("/invoice-links");
-          }
+          if (!next) setCreatedLink(null);
         }}
       />
     </MidGuard>

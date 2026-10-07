@@ -52,10 +52,25 @@ export const invoiceLinkStatusApi = (mid: string, invoiceId: string): string =>
     ? `${BASE_URL_V1}/customer-data/invoice/${mid}/status?id=${encodeURIComponent(invoiceId)}`
     : "";
 
-/** Leg 3: confirms the uploaded objects landed. */
+/**
+ * Leg 3: confirms the uploaded objects landed. A GET. Answers with
+ * `{ Status, fileData }`; anything but COMPLETED carries fresh presigned URLs
+ * for the files still missing (gcc-ui-temp's useUploadDocsToS3 retry).
+ */
 export const invoiceLinkVerifyUploadApi = (mid: string, invoiceId: string): string =>
   mid && invoiceId
     ? `${BASE_URL_V1}/customer-data/invoice/${mid}/verify-upload?id=${encodeURIComponent(invoiceId)}`
+    : "";
+
+/**
+ * Removes proof documents whose upload never completed, so a half-attached
+ * set is not left on the invoice. POST `{ fileNames }`. From gcc-ui-temp's
+ * `deleteInvoiceFailedDoc` (services/invoice.js); pg-dashboard has no
+ * equivalent.
+ */
+export const invoiceLinkDeleteFailedDocsApi = (mid: string, invoiceId: string): string =>
+  mid && invoiceId
+    ? `${BASE_URL_V1}/customer-data/invoice/${mid}/delete?id=${encodeURIComponent(invoiceId)}`
     : "";
 
 /**

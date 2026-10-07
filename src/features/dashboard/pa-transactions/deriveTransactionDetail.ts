@@ -1,7 +1,10 @@
 import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
 import { buildLinkedChildRows } from "@/features/dashboard/pa-transactions/linkedChildRecords";
 import { settlementRows } from "@/features/dashboard/settlement-reports/mock-data";
-import { derivePaymentBucket } from "@/features/dashboard/pa-transactions/status/paymentBucket";
+import {
+  derivePaymentBucket,
+  derivePaymentOutcome,
+} from "@/features/dashboard/pa-transactions/status/paymentBucket";
 import { deriveTransactionStatusChip } from "@/features/dashboard/pa-transactions/status/transactionStatus";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 import {
@@ -44,6 +47,12 @@ const ISSUER_BANKS = [
   "Axis Bank",
   "State Bank of India",
   "Kotak Mahindra Bank",
+  "Punjab National Bank",
+  "Bank of Baroda",
+  "Yes Bank",
+  "IndusInd Bank",
+  "IDFC First Bank",
+  "Federal Bank",
 ];
 const SETTLEMENT_ACCOUNTS = ["HDFC ****4521", "ICICI ****7789", "Axis ****3312"];
 const ADDRESS_POOL = [
@@ -245,6 +254,11 @@ export function deriveTransactionDetail(
   const rawKey = row.externalStatus?.toUpperCase().replace(/ /g, "_") ?? "";
   const isRawDisputeStatus = DISPUTE_STATUS_VALUES.has(rawKey);
   const paymentBucket = isRawDisputeStatus ? "success" : derivePaymentBucket(row.externalStatus);
+  // The finer-grained outcome deriveTransactionStatusChip needs (it tells
+  // Processing/Authorised/Sent for capture apart, paymentBucket above
+  // doesn't) — same isRawDisputeStatus guard, so a dispute-vocabulary raw
+  // status is treated as a collected payment here too.
+  const paymentOutcome = isRawDisputeStatus ? "SUCCESS" : derivePaymentOutcome(row.externalStatus);
 
   const statusReason = isRawDisputeStatus
     ? "Additional verification is in progress for this payment."
@@ -398,7 +412,7 @@ export function deriveTransactionDetail(
   // immediately, see buildLinkedChildRows's own doc comment.
   linkedTransactions.push(...buildLinkedChildRows(row, refundEvents, disputeEvents));
   const derivedTransactionStatus = deriveTransactionStatusChip({
-    paymentBucket,
+    paymentOutcome,
     originalAmount: amountReceived,
     refundedAmount,
     hasProcessingRefund,

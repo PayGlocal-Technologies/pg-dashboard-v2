@@ -26,7 +26,13 @@ import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import useNewPermissions from "@/hooks/useNewPermissions";
 import { useApp } from "@/stores/useApp";
 import { paTxnSearchApi } from "@/features/dashboard/pa-transactions/services";
-import { TransactionDetailsDrawer } from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
+import {
+  PA_DRAWER_WIDTH_PX,
+  TransactionDetailsDrawer,
+  TransactionDrawerBody,
+} from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
+import { TransactionDetailsPage } from "@/features/dashboard/pa-transactions/components/TransactionDetailsPage";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
 import type {
   PaTransaction,
   PaTransactionsResponse,
@@ -104,8 +110,21 @@ export function ManageMandatesTable() {
   const [activateRow, setActivateRow] = useState<Mandate | null>(null);
   const [disableRow, setDisableRow] = useState<Mandate | null>(null);
   const [historyRow, setHistoryRow] = useState<Mandate | null>(null);
-  const [initiateTxn, setInitiateTxn] = useState<PaTransaction | null>(null);
-  const [initiateTxnOpen, setInitiateTxnOpen] = useState(false);
+  // The initiating payment's details: the drawer, which Expand widens into
+  // the full page in place of the table (see useDrawerExpand).
+  const {
+    record: initiateTxn,
+    pageOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: openInitiateTxn,
+    onDrawerOpenChange,
+    expand,
+    collapse,
+    back,
+    morphLayer,
+  } = useDrawerExpand<PaTransaction>({ drawerWidthPx: PA_DRAWER_WIDTH_PX });
 
   const startTime =
     relativeWindow?.startTime ?? (dateRange.from ? toStartOfDayMs(dateRange.from) : undefined);
@@ -150,8 +169,7 @@ export function ManageMandatesTable() {
             toast.error("Couldn't find this transaction");
             return;
           }
-          setInitiateTxn(match);
-          setInitiateTxnOpen(true);
+          openInitiateTxn(match);
         },
         onError: (error) => toast.error(error.message || "Couldn't load this transaction"),
       }
@@ -334,75 +352,92 @@ export function ManageMandatesTable() {
 
   return (
     <>
-      {/* Desktop (lg+). The Actions column is sticky (see buildMandateColumns),
+      {/* One slot for the table and the expanded page to take turns in, so
+          the hand-off lands the page exactly here. */}
+      <div ref={slotRef}>
+        {pageOpen && initiateTxn ? (
+          <TransactionDetailsPage
+            transaction={initiateTxn}
+            onBack={back}
+            onCollapse={collapse}
+            backLabel="Back to Mandates"
+          />
+        ) : (
+          <>
+            {/* Desktop (lg+). The Actions column is sticky (see buildMandateColumns),
           so its cells need opaque fills or the grid would show through as it
           scrolls under them. Each is the colour the row already has there,
           made solid: the header band (muted/35 over the card), a row, and a
           hovered row (muted/40). */}
-      <DataTableCard<Mandate>
-        // Written out in full: Tailwind only generates classes it can read
-        // literally, so the cell marker can't be interpolated here.
-        className={cn(
-          "hidden lg:block",
-          "[&_th.mandate-actions]:bg-[color-mix(in_srgb,var(--muted)_35%,var(--card))]",
-          "[&_td.mandate-actions]:bg-card",
-          "[&_tr:hover_td.mandate-actions]:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))]"
-        )}
-        toolbar={desktopControls}
-        columns={columns}
-        data={rows}
-        rowKey={(row) => row.id}
-        isLoading={isLoading}
-        emptyTitle={emptyCopy.title}
-        emptyDescription={emptyCopy.description}
-        emptyState={
-          <PlaceholderState
-            variant="empty-table"
-            title={emptyCopy.title}
-            description={emptyCopy.description}
-            className="py-16"
-          />
-        }
-        errorState={errorState}
-        pagination={pagination}
-        tableLayout="content"
-        maxBodyHeight="none"
-      />
+            <DataTableCard<Mandate>
+              // Written out in full: Tailwind only generates classes it can read
+              // literally, so the cell marker can't be interpolated here.
+              className={cn(
+                "hidden lg:block",
+                "[&_th.mandate-actions]:bg-[color-mix(in_srgb,var(--muted)_35%,var(--card))]",
+                "[&_td.mandate-actions]:bg-card",
+                "[&_tr:hover_td.mandate-actions]:bg-[color-mix(in_srgb,var(--muted)_40%,var(--card))]"
+              )}
+              toolbar={desktopControls}
+              columns={columns}
+              data={rows}
+              rowKey={(row) => row.id}
+              isLoading={isLoading}
+              emptyTitle={emptyCopy.title}
+              emptyDescription={emptyCopy.description}
+              emptyState={
+                <PlaceholderState
+                  variant="empty-table"
+                  title={emptyCopy.title}
+                  description={emptyCopy.description}
+                  className="py-16"
+                />
+              }
+              errorState={errorState}
+              pagination={pagination}
+              tableLayout="content"
+              maxBodyHeight="none"
+            />
 
-      {/* Tablet + mobile (below lg): the same page's rows as cards. */}
-      <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
-        <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
-          <div className="flex flex-nowrap items-center gap-2">
-            {searchInput("min-w-0 flex-1")}
-            {reportButton}
-          </div>
-          {renderChips("scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto")}
-        </div>
-        <DataCardList<Mandate>
-          bordered={false}
-          rows={rows}
-          rowKey={(row) => row.id}
-          isLoading={isLoading}
-          renderCard={(row) => (
-            <MandateCard
-              row={row}
-              actions={renderActions(row)}
-              onOpenSiTransactions={openSiTransactions}
-              onOpenInitiateTransaction={openInitiateTransaction}
-            />
-          )}
-          renderSkeleton={() => <MandateCardSkeleton />}
-          emptyState={
-            <PlaceholderState
-              variant="empty-table"
-              size="sm"
-              title={emptyCopy.title}
-              description={emptyCopy.description}
-            />
-          }
-          errorState={errorState}
-          pagination={pagination}
-        />
+            {/* Tablet + mobile (below lg): the same page's rows as cards. */}
+            <div className="overflow-hidden rounded-xl border border-border bg-card lg:hidden">
+              <div className="flex flex-col gap-2 border-b border-border px-4 py-3">
+                <div className="flex flex-nowrap items-center gap-2">
+                  {searchInput("min-w-0 flex-1")}
+                  {reportButton}
+                </div>
+                {renderChips(
+                  "scrollbar-none flex flex-nowrap items-center gap-1.5 overflow-x-auto"
+                )}
+              </div>
+              <DataCardList<Mandate>
+                bordered={false}
+                rows={rows}
+                rowKey={(row) => row.id}
+                isLoading={isLoading}
+                renderCard={(row) => (
+                  <MandateCard
+                    row={row}
+                    actions={renderActions(row)}
+                    onOpenSiTransactions={openSiTransactions}
+                    onOpenInitiateTransaction={openInitiateTransaction}
+                  />
+                )}
+                renderSkeleton={() => <MandateCardSkeleton />}
+                emptyState={
+                  <PlaceholderState
+                    variant="empty-table"
+                    size="sm"
+                    title={emptyCopy.title}
+                    description={emptyCopy.description}
+                  />
+                }
+                errorState={errorState}
+                pagination={pagination}
+              />
+            </div>
+          </>
+        )}
       </div>
 
       <PauseMandateDialog row={pauseRow} onOpenChange={(open) => !open && setPauseRow(null)} />
@@ -420,9 +455,27 @@ export function ManageMandatesTable() {
       />
       <TransactionDetailsDrawer
         transaction={initiateTxn}
-        open={initiateTxnOpen}
-        onOpenChange={setInitiateTxnOpen}
+        open={drawerOpen}
+        onOpenChange={onDrawerOpenChange}
+        onExpand={expand}
+        instant={instantDrawer}
       />
+      {/* The drawer's and the page's real insides for the hand-off (inert,
+          so the handlers never fire). */}
+      {morphLayer((transaction) => ({
+        drawer: (
+          <TransactionDrawerBody transaction={transaction} onClose={() => {}} onExpand={() => {}} />
+        ),
+        page: (
+          <TransactionDetailsPage
+            transaction={transaction}
+            onBack={() => {}}
+            onCollapse={() => {}}
+            backLabel="Back to Mandates"
+            decorative
+          />
+        ),
+      }))}
     </>
   );
 }

@@ -32,7 +32,9 @@ export function InvoicePreviewDrawer({
 }) {
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="w-full sm:max-w-[50%]">
+      {/* The WIDTH is overridden, not just max-width: flux's right drawer is
+          `sm:w-96`, so a max-w alone left this at 384px and the PDF tiny. */}
+      <DrawerContent className="w-full sm:w-[70vw] lg:w-[700px]">
         <DrawerHeader>
           <DrawerTitle>{invoiceId ? `Invoice ${invoiceId}` : "Invoice preview"}</DrawerTitle>
         </DrawerHeader>

@@ -234,6 +234,23 @@ grep -rn "<button\|<input\|<select\|<table\|<dialog\|<textarea" pg-dashboard-v2/
 
 Every hit must either be a structural element (exempt per rule above) or have a documented reason in a code comment explaining why no flux-ui component fits.
 
+## Table column configuration — COMPULSORY RULE
+
+Every table with a column editor uses flux's `ColumnManager` (from `@/components/ui`) with **both reorder and hide/show**, wired the way `features/dashboard/mca-invoices/components/McaInvoiceTable.tsx` does it. Never hand-roll a column menu, and never ship a reorder-only `ColumnManager`.
+
+Required wiring:
+
+- `columnOrder` + `hiddenColumns` state; rendered columns are `reorderColumns(base, columnOrder).filter((c) => !hiddenColumns.includes(c.key))`.
+- `order` / `onOrderChange` and `hiddenKeys` / `onHiddenKeysChange` both passed.
+- `onReset` clears **both** the order and the hidden set.
+- `fixedKeys` names the columns a row is unreadable without (its identifier, amount, status), with a `fixedReason` saying why. Keep the list in the feature's `constants.ts` as `FIXED_COLUMN_KEYS` (or module-level when the feature has no constants file).
+- Non-data columns (row-action menu, selection checkbox) stay out of the editor's column list.
+
+```bash
+# Every ColumnManager must also pass hiddenKeys
+for f in $(grep -rl "<ColumnManager" src); do grep -q "hiddenKeys=" $f || echo "$f"; done
+```
+
 ## Environment / backend
 
 - `npm run dev` → connects to `gcc.dev.payglocal.in` backend

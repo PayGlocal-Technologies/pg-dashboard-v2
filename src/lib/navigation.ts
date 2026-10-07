@@ -38,7 +38,7 @@ export const homeNavigation: NavGroup[] = [
     label: "Overview",
     items: [
       { label: "Dashboard", href: "/dashboard", icon: "layout-grid", permission: [] },
-      { label: "Reports", href: "/settlement-report", icon: "file-text", permission: [] },
+      { label: "Reports", href: "/settlements", icon: "file-text", permission: [] },
       {
         label: "Settings",
         href: "/settings",
@@ -68,13 +68,6 @@ export const regularNavigation: NavGroup[] = [
         permission: [],
         product: "PA",
       },
-      {
-        label: "Dashboard",
-        href: "/mca-dashboard",
-        icon: "layout-grid",
-        permission: [],
-        product: "PACB",
-      },
     ],
   },
   {
@@ -96,29 +89,14 @@ export const regularNavigation: NavGroup[] = [
         icon: "shopping-cart",
         permission: [],
         children: [
-          // Multi Currency Accounts and Platforms live in the MCA tree only
-          // (as "International Accounts" and "Connect Platforms"), they are
-          // not Payments products.
-          //
-          // Receipts is this branch's own: uat carries no entry for it. Second
-          // way into /mca-receipts, the first being Finance's own entry below.
-          // Tagged PACB because the page is scoped to MCA receipts alone (see
-          // RECEIPT_PRODUCT) — it has nothing to show a PA-only merchant.
-          { label: "Receipts", href: "/mca-receipts", permission: [], product: "PACB" },
-          { label: "MCA Links", href: "/mca-links", permission: [], product: "PACB" },
+          // MCA-only products (MCA Links, Multi Currency Accounts, Platforms)
+          // live in the MCA tree only, this tree is PA-only.
           { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
           // Tagged PA: pg-dashboard's midMap routes page="INVOICE" to paMids,
           // so this has nothing to show a PACB-only merchant.
           { label: "Invoice Links", href: "/invoice-links", permission: [], product: "PA" },
           { label: "Payment Button", href: "/payment-button", permission: [] },
         ],
-      },
-      {
-        label: "SKU Management",
-        href: "/sku-management",
-        icon: "package",
-        badge: "NEW",
-        permission: [],
       },
       {
         label: "Manage Mandates",
@@ -133,54 +111,15 @@ export const regularNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/settlement-report",
+        href: "/settlements",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
-      },
-      // Same page the Payment Products group links to under Multi Currency
-      // Accounts (see above). Listed in both places deliberately: merchants
-      // reach receipts either as a finance record or from the product they were
-      // raised under, and the sidebar's active state keys off the pathname, so
-      // whichever entry is on screen highlights.
-      //
-      // OPEN ITEM: this entry is untagged, so it shows for a PA-only merchant —
-      // who now lands on a page that only ever lists MCA receipts. Tag it
-      // `product: "PACB"` (or drop it) once the placement is decided.
-      {
-        label: "Receipts",
-        href: "/mca-receipts",
-        icon: "receipt",
-        badge: "NEW",
-        permission: [],
-      },
-      {
-        label: "Invoice Management",
-        href: "/mca-invoices",
-        icon: "receipt",
-        permission: ["getAllMerchantInvoice"],
       },
       {
         label: "Invoice History",
         href: "/invoice-download",
         icon: "file-text",
         permission: ["getInvoices", "downloadInvoice"],
-      },
-      {
-        label: "Regularise Bills",
-        href: "/shipping-bill-regularisation",
-        icon: "file-text",
-        // pg-dashboard's own gate for Regularise Bills (Sidebar/constants.ts).
-        permission: ["billRegularization"],
-      },
-      {
-        label: "eBRC",
-        href: "/ebrc",
-        icon: "badge-check",
-        permission: ["processEbrcRequest"],
-        children: [
-          { label: "eBRC Status", href: "/ebrc-generation", permission: [] },
-          { label: "IRM Repository", href: "/irm-repository", permission: [] },
-        ],
       },
     ],
   },
@@ -199,18 +138,6 @@ export const regularNavigation: NavGroup[] = [
   {
     label: "Configure",
     items: [
-      // Points at this app's own Client Management page (/client-management)
-      // rather than pg-dashboard's /mca-clients route, which has no v2
-      // equivalent. Gated on getAllMcaClient, the permission pg-dashboard puts on
-      // the same page: the page now genuinely calls that endpoint (the client list
-      // is server-backed), so hiding it from a user who cannot call it is correct
-      // — which was not true while it read a local client book.
-      {
-        label: "Client Management",
-        href: "/client-management",
-        icon: "users",
-        permission: ["getAllMcaClient"],
-      },
       {
         label: "Configure",
         href: "/configure",
@@ -231,6 +158,21 @@ export const regularNavigation: NavGroup[] = [
         icon: "clock",
         permission: ["merchantAdminReport"],
       },
+    ],
+  },
+  {
+    // The MCA tree's Administration group, same labels, icons and permissions:
+    // the client book already spans PA and PACB MIDs (see useClientMids), and
+    // the SKU catalogue feeds PA Invoice Links too.
+    label: "Administration",
+    items: [
+      {
+        label: "Client management",
+        href: "/client-management",
+        icon: "users",
+        permission: ["getAllMcaClient"],
+      },
+      { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
     ],
   },
 ];
@@ -299,13 +241,12 @@ export const mcaNavigation: NavGroup[] = [
           { label: "IRM Repository", href: "/irm-repository", permission: [] },
         ],
       },
-      // This tree's name for the Payments tree's Regularise Bills, so it takes
-      // the same billRegularization gate pg-dashboard puts on that entry.
+      // MCA's name for pg-dashboard's Regularise Bills, so it takes the same
+      // billRegularization gate pg-dashboard puts on that entry.
       { label: "EDPMS", href: "/edpms", icon: "shield-check", permission: ["billRegularization"] },
-      // Same /mca-receipts page the Payments tree reaches under Payment Products and
-      // Finance, labelled for what an MCA merchant comes here for: the GST
-      // invoices PayGlocal raises against them. A compliance record in this tree,
-      // a finance record in that one, one page either way.
+      // /mca-receipts, labelled for what an MCA merchant comes here for: the GST
+      // invoices PayGlocal raises against them. MCA-only, so the Payments tree
+      // has no entry for it.
       {
         label: "GST Invoices",
         href: "/mca-receipts",
@@ -429,7 +370,7 @@ export const globalNavigation: NavGroup[] = [
     items: [
       {
         label: "Settlement Reports",
-        href: "/settlement-report",
+        href: "/settlements",
         icon: "file-text",
         permission: ["getAllSettlementDetailReports", "getSettlementReport"],
       },

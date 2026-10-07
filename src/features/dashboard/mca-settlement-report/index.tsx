@@ -5,8 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useScopeId } from "@/lib/hooks/useScopeId";
 import type { ProductType } from "@/lib/hooks/useResolvedMids";
-import { mcaSettlementDetailPath } from "@/features/dashboard/mca-settlement-report/routes";
-import { SettlementDetailsDrawer } from "@/features/dashboard/mca-settlement-report/components/SettlementDetailsDrawer";
+import {
+  MCA_SETTLEMENT_DRAWER_WIDTH_PX,
+  SettlementDetailsDrawer,
+  SettlementDrawerBody,
+} from "@/features/dashboard/mca-settlement-report/components/SettlementDetailsDrawer";
+import { McaSettlementDetailFeature } from "@/features/dashboard/mca-settlement-report/components/SettlementDetailFeature";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
 import { useApp } from "@/stores/useApp";
 import { useGet, usePostQuery } from "@/lib/api/hooks";
 import { MidGuard } from "@/components/common/MidGuard";
@@ -131,25 +136,47 @@ export function McaSettlementReportFeature() {
   const [dateFilter, setDateFilter] = useState<SettlementDateValue | undefined>(undefined);
   const [showCycleInfo, setShowCycleInfo] = useState(false);
   /**
-   * "View details" opens the drawer, not the page — the same flow as the MCA
-   * transactions table. The table stays mounted underneath, so filters, paging
-   * and scroll are untouched while the drawer is open and after it closes.
-   * Expand then hands the same settlement off to the full page.
+   * "View details" opens the drawer, Expand widens it into the full page in
+   * place of the list, Collapse and Back return (see useDrawerExpand). The
+   * table stays mounted under the drawer, so filters, paging and scroll
+   * survive it. The row itself is held rather than a key, because the detail
+   * needs both halves of the settlement's identity (merchant and date).
    *
-   * The row itself is held rather than a key, because the drawer needs both
-   * halves of the settlement's identity (merchant and date) and a row already
-   * carries them.
+   * Seeded from ?settlement=&mid=, which is how Collapse on the detail route
+   * hands a settlement back to the drawer. Read once on mount, like ?q=
+   * above. The list may not have fetched that settlement (a merchant can land
+   * on a date outside the current page), so a minimal stand-in row carries
+   * the only two fields the drawer needs: it fetches the detail itself.
    */
-  const [detailsRow, setDetailsRow] = useState<SettlementRow | null>(null);
-  /**
-   * Seeded from ?settlement=&mid=, which is how Collapse on the detail page
-   * hands a settlement back to the drawer. Read once on mount, like ?q= above:
-   * the URL is not kept in sync afterwards, so closing the drawer does not
-   * need to rewrite it.
-   */
-  const [drawerOpen, setDrawerOpen] = useState(() => !!searchParams.get("settlement"));
   const collapsedSettlementDate = searchParams.get("settlement");
   const collapsedMerchantId = searchParams.get("mid");
+  const {
+    record: drawerRow,
+    pageOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: openDetailsDrawer,
+    onDrawerOpenChange,
+    expand: expandDetailsToPage,
+    collapse: collapseDetailsToDrawer,
+    back: backToList,
+    morphLayer,
+  } = useDrawerExpand<SettlementRow>({
+    drawerWidthPx: MCA_SETTLEMENT_DRAWER_WIDTH_PX,
+    initialRecord: collapsedSettlementDate
+      ? {
+          id: collapsedSettlementDate,
+          merchantId: collapsedMerchantId ?? undefined,
+          amount: 0,
+          currency: "INR",
+          transactionCount: 0,
+          date: `${collapsedSettlementDate}T00:00:00+05:30`,
+          paymentReceivedAt: `${collapsedSettlementDate}T00:00:00+05:30`,
+          affectedByNonWorkingDay: false,
+        }
+      : null,
+  });
   /** The table's page, sent to the endpoint as `page`. Reset whenever the date
    *  filter narrows the set, or the current page can sit past the end of it. */
   const [page, setPage] = useState(1);
@@ -286,40 +313,6 @@ export function McaSettlementReportFeature() {
    *  that settlements have no id of their own. The row's own merchant is passed
    *  when the summary names one, since a UCIC-scoped list can span merchants and
    *  each row's report has to be asked for against its own account. */
-  /**
-   * The settlement the drawer is showing. Normally the clicked row, but on a
-   * Collapse the row has not been clicked — it comes from the URL, and the
-   * list may not even have fetched it (a merchant can land on a date outside
-   * the current page). A minimal stand-in row carries the only two fields the
-   * drawer needs, since it fetches the detail itself from that pair.
-   */
-  const drawerRow: SettlementRow | null =
-    detailsRow ??
-    (collapsedSettlementDate
-      ? {
-          id: collapsedSettlementDate,
-          merchantId: collapsedMerchantId ?? undefined,
-          amount: 0,
-          currency: "INR",
-          transactionCount: 0,
-          date: `${collapsedSettlementDate}T00:00:00+05:30`,
-          paymentReceivedAt: `${collapsedSettlementDate}T00:00:00+05:30`,
-          affectedByNonWorkingDay: false,
-        }
-      : null);
-
-  const openDetailsDrawer = (row: SettlementRow) => {
-    setDetailsRow(row);
-    setDrawerOpen(true);
-  };
-
-  /** Expand: same settlement, full page. Closes the drawer first so it is not
-   *  left mounted behind the navigation. */
-  const expandDetailsToPage = (row: SettlementRow) => {
-    setDrawerOpen(false);
-    router.push(mcaSettlementDetailPath(row.merchantId || scopeId, row.id));
-  };
-
   const downloadRowReport = (row: SettlementRow) =>
     // `row.id`, not `row.date`: the endpoint takes the bare YYYY-MM-DD in its
     // path, and `row.date` is the display timestamp. See the hook's doc.
@@ -340,247 +333,288 @@ export function McaSettlementReportFeature() {
 
   return (
     <MidGuard productType={PRODUCT}>
-      <div className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden overflow-y-visible">
-        {/* BACKEND GAP, narrowed: the table, the per-date report downloads, the
-         * holiday calendar behind this banner, and the three summary cards
-         * (total settled + trend + sparkline, previous settled, upcoming
-         * settlement) are all live now. What is still mock-backed is the
-         * per-settlement detail page below, the settlement-cycle dialog's
-         * cycle/bank-account block, the held-funds card, and the previous
-         * settlement's UTR and gross/tax/fee breakup — those last are passed
-         * nowhere rather than rendered from mock-data.ts, so nothing invented
-         * reaches the screen. They stay flagged until a contract exists. */}
-        {showHolidayBanner && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
-            <Icon name="alert-triangle" size={13} className="shrink-0" />
-            <p className="min-w-0 flex-1">
-              <span className="font-semibold">Upcoming bank holiday.</span> Banks are closed on{" "}
-              {formatWeekdayDate(upcoming.nonWorkingDayDate!)} for {upcoming.nonWorkingDayName}.
-              Settlements due around this date are scheduled for the next working day,{" "}
-              {formatDayMonth(upcoming.settlementDate)}.
-            </p>
-          </div>
-        )}
+      {/* One slot for the list and the expanded settlement to take turns in,
+          so the hand-off lands the page exactly here. */}
+      <div
+        ref={slotRef}
+        className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden overflow-y-visible"
+      >
+        {pageOpen && drawerRow ? (
+          <McaSettlementDetailFeature
+            merchantId={drawerRow.merchantId || scopeId}
+            settlementDate={drawerRow.id}
+            onBack={backToList}
+            onCollapse={collapseDetailsToDrawer}
+          />
+        ) : (
+          <>
+            {/* BACKEND GAP, narrowed: the table, the per-date report downloads, the
+             * holiday calendar behind this banner, and the three summary cards
+             * (total settled + trend + sparkline, previous settled, upcoming
+             * settlement) are all live now. What is still mock-backed is the
+             * per-settlement detail page below, the settlement-cycle dialog's
+             * cycle/bank-account block, the held-funds card, and the previous
+             * settlement's UTR and gross/tax/fee breakup — those last are passed
+             * nowhere rather than rendered from mock-data.ts, so nothing invented
+             * reaches the screen. They stay flagged until a contract exists. */}
+            {showHolidayBanner && (
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs leading-relaxed text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <Icon name="alert-triangle" size={13} className="shrink-0" />
+                <p className="min-w-0 flex-1">
+                  <span className="font-semibold">Upcoming bank holiday.</span> Banks are closed on{" "}
+                  {formatWeekdayDate(upcoming.nonWorkingDayDate!)} for {upcoming.nonWorkingDayName}.
+                  Settlements due around this date are scheduled for the next working day,{" "}
+                  {formatDayMonth(upcoming.settlementDate)}.
+                </p>
+              </div>
+            )}
 
-        <PageHeader
-          title="Settlement Reports"
-          subtitle="Daily settlement activity and bank transfers"
-          actions={
-            <>
-              {/* MOCK (hidden for now — no settlement-summary endpoint for the
+            <PageHeader
+              title="Settlement Reports"
+              subtitle="Daily settlement activity and bank transfers"
+              actions={
+                <>
+                  {/* MOCK (hidden for now — no settlement-summary endpoint for the
                   cycle / bank account). Re-enable by un-commenting this and its
                   import. */}
-              {/* <SettlementDetailsDialog
+                  {/* <SettlementDetailsDialog
                 cycleValue={summary.cycle.value}
                 cycleFrequency={summary.cycle.frequency}
                 bankAccount={summary.bankAccount}
                 bankAccountStatus={summary.bankAccountStatus}
               /> */}
-              <span data-guide="mca-settlement-calendar" className="inline-flex">
-                <SettlementCalendarButton
-                  // OUT OF SCOPE: past settled days are not shown for now.
-                  // rows={enhancedRows}
-                  todayKey={calendar.today}
-                  nextSettlementDate={calendar.nextSettlement.date}
-                  nextSettlementReason={calendar.nextSettlement.reason}
-                  nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
-                  hasUpcomingHoliday={calendar.hasUpcomingHoliday}
-                />
-              </span>
-            </>
-          }
-        />
+                  <span data-guide="mca-settlement-calendar" className="inline-flex">
+                    <SettlementCalendarButton
+                      // OUT OF SCOPE: past settled days are not shown for now.
+                      // rows={enhancedRows}
+                      todayKey={calendar.today}
+                      nextSettlementDate={calendar.nextSettlement.date}
+                      nextSettlementReason={calendar.nextSettlement.reason}
+                      nextSettlementSkippedDays={calendar.nextSettlement.skippedDays}
+                      hasUpcomingHoliday={calendar.hasUpcomingHoliday}
+                    />
+                  </span>
+                </>
+              }
+            />
 
-        <div className="flex items-start gap-4">
-          <div className="min-w-0 flex-1 space-y-4">
-            {/* Live: overview (total settled, trend, sparkline, previous
+            <div className="flex items-start gap-4">
+              <div className="min-w-0 flex-1 space-y-4">
+                {/* Live: overview (total settled, trend, sparkline, previous
                 settlement) and upcoming settlement. The previous settlement's
                 UTR and gross/tax/fee breakup have no endpoint and stay hidden —
                 see the commented props below and the note above. */}
-            <div data-guide="mca-settlement-analytics">
-              <SettlementStatCards
-                totalSettled={totalSettled}
-                totalSettledTrendPct={totalSettledTrendPct}
-                totalSettledComparisonLabel={overview?.comparisonLabel}
-                totalSettledTimeframe={settlementTimeframe}
-                onTotalSettledTimeframeChange={setSettlementTimeframe}
-                totalSettledChartData={totalSettledChartData}
-                previousSettledAmount={previousSettledAmount}
-                previousSettledDateLabel={previousSettledDateLabel}
-                previousSettledTransactionCount={previousSettledTransactionCount}
-                onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
-                onDownloadPreviousSettled={downloadPreviousSettledReport}
-                canDownloadPreviousSettled={!!prevSettlement?.settlementDate}
-                // MOCK — hidden for now (no endpoint): the previous-settlement time,
-                // UTR and gross/tax/fee breakup. Re-enable by un-commenting these
-                // and the matching blocks in SettlementStatCards.
-                // previousSettledTimeLabel={summary.previousSettled.timeLabel}
-                // previousSettledUtrNumber={summary.previousSettled.utrNumber}
-                // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
-                // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
-                // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
-                upcomingSettlementAmount={upcomingSettlementAmount}
-                upcomingSettlementDateLabel={upcomingSettlementDateLabel(calendar.upcomingSchedule)}
-                pendingInvoiceCount={upcomingPendingInvoiceCount}
-                onUploadInvoice={() => router.push("/mca-transactions")}
-              />
-            </div>
+                <div data-guide="mca-settlement-analytics">
+                  <SettlementStatCards
+                    totalSettled={totalSettled}
+                    totalSettledTrendPct={totalSettledTrendPct}
+                    totalSettledComparisonLabel={overview?.comparisonLabel}
+                    totalSettledTimeframe={settlementTimeframe}
+                    onTotalSettledTimeframeChange={setSettlementTimeframe}
+                    totalSettledChartData={totalSettledChartData}
+                    previousSettledAmount={previousSettledAmount}
+                    previousSettledDateLabel={previousSettledDateLabel}
+                    previousSettledTransactionCount={previousSettledTransactionCount}
+                    onShowPreviousSettledInfo={() => setShowCycleInfo(true)}
+                    onDownloadPreviousSettled={downloadPreviousSettledReport}
+                    canDownloadPreviousSettled={!!prevSettlement?.settlementDate}
+                    // MOCK — hidden for now (no endpoint): the previous-settlement time,
+                    // UTR and gross/tax/fee breakup. Re-enable by un-commenting these
+                    // and the matching blocks in SettlementStatCards.
+                    // previousSettledTimeLabel={summary.previousSettled.timeLabel}
+                    // previousSettledUtrNumber={summary.previousSettled.utrNumber}
+                    // previousSettledGrossLabel={formatCurrency(summary.previousSettled.grossAmount, "INR")}
+                    // previousSettledTaxLabel={formatCurrency(summary.previousSettled.tax, "INR")}
+                    // previousSettledFeeLabel={formatCurrency(summary.previousSettled.fee, "INR")}
+                    upcomingSettlementAmount={upcomingSettlementAmount}
+                    upcomingSettlementDateLabel={upcomingSettlementDateLabel(
+                      calendar.upcomingSchedule
+                    )}
+                    pendingInvoiceCount={upcomingPendingInvoiceCount}
+                    onUploadInvoice={() => router.push("/mca-transactions")}
+                  />
+                </div>
 
-            <DataTableCard<SettlementRow>
-              /* Same toolbar as the MCA transactions table: one flex row
+                <DataTableCard<SettlementRow>
+                  /* Same toolbar as the MCA transactions table: one flex row
                  divided off by a bottom border, search left, filters beside
                  it, actions pushed right, and every action on the same
                  compact h-auto/py-1 height. */
-              toolbar={
-                <div className="flex flex-wrap items-center gap-2">
-                  <RotatingSearchInput
-                    value={search}
-                    onSearch={onSearch}
-                    words={["Settlement date", "Merchant ID"]}
-                    className="w-40 sm:w-56"
-                  />
+                  toolbar={
+                    <div className="flex flex-wrap items-center gap-2">
+                      <RotatingSearchInput
+                        value={search}
+                        onSearch={onSearch}
+                        words={["Settlement date", "Merchant ID"]}
+                        className="w-40 sm:w-56"
+                      />
 
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
-                  </div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <SettlementDateFilter value={dateFilter} onChange={onDateFilter} />
+                      </div>
 
-                  <div className="ml-auto flex items-center gap-2">
+                      <div className="ml-auto flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          leftIcon={
+                            <Icon
+                              name="refresh"
+                              className={cn("h-3.5 w-3.5", isListLoading && "animate-spin")}
+                            />
+                          }
+                          onClick={refetchList}
+                          disabled={isListLoading}
+                          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                        >
+                          Refresh
+                        </Button>
+                        <ColumnManager
+                          columns={columnDefs}
+                          order={effectiveColumnOrder}
+                          onOrderChange={setColumnOrder}
+                          onReset={onResetColumns}
+                          hiddenKeys={hiddenColumns}
+                          onHiddenKeysChange={setHiddenColumns}
+                          fixedKeys={[SETTLEMENT_LOCKED_COLUMN]}
+                          fixedReason="Always shown. A settlement row is unreadable without its date."
+                        />
+                      </div>
+                    </div>
+                  }
+                  errorState={
+                    isListError ? (
+                      <PlaceholderState
+                        variant="error"
+                        title="Couldn't load settlements"
+                        description="Something went wrong while fetching data."
+                        className="py-14"
+                        action={
+                          <Button variant="outline" size="sm" onClick={refetchList}>
+                            Retry
+                          </Button>
+                        }
+                      />
+                    ) : undefined
+                  }
+                  emptyState={
+                    <PlaceholderState
+                      variant="empty-table"
+                      title={emptyCopy.title}
+                      description={emptyCopy.description}
+                      className="py-14"
+                    />
+                  }
+                  columns={buildSettlementColumns({
+                    columnOrder: effectiveColumnOrder,
+                    hiddenColumns,
+                    showMerchantId,
+                  })}
+                  // The whole row opens the drawer, via DataTable's own
+                  // row-level handler rather than a wrapper inside every cell.
+                  // Clicks on the row's buttons (Download, View details, the
+                  // Merchant ID copy control) are skipped by it, so each of
+                  // those still does only its own job.
+                  onRowClick={openDetailsDrawer}
+                  data={filteredEnhancedRows}
+                  isLoading={isListLoading}
+                  emptyTitle={emptyCopy.title}
+                  emptyDescription={emptyCopy.description}
+                  rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
+                  // Server-side: the endpoint pages, so the table is told the
+                  // filtered total rather than counting the page in hand.
+                  pagination={{
+                    mode: "page",
+                    page,
+                    pageSize: SETTLEMENT_TABLE_PAGE_SIZE,
+                    total: listTotalCount,
+                    onPageChange: setPage,
+                  }}
+                  maxBodyHeight="none"
+                  // Download is the only hover-revealed row action. No "View
+                  // details" button beside it: the row itself opens the drawer
+                  // (see onRowClick above), so a button for the same thing was
+                  // a second affordance for the row's own default action.
+                  // Download does not need to stop propagation, since
+                  // onRowClick already ignores clicks landing inside a button.
+                  rowAction={(row) => (
                     <Button
-                      type="button"
                       variant="outline"
                       size="sm"
-                      leftIcon={
-                        <Icon
-                          name="refresh"
-                          className={cn("h-3.5 w-3.5", isListLoading && "animate-spin")}
-                        />
-                      }
-                      onClick={refetchList}
-                      disabled={isListLoading}
-                      className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                      onClick={() => downloadRowReport(row)}
+                      leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
+                      className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                     >
-                      Refresh
+                      Download
                     </Button>
-                    <ColumnManager
-                      columns={columnDefs}
-                      order={effectiveColumnOrder}
-                      onOrderChange={setColumnOrder}
-                      onReset={onResetColumns}
-                      hiddenKeys={hiddenColumns}
-                      onHiddenKeysChange={setHiddenColumns}
-                      fixedKeys={[SETTLEMENT_LOCKED_COLUMN]}
-                      fixedReason="Always shown. A settlement row is unreadable without its date."
-                    />
-                  </div>
-                </div>
-              }
-              errorState={
-                isListError ? (
-                  <PlaceholderState
-                    variant="error"
-                    title="Couldn't load settlements"
-                    description="Something went wrong while fetching data."
-                    className="py-14"
-                    action={
-                      <Button variant="outline" size="sm" onClick={refetchList}>
-                        Retry
-                      </Button>
-                    }
-                  />
-                ) : undefined
-              }
-              emptyState={
-                <PlaceholderState
-                  variant="empty-table"
-                  title={emptyCopy.title}
-                  description={emptyCopy.description}
-                  className="py-14"
+                  )}
                 />
-              }
-              columns={buildSettlementColumns({
-                columnOrder: effectiveColumnOrder,
-                hiddenColumns,
-                showMerchantId,
-              })}
-              // The whole row opens the drawer, via DataTable's own
-              // row-level handler rather than a wrapper inside every cell.
-              // Clicks on the row's buttons (Download, View details, the
-              // Merchant ID copy control) are skipped by it, so each of
-              // those still does only its own job.
-              onRowClick={openDetailsDrawer}
-              data={filteredEnhancedRows}
-              isLoading={isListLoading}
-              emptyTitle={emptyCopy.title}
-              emptyDescription={emptyCopy.description}
-              rowKey={(row) => `${row.merchantId ?? ""}:${row.id}`}
-              // Server-side: the endpoint pages, so the table is told the
-              // filtered total rather than counting the page in hand.
-              pagination={{
-                mode: "page",
-                page,
-                pageSize: SETTLEMENT_TABLE_PAGE_SIZE,
-                total: listTotalCount,
-                onPageChange: setPage,
-              }}
-              maxBodyHeight="none"
-              // Download is the only hover-revealed row action. No "View
-              // details" button beside it: the row itself opens the drawer
-              // (see onRowClick above), so a button for the same thing was
-              // a second affordance for the row's own default action.
-              // Download does not need to stop propagation, since
-              // onRowClick already ignores clicks landing inside a button.
-              rowAction={(row) => (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => downloadRowReport(row)}
-                  leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
-                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                >
-                  Download
-                </Button>
+              </div>
+
+              {showCycleInfo && (
+                <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <SettlementCycleInfoPanel
+                    onClose={() => setShowCycleInfo(false)}
+                    // Same two live values the "Previous settled" card this panel
+                    // explains is showing, so the two can no longer disagree. The
+                    // time of day has no source (the overview returns a date, not a
+                    // timestamp) and is deliberately not passed — see the prop's
+                    // doc comment.
+                    previousSettledDateLabel={previousSettledDateLabel}
+                    previousSettledTransactionCount={previousSettledTransactionCount}
+                    upcomingSchedule={{
+                      affectedByNonWorkingDay: upcoming.affectedByNonWorkingDay,
+                      paymentReceivedDate: calendar.today,
+                      nonWorkingDayDate: upcoming.nonWorkingDayDate ?? undefined,
+                      nonWorkingDayReason: upcoming.nonWorkingDayReason ?? undefined,
+                      nonWorkingDayName: upcoming.nonWorkingDayName ?? undefined,
+                      settlementDate: upcoming.settlementDate,
+                    }}
+                  />
+                </aside>
               )}
+            </div>
+
+            {/* Guide launcher — MCA settlement view only. */}
+            <GuideLauncher
+              steps={MCA_SETTLEMENT_GUIDE_STEPS}
+              storageKey={MCA_SETTLEMENT_GUIDE_KEY}
             />
-          </div>
-
-          {showCycleInfo && (
-            <aside className="w-[320px] shrink-0 animate-in fade-in slide-in-from-right-4 duration-300">
-              <SettlementCycleInfoPanel
-                onClose={() => setShowCycleInfo(false)}
-                // Same two live values the "Previous settled" card this panel
-                // explains is showing, so the two can no longer disagree. The
-                // time of day has no source (the overview returns a date, not a
-                // timestamp) and is deliberately not passed — see the prop's
-                // doc comment.
-                previousSettledDateLabel={previousSettledDateLabel}
-                previousSettledTransactionCount={previousSettledTransactionCount}
-                upcomingSchedule={{
-                  affectedByNonWorkingDay: upcoming.affectedByNonWorkingDay,
-                  paymentReceivedDate: calendar.today,
-                  nonWorkingDayDate: upcoming.nonWorkingDayDate ?? undefined,
-                  nonWorkingDayReason: upcoming.nonWorkingDayReason ?? undefined,
-                  nonWorkingDayName: upcoming.nonWorkingDayName ?? undefined,
-                  settlementDate: upcoming.settlementDate,
-                }}
-              />
-            </aside>
-          )}
-        </div>
-
-        {/* Guide launcher — MCA settlement view only. */}
-        <GuideLauncher steps={MCA_SETTLEMENT_GUIDE_STEPS} storageKey={MCA_SETTLEMENT_GUIDE_KEY} />
-
-        {/* Kept mounted alongside the table rather than inside it: the table is
-            what stays on screen behind the drawer, and re-rendering it on every
-            open would drop its scroll position. */}
-        <SettlementDetailsDrawer
-          row={drawerRow}
-          open={drawerOpen}
-          onOpenChange={setDrawerOpen}
-          onExpand={expandDetailsToPage}
-          fallbackMerchantId={scopeId}
-        />
+          </>
+        )}
       </div>
+
+      {/* Kept mounted alongside the list rather than inside it: the table is
+          what stays on screen behind the drawer. */}
+      <SettlementDetailsDrawer
+        row={drawerRow}
+        open={drawerOpen}
+        onOpenChange={onDrawerOpenChange}
+        onExpand={() => expandDetailsToPage()}
+        fallbackMerchantId={scopeId}
+        instant={instantDrawer}
+      />
+      {/* The drawer's and the page's real insides for the hand-off (inert,
+          so the handlers never fire). */}
+      {morphLayer((row) => ({
+        drawer: (
+          <SettlementDrawerBody
+            row={row}
+            fallbackMerchantId={scopeId}
+            onClose={() => {}}
+            onExpand={() => {}}
+          />
+        ),
+        page: (
+          <McaSettlementDetailFeature
+            merchantId={row.merchantId || scopeId}
+            settlementDate={row.id}
+            onBack={() => {}}
+            onCollapse={() => {}}
+          />
+        ),
+      }))}
     </MidGuard>
   );
 }

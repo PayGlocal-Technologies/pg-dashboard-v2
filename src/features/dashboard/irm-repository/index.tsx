@@ -48,6 +48,9 @@ import {
  *  naming, and they are production's own list verbatim. */
 const IRM_SEARCH_WORDS = ["IRM Number", "Remitter Name", "Purpose Code"];
 
+/** Columns an IRM row is unreadable without, so the column editor cannot hide them. */
+const IRM_FIXED_COLUMN_KEYS = ["irmNumber", "remittanceAmount", "mappingStatus"];
+
 const MAPPING_STATUS_VARIANT: Record<MappingStatus, "muted" | "warning" | "success"> = {
   UNMAPPED: "warning",
   // Both mid-states read the same: some of the remittance is spoken for, none
@@ -232,6 +235,7 @@ export function IrmRepositoryFeature() {
   const [mappingFilter, setMappingFilter] = useState<MappingStatus[]>([]);
   const [processFilter, setProcessFilter] = useState<ProcessStatus[]>([]);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
+  const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [openRow, setOpenRow] = useState<IrmRepositoryRow | null>(null);
 
   const [page, setPage] = useState(1);
@@ -314,7 +318,9 @@ export function IrmRepositoryFeature() {
     },
   ];
 
-  const orderedColumns = reorderColumns(columns, columnOrder);
+  const orderedColumns = reorderColumns(columns, columnOrder).filter(
+    (c) => !hiddenColumns.includes(c.key)
+  );
   const reorderableColumns = columns.map((c) => ({
     key: c.key,
     label: typeof c.header === "string" ? c.header : c.key,
@@ -393,7 +399,14 @@ export function IrmRepositoryFeature() {
                 columns={reorderableColumns}
                 order={currentColumnOrder}
                 onOrderChange={setColumnOrder}
-                onReset={() => setColumnOrder(null)}
+                onReset={() => {
+                  setColumnOrder(null);
+                  setHiddenColumns([]);
+                }}
+                hiddenKeys={hiddenColumns}
+                onHiddenKeysChange={setHiddenColumns}
+                fixedKeys={IRM_FIXED_COLUMN_KEYS}
+                fixedReason="Always shown. An IRM row is unreadable without its number, amount and mapping status."
               />
             </div>
           </div>

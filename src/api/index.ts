@@ -9,4 +9,5 @@ export const staticDataApi = `${BASE_URL_V1}/static/data`;
 export const entitlementsApi = `${BASE_URL_V1}/iam/users/entitlements`;
 export const merchantProductsApi = `${BASE_URL_V1}/merchants/enabled-products`;
 export const countryCurrencyMapApi = `${BASE_URL_V1}/static/iso/countryCurrencyMap`;
+export const bankListApi = `${BASE_URL_V1}/data/altpay/bank-list/INB`;
 export const logoutApi = `${BASE_URL_V1}/iam/users/logout`;

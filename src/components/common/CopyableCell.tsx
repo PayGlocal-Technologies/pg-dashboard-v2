@@ -22,6 +22,7 @@ export function CopyableCell({
   label,
   monospace,
   className,
+  valueClassName,
 }: {
   value: string;
   /** Text actually written to the clipboard, if different from the displayed `value`. */
@@ -30,6 +31,8 @@ export function CopyableCell({
   label: string;
   monospace?: boolean;
   className?: string;
+  /** Classes for the value text itself, e.g. to let it wrap instead of truncating. */
+  valueClassName?: string;
 }) {
   return (
     <FluxCopyableCell
@@ -38,6 +41,7 @@ export function CopyableCell({
       label={label}
       monospace={monospace}
       className={className}
+      valueClassName={valueClassName}
     />
   );
 }

@@ -1,14 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/components/ManageTemplatesDialog";
 import { InvoiceLinkTable } from "@/features/dashboard/invoice-links/components/InvoiceLinkTable";
 import { INVOICE_LINKS_FEATURE } from "@/features/dashboard/invoice-links/constants";
-import { useInvoiceLinksEnabled } from "@/features/dashboard/invoice-links/hooks";
+import {
+  useInvoiceLinkMidScope,
+  useInvoiceLinksEnabled,
+} from "@/features/dashboard/invoice-links/hooks";
+import {
+  useInvoiceEditorMid,
+  useInvoiceLinkTemplates,
+} from "@/features/dashboard/invoice-links/create/hooks";
 
 /**
  * Invoice Links, at /invoice-links.
@@ -44,7 +54,8 @@ export function InvoiceLinksFeature() {
   const isEnabled = useInvoiceLinksEnabled();
 
   // "Create invoice link" picked from the header search arrives as
-  // ?action=create, the same handoff MCA Links uses.
+  // ?action=create, the same handoff MCA Links uses. It cannot ask which
+  // account first, so a multi-MID merchant is asked on the editor instead.
   useUrlAction("create", () => router.push("/invoice-links/create"));
 
   if (!isEnabled) {
@@ -62,18 +73,19 @@ export function InvoiceLinksFeature() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
+    // Fills the content area exactly, the way dispute management does in
+    // pg-internal-v2: the viewport, less the app header (57px) and the
+    // layout's padding (p-4, md:p-6). The table card takes what the page
+    // header leaves, and its rows scroll between the column header and the
+    // footer.
+    <div className="page-enter mx-auto flex h-[calc(100dvh-57px-2rem)] min-h-[28rem] max-w-[1400px] flex-col gap-4 md:h-[calc(100dvh-57px-3rem)]">
       <PageHeader
         title="Invoice Links"
         actions={
-          <Button
-            type="button"
-            variant="primary"
-            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-            onClick={() => router.push("/invoice-links/create")}
-          >
-            Create Invoice Link
-          </Button>
+          <>
+            <ManageTemplatesAction />
+            <CreateInvoiceLinkAction />
+          </>
         }
       />
 
@@ -81,5 +93,79 @@ export function InvoiceLinksFeature() {
         <InvoiceLinkTable />
       </MidGuard>
     </div>
+  );
+}
+
+/**
+ * "Manage templates", the same button and dialog MCA Invoices carries. The
+ * invoice link editor already reads and writes this template store, so this
+ * is the list-side door to it.
+ *
+ * Templates live under one MID's path, so the store is addressed to the MID
+ * the editor would write against. "Edit" selects that MID before opening the
+ * editor, so the template is read from the account it was listed under.
+ */
+function ManageTemplatesAction() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const mid = useInvoiceEditorMid();
+  const templateStore = useInvoiceLinkTemplates(mid);
+  const { selectMid } = useInvoiceLinkMidScope();
+
+  const handleEditTemplate = (templateId: string) => {
+    setOpen(false);
+    if (mid) selectMid(mid);
+    router.push(`/invoice-links/create?templateId=${encodeURIComponent(templateId)}`);
+  };
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        leftIcon={<Icon name="layout-template" className="h-3.5 w-3.5" />}
+        onClick={() => setOpen(true)}
+      >
+        Manage templates
+      </Button>
+
+      <ManageTemplatesDialog
+        open={open}
+        onOpenChange={setOpen}
+        templates={templateStore.templates}
+        isMutating={templateStore.isMutating}
+        onRename={templateStore.rename}
+        onDelete={templateStore.remove}
+        onEdit={handleEditTemplate}
+      />
+    </>
+  );
+}
+
+/**
+ * "Create Invoice Link", scoped the way MCA Invoices' Create is: with several
+ * eligible PA MIDs and none selected, it asks which account the link is for
+ * before the editor opens, since the editor puts one MID in every request
+ * path.
+ */
+function CreateInvoiceLinkAction() {
+  const router = useRouter();
+  const { needsMidChoice, midOptions, selectMid } = useInvoiceLinkMidScope();
+
+  const openEditor = (mid: string) => {
+    if (mid) selectMid(mid);
+    router.push("/invoice-links/create");
+  };
+
+  return (
+    <MidScopedAction
+      label="Create Invoice Link"
+      icon="plus"
+      variant="primary"
+      needsMidChoice={needsMidChoice}
+      midOptions={midOptions}
+      onRun={openEditor}
+    />
   );
 }

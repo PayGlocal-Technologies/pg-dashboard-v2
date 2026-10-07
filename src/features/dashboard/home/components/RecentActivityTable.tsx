@@ -259,14 +259,19 @@ export function RecentActivityTable({
         size="sm"
         className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
         onClick={() =>
-          router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-report")
+          router.push(tab === "transactions" ? "/mca-transactions" : "/settlements")
         }
       >
         View all
       </Button>
     ),
     tabs: (
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "transactions" | "settlements")}>
+      // pb-3: breathing room between the tab chips and the grid's header row.
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as "transactions" | "settlements")}
+        className="pb-3"
+      >
         <TabsList className="h-8">
           <TabsTrigger value="transactions" className="h-7 px-3 text-[13px]">
             Transactions

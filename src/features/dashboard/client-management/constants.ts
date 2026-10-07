@@ -256,3 +256,6 @@ export function countryOptionsFromMap(
 function isIso2Code(value: string): boolean {
   return /^[A-Za-z]{2}$/.test(value.trim());
 }
+
+/** Columns a client row is unreadable without, so the column editor cannot hide them. */
+export const FIXED_COLUMN_KEYS = ["businessName"];
