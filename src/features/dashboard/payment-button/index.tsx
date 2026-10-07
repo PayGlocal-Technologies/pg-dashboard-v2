@@ -1,10 +1,15 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { PageHeader } from "@/components/ui";
 import { MidGuard } from "@/components/common/MidGuard";
 import { PaymentButtonTable } from "@/features/dashboard/payment-button/components/PaymentButtonTable";
 import { PaymentButtonNotEnabled } from "@/features/dashboard/payment-button/components/PaymentButtonNotEnabled";
+import {
+  CreatePaymentButtonDialog,
+  EditPaymentButtonDialog,
+} from "@/features/dashboard/payment-button/components/create/CreatePaymentButtonFeature";
 import {
   usePaymentButtonCreateScope,
   usePaymentButtonsEnabled,
@@ -14,7 +19,10 @@ import {
   PAYMENT_BUTTON_PAGE_SUBTITLE,
   PAYMENT_BUTTONS_FEATURE,
 } from "@/features/dashboard/payment-button/constants";
-import type { PaymentButton } from "@/features/dashboard/payment-button/types";
+import type {
+  PaymentButton,
+  PaymentButtonEditTarget,
+} from "@/features/dashboard/payment-button/types";
 
 /**
  * Payment buttons, at /payment-button, gated the way pg-dashboard gates it:
@@ -29,20 +37,28 @@ import type { PaymentButton } from "@/features/dashboard/payment-button/types";
  * right, then the one table surface.
  */
 export function PaymentButtonFeature() {
-  const router = useRouter();
   const isEnabled = usePaymentButtonsEnabled();
 
-  // Create is its own full-screen route (see (invoice-editor)/payment-button).
-  // With several eligible MIDs and none selected, the button asks which one
-  // first (pg-dashboard's ChooseMidSelect) and the choice rides as ?mid=.
-  const { needsMidChoice, midOptions } = usePaymentButtonCreateScope();
-  const openCreate = (mid: string) =>
-    router.push(
-      mid ? `/payment-button/create?mid=${encodeURIComponent(mid)}` : "/payment-button/create"
-    );
+  // Create opens in a modal over the list. With several eligible MIDs and none
+  // selected, the button asks which one first (pg-dashboard's ChooseMidSelect);
+  // otherwise it uses the selected or only eligible MID.
+  const searchParams = useSearchParams();
+  const {
+    mid: defaultMid,
+    needsMidChoice,
+    midOptions,
+  } = usePaymentButtonCreateScope(searchParams.get("mid"));
+  // Seeded from ?create=1 (where /payment-button/create redirects, e.g. from
+  // the header search). Read once on mount; with several MIDs and none in the
+  // URL it stays closed, and the button asks for one as usual.
+  const [createMid, setCreateMid] = useState<string | null>(() =>
+    searchParams.get("create") === "1" ? defaultMid : null
+  );
+  const openCreate = (mid: string) => setCreateMid(mid || defaultMid);
 
-  // TODO: Edit lands with its design.
-  const openEdit = (_row: PaymentButton) => {};
+  // Edit opens the same modal on the button's saved settings.
+  const [editTarget, setEditTarget] = useState<PaymentButtonEditTarget | null>(null);
+  const openEdit = (row: PaymentButton) => setEditTarget({ mid: row.mid, buttonId: row.buttonId });
 
   if (!isEnabled) {
     return (
@@ -73,6 +89,17 @@ export function PaymentButtonFeature() {
       <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
         <PaymentButtonTable onEdit={openEdit} />
       </MidGuard>
+
+      <EditPaymentButtonDialog
+        target={editTarget}
+        onOpenChange={(open) => !open && setEditTarget(null)}
+      />
+
+      <CreatePaymentButtonDialog
+        mid={createMid}
+        open={createMid !== null}
+        onOpenChange={(open) => !open && setCreateMid(null)}
+      />
     </div>
   );
 }

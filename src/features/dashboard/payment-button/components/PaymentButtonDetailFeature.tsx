@@ -7,12 +7,15 @@ import { Icon, type IconName } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { formatCurrency } from "@/lib/utils/format";
+import { PaymentButtonCodeDialog } from "@/features/dashboard/payment-button/components/PaymentButtonCodeDialog";
+import { EditPaymentButtonDialog } from "@/features/dashboard/payment-button/components/create/CreatePaymentButtonFeature";
 import { PaymentButtonTransactionsTable } from "@/features/dashboard/payment-button/components/PaymentButtonTransactionsTable";
 import { DisablePaymentButtonDialog } from "@/features/dashboard/payment-button/components/DisablePaymentButtonDialog";
 import { formatButtonAmount } from "@/features/dashboard/payment-button/helpers";
 import { PaymentButtonStatusBadge } from "@/features/dashboard/payment-button/columns";
 import {
   useCopyPaymentButtonCode,
+  usePreviewPaymentButtonCode,
   useDisablePaymentButton,
   usePaymentButtonListMids,
   usePaymentButtons,
@@ -20,6 +23,7 @@ import {
 import { buildPaymentButtonListBody } from "@/features/dashboard/payment-button/helpers";
 import {
   CUSTOMER_DECIDES_LABEL,
+  DESIGN_ONLY_FIELDS_ENABLED,
   PAYMENT_BUTTONS_FEATURE,
 } from "@/features/dashboard/payment-button/constants";
 import type { PaymentButton } from "@/features/dashboard/payment-button/types";
@@ -132,7 +136,9 @@ export function PaymentButtonDetailFeature({ buttonId }: { buttonId: string }) {
 
 function PaymentButtonDetail({ button }: { button: PaymentButton }) {
   const { copyCode, copyingId } = useCopyPaymentButtonCode();
+  const codePreview = usePreviewPaymentButtonCode();
   const [pendingDisable, setPendingDisable] = useState<PaymentButton | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   const { disable, isDisabling } = useDisablePaymentButton();
 
   const isDisabled = button.status === "DISABLED";
@@ -160,11 +166,14 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
                 </h1>
                 <PaymentButtonStatusBadge status={button.status} />
               </div>
-              <p className="mt-1 text-[13px] text-muted-foreground">
-                Button label: {button.label ? <>&ldquo;{button.label}&rdquo;</> : "—"}
-              </p>
+              {/* Not in the list API (see DESIGN_ONLY_FIELDS_ENABLED). */}
+              {DESIGN_ONLY_FIELDS_ENABLED && (
+                <p className="mt-1 text-[13px] text-muted-foreground">
+                  Button label: {button.label ? <>&ldquo;{button.label}&rdquo;</> : "—"}
+                </p>
+              )}
               <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
-                <MetaItem icon="wallet">{amount}</MetaItem>
+                {DESIGN_ONLY_FIELDS_ENABLED && <MetaItem icon="wallet">{amount}</MetaItem>}
                 <MetaItem icon="calendar-days">
                   Created on {formatDateStamp(button.createdAt)}
                 </MetaItem>
@@ -184,15 +193,26 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
             >
               Deactivate
             </Button>
-            {/* TODO: Edit lands with its design. */}
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={isDisabled}
               leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
+              onClick={() => setEditOpen(true)}
             >
               Edit
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isDisabled}
+              isLoading={codePreview.previewingId === button.buttonId}
+              leftIcon={<Icon name="code" className="h-3.5 w-3.5" />}
+              onClick={() => codePreview.preview(button)}
+            >
+              Preview code
             </Button>
             <Button
               type="button"
@@ -208,16 +228,29 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 divide-y divide-border border-t border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-          <Stat
-            label="Total payments"
-            value={button.successfulPayments == null ? "—" : String(button.successfulPayments)}
-          />
-          <Stat label="Total revenue" value={revenue} />
-        </div>
+        {/* Not in the list API (see DESIGN_ONLY_FIELDS_ENABLED). */}
+        {DESIGN_ONLY_FIELDS_ENABLED && (
+          <div className="grid grid-cols-1 divide-y divide-border border-t border-border sm:grid-cols-2 sm:divide-x sm:divide-y-0">
+            <Stat
+              label="Total payments"
+              value={button.successfulPayments == null ? "—" : String(button.successfulPayments)}
+            />
+            <Stat label="Total revenue" value={revenue} />
+          </div>
+        )}
       </Card>
 
       <PaymentButtonTransactionsTable mid={button.mid} buttonId={button.buttonId} />
+
+      <PaymentButtonCodeDialog
+        script={codePreview.script}
+        onOpenChange={(open) => !open && codePreview.close()}
+      />
+
+      <EditPaymentButtonDialog
+        target={editOpen ? { mid: button.mid, buttonId: button.buttonId } : null}
+        onOpenChange={setEditOpen}
+      />
 
       <DisablePaymentButtonDialog
         row={pendingDisable}

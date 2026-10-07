@@ -14,6 +14,8 @@ export interface PaymentButtonRowActionHandlers {
   onCopyCode: (row: PaymentButton) => void;
   onEdit: (row: PaymentButton) => void;
   onDisable: (row: PaymentButton) => void;
+  /** pg-dashboard's "Preview Button Code": the id and snippet in a dialog. */
+  onPreviewCode: (row: PaymentButton) => void;
 }
 
 /**
@@ -62,6 +64,7 @@ export function PaymentButtonRowActions({
   onCopyCode,
   onEdit,
   onDisable,
+  onPreviewCode,
 }: PaymentButtonRowActionHandlers & {
   row: PaymentButton;
   isCopying?: boolean;
@@ -86,6 +89,10 @@ export function PaymentButtonRowActions({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-40">
+          <DropdownMenuItem disabled={isDisabled} onClick={() => onPreviewCode(row)}>
+            <Icon name="code" className="h-3.5 w-3.5" />
+            Preview button code
+          </DropdownMenuItem>
           <DropdownMenuItem disabled={isDisabled} onClick={() => onEdit(row)}>
             <Icon name="pencil" className="h-3.5 w-3.5" />
             Edit

@@ -8,7 +8,10 @@ import {
   formatButtonAmount,
   getPaymentButtonStatusMeta,
 } from "@/features/dashboard/payment-button/helpers";
-import { CUSTOMER_DECIDES_LABEL } from "@/features/dashboard/payment-button/constants";
+import {
+  CUSTOMER_DECIDES_LABEL,
+  DESIGN_ONLY_FIELDS_ENABLED,
+} from "@/features/dashboard/payment-button/constants";
 import type { PaymentButton } from "@/features/dashboard/payment-button/types";
 
 /** Amount + its currency code, the pair every amount cell in the app renders. */
@@ -89,7 +92,9 @@ export function buildPaymentButtonColumns({
   copyingId: string | null;
 }): Column<PaymentButton>[] {
   return [
-    ...DATA_COLUMNS,
+    ...DATA_COLUMNS.filter(
+      (col) => DESIGN_ONLY_FIELDS_ENABLED || !DESIGN_ONLY_COLUMN_KEYS.includes(col.key)
+    ),
     {
       // Right after the last data column, not pinned to the edge with the ⋯
       // menu, which stays always visible while this one waits for hover.
@@ -112,6 +117,9 @@ export function buildPaymentButtonColumns({
     },
   ];
 }
+
+/** Columns the list API has no data for (see DESIGN_ONLY_FIELDS_ENABLED). */
+const DESIGN_ONLY_COLUMN_KEYS = ["amount", "successfulPayments", "revenue"];
 
 const DATA_COLUMNS: Column<PaymentButton>[] = [
   {
@@ -163,13 +171,33 @@ const DATA_COLUMNS: Column<PaymentButton>[] = [
   },
   {
     key: "createdAt",
-    header: "Created at",
+    header: "Created On",
     minWidth: 200,
     cellClassName: CELL_PADDING,
-    render: (row) => (
-      <span className="text-[13px] whitespace-nowrap text-foreground">
-        {formatTimestamp(row.createdAt)}
-      </span>
-    ),
+    render: (row) => <DateCell value={row.createdAt} />,
+  },
+  // The button's validity window, as pg-dashboard's table shows it.
+  {
+    key: "startsOn",
+    header: "Starts On",
+    minWidth: 200,
+    cellClassName: CELL_PADDING,
+    render: (row) => <DateCell value={row.startsOn} />,
+  },
+  {
+    key: "expiresOn",
+    header: "Expires On",
+    minWidth: 200,
+    cellClassName: CELL_PADDING,
+    render: (row) => <DateCell value={row.expiresOn} />,
   },
 ];
+
+/** A list date, or a dash when the API sent none. */
+function DateCell({ value }: { value: string | null }) {
+  return (
+    <span className="text-[13px] whitespace-nowrap text-foreground">
+      {value ? formatTimestamp(value) : "—"}
+    </span>
+  );
+}
