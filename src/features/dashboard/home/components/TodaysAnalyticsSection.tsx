@@ -611,7 +611,7 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
               variant="outline"
               size="sm"
               className="h-9 shrink-0 self-start px-3 text-sm sm:self-center"
-              onClick={() => router.push("/settlement-report")}
+              onClick={() => router.push("/settlements")}
               rightIcon={
                 <Icon name="arrow-up-right" className="h-3.5 w-3.5 shrink-0" aria-hidden />
               }

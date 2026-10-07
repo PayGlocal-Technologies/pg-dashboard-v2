@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { useReducedMotion } from "framer-motion";
 import { toast } from "sonner";
 import { Button, ColumnManager, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
@@ -28,13 +27,7 @@ import {
   PA_DRAWER_WIDTH_PX,
 } from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
 import { TransactionDetailsPage } from "@/features/dashboard/pa-transactions/components/TransactionDetailsPage";
-import {
-  DrawerExpandMorph,
-  drawerRect,
-  elementRect,
-  type DrawerMorph,
-} from "@/components/common/DrawerExpandMorph";
-import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
+import { useDrawerExpand } from "@/components/common/useDrawerExpand";
 import { reorderColumns } from "@/lib/utils/columns";
 import { cn } from "@/lib/utils";
 import { usePostQuery } from "@/lib/api/hooks";
@@ -65,13 +58,6 @@ const FIXED_COLUMN_KEYS = ["totalAmount", "externalStatus", "formattedCreationDa
 const sameSet = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((v) => b.includes(v));
 
-// Sets scrollTop via a standalone function since the element comes from
-// useContentAreaElement, and React Compiler's lint forbids mutating a
-// hook-returned value directly (as on MCA Transactions).
-function setScrollTop(el: HTMLElement, value: number): void {
-  el.scrollTop = value;
-}
-
 interface PaTransactionTableProps {
   /** Fired as the full-page details view opens (true) and closes (false), so
    *  the page can hide its header and metric cards while one transaction is
@@ -82,8 +68,6 @@ interface PaTransactionTableProps {
 export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTableProps = {}) {
   const isPartnerUser = useApp((s) => s.isPartnerUser);
   const { urlMid, midFilter, isReady } = useResolvedMids("PA");
-  const contentEl = useContentAreaElement();
-  const reduceMotion = useReducedMotion();
 
   // Seeded from ?q= so the header's global search can hand an identifier
   // straight to this table. Read once on mount; the URL is not kept in sync as
@@ -197,103 +181,26 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
     else toast.success("Transactions updated");
   };
 
-  // Details, the MCA Transactions flow: a row opens the drawer (collapsed
-  // view); Expand hands the same transaction to a full page in place of the
-  // list (expanded view); Collapse and Back return. The transaction is held
-  // as the object itself, not an id to find in `rows`, so a refetch or a
-  // filter change can't blank it.
-  const [record, setRecord] = useState<PaTransaction | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [pageOpen, setPageOpen] = useState(false);
-  // The drawer <-> page hand-off in flight, if any (see DrawerExpandMorph).
-  const [morph, setMorph] = useState<DrawerMorph | null>(null);
-  // The drawer skips its own slide while the hand-off covers it, and keeps
-  // skipping it until the merchant next closes it themselves.
-  const [instantDrawer, setInstantDrawer] = useState(false);
-  // The slot the list and the page take turns in: where the page lays out.
-  const slotRef = useRef<HTMLDivElement>(null);
-  // Where the list was scrolled when it left the screen, for Back/Collapse.
-  const [scrollPosition, setScrollPosition] = useState(0);
-
-  const onViewDetails = (row: PaTransaction) => {
-    setRecord(row);
-    setInstantDrawer(false);
-    setDrawerOpen(true);
-  };
-
-  const onDrawerOpenChange = (open: boolean) => {
-    if (!open) setInstantDrawer(false);
-    setDrawerOpen(open);
-  };
-
-  const showPage = () => {
-    setPageOpen(true);
-    onDetailsOpenChange?.(true);
-    if (contentEl) setScrollTop(contentEl, 0);
-  };
-
-  const hidePage = () => {
-    setPageOpen(false);
-    onDetailsOpenChange?.(false);
-  };
-
-  // Expand: the drawer opens out into the page. The real drawer vanishes
-  // under a layer that starts exactly where it was and opens out to the
-  // content area, revealing the page in place; the real page swaps in under
-  // it as it lands.
-  const expandToPage = () => {
-    if (contentEl) setScrollPosition(contentEl.scrollTop);
-    if (reduceMotion) {
-      setDrawerOpen(false);
-      showPage();
-      return;
-    }
-    // Where the page will lay out: the slot's left and width, and the top of
-    // the feature once it is scrolled to the top with the header and metric
-    // cards hidden (both happen as the page arrives).
-    const slot = elementRect(slotRef.current);
-    const featureTop =
-      (slotRef.current?.parentElement?.getBoundingClientRect().top ?? slot.top) +
-      (contentEl ? contentEl.scrollTop : window.scrollY);
-    setInstantDrawer(true);
-    setMorph({
-      kind: "expand",
-      from: drawerRect(PA_DRAWER_WIDTH_PX),
-      to: elementRect(contentEl),
-      page: { top: featureTop, left: slot.left, width: slot.width },
-    });
-    setDrawerOpen(false);
-  };
-
-  // Collapse: the reverse. The layer takes over from the page, the list
-  // comes back under it, and it closes down into the drawer's place as the
-  // drawer reopens.
-  const collapseToDrawer = () => {
-    if (reduceMotion) {
-      hidePage();
-      setDrawerOpen(true);
-      return;
-    }
-    const slot = elementRect(slotRef.current);
-    setInstantDrawer(true);
-    setMorph({
-      kind: "collapse",
-      from: elementRect(contentEl),
-      to: drawerRect(PA_DRAWER_WIDTH_PX),
-      page: { top: slot.top, left: slot.left, width: slot.width },
-    });
-  };
-
-  const backToList = () => {
-    hidePage();
-    setRecord(null);
-  };
-
-  // Puts the list back where it was once it has re-rendered in the page's
-  // place: an effect, so it runs after the rows are back in the DOM.
-  useEffect(() => {
-    if (!pageOpen && contentEl) setScrollTop(contentEl, scrollPosition);
-  }, [pageOpen, contentEl, scrollPosition]);
+  // Details: a row opens the drawer, Expand widens it into a full page in
+  // place of the list, Collapse and Back return (see useDrawerExpand). The
+  // page also hides this page's header, so it lands from the slot's parent.
+  const {
+    record,
+    pageOpen,
+    drawerOpen,
+    instantDrawer,
+    slotRef,
+    open: onViewDetails,
+    onDrawerOpenChange,
+    expand,
+    collapse,
+    back,
+    morphLayer,
+  } = useDrawerExpand<PaTransaction>({
+    drawerWidthPx: PA_DRAWER_WIDTH_PX,
+    measureFrom: "parent",
+    onPageOpenChange: onDetailsOpenChange,
+  });
 
   const baseColumns = buildPaColumns(isPartnerUser);
   const columns = reorderColumns(baseColumns, columnOrder).filter(
@@ -321,11 +228,7 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
   // and search state), so Back restores the list as it was for free.
   const view =
     pageOpen && record ? (
-      <TransactionDetailsPage
-        transaction={record}
-        onBack={backToList}
-        onCollapse={collapseToDrawer}
-      />
+      <TransactionDetailsPage transaction={record} onBack={back} onCollapse={collapse} />
     ) : (
       <DataTableCard<PaTransaction>
         // Flat buttons throughout the card (row action, pager), not flux's
@@ -482,33 +385,24 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
         transaction={record}
         open={drawerOpen}
         onOpenChange={onDrawerOpenChange}
-        onExpand={expandToPage}
+        onExpand={expand}
         instant={instantDrawer}
       />
-      {morph && record && (
-        <DrawerExpandMorph
-          key={morph.kind}
-          morph={morph}
-          drawerWidthPx={PA_DRAWER_WIDTH_PX}
-          // The drawer's and the page's real insides, so the hand-off shows
-          // exactly what each view does (it is inert, so the handlers never
-          // fire).
-          drawerContent={
-            <TransactionDrawerBody transaction={record} onClose={() => {}} onExpand={() => {}} />
-          }
-          pageContent={
-            <TransactionDetailsPage
-              transaction={record}
-              onBack={() => {}}
-              onCollapse={() => {}}
-              decorative
-            />
-          }
-          onCovered={hidePage}
-          onArrive={morph.kind === "expand" ? showPage : () => setDrawerOpen(true)}
-          onDone={() => setMorph(null)}
-        />
-      )}
+      {/* The drawer's and the page's real insides for the hand-off (inert,
+          so the handlers never fire). */}
+      {morphLayer((transaction) => ({
+        drawer: (
+          <TransactionDrawerBody transaction={transaction} onClose={() => {}} onExpand={() => {}} />
+        ),
+        page: (
+          <TransactionDetailsPage
+            transaction={transaction}
+            onBack={() => {}}
+            onCollapse={() => {}}
+            decorative
+          />
+        ),
+      }))}
     </>
   );
 }

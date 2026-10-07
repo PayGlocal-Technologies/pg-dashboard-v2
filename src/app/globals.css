@@ -223,6 +223,16 @@ select {
   -webkit-backdrop-filter: none;
 }
 
+/* A drawer opened by the drawer-to-page hand-off (`instant`, see
+   DrawerExpandMorph) takes over from the hand-off's own dim in one frame, so
+   its overlay must arrive at full strength rather than fade in: a fade leaves
+   a moment where neither layer fully blurs the page behind. Flux renders the
+   overlay as the element right before DrawerContent, with no prop to reach
+   it, hence the sibling selector.                                          */
+:has(+ .drawer-instant) {
+  animation: none !important;
+}
+
 /* ─── Enter/exit animations ──────────────────────────────────────────────────
    Flux's Drawer (and Blanket) components emit `animate-in`, `animate-out`,
    `fade-in-0`, `fade-out-0`, `slide-in-from-*` and `slide-out-to-*` classes

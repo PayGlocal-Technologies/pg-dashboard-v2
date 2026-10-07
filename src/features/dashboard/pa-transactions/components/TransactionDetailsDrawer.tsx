@@ -65,7 +65,8 @@ export function TransactionDetailsDrawer({
         className={cn(
           "[&>button:last-child]:hidden",
           !isBottomSheet && "w-full sm:w-[32rem] sm:max-w-[92vw]",
-          instant && "data-[state=closed]:animate-none! data-[state=open]:animate-none!"
+          instant &&
+            "drawer-instant data-[state=closed]:animate-none! data-[state=open]:animate-none!"
         )}
       >
         <DrawerTitle asChild>

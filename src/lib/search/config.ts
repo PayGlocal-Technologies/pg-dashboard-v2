@@ -53,7 +53,7 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/mca-receipts",
   "/refer-and-earn",
   "/scheduler",
-  "/settlement-report",
+  "/settlements",
   "/sku-management",
   "/team-management",
   // The live settings sub-pages. /settings itself only redirects, and the rest
@@ -103,7 +103,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/mca-transactions": ["txn", "transaction ID", "GID", "payments", "settled"],
   "/pa-transactions": ["txn", "transaction ID", "GID", "payments", "orders"],
   "/mca-settlement-report": ["settlement", "UTR", "payout", "reports"],
-  "/settlement-report": ["settlement", "UTR", "payout", "reports"],
+  "/settlements": ["settlement", "UTR", "payout", "reports"],
   "/invoice-links": ["invoice link", "invoice", "collect", "due"],
   "/mca-links": ["payment link", "share link"],
   "/sku-management": ["product", "HSN", "SAC", "catalogue"],
@@ -248,7 +248,7 @@ export const STANDALONE_PAGES: readonly StandalonePage[] = [
     // it and MCA merchants lost the Settlements row from both.
     //
     // PACB-only: in the Payments and Home contexts the settlement list is
-    // /settlement-report, which the nav carries itself.
+    // /settlements, which the nav carries itself.
     label: "Settlement Reports",
     path: "/mca-settlement-report",
     icon: "file-text",
