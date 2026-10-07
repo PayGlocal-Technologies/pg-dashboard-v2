@@ -350,13 +350,10 @@ export const ACTION_ENTRIES: readonly ActionEntry[] = [
   },
   {
     // Currently inert, and deliberately kept: /mca-links has a page and a route
-    // but no reachable sidebar entry, so the parent gate below never passes.
-    // The only "MCA Links" item in navigation.ts is a child of Payment Products
-    // in regularNavigation tagged product:"PACB" — but regularNavigation is the
-    // tree for the *Payments* context, where activeProduct is "PA", and the
-    // PACB context renders mcaNavigation, which has no MCA Links entry at all.
-    // So the tag can never match the tree it sits in. This row starts working
-    // the moment that nav gap is closed, and needs no change here.
+    // but no sidebar entry in any tree (regularNavigation is PA-only, and
+    // mcaNavigation has no MCA Links item), so the parent gate below never
+    // passes. This row starts working the moment mcaNavigation gains an MCA
+    // Links entry, and needs no change here.
     label: "Create link",
     parentPath: "/mca-links",
     path: "/mca-links?action=create",
