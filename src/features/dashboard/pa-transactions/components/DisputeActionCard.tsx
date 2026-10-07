@@ -85,27 +85,28 @@ export function DisputeActionCard({
           You may either contest the dispute by providing evidence that the charge is legitimate, or
           accept it immediately to refund the cardholder and close the dispute.
         </p>
-      </div>
-
-      <Separator className="my-4" />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Part of the guidance, so it sits with it rather than sharing the
+         * action row, where it wrapped loose above the buttons in the
+         * drawer. */}
         <Button
           type="button"
           variant="link"
           onClick={onLearnMore}
-          className="h-auto w-fit p-0 text-sm font-medium"
+          className="mt-1.5 h-auto w-fit p-0 text-sm font-medium"
         >
           Learn how to respond to disputes
         </Button>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onAccept}>
-            Accept dispute
-          </Button>
-          <Button type="button" variant="primary" size="sm" onClick={onContest}>
-            Contest dispute
-          </Button>
-        </div>
+      </div>
+
+      <Separator className="my-4" />
+
+      <div className="flex items-center justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onAccept}>
+          Accept dispute
+        </Button>
+        <Button type="button" variant="primary" size="sm" onClick={onContest}>
+          Contest dispute
+        </Button>
       </div>
     </Card>
   );

@@ -1,13 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import { Button, ColumnManager, DataTableCard, PageHeader } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { FilterChipGroup } from "@/components/common/filters/FilterChips";
 import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
+import {
+  DrawerExpandMorph,
+  drawerRect,
+  elementRect,
+  type DrawerMorph,
+} from "@/components/common/DrawerExpandMorph";
+import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
+import {
+  DisputeDetailView,
+  DisputeFlowDialogs,
+  useDisputeDetailModel,
+} from "@/features/dashboard/pa-transactions/components/DisputeDetailFeature";
+import { PA_DRAWER_WIDTH_PX } from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
+import {
+  DisputeDetailsDrawer,
+  DisputeDrawerBody,
+} from "@/features/dashboard/dispute-management/components/DisputeDetailsDrawer";
 import { useDisputeResolutions } from "@/stores/useDisputeResolutions";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
@@ -124,8 +141,14 @@ const RECOVERED_TREND = [
   { x: "Apr", y: 2100 },
 ];
 
+// Sets scrollTop via a standalone function since the element comes from
+// useContentAreaElement, and React Compiler's lint forbids mutating a
+// hook-returned value directly (as on PA Transactions).
+function setScrollTop(el: HTMLElement, value: number): void {
+  el.scrollTop = value;
+}
+
 export function DisputeManagementFeature() {
-  const router = useRouter();
   const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
   const resolutionByGid = useDisputeResolutions((s) => s.resolutionByGid);
 
@@ -274,16 +297,104 @@ export function DisputeManagementFeature() {
     setHiddenColumns(new Set());
   };
 
-  const onViewDetails = (row: DisputeRow) => {
+  // Details, the Transactions flow: a row opens the drawer (collapsed view);
+  // Expand hands the same dispute to a full page in place of the list
+  // (expanded view); Collapse and Back return. The row's transaction goes to
+  // the transaction store first, which the detail model reads (and the
+  // dispute flow writes its updates to).
+  const contentEl = useContentAreaElement();
+  const reduceMotion = useReducedMotion();
+  const [selected, setSelected] = useState<{ txnGid: string; disputeId: string } | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [pageOpen, setPageOpen] = useState(false);
+  // The drawer <-> page hand-off in flight, if any (see DrawerExpandMorph).
+  const [morph, setMorph] = useState<DrawerMorph | null>(null);
+  // The drawer skips its own slide while the hand-off covers it.
+  const [instantDrawer, setInstantDrawer] = useState(false);
+  // The slot the list and the page take turns in: where the page lays out.
+  const slotRef = useRef<HTMLDivElement>(null);
+  // Where the list was scrolled when it left the screen, for Back/Collapse.
+  const [scrollPosition, setScrollPosition] = useState(0);
+
+  const { transaction, dispute, flow } = useDisputeDetailModel({
+    transactionId: selected?.txnGid ?? "",
+    disputeId: selected?.disputeId ?? "",
+    // The evidence form needs the page's room: opening it from the drawer
+    // (Contest, or Accept partially) expands first.
+    onOpenForm: () => {
+      if (!pageOpen) expandToPage();
+    },
+  });
+
+  function onViewDetails(row: DisputeRow) {
     setStoredTransaction(toPaTransaction(row));
-    // Stays under /dispute-management (not /transactions), see
-    // DisputeDetailFeature's `origin` prop for the back-link text. Opens the
-    // dispute's own detail view directly, not the parent transaction, the
-    // merchant explicitly selected this dispute.
-    router.push(
-      `/dispute-management/${encodeURIComponent(row.txnGid)}/${encodeURIComponent(row.disputeId)}`
-    );
-  };
+    setSelected({ txnGid: row.txnGid, disputeId: row.disputeId });
+    setInstantDrawer(false);
+    setDrawerOpen(true);
+  }
+
+  function onDrawerOpenChange(open: boolean) {
+    if (!open) setInstantDrawer(false);
+    setDrawerOpen(open);
+  }
+
+  function showPage() {
+    setPageOpen(true);
+    if (contentEl) setScrollTop(contentEl, 0);
+  }
+
+  // Expand: the drawer opens out into the page, revealing it in place; the
+  // real page swaps in under the moving layer as it lands.
+  function expandToPage() {
+    if (contentEl) setScrollPosition(contentEl.scrollTop);
+    if (reduceMotion) {
+      setDrawerOpen(false);
+      showPage();
+      return;
+    }
+    const slot = elementRect(slotRef.current);
+    setInstantDrawer(true);
+    setMorph({
+      kind: "expand",
+      from: drawerRect(PA_DRAWER_WIDTH_PX),
+      to: elementRect(contentEl),
+      // Where the page lays out once scrolled to the top.
+      page: {
+        top: slot.top + (contentEl ? contentEl.scrollTop : window.scrollY),
+        left: slot.left,
+        width: slot.width,
+      },
+    });
+    setDrawerOpen(false);
+  }
+
+  // Collapse: the reverse, closing down into the drawer as it reopens.
+  function collapseToDrawer() {
+    if (reduceMotion) {
+      setPageOpen(false);
+      setDrawerOpen(true);
+      return;
+    }
+    const slot = elementRect(slotRef.current);
+    setInstantDrawer(true);
+    setMorph({
+      kind: "collapse",
+      from: elementRect(contentEl),
+      to: drawerRect(PA_DRAWER_WIDTH_PX),
+      page: { top: slot.top, left: slot.left, width: slot.width },
+    });
+  }
+
+  function backToList() {
+    setPageOpen(false);
+    setSelected(null);
+  }
+
+  // Puts the list back where it was once it has re-rendered in the page's
+  // place: an effect, so it runs after the rows are back in the DOM.
+  useEffect(() => {
+    if (!pageOpen && contentEl) setScrollTop(contentEl, scrollPosition);
+  }, [pageOpen, contentEl, scrollPosition]);
 
   const showRespondBy = RESPOND_BY_SEGMENTS.includes(statusSegment);
   const columns = buildDisputeColumns({ columnOrder, hiddenColumns, showRespondBy, nowMs });
@@ -309,135 +420,195 @@ export function DisputeManagementFeature() {
     // shell's default grey (see (dashboard)/layout.tsx), same treatment as
     // the Transactions page.
     <div className="-m-4 min-h-[calc(100vh-57px)] bg-card p-4 md:-m-6 md:p-6">
-      <div className="page-enter mx-auto max-w-[1400px] space-y-4">
-        <PageHeader
-          title="Dispute Management"
-          subtitle="Track, respond to and resolve payment disputes"
-        />
-
-        {/* Same "section title + period control" header, then the card grid
-         * beneath it, as the Transactions page's own Metrics section. */}
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-foreground">Metrics</h2>
-            <SegmentedTabs
-              options={DISPUTE_TIMEFRAMES}
-              value={metricsTimeframe}
-              onChange={(v) => setMetricsTimeframe(v as DisputeTimeframe)}
+      {/* One stable slot the list and the expanded page take turns in, so
+          swapping them under the hand-off layer never remounts it. */}
+      <div ref={slotRef} className="mx-auto max-w-[1400px]">
+        {pageOpen && transaction && dispute ? (
+          <div className="[&_.shadow-sm]:shadow-none">
+            <DisputeDetailView
+              transaction={transaction}
+              dispute={dispute}
+              flow={flow}
+              layout="page"
+              backLabel="Back to Dispute Management"
+              onBack={backToList}
+              onCollapse={collapseToDrawer}
             />
           </div>
-
-          <DisputeStatCards
-            disputes={metricsRows}
-            recoveredLabel="₹2.1K"
-            recoveredTrendPct={19}
-            recoveredTrend={RECOVERED_TREND}
-            reasonBreakdown={reasonBreakdown}
-          />
-        </div>
-
-        <DataTableCard<DisputeRow>
-          // Flat table: no lift on the card itself or on the buttons and chips
-          // inside it. The metrics cards above keep flux's default shadow.
-          className="shadow-none [&_.shadow-sm]:shadow-none"
-          tabs={
-            <SegmentedTabs
-              options={DISPUTE_STATUS_SEGMENTS}
-              value={statusSegment}
-              onChange={(v) => setStatusSegment(v as DisputeStatusSegment)}
+        ) : (
+          <div className="page-enter space-y-4">
+            <PageHeader
+              title="Dispute Management"
+              subtitle="Track, respond to and resolve payment disputes"
             />
-          }
-          toolbar={
-            <div className="flex flex-wrap items-center gap-2.5">
-              <RotatingSearchInput
-                value={search}
-                onSearch={setSearch}
-                words={["customer name, email or dispute ID"]}
-                className="min-w-40 max-w-xs flex-1"
+
+            {/* Same "section title + period control" header, then the card grid
+             * beneath it, as the Transactions page's own Metrics section. */}
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-foreground">Metrics</h2>
+                <SegmentedTabs
+                  options={DISPUTE_TIMEFRAMES}
+                  value={metricsTimeframe}
+                  onChange={(v) => setMetricsTimeframe(v as DisputeTimeframe)}
+                />
+              </div>
+
+              <DisputeStatCards
+                disputes={metricsRows}
+                recoveredLabel="₹2.1K"
+                recoveredTrendPct={19}
+                recoveredTrend={RECOVERED_TREND}
+                reasonBreakdown={reasonBreakdown}
               />
+            </div>
 
-              <div className="hidden sm:block h-4 w-px bg-border" />
+            <DataTableCard<DisputeRow>
+              // Flat table: no lift on the card itself or on the buttons and chips
+              // inside it. The metrics cards above keep flux's default shadow.
+              className="shadow-none [&_.shadow-sm]:shadow-none"
+              tabs={
+                <SegmentedTabs
+                  options={DISPUTE_STATUS_SEGMENTS}
+                  value={statusSegment}
+                  onChange={(v) => setStatusSegment(v as DisputeStatusSegment)}
+                />
+              }
+              toolbar={
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <RotatingSearchInput
+                    value={search}
+                    onSearch={setSearch}
+                    words={["customer name, email or dispute ID"]}
+                    className="min-w-40 max-w-xs flex-1"
+                  />
 
-              {/* One group for the row, so clicking from one open chip to the
+                  <div className="hidden sm:block h-4 w-px bg-border" />
+
+                  {/* One group for the row, so clicking from one open chip to the
                   next closes the first and leaves the second open. Without it
                   each chip holds its own state and the outgoing one's focus
                   restore dismisses the incoming one. */}
-              <FilterChipGroup className="flex items-center gap-2 flex-wrap">
-                <MultiSelectChipFilter
-                  value={statusFilter}
-                  options={STATUS_FILTER_OPTIONS}
-                  onChange={setStatusFilter}
-                  placeholder="Status"
-                />
-                <DisputeReasonFilter value={reason} onChange={setReason} />
-                <TransactionAmountFilter value={amountRange} onChange={setAmountRange} />
-                <TransactionDateTimeFilter
-                  value={disputedDate}
-                  onChange={setDisputedDate}
-                  triggerLabel="Disputed Date"
-                />
-              </FilterChipGroup>
+                  <FilterChipGroup className="flex items-center gap-2 flex-wrap">
+                    <MultiSelectChipFilter
+                      value={statusFilter}
+                      options={STATUS_FILTER_OPTIONS}
+                      onChange={setStatusFilter}
+                      placeholder="Status"
+                    />
+                    <DisputeReasonFilter value={reason} onChange={setReason} />
+                    <TransactionAmountFilter value={amountRange} onChange={setAmountRange} />
+                    <TransactionDateTimeFilter
+                      value={disputedDate}
+                      onChange={setDisputedDate}
+                      triggerLabel="Disputed Date"
+                    />
+                  </FilterChipGroup>
 
-              {hasActive && (
+                  {hasActive && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      leftIcon={<Icon name="x" className="w-3 h-3" />}
+                      onClick={onClear}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </Button>
+                  )}
+
+                  <div className="ml-auto flex items-center gap-2">
+                    <ColumnManager
+                      columns={DISPUTE_COLUMN_DEFS}
+                      order={columnOrder}
+                      onOrderChange={setColumnOrder}
+                      hiddenKeys={[...hiddenColumns]}
+                      onHiddenKeysChange={(next) => setHiddenColumns(new Set(next))}
+                      onReset={onResetColumns}
+                    />
+                  </div>
+                </div>
+              }
+              columns={columns}
+              data={pageRows}
+              // A search or filter that matches nothing says so, rather than
+              // claiming the merchant has never had a dispute.
+              emptyTitle={hasActive ? "No disputes match these filters" : "No disputes yet"}
+              emptyDescription={
+                hasActive
+                  ? "Try a wider date range, or clear a filter to see more."
+                  : "Disputed payments will appear here as they come in."
+              }
+              rowKey={(row) => row.disputeId}
+              pagination={{
+                mode: "page",
+                page,
+                pageSize: PAGE_SIZE,
+                total: sortedRows.length,
+                onPageChange: (next) => setPageState({ key: filterKey, page: next }),
+              }}
+              // The whole row opens the dispute; clicks on the row's own
+              // buttons are skipped by DataTable, so View details does only its
+              // own job.
+              onRowClick={onViewDetails}
+              rowAction={(row) => (
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
-                  leftIcon={<Icon name="x" className="w-3 h-3" />}
-                  onClick={onClear}
-                  className="text-muted-foreground hover:text-foreground"
+                  onClick={() => onViewDetails(row)}
+                  rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+                  className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
                 >
-                  Clear
+                  View details
                 </Button>
               )}
+              maxBodyHeight="none"
+            />
+          </div>
+        )}
+      </div>
 
-              <div className="ml-auto flex items-center gap-2">
-                <ColumnManager
-                  columns={DISPUTE_COLUMN_DEFS}
-                  order={columnOrder}
-                  onOrderChange={setColumnOrder}
-                  hiddenKeys={[...hiddenColumns]}
-                  onHiddenKeysChange={(next) => setHiddenColumns(new Set(next))}
-                  onReset={onResetColumns}
-                />
-              </div>
+      <DisputeDetailsDrawer
+        transaction={transaction}
+        dispute={dispute}
+        flow={flow}
+        open={drawerOpen}
+        onOpenChange={onDrawerOpenChange}
+        onExpand={expandToPage}
+        instant={instantDrawer}
+      />
+      {transaction && dispute && (
+        <DisputeFlowDialogs dispute={dispute} transaction={transaction} flow={flow} />
+      )}
+      {morph && transaction && dispute && (
+        <DrawerExpandMorph
+          key={morph.kind}
+          morph={morph}
+          drawerWidthPx={PA_DRAWER_WIDTH_PX}
+          // The drawer's and the page's real insides; the layer is inert,
+          // so their handlers never fire.
+          drawerContent={
+            <DisputeDrawerBody transaction={transaction} dispute={dispute} flow={flow} />
+          }
+          pageContent={
+            <div className="[&_.shadow-sm]:shadow-none">
+              <DisputeDetailView
+                transaction={transaction}
+                dispute={dispute}
+                flow={flow}
+                layout="page"
+                backLabel="Back to Dispute Management"
+                onBack={() => {}}
+                onCollapse={() => {}}
+                decorative
+              />
             </div>
           }
-          columns={columns}
-          data={pageRows}
-          // A search or filter that matches nothing says so, rather than
-          // claiming the merchant has never had a dispute.
-          emptyTitle={hasActive ? "No disputes match these filters" : "No disputes yet"}
-          emptyDescription={
-            hasActive
-              ? "Try a wider date range, or clear a filter to see more."
-              : "Disputed payments will appear here as they come in."
-          }
-          rowKey={(row) => row.disputeId}
-          pagination={{
-            mode: "page",
-            page,
-            pageSize: PAGE_SIZE,
-            total: sortedRows.length,
-            onPageChange: (next) => setPageState({ key: filterKey, page: next }),
-          }}
-          // The whole row opens the dispute; clicks on the row's own
-          // buttons are skipped by DataTable, so View details does only its
-          // own job.
-          onRowClick={onViewDetails}
-          rowAction={(row) => (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onViewDetails(row)}
-              rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-              className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-            >
-              View details
-            </Button>
-          )}
-          maxBodyHeight="none"
+          onCovered={() => setPageOpen(false)}
+          onArrive={morph.kind === "expand" ? showPage : () => setDrawerOpen(true)}
+          onDone={() => setMorph(null)}
         />
-      </div>
+      )}
     </div>
   );
 }
