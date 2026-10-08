@@ -12,10 +12,6 @@ import { useDisputeResolutions } from "@/stores/useDisputeResolutions";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 import {
-  TransactionAmountFilter,
-  type AmountRangeValue,
-} from "@/features/dashboard/pa-transactions/components/TransactionAmountFilter";
-import {
   TransactionDateTimeFilter,
   type TransactionDateTimeValue,
 } from "@/features/dashboard/pa-transactions/components/TransactionDateTimeFilter";
@@ -139,7 +135,6 @@ export function DisputeManagementFeature() {
   const [statusSegment, setStatusSegment] = useState<DisputeStatusSegment>("action-required");
   const [statusFilter, setStatusFilter] = useState<string[] | undefined>(undefined);
   const [reason, setReason] = useState<string | undefined>(undefined);
-  const [amountRange, setAmountRange] = useState<AmountRangeValue | undefined>(undefined);
   const [disputedDate, setDisputedDate] = useState<TransactionDateTimeValue | undefined>(undefined);
   const [columnOrder, setColumnOrder] = useState<string[]>(DISPUTE_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
@@ -151,7 +146,6 @@ export function DisputeManagementFeature() {
     search,
     statusFilter,
     reason,
-    amountRange,
     disputedDate,
   ]);
   const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
@@ -178,10 +172,6 @@ export function DisputeManagementFeature() {
         return false;
       }
       if (reason && row.reason !== reason) return false;
-      if (amountRange) {
-        if (amountRange.min != null && row.amount < amountRange.min) return false;
-        if (amountRange.max != null && row.amount > amountRange.max) return false;
-      }
       if (disputedDate) {
         const ts = parseFormattedDate(row.disputedOn);
         if (ts == null) return false;
@@ -198,15 +188,14 @@ export function DisputeManagementFeature() {
       }
       return true;
     });
-  }, [rows, statusSegment, statusFilter, reason, amountRange, disputedDate, search]);
+  }, [rows, statusSegment, statusFilter, reason, disputedDate, search]);
 
   const hasActive =
-    !!statusFilter?.length || !!reason || !!amountRange || !!disputedDate || search !== "";
+    !!statusFilter?.length || !!reason || !!disputedDate || search !== "";
 
   const onClear = () => {
     setStatusFilter(undefined);
     setReason(undefined);
-    setAmountRange(undefined);
     setDisputedDate(undefined);
     setSearch("");
   };
@@ -315,7 +304,6 @@ export function DisputeManagementFeature() {
                   placeholder="Status"
                 />
                 <DisputeReasonFilter value={reason} onChange={setReason} />
-                <TransactionAmountFilter value={amountRange} onChange={setAmountRange} />
                 <TransactionDateTimeFilter
                   value={disputedDate}
                   onChange={setDisputedDate}

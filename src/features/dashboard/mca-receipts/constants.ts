@@ -72,13 +72,6 @@ export const RECEIPT_MONTH_HINT =
   "This receipt covers all payments made during the selected month.";
 
 /**
- * Assistive line inside the Amount filter's popover. Names what the two inputs
- * are compared against, since a receipt's amount is a whole month's fees rather
- * than any single payment, and every receipt is billed in INR.
- */
-export const RECEIPT_AMOUNT_HINT = "Matched against the receipt's total for the month, in INR.";
-
-/**
  * The hints the search box cycles through, exactly as the Transactions page
  * cycles remitter/transaction ID/UTR: each names a field the query is matched
  * against, and the query hits any of them (see filterReceipts). Rendered as
