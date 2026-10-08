@@ -115,7 +115,7 @@ function PaymentMethodCell({ row }: { row: PaTransaction }) {
   return (
     <div className="flex items-center gap-1.5">
       {logo}
-      <span className="text-[13px] text-muted-foreground font-mono">
+      <span className="text-[13px] text-foreground font-mono">
         {last4 ? `••• ${last4}` : "•••••••"}
       </span>
     </div>
@@ -182,7 +182,7 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
         return (
           <span className="flex items-center gap-2 whitespace-nowrap">
             {iso2 && <CountryFlag iso2={iso2} alt="" />}
-            <span className="text-[13px] text-muted-foreground lowercase">
+            <span className="text-[13px] text-foreground lowercase">
               {row.encEmailId ?? "—"}
             </span>
           </span>
