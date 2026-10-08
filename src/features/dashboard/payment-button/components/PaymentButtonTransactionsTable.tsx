@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Button,
@@ -55,6 +54,7 @@ import type {
   PaTransactionsResponse,
 } from "@/features/dashboard/pa-transactions/types";
 import type { TableReqBody } from "@/types/transactions";
+import { TransactionDetailsDrawer } from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
 
 /** Tabs: All, then each PA status the Transactions page's pills already name. */
 const VIEW_TABS = PA_STATUS_FILTERS.map((opt) => ({
@@ -161,7 +161,6 @@ export function PaymentButtonTransactionsTable({
   /** The "no payments yet" description. */
   emptyDescription?: string;
 }) {
-  const router = useRouter();
   const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
   // Partners address the search by MID in the path; everyone else sends "".
   const { urlMid } = useResolvedMids("PA");
@@ -260,8 +259,15 @@ export function PaymentButtonTransactionsTable({
         description: emptyDescription,
       };
 
+  // A row opens the Transactions page's details drawer in place, as the
+  // Transactions list does. The row is kept apart from the open flag so the
+  // drawer keeps its content while it slides shut; its own Expand opens the
+  // transaction's full page.
+  const [drawerRow, setDrawerRow] = useState<PaTransaction | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const openTransaction = (row: PaTransaction) => {
-    if (row.gid) router.push(`/pa-transactions/${encodeURIComponent(row.gid)}`);
+    setDrawerRow(row);
+    setDrawerOpen(true);
   };
 
   const handleRefresh = async () => {
@@ -501,6 +507,12 @@ export function PaymentButtonTransactionsTable({
           pagination={pagination}
         />
       </div>
+
+      <TransactionDetailsDrawer
+        transaction={drawerRow}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </>
   );
 }
