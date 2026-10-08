@@ -283,7 +283,7 @@ export function ManageMandatesTable() {
       onClick={() => download(buildMandateReportBody(startTime, endTime))}
       isLoading={isDownloading}
       disabled={!canDownload}
-      className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+      className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
     >
       Report
     </Button>
@@ -303,7 +303,7 @@ export function ManageMandatesTable() {
           }
           onClick={() => void handleRefresh()}
           disabled={isFetching || !body}
-          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+          className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
         >
           Refresh
         </Button>

@@ -15,8 +15,9 @@ import {
 import type { BadgeVariant } from "@payglocal_ui/flux-ui";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import { Icon, type IconName } from "@/components/icon";
-import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
+import { formatCurrency, formatTransactionTimestamp, truncateId } from "@/lib/utils/format";
 import type { InvoiceLink } from "@/features/dashboard/invoice-links/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 type StatusMeta = { label: string; variant: BadgeVariant };
 
@@ -196,8 +197,10 @@ function RowActionsMenu({ actions }: { actions: RowAction[] }) {
 }
 
 /**
- * The eight data columns, in pg-dashboard's order (INVOICE_LINKS_COLUMNS),
- * plus the row-action menu when handlers are supplied.
+ * The eight data columns, in pg-dashboard's order (INVOICE_LINKS_COLUMNS)
+ * except that Amount and Status lead, as they do in every other table here,
+ * plus the
+ * row-action menu when handlers are supplied.
  */
 export function buildInvoiceLinkColumns(opts?: {
   midType: string;
@@ -205,32 +208,17 @@ export function buildInvoiceLinkColumns(opts?: {
 }): Column<InvoiceLink>[] {
   const columns: Column<InvoiceLink>[] = [
     {
-      key: "id",
-      header: "Invoice ID",
-      minWidth: 170,
-      render: (row) => <CopyableCell value={row.id} label="Invoice ID" />,
-    },
-    {
-      key: "plId",
-      header: "PL ID",
-      minWidth: 170,
-      render: (row) =>
-        row.plId ? <CopyableCell value={row.plId} label="PL ID" /> : <span>-</span>,
-    },
-    {
       key: "totalAmount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 140,
       align: "right",
       render: (row) => {
         const currency = row.txnCurrency || "INR";
         return (
-          <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-            <span className="text-[13px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(parseFloat(row.totalAmount ?? "0"), currency)}
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground">{currency}</span>
-          </div>
+          <AmountWithCode
+            amount={formatCurrency(parseFloat(row.totalAmount ?? "0"), currency)}
+            code={currency}
+          />
         );
       },
     },
@@ -244,10 +232,42 @@ export function buildInvoiceLinkColumns(opts?: {
       },
     },
     {
+      key: "id",
+      header: "Invoice ID",
+      minWidth: 170,
+      render: (row) => <CopyableCell value={row.id} label="Invoice ID" />,
+    },
+    {
+      key: "plId",
+      header: "PL ID",
+      minWidth: 170,
+      render: (row) =>
+        row.plId ? (
+          <CopyableCell
+            // Shortened in the middle so the column stays narrow; the full
+            // PL ID is what's copied (and in the tooltip).
+            value={truncateId(row.plId)}
+            copyValue={row.plId}
+            label="PL ID"
+          />
+        ) : (
+          <span>-</span>
+        ),
+    },
+    {
       key: "merchantReferenceId",
       header: "Merchant Reference No",
       minWidth: 190,
-      render: (row) => <span className="text-foreground">{row.merchantReferenceId || "-"}</span>,
+      render: (row) =>
+        row.merchantReferenceId ? (
+          <CopyableCell
+            value={row.merchantReferenceId}
+            label="Merchant reference no"
+            valueClassName="text-foreground"
+          />
+        ) : (
+          <span className="text-foreground">-</span>
+        ),
     },
     {
       // Source renders the email as the cell and hangs a tooltip carrying
@@ -291,9 +311,9 @@ export function buildInvoiceLinkColumns(opts?: {
       // rather than rendering whatever the field happens to hold.
       render: (row) =>
         row.status?.toUpperCase() === "DRAFT" ? (
-          <span>-</span>
+          <span className="text-[13px] text-muted-foreground">-</span>
         ) : (
-          <span>
+          <span className="text-[13px] text-muted-foreground whitespace-nowrap">
             {row.formattedDueDate ? formatTransactionTimestamp(row.formattedDueDate) : "-"}
           </span>
         ),
@@ -306,7 +326,7 @@ export function buildInvoiceLinkColumns(opts?: {
       // literal that prints "record" after every timestamp (columns.tsx, the
       // Created On column). That is a source defect and is not carried over.
       render: (row) => (
-        <span>
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
           {row.formattedCreationTime ? formatTransactionTimestamp(row.formattedCreationTime) : "-"}
         </span>
       ),

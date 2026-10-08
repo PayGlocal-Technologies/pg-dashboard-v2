@@ -14,6 +14,7 @@ import type { McaSettlementPayment } from "@/features/dashboard/settlement-repor
 import { settlementListPath } from "@/features/dashboard/settlement-reports/routes";
 import { toProductType, type NavContext } from "@/stores/useProductContext";
 import { useSettlementReportDownload } from "@/features/dashboard/settlement-reports/hooks";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 interface BreakupRowProps {
   label: string;
@@ -78,16 +79,11 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
   return [
     {
       key: "amount",
-      header: "Amount",
+      header: <AmountHeader />,
+      align: "right",
       minWidth: 130,
-      cellClassName: "pl-5",
       render: (p) => (
-        <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-          <span className="font-semibold tabular-nums text-[13px] text-foreground">
-            {formatCurrency(p.amount, p.currency)}
-          </span>
-          <span className="text-[11px] font-medium text-muted-foreground">{p.currency}</span>
-        </div>
+        <AmountWithCode amount={formatCurrency(p.amount, p.currency)} code={p.currency} />
       ),
     },
     {

@@ -16,6 +16,7 @@ import type {
   SettlementRow,
   SettlementStatus,
 } from "@/features/dashboard/settlement-reports/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 /** Processing reads as in flight, Settled as done: the same chip vocabulary
  *  as the transactions tables. */
@@ -164,7 +165,6 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
               value={row.merchantId}
               copyValue={row.merchantId}
               label="Merchant ID"
-              monospace
               className="text-primary/80 transition-colors hover:text-primary"
             />
           ) : (
@@ -182,7 +182,6 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
               value={row.settlementId}
               copyValue={row.settlementId}
               label="Settlement ID"
-              monospace
               className="text-[13px]"
             />
           ) : (
@@ -218,36 +217,23 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
           if (!utr) {
             return row.status === "PROCESSING" ? <UtrNotGenerated settlementDate={row.id} /> : dash;
           }
-          return (
-            <CopyableCell
-              value={utr}
-              copyValue={utr}
-              label="UTR"
-              monospace
-              className="text-[13px]"
-            />
-          );
+          return <CopyableCell value={utr} copyValue={utr} label="UTR" className="text-[13px]" />;
         },
       };
     }
     case "amount":
       return {
         key: "amount",
-        header: "Amount",
+        header: <AmountHeader />,
         minWidth: 140,
-        // Leads the Payments row, left-aligned like the Transactions table.
-        align: withPayoutDetails ? "left" : "right",
-        cellClassName: "pl-5",
+        // Right-aligned, last digit under the header's last letter (see
+        // AmountCell). The breakup ⓘ leads the figure, so the code stays the
+        // last thing in the cell and the figures stay lined up.
+        align: "right",
         render: (row) => (
           <span className="inline-flex items-center gap-1.5">
-            {/* Amount then its currency code, as the Transactions table. */}
-            <span className="flex items-baseline gap-1.5">
-              <span className="whitespace-nowrap text-[13px] font-semibold text-foreground tabular-nums">
-                {formatCurrency(row.amount, row.currency)}
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
-            </span>
             <AmountBreakup row={row} />
+            <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
           </span>
         ),
       };

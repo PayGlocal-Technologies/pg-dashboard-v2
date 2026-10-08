@@ -42,6 +42,8 @@ import {
   type MappingStatus,
   type ProcessStatus,
 } from "@/features/dashboard/ebrc-generation/types";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 /** What the search actually matches. The box's text is sent as a full-text
  *  `queryString`, so it spans the whole record — these are the fields worth
@@ -121,7 +123,7 @@ function IrmDetailDrawer({
         {row && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
             <div className="flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate font-mono text-[13px] font-semibold text-foreground">
+              <p className="min-w-0 truncate tabular-nums text-[13px] font-semibold text-foreground">
                 IRM: {row.irmNumber}
               </p>
               {row.processStatus !== "PENDING" && (
@@ -256,18 +258,22 @@ export function IrmRepositoryFeature() {
       key: "issueDate",
       header: "Issue date",
       minWidth: 110,
-      render: (row) =>
-        formatDate(row.issueDate, { day: "2-digit", month: "short", year: "numeric" }),
+      render: (row) => (
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {formatDate(row.issueDate, { day: "2-digit", month: "short", year: "numeric" })}
+        </span>
+      ),
     },
     {
       key: "remittanceAmount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 140,
       align: "right",
       render: (row) => (
-        <span className="whitespace-nowrap tabular-nums">
-          {formatCurrency(row.remittanceAmount, row.currencyCode)} {row.currencyCode}
-        </span>
+        <AmountWithCode
+          amount={formatCurrency(row.remittanceAmount, row.currencyCode)}
+          code={row.currencyCode}
+        />
       ),
     },
     {
@@ -309,7 +315,7 @@ export function IrmRepositoryFeature() {
           type="button"
           variant="link"
           size="sm"
-          className="h-auto min-h-0 p-0 font-mono text-[12.5px]"
+          className="h-auto min-h-0 p-0 tabular-nums text-[12.5px]"
           onClick={() => setOpenRow(row)}
         >
           {row.irmNumber}
@@ -391,7 +397,7 @@ export function IrmRepositoryFeature() {
                 }
                 disabled={isRefreshing}
                 onClick={refresh}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               >
                 Refresh
               </Button>
@@ -413,24 +419,26 @@ export function IrmRepositoryFeature() {
 
           <DataTable
             className="rounded-none border-0"
-            columns={orderedColumns}
+            columns={[
+              ...orderedColumns,
+              rowActionColumn<IrmRepositoryRow>((row) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOpenRow(row)}
+                  className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+                >
+                  View details
+                </Button>
+              )),
+            ]}
             data={rows}
             rowKey={(row) => row.id}
             onRowClick={setOpenRow}
             // Hidden until the row is hovered/focused — DataTable's own
             // rowAction slot handles the opacity reveal, same treatment the
             // Transactions table's row-level "View details" uses.
-            rowAction={(row) => (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setOpenRow(row)}
-                className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-              >
-                View details
-              </Button>
-            )}
             isLoading={isLoading}
             skeletonRows={pageSize}
             emptyTitle={isError ? "Couldn't load IRMs" : "No IRMs found"}

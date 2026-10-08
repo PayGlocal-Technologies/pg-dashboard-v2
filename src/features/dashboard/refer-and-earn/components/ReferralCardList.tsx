@@ -74,7 +74,7 @@ export function RedemptionCard({ row }: { row: ReferralRedemption }) {
   return (
     <div className="flex flex-col rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center gap-3">
-        <span className="min-w-0 truncate font-mono text-[12px] text-muted-foreground">
+        <span className="min-w-0 truncate tabular-nums text-[12px] text-muted-foreground">
           {row.id}
         </span>
         <span className="ml-auto shrink-0 whitespace-nowrap text-[13px] font-semibold tabular-nums text-foreground">

@@ -47,7 +47,7 @@ export function LinkedId({
         title={id}
         aria-label={`Open ${label} ${id}`}
         onClick={onOpen}
-        className="h-auto min-h-0 p-0 font-mono text-[12.5px] font-medium whitespace-nowrap"
+        className="h-auto min-h-0 p-0 tabular-nums text-[12.5px] font-medium whitespace-nowrap"
       >
         {truncate ? truncateId(id) : id}
       </Button>

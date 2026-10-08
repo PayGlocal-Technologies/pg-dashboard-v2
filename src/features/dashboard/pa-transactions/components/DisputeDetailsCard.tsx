@@ -32,7 +32,6 @@ export function DisputeDetailsCard({ dispute, transaction, currency }: DisputeDe
               value={truncateId(dispute.disputeId)}
               copyValue={dispute.disputeId}
               label="Dispute ID"
-              monospace
               className="font-medium text-foreground"
             />
           </span>

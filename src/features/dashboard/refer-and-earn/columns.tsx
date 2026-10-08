@@ -137,7 +137,7 @@ export function buildRedemptionColumns(): Column<ReferralRedemption>[] {
       key: "id",
       header: "Reference number",
       render: (row) => (
-        <span className="block max-w-[20rem] truncate font-mono text-[12px] text-muted-foreground">
+        <span className="block max-w-[20rem] truncate tabular-nums text-[12px] text-muted-foreground">
           {row.id}
         </span>
       ),

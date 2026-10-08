@@ -102,21 +102,13 @@ export function InvoiceLinksFeature() {
  * is the list-side door to it.
  *
  * Templates live under one MID's path, so the store is addressed to the MID
- * the editor would write against. "Edit" selects that MID before opening the
- * editor, so the template is read from the account it was listed under.
+ * the editor would write against. Rename and delete only here: no open-in-
+ * editor (↗) action on this page.
  */
 function ManageTemplatesAction() {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const mid = useInvoiceEditorMid();
   const templateStore = useInvoiceLinkTemplates(mid);
-  const { selectMid } = useInvoiceLinkMidScope();
-
-  const handleEditTemplate = (templateId: string) => {
-    setOpen(false);
-    if (mid) selectMid(mid);
-    router.push(`/invoice-links/create?templateId=${encodeURIComponent(templateId)}`);
-  };
 
   return (
     <>
@@ -137,7 +129,6 @@ function ManageTemplatesAction() {
         isMutating={templateStore.isMutating}
         onRename={templateStore.rename}
         onDelete={templateStore.remove}
-        onEdit={handleEditTemplate}
       />
     </>
   );

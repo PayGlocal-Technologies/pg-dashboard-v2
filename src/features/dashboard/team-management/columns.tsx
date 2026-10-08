@@ -30,7 +30,7 @@ export const teamMemberColumns: Column<TeamMemberRow>[] = [
     key: "username",
     header: "Username",
     minWidth: 150,
-    render: (row) => <CopyableCell value={row.username} label="Username" monospace />,
+    render: (row) => <CopyableCell value={row.username} label="Username" />,
   },
   {
     key: "role",
@@ -47,7 +47,7 @@ export const teamMemberColumns: Column<TeamMemberRow>[] = [
     header: "Merchant ID",
     minWidth: 140,
     render: (row) => (
-      <span className="whitespace-nowrap font-mono text-[13px] text-muted-foreground">
+      <span className="whitespace-nowrap tabular-nums text-[13px] text-muted-foreground">
         {row.merchantId}
       </span>
     ),

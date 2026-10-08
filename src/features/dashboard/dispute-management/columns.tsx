@@ -9,6 +9,7 @@ import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithToolt
 import { formatFee } from "@/features/dashboard/pa-transactions/status/disputeStages";
 import { DISPUTE_STATUS_META } from "@/features/dashboard/pa-transactions/status/disputeStatus";
 import type { DisputeResolution, DisputeRow } from "@/features/dashboard/dispute-management/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // Reuses DISPUTE_STATUS_META as-is, same chip labels/colors as the disputed
 // rows already shown in the Transactions table, so a dispute looks
@@ -194,18 +195,11 @@ function buildColumn(key: string): Column<DisputeRow> | null {
     case "amount":
       return {
         key: "amount",
-        header: "Amount",
+        header: <AmountHeader />,
+        align: "right",
         minWidth: 135,
-        // Left-aligned (not "right") and padded to match the toolbar above
-        // it, same fix as the Transactions table's Amount column.
-        cellClassName: "pl-5",
         render: (row) => (
-          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="text-[13px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(row.amount, row.currency)}
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
-          </div>
+          <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
         ),
       };
     case "status":

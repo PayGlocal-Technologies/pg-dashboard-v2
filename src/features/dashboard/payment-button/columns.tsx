@@ -13,6 +13,7 @@ import {
   DESIGN_ONLY_FIELDS_ENABLED,
 } from "@/features/dashboard/payment-button/constants";
 import type { PaymentButton } from "@/features/dashboard/payment-button/types";
+import { AmountHeader, AmountPlaceholder, AmountWithCode } from "@/components/common/AmountCell";
 
 /** Amount + its currency code, the pair every amount cell in the app renders. */
 export function PaymentButtonAmount({
@@ -23,25 +24,35 @@ export function PaymentButtonAmount({
   size?: "table" | "card";
 }) {
   // Not in the list API yet (see PaymentButton): a bare dash, no stray code.
+  // In the table, everything ends where the figures do: right-aligned, last
+  // digit under the header's last letter (see AmountCell).
+  const inTable = size === "table";
   if (row.amountType === null || (row.amountType === "FIXED" && !row.currency)) {
-    return <span className="text-[13px] text-muted-foreground">—</span>;
+    return inTable ? (
+      <AmountPlaceholder className="text-[13px] text-muted-foreground">—</AmountPlaceholder>
+    ) : (
+      <span className="text-[13px] text-muted-foreground">—</span>
+    );
   }
   if (row.amountType === "CUSTOMER_DECIDES") {
-    return (
+    return inTable ? (
+      <AmountPlaceholder className="text-[13px] whitespace-nowrap text-muted-foreground">
+        {CUSTOMER_DECIDES_LABEL}
+      </AmountPlaceholder>
+    ) : (
       <span className="text-[13px] whitespace-nowrap text-muted-foreground">
         {CUSTOMER_DECIDES_LABEL}
       </span>
     );
   }
+  if (inTable) {
+    return (
+      <AmountWithCode amount={formatButtonAmount(row.amount, row.currency)} code={row.currency} />
+    );
+  }
   return (
     <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-      <span
-        className={
-          size === "card"
-            ? "text-[15px] font-semibold tabular-nums text-foreground"
-            : "text-[13px] font-semibold tabular-nums text-foreground"
-        }
-      >
+      <span className="text-[15px] font-semibold tabular-nums text-foreground">
         {formatButtonAmount(row.amount, row.currency)}
       </span>
       <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
@@ -131,11 +142,12 @@ const DATA_COLUMNS: Column<PaymentButton>[] = [
     // its right side takes the 14px every other cell has; flux applies
     // cellClassName to the header cell too, so both move together.
     cellClassName: "overflow-visible pl-8 pr-[14px]",
-    render: (row) => <CopyableCell value={row.buttonId} label="Button ID" monospace />,
+    render: (row) => <CopyableCell value={row.buttonId} label="Button ID" />,
   },
   {
     key: "amount",
-    header: "Amount",
+    header: <AmountHeader />,
+    align: "right",
     minWidth: 210,
     cellClassName: CELL_PADDING,
     render: (row) => <PaymentButtonAmount row={row} />,
@@ -196,7 +208,7 @@ const DATA_COLUMNS: Column<PaymentButton>[] = [
 /** A list date, or a dash when the API sent none. */
 function DateCell({ value }: { value: string | null }) {
   return (
-    <span className="text-[13px] whitespace-nowrap text-foreground">
+    <span className="text-[13px] whitespace-nowrap text-muted-foreground">
       {value ? formatTimestamp(value) : "—"}
     </span>
   );

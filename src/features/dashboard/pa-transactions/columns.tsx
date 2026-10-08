@@ -3,11 +3,11 @@
 import type React from "react";
 import { AppImage } from "@/components/common/AppImage";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
-import { type Column, StatusBadge } from "@/components/ui";
+import { type Column, CopyableCell, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
-import { cn } from "@/lib/utils";
-import { formatCurrency, formatTimestamp, truncateMiddle } from "@/lib/utils/format";
+import { formatCurrency, formatTimestamp, truncateId } from "@/lib/utils/format";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -94,6 +94,11 @@ function FallbackBrand({ brand }: { brand?: string }) {
 }
 
 function PaymentMethodCell({ row }: { row: PaTransaction }) {
+  // The customer cancelled before paying, so no method was ever used: a dash,
+  // not a placeholder card glyph that reads as "paid by some card".
+  if (row.externalStatus === "CUSTOMER_CANCELLED") {
+    return <span className="text-[13px] text-muted-foreground">{"\u2014"}</span>;
+  }
   const instrument = row.paymentInstrument?.toUpperCase();
   const last4 = row.maskedCardNumber?.replaceAll("x", "").replaceAll("X", "").trim();
 
@@ -115,7 +120,7 @@ function PaymentMethodCell({ row }: { row: PaTransaction }) {
   return (
     <div className="flex items-center gap-1.5">
       {logo}
-      <span className="text-[13px] text-muted-foreground font-mono">
+      <span className="text-[13px] text-foreground font-mono">
         {last4 ? `••• ${last4}` : "•••••••"}
       </span>
     </div>
@@ -143,19 +148,13 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
   const cols: Column<PaTransaction>[] = [
     {
       key: "totalAmount",
-      header: "Amount",
+      header: <AmountHeader />,
+      align: "right",
       minWidth: 135,
       render: (row) => {
         const currency = row.txnCurrency ?? "INR";
         const amount = parseFloat(row.totalAmount ?? "0");
-        return (
-          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="font-semibold text-foreground tabular-nums text-[13px]">
-              {formatCurrency(amount, currency)}
-            </span>
-            <span className="text-[11px] text-muted-foreground font-medium">{currency}</span>
-          </div>
-        );
+        return <AmountWithCode amount={formatCurrency(amount, currency)} code={currency} />;
       },
     },
     {
@@ -182,9 +181,13 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
         return (
           <span className="flex items-center gap-2 whitespace-nowrap">
             {iso2 && <CountryFlag iso2={iso2} alt="" />}
-            <span className="text-[13px] text-muted-foreground lowercase">
-              {row.encEmailId ?? "—"}
-            </span>
+            {/* Copy button revealed on row hover; it stops propagation, so
+                copying never also opens the row's drawer. */}
+            <CopyableCell
+              value={row.encEmailId}
+              label="Email"
+              valueClassName="text-[13px] text-foreground lowercase"
+            />
           </span>
         );
       },
@@ -194,16 +197,15 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
       header: "Transaction ID",
       minWidth: 155,
       render: (row) => (
-        // Shortened in the middle (the full ID is in the title tooltip and the
-        // details view), so the column stays narrow.
-        <span
-          title={row.gid}
-          className={cn(
-            "text-[13px] font-mono text-muted-foreground transition-colors whitespace-nowrap"
-          )}
-        >
-          {row.gid ? truncateMiddle(row.gid, 4, 4) : "—"}
-        </span>
+        // Shortened in the middle so the column stays narrow; the full ID is
+        // what's copied (and in the tooltip), via the copy button revealed on
+        // row hover.
+        <CopyableCell
+          value={row.gid}
+          display={row.gid ? truncateId(row.gid) : undefined}
+          label="Transaction ID"
+          valueClassName="text-[13px] text-muted-foreground whitespace-nowrap"
+        />
       ),
     },
     {
