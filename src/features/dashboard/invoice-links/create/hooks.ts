@@ -40,7 +40,6 @@ import {
   merchantAdditionalInfoApi,
   merchantProfileApi,
   invoiceLinkConfigApi,
-  paymentLinkFormConfigApi,
 } from "@/features/dashboard/invoice-links/create/services";
 import {
   CLIENT_PICKER_LIMIT,
@@ -291,35 +290,6 @@ export function useInvoiceLinkConfig(mid: string): InvoiceLinkConfig {
     isInvoiceEnabled: data === undefined ? undefined : !!enabled,
     isCustomerSharing: !!pick<boolean>(data, "invoiceCustomerSharing"),
   };
-}
-
-export interface RequiredAddresses {
-  billing: boolean;
-  shipping: boolean;
-}
-
-/**
- * Which address sections this merchant must fill, from the payment-link form
- * config's `plRequiredFields` — gcc forces those sections open and makes
- * street, country, state, city and postcode required in them.
- */
-export function useRequiredAddresses(mid: string): RequiredAddresses {
-  const { data } = useGet<unknown>(
-    ["payment-link-form-config", mid],
-    paymentLinkFormConfigApi(mid),
-    { enabled: !!mid, staleTime: Infinity }
-  );
-  const fields = pick<{ billingAddressRequired?: boolean; shippingAddressRequired?: boolean }>(
-    data,
-    "plRequiredFields"
-  );
-  return useMemo(
-    () => ({
-      billing: !!fields?.billingAddressRequired,
-      shipping: !!fields?.shippingAddressRequired,
-    }),
-    [fields?.billingAddressRequired, fields?.shippingAddressRequired]
-  );
 }
 
 /** Country options for both address sections. */
