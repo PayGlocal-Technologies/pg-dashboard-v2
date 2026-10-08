@@ -1,9 +1,10 @@
 "use client";
 
 import { CopyableCell } from "@/components/ui";
+import { cn } from "@/lib/utils";
 
 /**
- * A monospace value with a copy control.
+ * A value (an ID, typically) with a copy control, in tabular figures.
  *
  * The implementation is flux's `CopyableCell`, which now carries both of this
  * component's shapes — `variant="cell"` makes the whole element the copy
@@ -52,7 +53,6 @@ export function CopyableText({
       value={value}
       display={displayValue}
       variant={variant}
-      monospace
       // The cell form is the clickable one, so it reads in the accent colour
       // the way a link would; inline stays body text.
       accent={variant === "cell"}
@@ -60,7 +60,9 @@ export function CopyableText({
       // The tick and the tooltip are feedback enough here — a toast on every
       // copy of a field on a detail page would be noise.
       showToast={false}
-      valueClassName={valueClassName}
+      // IDs read in the body font with tabular figures, as amounts do, not
+      // monospace.
+      valueClassName={cn("tabular-nums", valueClassName)}
       className={className}
     />
   );

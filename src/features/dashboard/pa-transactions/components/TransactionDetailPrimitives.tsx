@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { toast } from "sonner";
 import { Button, Card, CardContent } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -78,26 +79,50 @@ export function CopyableDetailRow({
   layout = "stacked",
 }: CopyableDetailRowProps) {
   const inline = layout === "inline";
+  if (inline) {
+    const full = copyValue ?? value;
+    return (
+      <div className="group flex items-center justify-between gap-4">
+        <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
+        {/* The copy control sits on the value itself, over its right end.
+            On hover the value's tail dissolves under a gradient mask (the
+            last ~44px fade to nothing), so the button reads cleanly on top
+            without a backing chip. The mask is 44px wider than the value: at
+            rest its fade hangs off the right edge (value fully visible), and
+            hover slides it 44px left onto the value's tail. */}
+        <div className="relative min-w-0">
+          <span
+            title={full}
+            className="block truncate text-right text-[13px] font-medium tabular-nums text-foreground transition-[mask-position] duration-200 [mask-image:linear-gradient(to_left,transparent_0,transparent_20px,black_44px)] [mask-position:0_0] [mask-repeat:no-repeat] [mask-size:calc(100%_+_44px)_100%] group-focus-within:[mask-position:-44px_0] group-hover:[mask-position:-44px_0]"
+          >
+            {value}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label={`Copy ${label}`}
+            onClick={() => {
+              void navigator.clipboard.writeText(full).then(() => toast.success(`${label} copied`));
+            }}
+            className="absolute top-1/2 right-0 h-6 w-6 min-h-0 min-w-0 -translate-y-1/2 rounded-md p-0 text-muted-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-muted hover:text-foreground"
+          >
+            <Icon name="copy" className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    );
+  }
   return (
-    <div
-      className={cn("group flex", inline ? "items-center justify-between gap-4" : "flex-col gap-1")}
-    >
-      <span className={cn("text-[12px] text-muted-foreground", inline && "shrink-0")}>{label}</span>
+    <div className="group flex flex-col gap-1">
+      <span className="text-[12px] text-muted-foreground">{label}</span>
       <CopyableCell
         value={value}
         copyValue={copyValue}
         label={label}
         monospace={monospace}
-        className={cn(
-          "text-[13px] font-medium text-foreground",
-          wrap && "items-start",
-          inline && "min-w-0 justify-end"
-        )}
-        valueClassName={cn(
-          wrap && "whitespace-normal leading-snug wrap-break-word",
-          // Inline: a value that wraps keeps every line on the right edge.
-          inline && "text-right"
-        )}
+        className={cn("text-[13px] font-medium text-foreground", wrap && "items-start")}
+        valueClassName={wrap ? "whitespace-normal leading-snug wrap-break-word" : undefined}
       />
     </div>
   );

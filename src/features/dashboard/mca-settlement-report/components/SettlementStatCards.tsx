@@ -63,7 +63,7 @@ function UtrCopyButton({ utrNumber }: UtrCopyButtonProps) {
   return (
     <div className="mt-1 flex items-center gap-1.5">
       <span className="text-[11px] text-muted-foreground">UTR</span>
-      <span className="whitespace-nowrap font-mono text-xs text-foreground">{utrNumber}</span>
+      <span className="whitespace-nowrap tabular-nums text-xs text-foreground">{utrNumber}</span>
       <Button
         type="button"
         variant="ghost"

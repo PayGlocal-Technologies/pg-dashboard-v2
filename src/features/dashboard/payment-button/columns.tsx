@@ -142,7 +142,7 @@ const DATA_COLUMNS: Column<PaymentButton>[] = [
     // its right side takes the 14px every other cell has; flux applies
     // cellClassName to the header cell too, so both move together.
     cellClassName: "overflow-visible pl-8 pr-[14px]",
-    render: (row) => <CopyableCell value={row.buttonId} label="Button ID" monospace />,
+    render: (row) => <CopyableCell value={row.buttonId} label="Button ID" />,
   },
   {
     key: "amount",
@@ -208,7 +208,7 @@ const DATA_COLUMNS: Column<PaymentButton>[] = [
 /** A list date, or a dash when the API sent none. */
 function DateCell({ value }: { value: string | null }) {
   return (
-    <span className="text-[13px] whitespace-nowrap text-foreground">
+    <span className="text-[13px] whitespace-nowrap text-muted-foreground">
       {value ? formatTimestamp(value) : "—"}
     </span>
   );

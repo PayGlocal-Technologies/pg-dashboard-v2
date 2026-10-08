@@ -59,7 +59,7 @@ function MidRow({
         </span>
         {/* Only worth a line of its own when it is not already the heading. */}
         {name !== mid && (
-          <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
+          <span className="mt-0.5 block truncate tabular-nums text-[11px] text-muted-foreground">
             {mid}
           </span>
         )}

@@ -5,7 +5,7 @@ import { AppImage } from "@/components/common/AppImage";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { type Column, CopyableCell, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
-import { formatCurrency, formatTimestamp, truncateMiddle } from "@/lib/utils/format";
+import { formatCurrency, formatTimestamp, truncateId } from "@/lib/utils/format";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
@@ -202,9 +202,8 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
         // row hover.
         <CopyableCell
           value={row.gid}
-          display={row.gid ? truncateMiddle(row.gid, 4, 4) : undefined}
+          display={row.gid ? truncateId(row.gid) : undefined}
           label="Transaction ID"
-          monospace
           valueClassName="text-[13px] text-muted-foreground whitespace-nowrap"
         />
       ),

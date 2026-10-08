@@ -123,7 +123,7 @@ function IrmDetailDrawer({
         {row && (
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
             <div className="flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate font-mono text-[13px] font-semibold text-foreground">
+              <p className="min-w-0 truncate tabular-nums text-[13px] font-semibold text-foreground">
                 IRM: {row.irmNumber}
               </p>
               {row.processStatus !== "PENDING" && (
@@ -258,8 +258,11 @@ export function IrmRepositoryFeature() {
       key: "issueDate",
       header: "Issue date",
       minWidth: 110,
-      render: (row) =>
-        formatDate(row.issueDate, { day: "2-digit", month: "short", year: "numeric" }),
+      render: (row) => (
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {formatDate(row.issueDate, { day: "2-digit", month: "short", year: "numeric" })}
+        </span>
+      ),
     },
     {
       key: "remittanceAmount",
@@ -312,7 +315,7 @@ export function IrmRepositoryFeature() {
           type="button"
           variant="link"
           size="sm"
-          className="h-auto min-h-0 p-0 font-mono text-[12.5px]"
+          className="h-auto min-h-0 p-0 tabular-nums text-[12.5px]"
           onClick={() => setOpenRow(row)}
         >
           {row.irmNumber}
@@ -394,7 +397,7 @@ export function IrmRepositoryFeature() {
                 }
                 disabled={isRefreshing}
                 onClick={refresh}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               >
                 Refresh
               </Button>

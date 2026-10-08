@@ -60,7 +60,6 @@ function buildColumn(key: string): Column<SettlementRow> | null {
               value={row.merchantId}
               copyValue={row.merchantId}
               label="Merchant ID"
-              monospace
               className="text-primary/80 transition-colors hover:text-primary"
             />
           ) : (

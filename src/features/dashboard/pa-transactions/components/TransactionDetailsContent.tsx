@@ -29,6 +29,7 @@ import {
   TransactionPaymentMethod,
 } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { BankName } from "@/components/common/BankLogo";
+import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { PaymentTimeline } from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
 import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/components/timelineStepFormatting";
 import { validateRefund } from "@/features/dashboard/pa-transactions/financial/deriveFinancials";
@@ -246,9 +247,8 @@ export function TransactionDetailsContent({
             <CopyableDetailRow
               layout="inline"
               label="Transaction ID"
-              value={transaction.gid}
-              monospace
-              wrap
+              value={truncateId(transaction.gid)}
+              copyValue={transaction.gid}
             />
           ) : (
             <DetailRow layout="inline" label="Transaction ID" value="Not available" />
@@ -256,9 +256,8 @@ export function TransactionDetailsContent({
           <CopyableDetailRow
             layout="inline"
             label="Merchant Transaction ID"
-            value={detail.merchantTxnId}
-            monospace
-            wrap
+            value={truncateId(detail.merchantTxnId)}
+            copyValue={detail.merchantTxnId}
           />
           <DetailRow
             layout="inline"

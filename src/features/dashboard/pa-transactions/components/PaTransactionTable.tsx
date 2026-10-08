@@ -292,7 +292,7 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
                 }
                 onClick={() => void handleRefresh()}
                 disabled={isFetching}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground shadow-none hover:text-foreground"
+                className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               >
                 Refresh
               </Button>
@@ -308,8 +308,6 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
                 onHiddenKeysChange={setHiddenColumns}
                 fixedKeys={FIXED_COLUMN_KEYS}
                 fixedReason="Always shown. A transaction row is unreadable without these columns."
-                // Flat, as every surface on this page.
-                className="shadow-none"
               />
             </div>
           </div>

@@ -155,7 +155,7 @@ const transactionColumns: Column<RecentTransaction>[] = [
     header: "Transaction ID",
     minWidth: 150,
     render: (row) => (
-      <span className="cursor-pointer font-mono text-[13px] text-primary/70 transition-colors hover:text-primary">
+      <span className="cursor-pointer tabular-nums text-[13px] text-primary/70 transition-colors hover:text-primary">
         {row.id}
       </span>
     ),
@@ -176,7 +176,7 @@ const settlementColumns: Column<RecentSettlement>[] = [
     header: "Settlement ID",
     minWidth: 170,
     render: (row) => (
-      <span className="cursor-pointer font-mono text-[13px] text-primary/70 transition-colors hover:text-primary">
+      <span className="cursor-pointer tabular-nums text-[13px] text-primary/70 transition-colors hover:text-primary">
         {truncate(row.id, 16)}
       </span>
     ),

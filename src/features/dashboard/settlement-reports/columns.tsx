@@ -165,7 +165,6 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
               value={row.merchantId}
               copyValue={row.merchantId}
               label="Merchant ID"
-              monospace
               className="text-primary/80 transition-colors hover:text-primary"
             />
           ) : (
@@ -183,7 +182,6 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
               value={row.settlementId}
               copyValue={row.settlementId}
               label="Settlement ID"
-              monospace
               className="text-[13px]"
             />
           ) : (
@@ -219,15 +217,7 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
           if (!utr) {
             return row.status === "PROCESSING" ? <UtrNotGenerated settlementDate={row.id} /> : dash;
           }
-          return (
-            <CopyableCell
-              value={utr}
-              copyValue={utr}
-              label="UTR"
-              monospace
-              className="text-[13px]"
-            />
-          );
+          return <CopyableCell value={utr} copyValue={utr} label="UTR" className="text-[13px]" />;
         },
       };
     }

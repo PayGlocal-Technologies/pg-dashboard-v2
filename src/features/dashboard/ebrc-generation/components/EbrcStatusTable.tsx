@@ -149,7 +149,7 @@ function RequestDetailDrawer({
                     <TabsTrigger
                       key={row.irmNumber}
                       value={String(i)}
-                      className="font-mono text-[12px]"
+                      className="tabular-nums text-[12px]"
                     >
                       IRM: {row.irmNumber}
                     </TabsTrigger>
@@ -252,7 +252,7 @@ export function EbrcStatusTable() {
           type="button"
           variant="link"
           size="sm"
-          className="h-auto min-h-0 p-0 font-mono text-[12.5px]"
+          className="h-auto min-h-0 p-0 tabular-nums text-[12.5px]"
           onClick={() => setOpenRequest(row)}
         >
           {row.requestId}
@@ -263,7 +263,7 @@ export function EbrcStatusTable() {
       key: "dgftAckId",
       header: "DGFT Ack. ID",
       minWidth: 130,
-      render: (row) => <span className="font-mono text-[12.5px]">{row.dgftAckId}</span>,
+      render: (row) => <span className="tabular-nums text-[12.5px]">{row.dgftAckId}</span>,
     },
     { key: "iecNumber", header: "IEC Number", minWidth: 110, render: (row) => row.iecNumber },
     {
@@ -289,8 +289,11 @@ export function EbrcStatusTable() {
       key: "createdAt",
       header: "Created At",
       minWidth: 110,
-      render: (row) =>
-        formatDate(row.createdAt, { day: "2-digit", month: "2-digit", year: "numeric" }),
+      render: (row) => (
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {formatDate(row.createdAt, { day: "2-digit", month: "2-digit", year: "numeric" })}
+        </span>
+      ),
     },
   ];
 
@@ -339,7 +342,7 @@ export function EbrcStatusTable() {
               }
               disabled={isRefreshing}
               onClick={refresh}
-              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+              className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
             >
               Refresh
             </Button>

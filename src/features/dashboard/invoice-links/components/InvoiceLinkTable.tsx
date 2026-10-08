@@ -83,9 +83,10 @@ export function InvoiceLinkTable() {
 
   // Row-action surfaces. Each keeps the row it was opened from, so closing one
   // leaves the table's filters, ordering and page exactly as they were.
-  const [previewState, setPreviewState] = useState<{ url: string | null; invoiceId: string | null }>(
-    { url: null, invoiceId: null }
-  );
+  const [previewState, setPreviewState] = useState<{
+    url: string | null;
+    invoiceId: string | null;
+  }>({ url: null, invoiceId: null });
   const [previewOpen, setPreviewOpen] = useState(false);
   const [statusTarget, setStatusTarget] = useState<{
     mid: string;
@@ -104,11 +105,7 @@ export function InvoiceLinkTable() {
 
   const { selectMid } = useInvoiceLinkMidScope();
 
-  const {
-    mutate: downloadReport,
-    isPending: isReportPending,
-    reportMid,
-  } = useInvoiceLinksReport();
+  const { mutate: downloadReport, isPending: isReportPending, reportMid } = useInvoiceLinksReport();
 
   // Report opens the shared "Generate report" drawer, as pg-dashboard's does,
   // pre-filled from the table's Date chip (upstream's setReportRange). It is
@@ -266,11 +263,14 @@ export function InvoiceLinkTable() {
                 variant="outline"
                 size="sm"
                 leftIcon={
-                  <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+                  <Icon
+                    name="refresh"
+                    className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+                  />
                 }
                 onClick={() => void handleRefresh()}
                 disabled={!isReady || isFetching}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               >
                 Refresh
               </Button>
@@ -293,7 +293,7 @@ export function InvoiceLinkTable() {
                 size="sm"
                 leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
                 onClick={openReportDrawer}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               >
                 Report
               </Button>

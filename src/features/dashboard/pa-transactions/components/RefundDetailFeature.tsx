@@ -191,7 +191,6 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
                         value={truncateId(refund.id)}
                         copyValue={refund.id}
                         label="Refund ID"
-                        monospace
                         className="font-semibold text-foreground/85"
                       />
                     </div>
@@ -205,7 +204,6 @@ export function RefundDetailFeature({ transactionId, refundId }: RefundDetailFea
                         value={truncateId(transaction.gid ?? "Not available")}
                         copyValue={transaction.gid ?? ""}
                         label="Parent Transaction ID"
-                        monospace
                         className="font-semibold text-foreground/85"
                       />
                     </div>

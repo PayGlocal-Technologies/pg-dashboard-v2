@@ -55,7 +55,7 @@ export function MandateCard({
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-start justify-between gap-2">
-        <span className="truncate font-mono text-[13px] font-semibold text-foreground">
+        <span className="truncate tabular-nums text-[13px] font-semibold text-foreground">
           {row.maskedMandateId || "—"}
         </span>
         {actions}

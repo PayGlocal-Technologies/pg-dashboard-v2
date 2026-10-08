@@ -15,7 +15,7 @@ import {
 import type { BadgeVariant } from "@payglocal_ui/flux-ui";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import { Icon, type IconName } from "@/components/icon";
-import { formatCurrency, formatTransactionTimestamp, truncateMiddle } from "@/lib/utils/format";
+import { formatCurrency, formatTransactionTimestamp, truncateId } from "@/lib/utils/format";
 import type { InvoiceLink } from "@/features/dashboard/invoice-links/types";
 import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
@@ -246,7 +246,7 @@ export function buildInvoiceLinkColumns(opts?: {
           <CopyableCell
             // Shortened in the middle so the column stays narrow; the full
             // PL ID is what's copied (and in the tooltip).
-            value={truncateMiddle(row.plId, 4, 4)}
+            value={truncateId(row.plId)}
             copyValue={row.plId}
             label="PL ID"
           />
@@ -311,9 +311,9 @@ export function buildInvoiceLinkColumns(opts?: {
       // rather than rendering whatever the field happens to hold.
       render: (row) =>
         row.status?.toUpperCase() === "DRAFT" ? (
-          <span>-</span>
+          <span className="text-[13px] text-muted-foreground">-</span>
         ) : (
-          <span>
+          <span className="text-[13px] text-muted-foreground whitespace-nowrap">
             {row.formattedDueDate ? formatTransactionTimestamp(row.formattedDueDate) : "-"}
           </span>
         ),
@@ -326,7 +326,7 @@ export function buildInvoiceLinkColumns(opts?: {
       // literal that prints "record" after every timestamp (columns.tsx, the
       // Created On column). That is a source defect and is not carried over.
       render: (row) => (
-        <span>
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
           {row.formattedCreationTime ? formatTransactionTimestamp(row.formattedCreationTime) : "-"}
         </span>
       ),

@@ -13,7 +13,7 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
-import { truncateMiddle } from "@/lib/utils/format";
+import { truncateId } from "@/lib/utils/format";
 import { TransactionDetailsContent } from "@/features/dashboard/pa-transactions/components/TransactionDetailsContent";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
@@ -116,7 +116,7 @@ export function TransactionDrawerBody({
         {transaction.gid && (
           <CopyableText
             value={transaction.gid}
-            displayValue={truncateMiddle(transaction.gid, 10, 6)}
+            displayValue={truncateId(transaction.gid)}
             valueClassName="min-w-0 truncate text-muted-foreground"
             className="ml-auto min-w-0"
           />

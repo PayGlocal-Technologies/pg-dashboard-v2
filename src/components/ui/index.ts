@@ -156,7 +156,6 @@ export {
   type RotatingSearchInputProps,
   ToolbarButton,
   // Column manager — the one column editor every grid uses.
-  ColumnManager,
   type ColumnManagerProps,
   type ManagedColumn,
   useColumnPreferences,
@@ -228,3 +227,6 @@ export {
   type SingleSelectOption,
   type SingleSelectProps,
 } from "@payglocal_ui/flux-ui";
+
+// Flux's ColumnManager in the table toolbar's tone, see ColumnManager.tsx.
+export { ColumnManager } from "@/components/ui/ColumnManager";

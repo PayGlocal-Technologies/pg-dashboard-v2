@@ -11,6 +11,8 @@ import {
 import type { SchedulerTxn } from "@/features/dashboard/scheduler/types";
 
 const TEXT = "text-[13px] text-foreground whitespace-nowrap";
+/** Dates and times are muted, as in every table (see pa-transactions). */
+const DATE_TEXT = "text-[13px] text-muted-foreground whitespace-nowrap";
 
 export function SchedulerStatusBadge({ status }: { status: string }) {
   const { label, variant, trailIcon } = getSchedulerStatusMeta(status);
@@ -51,7 +53,7 @@ function amountCell(row: SchedulerTxn) {
 }
 
 function timeCell(value: string) {
-  return <span className={TEXT}>{formatTimestamp(value)}</span>;
+  return <span className={DATE_TEXT}>{formatTimestamp(value)}</span>;
 }
 
 interface ColumnHandlers {

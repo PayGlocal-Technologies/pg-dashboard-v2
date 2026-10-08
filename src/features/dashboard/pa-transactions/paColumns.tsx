@@ -170,7 +170,7 @@ export function formatDisplayDateTime(value?: string): string | null {
 function DateTimeCell({ value }: { value?: string }) {
   const formatted = formatDisplayDateTime(value);
   return (
-    <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+    <span className="whitespace-nowrap text-[12px] font-medium text-muted-foreground">
       {formatted ?? "N/A"}
     </span>
   );

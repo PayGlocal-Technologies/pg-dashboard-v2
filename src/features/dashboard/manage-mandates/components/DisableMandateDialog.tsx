@@ -32,7 +32,7 @@ export function DisableMandateDialog({
                 <DialogTitle>Disable mandate?</DialogTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
                   No further payments will be collected on{" "}
-                  <span className="font-mono">{row.maskedMandateId}</span>.
+                  <span className="tabular-nums">{row.maskedMandateId}</span>.
                 </p>
               </div>
             </div>

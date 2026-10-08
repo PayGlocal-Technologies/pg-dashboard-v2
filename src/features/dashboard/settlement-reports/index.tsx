@@ -83,7 +83,7 @@ const SETTLEMENT_PAGE_LIMIT = 50;
 
 /** The compact outline style of the Transactions table's toolbar actions. */
 const TOOLBAR_BUTTON_CLASS =
-  "h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground";
+  "h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!";
 
 /** The Payments table's two views: payouts still on their way, and paid. */
 const SETTLEMENT_STATUS_TABS = [
