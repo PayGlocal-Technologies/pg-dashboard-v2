@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import {
   Button,
   Command,
@@ -35,7 +36,10 @@ import {
   clientToRecipient,
   validateRecipient,
 } from "@/features/dashboard/invoice-links/create/helpers";
-import { useInvoiceLinkClients } from "@/features/dashboard/invoice-links/create/hooks";
+import {
+  useFetchClientDetails,
+  useInvoiceLinkClients,
+} from "@/features/dashboard/invoice-links/create/hooks";
 import type {
   AddressValues,
   InvoiceRecipient,
@@ -84,9 +88,12 @@ export function RecipientsSection({
   recipients,
   onChange,
   error,
+  requiredAddresses,
 }: {
   mid: string;
   recipients: InvoiceRecipient[];
+  /** From the merchant's payment-link form config: addresses each client must have. */
+  requiredAddresses?: { billing: boolean; shipping: boolean };
   /** An updater, not a value: a client added from the modal lands asynchronously. */
   onChange: (update: RecipientsUpdate) => void;
   /** Section-level error, e.g. nothing picked. */
@@ -106,7 +113,8 @@ export function RecipientsSection({
     return () => clearTimeout(timer);
   }, [query]);
 
-  const { clients, isLoading, isError, refetch, fetchClient } = useInvoiceLinkClients(mid, search);
+  const { clients, isLoading, isError, refetch } = useInvoiceLinkClients(mid, search);
+  const fetchClientDetails = useFetchClientDetails(mid);
 
   const countryMap = useClientCountryMap();
   const { createClient } = useCreateClient(mid);
@@ -114,12 +122,38 @@ export function RecipientsSection({
 
   const selectedIds = useMemo(() => new Set(recipients.map((r) => r.key)), [recipients]);
 
+  /**
+   * Reads a picked client's full record and swaps it in. The search rows the
+   * picker lists carry no address, so a pick is held as "loading" — shown at
+   * once, but blocking Create — until this lands. A client removed meanwhile
+   * stays removed: the swap only touches a row that is still there.
+   */
+  const loadDetails = (clientId: string) => {
+    onChange((prev) =>
+      prev.map((r) => (r.key === clientId ? { ...r, detailsStatus: "loading" } : r))
+    );
+    fetchClientDetails(clientId)
+      .then((full) =>
+        onChange((prev) => prev.map((r) => (r.key === clientId ? clientToRecipient(full) : r)))
+      )
+      .catch(() =>
+        onChange((prev) =>
+          prev.map((r) => (r.key === clientId ? { ...r, detailsStatus: "error" } : r))
+        )
+      );
+  };
+
   const toggle = (client: Client) => {
+    if (selectedIds.has(client.id)) {
+      onChange((prev) => prev.filter((r) => r.key !== client.id));
+      return;
+    }
     onChange((prev) =>
       prev.some((r) => r.key === client.id)
-        ? prev.filter((r) => r.key !== client.id)
-        : [...prev, clientToRecipient(client)]
+        ? prev
+        : [...prev, { ...clientToRecipient(client), detailsStatus: "loading" }]
     );
+    loadDetails(client.id);
   };
 
   const remove = (key: string) => onChange((prev) => prev.filter((r) => r.key !== key));
@@ -141,11 +175,17 @@ export function RecipientsSection({
       if (file) uploadContract({ clientId: newClientId, file });
       // Read back rather than rebuilt from the form, so the recipient carries
       // exactly what the server stored (split phone, resolved country).
-      fetchClient(newClientId, (client) =>
-        onChange((prev) =>
-          prev.some((r) => r.key === client.id) ? prev : [...prev, clientToRecipient(client)]
+      fetchClientDetails(newClientId)
+        .then((client) =>
+          onChange((prev) =>
+            prev.some((r) => r.key === client.id) ? prev : [...prev, clientToRecipient(client)]
+          )
         )
-      );
+        .catch(() =>
+          toast.error("Client added, but couldn't be picked", {
+            description: "Search for them in the list to bill them.",
+          })
+        );
     });
 
     setAddClientOpen(false);
@@ -329,7 +369,9 @@ export function RecipientsSection({
       {recipients.length > 0 ? (
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
           {recipients.map((recipient) => {
-            const issues = validateRecipient(recipient);
+            const issues = validateRecipient(recipient, requiredAddresses);
+            const isLoadingDetails = recipient.detailsStatus === "loading";
+            const failedDetails = recipient.detailsStatus === "error";
             const address = formatAddress(recipient.billing);
             return (
               <li key={recipient.key} className="flex items-start gap-3 px-3 py-2.5">
@@ -360,7 +402,26 @@ export function RecipientsSection({
                       Saved on this draft, not linked to a client
                     </p>
                   ) : null}
-                  {issues.length > 0 ? (
+                  {isLoadingDetails ? (
+                    <p className="mt-1 flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                      <Icon name="loader" className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                      Loading their details…
+                    </p>
+                  ) : failedDetails ? (
+                    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-destructive">
+                      <Icon name="alert-circle" className="h-3.5 w-3.5 shrink-0" />
+                      Couldn&apos;t load their details.
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-1.5 text-[12px]"
+                        onClick={() => loadDetails(recipient.key)}
+                      >
+                        Retry
+                      </Button>
+                    </p>
+                  ) : issues.length > 0 ? (
                     <p className="mt-1 flex items-start gap-1.5 text-[12px] text-amber-700 dark:text-amber-500">
                       <Icon name="alert-triangle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       {issues.join(". ")}. Update this client to create their link.

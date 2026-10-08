@@ -211,13 +211,6 @@ export function buildInvoiceLinkColumns(opts?: {
       render: (row) => <CopyableCell value={row.id} label="Invoice ID" />,
     },
     {
-      key: "plId",
-      header: "PL ID",
-      minWidth: 170,
-      render: (row) =>
-        row.plId ? <CopyableCell value={row.plId} label="PL ID" /> : <span>-</span>,
-    },
-    {
       key: "totalAmount",
       header: "Amount",
       minWidth: 140,
