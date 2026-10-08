@@ -78,8 +78,13 @@ export function KeysTable({
     .filter((c) => c.key !== "action")
     .map((c) => ({ key: c.key, label: typeof c.header === "string" ? c.header : c.key }));
 
+  // The certificate tab has no list to fetch (PAYGLOCAL_CERTIFICATE_ROW is
+  // fixed), so its Refresh re-checks the MID's key status instead, which is
+  // what decides whether the API keys tab shows.
+  const refreshing = kind === "certificate" ? scope.isStatusFetching : isFetching;
   const handleRefresh = async () => {
-    const { isError: failed } = await refetch();
+    const { isError: failed } =
+      kind === "certificate" ? await scope.refetchStatus() : await refetch();
     if (failed) toast.error("Couldn't refresh keys. Please try again.");
     else toast.success("Keys updated");
   };
@@ -99,21 +104,19 @@ export function KeysTable({
   // toolbar row of its own would hold nothing but these.
   const controls = (
     <div className="flex items-center justify-end gap-2">
-      {kind !== "certificate" && (
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          leftIcon={
-            <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-          }
-          onClick={() => void handleRefresh()}
-          disabled={isFetching || !scope.mid}
-          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
-        >
-          Refresh
-        </Button>
-      )}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        leftIcon={
+          <Icon name="refresh" className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+        }
+        onClick={() => void handleRefresh()}
+        disabled={refreshing || !scope.mid || scope.isGuestUser}
+        className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+      >
+        Refresh
+      </Button>
       <ColumnManager
         columns={reorderableColumns}
         order={columnOrder ?? reorderableColumns.map((c) => c.key)}

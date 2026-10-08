@@ -50,7 +50,11 @@ export function useKmsScope() {
   const mid = selectedMid || paMids[0] || profile?.mid || "";
   const isPartner = isKmsPartner(profile);
 
-  const { data } = useGet<ApiKeyStatusResponse>(
+  const {
+    data,
+    isFetching: isStatusFetching,
+    refetch: refetchStatus,
+  } = useGet<ApiKeyStatusResponse>(
     ["kms-api-key-status", mid],
     mid ? apiKeyStatusApi(mid) : "",
     undefined,
@@ -63,6 +67,10 @@ export function useKmsScope() {
     isGuestUser,
     apiKeysEnabled: !!data?.data?.apiKeyStatus,
     apiKeyVersion: data?.data?.apiKeyVersion === "VERSION_2" ? ("v2" as const) : ("v1" as const),
+    /** Re-checks whether API keys are on for the MID (the certificate tab's
+     *  Refresh: the certificate itself is fixed, nothing to fetch). */
+    refetchStatus,
+    isStatusFetching,
   };
 }
 

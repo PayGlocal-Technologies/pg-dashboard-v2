@@ -6,7 +6,11 @@ import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { SETTINGS_NAV_GROUPS, type SettingsNavItem } from "@/features/dashboard/settings/constants";
+import {
+  SETTINGS_NAV_GROUPS,
+  type SettingsNavGroup,
+  type SettingsNavItem,
+} from "@/features/dashboard/settings/constants";
 
 function isPathActive(pathname: string, href: string): boolean {
   return pathname.startsWith(href);
@@ -89,10 +93,29 @@ function SettingsNavItemRow({ item, pathname }: { item: SettingsNavItem; pathnam
   );
 }
 
+/** The nav's hrefs are written against /settings; a section mounted
+ *  elsewhere (/pa-settings) gets the same items under its own base. */
+function withBasePath(item: SettingsNavItem, basePath: string): SettingsNavItem {
+  const rebase = (href: string) => href.replace(/^\/settings(?=\/|$)/, basePath);
+  return {
+    ...item,
+    href: rebase(item.href),
+    children: item.children?.map((child) => ({ ...child, href: rebase(child.href) })),
+  };
+}
+
 /** Dedicated left nav for the /settings section, rendered as its own nested
  * column alongside the main app Sidebar (not a replacement for it), see
- * (dashboard)/settings/layout.tsx. */
-export function SettingsSidebar() {
+ * (dashboard)/settings/layout.tsx. `basePath` mounts the same nav under
+ * another section (/pa-settings). */
+export function SettingsSidebar({
+  basePath = "/settings",
+  groups = SETTINGS_NAV_GROUPS,
+}: {
+  basePath?: string;
+  /** The nav to show; /settings' own by default. */
+  groups?: SettingsNavGroup[];
+}) {
   const pathname = usePathname();
 
   return (
@@ -103,14 +126,18 @@ export function SettingsSidebar() {
       </div>
 
       <nav className="mt-6 space-y-5">
-        {SETTINGS_NAV_GROUPS.map((group) => (
+        {groups.map((group) => (
           <div key={group.label}>
             <p className="px-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
               {group.label}
             </p>
             <div className="mt-1.5 space-y-0.5">
               {group.items.map((item) => (
-                <SettingsNavItemRow key={item.href} item={item} pathname={pathname} />
+                <SettingsNavItemRow
+                  key={item.href}
+                  item={withBasePath(item, basePath)}
+                  pathname={pathname}
+                />
               ))}
             </div>
           </div>
