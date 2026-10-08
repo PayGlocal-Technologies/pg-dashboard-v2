@@ -88,7 +88,46 @@ export function AttentionIndicator({
   );
 }
 
-export function ProductBadges({ merchant }: { merchant: PartnerMerchant }) {
+/** Each product's colour, the same as the partner dashboard's product split
+ *  (Payment Gateway blue, MCA green). */
+const PRODUCT_DOT: Record<PartnerMerchant["products"][number], string> = {
+  PG: "var(--chart-1)",
+  MCA: "var(--chart-4)",
+};
+
+/** Full product names, wrapping (the drawer); `compact` is the table's form:
+ *  short codes on one line, each with its colour dot, the full name on
+ *  hover, so a two-product row stays one line high. */
+export function ProductBadges({
+  merchant,
+  compact = false,
+}: {
+  merchant: PartnerMerchant;
+  compact?: boolean;
+}) {
+  if (compact) {
+    return (
+      <span
+        className="flex items-center gap-1.5"
+        aria-label={merchant.products.map((p) => PRODUCT_LABEL[p]).join(", ")}
+      >
+        {merchant.products.map((p) => (
+          <span
+            key={p}
+            title={PRODUCT_LABEL[p]}
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-border bg-card px-1.5 py-0.5 text-[11.5px] font-medium text-foreground/85"
+          >
+            <span
+              aria-hidden
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: PRODUCT_DOT[p] }}
+            />
+            {p}
+          </span>
+        ))}
+      </span>
+    );
+  }
   return (
     <span className="flex flex-wrap gap-1">
       {merchant.products.map((p) => (

@@ -393,6 +393,21 @@ export const partnersNavigation: NavGroup[] = [
           { label: "Webhooks", href: "/partner-webhooks", permission: [] },
         ],
       },
+      // DESIGN MOCK on a sample reseller team, open to everyone in the
+      // Partners context (unlike Account Management's gated live page).
+      {
+        label: "Team Management",
+        href: "/partner-team-management",
+        icon: "user-plus",
+        permission: [],
+      },
+      {
+        label: "Key Management",
+        href: "/partner-key-management",
+        icon: "key-round",
+        permission: [],
+      },
+      { label: "Webhooks", href: "/partner-webhooks", icon: "webhook", permission: [] },
       { label: "Pricing", href: "/pricing", icon: "tag", permission: [] },
     ],
   },

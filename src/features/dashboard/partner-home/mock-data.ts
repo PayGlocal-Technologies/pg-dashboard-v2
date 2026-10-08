@@ -50,6 +50,11 @@ export interface ActionItem {
   issue: string;
   waitingDays: number;
   action: ActionKind;
+  /** Who the reminder or invite goes to. MOCK placeholders (example.com, a
+   *  masked phone), never real contact details. */
+  contact: { name: string; email: string; phone: string };
+  /** The last time the partner followed up, e.g. "Invite sent 3 days ago". */
+  lastContact: string;
 }
 
 export interface Payout {
@@ -140,6 +145,8 @@ export const PARTNER_DASHBOARD_MOCK: PartnerDashboardData = {
       issue: "GST certificate missing from KYB",
       waitingDays: 6,
       action: "send-reminder",
+      contact: { name: "Store owner", email: "owner@kaveri.example.com", phone: "+91 ••••• ••421" },
+      lastContact: "Last reminded 6 days ago",
     },
     {
       id: "a2",
@@ -148,6 +155,12 @@ export const PARTNER_DASHBOARD_MOCK: PartnerDashboardData = {
       issue: "Website and business details incomplete",
       waitingDays: 4,
       action: "complete-for-merchant",
+      contact: {
+        name: "Founder",
+        email: "founder@northwind.example.com",
+        phone: "+91 ••••• ••108",
+      },
+      lastContact: "Signed up 4 days ago",
     },
     {
       id: "a3",
@@ -156,6 +169,8 @@ export const PARTNER_DASHBOARD_MOCK: PartnerDashboardData = {
       issue: "Invite not opened yet",
       waitingDays: 3,
       action: "resend-invite",
+      contact: { name: "Owner", email: "hello@aranya.example.com", phone: "+91 ••••• ••763" },
+      lastContact: "Invite sent 3 days ago",
     },
   ],
   previousPayouts: [

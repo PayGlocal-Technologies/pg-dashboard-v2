@@ -24,7 +24,11 @@ import { Icon } from "@/components/icon";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { buildDepartmentOptions } from "@/features/dashboard/team-management/constants";
 import { iamRolesApi, inviteTempUserApi } from "@/features/dashboard/team-management/services";
-import type { InviteTempUserBody, RolesResponse } from "@/features/dashboard/team-management/types";
+import type {
+  InviteTempUserBody,
+  RolesRecord,
+  RolesResponse,
+} from "@/features/dashboard/team-management/types";
 
 interface AddTeamMemberFormValues {
   firstName: string;
@@ -69,6 +73,20 @@ interface AddTeamMemberModalProps {
   midType: string;
   /** List query key(s) to invalidate on a successful invite. */
   invalidateKey: QueryKey[];
+  /** DESIGN MOCK mode (the Partners → Team Management page): departments
+   *  come from here and an invite calls onInvite instead of the API. */
+  demo?: {
+    roles: RolesRecord[];
+    onInvite: (member: {
+      firstName: string;
+      lastName: string;
+      username: string;
+      department: string;
+      role: string;
+      email: string;
+      phone: string;
+    }) => void;
+  };
 }
 
 export function AddTeamMemberModal({
@@ -77,14 +95,15 @@ export function AddTeamMemberModal({
   mid,
   midType,
   invalidateKey,
+  demo,
 }: AddTeamMemberModalProps) {
   // Roles/departments are fetched live (dynamic on the backend). Enabled only
   // while the dialog is open — the dialog mounts on open, so no lazy refetch
   // dance is needed (unlike pg-dashboard's enabled:false + refetch).
   const rolesQuery = useGet<RolesResponse>(["iam-roles", mid, midType], iamRolesApi(mid, midType), {
-    enabled: open && !!mid,
+    enabled: open && !!mid && !demo,
   });
-  const roles = rolesQuery.data?.data?.roles ?? [];
+  const roles = demo?.roles ?? rolesQuery.data?.data?.roles ?? [];
   const departmentOptions = buildDepartmentOptions(roles);
 
   const { mutate: invite, isPending } = usePost<unknown, InviteTempUserBody>(inviteTempUserApi, {
@@ -97,6 +116,21 @@ export function AddTeamMemberModal({
       // Old dashboard mapping: the dropdown shows `department`, submits it as
       // `department`, and sends the matching role's `name` as `role`.
       const selectedRole = roles.find((r) => r.department === value.department);
+      if (demo) {
+        demo.onInvite({
+          firstName: value.firstName.trim(),
+          lastName: value.lastName.trim(),
+          username: value.username.trim(),
+          department: value.department,
+          role: selectedRole?.name ?? "",
+          email: value.email.trim(),
+          phone: value.phone.trim(),
+        });
+        toast.success("Teammate invited successfully");
+        onOpenChange(false);
+        form.reset();
+        return;
+      }
       const body: InviteTempUserBody = {
         firstName: value.firstName.trim(),
         lastName: value.lastName.trim(),
@@ -202,7 +236,9 @@ export function AddTeamMemberModal({
                   <Select value={field.state.value} onValueChange={(v) => field.handleChange(v)}>
                     <SelectTrigger id="role">
                       <SelectValue
-                        placeholder={rolesQuery.isPending ? "Loading roles…" : "Select a role"}
+                        placeholder={
+                          rolesQuery.isPending && !demo ? "Loading roles…" : "Select a role"
+                        }
                       />
                     </SelectTrigger>
                     <SelectContent>

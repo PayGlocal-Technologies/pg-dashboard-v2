@@ -29,8 +29,8 @@ export function buildMerchantColumns(nowMs: number): Column<PartnerMerchant>[] {
     {
       key: "products",
       header: "Product",
-      minWidth: 170,
-      render: (m) => <ProductBadges merchant={m} />,
+      minWidth: 120,
+      render: (m) => <ProductBadges merchant={m} compact />,
     },
     {
       key: "contact",

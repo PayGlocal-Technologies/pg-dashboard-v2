@@ -1,20 +1,26 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { useApp } from "@/stores/useApp";
-import { TimeRangeTabs } from "@/components/common/TimeRangeTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { McaDashboardAurora } from "@/features/dashboard/mca-home/components/McaDashboardAurora";
-import { McaStatCard } from "@/features/dashboard/mca-home/components/McaStatCard";
 import { OnboardingPipelineCard } from "@/features/dashboard/partner-home/components/OnboardingPipelineCard";
+import { PartnerAttentionCard } from "@/features/dashboard/partner-home/components/PartnerAttentionCard";
+import { PartnerCommissionCard } from "@/features/dashboard/partner-home/components/PartnerCommissionCard";
+import { PartnerQuickAccess } from "@/features/dashboard/partner-home/components/PartnerQuickAccess";
+import { ReferralLinksDialog } from "@/features/dashboard/partner-home/components/ReferralLinksDialog";
+import {
+  MerchantFollowUpDialog,
+  type FollowUpKind,
+} from "@/features/dashboard/partner-home/components/MerchantFollowUpDialog";
 import { PreviousPayoutCard } from "@/features/dashboard/partner-home/components/PreviousPayoutCard";
 import { ReferralLinksCard } from "@/features/dashboard/partner-home/components/ReferralLinksCard";
 import { TopMerchantsCard } from "@/features/dashboard/partner-home/components/TopMerchantsCard";
-import { ProductSplit } from "@/features/dashboard/partner-home/components/ProductSplit";
+import { PartnerMetricTile } from "@/features/dashboard/partner-home/components/PartnerMetricTile";
 import { inr } from "@/features/dashboard/partner-home/format";
 import {
   PARTNER_DASHBOARD_MOCK,
@@ -22,12 +28,6 @@ import {
   type PartnerDashboardData,
   type PartnerPeriod,
 } from "@/features/dashboard/partner-home/mock-data";
-
-const PERIOD_OPTIONS = [
-  { value: "month", label: "This month" },
-  { value: "quarter", label: "Last 3 months" },
-  { value: "year", label: "This year" },
-] as const satisfies readonly { value: PartnerPeriod; label: string }[];
 
 /** Where each dashboard link goes: the routes the Partners navigation
  *  already uses. /my-merchants is listed there but not built yet. */
@@ -60,18 +60,20 @@ function useGreeting() {
 }
 
 /**
- * DESIGN MOCK: the Partner Dashboard (Partners → Home). An operating view,
- * in the MCA dashboard's own components and layout: how the business is
- * doing (KPIs), who needs the partner (pipeline and actions), how to bring
- * more (referral links), what they were last paid, and which merchants earn
- * most.
+ * DESIGN MOCK: the Partner Dashboard (Partners → Home), in the MCA
+ * dashboard's hierarchy:
+ *  1. greeting, with the one primary action (Add merchant);
+ *  2. quick-access pills;
+ *  3. the snapshot: commission earned (with its chart) and the other three
+ *     KPIs under it, beside who needs the partner and the referral links;
+ *  4. "Explore your business": the onboarding pipeline beside the last
+ *     payout, then the top earning merchants.
  */
 export function PartnerDashboardFeature() {
   const router = useRouter();
   const profile = useApp((s) => s.profile);
   const greeting = useGreeting();
   const [period, setPeriod] = useState<PartnerPeriod>("month");
-  const referralRef = useRef<HTMLDivElement>(null);
   const { data, isLoading, isError } = usePartnerDashboard();
 
   const firstName = profile?.firstName || profile?.username || "there";
@@ -84,31 +86,27 @@ export function PartnerDashboardFeature() {
       ? `${attention} ${attention === 1 ? "merchant needs" : "merchants need"} your attention.`
       : `You have ${data.onboarding.live} live ${data.onboarding.live === 1 ? "merchant" : "merchants"}.`;
 
+  // Remind and Resend open their follow-up flow; what was sent this session
+  // marks the row (and stops a second send straight after the first).
+  const [followUp, setFollowUp] = useState<{ kind: FollowUpKind; item: ActionItem } | null>(null);
+  const [followUpOpen, setFollowUpOpen] = useState(false);
+  const [referralOpen, setReferralOpen] = useState(false);
+  const [followedUp, setFollowedUp] = useState<Record<string, FollowUpKind>>({});
+
   function handleAction(item: ActionItem) {
-    // MOCK: no partner action endpoints yet; confirms what would happen.
-    const done = {
-      "send-reminder": `Reminder sent to ${item.merchant}.`,
-      "resend-invite": `Invite resent to ${item.merchant}.`,
-      "complete-for-merchant": `Assisted onboarding for ${item.merchant} isn't connected yet.`,
-    }[item.action];
-    if (item.action === "complete-for-merchant") toast.message(done);
-    else toast.success(done);
+    if (item.action === "send-reminder" || item.action === "resend-invite") {
+      setFollowUp({ kind: item.action, item });
+      setFollowUpOpen(true);
+      return;
+    }
+    // MOCK: assisted onboarding has no flow yet.
+    toast.message(`Assisted onboarding for ${item.merchant} isn't connected yet.`);
   }
 
   const count = (n: number) => n.toLocaleString("en-IN");
   const merchants = (n: number) => `${n} ${n === 1 ? "merchant" : "merchants"}`;
 
   const kpis = [
-    {
-      title: "Commission earned",
-      split: summary.commissionEarned.split,
-      formatSplit: inr,
-      shares: true,
-      valueLabel: inr(summary.commissionEarned.value),
-      trendPct: summary.commissionEarned.changePct,
-      spark: summary.commissionEarned.spark,
-      accentColor: "var(--chart-1)",
-    },
     {
       title: "Gross volume",
       split: summary.grossVolume.split,
@@ -143,43 +141,30 @@ export function PartnerDashboardFeature() {
 
   return (
     <McaDashboardAurora contentClassName="space-y-5">
-      {/* ── Greeting and actions ── */}
+      {/* ── 1. Greeting: one line of context, one primary action ── */}
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-[1.35rem] font-bold leading-snug tracking-tight text-foreground">
             {greeting}, {firstName}
           </h1>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {lead}
-          </p>
+          <p className="mt-0.5 text-[13px] text-muted-foreground">{lead}</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="link" className="h-3.5 w-3.5" />}
-            onClick={() =>
-              referralRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
-            }
-          >
-            Share referral links
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-            onClick={() =>
-              toast.message("Adding a merchant isn't connected yet", {
-                description: "Share a referral link for now.",
-              })
-            }
-          >
-            Add merchant
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="primary"
+          leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+          onClick={() =>
+            toast.message("Adding a merchant isn't connected yet", {
+              description: "Share a referral link for now.",
+            })
+          }
+        >
+          Add merchant
+        </Button>
       </div>
+
+      {/* ── 2. Shortcuts ── */}
+      <PartnerQuickAccess onReferralLinks={() => setReferralOpen(true)} />
 
       {isError ? (
         <PlaceholderState
@@ -190,70 +175,101 @@ export function PartnerDashboardFeature() {
         />
       ) : (
         <>
-          {/* ── Business overview ── */}
-          <section className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
-                Business overview
-              </h2>
-              <TimeRangeTabs
-                options={PERIOD_OPTIONS}
-                value={period}
-                onValueChange={setPeriod}
-                label="Business overview period"
-              />
-            </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {kpis.map(({ split, formatSplit, shares, ...k }) => (
-                <McaStatCard
-                  key={k.title}
-                  data={{ ...k, comparisonLabel: summary.comparisonLabel }}
+          {/* ── 3. Snapshot: what they earn, beside who needs them and how to
+              bring more. The right column stretches to the commission card's
+              height: Needs your attention takes the room, the referral links
+              sit fixed under it, in view without scrolling. */}
+          <div className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
+            {/* Left: the commission card takes whatever height is left once
+                the three compact KPIs under it are placed, so all of it sits
+                in view together. */}
+            <div className="flex flex-col gap-4 lg:col-span-8">
+              <div className="min-h-0 flex-1">
+                <PartnerCommissionCard
+                  kpi={summary.commissionEarned}
+                  comparisonLabel={summary.comparisonLabel}
+                  period={period}
+                  onPeriodChange={setPeriod}
                   isLoading={isLoading}
-                  // The split by product takes the sparkline's place.
-                  footer={<ProductSplit split={split} format={formatSplit} shares={shares} />}
-                />
-              ))}
-            </div>
-          </section>
-
-          {/* ── Attention and merchant performance (wide, left) beside money
-              and growth (narrow, right). Top earning merchants sits under the
-              pipeline rather than full width below both, so the two columns
-              come out about even and neither leaves a gap under it. Below lg
-              it all stacks: pipeline, referral links, payout, top merchants. */}
-          <div className="grid gap-4 lg:grid-cols-12 lg:items-start">
-            <div className="contents lg:col-span-8 lg:flex lg:flex-col lg:gap-4">
-              <OnboardingPipelineCard
-                onboarding={data.onboarding}
-                actionItems={data.actionItems}
-                isLoading={isLoading}
-                onViewAll={() => router.push(ROUTES.merchants)}
-                onAction={handleAction}
-              />
-              <div className="order-last lg:order-none">
-                <TopMerchantsCard
-                  merchants={data.topMerchants}
-                  isLoading={isLoading}
-                  onSeeAll={() => router.push(ROUTES.liveMerchants)}
                 />
               </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {kpis.map(({ split, formatSplit, shares, title, valueLabel, trendPct }) => (
+                  <PartnerMetricTile
+                    key={title}
+                    title={title}
+                    valueLabel={valueLabel}
+                    trendPct={trendPct}
+                    comparisonLabel={summary.comparisonLabel}
+                    split={split}
+                    formatSplit={formatSplit}
+                    shares={shares}
+                    isLoading={isLoading}
+                  />
+                ))}
+              </div>
             </div>
-            <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-4">
-              <div ref={referralRef}>
-                <ReferralLinksCard
-                  links={data.referralLinks}
-                  onViewLinks={() => router.push(ROUTES.referralLinks)}
+            <div className="flex flex-col gap-4 lg:col-span-4">
+              <div className="min-h-0 flex-1">
+                <PartnerAttentionCard
+                  items={data.actionItems}
+                  isLoading={isLoading}
+                  onViewAll={() => router.push(ROUTES.merchants)}
+                  onAction={handleAction}
+                  followedUp={followedUp}
                 />
               </div>
-              <PreviousPayoutCard
-                payouts={data.previousPayouts}
-                isLoading={isLoading}
-                onViewPayouts={() => router.push(ROUTES.payouts)}
+              <ReferralLinksCard
+                links={data.referralLinks}
+                onViewLinks={() => router.push(ROUTES.referralLinks)}
               />
             </div>
           </div>
+
+          {/* ── 4. Deeper insights ── */}
+          <section className="space-y-4 pt-2">
+            <h2 className="text-base font-semibold tracking-[-0.01em] text-foreground">
+              Explore your business
+            </h2>
+
+            <div className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
+              <div className="lg:col-span-8">
+                <OnboardingPipelineCard
+                  onboarding={data.onboarding}
+                  isLoading={isLoading}
+                  onViewAll={() => router.push(ROUTES.merchants)}
+                />
+              </div>
+              <div className="lg:col-span-4">
+                <PreviousPayoutCard
+                  payouts={data.previousPayouts}
+                  isLoading={isLoading}
+                  onViewPayouts={() => router.push(ROUTES.payouts)}
+                />
+              </div>
+            </div>
+
+            <TopMerchantsCard
+              merchants={data.topMerchants}
+              isLoading={isLoading}
+              onSeeAll={() => router.push(ROUTES.liveMerchants)}
+            />
+          </section>
         </>
       )}
+      <ReferralLinksDialog
+        open={referralOpen}
+        onOpenChange={setReferralOpen}
+        links={data.referralLinks}
+        onViewAll={() => router.push(ROUTES.referralLinks)}
+      />
+      <MerchantFollowUpDialog
+        kind={followUp?.kind ?? "send-reminder"}
+        item={followUp?.item ?? null}
+        open={followUpOpen}
+        onOpenChange={setFollowUpOpen}
+        onSent={(item, kind) => setFollowedUp((prev) => ({ ...prev, [item.id]: kind }))}
+      />
     </McaDashboardAurora>
   );
 }

@@ -14,6 +14,11 @@ import { useApp } from "@/stores/useApp";
 import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { teamMemberColumns } from "@/features/dashboard/team-management/columns";
+import {
+  PARTNER_DEMO_MID,
+  PARTNER_DEMO_ROLES,
+  PARTNER_DEMO_TEAM,
+} from "@/features/dashboard/team-management/partnerDemo";
 import { TeamMemberRowActions } from "@/features/dashboard/team-management/components/TeamMemberRowActions";
 import { AddTeamMemberModal } from "@/features/dashboard/team-management/components/AddTeamMemberModal";
 import { DeactivateMemberDialog } from "@/features/dashboard/team-management/components/DeactivateMemberDialog";
@@ -42,16 +47,24 @@ import type {
 } from "@/features/dashboard/team-management/types";
 import type { TableReqBody } from "@/types/transactions";
 
-export function TeamManagementFeature() {
-  const isPartnerUser = useApp((s) => s.isPartnerUser);
+/**
+ * `demo`: the Partners → Team Management page, a DESIGN MOCK on a sample
+ * reseller team (see partnerDemo.ts). No request is made; inviting,
+ * deactivating, reactivating and resending change the sample rows only.
+ */
+export function TeamManagementFeature({ demo = false }: { demo?: boolean } = {}) {
+  const liveIsPartnerUser = useApp((s) => s.isPartnerUser);
+  // The demo is a partner team, but invites are open on it (local only).
+  const isPartnerUser = demo ? false : liveIsPartnerUser;
   const isGuestUser = useApp((s) => s.isGuestUser);
   const profile = useApp((s) => s.profile);
+  const [demoRows, setDemoRows] = useState<TeamMemberRow[]>(PARTNER_DEMO_TEAM);
 
   // Team management is always scoped to the profile MID — the account the
   // signed-in user belongs to — never to a selected sub-MID and never to the
   // UCIC id. Team membership is a property of that account, so it does not
   // follow the header's merchant selection the way the reporting pages do.
-  const mid = profile?.mid ?? "";
+  const mid = demo ? PARTNER_DEMO_MID : (profile?.mid ?? "");
   const midType = profile?.midType ?? "";
 
   const [search, setSearch] = useState("");
@@ -76,7 +89,7 @@ export function TeamManagementFeature() {
   // OUT OF SCOPE — limited-time access not required for now.
   // const [limitedTimeRow, setLimitedTimeRow] = useState<TeamMemberRow | null>(null);
 
-  const enabled = !!mid && !isGuestUser;
+  const enabled = !!mid && !isGuestUser && !demo;
   const invalidateKey: QueryKey[] = isPartnerUser ? [["team-partner"]] : [["team-merchant"]];
 
   // ── Merchant team (OpenSearch /search/users) ────────────────────────────────
@@ -112,14 +125,15 @@ export function TeamManagementFeature() {
   );
 
   const rows: TeamMemberRow[] = useMemo(() => {
+    if (demo) return demoRows;
     if (isPartnerUser) {
       return (partnerQuery.data?.data?.listOfUsers ?? []).map(mapPartnerRecordToRow);
     }
     return (merchantQuery.data?.data?.data ?? []).map(mapUserRecordToRow);
-  }, [isPartnerUser, merchantQuery.data, partnerQuery.data]);
+  }, [demo, demoRows, isPartnerUser, merchantQuery.data, partnerQuery.data]);
 
-  const isPending = isPartnerUser ? partnerQuery.isPending : merchantQuery.isPending;
-  const isError = isPartnerUser ? partnerQuery.isError : merchantQuery.isError;
+  const isPending = demo ? false : isPartnerUser ? partnerQuery.isPending : merchantQuery.isPending;
+  const isError = demo ? false : isPartnerUser ? partnerQuery.isError : merchantQuery.isError;
   const refetch = isPartnerUser ? partnerQuery.refetch : merchantQuery.refetch;
 
   // Role filter options come from the roles actually present in the list
@@ -166,9 +180,16 @@ export function TeamManagementFeature() {
   });
   const { mutate: resendLink } = usePost<unknown, { phoneNumber: string }>(resendVerificationApi);
 
+  // DESIGN MOCK: the demo's row actions change the sample rows only.
+  function setDemoStatus(row: TeamMemberRow, status: TeamMemberRow["status"], message: string) {
+    setDemoRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status } : r)));
+    toast.success(message);
+  }
+
   function confirmDeactivate() {
     const row = deactivatingRow;
     if (!row) return;
+    if (demo) return setDemoStatus(row, "DEACTIVATED", "Team member deactivated");
     activateDeactivate(
       { dynamicUrl: activateDeactivateUserApi(row.merchantId, "deactivate", row.username) },
       {
@@ -179,6 +200,7 @@ export function TeamManagementFeature() {
   }
 
   function reactivate(row: TeamMemberRow) {
+    if (demo) return setDemoStatus(row, "ACTIVE", "Team member reactivated");
     activateDeactivate(
       { dynamicUrl: activateDeactivateUserApi(row.merchantId, "activate", row.username) },
       {
@@ -189,6 +211,7 @@ export function TeamManagementFeature() {
   }
 
   function resend(row: TeamMemberRow) {
+    if (demo) return void toast.success(`Registration link resent to ${row.firstName}`);
     resendLink(
       { phoneNumber: `${row.phoneCountryCode}${row.phone}` },
       {
@@ -314,6 +337,32 @@ export function TeamManagementFeature() {
         mid={mid}
         midType={midType}
         invalidateKey={invalidateKey}
+        demo={
+          demo
+            ? {
+                roles: PARTNER_DEMO_ROLES,
+                onInvite: (m) =>
+                  setDemoRows((prev) => [
+                    {
+                      id: `invite-${m.username}`,
+                      firstName: m.firstName,
+                      lastName: m.lastName,
+                      username: m.username,
+                      role: m.role,
+                      merchantId: PARTNER_DEMO_MID,
+                      status: "NOT_REGISTERED",
+                      phoneCountryCode: "+91",
+                      phone: m.phone,
+                      email: m.email,
+                      whatsappEchoEnabled: false,
+                      invitedAt: "",
+                      department: m.department,
+                    },
+                    ...prev,
+                  ]),
+              }
+            : undefined
+        }
       />
       <DeactivateMemberDialog
         row={deactivatingRow}
