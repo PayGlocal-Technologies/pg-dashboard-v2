@@ -12,6 +12,7 @@ import type { MerchantEnabledProducts } from "@/stores/useApp";
 import type { BaseResponse } from "@/types/common";
 import { MidAvatar, MID_STATUS_DOT } from "@/components/common/MidAvatar";
 import { cn } from "@/lib/utils";
+import { useProductContext, type NavContext } from "@/stores/useProductContext";
 
 const COLOR_SET = ["#E5B5FF", "#D4FFB5", "#A9FFCB"];
 
@@ -26,6 +27,9 @@ const STATUS_BADGE_STYLE: Record<string, React.CSSProperties> = {
   INACTIVE: { background: "#fef3c7", color: "#d97706" },
   DISABLED: { background: "#f9fafb", color: "#9ca3af" },
 };
+
+/** Header product context each dropdown product column belongs to. */
+const PRODUCT_CONTEXT: Record<string, NavContext> = { GFT: "PACB", CARDS: "PA" };
 
 type TagUpdateVars = { dynamicUrl: string };
 
@@ -56,6 +60,7 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
 
   const selectedMidDetails = useAccountSetup((s) => s.selectedMidDetails);
   const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+  const setActiveContext = useProductContext((s) => s.setActiveContext);
 
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
@@ -175,6 +180,22 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
     : null;
 
   const activeMids = products.find((p) => p.key === activeProduct)?.mids ?? [];
+
+  function selectMid(mid: string, status: string) {
+    if (status !== "ACTIVE" || selectedMidDetails.mid === mid) return;
+    setSelectedMidDetails((prev) => {
+      const others = COLOR_SET.filter((c) => c !== prev.color);
+      const newColor = others[Math.floor(Math.random() * others.length)] ?? COLOR_SET[0];
+      return { mid, status, color: newColor };
+    });
+    // The sidebar's nav tree follows the header's product context, so picking a
+    // MID moves the context to that MID's product: a Card Payments MID shows the
+    // Payments tree, a Global Funds Transfer MID the MCA one. Keyed on the
+    // column it was picked from rather than paMids/paCbMids membership, which
+    // keeps a MID listed under both products unambiguous.
+    if (activeProduct) setActiveContext(PRODUCT_CONTEXT[activeProduct]);
+    setOpen(false);
+  }
 
   function toggleOpen() {
     if (open) {
@@ -377,27 +398,11 @@ export function MerchantSelector({ collapsed = false }: MerchantSelectorProps) {
                         aria-disabled={status !== "ACTIVE"}
                         onMouseEnter={() => status === "ACTIVE" && setHoveredMid(mid)}
                         onMouseLeave={() => setHoveredMid(null)}
-                        onClick={() => {
-                          if (status !== "ACTIVE" || selectedMidDetails.mid === mid) return;
-                          setSelectedMidDetails((prev) => {
-                            const others = COLOR_SET.filter((c) => c !== prev.color);
-                            const newColor =
-                              others[Math.floor(Math.random() * others.length)] ?? COLOR_SET[0];
-                            return { mid, status, color: newColor };
-                          });
-                          setOpen(false);
-                        }}
+                        onClick={() => selectMid(mid, status)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
-                            if (status !== "ACTIVE" || selectedMidDetails.mid === mid) return;
-                            setSelectedMidDetails((prev) => {
-                              const others = COLOR_SET.filter((c) => c !== prev.color);
-                              const newColor =
-                                others[Math.floor(Math.random() * others.length)] ?? COLOR_SET[0];
-                              return { mid, status, color: newColor };
-                            });
-                            setOpen(false);
+                            selectMid(mid, status);
                           }
                         }}
                         className={cn(
