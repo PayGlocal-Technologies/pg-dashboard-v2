@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
   Button,
+  IconButton,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -152,7 +153,7 @@ export function IssueRefundDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-sm flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0"
         onOpenAutoFocus={(e) => {
           // Radix focuses the first focusable descendant by default, which
           // would otherwise be the info icon button, opening its tooltip the
@@ -166,6 +167,19 @@ export function IssueRefundDialog({
          * with the library's absolutely-positioned (top-3 right-3) close
          * button rather than below the default pt-10 reserved for it. */}
         <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-6 py-4 pr-14">
+          {/* Verify step: an icon-only back arrow leads the title. */}
+          {step === "verify" && (
+            <IconButton
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Back"
+              onClick={() => setStep("details")}
+              className="-ml-1.5 text-muted-foreground hover:text-foreground"
+            >
+              <Icon name="arrow-left" className="h-4 w-4" />
+            </IconButton>
+          )}
           <DialogTitle className="pr-0">
             {step === "details" ? "Refund payment" : "Verify refund"}
           </DialogTitle>
@@ -313,17 +327,7 @@ export function IssueRefundDialog({
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-6 py-4">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
-                onClick={() => setStep("details")}
-                className="pl-1 text-muted-foreground hover:text-foreground"
-              >
-                Back
-              </Button>
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
               <Button
                 type="button"
                 variant="primary"
