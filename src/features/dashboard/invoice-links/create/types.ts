@@ -108,6 +108,13 @@ export interface InvoiceRecipient {
   billing: AddressValues;
   /** Null when shipping is the billing address. */
   shipping: AddressValues | null;
+  /**
+   * A client-book pick whose full record (with its addresses) is still being
+   * read from the client-details API, or failed to load. The search response
+   * the picker lists from carries no address, so a pick is only usable once
+   * this clears. Absent for a loaded client and for a draft's customer.
+   */
+  detailsStatus?: "loading" | "error";
 }
 
 /** The customer half of a request, before it is split into its three wire objects. */
@@ -173,6 +180,12 @@ export interface InvoiceCreateRequest {
     callingCode: string | null;
     phoneNumber: string | null;
     expiry: number;
+    /**
+     * Required by the backend's invoice-link create (it fails "Product
+     * description field cannot be empty" without it). Neither gcc-ui-temp nor
+     * pg-dashboard sends it; v2 sends "Invoice <invoice number>".
+     */
+    productDescription: string;
   };
   plBillingData: WireAddress & {
     firstName: string | null;
