@@ -58,18 +58,8 @@ export const homeNavigation: NavGroup[] = [
 // above and below.
 
 export const regularNavigation: NavGroup[] = [
-  {
-    label: "Overview",
-    items: [
-      {
-        label: "Dashboard",
-        href: "/pa-dashboard",
-        icon: "layout-grid",
-        permission: [],
-        product: "PA",
-      },
-    ],
-  },
+  // No Overview/Dashboard entry: /pa-dashboard has no analytics of its own
+  // yet (see PaDashboardFeature), so the Payments tree opens on its tables.
   {
     label: "Payments",
     items: [
