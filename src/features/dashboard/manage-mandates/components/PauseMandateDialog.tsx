@@ -56,7 +56,7 @@ function PauseMandateFlow({ row, onClose }: { row: Mandate; onClose: () => void 
       <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
         <DialogTitle>Pause mandate</DialogTitle>
         <DialogDescription>
-          <span className="font-mono">{row.maskedMandateId}</span> on {row.mid}
+          <span className="tabular-nums">{row.maskedMandateId}</span> on {row.mid}
         </DialogDescription>
       </div>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">

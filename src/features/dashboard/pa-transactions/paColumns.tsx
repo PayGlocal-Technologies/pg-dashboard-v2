@@ -4,7 +4,8 @@ import { formatDateTime, formatTimestamp, parseApiDateTime } from "@/lib/utils/f
 import { type Column, StatusBadge } from "@/components/ui";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
 import { TransactionPaymentMethod } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
-import { TransactionAmount } from "@/features/dashboard/pa-transactions/components/TransactionAmount";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
+import { formatCurrency } from "@/lib/utils";
 import { TransactionId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { getRefundedAmount } from "@/features/dashboard/pa-transactions/financial/deriveFinancials";
 import { derivePaymentOutcome } from "@/features/dashboard/pa-transactions/status/paymentBucket";
@@ -169,7 +170,7 @@ export function formatDisplayDateTime(value?: string): string | null {
 function DateTimeCell({ value }: { value?: string }) {
   const formatted = formatDisplayDateTime(value);
   return (
-    <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+    <span className="whitespace-nowrap text-[12px] font-medium text-muted-foreground">
       {formatted ?? "N/A"}
     </span>
   );
@@ -221,22 +222,22 @@ function buildColumn(key: string): Column<PaTransaction> | null {
     case "amount":
       return {
         key: "amount",
-        header: "Amount",
+        header: <AmountHeader />,
         minWidth: 135,
-        // Left-aligned (not "right") so every row's amount starts at the same
-        // x position regardless of how many digits it has, a right-aligned
-        // column made shorter amounts look raggedly indented next to longer
-        // ones instead of forming a clean left edge.
-        // Aligns the table's first column with the toolbar/tabs above it,
-        // which sit inside a `pl-5` wrapper (see PaTransactionTable), the
-        // DataTable itself has no equivalent padding of its own.
-        cellClassName: "pl-5",
-        render: (row) => (
-          <TransactionAmount
-            amount={parseFloat(row.totalAmount ?? "0")}
-            currency={row.txnCurrency ?? "INR"}
-          />
-        ),
+        // Right-aligned, last digit under the header's last letter (see
+        // AmountCell), in TransactionAmount's own type sizes.
+        align: "right",
+        render: (row) => {
+          const currency = row.txnCurrency ?? "INR";
+          return (
+            <AmountWithCode
+              amount={formatCurrency(parseFloat(row.totalAmount ?? "0"), currency)}
+              code={currency}
+              amountClassName="text-[12px] font-medium"
+              codeClassName="text-[10px]"
+            />
+          );
+        },
       };
     case "status":
       return {

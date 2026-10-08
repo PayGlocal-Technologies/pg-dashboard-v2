@@ -14,6 +14,7 @@ import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
 import { LinkConsentFooter } from "@/features/dashboard/mca-invoices/components/LinkConsentFooter";
 import type { InvoiceRef } from "@/features/dashboard/mca-invoices/types";
 import type { BaseResponse } from "@/types/common";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 /** The transaction shape LINK_TXN_COLUMNS reads in pg-dashboard. */
 interface LinkableTransaction {
@@ -155,20 +156,18 @@ function LinkTransactionBody({
       key: "gid",
       header: "Transaction ID",
       minWidth: 170,
-      render: (row) => <span className="font-mono text-[12px] text-foreground">{row.gid}</span>,
+      render: (row) => <span className="tabular-nums text-[12px] text-foreground">{row.gid}</span>,
     },
     {
       key: "amount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 140,
       align: "right",
       render: (row) => (
-        <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-          <span className="text-[13px] font-semibold tabular-nums text-foreground">
-            {formatCurrency(parseFloat(row.amount ?? "0"), row.currency ?? "USD", "en-US")}
-          </span>
-          <span className="text-[11px] text-muted-foreground">{row.currency}</span>
-        </span>
+        <AmountWithCode
+          amount={formatCurrency(parseFloat(row.amount ?? "0"), row.currency ?? "USD", "en-US")}
+          code={row.currency}
+        />
       ),
     },
     {

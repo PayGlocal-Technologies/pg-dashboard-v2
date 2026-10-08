@@ -109,7 +109,7 @@ export function KeysTable({
           }
           onClick={() => void handleRefresh()}
           disabled={isFetching || !scope.mid}
-          className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+          className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
         >
           Refresh
         </Button>
@@ -179,7 +179,10 @@ export function KeysTable({
         }
         errorState={errorState}
         pagination={{ mode: "none" }}
-        tableLayout="content"
+        // Fixed, not content: content adds a greedy spacer column after the
+        // last one, which left Actions mid-row. Fixed spans the columns across
+        // the full width, so Actions (right-aligned) ends at the table's edge.
+        tableLayout="fixed"
         maxBodyHeight="none"
       />
 

@@ -152,7 +152,7 @@ export function IssueRefundDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
-        className="flex max-h-[90vh] max-w-sm flex-col gap-0 overflow-hidden p-0"
+        className="flex max-h-[90vh] max-w-lg flex-col gap-0 overflow-hidden p-0"
         onOpenAutoFocus={(e) => {
           // Radix focuses the first focusable descendant by default, which
           // would otherwise be the info icon button, opening its tooltip the
@@ -313,14 +313,15 @@ export function IssueRefundDialog({
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center justify-between gap-2 border-t border-border px-6 py-4">
+            {/* Back sits beside the refund action, as Cancel does beside
+                Send OTP on the details step. */}
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
-                leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
                 onClick={() => setStep("details")}
-                className="pl-1 text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground hover:text-foreground"
               >
                 Back
               </Button>

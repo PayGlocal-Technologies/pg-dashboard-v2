@@ -1,7 +1,8 @@
-import { type Column, StatusBadge } from "@/components/ui";
+import { type Column, CopyableCell, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { PaymentLinkRow, PaymentLinkStatus } from "@/features/dashboard/payment-links/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
@@ -15,16 +16,11 @@ export const PAYMENT_LINK_STATUS_META: Record<PaymentLinkStatus, StatusMeta> = {
 export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
   {
     key: "amount",
-    header: "Amount",
+    header: <AmountHeader />,
     minWidth: 135,
     align: "right",
     render: (row) => (
-      <div className="flex items-baseline gap-1.5 whitespace-nowrap justify-end">
-        <span className="font-semibold text-foreground tabular-nums text-[13px]">
-          {formatCurrency(row.amount, row.currency)}
-        </span>
-        <span className="text-[11px] text-muted-foreground font-medium">{row.currency}</span>
-      </div>
+      <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
     ),
   },
   {
@@ -48,12 +44,16 @@ export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
   },
   {
     key: "customerDetails",
-    header: "Customer Details",
+    header: "Customer Email",
     minWidth: 190,
+    // Copy button revealed on row hover (CopyableCell); it stops
+    // propagation, so copying never also opens the row.
     render: (row) => (
-      <span className="text-[13px] text-muted-foreground whitespace-nowrap lowercase">
-        {row.customerDetails}
-      </span>
+      <CopyableCell
+        value={row.customerDetails}
+        label="Email"
+        valueClassName="text-[13px] text-muted-foreground whitespace-nowrap lowercase"
+      />
     ),
   },
   {
@@ -61,9 +61,11 @@ export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
     header: "Payment Link",
     minWidth: 175,
     render: (row) => (
-      <span className="text-[13px] font-mono text-primary/70 hover:text-primary transition-colors cursor-pointer whitespace-nowrap">
-        {row.paymentLinkUrl}
-      </span>
+      <CopyableCell
+        value={row.paymentLinkUrl}
+        label="Payment link"
+        valueClassName="text-[13px] text-primary whitespace-nowrap"
+      />
     ),
   },
   {

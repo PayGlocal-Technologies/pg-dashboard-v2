@@ -22,6 +22,13 @@ function text(value: string | null | undefined) {
   return <span className={TEXT}>{value || "—"}</span>;
 }
 
+/** Dates and times are muted, as in every table (see pa-transactions). */
+function dateText(value: string | null | undefined) {
+  return (
+    <span className="text-[13px] text-muted-foreground whitespace-nowrap">{value || "—"}</span>
+  );
+}
+
 /**
  * pg-dashboard's mandate columns, every one of them, in its order and under
  * its headers (sentence-cased to match this app). SI ID opens the SI's
@@ -57,7 +64,7 @@ export function buildMandateColumns({
       header: "Mandate ID",
       minWidth: 160,
       render: (row) => (
-        <span className="font-mono text-[12.5px] whitespace-nowrap text-foreground">
+        <span className="tabular-nums text-[12.5px] whitespace-nowrap text-foreground">
           {row.maskedMandateId || "—"}
         </span>
       ),
@@ -131,19 +138,19 @@ export function buildMandateColumns({
       key: "startDate",
       header: "Start date",
       minWidth: 120,
-      render: (row) => text(formatCompactDate(row.startDate)),
+      render: (row) => dateText(formatCompactDate(row.startDate)),
     },
     {
       key: "mandateCreationTime",
       header: "Creation time",
       minWidth: 170,
-      render: (row) => text(formatTimestamp(row.mandateCreationTime)),
+      render: (row) => dateText(formatTimestamp(row.mandateCreationTime)),
     },
     {
       key: "mandateExpiryTime",
       header: "Expiry time",
       minWidth: 170,
-      render: (row) => text(formatTimestamp(row.mandateExpiryTime)),
+      render: (row) => dateText(formatTimestamp(row.mandateExpiryTime)),
     },
     {
       // Keyed "action" so reorderColumns keeps it last, and pinned to the

@@ -386,7 +386,6 @@ export function DisputeDetailFeature({
                       value={truncateId(transaction.gid ?? "Not available")}
                       copyValue={transaction.gid ?? ""}
                       label="Transaction ID"
-                      monospace
                       className="font-medium text-foreground"
                     />
                   </span>

@@ -16,6 +16,7 @@ import { COUNTRY_NAME_MAP } from "@/features/dashboard/mca-transactions/constant
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 import { useApp } from "@/stores/useApp";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -228,9 +229,10 @@ export function buildMcaColumns(
   const cols: Column<McaTransaction>[] = [
     {
       key: "amount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 135,
-      align: "left",
+      // Last digit under the header's last letter (see AmountCell).
+      align: "right",
       render: (row) => {
         const amount = parseFloat(row.amount ?? "0");
         const currency = row.currency ?? "USD";
@@ -240,15 +242,10 @@ export function buildMcaColumns(
                 amount block's own baseline alignment) so a discounted
                 transaction is identifiable while scanning the column, the
                 same placement pg-dashboard uses. */}
-            <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
               <MdrOfferBadge totalMdrDiscount={row.totalMdrDiscount} />
               <FrmPendingBadge frmStatus={row.frmStatus} />
-              <span className="flex items-baseline gap-1.5">
-                <span className="font-semibold text-foreground tabular-nums text-[13px]">
-                  {formatCurrency(amount, currency, "en-US")}
-                </span>
-                <span className="text-[11px] text-muted-foreground font-medium">{currency}</span>
-              </span>
+              <AmountWithCode amount={formatCurrency(amount, currency, "en-US")} code={currency} />
             </div>
           </>
         );

@@ -152,7 +152,7 @@ export function SelectIrmsStep({
       header: "IRM Date",
       minWidth: 100,
       render: (row) => (
-        <span className="whitespace-nowrap text-[13px] text-foreground">
+        <span className="whitespace-nowrap text-[13px] text-muted-foreground">
           {formatDate(row.irmDate, { day: "2-digit", month: "short", year: "2-digit" })}
         </span>
       ),
@@ -162,7 +162,7 @@ export function SelectIrmsStep({
       key: "irmNumber",
       header: "IRM Number",
       minWidth: 170,
-      render: (row) => <span className="font-mono text-[12.5px]">{row.irmNumber}</span>,
+      render: (row) => <span className="tabular-nums text-[12.5px]">{row.irmNumber}</span>,
     },
     {
       key: "remitterName",
@@ -274,7 +274,7 @@ export function SelectIrmsStep({
               }
               disabled={isRefreshing}
               onClick={refresh}
-              className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+              className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
             >
               Refresh
             </Button>

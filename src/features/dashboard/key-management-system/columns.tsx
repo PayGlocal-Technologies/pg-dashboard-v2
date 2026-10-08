@@ -7,6 +7,8 @@ import { getKeyStatusMeta } from "@/features/dashboard/key-management-system/hel
 import type { KeyKind, MerchantKey } from "@/features/dashboard/key-management-system/types";
 
 const TEXT = "text-[13px] text-foreground whitespace-nowrap";
+/** Dates and times are muted, as in every table (see pa-transactions). */
+const DATE_TEXT = "text-[13px] text-muted-foreground whitespace-nowrap";
 
 export function KeyStatusBadge({ status }: { status: string | null | undefined }) {
   const { label, variant, trailIcon } = getKeyStatusMeta(status);
@@ -70,12 +72,15 @@ export function buildKeyColumns(
       key: "kid",
       header: "Key ID",
       minWidth: 260,
+      // A long value (the certificate's description) wraps onto a second
+      // line rather than being cut off in the fixed-width column.
+      wrap: true,
       // The certificate row's "id" is a description, not something to copy.
       render: (row) =>
         kind === "certificate" ? (
-          <span className={TEXT}>{row.kid}</span>
+          <span className="text-[13px] leading-snug text-foreground">{row.kid}</span>
         ) : row.kid ? (
-          <CopyableCell value={row.kid} label="Key ID" monospace />
+          <CopyableCell value={row.kid} label="Key ID" />
         ) : (
           <span className="text-[13px] text-muted-foreground">—</span>
         ),
@@ -87,23 +92,32 @@ export function buildKeyColumns(
       render: (row) => <KeyStatusBadge status={row.keyStatus} />,
     },
     {
-      key: "creationDate",
-      header: "Date of generation",
-      minWidth: 170,
-      render: (row) => <span className={TEXT}>{formatTimestamp(row.creationDate)}</span>,
-    },
-    {
-      key: "expiryDate",
-      header: "Date of expiry",
-      minWidth: 170,
-      render: (row) => <span className={TEXT}>{formatTimestamp(row.expiryDate)}</span>,
-    },
-    {
       key: "keyType",
       header: "Type",
       minWidth: 140,
       render: (row) => <span className={TEXT}>{row.keyType?.trim() || "—"}</span>,
     },
-    { key: "action", header: "Actions", minWidth: 110, render: renderAction },
+    {
+      key: "creationDate",
+      header: "Date of generation",
+      minWidth: 170,
+      render: (row) => <span className={DATE_TEXT}>{formatTimestamp(row.creationDate)}</span>,
+    },
+    {
+      key: "expiryDate",
+      header: "Date of expiry",
+      minWidth: 170,
+      render: (row) => <span className={DATE_TEXT}>{formatTimestamp(row.expiryDate)}</span>,
+    },
+    {
+      key: "action",
+      header: "Actions",
+      // No width: in the fixed-layout table (see KeysTable) every other
+      // column keeps its set width and this one takes all the leftover
+      // space, right-aligned, so the actions sit at the table's far edge
+      // without spreading the data columns apart.
+      align: "right",
+      render: renderAction,
+    },
   ];
 }

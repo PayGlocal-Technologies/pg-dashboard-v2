@@ -54,7 +54,7 @@ export function DisputeActionCard({
     <Card className={cn("gap-0 p-5", ACTION_CARD_CLASS)}>
       <h2 className="text-base font-bold text-foreground">{merchantLabel}</h2>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <Badge variant="secondary" size="sm" square className="font-mono">
+        <Badge variant="secondary" size="sm" square className="tabular-nums">
           {reasonCode}
         </Badge>
         <span className="text-sm text-muted-foreground">{reason}</span>

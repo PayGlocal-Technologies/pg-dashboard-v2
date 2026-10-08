@@ -32,8 +32,8 @@ export function DisablePaymentButtonDialog({
               <div>
                 <DialogTitle>Disable payment button?</DialogTitle>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  <span className="font-mono">{row.buttonId}</span> will stop accepting payments on
-                  every page it is embedded on.
+                  <span className="tabular-nums">{row.buttonId}</span> will stop accepting payments
+                  on every page it is embedded on.
                 </p>
               </div>
             </div>

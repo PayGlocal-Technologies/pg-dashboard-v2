@@ -613,6 +613,15 @@ export function truncate(str: string, length: number): string {
  */
 const MIN_ELIDED = 4;
 
+/** An ID shortened for display: its first 3 characters less any trailing
+ *  separator, "...", then the last 7 ("gl_o-a46…0e64X2" -> "gl...0e64X2").
+ *  The one ID format across tables and details; callers still copy and show
+ *  the full ID in the tooltip. */
+export function truncateId(id: string): string {
+  if (id.length <= 13) return id;
+  return `${id.slice(0, 3).replace(/[_-]+$/, "")}...${id.slice(-7)}`;
+}
+
 export function truncateMiddle(str: string, head = 12, tail = 6): string {
   if (str.length <= head + tail + MIN_ELIDED) return str;
   return `${str.slice(0, head)}…${str.slice(-tail)}`;

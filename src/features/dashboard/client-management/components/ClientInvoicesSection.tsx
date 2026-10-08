@@ -219,11 +219,9 @@ export function ClientInvoicesSection({
       key: "totalAmount",
       header: "Amount",
       minWidth: 130,
-      // Left, matching the Transactions table's own Amount column. In a
-      // content-width table a right-aligned column pushes its figures away from
-      // the header above them, and that was this table's most visible departure
-      // from every other one in the app.
-      align: "left",
+      // Right-aligned like every Amount column, last digit under the header's
+      // last letter (no currency code here, so no code slot; see AmountCell).
+      align: "right",
       render: (row) => {
         const amount = Number(row.totalAmount);
         return (

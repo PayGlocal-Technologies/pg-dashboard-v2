@@ -297,9 +297,18 @@ function toWireAddress(address: AddressValues, countryCode: CountryCodeOf): Wire
 }
 
 /** The three customer objects for one recipient, as gcc-ui-temp builds them. */
+/**
+ * `plCustomerData.productDescription`, which the backend requires: "Invoice
+ * <invoice number>". The base number, not the -1, -2 a batch adds per client.
+ */
+export function productDescriptionFor(values: InvoiceFormValues): string {
+  return `Invoice ${values.invoiceNo.trim()}`.trim();
+}
+
 function buildCustomerParts(
   customer: InvoiceCustomer,
-  countryCode: CountryCodeOf
+  countryCode: CountryCodeOf,
+  productDescription: string
 ): Pick<InvoiceCreateRequest, "plCustomerData" | "plBillingData" | "plShippingData"> {
   const billing = toWireAddress(customer.billing, countryCode);
   // gcc splits the name: the first word, then the rest.
@@ -312,6 +321,7 @@ function buildCustomerParts(
       callingCode: customer.callingCode || null,
       phoneNumber: customer.phoneNumber || null,
       expiry: 6,
+      productDescription,
     },
 
     plBillingData: {
@@ -352,7 +362,7 @@ export function buildInvoiceRequest(
 ): InvoiceCreateRequest {
   return {
     invoiceRequestData: buildInvoiceRequestData(values, items, merchantLogo),
-    ...buildCustomerParts(customer, countryCode),
+    ...buildCustomerParts(customer, countryCode, productDescriptionFor(values)),
     siTxn: false,
     collectByGlobalAltPay: false,
     merchantCustomPayload: null,
@@ -374,7 +384,11 @@ export function buildBulkInvoiceRequest(
   return {
     invoiceRequestData: buildInvoiceRequestData(values, items, merchantLogo),
     clients: recipients.map((recipient) =>
-      buildCustomerParts(customerFromRecipient(recipient), countryCode)
+      buildCustomerParts(
+        customerFromRecipient(recipient),
+        countryCode,
+        productDescriptionFor(values)
+      )
     ),
     siTxn: false,
     collectByGlobalAltPay: false,
@@ -450,13 +464,28 @@ export function clientToRecipient(client: Client): InvoiceRecipient {
 }
 
 /** One line per thing that would stop this recipient's link being created. */
-export function validateRecipient(recipient: InvoiceRecipient): string[] {
+export function validateRecipient(
+  recipient: InvoiceRecipient,
+  required: { billing: boolean; shipping: boolean } = { billing: false, shipping: false }
+): string[] {
+  // Nothing else can be judged until the client's full record is in.
+  if (recipient.detailsStatus === "loading") return ["Loading their details…"];
+  if (recipient.detailsStatus === "error") return ["Couldn't load their details"];
+  // With no own shipping address the link ships to the billing one, which is
+  // therefore what a required shipping address is checked against.
+  const shipping = recipient.shipping ?? recipient.billing;
   const issues = [
     validateFullName(recipient.fullName),
     validateEmail(recipient.emailId),
     validatePhone(recipient.phoneNumber),
     ...Object.values(validateAddress(recipient.billing)),
     ...(recipient.shipping ? Object.values(validateAddress(recipient.shipping)) : []),
+    required.billing && missingAddressFields(recipient.billing).length > 0
+      ? "Complete their billing address"
+      : undefined,
+    required.shipping && missingAddressFields(shipping).length > 0
+      ? "Complete their shipping address"
+      : undefined,
   ];
   return issues.filter((issue): issue is string => !!issue);
 }
@@ -750,6 +779,38 @@ export function validateAddress(
     errors.zipcode = `Zipcode must be at most ${ZIPCODE_MAX_LENGTH} characters`;
   }
 
+  return errors;
+}
+
+/** The fields gcc-ui-temp requires in an address section the merchant config makes required. */
+const REQUIRED_ADDRESS_FIELDS: { key: keyof AddressValues; message: string }[] = [
+  { key: "streetAddress", message: "Enter a street address" },
+  { key: "country", message: "Select a country" },
+  { key: "state", message: "Enter a state" },
+  { key: "city", message: "Enter a city" },
+  { key: "zipcode", message: "Enter a postal code" },
+];
+
+/** The required fields this address leaves blank (the landmark line stays optional). */
+export function missingAddressFields(address: AddressValues): (keyof AddressValues)[] {
+  return REQUIRED_ADDRESS_FIELDS.filter(({ key }) => !(address[key] ?? "").trim()).map(
+    ({ key }) => key
+  );
+}
+
+/**
+ * validateAddress, plus "required" for each blank field when the merchant's
+ * payment-link form config (`plRequiredFields`) makes this address required.
+ */
+export function validateRequiredAddress(
+  values: AddressValues,
+  isRequired: boolean
+): Partial<Record<keyof AddressValues, string>> {
+  const errors = validateAddress(values);
+  if (!isRequired) return errors;
+  for (const { key, message } of REQUIRED_ADDRESS_FIELDS) {
+    if (!errors[key] && !(values[key] ?? "").trim()) errors[key] = message;
+  }
   return errors;
 }
 
