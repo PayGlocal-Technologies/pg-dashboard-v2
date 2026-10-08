@@ -75,12 +75,7 @@ function toFormValues(product: SkuProduct): SkuItemFormValues {
   };
 }
 
-export function SkuTable({
-  addItemOpen,
-  onAddItemOpenChange,
-  onAddItem,
-  onImport,
-}: SkuTableProps) {
+export function SkuTable({ addItemOpen, onAddItemOpenChange, onAddItem, onImport }: SkuTableProps) {
   const [tab, setTab] = useState<SkuViewTab>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -266,7 +261,7 @@ export function SkuTable({
           <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
         }
         onClick={refetch}
-        className="ml-auto h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+        className="ml-auto h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
       >
         Refresh
       </Button>

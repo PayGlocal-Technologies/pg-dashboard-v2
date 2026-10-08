@@ -34,6 +34,7 @@ import {
 } from "@/features/dashboard/dispute-management/constants";
 import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
 import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 /** Chip options for the table's own multi-select "Status" filter, distinct
  * from the single-select SegmentedTabs above it: this lets a merchant view,
@@ -236,6 +237,22 @@ export function DisputeManagementFeature() {
 
   const showRespondBy = RESPOND_BY_SEGMENTS.includes(statusSegment);
   const columns = buildDisputeColumns({ columnOrder, hiddenColumns, showRespondBy, nowMs });
+  // View details as a trailing column, right after the last data column
+  // (see rowActionColumn).
+  const tableColumns = [
+    ...columns,
+    rowActionColumn<DisputeRow>((row) => (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onViewDetails(row)}
+        rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+      >
+        View details
+      </Button>
+    )),
+  ];
 
   // Soonest deadline first whenever "Respond by" is showing (status-
   // vocabulary spec §27's "sorted ascending by default"), a row with no
@@ -330,7 +347,7 @@ export function DisputeManagementFeature() {
               </div>
             </div>
           }
-          columns={columns}
+          columns={tableColumns}
           data={pageRows}
           // A search or filter that matches nothing says so, rather than
           // claiming the merchant has never had a dispute.
@@ -352,17 +369,6 @@ export function DisputeManagementFeature() {
           // buttons are skipped by DataTable, so View details does only its
           // own job.
           onRowClick={onViewDetails}
-          rowAction={(row) => (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onViewDetails(row)}
-              rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-              className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-            >
-              View details
-            </Button>
-          )}
           maxBodyHeight="none"
         />
       </div>

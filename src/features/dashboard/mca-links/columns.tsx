@@ -6,6 +6,7 @@ import { Icon } from "@/components/icon";
 import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
 import { CountryCell } from "@/features/dashboard/mca-transactions/columns";
 import type { McaLink, McaLinkStatus } from "@/features/dashboard/mca-links/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // ── Status mapping: raw value → display meta ─────────────────────────────────
 // Same shape as MCA Transactions' MCA_STATUS_META, so both tables' chips are
@@ -32,19 +33,14 @@ export function buildMcaLinkColumns(onCopyLink: (row: McaLink) => void): Column<
   return [
     {
       key: "amount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 135,
       align: "right",
       render: (row) => {
         const amount = parseFloat(row.amount ?? "0");
         const currency = row.currency ?? "USD";
         return (
-          <div className="flex items-baseline gap-1.5 whitespace-nowrap justify-end">
-            <span className="font-semibold text-foreground tabular-nums text-[13px]">
-              {formatCurrency(amount, currency, "en-US")}
-            </span>
-            <span className="text-[11px] text-muted-foreground font-medium">{currency}</span>
-          </div>
+          <AmountWithCode amount={formatCurrency(amount, currency, "en-US")} code={currency} />
         );
       },
     },

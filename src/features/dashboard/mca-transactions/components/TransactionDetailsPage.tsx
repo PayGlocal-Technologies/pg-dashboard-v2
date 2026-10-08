@@ -17,7 +17,7 @@ import {
   formatCurrency,
   formatTransactionDateOnly,
   formatTransactionTimestamp,
-  truncateMiddle,
+  truncateId,
 } from "@/lib/utils/format";
 import {
   CountryCell,
@@ -201,7 +201,7 @@ function PaymentDetailsSection({
             value={
               <CopyableText
                 value={row.gid}
-                displayValue={truncateMiddle(row.gid, 12, 6)}
+                displayValue={truncateId(row.gid)}
                 className="min-w-0"
                 valueClassName="min-w-0 truncate"
               />

@@ -59,7 +59,7 @@ export function PaymentButtonCard({
       className="cursor-pointer rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
     >
       <div className="flex items-start justify-between gap-2">
-        <span className="font-mono text-[12.5px] font-medium break-all text-foreground">
+        <span className="tabular-nums text-[12.5px] font-medium break-all text-foreground">
           {row.buttonId}
         </span>
         <span className="shrink-0" onClick={(e) => e.stopPropagation()}>

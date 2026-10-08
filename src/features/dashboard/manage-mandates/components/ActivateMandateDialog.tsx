@@ -35,7 +35,7 @@ function ActivateMandateFlow({ row, onClose }: { row: Mandate; onClose: () => vo
       <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
         <DialogTitle>Activate mandate?</DialogTitle>
         <DialogDescription>
-          <span className="font-mono">{row.maskedMandateId}</span> will collect payments on its
+          <span className="tabular-nums">{row.maskedMandateId}</span> will collect payments on its
           schedule again. We&apos;ll send you a code to confirm it&apos;s you.
         </DialogDescription>
       </div>

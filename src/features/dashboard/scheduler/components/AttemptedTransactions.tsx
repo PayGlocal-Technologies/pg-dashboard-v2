@@ -34,7 +34,7 @@ export function AttemptedTransactions({
                 aria-label={`Open attempt ${attempt.gid}`}
                 onClick={() => onOpen(attempt.gid)}
                 className={cn(
-                  "h-auto min-h-0 rounded-md border px-1.5 py-0.5 font-mono text-[11px] font-medium",
+                  "h-auto min-h-0 rounded-md border px-1.5 py-0.5 tabular-nums text-[11px] font-medium",
                   succeeded
                     ? "border-emerald-600/40 bg-emerald-500/5 text-emerald-700 hover:bg-emerald-500/10 hover:text-emerald-700"
                     : "border-red-500/40 bg-red-500/5 text-red-600 hover:bg-red-500/10 hover:text-red-600"
@@ -45,7 +45,7 @@ export function AttemptedTransactions({
             </TooltipTrigger>
             <TooltipContent side="top" className="text-xs">
               <div className="space-y-0.5">
-                <p className="font-mono">{attempt.gid}</p>
+                <p className="tabular-nums">{attempt.gid}</p>
                 <p>Status: {attempt.txnStatus.replaceAll("_", " ").toLowerCase()}</p>
                 <p>Manual: {attempt.manuallyTriggered ? "Yes" : "No"}</p>
               </div>

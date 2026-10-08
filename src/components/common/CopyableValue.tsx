@@ -73,7 +73,12 @@ export function CopyableValue({
 
   const valueBlock = (
     <div className="flex min-w-0 items-center gap-1.5">
-      <p className={cn("truncate font-mono text-sm font-semibold text-foreground", valueClassName)}>
+      <p
+        className={cn(
+          "truncate tabular-nums text-sm font-semibold text-foreground",
+          valueClassName
+        )}
+      >
         {value}
       </p>
       {copyable && (

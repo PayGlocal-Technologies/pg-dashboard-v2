@@ -195,7 +195,7 @@ export function BulkUploadDialog({
                     {result.dgftAckId && (
                       <p className="text-[12px] text-muted-foreground">
                         DGFT Ack. ID:{" "}
-                        <span className="font-mono text-foreground">{result.dgftAckId}</span>
+                        <span className="tabular-nums text-foreground">{result.dgftAckId}</span>
                       </p>
                     )}
                   </>

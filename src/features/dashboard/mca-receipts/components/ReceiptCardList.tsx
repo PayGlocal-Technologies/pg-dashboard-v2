@@ -30,7 +30,13 @@ export function ReceiptCardSkeleton() {
 // stacked card instead of cells — Invoice number, Invoice ID, Amount, Month,
 // Product type — with the row's own download action in the same place the table
 // pins it: the far right of the leading row.
-export function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (row: Receipt) => void }) {
+export function ReceiptCard({
+  row,
+  onDownload,
+}: {
+  row: Receipt;
+  onDownload: (row: Receipt) => void;
+}) {
   return (
     <div className="rounded-xl border border-border bg-card px-4 py-3.5 transition-colors hover:bg-muted/40">
       {/* Invoice number leads and the download icon closes the row: what
@@ -40,7 +46,7 @@ export function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (ro
           name. Always drawn — nothing here is hover-gated, since there is no
           hover on touch. */}
       <div className="flex items-start justify-between gap-2">
-        <span className="font-mono text-[12.5px] font-medium break-all text-foreground">
+        <span className="tabular-nums text-[12.5px] font-medium break-all text-foreground">
           {row.invoiceNumber}
         </span>
         <span className="shrink-0">
@@ -67,7 +73,7 @@ export function ReceiptCard({ row, onDownload }: { row: Receipt; onDownload: (ro
       <div className="mt-3 grid grid-cols-1 gap-x-4 gap-y-1.5 sm:grid-cols-2">
         <div className="min-w-0">
           <p className="text-[11px] text-muted-foreground">Invoice ID</p>
-          <p className="truncate font-mono text-[12.5px] text-foreground">{row.invoiceId}</p>
+          <p className="truncate tabular-nums text-[12.5px] text-foreground">{row.invoiceId}</p>
         </div>
         <div className="min-w-0">
           <p className="text-[11px] text-muted-foreground">Month</p>

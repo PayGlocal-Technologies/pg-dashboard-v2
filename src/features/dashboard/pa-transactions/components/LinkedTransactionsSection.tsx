@@ -2,6 +2,7 @@ import { Button, DataTable } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { buildPaColumns } from "@/features/dashboard/pa-transactions/paColumns";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 const LINKED_COLUMNS = buildPaColumns({ isPartnerUser: false });
 
@@ -31,7 +32,20 @@ export function LinkedTransactionsSection({
 
   return (
     <DataTable
-      columns={LINKED_COLUMNS}
+      columns={[
+        ...LINKED_COLUMNS,
+        rowActionColumn<PaTransaction>((row) => (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onViewDetails(row)}
+            rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+            className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+          >
+            View details
+          </Button>
+        )),
+      ]}
       data={transactions}
       rowKey={(row) => row.gid ?? ""}
       density="compact"
@@ -40,17 +54,6 @@ export function LinkedTransactionsSection({
         mode: "client",
         summary: "count",
       }}
-      rowAction={(row) => (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onViewDetails(row)}
-          rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-          className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-        >
-          View details
-        </Button>
-      )}
     />
   );
 }

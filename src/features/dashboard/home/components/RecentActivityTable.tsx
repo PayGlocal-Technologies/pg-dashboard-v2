@@ -22,6 +22,8 @@ import {
   type RecentSettlement,
 } from "@/features/dashboard/home/mock-data";
 import { formatDate, formatCurrency, truncate } from "@/lib/utils/format";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // ── Status mapping: raw (lowercase) value → display meta ──────────────────────
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -110,15 +112,11 @@ function PaymentMethod({
 const transactionColumns: Column<RecentTransaction>[] = [
   {
     key: "amount",
-    header: "Amount",
+    header: <AmountHeader />,
+    align: "right",
     minWidth: 120,
     render: (row) => (
-      <span className="whitespace-nowrap">
-        <span className="text-[13px] font-semibold tabular-nums text-foreground">
-          {formatCurrency(row.amount, row.currency)}
-        </span>
-        <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">{row.currency}</span>
-      </span>
+      <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
     ),
   },
   {
@@ -157,7 +155,7 @@ const transactionColumns: Column<RecentTransaction>[] = [
     header: "Transaction ID",
     minWidth: 150,
     render: (row) => (
-      <span className="cursor-pointer font-mono text-[13px] text-primary/70 transition-colors hover:text-primary">
+      <span className="cursor-pointer tabular-nums text-[13px] text-primary/70 transition-colors hover:text-primary">
         {row.id}
       </span>
     ),
@@ -178,7 +176,7 @@ const settlementColumns: Column<RecentSettlement>[] = [
     header: "Settlement ID",
     minWidth: 170,
     render: (row) => (
-      <span className="cursor-pointer font-mono text-[13px] text-primary/70 transition-colors hover:text-primary">
+      <span className="cursor-pointer tabular-nums text-[13px] text-primary/70 transition-colors hover:text-primary">
         {truncate(row.id, 16)}
       </span>
     ),
@@ -186,6 +184,7 @@ const settlementColumns: Column<RecentSettlement>[] = [
   {
     key: "amount",
     header: "Amount",
+    align: "right",
     minWidth: 135,
     render: (row) => (
       <span className="text-[13px] font-semibold tabular-nums text-foreground">
@@ -258,9 +257,7 @@ export function RecentActivityTable({
         variant="ghost"
         size="sm"
         className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
-        onClick={() =>
-          router.push(tab === "transactions" ? "/mca-transactions" : "/settlements")
-        }
+        onClick={() => router.push(tab === "transactions" ? "/mca-transactions" : "/settlements")}
       >
         View all
       </Button>
@@ -293,7 +290,7 @@ export function RecentActivityTable({
   return tab === "transactions" ? (
     <DataTableCard<RecentTransaction>
       {...shell}
-      columns={transactionColumns}
+      columns={[...transactionColumns, rowActionColumn(() => rowActionButton("View details"))]}
       data={transactions.slice(0, 7)}
       rowKey={(row) => row.id}
       isLoading={isLoading}
@@ -309,12 +306,11 @@ export function RecentActivityTable({
           className="py-12"
         />
       }
-      rowAction={rowActionButton("View details")}
     />
   ) : (
     <DataTableCard<RecentSettlement>
       {...shell}
-      columns={settlementColumns}
+      columns={[...settlementColumns, rowActionColumn(() => rowActionButton("View report"))]}
       data={settlements}
       rowKey={(row) => row.id}
       isLoading={isLoading}
@@ -330,7 +326,6 @@ export function RecentActivityTable({
           className="py-12"
         />
       }
-      rowAction={rowActionButton("View report")}
     />
   );
 }

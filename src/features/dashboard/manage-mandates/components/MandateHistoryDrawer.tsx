@@ -39,7 +39,9 @@ export function MandateHistoryDrawer({
           <div className="min-w-0">
             <DrawerTitle className="pr-0 text-lg">Mandate history</DrawerTitle>
             {row && (
-              <DrawerDescription className="truncate font-mono">SI ID {row.siId}</DrawerDescription>
+              <DrawerDescription className="truncate tabular-nums">
+                SI ID {row.siId}
+              </DrawerDescription>
             )}
           </div>
           <IconButton

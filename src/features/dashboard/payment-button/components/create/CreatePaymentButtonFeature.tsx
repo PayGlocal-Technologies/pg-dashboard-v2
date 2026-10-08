@@ -313,7 +313,9 @@ function CreatePaymentButtonEditor({
               {edit ? "Edit payment button" : "Create a new payment button"}
             </h1>
             {edit && (
-              <span className="font-mono text-[13px] text-muted-foreground">{edit.buttonId}</span>
+              <span className="tabular-nums text-[13px] text-muted-foreground">
+                {edit.buttonId}
+              </span>
             )}
             {/* No draft endpoint and no auto-save behind these (see
                 DESIGN_ONLY_FIELDS_ENABLED). */}
@@ -328,18 +330,6 @@ function CreatePaymentButtonEditor({
             )}
           </div>
         </div>
-
-        <Button
-          type="button"
-          variant="primary"
-          size="sm"
-          leftIcon={<Icon name={edit ? "check" : "send"} className="h-3.5 w-3.5" />}
-          isLoading={isCreating || isSaving}
-          disabled={isCreating || isSaving || !!created}
-          onClick={() => void form.handleSubmit()}
-        >
-          {edit ? "Save changes" : "Create button"}
-        </Button>
       </header>
 
       <div
@@ -890,6 +880,22 @@ function CreatePaymentButtonEditor({
             </div>
           </>
         )}
+      </div>
+
+      {/* The form's action, at the bottom of the modal: fixed below the
+          scrolling body so it stays in reach however long the form runs. */}
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-5 py-3">
+        <Button
+          type="button"
+          variant="primary"
+          size="sm"
+          leftIcon={<Icon name={edit ? "check" : "send"} className="h-3.5 w-3.5" />}
+          isLoading={isCreating || isSaving}
+          disabled={isCreating || isSaving || !!created}
+          onClick={() => void form.handleSubmit()}
+        >
+          {edit ? "Save changes" : "Create button"}
+        </Button>
       </div>
 
       <GetCodeDialog open={getCodeOpen} onOpenChange={setGetCodeOpen} lines={embedLines} />

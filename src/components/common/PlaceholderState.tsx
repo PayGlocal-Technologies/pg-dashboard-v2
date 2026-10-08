@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { AppImage } from "@/components/common/AppImage";
+import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
 
 /**
@@ -47,10 +48,18 @@ const VARIANT_ASSET: Record<PlaceholderVariant, string> = {
   "no-analytics": "/assets/no-analytics.svg",
   "no-data": "/assets/no-data-available.svg",
   "no-metric-data": "/assets/No data(metric usage).png",
-  "empty-table": "/assets/table empty.png",
+  // Drawn from the icon registry instead, see VARIANT_ICON.
+  "empty-table": "",
   "no-internet": "/assets/no-internet.svg",
   error: "/assets/something-went-wrong.svg",
   "404": "/assets/404-error.svg",
+};
+
+/** Variants drawn from the icon registry rather than public/assets. Every
+ *  table's "no rows" state uses the same receipt illustration the linked
+ *  transactions list does, so empty tables read the same across the app. */
+const VARIANT_ICON: Partial<Record<PlaceholderVariant, IconName>> = {
+  "empty-table": "no-transactions-illustration",
 };
 
 /** Illustration edge length in px. The artwork is square (200×200 viewBox).
@@ -110,15 +119,24 @@ export function PlaceholderState({
       )}
     >
       {/* Decorative — the title carries the meaning, so alt is empty. */}
-      <AppImage
-        src={VARIANT_ASSET[variant]}
-        alt=""
-        width={px}
-        height={px}
-        unoptimized
-        style={{ width: px, height: px }}
-        className="shrink-0"
-      />
+      {VARIANT_ICON[variant] ? (
+        <Icon
+          name={VARIANT_ICON[variant]}
+          aria-hidden
+          style={{ width: px, height: px }}
+          className="shrink-0"
+        />
+      ) : (
+        <AppImage
+          src={VARIANT_ASSET[variant]}
+          alt=""
+          width={px}
+          height={px}
+          unoptimized
+          style={{ width: px, height: px }}
+          className="shrink-0"
+        />
+      )}
       <div className="space-y-1">
         <p className="text-sm font-semibold text-foreground">{title}</p>
         {description ? (

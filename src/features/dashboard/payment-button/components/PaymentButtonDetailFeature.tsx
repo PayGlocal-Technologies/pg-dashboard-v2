@@ -161,7 +161,7 @@ function PaymentButtonDetail({ button }: { button: PaymentButton }) {
             </span>
             <div className="min-w-0 pt-1">
               <div className="flex flex-wrap items-center gap-2.5">
-                <h1 className="font-mono text-[20px] font-semibold tracking-tight text-foreground">
+                <h1 className="tabular-nums text-[20px] font-semibold tracking-tight text-foreground">
                   {button.buttonId}
                 </h1>
                 <PaymentButtonStatusBadge status={button.status} />

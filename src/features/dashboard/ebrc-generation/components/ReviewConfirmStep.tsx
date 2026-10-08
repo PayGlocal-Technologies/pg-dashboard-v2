@@ -178,7 +178,7 @@ export function ReviewConfirmStep({
                         />
                       </span>
                       <div>
-                        <p className="font-mono text-[12.5px] font-semibold text-foreground">
+                        <p className="tabular-nums text-[12.5px] font-semibold text-foreground">
                           {row.irmNumber}
                         </p>
                         <p className="text-[11px] text-muted-foreground">

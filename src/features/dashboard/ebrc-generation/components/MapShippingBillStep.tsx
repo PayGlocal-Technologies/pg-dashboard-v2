@@ -109,7 +109,7 @@ function IrmNavItem({
           gate's toast, DGFT, the merchant's own bank statement), so it is on
           the row too: without it "CITIN…635 needs mapping" could not be
           matched to anything in this list. */}
-      {irm && <span className="font-mono text-[11px] text-muted-foreground">{irmId}</span>}
+      {irm && <span className="tabular-nums text-[11px] text-muted-foreground">{irmId}</span>}
       {irm && (
         <span className="truncate text-[11.5px] text-muted-foreground">
           {irm.remitterName} · {irm.country}

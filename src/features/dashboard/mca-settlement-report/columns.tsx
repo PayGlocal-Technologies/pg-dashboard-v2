@@ -2,6 +2,7 @@ import { type Column } from "@/components/ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import type { SettlementRow } from "@/features/dashboard/mca-settlement-report/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // Every reorderable/hideable data column lives here, keyed so
 // ColumnManager can
@@ -59,7 +60,6 @@ function buildColumn(key: string): Column<SettlementRow> | null {
               value={row.merchantId}
               copyValue={row.merchantId}
               label="Merchant ID"
-              monospace
               className="text-primary/80 transition-colors hover:text-primary"
             />
           ) : (
@@ -69,22 +69,18 @@ function buildColumn(key: string): Column<SettlementRow> | null {
     case "amount":
       return {
         key: "amount",
-        header: "Amount",
+        header: <AmountHeader />,
         minWidth: 140,
-        // Left-aligned with the currency code beside the figure, matching the
-        // MCA transactions table exactly. The code is not redundant even though
-        // every settlement is INR: it is what tells the merchant these are
-        // rupees, after a table of USD/EUR/CAD remittances led them here.
-        // Locale stays the default en-IN, so a crore-scale figure keeps its
-        // lakh grouping rather than switching to the transactions' en-US.
-        align: "left",
+        // Right-aligned, last digit under the header's last letter (see
+        // AmountCell), with the currency code beside the figure. The code is
+        // not redundant even though every settlement is INR: it is what tells
+        // the merchant these are rupees, after a table of USD/EUR/CAD
+        // remittances led them here. Locale stays the default en-IN, so a
+        // crore-scale figure keeps its lakh grouping rather than switching to
+        // the transactions' en-US.
+        align: "right",
         render: (row) => (
-          <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="text-[13px] font-semibold text-foreground tabular-nums">
-              {formatCurrency(row.amount, row.currency)}
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
-          </span>
+          <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
         ),
       };
     case "transactionCount":
