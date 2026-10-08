@@ -28,7 +28,6 @@ import {
   PaymentCategoryLogo,
   TransactionPaymentMethod,
 } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
-import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { BankName } from "@/components/common/BankLogo";
 import { PaymentTimeline } from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
 import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/components/timelineStepFormatting";
@@ -245,21 +244,24 @@ export function TransactionDetailsContent({
         <div className="flex flex-col gap-5">
           {transaction.gid ? (
             <CopyableDetailRow
+              layout="inline"
               label="Transaction ID"
-              value={truncateId(transaction.gid)}
-              copyValue={transaction.gid}
+              value={transaction.gid}
               monospace
+              wrap
             />
           ) : (
-            <DetailRow label="Transaction ID" value="Not available" />
+            <DetailRow layout="inline" label="Transaction ID" value="Not available" />
           )}
           <CopyableDetailRow
+            layout="inline"
             label="Merchant Transaction ID"
-            value={truncateId(detail.merchantTxnId)}
-            copyValue={detail.merchantTxnId}
+            value={detail.merchantTxnId}
             monospace
+            wrap
           />
           <DetailRow
+            layout="inline"
             label="Payment Category"
             value={
               <span className="inline-flex items-center gap-2">
@@ -270,6 +272,7 @@ export function TransactionDetailsContent({
           />
           {detail.cardType && (
             <DetailRow
+              layout="inline"
               label="Card Type"
               value={
                 <span className="inline-flex items-center gap-2">
@@ -279,7 +282,7 @@ export function TransactionDetailsContent({
               }
             />
           )}
-          <DetailRow label="Issuer" value={<BankName name={detail.issuerBank} />} />
+          <DetailRow layout="inline" label="Issuer" value={<BankName name={detail.issuerBank} />} />
         </div>
       </Card>
     </section>

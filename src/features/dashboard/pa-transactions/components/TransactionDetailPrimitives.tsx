@@ -18,14 +18,30 @@ export function SectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
+/** `stacked` (default): label above, value below, as in the MCA details
+ *  cards. `inline`: label on the left, value right-aligned on the same line,
+ *  for a compact card of short values (e.g. Payment Details). */
+type DetailRowLayout = "stacked" | "inline";
+
 interface DetailRowProps {
   /** Usually text; a node when the label carries an ⓘ explanation. */
   label: ReactNode;
   value: ReactNode;
+  layout?: DetailRowLayout;
 }
 
-/** Label above, value below, as in the MCA details cards. */
-export function DetailRow({ label, value }: DetailRowProps) {
+/** Label above, value below, as in the MCA details cards (see DetailRowLayout). */
+export function DetailRow({ label, value, layout = "stacked" }: DetailRowProps) {
+  if (layout === "inline") {
+    return (
+      <div className="flex items-center justify-between gap-4">
+        <span className="shrink-0 text-[12px] text-muted-foreground">{label}</span>
+        <div className="min-w-0 wrap-break-word text-right text-[13px] font-medium text-foreground">
+          {value}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-col gap-1">
       <span className="text-[12px] text-muted-foreground">{label}</span>
@@ -48,6 +64,7 @@ interface CopyableDetailRowProps {
   monospace?: boolean;
   /** Wrap across lines instead of truncating, for long text like an address. */
   wrap?: boolean;
+  layout?: DetailRowLayout;
 }
 
 /** DetailRow whose value has a copy button, revealed on hovering anywhere in
@@ -58,17 +75,29 @@ export function CopyableDetailRow({
   copyValue,
   monospace,
   wrap,
+  layout = "stacked",
 }: CopyableDetailRowProps) {
+  const inline = layout === "inline";
   return (
-    <div className="group flex flex-col gap-1">
-      <span className="text-[12px] text-muted-foreground">{label}</span>
+    <div
+      className={cn("group flex", inline ? "items-center justify-between gap-4" : "flex-col gap-1")}
+    >
+      <span className={cn("text-[12px] text-muted-foreground", inline && "shrink-0")}>{label}</span>
       <CopyableCell
         value={value}
         copyValue={copyValue}
         label={label}
         monospace={monospace}
-        className={cn("text-[13px] font-medium text-foreground", wrap && "items-start")}
-        valueClassName={wrap ? "whitespace-normal leading-snug wrap-break-word" : undefined}
+        className={cn(
+          "text-[13px] font-medium text-foreground",
+          wrap && "items-start",
+          inline && "min-w-0 justify-end"
+        )}
+        valueClassName={cn(
+          wrap && "whitespace-normal leading-snug wrap-break-word",
+          // Inline: a value that wraps keeps every line on the right edge.
+          inline && "text-right"
+        )}
       />
     </div>
   );
