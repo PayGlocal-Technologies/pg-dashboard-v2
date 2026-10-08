@@ -361,7 +361,7 @@ export function CreatePaymentLinkModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-xl flex-col gap-0 overflow-hidden p-0">
+      <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-[40rem] flex-col gap-0 overflow-hidden p-0">
         <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
           <DialogTitle>Create payment link</DialogTitle>
         </div>
@@ -423,7 +423,6 @@ export function CreatePaymentLinkModal({
               </div>
 
               <Alert variant="warning">
-                <Icon name="alert-triangle" className="h-4 w-4" aria-hidden />
                 <AlertDescription>
                   This payment link cannot be used for prohibited or restricted items, such as{" "}
                   <strong>medicines, tobacco, drugs, narcotics or weapons</strong>. Violations may
@@ -467,6 +466,15 @@ export function CreatePaymentLinkModal({
                         }}
                         placeholder="Code"
                         showSearch
+                        filterOption={(option, query) => {
+                          const q = query.toLowerCase();
+                          const name = callingCodes.find((c) => c.value === option.value)?.countryName;
+                          return (
+                            option.label.toLowerCase().includes(q) ||
+                            option.value.toLowerCase().includes(q) ||
+                            (name?.toLowerCase().includes(q) ?? false)
+                          );
+                        }}
                       />
                     </div>
                     <Input
