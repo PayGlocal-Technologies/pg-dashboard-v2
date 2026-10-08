@@ -84,12 +84,9 @@ export function RecipientsSection({
   recipients,
   onChange,
   error,
-  requiredAddresses,
 }: {
   mid: string;
   recipients: InvoiceRecipient[];
-  /** From the merchant's payment-link form config: addresses each client must have. */
-  requiredAddresses?: { billing: boolean; shipping: boolean };
   /** An updater, not a value: a client added from the modal lands asynchronously. */
   onChange: (update: RecipientsUpdate) => void;
   /** Section-level error, e.g. nothing picked. */
@@ -332,7 +329,7 @@ export function RecipientsSection({
       {recipients.length > 0 ? (
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
           {recipients.map((recipient) => {
-            const issues = validateRecipient(recipient, requiredAddresses);
+            const issues = validateRecipient(recipient);
             const address = formatAddress(recipient.billing);
             return (
               <li key={recipient.key} className="flex items-start gap-3 px-3 py-2.5">
