@@ -173,9 +173,11 @@ body {
    the control and not to whatever wraps it — a future form nested in any muted
    container gets it for free.
 
-   Bare element selectors, so this loses to every Tailwind utility: flux's own
-   `read-only:text-muted-foreground` and `disabled:` treatments still win, and
-   ::placeholder is a pseudo-element the element's own colour never reaches. */
+   Note this is unlayered, and under Tailwind v4's cascade layers an unlayered
+   rule beats every (layered) utility however specific: a colour utility on an
+   input, flux's `read-only:text-muted-foreground` included, does not apply
+   unless marked important (e.g. `text-primary!`). ::placeholder is a
+   pseudo-element the element's own colour never reaches. */
 input,
 textarea,
 select {

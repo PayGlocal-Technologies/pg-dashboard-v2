@@ -80,16 +80,18 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[90vh] w-[calc(100%-2rem)] max-w-[720px] flex-col gap-0 overflow-hidden p-0">
         <div className="flex shrink-0 items-center justify-between gap-4 border-b border-border px-6 py-4 pr-14">
-          {/* The link's ID sits beside the title, on the same line. */}
-          <div className="flex min-w-0 items-center gap-2.5">
-            <DialogTitle className="shrink-0">Payment Link Details</DialogTitle>
-            <div className="flex min-w-0 items-center gap-1">
-              <span className="truncate font-mono text-sm text-muted-foreground">{row.id}</span>
+          {/* The link's ID sits right beside the title (pr-0 drops the
+              DialogTitle's own right padding), in a light grey chip with its
+              copy button. */}
+          <div className="flex min-w-0 items-center gap-2">
+            <DialogTitle className="shrink-0 pr-0">Payment Link Details</DialogTitle>
+            <div className="flex min-w-0 items-center gap-0.5 rounded-md bg-muted py-0.5 pr-0.5 pl-2">
+              <span className="truncate tabular-nums text-sm text-muted-foreground">{row.id}</span>
               <Button
                 type="button"
                 variant="ghost"
                 onClick={() => copyToClipboard(row.id, "Payment Link ID copied")}
-                className="h-6 w-6 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground"
+                className="h-6 w-6 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground hover:bg-background"
                 aria-label="Copy Payment Link ID"
               >
                 <Icon name="copy" size={12} />
@@ -120,16 +122,17 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
             </div>
           </div>
 
-          {/* Half the body's width from sm up (full width on a phone, where
-              half would clip the URL); the link reads as one, in the primary
-              blue. */}
-          <InputGroup className="sm:w-1/2">
-            {/* read-only: Flux's Input mutes read-only text with a read-only:
-                variant, which outranks a plain colour class. */}
+          {/* 248px from sm up (with a trimmed left padding), just enough for the short link and its copy
+              button (full width on a phone); the link reads as one, in the
+              primary blue. */}
+          <InputGroup className="sm:w-62">
+            {/* text-primary!: globals.css colours every input with an
+                unlayered rule, which beats any (layered) Tailwind utility
+                however specific, and Flux mutes read-only text besides. */}
             <InputGroupInput
               readOnly
               value={fullUrl}
-              className="font-mono text-sm text-primary read-only:text-primary"
+              className="pl-3 tabular-nums text-sm text-primary!"
             />
             <InputGroupAddon align="inline-end">
               <InputGroupButton

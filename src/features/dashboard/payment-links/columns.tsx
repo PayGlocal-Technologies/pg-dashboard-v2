@@ -64,8 +64,7 @@ export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
       <CopyableCell
         value={row.paymentLinkUrl}
         label="Payment link"
-        monospace
-        valueClassName="text-[13px] text-primary/70 hover:text-primary transition-colors whitespace-nowrap"
+        valueClassName="text-[13px] text-primary whitespace-nowrap"
       />
     ),
   },
