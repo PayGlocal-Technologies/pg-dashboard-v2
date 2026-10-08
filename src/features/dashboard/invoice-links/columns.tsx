@@ -107,8 +107,7 @@ export function buildInvoiceLinkRowActions(
 
   const isDisableAllowed = ["ACTIVE", "PAYMENT_DUE", "DRAFT"].includes(status);
   const isOfflinePaid = status === "PAID" && row.paidOffline === "true";
-  const canTouchDocuments =
-    ["ACTIVE", "PAYMENT_DUE", "OVERDUE"].includes(status) || isOfflinePaid;
+  const canTouchDocuments = ["ACTIVE", "PAYMENT_DUE", "OVERDUE"].includes(status) || isOfflinePaid;
 
   const actions: RowAction[] = [
     {
@@ -294,7 +293,9 @@ export function buildInvoiceLinkColumns(opts?: {
         row.status?.toUpperCase() === "DRAFT" ? (
           <span>-</span>
         ) : (
-          <span>{row.formattedDueDate ? formatTransactionTimestamp(row.formattedDueDate) : "-"}</span>
+          <span>
+            {row.formattedDueDate ? formatTransactionTimestamp(row.formattedDueDate) : "-"}
+          </span>
         ),
     },
     {

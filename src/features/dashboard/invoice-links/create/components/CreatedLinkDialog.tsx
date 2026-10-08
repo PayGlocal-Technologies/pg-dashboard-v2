@@ -16,10 +16,13 @@ import { SuccessTick } from "@/components/common/SuccessTick";
 export function CreatedLinkDialog({
   open,
   link,
+  isShared,
   onOpenChange,
 }: {
   open: boolean;
   link: string;
+  /** The merchant's invoice config has customer sharing on (`invoiceCustomerSharing`). */
+  isShared: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
   const router = useRouter();
@@ -38,8 +41,13 @@ export function CreatedLinkDialog({
       <DialogContent className="max-w-sm">
         <div className="text-center">
           <SuccessTick className="mx-auto h-14 w-14" />
+          {/* gcc-ui-temp's two titles: "shared" only when the merchant's invoice
+              config has customer sharing on, since only then is the link
+              actually sent to the customer. */}
           <DialogTitle className="mt-2 text-base">
-            Invoice Link is created successfully and shared!
+            {isShared
+              ? "Invoice Link is created and successfully shared!"
+              : "Invoice Link is created!"}
           </DialogTitle>
           <p className="mt-1 text-[12.5px] text-muted-foreground">
             Use the link below to receive payment from your customers
