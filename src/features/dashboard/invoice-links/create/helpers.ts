@@ -695,7 +695,14 @@ export function validateEmail(value: string): string | undefined {
 }
 
 export function validatePhone(value: string): string | undefined {
-  if (!value?.trim()) return "Please enter the Phone Number";
+  // TEMPORARY, UNDER TEST: phone made optional so a client saved without one
+  // (Client management allows it) can still get a link. Both sources require
+  // it (gcc-ui-temp InvoiceCustomerDetails IsRequired(), pg-dashboard
+  // isInvoiceForm), so whether the backend accepts a link with no phone is
+  // being checked in UAT. A blank phone goes out as null (buildCustomerParts).
+  // If the backend rejects it, restore this line.
+  // if (!value?.trim()) return "Please enter the Phone Number";
+  if (!value?.trim()) return undefined;
   if (value.length > PHONE_MAX_LENGTH)
     return `Phone Number must be at most ${PHONE_MAX_LENGTH} characters`;
   if (!EXTENDED_ALNUM_PATTERN.test(value)) {
