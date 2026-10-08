@@ -49,8 +49,9 @@ export function ManageTemplatesDialog({
   onRename: (templateId: string, name: string) => void;
   onDelete: (templateId: string) => void;
   /** Opens the template's content in the invoice workflow so its items, notes
-   *  and branding can be edited. Rename above only ever touches the name. */
-  onEdit: (templateId: string) => void;
+   *  and branding can be edited. Rename above only ever touches the name.
+   *  Omit it and the row has no open (↗) action. */
+  onEdit?: (templateId: string) => void;
 }) {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -199,17 +200,19 @@ export function ManageTemplatesDialog({
                         </div>
                       ) : (
                         <div className="flex shrink-0 items-center gap-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            aria-label={`Edit ${template.name}`}
-                            className="h-7 w-7 p-0"
-                            disabled={isMutating}
-                            onClick={() => onEdit(template.id)}
-                          >
-                            <Icon name="arrow-up-right" className="h-3.5 w-3.5" />
-                          </Button>
+                          {onEdit && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              aria-label={`Edit ${template.name}`}
+                              className="h-7 w-7 p-0"
+                              disabled={isMutating}
+                              onClick={() => onEdit(template.id)}
+                            >
+                              <Icon name="arrow-up-right" className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                           <Button
                             type="button"
                             variant="ghost"
