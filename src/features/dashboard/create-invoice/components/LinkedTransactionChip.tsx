@@ -30,7 +30,9 @@ export function LinkedTransactionChip({
       <span className="text-[10.5px] font-semibold uppercase tracking-wide text-muted-foreground">
         Linked to
       </span>
-      <span className="font-mono text-[12px] font-medium text-foreground">****{gid.slice(-6)}</span>
+      <span className="tabular-nums text-[12px] font-medium text-foreground">
+        ****{gid.slice(-6)}
+      </span>
 
       {record?.partnerCustomerFullName && (
         <span className="hidden text-[12px] text-foreground lg:inline">

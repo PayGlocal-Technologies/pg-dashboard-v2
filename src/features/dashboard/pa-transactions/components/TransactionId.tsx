@@ -4,17 +4,16 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { truncateId } from "@/lib/utils/format";
 
 interface TransactionIdProps {
   id: string;
 }
 
-/** "gl_o-a1f114aebb83002dcmf0L2hX2" -> "gl_o....2hX2". Display only, the
- * full id is still what gets copied below. */
-export function truncateId(id: string): string {
-  if (id.length <= 10) return id;
-  return `${id.slice(0, 4)}....${id.slice(-4)}`;
-}
+// "gl_o-a1f114aebb83002dcmf0L2hX2" -> "gl_...0L2hX2" (see truncateId).
+// Display only, the full id is still what gets copied below. Re-exported so
+// existing callers keep importing it from here.
+export { truncateId };
 
 // The copy icon only fades in on hover, reuses the DataTable row's own
 // `group` class (every `<tr>` already carries it for the rowAction slot),

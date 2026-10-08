@@ -13,7 +13,7 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
-import { truncateMiddle } from "@/lib/utils/format";
+import { truncateId } from "@/lib/utils/format";
 import { TransactionDetailsContent } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import type { McaTransaction } from "@/features/dashboard/mca-transactions/types";
 import { GuideTour } from "@/components/common/guide/GuideTour";
@@ -205,7 +205,7 @@ export function TransactionDrawerBody({
         </div>
         <CopyableText
           value={row.gid}
-          displayValue={truncateMiddle(row.gid, 10, 6)}
+          displayValue={truncateId(row.gid)}
           valueClassName="min-w-0 truncate text-muted-foreground"
           className="ml-auto min-w-0"
         />

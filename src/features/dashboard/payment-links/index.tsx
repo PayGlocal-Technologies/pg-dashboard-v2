@@ -26,6 +26,7 @@ import {
 } from "@/features/dashboard/payment-links/constants";
 import { paymentLinkRows as initialPaymentLinkRows } from "@/features/dashboard/payment-links/mock-data";
 import type { PaymentLinkRow } from "@/features/dashboard/payment-links/types";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 // TODO(integration): this screen is mock data only (see mock-data.ts). Wire it
 // up to the real payment links endpoints per the CLAUDE.md migration
@@ -199,7 +200,20 @@ export function PaymentLinksFeature() {
             className="py-16"
           />
         }
-        columns={paymentLinkColumns}
+        columns={[
+          ...paymentLinkColumns,
+          rowActionColumn((row) => (
+            <Button
+              variant="outline"
+              size="sm"
+              rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+              onClick={() => openDetails(row)}
+              className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+            >
+              View details
+            </Button>
+          )),
+        ]}
         data={filteredRows}
         emptyTitle={emptyCopy.title}
         emptyDescription={emptyCopy.description}
@@ -212,17 +226,6 @@ export function PaymentLinksFeature() {
           pageSize: PAYMENT_LINKS_PAGE_LIMIT,
         }}
         maxBodyHeight="none"
-        rowAction={(row) => (
-          <Button
-            variant="outline"
-            size="sm"
-            leftIcon={<Icon name="eye" className="h-2.5 w-2.5" />}
-            onClick={() => openDetails(row)}
-            className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-          >
-            View details
-          </Button>
-        )}
       />
 
       <PaymentLinkDetailsModal row={detailsRow} open={detailsOpen} onOpenChange={setDetailsOpen} />

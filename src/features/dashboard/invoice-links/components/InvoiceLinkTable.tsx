@@ -270,7 +270,7 @@ export function InvoiceLinkTable() {
                 }
                 onClick={() => void handleRefresh()}
                 disabled={!isReady || isFetching}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               >
                 Refresh
               </Button>
@@ -293,7 +293,7 @@ export function InvoiceLinkTable() {
                 size="sm"
                 leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
                 onClick={openReportDrawer}
-                className="h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+                className="h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               >
                 Report
               </Button>

@@ -20,6 +20,7 @@ import {
   getInvoiceStatusMeta,
 } from "@/features/dashboard/mca-invoices/constants";
 import type { McaInvoiceRow } from "@/features/dashboard/mca-invoices/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 export interface InvoiceRowHandlers {
   /** Row click and the primary CTA: drafts reopen in the editor, the rest
@@ -243,19 +244,14 @@ export function buildInvoiceColumns(options: {
     },
     {
       key: "totalAmount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 150,
       align: "right",
       render: (row) => {
         const amount = parseFloat(row.totalAmount ?? "0");
         const currency = row.currency ?? "INR";
         return (
-          <span className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-            <span className="text-[13px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(amount, currency, "en-IN")}
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground">{currency}</span>
-          </span>
+          <AmountWithCode amount={formatCurrency(amount, currency, "en-IN")} code={currency} />
         );
       },
     },

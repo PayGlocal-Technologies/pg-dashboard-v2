@@ -92,6 +92,7 @@ export const regularNavigation: NavGroup[] = [
           // MCA-only products (MCA Links, Multi Currency Accounts, Platforms)
           // live in the MCA tree only, this tree is PA-only.
           { label: "Payment Links", href: "/payment-links", permission: [], product: "PA" },
+          { label: "Static Link", href: "/static-link", permission: [], product: "PA" },
           // Tagged PA: pg-dashboard's midMap routes page="INVOICE" to paMids,
           // so this has nothing to show a PACB-only merchant.
           { label: "Invoice Links", href: "/invoice-links", permission: [], product: "PA" },

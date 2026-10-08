@@ -126,7 +126,7 @@ const PAYMENT_COLUMNS: Column<MockPaSettlementPayment>[] = [
     header: "Created on",
     minWidth: 150,
     render: (p) => (
-      <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+      <span className="whitespace-nowrap text-[12px] font-medium text-muted-foreground">
         {formatDate(p.createdAt)}
       </span>
     ),
@@ -136,13 +136,7 @@ const PAYMENT_COLUMNS: Column<MockPaSettlementPayment>[] = [
     header: "Transaction ID",
     minWidth: 170,
     render: (p) => (
-      <CopyableCell
-        value={p.id}
-        copyValue={p.id}
-        label="Transaction ID"
-        monospace
-        className="text-[12px]"
-      />
+      <CopyableCell value={p.id} copyValue={p.id} label="Transaction ID" className="text-[12px]" />
     ),
   },
   {
@@ -275,7 +269,6 @@ export function SettlementDetailsContent({
                   value={settlement.settlementId}
                   copyValue={settlement.settlementId}
                   label="Settlement ID"
-                  monospace
                   className="text-[13px]"
                 />
               ) : (
@@ -287,13 +280,7 @@ export function SettlementDetailsContent({
             label={<LabelWithInfo label="UTR number" help={HELP.utr} />}
             value={
               utr ? (
-                <CopyableCell
-                  value={utr}
-                  copyValue={utr}
-                  label="UTR"
-                  monospace
-                  className="text-[13px]"
-                />
+                <CopyableCell value={utr} copyValue={utr} label="UTR" className="text-[13px]" />
               ) : isProcessing ? (
                 <UtrNotGenerated settlementDate={settlement.id} />
               ) : (
@@ -373,7 +360,7 @@ export function SettlementDetailsContent({
                 {preview.map((p) => (
                   <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3">
                     <div className="min-w-0">
-                      <p className="truncate font-mono text-[12px] text-foreground">{p.id}</p>
+                      <p className="truncate tabular-nums text-[12px] text-foreground">{p.id}</p>
                       <p className="text-[11px] text-muted-foreground">
                         {p.method} · {formatDate(p.createdAt)}
                       </p>
