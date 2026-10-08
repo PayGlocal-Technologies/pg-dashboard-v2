@@ -13,3 +13,6 @@ export const PAYMENT_LINK_STATUS_FILTERS: FilterOption[] = [
   { value: "EXPIRED", label: "Expired" },
   { value: "DEACTIVATED", label: "Deactivated" },
 ];
+
+/** The tab the table opens on: the links that can still be paid. */
+export const PAYMENT_LINK_DEFAULT_STATUS = "ACTIVE";
