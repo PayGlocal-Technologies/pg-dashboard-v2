@@ -71,11 +71,14 @@ export function buildKeyColumns(
     {
       key: "kid",
       header: "Key ID",
-      minWidth: 220,
+      minWidth: 260,
+      // A long value (the certificate's description) wraps onto a second
+      // line rather than being cut off in the fixed-width column.
+      wrap: true,
       // The certificate row's "id" is a description, not something to copy.
       render: (row) =>
         kind === "certificate" ? (
-          <span className={TEXT}>{row.kid}</span>
+          <span className="text-[13px] leading-snug text-foreground">{row.kid}</span>
         ) : row.kid ? (
           <CopyableCell value={row.kid} label="Key ID" />
         ) : (
@@ -91,7 +94,7 @@ export function buildKeyColumns(
     {
       key: "keyType",
       header: "Type",
-      minWidth: 100,
+      minWidth: 140,
       render: (row) => <span className={TEXT}>{row.keyType?.trim() || "—"}</span>,
     },
     {

@@ -235,18 +235,6 @@ select {
   animation: none !important;
 }
 
-/* ─── Table first column ─────────────────────────────────────────────────────
-   Extra room on the left of every table's first column, header and body, so
-   the data doesn't hug the card's edge. Flux's DataTable pads every cell the
-   same (px-3 in compact) and its <table> carries no class, hence the element
-   selector. Full-width rows (empty state, loading) span every column with
-   colspan and keep their own padding. Unlayered, so it beats Flux's
-   @layer utilities without !important.                                      */
-   table > thead > tr > th:first-child,
-   table > tbody > tr > td:first-child:not([colspan]) {
-     padding-left: 1.6rem;
-   }
-
 /* ─── Enter/exit animations ──────────────────────────────────────────────────
    Flux's Drawer (and Blanket) components emit `animate-in`, `animate-out`,
    `fade-in-0`, `fade-out-0`, `slide-in-from-*` and `slide-out-to-*` classes

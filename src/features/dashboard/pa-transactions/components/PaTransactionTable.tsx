@@ -308,6 +308,10 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
                 onHiddenKeysChange={setHiddenColumns}
                 fixedKeys={FIXED_COLUMN_KEYS}
                 fixedReason="Always shown. A transaction row is unreadable without these columns."
+                // This card flattens every shadow inside it ([&_*]:shadow-none
+                // above), so the toolbar's lift is restated as important, as
+                // the Refresh button beside it does.
+                className="shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!"
               />
             </div>
           </div>
