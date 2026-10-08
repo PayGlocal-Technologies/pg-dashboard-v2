@@ -1,4 +1,4 @@
-import { type Column, StatusBadge } from "@/components/ui";
+import { type Column, CopyableCell, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { PaymentLinkRow, PaymentLinkStatus } from "@/features/dashboard/payment-links/types";
@@ -44,12 +44,16 @@ export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
   },
   {
     key: "customerDetails",
-    header: "Customer Details",
+    header: "Customer Email",
     minWidth: 190,
+    // Copy button revealed on row hover (CopyableCell); it stops
+    // propagation, so copying never also opens the row.
     render: (row) => (
-      <span className="text-[13px] text-muted-foreground whitespace-nowrap lowercase">
-        {row.customerDetails}
-      </span>
+      <CopyableCell
+        value={row.customerDetails}
+        label="Email"
+        valueClassName="text-[13px] text-muted-foreground whitespace-nowrap lowercase"
+      />
     ),
   },
   {
@@ -57,9 +61,12 @@ export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
     header: "Payment Link",
     minWidth: 175,
     render: (row) => (
-      <span className="text-[13px] font-mono text-primary/70 hover:text-primary transition-colors cursor-pointer whitespace-nowrap">
-        {row.paymentLinkUrl}
-      </span>
+      <CopyableCell
+        value={row.paymentLinkUrl}
+        label="Payment link"
+        monospace
+        valueClassName="text-[13px] text-primary/70 hover:text-primary transition-colors whitespace-nowrap"
+      />
     ),
   },
   {

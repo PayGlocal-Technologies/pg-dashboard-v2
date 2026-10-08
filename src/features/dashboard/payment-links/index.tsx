@@ -206,7 +206,7 @@ export function PaymentLinksFeature() {
             <Button
               variant="outline"
               size="sm"
-              leftIcon={<Icon name="eye" className="h-2.5 w-2.5" />}
+              rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
               onClick={() => openDetails(row)}
               className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
             >
