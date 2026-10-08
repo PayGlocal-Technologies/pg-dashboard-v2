@@ -141,13 +141,25 @@ function PaTxnCard({ row, onOpen }: { row: PaTransaction; onOpen: (row: PaTransa
  * Report is drawn but not wired. PA exports are pg-dashboard's asynchronous
  * request-then-poll flow (`/reports/txn/download` + `/reports/txn/status`),
  * which this app has not ported yet.
+ *
+ * Also the no-code products' table (Static Link): pass `productId` instead of
+ * `buttonId` and the search is scoped by `fieldSearch.productId`, as
+ * pg-dashboard's ProductTransactionsCard scopes it, leaving the full-text query
+ * free, so the search box then queries the server rather than the loaded page.
  */
 export function PaymentButtonTransactionsTable({
   mid,
   buttonId,
+  productId,
+  emptyDescription = "Each payment taken through this button lands here with its status and method.",
 }: {
   mid: string;
-  buttonId: string;
+  /** The payment button: scopes the search by full-text query. */
+  buttonId?: string;
+  /** A no-code product (e.g. Static Link): scopes it by `fieldSearch.productId`. */
+  productId?: string;
+  /** The "no payments yet" description. */
+  emptyDescription?: string;
 }) {
   const router = useRouter();
   const countryCurrencyMap = useApp((s) => s.countryCurrencyMap);
@@ -169,7 +181,7 @@ export function PaymentButtonTransactionsTable({
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [page, setPage] = useState(1);
 
-  const body = buildTxnRequestBody(
+  const builtBody = buildTxnRequestBody(
     {
       externalStatus: statusFilters.length ? statusFilters : undefined,
       paymentInstrument: methodFilters.length ? methodFilters : undefined,
@@ -179,18 +191,26 @@ export function PaymentButtonTransactionsTable({
       endTime: relativeWindow?.endTime ?? (dateRange.to ? toEndOfDayMs(dateRange.to) : undefined),
     },
     {
-      searchQuery: buttonId,
+      // A product's search leaves the full-text query to the search box.
+      searchQuery: productId ? search.trim() || undefined : buttonId,
       selectedMid: { key: "merchantId", value: [mid] },
       pageLimit: TRANSACTIONS_PAGE_LIMIT,
       from: (page - 1) * TRANSACTIONS_PAGE_LIMIT,
     }
   );
 
+  // Scoped to the product the way pg-dashboard's PaTransactionTable does it:
+  // merged into fieldSearch after the body is built. The MID is already a
+  // fieldSearch key, so the search filter type already says "filtered".
+  const body: TableReqBody = productId
+    ? { ...builtBody, fieldSearch: { ...builtBody.fieldSearch, productId: [productId] } }
+    : builtBody;
+
   const { data, isPending, isFetching, isError, refetch } = usePostQuery<
     PaTransactionsResponse,
     TableReqBody
   >(
-    ["payment-button-transactions", mid, buttonId],
+    ["payment-button-transactions", mid, buttonId ?? productId],
     paTxnSearchApi(urlMid),
     body,
     { staleTime: 0 },
@@ -199,7 +219,8 @@ export function PaymentButtonTransactionsTable({
 
   const totalCount = data?.data?.totalCount ?? 0;
 
-  const query = search.trim().toLowerCase();
+  // Narrowed client-side only for a button, whose id fills the server query.
+  const query = productId ? "" : search.trim().toLowerCase();
   const rows = useMemo(() => {
     const fetched = data?.data?.data ?? [];
     if (!query) return fetched;
@@ -222,7 +243,7 @@ export function PaymentButtonTransactionsTable({
 
   // Status tabs are a view, not the merchant's own narrowing (see the MCA table).
   const hasNarrowingFilters =
-    !!query ||
+    !!search.trim() ||
     methodFilters.length > 0 ||
     countryFilters.length > 0 ||
     !!dateRange.from ||
@@ -236,8 +257,7 @@ export function PaymentButtonTransactionsTable({
       }
     : {
         title: "No payments yet",
-        description:
-          "Each payment taken through this button lands here with its status and method.",
+        description: emptyDescription,
       };
 
   const openTransaction = (row: PaTransaction) => {

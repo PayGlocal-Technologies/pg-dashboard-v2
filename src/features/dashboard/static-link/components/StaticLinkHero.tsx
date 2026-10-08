@@ -1,88 +1,165 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import { toast } from "sonner";
-import { Button, Card } from "@/components/ui";
+import { Button, Card, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { HowItWorksDialog } from "@/features/dashboard/static-link/components/HowItWorksDialog";
+import { CollectedFieldsPopover } from "@/features/dashboard/static-link/components/CollectedFieldsPopover";
 import { StaticLinkArtwork } from "@/features/dashboard/static-link/components/StaticLinkArtwork";
 import {
   STATIC_LINK_COPIED_MESSAGE,
   STATIC_LINK_SUBTITLE,
   STATIC_LINK_TITLE,
 } from "@/features/dashboard/static-link/constants";
+import {
+  canCustomizeStaticLinkHandle,
+  isAwaitingPlatform,
+  isSwitchedOn,
+  toCollectedFields,
+  toDisplayLink,
+} from "@/features/dashboard/static-link/helpers";
+import type {
+  StaticLinkDisplayFieldsRequest,
+  StaticLinkProductData,
+} from "@/features/dashboard/static-link/types";
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="px-6 py-4">
-      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1.5 text-[19px] font-medium tabular-nums text-foreground">{value}</p>
-    </div>
-  );
+function LinkStatusBadge({ link }: { link: StaticLinkProductData | null }) {
+  if (!link) return null;
+  if (isSwitchedOn(link)) return <StatusBadge variant="success" label="Live" size="sm" />;
+  // Amber for both: neither is taking payments right now, and a switched-off
+  // link is something the merchant may want to act on.
+  if (isAwaitingPlatform(link)) {
+    return <StatusBadge variant="warning" label="Not active yet" size="sm" />;
+  }
+  return <StatusBadge variant="warning" label="Disabled" size="sm" />;
 }
 
 /**
- * The link itself: what it is, the link with Copy Link, and how it is doing.
+ * The merchant's unique, permanent payment link and the controls they own over
+ * it (pg-dashboard's StaticLinkCard): the details to collect, the one-time
+ * name, and Copy Link.
  *
- * TODO(api): the three stats read 0 until a static link stats endpoint
- * exists.
+ * The URL is always the server's `shareableLink`; when there is none the card
+ * says so rather than showing a plausible guess, since a wrong payment link is
+ * worse than none.
+ *
+ * No headline numbers (payments, revenue): there is no summary endpoint, and a
+ * hardcoded zero reads as a real figure that contradicts the transactions
+ * listed below. pg-dashboard hides them for the same reason.
  */
-export function StaticLinkHero({ url, host }: { url: string; host: string }) {
-  const [isHowItWorksOpen, setIsHowItWorksOpen] = useState(false);
+export function StaticLinkHero({
+  link,
+  isLoading,
+  isSaving,
+  onHowItWorks,
+  onEditHandle,
+  onSaveDisplayFields,
+}: {
+  link: StaticLinkProductData | null;
+  isLoading: boolean;
+  isSaving: boolean;
+  onHowItWorks: () => void;
+  /** Opens the one-time handle editor. Only offered while unlocked. */
+  onEditHandle: () => void;
+  onSaveDisplayFields: (body: StaticLinkDisplayFieldsRequest) => void;
+}) {
+  const collectedFields = useMemo(() => toCollectedFields(link), [link]);
+  const shareableLink = link?.shareableLink ?? "";
+  const displayLink = toDisplayLink(shareableLink);
 
   const copy = () =>
     void navigator.clipboard
-      .writeText(`https://${url}`)
+      .writeText(shareableLink)
       .then(() => toast.success(STATIC_LINK_COPIED_MESSAGE))
       .catch(() => toast.error("Couldn't copy to clipboard"));
 
   return (
     <Card className="flex-col gap-5 p-5 sm:flex-row">
-      <StaticLinkArtwork url={url} />
+      <StaticLinkArtwork url={displayLink} />
 
       <div className="min-w-0 flex-1 pt-1">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h1 className="text-[14.5px] font-semibold text-foreground">{STATIC_LINK_TITLE}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-[14.5px] font-semibold text-foreground">{STATIC_LINK_TITLE}</h1>
+              <LinkStatusBadge link={link} />
+            </div>
             <p className="mt-0.5 text-[12.5px] text-muted-foreground">{STATIC_LINK_SUBTITLE}</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsHowItWorksOpen(true)}
-            leftIcon={<Icon name="help-circle" className="h-3.5 w-3.5" />}
-            className="text-[12.5px]"
-          >
-            How it works
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Shown even before the link exists, disabled: the config is part
+                of what this screen offers. */}
+            <CollectedFieldsPopover
+              fields={collectedFields}
+              isSaving={isSaving}
+              disabled={!link}
+              onSave={onSaveDisplayFields}
+            />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onHowItWorks}
+              leftIcon={<Icon name="help-circle" className="h-3.5 w-3.5" />}
+              className="text-[12.5px]"
+            >
+              How it works
+            </Button>
+          </div>
         </div>
 
-        <div className="mt-2.5 flex h-[52px] max-w-[448px] items-center justify-between gap-3 rounded-lg bg-muted/70 pr-2 pl-3">
-          <span className="truncate text-[14px] font-medium text-foreground">{url}</span>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={copy}
-            leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
-            className="h-[34px] min-h-[34px] shrink-0 px-3.5 text-[13px]"
-          >
-            Copy Link
-          </Button>
+        <div className="mt-2.5 flex h-[52px] max-w-[520px] items-center justify-between gap-2 rounded-lg bg-muted/70 pr-2 pl-3">
+          {isLoading && !link ? (
+            <Shimmer className="h-4 w-56" />
+          ) : (
+            <span
+              title={displayLink || undefined}
+              className={
+                displayLink
+                  ? "truncate text-[14px] font-medium text-foreground"
+                  : "truncate text-[14px] text-muted-foreground"
+              }
+            >
+              {displayLink || "No link set up yet"}
+            </span>
+          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {/* The one window for naming the link: it closes for good the
+                first time the link goes live. */}
+            {canCustomizeStaticLinkHandle(link) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onEditHandle}
+                leftIcon={<Icon name="pencil" className="h-3.5 w-3.5" />}
+                className="h-[34px] min-h-[34px] px-3 text-[13px]"
+              >
+                Edit name
+              </Button>
+            )}
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={copy}
+              disabled={!shareableLink}
+              aria-label={displayLink ? `Copy ${displayLink}` : "Copy link"}
+              leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
+              className="h-[34px] min-h-[34px] px-3.5 text-[13px]"
+            >
+              Copy Link
+            </Button>
+          </div>
         </div>
 
-        <div className="mt-5 grid max-w-[662px] grid-cols-1 divide-y divide-border rounded-lg border border-border sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-          <Stat label="Total payments" value="0" />
-          <Stat label="Successful payments" value="0" />
-          <Stat label="Total revenue" value="₹0.00" />
-        </div>
+        {/* DRAFT and PAUSED are the one upstream state the merchant read can
+            see; the platform's own gate is not returned, so a switched-off
+            link cannot be told apart from a platform one. */}
+        {isAwaitingPlatform(link) && (
+          <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+            <Icon name="info" className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            PayGlocal has not activated your link yet. Customers cannot pay through it until then.
+          </p>
+        )}
       </div>
-
-      <HowItWorksDialog
-        open={isHowItWorksOpen}
-        onOpenChange={setIsHowItWorksOpen}
-        url={url}
-        host={host}
-      />
     </Card>
   );
 }

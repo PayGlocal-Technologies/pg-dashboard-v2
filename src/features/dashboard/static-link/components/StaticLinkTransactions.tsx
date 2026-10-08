@@ -1,57 +1,49 @@
 "use client";
 
-import { useMemo } from "react";
-import { Card, DataTable } from "@/components/ui";
-import { buildPaColumns } from "@/features/dashboard/pa-transactions/paColumns";
-import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
-import { useApp } from "@/stores/useApp";
-
-const NO_ROWS: PaTransaction[] = [];
-
-/** This page's own header wording, over the Transactions page's columns. */
-const HEADER_LABELS: Record<string, string> = {
-  paymentMethod: "Payment method",
-  customerName: "Customer name",
-  customerEmail: "Email",
-  dateTime: "Date and time",
-};
+import { Card } from "@/components/ui";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { PaymentButtonTransactionsTable } from "@/features/dashboard/payment-button/components/PaymentButtonTransactionsTable";
 
 /**
- * Payments made through the static link, in the Transactions page's columns
- * (Amount, Status, Payment method, Customer, Email, ID, Date and time), set
- * inside the card's padding as designed rather than edge to edge.
+ * Payments taken through the static link: the PA transaction search scoped by
+ * `fieldSearch.productId`, as pg-dashboard's ProductTransactionsCard does,
+ * on the same table the payment button's page uses.
  *
- * TODO(api): no way to find a static link's payments yet; rows join once the
- * PA transaction search can filter by it (as it does by payment button ID).
+ * With no link (not provisioned on this MID yet) there is nothing to scope the
+ * search by, so it says so instead of listing every payment on the account.
  */
-export function StaticLinkTransactions() {
-  const isPartnerUser = useApp((s) => s.isPartnerUser);
-  const columns = useMemo(
-    () =>
-      buildPaColumns({ isPartnerUser }).map((column) => ({
-        ...column,
-        header: HEADER_LABELS[column.key] ?? column.header,
-      })),
-    [isPartnerUser]
-  );
+export function StaticLinkTransactions({
+  merchantId,
+  productId,
+  isLoading,
+}: {
+  merchantId: string;
+  productId?: string;
+  isLoading: boolean;
+}) {
+  if (productId) {
+    return (
+      <div className="space-y-3">
+        <h2 className="text-[15px] font-semibold text-foreground">Linked transactions</h2>
+        <PaymentButtonTransactionsTable
+          mid={merchantId}
+          productId={productId}
+          emptyDescription="Payments made through your static link will show up here."
+        />
+      </div>
+    );
+  }
+
+  if (isLoading) return null;
 
   return (
-    <Card className="gap-4 p-5">
+    <Card className="gap-0 p-5">
       <h2 className="text-[15px] font-semibold text-foreground">Linked transactions</h2>
-      <DataTable<PaTransaction>
-        columns={columns}
-        data={NO_ROWS}
-        rowKey={(row) =>
-          row.gid ?? `${row.merchantId ?? ""}-${row.formattedCreationDateTime ?? ""}`
-        }
-        emptyTitle="No transactions yet"
-        emptyDescription="Payments made through your static link will show up here."
-        headerStyle="surface"
-        // No frame of its own: the card is the frame, and the header band
-        // carries the table's edge, as designed.
-        className="rounded-none border-0"
-        theadClassName="[&_th]:bg-muted/80"
-        pagination={{ mode: "none" }}
+      <PlaceholderState
+        variant="empty-table"
+        title="No static link on this Merchant ID"
+        description="Use the Merchant ID dropdown in the sidebar to select the account your link belongs to."
+        className="py-12"
       />
     </Card>
   );
