@@ -62,7 +62,10 @@ export function useInvoiceLinksEnabled(): boolean {
  * selected the search spans every PA MID the merchant has. Sending the wrong
  * key would silently drop the scope and search across merchants.
  */
-function useInvoiceLinkMidFilter(): { filter: { key: string; value: string[] } | undefined; isReady: boolean } {
+function useInvoiceLinkMidFilter(): {
+  filter: { key: string; value: string[] } | undefined;
+  isReady: boolean;
+} {
   const paMids = useApp((s) => s.paMids);
   const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
 

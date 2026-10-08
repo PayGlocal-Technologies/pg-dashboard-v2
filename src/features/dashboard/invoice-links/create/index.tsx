@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -26,6 +26,8 @@ import {
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { SelectMidView } from "@/components/common/SelectMidView";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { useAccountSetup } from "@/stores/useAccountSetup";
 // Presentational only (ui + Icon + cn), so it is safe to borrow across
 // features — the same way mca-links borrows CountryCell from mca-transactions.
 import { ChipField } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
@@ -70,6 +72,7 @@ import {
   useInvoiceDraft,
   useInvoiceEditorMid,
   useImportItemsToSku,
+  useInvoiceLinkConfig,
   useInvoiceLinkTemplates,
   useInvoiceLogo,
   useMerchantShortName,
@@ -295,6 +298,35 @@ function requestToItems(request: DraftRequest | undefined): InvoiceLineItem[] {
 export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) {
   const router = useRouter();
   const { needsMidChoice, midOptions } = useInvoiceLinkMidScope();
+  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+  const mid = useInvoiceEditorMid();
+  // gcc-ui-temp only lets a merchant create an invoice link when their invoice
+  // config has `merchantInvoiceEnabled`. Checked here, for the MID the link
+  // will be raised under, rather than on the list's button: the list may span
+  // several MIDs, and only once one is chosen is there a single config to ask.
+  // Not read while a MID is still to be picked.
+  const { isInvoiceEnabled } = useInvoiceLinkConfig(needsMidChoice ? "" : mid);
+
+  const shell = (body: ReactNode) => (
+    <>
+      <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label="Close"
+          className="h-9 w-9 shrink-0 p-0"
+          onClick={() => router.push("/invoice-links")}
+        >
+          <Icon name="x" className="h-4 w-4" />
+        </Button>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          {invoiceId ? "Edit invoice link" : "Create an invoice link"}
+        </h1>
+      </header>
+      <div className="mx-auto w-full max-w-2xl px-6 py-16">{body}</div>
+    </>
+  );
 
   /**
    * The editor cannot open without knowing which account the link is for:
@@ -307,27 +339,43 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
    * answered.
    */
   if (needsMidChoice) {
-    return (
-      <>
-        <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Close"
-            className="h-9 w-9 shrink-0 p-0"
-            onClick={() => router.push("/invoice-links")}
-          >
-            <Icon name="x" className="h-4 w-4" />
-          </Button>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {invoiceId ? "Edit invoice link" : "Create an invoice link"}
-          </h1>
-        </header>
-        <div className="mx-auto w-full max-w-2xl px-6 py-16">
-          <SelectMidView midType="PA" midOptions={midOptions} showSidebarHint={false} />
-        </div>
-      </>
+    return shell(<SelectMidView midType="PA" midOptions={midOptions} showSidebarHint={false} />);
+  }
+
+  // Create only: gcc gates the Create action, not editing an existing link.
+  // Held back on an explicit false alone — while the config loads, or if it
+  // fails, the editor opens as before rather than a hiccup locking it.
+  if (!invoiceId && isInvoiceEnabled === false) {
+    return shell(
+      <PlaceholderState
+        variant="empty-table"
+        title="Invoice links aren't switched on for this account"
+        description="Contact your account manager to enable invoice links for this Merchant ID."
+        className="rounded-xl border border-border bg-card py-16"
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {midOptions.length > 1 ? (
+              // Clearing the selection brings back the account picker above.
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedMidDetails({ mid: "", status: "", color: "" })}
+              >
+                Choose another account
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => router.push("/invoice-links")}
+            >
+              Back to Invoice Links
+            </Button>
+          </div>
+        }
+      />
     );
   }
 
@@ -343,6 +391,8 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
   const initialTemplateId = invoiceId ? null : searchParams.get("templateId");
   const mid = useInvoiceEditorMid();
   const currencies = useInvoiceCurrencies();
+  // gcc-ui-temp's merchant configs (features/Invoice/helper.js).
+  const invoiceConfig = useInvoiceLinkConfig(mid);
   // gcc-ui-temp sends `addressCountry` as an ISO2 code; the form holds names.
   const countries = useInvoiceCountries();
   // Matched ignoring case and punctuation: the client book and this list do
@@ -363,6 +413,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     displayUrl: logoUrl,
     upload: uploadLogo,
     isUploading: isLogoUploading,
+    merchantLogo,
   } = useInvoiceLogo(mid);
 
   // Derived state, not synced state: `edits` holds only what the merchant has
@@ -633,20 +684,29 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     };
 
     if (isEditingIssued) {
-      editInvoice(buildInvoiceRequest(values, items, undefined, countryCode), handlers);
+      editInvoice(
+        buildInvoiceRequest(values, items, undefined, countryCode, merchantLogo),
+        handlers
+      );
       return;
     }
 
     if (recipients.length === 1) {
       createInvoice(
-        buildInvoiceRequest(values, items, customerFromRecipient(recipients[0]), countryCode),
+        buildInvoiceRequest(
+          values,
+          items,
+          customerFromRecipient(recipients[0]),
+          countryCode,
+          merchantLogo
+        ),
         handlers
       );
       return;
     }
 
     const sent = recipients;
-    createBatch(buildBulkInvoiceRequest(values, items, sent, countryCode), {
+    createBatch(buildBulkInvoiceRequest(values, items, sent, countryCode, merchantLogo), {
       onSuccess: (res) => setBatch({ results: res?.data?.results ?? [], recipients: sent }),
       onError: (error: Error) => toast.error(error?.message || "Failed to create links"),
     });
@@ -664,7 +724,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
         : customerFromRecipient(EMPTY_RECIPIENT)
       : undefined;
     saveTickedItemsToSku();
-    saveDraft(buildInvoiceRequest(values, items, customer, countryCode), {
+    saveDraft(buildInvoiceRequest(values, items, customer, countryCode, merchantLogo), {
       onSuccess: () => {
         toast.success("Draft saved");
         router.push("/invoice-links");
@@ -1250,6 +1310,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
       <CreatedLinkDialog
         open={createdLink !== null}
         link={createdLink ?? ""}
+        isShared={invoiceConfig.isCustomerSharing}
         // Same as the batch results: closing stays in the editor; the dialog's
         // own button is the way to the list.
         onOpenChange={(next) => {

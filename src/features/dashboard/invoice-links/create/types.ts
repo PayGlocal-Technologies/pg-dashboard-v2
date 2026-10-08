@@ -164,7 +164,7 @@ export interface InvoiceCreateRequest {
     discountAmount: string;
     /** Always "0": invoice links have no extra charges, and the backend ignores it in the total. */
     extraChargeAmount: string;
-    merchantLogo: { name: string; fileExtension: string };
+    merchantLogo: InvoiceMerchantLogo;
     additionalEmailId: string[];
   };
   plCustomerData: {
@@ -377,6 +377,15 @@ export interface InvoiceLogoResponse {
   data: {
     logo?: Record<string, string>;
   };
+}
+
+/**
+ * Tells the backend which stored logo to put on the invoice: the MID the logo
+ * was uploaded under and its extension, or both empty for none.
+ */
+export interface InvoiceMerchantLogo {
+  name: string;
+  fileExtension: string;
 }
 
 export interface MerchantAdditionalInfoResponse {

@@ -11,6 +11,7 @@ import {
   INVOICE_NO_MAX_LENGTH,
   INVOICE_NO_MIN_LENGTH,
   ITEM_TEXT_MAX_LENGTH,
+  NO_MERCHANT_LOGO,
   NAME_MAX_LENGTH,
   NUMERIC_DECIMAL_PATTERN,
   NUMERIC_PATTERN,
@@ -27,6 +28,7 @@ import type {
   InvoiceFormValues,
   InvoiceLineItem,
   InvoiceLinkTemplate,
+  InvoiceMerchantLogo,
   InvoiceRecipient,
   TemplateLineItem,
   TemplateWriteBody,
@@ -201,7 +203,8 @@ const sameValue: CountryCodeOf = (country) => country;
  */
 function buildInvoiceRequestData(
   values: InvoiceFormValues,
-  items: InvoiceLineItem[]
+  items: InvoiceLineItem[],
+  merchantLogo: InvoiceMerchantLogo
 ): InvoiceCreateRequest["invoiceRequestData"] {
   const subTotal = getSubTotalAmount(items).toFixed(2);
   const total = getTotalAmount(items, values.discount || "0", values.discountType);
@@ -251,13 +254,15 @@ function buildInvoiceRequestData(
     // a fixed discount goes in discountAmount. discountAmount and
     // extraChargeAmount are required fields — "0", never blank or null, when
     // unused (a missing discountAmount fails field validation).
-    discountAmount:
-      discount && values.discountType === "fixed" ? fromCentsString(discount) : "0",
+    discountAmount: discount && values.discountType === "fixed" ? fromCentsString(discount) : "0",
     ...(discount && values.discountType === "percentage" ? { discountPercent: discount } : {}),
     // Ignored by the backend's total check today, so it is never part of
     // totalAmount; invoice links have no extra charges anyway.
     extraChargeAmount: "0",
-    merchantLogo: { name: "", fileExtension: "" },
+    // gcc's getMerchantLogo: filled only once a logo was uploaded in this
+    // editor (see useInvoiceLogo). Left empty, the backend renders no logo,
+    // even when the merchant has one stored.
+    merchantLogo,
     additionalEmailId: [],
   };
 }
@@ -332,8 +337,8 @@ function buildCustomerParts(
  * upstream has it — the three endpoints take the same shape and differ only in
  * URL and verb.
  *
- * The constants (`expiry: 6`, `siTxn: false`, the empty `merchantLogo`, …)
- * are gcc-ui-temp's, as is everything left out when empty.
+ * The constants (`expiry: 6`, `siTxn: false`, …) are gcc-ui-temp's, as is
+ * everything left out when empty.
  *
  * `customer` defaults to the single-customer form fields, which is the edit
  * path; create passes the one picked recipient instead.
@@ -342,10 +347,11 @@ export function buildInvoiceRequest(
   values: InvoiceFormValues,
   items: InvoiceLineItem[],
   customer: InvoiceCustomer = customerFromValues(values),
-  countryCode: CountryCodeOf = sameValue
+  countryCode: CountryCodeOf = sameValue,
+  merchantLogo: InvoiceMerchantLogo = NO_MERCHANT_LOGO
 ): InvoiceCreateRequest {
   return {
-    invoiceRequestData: buildInvoiceRequestData(values, items),
+    invoiceRequestData: buildInvoiceRequestData(values, items, merchantLogo),
     ...buildCustomerParts(customer, countryCode),
     siTxn: false,
     collectByGlobalAltPay: false,
@@ -362,10 +368,11 @@ export function buildBulkInvoiceRequest(
   values: InvoiceFormValues,
   items: InvoiceLineItem[],
   recipients: InvoiceRecipient[],
-  countryCode: CountryCodeOf = sameValue
+  countryCode: CountryCodeOf = sameValue,
+  merchantLogo: InvoiceMerchantLogo = NO_MERCHANT_LOGO
 ): InvoiceBulkCreateRequest {
   return {
-    invoiceRequestData: buildInvoiceRequestData(values, items),
+    invoiceRequestData: buildInvoiceRequestData(values, items, merchantLogo),
     clients: recipients.map((recipient) =>
       buildCustomerParts(customerFromRecipient(recipient), countryCode)
     ),
@@ -688,7 +695,14 @@ export function validateEmail(value: string): string | undefined {
 }
 
 export function validatePhone(value: string): string | undefined {
-  if (!value?.trim()) return "Please enter the Phone Number";
+  // TEMPORARY, UNDER TEST: phone made optional so a client saved without one
+  // (Client management allows it) can still get a link. Both sources require
+  // it (gcc-ui-temp InvoiceCustomerDetails IsRequired(), pg-dashboard
+  // isInvoiceForm), so whether the backend accepts a link with no phone is
+  // being checked in UAT. A blank phone goes out as null (buildCustomerParts).
+  // If the backend rejects it, restore this line.
+  // if (!value?.trim()) return "Please enter the Phone Number";
+  if (!value?.trim()) return undefined;
   if (value.length > PHONE_MAX_LENGTH)
     return `Phone Number must be at most ${PHONE_MAX_LENGTH} characters`;
   if (!EXTENDED_ALNUM_PATTERN.test(value)) {

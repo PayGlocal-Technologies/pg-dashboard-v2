@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  Shimmer,
-} from "@/components/ui";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, Shimmer } from "@/components/ui";
 import { PdfViewer } from "@/components/common/PdfViewer";
 
 /**
