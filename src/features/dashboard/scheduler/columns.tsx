@@ -95,7 +95,7 @@ export function buildExecutedColumns({
         />
       ),
     },
-    { key: "totalAmount", header: "Amount", minWidth: 130, render: amountCell },
+    { key: "totalAmount", header: "Amount", align: "right", minWidth: 130, render: amountCell },
     {
       key: "status",
       header: "Status",
@@ -171,7 +171,7 @@ export function buildProjectedColumns({
         />
       ),
     },
-    { key: "totalAmount", header: "Amount", minWidth: 130, render: amountCell },
+    { key: "totalAmount", header: "Amount", align: "right", minWidth: 130, render: amountCell },
     {
       key: "scheduledTime",
       header: "Scheduled time",

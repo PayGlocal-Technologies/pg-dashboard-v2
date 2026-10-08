@@ -17,6 +17,7 @@ import { CopyableCell } from "@/components/common/CopyableCell";
 import { Icon, type IconName } from "@/components/icon";
 import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
 import type { InvoiceLink } from "@/features/dashboard/invoice-links/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 type StatusMeta = { label: string; variant: BadgeVariant };
 
@@ -107,8 +108,7 @@ export function buildInvoiceLinkRowActions(
 
   const isDisableAllowed = ["ACTIVE", "PAYMENT_DUE", "DRAFT"].includes(status);
   const isOfflinePaid = status === "PAID" && row.paidOffline === "true";
-  const canTouchDocuments =
-    ["ACTIVE", "PAYMENT_DUE", "OVERDUE"].includes(status) || isOfflinePaid;
+  const canTouchDocuments = ["ACTIVE", "PAYMENT_DUE", "OVERDUE"].includes(status) || isOfflinePaid;
 
   const actions: RowAction[] = [
     {
@@ -220,18 +220,16 @@ export function buildInvoiceLinkColumns(opts?: {
     },
     {
       key: "totalAmount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 140,
       align: "right",
       render: (row) => {
         const currency = row.txnCurrency || "INR";
         return (
-          <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-            <span className="text-[13px] font-semibold tabular-nums text-foreground">
-              {formatCurrency(parseFloat(row.totalAmount ?? "0"), currency)}
-            </span>
-            <span className="text-[11px] font-medium text-muted-foreground">{currency}</span>
-          </div>
+          <AmountWithCode
+            amount={formatCurrency(parseFloat(row.totalAmount ?? "0"), currency)}
+            code={currency}
+          />
         );
       },
     },
@@ -294,7 +292,9 @@ export function buildInvoiceLinkColumns(opts?: {
         row.status?.toUpperCase() === "DRAFT" ? (
           <span>-</span>
         ) : (
-          <span>{row.formattedDueDate ? formatTransactionTimestamp(row.formattedDueDate) : "-"}</span>
+          <span>
+            {row.formattedDueDate ? formatTransactionTimestamp(row.formattedDueDate) : "-"}
+          </span>
         ),
     },
     {

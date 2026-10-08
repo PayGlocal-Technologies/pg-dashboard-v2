@@ -7,6 +7,7 @@ import { type Column, CopyableCell, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { formatCurrency, formatTimestamp, truncateMiddle } from "@/lib/utils/format";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // ── Status mapping: raw API value → display meta ──────────────────────────────
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -93,6 +94,11 @@ function FallbackBrand({ brand }: { brand?: string }) {
 }
 
 function PaymentMethodCell({ row }: { row: PaTransaction }) {
+  // The customer cancelled before paying, so no method was ever used: a dash,
+  // not a placeholder card glyph that reads as "paid by some card".
+  if (row.externalStatus === "CUSTOMER_CANCELLED") {
+    return <span className="text-[13px] text-muted-foreground">{"\u2014"}</span>;
+  }
   const instrument = row.paymentInstrument?.toUpperCase();
   const last4 = row.maskedCardNumber?.replaceAll("x", "").replaceAll("X", "").trim();
 
@@ -142,19 +148,13 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
   const cols: Column<PaTransaction>[] = [
     {
       key: "totalAmount",
-      header: "Amount",
+      header: <AmountHeader />,
+      align: "right",
       minWidth: 135,
       render: (row) => {
         const currency = row.txnCurrency ?? "INR";
         const amount = parseFloat(row.totalAmount ?? "0");
-        return (
-          <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-            <span className="font-semibold text-foreground tabular-nums text-[13px]">
-              {formatCurrency(amount, currency)}
-            </span>
-            <span className="text-[11px] text-muted-foreground font-medium">{currency}</span>
-          </div>
-        );
+        return <AmountWithCode amount={formatCurrency(amount, currency)} code={currency} />;
       },
     },
     {

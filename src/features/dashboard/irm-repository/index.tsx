@@ -43,6 +43,7 @@ import {
   type ProcessStatus,
 } from "@/features/dashboard/ebrc-generation/types";
 import { rowActionColumn } from "@/components/common/rowActionColumn";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 /** What the search actually matches. The box's text is sent as a full-text
  *  `queryString`, so it spans the whole record — these are the fields worth
@@ -262,13 +263,14 @@ export function IrmRepositoryFeature() {
     },
     {
       key: "remittanceAmount",
-      header: "Amount",
+      header: <AmountHeader />,
       minWidth: 140,
       align: "right",
       render: (row) => (
-        <span className="whitespace-nowrap tabular-nums">
-          {formatCurrency(row.remittanceAmount, row.currencyCode)} {row.currencyCode}
-        </span>
+        <AmountWithCode
+          amount={formatCurrency(row.remittanceAmount, row.currencyCode)}
+          code={row.currencyCode}
+        />
       ),
     },
     {

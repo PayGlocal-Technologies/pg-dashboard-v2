@@ -2,6 +2,7 @@ import { type Column, StatusBadge } from "@/components/ui";
 import type { BadgeVariant, BadgeTrailIcon } from "@payglocal_ui/flux-ui";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { PaymentLinkRow, PaymentLinkStatus } from "@/features/dashboard/payment-links/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 export type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
 
@@ -15,16 +16,11 @@ export const PAYMENT_LINK_STATUS_META: Record<PaymentLinkStatus, StatusMeta> = {
 export const paymentLinkColumns: Column<PaymentLinkRow>[] = [
   {
     key: "amount",
-    header: "Amount",
+    header: <AmountHeader />,
     minWidth: 135,
     align: "right",
     render: (row) => (
-      <div className="flex items-baseline gap-1.5 whitespace-nowrap justify-end">
-        <span className="font-semibold text-foreground tabular-nums text-[13px]">
-          {formatCurrency(row.amount, row.currency)}
-        </span>
-        <span className="text-[11px] text-muted-foreground font-medium">{row.currency}</span>
-      </div>
+      <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
     ),
   },
   {

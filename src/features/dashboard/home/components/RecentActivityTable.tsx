@@ -23,6 +23,7 @@ import {
 } from "@/features/dashboard/home/mock-data";
 import { formatDate, formatCurrency, truncate } from "@/lib/utils/format";
 import { rowActionColumn } from "@/components/common/rowActionColumn";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 // ── Status mapping: raw (lowercase) value → display meta ──────────────────────
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -111,15 +112,11 @@ function PaymentMethod({
 const transactionColumns: Column<RecentTransaction>[] = [
   {
     key: "amount",
-    header: "Amount",
+    header: <AmountHeader />,
+    align: "right",
     minWidth: 120,
     render: (row) => (
-      <span className="whitespace-nowrap">
-        <span className="text-[13px] font-semibold tabular-nums text-foreground">
-          {formatCurrency(row.amount, row.currency)}
-        </span>
-        <span className="ml-1.5 text-[11px] font-medium text-muted-foreground">{row.currency}</span>
-      </span>
+      <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
     ),
   },
   {
@@ -187,6 +184,7 @@ const settlementColumns: Column<RecentSettlement>[] = [
   {
     key: "amount",
     header: "Amount",
+    align: "right",
     minWidth: 135,
     render: (row) => (
       <span className="text-[13px] font-semibold tabular-nums text-foreground">

@@ -18,6 +18,7 @@ import {
   RECEIPT_PRODUCT_LABEL,
 } from "@/features/dashboard/mca-receipts/constants";
 import type { Receipt } from "@/features/dashboard/mca-receipts/types";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 /**
  * The Month column's heading, with its info tip.
@@ -133,17 +134,10 @@ export const RECEIPT_COLUMNS: Column<Receipt>[] = [
   },
   {
     key: "amount",
-    header: "Amount",
+    header: <AmountHeader />,
     minWidth: 160,
     align: "right",
-    render: (row) => (
-      <div className="flex items-baseline justify-end gap-1.5 whitespace-nowrap">
-        <span className="text-[13px] font-semibold tabular-nums text-foreground">
-          {formatReceiptAmount(row)}
-        </span>
-        <span className="text-[11px] font-medium text-muted-foreground">{row.currency}</span>
-      </div>
-    ),
+    render: (row) => <AmountWithCode amount={formatReceiptAmount(row)} code={row.currency} />,
   },
   {
     key: "periodMonth",

@@ -34,6 +34,7 @@ import {
 import { TransactionDetailsDrawer } from "@/features/dashboard/mca-transactions/components/TransactionDetailsDrawer";
 import { TransactionDetailsPage } from "@/features/dashboard/mca-transactions/components/TransactionDetailsPage";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
 /** Mirrors the loaded layout — header, the two cards, the payments table — so
  *  the page does not reflow when the response lands. */
@@ -72,16 +73,11 @@ function buildMcaPaymentColumns(): Column<McaSettlementPayment>[] {
   return [
     {
       key: "amount",
-      header: "Amount",
+      header: <AmountHeader />,
+      align: "right",
       minWidth: 130,
-      cellClassName: "pl-5",
       render: (p) => (
-        <div className="flex items-baseline gap-1.5 whitespace-nowrap">
-          <span className="font-semibold tabular-nums text-[13px] text-foreground">
-            {formatCurrency(p.amount, p.currency)}
-          </span>
-          <span className="text-[11px] font-medium text-muted-foreground">{p.currency}</span>
-        </div>
+        <AmountWithCode amount={formatCurrency(p.amount, p.currency)} code={p.currency} />
       ),
     },
     {
