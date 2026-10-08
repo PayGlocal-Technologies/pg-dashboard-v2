@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { toast } from "sonner";
 import { Button, IconButton, Textarea } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
@@ -122,12 +123,17 @@ export function FeedbackSheet() {
   // first. Either way the prompt is marked shown, so the server stops
   // reporting this merchant as eligible. A failed post is never retried in the
   // merchant's face — this is optional feedback, not something worth blocking
-  // on.
+  // on. A successful post is acknowledged with a toast, the same "Thank you for
+  // your feedback!" notification pg-dashboard's survey shows, since the tray
+  // itself has already closed by then.
   const resolve = (rating?: number) => {
     if (rating != null) {
       submitFeedback(
         { type: "GENERAL", rating, freeText: comment.trim(), expectations: "" },
-        { onError: () => undefined }
+        {
+          onSuccess: () => toast.success("Thank you for your feedback!"),
+          onError: () => undefined,
+        }
       );
     }
     markShown({ type: "GENERAL" }, { onError: () => undefined });

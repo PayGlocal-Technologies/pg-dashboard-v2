@@ -30,7 +30,7 @@ const eslintConfig = [
             {
               name: "next/image",
               message:
-                "Import <AppImage/> (@/components/common/AppImage) instead. Next does not apply basePath to a local image src, so next/image directly renders a broken image under /app-v2. Only components/common/AppImage.tsx may import next/image.",
+                "Import <AppImage/> (@/components/common/AppImage) instead. Next does not apply basePath to a local image src, so next/image directly renders a broken image under /hub. Only components/common/AppImage.tsx may import next/image.",
             },
           ],
           patterns: [

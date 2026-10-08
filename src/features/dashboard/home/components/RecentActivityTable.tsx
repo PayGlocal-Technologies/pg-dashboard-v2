@@ -259,14 +259,19 @@ export function RecentActivityTable({
         size="sm"
         className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
         onClick={() =>
-          router.push(tab === "transactions" ? "/mca-transactions" : "/settlement-report")
+          router.push(tab === "transactions" ? "/mca-transactions" : "/settlements")
         }
       >
         View all
       </Button>
     ),
     tabs: (
-      <Tabs value={tab} onValueChange={(v) => setTab(v as "transactions" | "settlements")}>
+      // pb-3: breathing room between the tab chips and the grid's header row.
+      <Tabs
+        value={tab}
+        onValueChange={(v) => setTab(v as "transactions" | "settlements")}
+        className="pb-3"
+      >
         <TabsList className="h-8">
           <TabsTrigger value="transactions" className="h-7 px-3 text-[13px]">
             Transactions
@@ -297,7 +302,7 @@ export function RecentActivityTable({
       emptyDescription="As customers start paying you, your most recent transactions show up in this list."
       emptyState={
         <PlaceholderState
-          variant="no-transactions"
+          variant="empty-table"
           size="sm"
           title="Your payments will appear here"
           description="As customers start paying you, your most recent transactions show up in this list."
@@ -318,7 +323,7 @@ export function RecentActivityTable({
       emptyDescription="Once payouts begin, the most recent ones are listed here with the amount that reached your account."
       emptyState={
         <PlaceholderState
-          variant="no-settlements"
+          variant="empty-table"
           size="sm"
           title="Your settlements will appear here"
           description="Once payouts begin, the most recent ones are listed here with the amount that reached your account."

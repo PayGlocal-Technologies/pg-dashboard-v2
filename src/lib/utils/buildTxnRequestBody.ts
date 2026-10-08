@@ -50,9 +50,20 @@ export function buildTxnRequestBody(
     fieldSearch.irmProcessStatus = filters.irmProcessStatus;
   }
 
-  // Currency filter (MCA)
+  // PA order status, same key pg-dashboard's tableRequestbodyBuilder sends.
+  if (filters.orderStatus?.length) {
+    fieldSearch.orderStatus = filters.orderStatus;
+  }
+
+  // Currency filter (MCA; PA sends it here too, field name UNCONFIRMED for PA)
   if (filters.currency?.length) {
     fieldSearch.currency = filters.currency;
+  }
+
+  // Generic status filter — the key the invoice/payment/MCA link searches use,
+  // as opposed to externalStatus above.
+  if (filters.status?.length) {
+    fieldSearch.status = filters.status;
   }
 
   // Country filter (client list) — names, not codes. Same key pg-dashboard's

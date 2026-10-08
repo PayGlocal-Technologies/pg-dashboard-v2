@@ -85,9 +85,8 @@ function FieldGroupTitle({ children, className }: { children: ReactNode; classNa
 /**
  * Overrides CopyableText's own font-mono/regular-weight value styling so a
  * copyable value in the Contact card renders in exactly the typography
- * ClientDetailRow gives every other value: the app's sans stack (font-sans →
- * --font-geist-sans, the same family Transaction Details' own field values
- * use), at the row's 13px/medium/foreground. Only the family, weight, and
+ * ClientDetailRow gives every other value: the app's sans stack (font-sans, the
+ * same family Transaction Details' own field values use), at the row's 13px/medium/foreground. Only the family, weight, and
  * wrapping are set here — size and colour already come from the row.
  * whitespace-normal cancels CopyableText's nowrap so a long address can wrap
  * inside the column rather than overflowing the card.
@@ -562,8 +561,10 @@ export function ClientDetailsContent({
     // to their parent's width, and DataTable's own overflow-x-auto takes over
     // inside the table where the scrolling belongs. The grid this replaced needed
     // an explicit min-w-0 on every item for that, since grid items default to
-    // min-width:auto — their content's intrinsic width.
-    <div className="space-y-6">
+    // min-width:auto — their content's intrinsic width. data-morph-anchor:
+    // where the drawer-to-page hand-off picks this view up and sets it down
+    // (see DrawerExpandMorph).
+    <div className="space-y-6" data-morph-anchor>
       <ClientIdentitySummary client={client} />
       <ClientInvoiceMetrics client={client} />
       <ClientContactSection client={client} layout={layout} onViewContract={onViewContract} />

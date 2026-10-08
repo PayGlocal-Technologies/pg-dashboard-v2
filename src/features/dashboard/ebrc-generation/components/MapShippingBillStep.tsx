@@ -869,7 +869,7 @@ export function MapShippingBillStep({
             />
           ) : !activeRecord ? (
             <PlaceholderState
-              variant="no-transactions"
+              variant="empty-table"
               size="sm"
               title="No details for this IRM"
               description={

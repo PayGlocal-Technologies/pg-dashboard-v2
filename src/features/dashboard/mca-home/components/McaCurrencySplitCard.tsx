@@ -149,7 +149,7 @@ export function McaCurrencySplitCard() {
         />
       ) : !hasData ? (
         <PlaceholderState
-          variant="no-analytics"
+          variant="no-metric-data"
           size="sm"
           title="No transactions in this period"
           description="Once payments arrive, you'll see how they split across the currencies you collect in."

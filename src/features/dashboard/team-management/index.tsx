@@ -267,7 +267,7 @@ export function TeamManagementFeature() {
         }
         emptyState={
           <PlaceholderState
-            variant="no-data"
+            variant="empty-table"
             title={emptyCopy.title}
             description={emptyCopy.description}
             // Same guard the header's own button carries: a partner user, or

@@ -24,3 +24,6 @@ export const MCA_LINK_VIEW_TABS = [
 
 export const ACTIVE_LINK_STATUSES: McaLinkStatus[] = ["ACTIVE"];
 export const DISABLED_LINK_STATUSES: McaLinkStatus[] = ["DISABLED"];
+
+/** Columns a link row is unreadable without, so the column editor cannot hide them. */
+export const FIXED_COLUMN_KEYS = ["amount", "status"];

@@ -174,3 +174,39 @@ export function DashboardHomeFeature() {
     </div>
   );
 }
+
+/**
+ * The Payments dashboard (/pa-dashboard): the Home dashboard's greeting and
+ * Recent activity only. Today's analytics, the widget grid and the banner are
+ * left out, since they draw on mock figures with no analytics endpoint behind
+ * them, which read as the merchant's own numbers.
+ */
+export function PaDashboardFeature() {
+  const profile = useApp((s) => s.profile);
+  const greeting = useGreeting();
+  const contextLine = useContextLine();
+
+  const displayName =
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") ||
+    profile?.username ||
+    "there";
+
+  return (
+    <div className="mx-auto max-w-[1400px] space-y-4">
+      <div>
+        <h1 className="text-[1.35rem] font-bold leading-snug tracking-tight text-foreground">
+          {greeting}, {displayName}{" "}
+          <span
+            className="inline-block origin-bottom-right"
+            style={{ animation: "wave 2.4s ease-in-out infinite" }}
+          >
+            👋
+          </span>
+        </h1>
+        <p className="mt-0.5 text-[13px] text-muted-foreground">{contextLine}</p>
+      </div>
+
+      <RecentActivityTable />
+    </div>
+  );
+}

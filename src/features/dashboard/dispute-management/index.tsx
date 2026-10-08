@@ -25,15 +25,12 @@ import {
   DISPUTE_COLUMN_ORDER,
 } from "@/features/dashboard/dispute-management/columns";
 import { DisputeReasonFilter } from "@/features/dashboard/dispute-management/components/DisputeReasonFilter";
-import { DisputeStatCards } from "@/features/dashboard/dispute-management/components/DisputeStatCards";
-import { MOCK_DISPUTE_ROWS } from "@/features/dashboard/dispute-management/mockRows";
 import {
   DISPUTE_SEGMENT_RAW_STATUSES,
+  DISPUTE_STATUS_FILTERS,
   DISPUTE_STATUS_SEGMENTS,
-  DISPUTE_TIMEFRAMES,
   RESPOND_BY_SEGMENTS,
   type DisputeStatusSegment,
-  type DisputeTimeframe,
 } from "@/features/dashboard/dispute-management/constants";
 import type { DisputeRow } from "@/features/dashboard/dispute-management/types";
 import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
@@ -45,9 +42,7 @@ import { getDisputeReasonMeta } from "@/features/dashboard/pa-transactions/dispu
  * raw-status mapping (e.g. "Action required" covers both DISPUTED and
  * NEEDS_ACTION) instead of a second copy of that vocabulary, "All disputes"
  * excluded since it isn't a real status to filter by. */
-const STATUS_FILTER_OPTIONS = DISPUTE_STATUS_SEGMENTS.filter(
-  (segment) => segment.value !== "all"
-).map((segment) => ({ value: segment.value, label: segment.label }));
+const STATUS_FILTER_OPTIONS = DISPUTE_STATUS_FILTERS.map(({ value, label }) => ({ value, label }));
 
 /** "08/08/2026, 10:22:15" -> epoch ms, same shape as PaTransaction's
  * formattedCreationDateTime, this feature's mock rows generate it the
@@ -70,6 +65,8 @@ function parseFormattedDate(value?: string): number | undefined {
  * deriveTransactionDetail's generic status-keyed fallback to guess, that
  * fallback exists for real API data with no structured dispute of its own,
  * not for dispute-management rows, which already have one. */
+const PAGE_SIZE = 8;
+
 export function toPaTransaction(row: DisputeRow): PaTransaction {
   const reasonMeta = getDisputeReasonMeta(row.reason);
   return {
@@ -96,17 +93,31 @@ export function toPaTransaction(row: DisputeRow): PaTransaction {
         status: row.status,
         raisedOn: row.disputedOn,
         respondBy: row.respondBy,
+        documents: row.documents,
+        // The list's escalation round, so the detail page offers that
+        // stage's own choices (see status/disputeStages.ts).
+        disputePhase: row.disputePhase === "DISPUTE" ? "CHARGEBACK" : row.disputePhase,
+        reviewPhase: row.reviewPhase,
+        withdrawalFeeApplies: row.withdrawalFeeApplies,
+        withdrawn: row.resolution === "WITHDRAWN",
+        appliedFee: row.appliedFee,
+        resolvedOn:
+          row.status === "CLEARED" ||
+          row.status === "CHARGED_BACK" ||
+          row.status === "ACCEPTED" ||
+          row.status === "EXPIRED"
+            ? row.disputedOn
+            : undefined,
       },
     ],
   };
 }
 
-const RECOVERED_TREND = [
-  { x: "Jan", y: 1200 },
-  { x: "Feb", y: 1450 },
-  { x: "Mar", y: 1800 },
-  { x: "Apr", y: 2100 },
-];
+// TODO(integration): the disputes come from the chargeback search
+// (`v1/search/cb`, see pg-dashboard's features/chargebacks/services.ts). Until
+// that is wired the page shows no disputes, not invented ones: the table and
+// every card fall back to their empty states.
+const DISPUTE_ROWS: DisputeRow[] = [];
 
 export function DisputeManagementFeature() {
   const router = useRouter();
@@ -117,70 +128,36 @@ export function DisputeManagementFeature() {
   // useDisputeResolutions/TransactionDetailFeature) so a dispute shows as
   // Lost here too after being resolved from its detail page.
   const rows = useMemo(() => {
-    return MOCK_DISPUTE_ROWS.map((row) => {
+    return DISPUTE_ROWS.map((row) => {
       const override = resolutionByGid[row.txnGid];
       return override ? { ...row, status: override } : row;
     });
   }, [resolutionByGid]);
 
   const [search, setSearch] = useState("");
-  const [statusSegment, setStatusSegment] = useState<DisputeStatusSegment>("all");
+  const [statusSegment, setStatusSegment] = useState<DisputeStatusSegment>("action-required");
   const [statusFilter, setStatusFilter] = useState<string[] | undefined>(undefined);
   const [reason, setReason] = useState<string | undefined>(undefined);
   const [amountRange, setAmountRange] = useState<AmountRangeValue | undefined>(undefined);
   const [disputedDate, setDisputedDate] = useState<TransactionDateTimeValue | undefined>(undefined);
   const [columnOrder, setColumnOrder] = useState<string[]>(DISPUTE_COLUMN_ORDER);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
+  // The table's page, tied to the filters it was chosen under: any change to
+  // the tab, search or a filter goes back to page 1 (derived, not reset in an
+  // effect), so a later page can't be left showing an empty list.
+  const filterKey = JSON.stringify([
+    statusSegment,
+    search,
+    statusFilter,
+    reason,
+    amountRange,
+    disputedDate,
+  ]);
+  const [pageState, setPageState] = useState({ key: filterKey, page: 1 });
 
-  // Drives only the metrics cards below, the table keeps its own separate
-  // "Disputed Date" filter chip, same split as the Transactions page's
-  // timeframe tabs (stat cards) vs. its table's date filter.
-  const [metricsTimeframe, setMetricsTimeframe] = useState<DisputeTimeframe>("ytd");
   // Captured once on mount (see CLAUDE.md's no-Date.now()-during-render
-  // rule), every timeframe boundary below is derived from this fixed point,
-  // not a fresh "now" on every render.
+  // rule), the fixed "now" the Respond by column is measured against.
   const [nowMs] = useState(() => Date.now());
-
-  const metricsStartMs = useMemo(() => {
-    const start = new Date(nowMs);
-    if (metricsTimeframe === "today") {
-      start.setHours(0, 0, 0, 0);
-    } else if (metricsTimeframe === "1w") {
-      start.setDate(start.getDate() - 7);
-    } else if (metricsTimeframe === "1m") {
-      start.setMonth(start.getMonth() - 1);
-    } else if (metricsTimeframe === "3m") {
-      start.setMonth(start.getMonth() - 3);
-    } else {
-      start.setMonth(0, 1);
-      start.setHours(0, 0, 0, 0);
-    }
-    return start.getTime();
-  }, [nowMs, metricsTimeframe]);
-
-  const metricsRows = useMemo(() => {
-    return rows.filter((row) => {
-      const ts = parseFormattedDate(row.disputedOn);
-      return ts != null && ts >= metricsStartMs && ts <= nowMs;
-    });
-  }, [rows, metricsStartMs, nowMs]);
-
-  const reasonBreakdown = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const row of metricsRows) {
-      counts.set(row.reason, (counts.get(row.reason) ?? 0) + 1);
-    }
-    const total = metricsRows.length;
-    if (total === 0) return [];
-    return Array.from(counts.entries())
-      .map(([reasonLabel, count]) => ({
-        reason: reasonLabel,
-        count,
-        pct: Math.round((count / total) * 100),
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
-  }, [metricsRows]);
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -193,10 +170,8 @@ export function DisputeManagementFeature() {
       if (
         statusFilter &&
         statusFilter.length > 0 &&
-        !statusFilter.some((segmentValue) =>
-          DISPUTE_SEGMENT_RAW_STATUSES[
-            segmentValue as Exclude<DisputeStatusSegment, "all">
-          ].includes(row.status)
+        !statusFilter.some((value) =>
+          DISPUTE_STATUS_FILTERS.find((f) => f.value === value)?.raw.includes(row.status)
         )
       ) {
         return false;
@@ -274,6 +249,10 @@ export function DisputeManagementFeature() {
     });
   }, [filteredRows, showRespondBy]);
 
+  const pageCount = Math.max(1, Math.ceil(sortedRows.length / PAGE_SIZE));
+  const page = Math.min(pageState.key === filterKey ? pageState.page : 1, pageCount);
+  const pageRows = sortedRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
     // Full-bleed background matching the cards below, rather than the app
     // shell's default grey (see (dashboard)/layout.tsx), same treatment as
@@ -285,28 +264,10 @@ export function DisputeManagementFeature() {
           subtitle="Track, respond to and resolve payment disputes"
         />
 
-        {/* Same "section title + period control" header, then the card grid
-         * beneath it, as the Transactions page's own Metrics section. */}
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-foreground">Metrics</h2>
-            <SegmentedTabs
-              options={DISPUTE_TIMEFRAMES}
-              value={metricsTimeframe}
-              onChange={(v) => setMetricsTimeframe(v as DisputeTimeframe)}
-            />
-          </div>
-
-          <DisputeStatCards
-            disputes={metricsRows}
-            recoveredLabel="₹2.1K"
-            recoveredTrendPct={19}
-            recoveredTrend={RECOVERED_TREND}
-            reasonBreakdown={reasonBreakdown}
-          />
-        </div>
-
         <DataTableCard<DisputeRow>
+          // Flat table: no lift on the card itself or on the buttons and chips
+          // inside it.
+          className="shadow-none [&_.shadow-sm]:shadow-none"
           tabs={
             <SegmentedTabs
               options={DISPUTE_STATUS_SEGMENTS}
@@ -370,24 +331,27 @@ export function DisputeManagementFeature() {
             </div>
           }
           columns={columns}
-          data={sortedRows}
-          // Reuses `hasActive` — the same boolean the Clear button above is
-          // gated on — so a filtered-to-nothing result says so instead of
-          // claiming the merchant has never had a dispute. No CTA either
-          // way: disputes are raised by customers, not created here.
-          emptyTitle={
-            hasActive ? "No disputes match these filters" : "Keep track of disputes and chargebacks"
-          }
+          data={pageRows}
+          // A search or filter that matches nothing says so, rather than
+          // claiming the merchant has never had a dispute.
+          emptyTitle={hasActive ? "No disputes match these filters" : "No disputes yet"}
           emptyDescription={
             hasActive
               ? "Try a wider date range, or clear a filter to see more."
-              : "If a customer disputes a payment, it appears here with the evidence to submit and the date it's due by."
+              : "Disputed payments will appear here as they come in."
           }
           rowKey={(row) => row.disputeId}
           pagination={{
-            mode: "client",
-            pageSize: 8,
+            mode: "page",
+            page,
+            pageSize: PAGE_SIZE,
+            total: sortedRows.length,
+            onPageChange: (next) => setPageState({ key: filterKey, page: next }),
           }}
+          // The whole row opens the dispute; clicks on the row's own
+          // buttons are skipped by DataTable, so View details does only its
+          // own job.
+          onRowClick={onViewDetails}
           rowAction={(row) => (
             <Button
               variant="outline"

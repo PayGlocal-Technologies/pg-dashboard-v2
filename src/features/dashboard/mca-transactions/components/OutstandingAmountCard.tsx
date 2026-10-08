@@ -12,6 +12,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { AppImage } from "@/components/common/AppImage";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/utils/format";
 import { CompactAmount } from "@/components/common/CompactAmount";
@@ -33,16 +34,19 @@ function currencyLabel(currency: string): string {
  * expandable per-currency breakdown.
  *
  * The headline amount + count come from the document-pending endpoint for the
- * given `timeframe`. The "By currency" breakdown is a separate live snapshot of
- * everything currently DOCUMENT_PENDING (no timeframe), so it's labelled as such
- * to keep the two figures from being read as the same window.
+ * given `timeframe`, and the "By currency" breakdown from
+ * document-pending-by-currency for the same window, so the two always agree.
+ * Only when no timeframe is passed (International Accounts) does the breakdown
+ * fall back to the endpoint's live snapshot of everything currently pending.
  */
 export function OutstandingAmountCard({
   className,
-  /** today | week | month | ytd. Defaults to ytd for the aggregate placements
-   *  (e.g. International Accounts) that have no time-range control of their own;
-   *  the Transactions analytics section passes its selected range through. */
-  timeframe = "ytd",
+  /** today | week | month | ytd. The Transactions analytics section passes its
+   *  selected range through, and both calls follow it. Placements with no
+   *  time-range control of their own (International Accounts) omit it: the
+   *  headline then defaults to ytd and the by-currency call sends no timeframe,
+   *  keeping its currently-pending snapshot. */
+  timeframe,
   /** When set (e.g. the International Accounts page, keyed to the selected
    *  region), the headline shows that one currency's pending slice from the
    *  by-currency snapshot instead of the timeframe total, and the per-currency
@@ -71,8 +75,8 @@ export function OutstandingAmountCard({
   badgePlacement?: "title" | "below-amount";
   dangerTint?: boolean;
 }) {
-  const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe);
-  const { breakdown, isLoading: isBreakdownLoading } = useDocumentPendingByCurrency();
+  const { documentPending, isLoading: isTimeframeLoading } = useDocumentPending(timeframe ?? "ytd");
+  const { breakdown, isLoading: isBreakdownLoading } = useDocumentPendingByCurrency(timeframe);
 
   const isCurrencyScoped = !!scopedCurrency;
   const scopedRow = isCurrencyScoped
@@ -122,9 +126,22 @@ export function OutstandingAmountCard({
             {/* h-12 w-12/rounded-full/amber-500 at 10% opacity: the same subtle
                 tinted-circle treatment as Saved Amount's green version, amber for
                 "pending". */}
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
-              <Icon name="clock" size={22} />
-            </span>
+            {/* Nothing pending: the shared "no metric data" artwork in the same
+                slot and size, instead of the clock. */}
+            {!isLoading && amount === 0 && pendingCount === 0 ? (
+              <AppImage
+                src="/assets/No data(metric usage).png"
+                alt=""
+                width={48}
+                height={48}
+                unoptimized
+                className="h-12 w-12 shrink-0"
+              />
+            ) : (
+              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600">
+                <Icon name="clock" size={22} />
+              </span>
+            )}
           </div>
         )}
 
@@ -178,11 +195,8 @@ export function OutstandingAmountCard({
           </>
         )}
 
-        {/* Per-currency breakdown of what's currently pending — a snapshot, not
-            scoped to the timeframe above, so it's named that way (and, unlike
-            the headline KPI, it does not change when the section's time-range
-            control changes — useDocumentPendingByCurrency takes no timeframe
-            argument at all).
+        {/* Per-currency breakdown of what's pending, for the same timeframe as
+            the headline above (it follows the section's time-range control).
 
             A hover tooltip now, not an always-visible list and not a
             click-to-expand one either: both of those put the row list in
@@ -210,7 +224,7 @@ export function OutstandingAmountCard({
                   variant="ghost"
                   className="h-auto min-h-0 w-auto p-0 text-xs font-medium text-muted-foreground underline decoration-dotted underline-offset-2 hover:text-foreground"
                 >
-                  Currently pending by currency
+                  {timeframe ? "Pending by currency" : "Currently pending by currency"}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom" align="start" className="w-64 max-w-none p-3">

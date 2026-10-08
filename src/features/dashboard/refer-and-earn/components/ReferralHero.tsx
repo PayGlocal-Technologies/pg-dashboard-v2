@@ -103,10 +103,12 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
           Since the artwork fades to solid white at its own bottom edge, and
           the content block below uses the same white card surface, there's
           no visible seam between the two blocks. */}
-      {/* 9:5 frame, a little shorter than the asset's own 2196:1344. With
-          object-top, the only thing cropped is the plain white fade at the
-          bottom of the artwork, which blends into the white content block
-          below anyway. */}
+      {/* 9:5 frame over the asset's top 61% (2224:1989): that's where its
+          artwork turns to plain white. The export has a transparent edge
+          (~12px at the sides, 8px on top) and rounded corners of its own;
+          scale-[1.04] from the frame's bottom (which sits in the white) pushes
+          both past the card's clip, so the artwork runs flush to its top and
+          sides with no sliver. */}
       <div className="relative aspect-9/5 w-full">
         <Image
           src={REFERRAL_HERO_BANNER.src}
@@ -114,7 +116,7 @@ export function ReferralHero({ referralUrl }: ReferralHeroProps) {
           fill
           priority
           sizes="(min-width: 1024px) 800px, (min-width: 768px) 480px, 100vw"
-          className="object-cover object-top"
+          className="origin-bottom scale-[1.04] object-cover object-top"
         />
       </div>
 

@@ -11,9 +11,6 @@ export {
   AvatarFallback,
   Button,
   type ButtonProps,
-  SingleSelect,
-  type SingleSelectOption,
-  type SingleSelectProps,
   Card,
   CardHeader,
   CardFooter,
@@ -224,4 +221,10 @@ export {
   type UnderlineTab,
   SegmentedTabs,
   type SegmentedTabOption,
+} from "@payglocal_ui/flux-ui";
+
+export {
+  SingleSelect,
+  type SingleSelectOption,
+  type SingleSelectProps,
 } from "@payglocal_ui/flux-ui";

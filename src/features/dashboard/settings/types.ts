@@ -61,12 +61,16 @@ export interface PurposeCodesResponse {
   data?: PurposeCodesData | null;
 }
 
-/** The PUT body pg-dashboard sends — note the plural key `purposeCodes`, which
- *  differs from the singular `purposeCode` the GET returns. */
-export interface BusinessUpdatePayload {
-  /** Still an array on the wire, so the contract is untouched, but the UI now
-   *  only ever sends a single code, see BusinessDetailsFeature. */
-  purposeCodes: string[];
+/** GET /v1/merchants/{merchantId}/purpose-code. `purposeCode` is null when
+ *  the merchant has never had one set. */
+export interface MerchantPurposeCodeResponse {
+  data?: { purposeCode?: string | null } | null;
+}
+
+/** PUT /v1/merchants/{merchantId}/purpose-code body. Overwrites the stored
+ *  code every time. */
+export interface MerchantPurposeCodeUpdatePayload {
+  purposeCode: string;
 }
 
 export interface SettlementData {
@@ -77,19 +81,36 @@ export interface SettlementData {
    *  form binds this key (its field is literally named `accountNumber`), which
    *  is why the two endpoints return the number under different keys. */
   accountNumber?: string | null;
+  /** When the settlement account was last changed, epoch milliseconds as a
+   *  string (e.g. "1790762925003"). Returned by the masked /settlement read
+   *  (GET /v3/merchants/profile/{onbId}/settlement). Drives
+   *  the once-every-30-days change rule, see settlementChangePolicy. */
+  lastUpdatedTime?: string | null;
 }
 
 export interface SettlementDataResponse {
   data?: SettlementData | null;
 }
 
-/** PUT body for updating the settlement bank account. Endpoint:
- *  PUT /gcc/v2/merchants/{merchantId}/account-details — note the key is
- *  `number` (not `accountNumber`), and it is scoped by merchant id, not
- *  onboarding id. `ifscCode` must resolve via IFSC lookup or the API 4xxs. */
-export interface AccountDetailsUpdatePayload {
-  number: string;
+/** PUT /gcc/v3/merchants/profile/{onboardingId}/settlement body. */
+export interface SettlementUpdatePayload {
+  accountNumber: string;
   ifscCode: string;
+}
+
+/**
+ * Its response. Success is `{ message }` alone. Failures carry `status` and
+ * `reasonCode` with the message to show:
+ *   - "Invalid IFSC code"                                REQUEST_ERROR / GL-400-001
+ *   - "You can next update your bank account on <date>." REQUEST_ERROR / GL-400-001
+ *   - "Account verification failed, please check ..."    CONFIG_ERROR  / GL-201-020
+ * The last one's reason code is in the 2xx family, so it may come back with a
+ * 2xx HTTP status; the body's `status`, not the HTTP code, decides success.
+ */
+export interface SettlementUpdateResponse {
+  message?: string;
+  status?: string;
+  reasonCode?: string;
 }
 
 export interface ContactData {

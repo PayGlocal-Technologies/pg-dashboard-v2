@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { useGet } from "@/lib/api/hooks";
+import { toast } from "sonner";
+import { useGet, usePost } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useResolvedMids } from "@/lib/hooks/useResolvedMids";
 import { useScopeId } from "@/lib/hooks/useScopeId";
@@ -12,6 +13,7 @@ import {
   mcaRevenueTrendByUcicApi,
   mcaTopClientsByMidApi,
   mcaTopClientsByUcicApi,
+  paymentGatewayInterestApi,
 } from "@/features/dashboard/mca-home/services";
 import type {
   ClientAnalyticsRecord,
@@ -226,4 +228,42 @@ export function useNeedsAttention(): {
     isLoading: enabled && isPending,
     isError,
   };
+}
+
+/** Fallback toast copy, only for a success response that carries no `message`.
+ *  The endpoint's own message is what the merchant normally sees. */
+const PG_INTEREST_SUCCESS_FALLBACK =
+  "Your interest has been noted, we will reach out to you shortly.";
+
+/**
+ * "Learn more" on the payment-gateway promo slide: tells the merchant's
+ * account manager they're interested, then toasts the endpoint's message. Errors show
+ * the endpoint's own message (no merchant found / no account manager yet).
+ */
+export function usePaymentGatewayInterest(): {
+  registerInterest: () => void;
+  isPending: boolean;
+} {
+  const ucicId = useApp((s) => s.profile?.ucicId) ?? "";
+  const { mutate, isPending } = usePost<{ message?: string }, void>(paymentGatewayInterestApi(ucicId), {
+    invalidateQueries: false,
+    onSuccess: (response) => {
+      toast.success(response?.message || PG_INTEREST_SUCCESS_FALLBACK);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Couldn't notify the team. Please try again.");
+    },
+  });
+
+  const registerInterest = () => {
+    if (!ucicId) {
+      toast.error("Couldn't notify the team", {
+        description: "Your account details haven't loaded yet. Please try again.",
+      });
+      return;
+    }
+    mutate();
+  };
+
+  return { registerInterest, isPending };
 }

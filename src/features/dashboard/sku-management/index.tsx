@@ -3,13 +3,11 @@
 import { useState } from "react";
 import { PageHeader } from "@/components/ui";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
-import { SelectMidView } from "@/components/common/SelectMidView";
 import { SkuTable } from "@/features/dashboard/sku-management/components/SkuTable";
 import { ImportSkuFileModal } from "@/features/dashboard/sku-management/components/ImportSkuFileModal";
 import { GuideLauncher } from "@/components/common/guide/GuideLauncher";
 import { SKU_GUIDE_KEY, SKU_GUIDE_STEPS } from "@/features/dashboard/sku-management/guide";
-import { useSkuPathMid } from "@/features/dashboard/sku-management/hooks";
-import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
+import { useSkuMidScope } from "@/features/dashboard/sku-management/hooks";
 import { useUrlAction } from "@/lib/hooks/useUrlAction";
 
 export function SkuManagementFeature() {
@@ -22,22 +20,28 @@ export function SkuManagementFeature() {
   // not silently re-scope the catalogue the merchant is looking at.
   const [importMid, setImportMid] = useState("");
 
-  // The catalogue addresses one MID in the request path, so a merchant sitting
-  // on a Card Payments MID has no catalogue to show — same guard pg-dashboard
-  // applies here (`isPaMidSelected` → SelectMidView), expressed through
-  // useResolvedMids' guardState.
-  const { guardState } = useSkuPathMid();
-  const { needsMidChoice, midOptions, selectMid } = usePacbMidScope();
+  // The catalogue spans Card Payments (PA) and Global Fund Transfer (PACB)
+  // MIDs alike. It used to be PACB-only, with a Card Payments selection shown a
+  // "pick a Global Fund Transfer MID" screen instead (pg-dashboard's
+  // `isPaMidSelected` → SelectMidView); that guard is gone with the scope.
+  const { needsMidChoice, midOptions, selectMid } = useSkuMidScope();
+
+  // "" means MidScopedAction had nothing to ask. With exactly one MID that is
+  // the one, and it is named explicitly: a multi-MID account with nothing
+  // selected otherwise resolves the path to its UCIC id, and a SKU has to be
+  // created under a real MID.
+  const resolveMid = (mid: string) => mid || (midOptions.length === 1 ? midOptions[0] : "");
 
   const openImport = (mid: string) => {
-    setImportMid(mid);
+    setImportMid(resolveMid(mid));
     setImportOpen(true);
   };
 
   const openAddItem = (mid: string) => {
     // Add item does re-scope the page, because the row it creates belongs to
     // that MID and the merchant should end up looking at the list containing it.
-    if (mid) selectMid(mid);
+    const target = resolveMid(mid);
+    if (target) selectMid(target);
     setAddItemOpen(true);
   };
 
@@ -45,21 +49,10 @@ export function SkuManagementFeature() {
   // ?action=add-item / ?action=import. Both call the same openers with "" that
   // the buttons call when there is no MID to choose (see MidScopedAction), so
   // the two entry points are one code path. Held back until the MID list has
-  // loaded, and never fired while a choice is pending or the page is showing
-  // its own MID picker instead of the catalogue.
-  const canRunUrlAction =
-    guardState !== "not-applicable" && midOptions.length > 0 && !needsMidChoice;
+  // loaded, and never fired while a choice is pending.
+  const canRunUrlAction = midOptions.length > 0 && !needsMidChoice;
   useUrlAction("add-item", () => openAddItem(""), canRunUrlAction);
   useUrlAction("import", () => openImport(""), canRunUrlAction);
-
-  if (guardState === "not-applicable") {
-    return (
-      <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
-        <PageHeader title="SKU management" />
-        <SelectMidView midType="PACB" />
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
@@ -90,10 +83,11 @@ export function SkuManagementFeature() {
       <SkuTable
         addItemOpen={addItemOpen}
         onAddItemOpenChange={setAddItemOpen}
-        // The first-run empty state offers Import as a second way in. It never
-        // needs a MID pick: an empty catalogue means the page already resolved
-        // to one account's worth of nothing.
-        onImport={() => openImport("")}
+        // The first-run empty state's Add item and Import run the same openers
+        // as the header, through the same MID question: an empty catalogue no
+        // longer means a single account, now that it spans PA and PACB MIDs.
+        onAddItem={openAddItem}
+        onImport={openImport}
       />
 
       <ImportSkuFileModal open={importOpen} onOpenChange={setImportOpen} mid={importMid} />

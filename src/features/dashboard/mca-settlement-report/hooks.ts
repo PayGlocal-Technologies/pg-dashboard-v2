@@ -54,7 +54,7 @@ import {
 /**
  * The settlement rail these screens are about. Production's BankHolidayCalendar
  * offers a currency picker over ALL_CODES and defaults to BASE, which is "INR";
- * settlements land in INR, so this screen only ever wants that bucket. Not a
+ * settlements land in INR, so this screen only ever wants that currency. Not a
  * picker here because the v2 design has none.
  */
 const SETTLEMENT_CURRENCY = "INR";
@@ -102,19 +102,26 @@ function lookaheadMonthCount(dateKey: string, lookaheadDays: number): number {
 }
 
 /**
- * Flattens one or more calendar responses into a single holiday list.
+ * One currency's holidays out of one or more calendar responses, as a single
+ * list (INR, the settlement currency, unless asked otherwise).
  *
- * The response buckets by country code and the same holiday can appear under
- * several countries that share a currency, so entries are deduped by date and
- * sorted, letting callers rely on the order. Takes an array because the
- * multi-month read below has one response per month to merge.
+ * Production's BankHolidayCalendar handling: every country's list in
+ * `data.holidays` is merged (`Object.values(...).flat()`) and the entries are
+ * kept by their own `currency` field, whatever country key they sit under. So
+ * EUR picks up every eurozone country's entries, however the backend keys
+ * them. Entries are deduped by date and sorted, letting callers rely on the
+ * order. Takes an array because the multi-month read below has one response
+ * per month to merge.
  */
-function flattenHolidays(responses: (HolidayCalendarResponse | undefined)[]): HolidayInfo[] {
+function flattenHolidays(
+  responses: (HolidayCalendarResponse | undefined)[],
+  currency: string = SETTLEMENT_CURRENCY
+): HolidayInfo[] {
   const byDate = new Map<string, HolidayInfo>();
   for (const response of responses) {
     for (const entries of Object.values(response?.data?.holidays ?? {})) {
-      for (const entry of entries) {
-        if (entry.currency !== SETTLEMENT_CURRENCY || !entry.date) continue;
+      for (const entry of entries ?? []) {
+        if (!entry?.date || entry.currency !== currency) continue;
         if (!byDate.has(entry.date)) byDate.set(entry.date, { date: entry.date, name: entry.name });
       }
     }
@@ -159,11 +166,17 @@ export function useBankHolidays(
  * production does anyway, so each month is cached under the same key
  * `useBankHolidays` uses and the calendar grid's own read of a month already
  * fetched here is served from cache.
+ *
+ * `currency` picks whose holidays, matched on each entry's own `currency`
+ * field as production does: INR (settlements) by default. Each month's
+ * response carries every currency, so a different currency reuses the same
+ * cached months rather than fetching again.
  */
 export function useBankHolidayMonths(
   dateKey: string,
-  monthCount: number
-): { holidays: HolidayInfo[]; isLoading: boolean } {
+  monthCount: number,
+  currency: string = SETTLEMENT_CURRENCY
+): { holidays: HolidayInfo[]; isLoading: boolean; isError: boolean } {
   const isGuestUser = useApp((s) => s.isGuestUser);
 
   const windows = useMemo(
@@ -171,7 +184,7 @@ export function useBankHolidayMonths(
     [dateKey, monthCount]
   );
 
-  const { results, isLoading } = useMultipleGet<HolidayCalendarResponse>(
+  const { results, isLoading, isError } = useMultipleGet<HolidayCalendarResponse>(
     windows.map(({ from, to }) => ({
       queryKey: ["bank-holidays", from, to],
       url: bankHolidayCalendarApi(from, to),
@@ -182,9 +195,12 @@ export function useBankHolidayMonths(
   // No useMemo: `results` is a fresh array every render, so a dependency list
   // over it would never hit anyway. flattenHolidays is pure and runs over a few
   // dozen entries, and the React Compiler memoizes the call for us.
-  const holidays = flattenHolidays(results.map((result) => result.data));
+  const holidays = flattenHolidays(
+    results.map((result) => result.data),
+    currency
+  );
 
-  return { holidays, isLoading };
+  return { holidays, isLoading, isError };
 }
 
 export interface SettlementCalendarState {

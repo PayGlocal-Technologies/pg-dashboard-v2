@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { UseMutateFunction } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGet, usePost, usePut } from "@/lib/api/hooks";
@@ -8,19 +8,21 @@ import { useApp } from "@/stores/useApp";
 import { getPublicKey } from "@/features/auth/helpers";
 import { useEncryptPayload, type EncryptedPayload } from "@/features/auth/hooks";
 import { EMAIL_CHANGE_COMPLETED_STATUS } from "@/features/dashboard/settings/constants";
+import { dateKeyFromEpochMillis } from "@/features/dashboard/settings/settlementChangePolicy";
 import {
   businessDetailsApi,
   contactDetailsApi,
   initiateEmailChangeApi,
   merchantLogoUploadApi,
   merchantProfileApi,
+  merchantPurposeCodeApi,
   purposeCodeOptionsApi,
   resendNewEmailOtpApi,
   resendOldEmailOtpApi,
   secureSettlementDetailsApi,
   sendNewEmailOtpApi,
   settlementDetailsApi,
-  updateAccountDetailsApi,
+  updateSettlementDetailsApi,
   verifyNewEmailApi,
   verifyOldEmailApi,
 } from "@/features/dashboard/settings/services";
@@ -30,10 +32,8 @@ import {
   type PurposeCodeOption,
 } from "@/lib/purposeCodes";
 import type {
-  AccountDetailsUpdatePayload,
   BusinessData,
   BusinessDataResponse,
-  BusinessUpdatePayload,
   ChangeEmailCommit,
   ChangeEmailResponse,
   ContactData,
@@ -41,9 +41,13 @@ import type {
   MerchantBusinessSummary,
   MerchantLogoUploadResponse,
   MerchantProfileResponse,
+  MerchantPurposeCodeResponse,
+  MerchantPurposeCodeUpdatePayload,
   PurposeCodesResponse,
   SettlementData,
   SettlementDataResponse,
+  SettlementUpdatePayload,
+  SettlementUpdateResponse,
 } from "@/features/dashboard/settings/types";
 
 /** The onboarding id every merchant-profile settings endpoint is scoped by.
@@ -53,7 +57,7 @@ function useOnboardingId(): string {
   return useApp((s) => s.profile?.onboardingId) ?? "";
 }
 
-/** Business trade name + purpose codes (read). */
+/** Business trade name (read). */
 export function useBusinessDetails(): {
   business: BusinessData | null;
   isLoading: boolean;
@@ -151,17 +155,47 @@ export function usePurposeCodeOptions(extraCodes: string[] = []): {
   return { options: [...missing, ...fromApi], isLoading: !!onbId && isPending };
 }
 
-/** Update the merchant's purpose codes. pg-dashboard sends `{ purposeCodes }`
- *  (plural) as plain JSON and invalidates the business read on success. */
-export function useUpdateBusinessDetails(): {
-  updateBusiness: UseMutateFunction<unknown, Error, BusinessUpdatePayload>;
-  isSaving: boolean;
+/** The MID the purpose-code endpoint is addressed by: the first PACB MID from
+ *  the enabled-products response (purpose codes are a cross-border setting),
+ *  not profile.mid. Empty until enabled-products loads, or when the account has
+ *  no PACB MID, which keeps the read disabled and the save a no-op. */
+function usePurposeCodeMerchantId(): string {
+  return useApp((s) => s.paCbMids[0]) ?? "";
+}
+
+/** The merchant's saved purpose code, from GET /v1/merchants/{mid}/purpose-code.
+ *  Normalised to trimmed upper case; empty string when none was ever set. */
+export function useMerchantPurposeCode(): {
+  purposeCode: string;
+  isLoading: boolean;
 } {
-  const onbId = useOnboardingId();
-  const { mutate, isPending } = usePut<unknown, BusinessUpdatePayload>(businessDetailsApi(onbId), {
-    invalidateQueries: [["settings-business", onbId]],
-  });
-  return { updateBusiness: mutate, isSaving: isPending };
+  const merchantId = usePurposeCodeMerchantId();
+  const { data, isPending } = useGet<MerchantPurposeCodeResponse>(
+    ["settings-purpose-code", merchantId],
+    merchantPurposeCodeApi(merchantId),
+    { enabled: !!merchantId }
+  );
+  return {
+    purposeCode: data?.data?.purposeCode?.trim().toUpperCase() ?? "",
+    isLoading: !!merchantId && isPending,
+  };
+}
+
+/** Save the merchant's purpose code via PUT /v1/merchants/{mid}/purpose-code,
+ *  plain JSON `{ purposeCode }`. The endpoint overwrites on every call, so the
+ *  same hook serves a first-time set and an edit. Invalidates the read above. */
+export function useUpdateMerchantPurposeCode(): {
+  updatePurposeCode: UseMutateFunction<unknown, Error, MerchantPurposeCodeUpdatePayload>;
+  isSaving: boolean;
+  /** False while there is no PACB MID to address. */
+  canEdit: boolean;
+} {
+  const merchantId = usePurposeCodeMerchantId();
+  const { mutate, isPending } = usePut<unknown, MerchantPurposeCodeUpdatePayload>(
+    merchantPurposeCodeApi(merchantId),
+    { invalidateQueries: [["settings-purpose-code", merchantId]] }
+  );
+  return { updatePurposeCode: mutate, isSaving: isPending, canEdit: !!merchantId };
 }
 
 /** Settlement account (IFSC + account number). `masked` picks which endpoint
@@ -182,29 +216,92 @@ export function useSettlementDetails(masked: boolean): {
   return { settlement: data?.data ?? null, isLoading: !!onbId && isPending, isError };
 }
 
-/** The merchant id (profile.mid) the account-details update endpoint is scoped
- *  by. Distinct from the onboarding id the read endpoints use. Empty string
- *  until the profile resolves — callers gate the Save action on it. */
+/**
+ * When the settlement account was last changed (local YYYY-MM-DD, or null if
+ * never), from `lastUpdatedTime` on the masked settlement read
+ * (GET /v3/merchants/profile/{onbId}/settlement).
+ *
+ * Same query key as the card's own default (masked) read, so this shares that
+ * request rather than adding one. An update invalidates it (see
+ * useUpdateAccountDetails), so the new timestamp, and with it the lock,
+ * arrives right after a change. A failed read settles to "never changed".
+ */
+export function useSettlementLastChanged(): { lastChangedDate: string | null; isLoading: boolean } {
+  const onbId = useOnboardingId();
+  const { data, isPending } = useGet<SettlementDataResponse>(
+    ["settings-settlement", onbId, true],
+    settlementDetailsApi(onbId),
+    { enabled: !!onbId }
+  );
+  return {
+    lastChangedDate: dateKeyFromEpochMillis(data?.data?.lastUpdatedTime),
+    isLoading: !!onbId && isPending,
+  };
+}
+
+/** The merchant id (profile.mid) the merchant-scoped endpoints (logo upload)
+ *  take. Distinct from the onboarding id the profile reads use. Empty string
+ *  until the profile resolves; callers gate their action on it. */
 function useMerchantId(): string {
   return useApp((s) => s.profile?.mid) ?? "";
 }
 
-/** Update the settlement bank account (number + IFSC) via
- *  PUT /gcc/v2/merchants/{merchantId}/account-details. Plain JSON body, no JWE.
- *  Invalidates both masked/unmasked settlement reads on success so the card
- *  reflects the new account. `canEdit` is false until the merchant id resolves. */
+/** True when a settlement-update response is a failure despite arriving as a
+ *  success: any `*_ERROR` status (REQUEST_ERROR, CONFIG_ERROR, ...). */
+function isFailedSettlementUpdate(res: SettlementUpdateResponse | undefined): boolean {
+  return !!res?.status && res.status.toUpperCase().endsWith("_ERROR");
+}
+
+const SETTLEMENT_UPDATE_FALLBACK_ERROR = "Failed to update bank account.";
+
+/**
+ * Update the settlement bank account via
+ * PUT /gcc/v3/merchants/profile/{onboardingId}/settlement, plain JSON
+ * `{ accountNumber, ifscCode }`.
+ *
+ * `updateAccount` resolves only on a real success and rejects with the
+ * backend's own message otherwise (invalid IFSC, cooldown still running, bank
+ * verification failed), including a failure that comes back as HTTP 2xx (see
+ * SettlementUpdateResponse). Either way the settlement reads are refetched
+ * afterwards: on success they carry the new account and lastUpdatedTime (so
+ * the 30-day lock starts), and on a cooldown error they bring the lock the
+ * card didn't know about yet. `canEdit` is false until the onboarding id
+ * resolves.
+ */
 export function useUpdateAccountDetails(): {
-  updateAccount: UseMutateFunction<unknown, Error, AccountDetailsUpdatePayload>;
+  updateAccount: (payload: SettlementUpdatePayload) => Promise<SettlementUpdateResponse>;
   isSaving: boolean;
   canEdit: boolean;
 } {
-  const merchantId = useMerchantId();
   const onbId = useOnboardingId();
-  const { mutate, isPending } = usePut<unknown, AccountDetailsUpdatePayload>(
-    updateAccountDetailsApi(merchantId),
-    { invalidateQueries: [["settings-settlement", onbId]] }
+  const queryClient = useQueryClient();
+  const { mutateAsync, isPending } = usePut<SettlementUpdateResponse, SettlementUpdatePayload>(
+    updateSettlementDetailsApi(onbId),
+    // Refetched below on both outcomes instead.
+    { invalidateQueries: false }
   );
-  return { updateAccount: mutate, isSaving: isPending, canEdit: !!merchantId };
+
+  const updateAccount = useCallback(
+    async (payload: SettlementUpdatePayload): Promise<SettlementUpdateResponse> => {
+      try {
+        const res = await mutateAsync(payload);
+        if (isFailedSettlementUpdate(res)) {
+          throw new Error(res?.message || SETTLEMENT_UPDATE_FALLBACK_ERROR);
+        }
+        return res;
+      } catch (err) {
+        // handleApiError rejects with the response body (message included),
+        // not always an Error instance; normalise so callers read one shape.
+        const message = (err as { message?: string } | null)?.message;
+        throw new Error(message || SETTLEMENT_UPDATE_FALLBACK_ERROR);
+      } finally {
+        void queryClient.invalidateQueries({ queryKey: ["settings-settlement", onbId] });
+      }
+    },
+    [mutateAsync, queryClient, onbId]
+  );
+
+  return { updateAccount, isSaving: isPending, canEdit: !!onbId };
 }
 
 /** Upload the merchant's checkout logo via

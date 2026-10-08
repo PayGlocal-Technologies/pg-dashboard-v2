@@ -174,3 +174,28 @@ export interface CreatePaymentButtonBody {
     customerEmailId: boolean;
   };
 }
+
+/**
+ * One button's saved settings, `GET /v1/merchants/{mid}/payment-button/{id}`,
+ * as pg-dashboard's EditPaymentButton reads it (`data.paymentButtonData`).
+ */
+export interface PaymentButtonConfig {
+  paymentButtonId?: string | null;
+  iso3CurrencyCode?: string;
+  webDomain?: string;
+  pbRequiredFields?: {
+    customerName?: boolean;
+    customerPhoneNumber?: boolean;
+    customerEmailId?: boolean;
+  };
+}
+
+export interface PaymentButtonConfigResponse {
+  data?: { paymentButtonData?: PaymentButtonConfig | null } | null;
+}
+
+/** The button to edit: every per-button endpoint is addressed by both. */
+export interface PaymentButtonEditTarget {
+  mid: string;
+  buttonId: string;
+}

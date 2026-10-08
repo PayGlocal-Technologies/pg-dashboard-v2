@@ -16,7 +16,7 @@ import {
 import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
 import { withBasePath } from "@/constants/basePath";
-import { brandBackdropStyle } from "@/lib/utils/brandBackdrop";
+import { brandBackdropStyle, INVOICE_PREVIEW_BACKDROP } from "@/lib/utils/brandBackdrop";
 import { useGet, usePost } from "@/lib/api/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { INVOICE_DATA_KEYS } from "@/features/dashboard/mca-invoices/constants";
@@ -220,7 +220,7 @@ function EditorSkeleton({ onClose }: { onClose: () => void }) {
           // A wash layered under the image (not `opacity` on this div)
           // lightens the image itself without touching the foreground
           // content's own opacity.
-          style={brandBackdropStyle(55)}
+          style={brandBackdropStyle(55, INVOICE_PREVIEW_BACKDROP)}
         >
           <div className="space-y-4 p-4 md:p-6">
             <div className="flex items-center justify-between">
@@ -1113,7 +1113,7 @@ function InvoiceEditor({
    */
   const handleEditTemplate = (templateId: string) => {
     // withBasePath because a raw `window.location` navigation is handed to the
-    // browser as-is — Next only prefixes /app-v2 for framework navigation
+    // browser as-is — Next only prefixes /hub for framework navigation
     // (router.push, next/link), not this. See src/constants/basePath.ts.
     // The MID rides along for the same reason the invoice list's copy does:
     // the selection does not survive a full page load.
@@ -1674,6 +1674,8 @@ function InvoiceEditor({
                 onApply={handleApplyTemplate}
                 onDetach={handleDetachTemplate}
                 onManage={() => setManageTemplatesOpen(true)}
+                canSave={hasTemplatableContent}
+                onSave={() => setSaveTemplateOpen(true)}
               />
             </div>
 
@@ -1761,7 +1763,7 @@ function InvoiceEditor({
           // A wash layered under the image (not `opacity` on this div)
           // lightens the image itself without touching the foreground
           // content's own opacity.
-          style={brandBackdropStyle(55)}
+          style={brandBackdropStyle(55, INVOICE_PREVIEW_BACKDROP)}
         >
           <div className="space-y-4 p-4 md:p-6" data-guide="invoice-preview">
             <InvoicePreviewSidebar

@@ -250,7 +250,7 @@ task's egress.
 
 ### Option C: redirect to the UAT dashboard
 
-Toggle navigates to `https://uat.dashboard.pygcl.com/app-v2` and the merchant
+Toggle navigates to `https://uat.dashboard.pygcl.com/hub` and the merchant
 signs in again. An afternoon of work, and it is honest about what it is doing,
 but it is not test mode: the prod session is left behind, deep links break, and
 there is no way back other than a bookmark. Worth mentioning only as the

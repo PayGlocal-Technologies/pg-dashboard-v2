@@ -2,15 +2,26 @@
 
 import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button, DataCardList, DataTableCard } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import {
   AmountFilterChip,
+  DateFilterChip,
+  EMPTY_RELATIVE_RANGE,
   FilterChipGroup,
   StatusFilterChip,
+  TextFilterChip,
+  hasRelativeRange,
+  relativeRangeToEpochMs,
+  toEndOfDayMs,
+  toStartOfDayMs,
   type AmountRangeValue,
+  type DateRangeValue,
+  type RelativeRangeValue,
 } from "@/components/common/filters/FilterChips";
 import { buildPaymentButtonColumns } from "@/features/dashboard/payment-button/columns";
 import {
@@ -19,8 +30,10 @@ import {
 } from "@/features/dashboard/payment-button/components/PaymentButtonCardList";
 import { PaymentButtonRowActions } from "@/features/dashboard/payment-button/components/PaymentButtonRowActions";
 import { DisablePaymentButtonDialog } from "@/features/dashboard/payment-button/components/DisablePaymentButtonDialog";
+import { PaymentButtonCodeDialog } from "@/features/dashboard/payment-button/components/PaymentButtonCodeDialog";
 import {
   useCopyPaymentButtonCode,
+  usePreviewPaymentButtonCode,
   useDisablePaymentButton,
   usePaymentButtonListMids,
   usePaymentButtons,
@@ -35,6 +48,7 @@ import {
   PAYMENT_BUTTON_SEARCH_HINTS,
   PAYMENT_BUTTON_STATUS_FILTERS,
   PAYMENT_BUTTON_VIEW_TABS,
+  DESIGN_ONLY_FIELDS_ENABLED,
   type PaymentButtonViewTab,
 } from "@/features/dashboard/payment-button/constants";
 import type { PaymentButton } from "@/features/dashboard/payment-button/types";
@@ -75,6 +89,7 @@ interface PaymentButtonTableProps {
 export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
   const router = useRouter();
   const { copyCode, copyingId } = useCopyPaymentButtonCode();
+  const codePreview = usePreviewPaymentButtonCode();
   const [pendingDisable, setPendingDisable] = useState<PaymentButton | null>(null);
   const { disable, isDisabling } = useDisablePaymentButton();
 
@@ -84,6 +99,15 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [statuses, setStatuses] = useState<string[]>([]);
   const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
+  // Date and Time, pg-dashboard's `date` filter: an absolute range, or "Last N
+  // days" resolved to epoch millis once, when applied (resolving it per render
+  // would change the query key every render). Applying one clears the other.
+  const [dateRange, setDateRange] = useState<DateRangeValue>({ from: "", to: "" });
+  const [relativeRange, setRelativeRange] = useState<RelativeRangeValue>(EMPTY_RELATIVE_RANGE);
+  const [relativeWindow, setRelativeWindow] = useState<{
+    startTime: number;
+    endTime: number;
+  } | null>(null);
   const [page, setPage] = useState(1);
 
   const mids = usePaymentButtonListMids();
@@ -91,10 +115,29 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
     mids,
     statuses,
     search,
+    startTime:
+      relativeWindow?.startTime ?? (dateRange.from ? toStartOfDayMs(dateRange.from) : undefined),
+    endTime: relativeWindow?.endTime ?? (dateRange.to ? toEndOfDayMs(dateRange.to) : undefined),
     pageLimit: PAYMENT_BUTTON_PAGE_LIMIT,
     from: (page - 1) * PAYMENT_BUTTON_PAGE_LIMIT,
   });
-  const { rows: pageRows, totalCount, isLoading, isError, refetch } = usePaymentButtons(body);
+  const {
+    rows: pageRows,
+    totalCount,
+    isLoading,
+    isFetching,
+    isError,
+    refetch,
+    refresh,
+  } = usePaymentButtons(body);
+
+  // A refetch can finish faster than the spinner is noticeable, so the
+  // outcome is confirmed explicitly, as on the Transactions tables.
+  const handleRefresh = async () => {
+    const { failed } = await refresh();
+    if (failed) toast.error("Couldn't refresh payment buttons. Please try again.");
+    else toast.success("Payment buttons updated");
+  };
 
   // Every control that changes what matches also returns to page 1.
   const onSearch = (value: string) => {
@@ -110,7 +153,13 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
   // Search and the Amount chip are the merchant's own narrowing; the tab (and
   // its twin, the Status chip) is a view, and an empty view reads as "none yet"
   // in the design rather than as a failed search.
-  const hasNarrowingFilters = !!search.trim() || !!amountRange.min || !!amountRange.max;
+  const hasNarrowingFilters =
+    !!search.trim() ||
+    !!amountRange.min ||
+    !!amountRange.max ||
+    !!dateRange.from ||
+    !!dateRange.to ||
+    relativeWindow !== null;
 
   const emptyTitle = hasNarrowingFilters ? "No matching payment buttons" : "No payment buttons yet";
   const emptyDescription = hasNarrowingFilters
@@ -135,6 +184,7 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
       onCopyCode={copyCode}
       onEdit={onEdit}
       onDisable={setPendingDisable}
+      onPreviewCode={codePreview.preview}
     />
   );
 
@@ -159,19 +209,63 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
         className="w-full sm:w-56"
       />
       <FilterChipGroup className={chipRowClassName}>
-        <AmountFilterChip
-          value={amountRange}
-          onChange={(next) => {
-            setAmountRange(next);
-            setPage(1);
-          }}
-        />
+        {/* No amount on a list row to filter by (see DESIGN_ONLY_FIELDS_ENABLED). */}
+        {DESIGN_ONLY_FIELDS_ENABLED && (
+          <AmountFilterChip
+            value={amountRange}
+            onChange={(next) => {
+              setAmountRange(next);
+              setPage(1);
+            }}
+          />
+        )}
         <StatusFilterChip
           options={PAYMENT_BUTTON_STATUS_FILTERS}
           selected={statuses}
           onChange={onStatusesChange}
         />
+        <DateFilterChip
+          label="Date and Time"
+          value={dateRange}
+          onChange={(next) => {
+            setDateRange(next);
+            setRelativeRange(EMPTY_RELATIVE_RANGE);
+            setRelativeWindow(null);
+            setPage(1);
+          }}
+          relativeValue={relativeRange}
+          onRelativeChange={(next) => {
+            setRelativeRange(next);
+            // Date.now() belongs here, in the handler, not in render.
+            setRelativeWindow(hasRelativeRange(next) ? relativeRangeToEpochMs(next) : null);
+            setPage(1);
+          }}
+        />
+        {/* pg-dashboard sends its Button ID filter as the search query, the
+            same field the search box drives, so the two share one value. */}
+        <TextFilterChip
+          chipKey="buttonId"
+          label="Button ID"
+          fieldLabel="Button ID"
+          placeholder="Enter Button ID"
+          value={search}
+          onChange={onSearch}
+          align="end"
+        />
       </FilterChipGroup>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        leftIcon={
+          <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
+        }
+        onClick={() => void handleRefresh()}
+        disabled={isFetching}
+        className="ml-auto h-auto min-h-0 shrink-0 py-1 text-muted-foreground hover:text-foreground"
+      >
+        Refresh
+      </Button>
     </div>
   );
 
@@ -255,6 +349,11 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
           pagination={pagination}
         />
       </div>
+
+      <PaymentButtonCodeDialog
+        script={codePreview.script}
+        onOpenChange={(open) => !open && codePreview.close()}
+      />
 
       <DisablePaymentButtonDialog
         row={pendingDisable}

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   Area,
   AreaChart,
@@ -15,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { DotGridLine } from "@/components/common/charts/DotGridLine";
 import { RollingNumber } from "@/components/common/RollingNumber";
 import { CompactAmount } from "@/components/common/CompactAmount";
-import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { EmptyAxesChart, EMPTY_AXIS_LABELS } from "@/components/common/charts/EmptyAxesChart";
 import { formatCurrencyShort } from "@/lib/utils/format";
 import {
   totalSettledTimeframes,
@@ -72,6 +73,11 @@ interface TotalSettledCardProps {
   /** The chart series for the selected timeframe. */
   chartData: SparklinePoint[];
   className?: string;
+  /** Overrides the chart's height (default h-76). */
+  chartClassName?: string;
+  /** A row under the chart, set off by a divider (e.g. the upcoming
+   *  settlement on the Payments page). */
+  footer?: ReactNode;
 }
 
 export function TotalSettledCard({
@@ -82,6 +88,8 @@ export function TotalSettledCard({
   onTimeframeChange,
   chartData,
   className,
+  chartClassName,
+  footer,
 }: TotalSettledCardProps) {
   const trendPositive = totalSettledTrendPct >= 0;
   const data = chartData;
@@ -152,13 +160,12 @@ export function TotalSettledCard({
         </div>
       </div>
 
-      <div className="h-76 w-full">
+      <div className={cn("relative w-full", chartClassName ?? "h-76")}>
         {!hasData ? (
-          <PlaceholderState
-            variant="no-settlements"
+          <EmptyAxesChart
+            labels={EMPTY_AXIS_LABELS[timeframe]}
             title="No settlements in this period"
             description="As payouts are made, this charts how much settled to your account over time."
-            className="h-full"
           />
         ) : (
           <ResponsiveContainer width="100%" height="100%">
@@ -201,6 +208,7 @@ export function TotalSettledCard({
           </ResponsiveContainer>
         )}
       </div>
+      {footer && <div className="-mx-5 -mb-5 border-t border-border px-5 py-4">{footer}</div>}
     </Card>
   );
 }

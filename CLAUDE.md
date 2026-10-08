@@ -175,13 +175,13 @@ import Image from "next/image";
 
 ### Why AppImage and not `next/image` — COMPULSORY RULE
 
-The app is served from a base path (`/app-v2`, see `src/constants/basePath.ts`).
+The app is served from a base path (`/hub`, see `src/constants/basePath.ts`).
 Next applies that prefix to the image **optimizer route** but *not* to the `src`
 it points at, and for `unoptimized` images it does not touch the src at all. A
 `public/` file therefore fails **both** ways round:
 
 ```
-optimized:   src="/app-v2/_next/image?url=%2Fassets%2Flogo.png"   → 400 "not a valid image"
+optimized:   src="/hub/_next/image?url=%2Fassets%2Flogo.png"   → 400 "not a valid image"
 unoptimized: src="/assets/logo.png"                                → 404
 ```
 
@@ -192,7 +192,7 @@ everywhere.
 
 `src/components/common/AppImage.tsx` is the only file allowed to import
 `next/image`; an ESLint `no-restricted-imports` rule enforces this. **Never
-hardcode the base path into a src** (`src="/app-v2/assets/…"`) — that is what
+hardcode the base path into a src** (`src="/hub/assets/…"`) — that is what
 pg-dashboard does in 41 places, and it means every base-path change is a
 find-and-replace.
 
@@ -233,6 +233,23 @@ grep -rn "<button\|<input\|<select\|<table\|<dialog\|<textarea" pg-dashboard-v2/
 ```
 
 Every hit must either be a structural element (exempt per rule above) or have a documented reason in a code comment explaining why no flux-ui component fits.
+
+## Table column configuration — COMPULSORY RULE
+
+Every table with a column editor uses flux's `ColumnManager` (from `@/components/ui`) with **both reorder and hide/show**, wired the way `features/dashboard/mca-invoices/components/McaInvoiceTable.tsx` does it. Never hand-roll a column menu, and never ship a reorder-only `ColumnManager`.
+
+Required wiring:
+
+- `columnOrder` + `hiddenColumns` state; rendered columns are `reorderColumns(base, columnOrder).filter((c) => !hiddenColumns.includes(c.key))`.
+- `order` / `onOrderChange` and `hiddenKeys` / `onHiddenKeysChange` both passed.
+- `onReset` clears **both** the order and the hidden set.
+- `fixedKeys` names the columns a row is unreadable without (its identifier, amount, status), with a `fixedReason` saying why. Keep the list in the feature's `constants.ts` as `FIXED_COLUMN_KEYS` (or module-level when the feature has no constants file).
+- Non-data columns (row-action menu, selection checkbox) stay out of the editor's column list.
+
+```bash
+# Every ColumnManager must also pass hiddenKeys
+for f in $(grep -rl "<ColumnManager" src); do grep -q "hiddenKeys=" $f || echo "$f"; done
+```
 
 ## Environment / backend
 

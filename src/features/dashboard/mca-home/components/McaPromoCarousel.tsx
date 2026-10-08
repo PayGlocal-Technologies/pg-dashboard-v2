@@ -5,37 +5,46 @@ import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { AppImage } from "@/components/common/AppImage";
 import { Button } from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { cn } from "@/lib/utils";
+import { usePaymentGatewayInterest } from "@/features/dashboard/mca-home/hooks";
 
 const AUTO_MS = 6500;
 
 interface PromoSlide {
   id: string;
   image: string;
+  /** Dark-theme artwork, same size and layout as `image`. Falls back to
+   *  `image` when a slide has none. */
+  imageDark?: string;
   headline: React.ReactNode;
   body: string;
   ctaLabel: string;
-  href: string;
+  /** Where the CTA navigates. Omitted on a slide whose CTA runs `action`
+   *  instead. */
+  href?: string;
+  /** "pg-interest": the CTA notifies the merchant's account manager (see
+   *  usePaymentGatewayInterest) rather than navigating anywhere. */
+  action?: "pg-interest";
 }
 
 const SLIDES: PromoSlide[] = [
   {
     id: "sell-globally",
     image: "/assets/dashboardPG_banner1.png",
-    headline: (
-      <>
-        Add international and domestic cards checkout
-        <br />
-        without a second onboarding
-      </>
-    ),
-    body: "Accept international payments through cards, Apple Pay and Google Pay — all through one payment gateway.",
+    imageDark: "/assets/dashboardPG_banner_dark mode.png",
+    // No forced break: the half-width text column wraps this into two lines
+    // by itself; a break after "checkout" made it three.
+    headline: "Add international and domestic cards checkout without a second onboarding",
+    body: "Accept international payments through cards, Apple Pay and Google Pay, all through one payment gateway.",
     ctaLabel: "Learn more",
-    href: "/multi-currency",
+    // Used to navigate to /multi-currency; now registers the merchant's
+    // interest with their account manager and confirms with a toast.
+    action: "pg-interest",
   },
   {
     id: "refer-and-earn",
-    image: "/assets/referandearnbanner.png",
+    image: "/assets/r&e_homepage.png",
     headline: (
       <>
         Know a business that needs
@@ -56,14 +65,16 @@ const SLIDES: PromoSlide[] = [
  * dashboard) — name kept as McaPromoCarousel from when it briefly held only
  * one static slide, since callers don't need to change either way.
  *
- * All slides share one crop (`aspect-4680/950` on a 4680×1132 source, an
- * even ~8% trim off the top and bottom) and one text-overlay layout (left
- * half, vertically centered) so the swipe only moves the slide itself, not
- * the banner's own shape or text position.
+ * All slides share one frame (`aspect-4680/1132`, the "sell globally"
+ * artwork's own shape, so it shows whole; the 4680×1296 refer-and-earn
+ * artwork loses an even ~6% off its top and bottom, clear of its coins) and
+ * one text-overlay layout (left half, vertically centered) so the swipe only
+ * moves the slide itself, not the banner's own shape or text position.
  */
 export function McaPromoCarousel() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
+  const { registerInterest, isPending: isRegisteringInterest } = usePaymentGatewayInterest();
   const [index, setIndex] = useState(0);
   const [paused, setPaused] = useState(false);
 
@@ -77,7 +88,7 @@ export function McaPromoCarousel() {
 
   return (
     <div
-      className="relative isolate aspect-4680/950 w-full overflow-hidden rounded-2xl border border-border/70"
+      className="@container relative isolate aspect-4680/1132 w-full overflow-hidden rounded-2xl border border-border/70"
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
@@ -103,28 +114,58 @@ export function McaPromoCarousel() {
             aria-hidden={i !== index}
             inert={i !== index}
           >
+            {/* The theme class on <html> picks light or dark artwork, so
+                there's no flash or hydration mismatch while it loads. */}
             <AppImage
               src={slide.image}
               alt=""
               fill
               sizes="100vw"
               priority={i === 0}
-              className="object-cover object-center"
+              className={cn("object-cover object-center", slide.imageDark && "dark:hidden")}
             />
+            {slide.imageDark && (
+              <AppImage
+                src={slide.imageDark}
+                alt=""
+                fill
+                sizes="100vw"
+                priority={i === 0}
+                className="hidden object-cover object-center dark:block"
+              />
+            )}
 
-            <div className="absolute inset-y-0 left-0 flex w-1/2 flex-col justify-center gap-2 px-6 py-5 sm:gap-2.5 sm:px-10">
-              <h2 className="text-xl font-bold leading-snug tracking-tight text-foreground sm:text-2xl">
+            {/* The banner keeps a fixed aspect ratio, so it gets shorter as it
+                narrows; fixed text sizes then overflowed its bottom edge on
+                smaller screens. Font sizes, padding and gaps are in container
+                width units (cqw) instead, sized so the banner at ~1190px wide
+                (full width on a laptop) renders exactly as before (24px
+                headline, 16px body, 40px side padding) and the text shrinks
+                in step with the artwork below that. Lines wrap at the same
+                words at every width, since everything scales together. The
+                clamps stop the headline going below 14px; the body copy hides
+                on banners narrower than 48rem, where it would drop below a
+                readable size and no longer fit. */}
+            <div className="absolute inset-y-0 left-0 flex w-1/2 flex-col justify-center gap-[0.84cqw] px-[3.36cqw] py-[1.68cqw]">
+              <h2 className="text-[clamp(0.875rem,2.02cqw,1.5rem)] font-bold leading-snug tracking-tight text-foreground">
                 {slide.headline}
               </h2>
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground sm:text-base">
+              <p className="max-w-[37.6cqw] text-[clamp(0.8125rem,1.345cqw,1rem)] leading-relaxed text-muted-foreground @max-3xl:hidden">
                 {slide.body}
               </p>
               <Button
                 type="button"
                 variant="link"
                 size="sm"
-                className="h-auto min-h-0 w-fit p-0 text-base"
-                onClick={() => router.push(slide.href)}
+                // Small caps-style label with a trailing arrow: a quiet link,
+                // so the headline stays the loudest thing on the slide.
+                rightIcon={<Icon name="arrow-right" size={13} aria-hidden />}
+                className="mt-1 h-auto min-h-0 w-fit gap-1.5 p-0 text-[11px] font-semibold uppercase tracking-[0.08em]"
+                isLoading={slide.action === "pg-interest" && isRegisteringInterest}
+                onClick={() => {
+                  if (slide.action === "pg-interest") registerInterest();
+                  else if (slide.href) router.push(slide.href);
+                }}
               >
                 {slide.ctaLabel}
               </Button>

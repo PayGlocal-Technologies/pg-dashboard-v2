@@ -341,7 +341,10 @@ export function SettlementDetailsContent({
   );
 
   return (
-    <div className="space-y-4">
+    // data-morph-anchor: where the drawer-to-page hand-off picks this view up
+    // and sets it down; one layout for both, so no body of its own (see
+    // DrawerExpandMorph).
+    <div className="space-y-4" data-morph-anchor>
       {/* Summary. The settlement amount is the view's identity; the date
        * beneath it is the other half of its key. No status chip and no
        * lifecycle line — a settlement only exists here once it has happened,
@@ -472,6 +475,10 @@ interface McaSettlementDetailFeatureProps {
   merchantId: string;
   /** YYYY-MM-DD. */
   settlementDate: string;
+  /** In place of the list (expanded from the drawer): Back and Collapse are
+   *  handled by the list rather than by navigating. Omitted on the route. */
+  onBack?: () => void;
+  onCollapse?: () => void;
 }
 
 /**
@@ -485,6 +492,8 @@ interface McaSettlementDetailFeatureProps {
 export function McaSettlementDetailFeature({
   merchantId,
   settlementDate,
+  onBack,
+  onCollapse,
 }: McaSettlementDetailFeatureProps) {
   const router = useRouter();
   /** How Expand inside the settlement drawer hands a payment to this page —
@@ -507,7 +516,11 @@ export function McaSettlementDetailFeature({
   const schedule = computeSettlementSchedule(paymentReceivedDate, calendar.holidays);
 
   return (
-    <div className="page-enter mx-auto max-w-[1400px] space-y-4 overflow-x-hidden">
+    // No entrance fade in place: the expand hand-off has already shown it
+    // arriving, and replaying it as the real page swaps in would flash.
+    <div
+      className={cn("mx-auto max-w-[1400px] space-y-4 overflow-x-hidden", !onBack && "page-enter")}
+    >
       {/* Back and Collapse, adjacent and left-aligned, same as the transaction
           detail page. Collapse is the inverse of the drawer's Expand: it
           returns to the list with this settlement reopened in the drawer,
@@ -519,7 +532,7 @@ export function McaSettlementDetailFeature({
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="chevron-left" className="h-4 w-4" />}
-            onClick={() => router.push(MCA_SETTLEMENT_LIST_PATH)}
+            onClick={onBack ?? (() => router.push(MCA_SETTLEMENT_LIST_PATH))}
             className="pl-0 text-muted-foreground hover:text-foreground"
           >
             Back to Settlements
@@ -529,7 +542,10 @@ export function McaSettlementDetailFeature({
             variant="ghost"
             size="sm"
             leftIcon={<Icon name="shrink" className="h-4 w-4" />}
-            onClick={() => router.push(mcaSettlementListPathWithDrawer(merchantId, settlementDate))}
+            onClick={
+              onCollapse ??
+              (() => router.push(mcaSettlementListPathWithDrawer(merchantId, settlementDate)))
+            }
             className="text-muted-foreground hover:text-foreground"
           >
             Collapse

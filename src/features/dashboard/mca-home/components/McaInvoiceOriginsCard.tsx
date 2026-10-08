@@ -23,6 +23,18 @@ const TIMEFRAMES: { value: InvoiceOriginTimeframe; label: string }[] = [
   { value: "3M", label: "3M" },
 ];
 
+/** How the selected window reads inside a sentence ("...a small second
+ *  market in the last month"). */
+const PERIOD_PHRASE: Record<InvoiceOriginTimeframe, string> = {
+  "1W": "in the last week",
+  "1M": "in the last month",
+  "3M": "in the last 3 months",
+};
+
+/** The two-market tier's series colours: split bar segments, row dots and
+ *  the globe highlights. */
+const SPLIT_COLORS = ["var(--chart-1)", "var(--chart-2)"];
+
 const TIMEFRAME_DAYS: Record<InvoiceOriginTimeframe, number> = { "1W": 7, "1M": 30, "3M": 90 };
 
 /**
@@ -256,7 +268,8 @@ export function McaInvoiceOriginsCard() {
 
   const globeHighlights = rows.map((origin, i) => ({
     countryCode: origin.countryCode,
-    color: BAR_COLORS[i % BAR_COLORS.length]!,
+    // Two markets: the globe matches the split bar's two colours.
+    color: rows.length === 2 ? SPLIT_COLORS[i]! : BAR_COLORS[i % BAR_COLORS.length]!,
     countryName: origin.countryName,
     flag: origin.flag,
     amountLabel: formatAmount(origin.amount, currency),
@@ -344,7 +357,7 @@ export function McaInvoiceOriginsCard() {
               />
             ) : rows.length === 0 ? (
               <PlaceholderState
-                variant="no-analytics"
+                variant="no-metric-data"
                 size="sm"
                 title="Nothing invoiced in this period"
                 description="Once you raise invoices, this shows where your invoiced volume comes from."
@@ -390,44 +403,97 @@ export function McaInvoiceOriginsCard() {
                 <DecorativeTrendGlyph positive={(totalInvoicedTrendPct ?? 0) >= 0} />
               </div>
             ) : rows.length === 2 ? (
-              <div className="flex h-full flex-col justify-center gap-4">
-                <div className="grid grid-cols-2 gap-6">
-                  {rows.map((origin) => {
-                    const pct = rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0;
-                    return (
-                      <div key={origin.countryCode} className="min-w-0">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              // Same two-item layout as the Transactions page's Total amount
+              // collected card: a split bar (the smaller side keeps a minimum
+              // sliver), two compact rows, and a plain-language note when one
+              // market is 95% or more. No per-market trend glyphs: two
+              // near-identical curves where one is thousands of times the
+              // other said nothing.
+              (() => {
+                const [a, b] = rows as [OriginRow, OriginRow];
+                const shareA = rowsAmountSum > 0 ? a.amount / rowsAmountSum : 0;
+                const shareB = rowsAmountSum > 0 ? b.amount / rowsAmountSum : 0;
+                return (
+                  <div className="flex h-full flex-col justify-center gap-3">
+                    <div
+                      className="flex h-2.5 gap-0.5 overflow-hidden rounded-full bg-muted"
+                      role="img"
+                      aria-label={`${a.countryName} ${formatSharePct(shareA)}, ${b.countryName} ${formatSharePct(shareB)}`}
+                    >
+                      <span
+                        className="block h-full"
+                        style={{ flex: `${shareA} 1 0`, background: SPLIT_COLORS[0] }}
+                      />
+                      <span
+                        className="block h-full min-w-1.5"
+                        style={{ flex: `${shareB} 0 0`, background: SPLIT_COLORS[1] }}
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 @2xl:grid-cols-2">
+                      {rows.map((origin, i) => (
+                        <div
+                          key={origin.countryCode}
+                          className="flex items-center gap-3 rounded-xl border border-border px-3.5 py-3"
+                        >
+                          <span
+                            className="h-2 w-2 shrink-0 rounded-full"
+                            style={{ background: SPLIT_COLORS[i] }}
+                            aria-hidden
+                          />
                           <CountryFlagAvatar
                             iso2={origin.countryCode}
                             countryName={origin.countryName}
-                            className="h-6 w-6 shrink-0"
+                            className="h-7 w-7 shrink-0"
                           />
-                          <span className="truncate">{origin.countryName}</span>
-                          <span className="ml-auto shrink-0 tabular-nums">
-                            {formatSharePct(pct)}
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-semibold text-foreground">
+                              {origin.countryName}
+                            </span>
+                            <span className="block text-xs tabular-nums text-muted-foreground">
+                              {origin.invoiceCount.toLocaleString("en-IN")} transaction
+                              {origin.invoiceCount === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                          <span className="ml-auto shrink-0 text-right">
+                            <span className="block text-base font-semibold tabular-nums text-foreground">
+                              {formatCurrencyShort(origin.amount, currency)}
+                            </span>
+                            <span className="block text-xs tabular-nums text-muted-foreground">
+                              {formatSharePct(i === 0 ? shareA : shareB)}
+                            </span>
                           </span>
                         </div>
-                        <p className="mt-1.5 text-xl font-bold tracking-tight text-foreground tabular-nums">
-                          {formatCurrencyShort(origin.amount, currency)}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-                <MdrWaiverCallout />
-              </div>
+                      ))}
+                    </div>
+                    {shareA >= 0.95 && (
+                      <p className="rounded-lg bg-primary/10 px-3.5 py-2.5 text-sm text-foreground">
+                        Almost all of your volume ({formatSharePct(shareA)}) came from{" "}
+                        {a.countryName}. {b.countryName} is a small second market{" "}
+                        {PERIOD_PHRASE[timeframe]}.
+                      </p>
+                    )}
+                    <MdrWaiverCallout />
+                  </div>
+                );
+              })()
             ) : rows.length <= 6 ? (
               <div className={cn("flex flex-col", rows.length <= 4 ? "gap-5" : "gap-3")}>
                 {rows.map((origin, i) => {
                   const pct = rowsAmountSum > 0 ? origin.amount / rowsAmountSum : 0;
-                  // Every bar gets a visible stub, however small its share —
-                  // a market that's genuinely 0.01% of volume still ran real
-                  // transactions, and an empty-looking track reads as "no
-                  // data" rather than "very little".
-                  const widthPct = Math.max(pct * 100, 1.5);
+                  // Bars are ranked against the top market (it fills the
+                  // track), not against the total, and every bar gets a
+                  // visible stub however small: a market that's genuinely
+                  // 0.01% of volume still ran real transactions, and an
+                  // empty-looking track reads as "no data" rather than
+                  // "very little". The share column carries the exact figure.
+                  const topAmount = rows[0]!.amount;
+                  const widthPct = Math.max(
+                    topAmount > 0 ? (origin.amount / topAmount) * 100 : 0,
+                    1.5
+                  );
                   return (
-                    <div key={origin.countryCode} className="flex items-center gap-3">
-                      <span className="flex w-32 min-w-0 shrink-0 items-center gap-2">
+                    <div key={origin.countryCode} className="flex items-center gap-3.5">
+                      <span className="flex w-38 min-w-0 shrink-0 items-center gap-2">
                         <CountryFlagAvatar
                           iso2={origin.countryCode}
                           countryName={origin.countryName}
@@ -449,7 +515,7 @@ export function McaInvoiceOriginsCard() {
                       <span className="w-14 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
                         {formatSharePct(pct)}
                       </span>
-                      <span className="w-20 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
+                      <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-foreground">
                         {formatCurrencyShort(origin.amount, currency)}
                       </span>
                     </div>
@@ -457,18 +523,16 @@ export function McaInvoiceOriginsCard() {
                 })}
               </div>
             ) : (
-              <ul className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-                {rows.map((origin, i) => (
-                  <li key={origin.countryCode} className="flex items-center gap-3 py-1">
-                    <span
-                      className="h-8 w-1 shrink-0 rounded-sm"
-                      style={{ backgroundColor: BAR_COLORS[i % BAR_COLORS.length] }}
-                      aria-hidden="true"
-                    />
+              <ul className="grid grid-cols-1 gap-x-8 @2xl:grid-cols-2">
+                {rows.map((origin) => (
+                  <li
+                    key={origin.countryCode}
+                    className="flex items-center gap-3 border-b border-border/60 py-2"
+                  >
                     <CountryFlagAvatar
                       iso2={origin.countryCode}
                       countryName={origin.countryName}
-                      className="h-8 w-8 shrink-0"
+                      className="h-7 w-7 shrink-0"
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold text-foreground">

@@ -163,11 +163,14 @@ export const mcaDocumentPendingApi = (merchantId: string, timeframe: string) =>
       (timeframe ? `?timeframe=${encodeURIComponent(timeframe)}` : "")
     : "";
 
-/** Documents pending broken down by currency — a live snapshot of everything
- *  currently DOCUMENT_PENDING (no timeframe). Backs the per-currency breakdown. */
-export const mcaDocumentPendingByCurrencyApi = (merchantId: string) =>
+/** Documents pending broken down by currency. Takes the same timeframe set as
+ *  document-pending (today | week | month | ytd); with none it is a live
+ *  snapshot of everything currently DOCUMENT_PENDING. Backs the per-currency
+ *  breakdown. */
+export const mcaDocumentPendingByCurrencyApi = (merchantId: string, timeframe: string) =>
   merchantId
-    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-by-currency`
+    ? `${BASE_URL_V3}/analytics/${encodeURIComponent(merchantId)}/merchant/document-pending-by-currency` +
+      (timeframe ? `?timeframe=${encodeURIComponent(timeframe)}` : "")
     : "";
 
 /**
@@ -213,3 +216,14 @@ export const mcaDocumentPendingListApi = (
  */
 export const mcaTxnReportDownloadApi = (mid: string) =>
   mid ? `${BASE_URL_V1}/search/ffms/txn/${mid}/download` : "";
+
+/**
+ * Suggested receiving accounts for one currency, for when there is no invoice
+ * in context (the payment ETA check). GET → { data: { suggestedAccounts } }.
+ * The invoice-based GET /mca-invoice/{mid}/{invoiceId}/get-suggested-account
+ * derives the currency from the invoice and shares this logic server side.
+ */
+export const suggestedAccountsByCurrencyApi = (mid: string, currency: string) =>
+  mid && currency
+    ? `${BASE_URL_V3}/mca-invoice/${mid}/get-suggested-account-by-currency?currency=${encodeURIComponent(currency)}`
+    : "";

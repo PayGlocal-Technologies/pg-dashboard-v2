@@ -11,8 +11,10 @@ import { brandBackdropStyle } from "@/lib/utils/brandBackdrop";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { useEbrcSelection } from "@/stores/useEbrcSelection";
+import { NoFeatureView } from "@/components/common/NoFeatureView";
 import {
   useDgftCustomerStatus,
+  useEbrcEntitled,
   useIrmsByNumber,
   usePushIrms,
 } from "@/features/dashboard/ebrc-generation/hooks";
@@ -177,6 +179,10 @@ export function EbrcGenerationWizard() {
   // pointing at a control that isn't on screen — the same inline form the
   // invoice editor uses for exactly this situation.
   const { needsMidChoice } = usePacbMidScope();
+  // The landing page's MidGuard does not cover this route, and search links
+  // straight here, so the per-MID "EBRC" entitlement pg-dashboard checks on its
+  // mapping and review screens is checked here too.
+  const isEntitled = useEbrcEntitled();
   const clearSelectedIrms = useEbrcSelection((s) => s.clearSelectedIrms);
 
   const { isConnected: dgftConnected, isLoading: isStatusLoading } = useDgftCustomerStatus();
@@ -203,9 +209,10 @@ export function EbrcGenerationWizard() {
   useEffect(() => {
     // Not while a MID is still owed: the status call is disabled until one is
     // picked, so "not connected" is the absence of an answer rather than a no.
-    if (needsMidChoice) return;
+    // Nor for a MID without eBRC: NoFeatureView answers that here.
+    if (needsMidChoice || !isEntitled) return;
     if (!isStatusLoading && !dgftConnected) router.replace("/ebrc-generation");
-  }, [needsMidChoice, isStatusLoading, dgftConnected, router]);
+  }, [needsMidChoice, isEntitled, isStatusLoading, dgftConnected, router]);
 
   // Full records for the current selection — carries each IRM's saved
   // shipping-bill data, its extraction status, and the presigned URL for a
@@ -362,6 +369,10 @@ export function EbrcGenerationWizard() {
       {needsMidChoice ? (
         <div className="mx-auto w-full max-w-2xl px-6 py-16">
           <SelectMidView midType="PACB" showSidebarHint={false} />
+        </div>
+      ) : !isEntitled ? (
+        <div className="mx-auto w-full max-w-2xl px-6 py-16">
+          <NoFeatureView />
         </div>
       ) : isStatusLoading || !dgftConnected ? (
         // Either the status call is still in flight, or it came back

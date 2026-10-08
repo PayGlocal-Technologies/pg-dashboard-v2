@@ -4,8 +4,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button, DataCardList, DataTableCard, EmptyState } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
 import { cn } from "@/lib/utils";
-import { usePacbMidScope } from "@/lib/hooks/usePacbMidScope";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import { buildSkuColumns } from "@/features/dashboard/sku-management/columns";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
@@ -34,6 +34,7 @@ import {
   useDeleteSku,
   useDuplicateSku,
   useSkuCatalogue,
+  useSkuMidScope,
   useUpdateSku,
 } from "@/features/dashboard/sku-management/hooks";
 import type {
@@ -47,9 +48,11 @@ interface SkuTableProps {
    *  the page header while every row this creates lives down here. */
   addItemOpen: boolean;
   onAddItemOpenChange: (open: boolean) => void;
-  /** Opens the page's import modal. The first-run empty state offers it as a
-   *  second way in, so the button in the header isn't the only one. */
-  onImport: () => void;
+  /** The page's own openers, each taking the MID the merchant picked ("" when
+   *  there was nothing to ask). The first-run empty state offers both, behind
+   *  the same MID question as the header buttons. */
+  onAddItem: (mid: string) => void;
+  onImport: (mid: string) => void;
 }
 
 /** Turns a saved product back into form values, so Edit opens pre-filled with
@@ -72,7 +75,12 @@ function toFormValues(product: SkuProduct): SkuItemFormValues {
   };
 }
 
-export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTableProps) {
+export function SkuTable({
+  addItemOpen,
+  onAddItemOpenChange,
+  onAddItem,
+  onImport,
+}: SkuTableProps) {
   const [tab, setTab] = useState<SkuViewTab>("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -105,9 +113,9 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
     pageLimit: pageSize,
   });
 
-  // Only true when several PACB MIDs are in play and none is selected — see
-  // usePacbMidScope. That is the one state where a row's own MID matters.
-  const { needsMidChoice } = usePacbMidScope();
+  // Only true when several MIDs (PA or PACB) are in play and none is selected —
+  // see useSkuMidScope. That is the one state where a row's own MID matters.
+  const { needsMidChoice, midOptions } = useSkuMidScope();
 
   const closeItemForm = (open: boolean) => {
     if (!open) setEditing(null);
@@ -274,31 +282,29 @@ export function SkuTable({ addItemOpen, onAddItemOpenChange, onImport }: SkuTabl
       description="Add a product or service once, then reuse it on invoices with its price, code and tax details."
       action={
         <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button
-            type="button"
+          <MidScopedAction
+            label="Import from a file"
+            icon="upload"
             variant="outline"
-            size="sm"
-            leftIcon={<Icon name="upload" className="h-3.5 w-3.5" />}
-            onClick={onImport}
-          >
-            Import from a file
-          </Button>
-          <Button
-            type="button"
+            needsMidChoice={needsMidChoice}
+            midOptions={midOptions}
+            onRun={onImport}
+          />
+          <MidScopedAction
+            label="Add item"
+            icon="plus"
             variant="primary"
-            size="sm"
-            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-            onClick={() => onAddItemOpenChange(true)}
-          >
-            Add item
-          </Button>
+            needsMidChoice={needsMidChoice}
+            midOptions={midOptions}
+            onRun={onAddItem}
+          />
         </div>
       }
       className="py-12"
     />
   ) : (
     <PlaceholderState
-      variant="no-data"
+      variant="empty-table"
       title={emptyTitle}
       description={emptyDescription}
       className="py-16"

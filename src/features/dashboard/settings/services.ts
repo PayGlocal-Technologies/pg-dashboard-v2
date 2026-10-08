@@ -1,19 +1,27 @@
-import { BASE_URL_V1, BASE_URL_V2, BASE_URL_V3 } from "@/api";
+import { BASE_URL_V1, BASE_URL_V3 } from "@/api";
 
 // Endpoint URL builders only, copied verbatim from pg-dashboard's
 // src/features/my-account/services.ts. Every one is scoped by the merchant's
 // onboarding id (profile.onboardingId), the same value pg-dashboard passes.
 
-/** Business trade name + purpose codes. GET reads, PUT updates the codes. */
+/** Business trade name (and the legacy purpose-code array, which Business
+ *  details no longer reads — see merchantPurposeCodeApi). */
 export const businessDetailsApi = (onbId: string): string =>
   `${BASE_URL_V3}/merchants/profile/${onbId}/business`;
+
+/** The merchant's single purpose code. GET returns `{ data: { purposeCode } }`
+ *  (null when none was ever set); PUT `{ purposeCode }` overwrites it on every
+ *  call. Keyed by the first PACB MID from enabled-products, not the
+ *  onboarding id (see usePurposeCodeMerchantId). */
+export const merchantPurposeCodeApi = (merchantId: string): string =>
+  merchantId ? `${BASE_URL_V1}/merchants/${merchantId}/purpose-code` : "";
 
 /** The purpose codes this merchant may pick from. GET returns
  *  `{ data: { suggestedPurposeCodes, possiblePurposeCodes } }`, where
  *  `possiblePurposeCodes` is a code -> description map. Same endpoint
  *  pg-dashboard's PurposeCodeBanner and tid-management AddProduct read (see
- *  its OnboardingBanners/services.ts purposeCodeApi); the codes are saved
- *  through businessDetailsApi above, not here. */
+ *  its OnboardingBanners/services.ts purposeCodeApi); the chosen code is saved
+ *  through merchantPurposeCodeApi above, not here. */
 export const purposeCodeOptionsApi = (onbId: string): string =>
   onbId ? `${BASE_URL_V3}/merchants/banner/${onbId}/purpose-codes` : "";
 
@@ -26,10 +34,11 @@ export const settlementDetailsApi = (onbId: string): string =>
 export const secureSettlementDetailsApi = (onbId: string): string =>
   `${BASE_URL_V3}/merchants/profile/${onbId}/settlement-details`;
 
-/** Update the settlement bank account (account number + IFSC). Scoped by the
- *  merchant id (profile.mid), NOT the onboarding id the read endpoints use. */
-export const updateAccountDetailsApi = (merchantId: string): string =>
-  `${BASE_URL_V2}/merchants/${merchantId}/account-details`;
+/** Update the settlement bank account (account number + IFSC). PUT to the
+ *  same path the masked read GETs, scoped by the onboarding id like it. The
+ *  backend enforces the 30-day cooldown and verifies the account here. */
+export const updateSettlementDetailsApi = (onbId: string): string =>
+  onbId ? `${BASE_URL_V3}/merchants/profile/${onbId}/settlement` : "";
 
 /** Contact phone + email. Read-only in pg-dashboard (no update endpoint). */
 export const contactDetailsApi = (onbId: string): string =>

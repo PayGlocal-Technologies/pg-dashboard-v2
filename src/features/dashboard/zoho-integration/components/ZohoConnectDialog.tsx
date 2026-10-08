@@ -74,8 +74,8 @@ export function ZohoConnectDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-[32rem]">
-        <div className="flex flex-col items-center gap-2 text-center">
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-[32rem]">
+        <div className="flex shrink-0 flex-col items-center gap-2 border-b border-border px-6 pb-4 pt-10 text-center">
           <ZohoConnectBadge />
           <DialogTitle className="mt-1 text-base font-bold tracking-tight">
             Connect Zoho Books or Invoices
@@ -85,39 +85,41 @@ export function ZohoConnectDialog({
           </p>
         </div>
 
-        {needsMidSelection && (
-          <div className="mt-1 space-y-1.5">
-            <p className="text-[13px] font-semibold text-foreground">Select the mid to connect</p>
-            <Select value={chosenMid} onValueChange={setChosenMid}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a mid" />
-              </SelectTrigger>
-              <SelectContent>
-                {pacbMids.map((mid) => (
-                  <SelectItem key={mid} value={mid} className="tabular-nums">
-                    {mid}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
-
-        <div className="mt-1 space-y-2.5 rounded-xl border border-border bg-muted/40 p-3.5">
-          {BENEFITS.map((benefit) => (
-            <div key={benefit.title} className="flex items-start gap-2.5">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-card">
-                <Icon name={benefit.icon} className="h-3.5 w-3.5 text-primary" aria-hidden />
-              </span>
-              <div className="min-w-0">
-                <p className="text-[13px] font-semibold text-foreground">{benefit.title}</p>
-                <p className="text-xs text-muted-foreground">{benefit.description}</p>
-              </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-6 py-5">
+          {needsMidSelection && (
+            <div className="space-y-1.5">
+              <p className="text-[13px] font-semibold text-foreground">Select the mid to connect</p>
+              <Select value={chosenMid} onValueChange={setChosenMid}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a mid" />
+                </SelectTrigger>
+                <SelectContent>
+                  {pacbMids.map((mid) => (
+                    <SelectItem key={mid} value={mid} className="tabular-nums">
+                      {mid}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          ))}
+          )}
+
+          <div className="space-y-2.5 rounded-xl border border-border bg-muted/40 p-3.5">
+            {BENEFITS.map((benefit) => (
+              <div key={benefit.title} className="flex items-start gap-2.5">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-card">
+                  <Icon name={benefit.icon} className="h-3.5 w-3.5 text-primary" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-[13px] font-semibold text-foreground">{benefit.title}</p>
+                  <p className="text-xs text-muted-foreground">{benefit.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex shrink-0 flex-col gap-3 border-t border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <Icon name="shield-check" className="h-3.5 w-3.5 text-emerald-600" aria-hidden />
             Your data stays safe and protected

@@ -479,3 +479,22 @@ export function hasTimelineReversal(
 
   return events.some((event) => isReversalDone(event?.STATUS));
 }
+
+/**
+ * Whether the timeline is waiting on an invoice from the merchant: some
+ * upload round-trip reports INVOICE_UPLOAD as IN_PROGRESS. This is the exact
+ * rule pg-dashboard's TimeLineMapper uses to decide whether to render its
+ * upload flow (a missing status counts as PENDING there, so not awaited).
+ * Once an upload lands, the refetched timeline flips that entry to SUCCESS
+ * and the upload form goes away, whatever the row's status still says.
+ */
+export function isInvoiceUploadAwaited(
+  data: PaymentTimelineData | undefined,
+  multipleTimelineEvents?: MultipleTimelineEvents
+): boolean {
+  const invoiceEvents =
+    multipleTimelineEvents?.INVOICE && multipleTimelineEvents.INVOICE.length > 0
+      ? multipleTimelineEvents.INVOICE
+      : [{ INVOICE_UPLOAD: data?.INVOICE_UPLOAD }];
+  return invoiceEvents.some((e) => e?.INVOICE_UPLOAD?.STATUS === "IN_PROGRESS");
+}

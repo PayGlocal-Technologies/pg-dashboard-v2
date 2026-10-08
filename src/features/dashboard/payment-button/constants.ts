@@ -12,6 +12,25 @@ import type {
   PaymentButtonTheme,
 } from "@/features/dashboard/payment-button/types";
 
+/**
+ * Design-only UI: parts of the design the backend has no data or field for,
+ * hidden until it does. pg-dashboard (the API's source of truth) lists only a
+ * button's id, MID, status (ACTIVE / INACTIVE) and dates, and creates a button
+ * from a currency, the website on file and two required-field switches (email
+ * and phone). Everything else the design draws is gated on this flag:
+ *
+ *  - list: the Draft tab and status option, the Amount filter, and the
+ *    Amount / Successful payments / Revenue columns (and card fields)
+ *  - details: the button label, its amount, and the payments / revenue totals
+ *  - create: the Draft badge and auto-save note, the button label, the amount
+ *    type and value, the Name and Billing address options, custom fields, the
+ *    merchant contact details, the checkout preview and Customisation
+ *
+ * Kept as code (not deleted, and still type-checked) so each piece can come
+ * back as its endpoint lands: flip this, then wire the field.
+ */
+export const DESIGN_ONLY_FIELDS_ENABLED = false;
+
 /** Supporting line under the page title. */
 export const PAYMENT_BUTTON_PAGE_SUBTITLE =
   "Embeddable buttons that collect payments from any website";
@@ -24,21 +43,26 @@ export const PAYMENT_BUTTON_PAGE_LIMIT = 15;
  * same status filter the Status chip drives, not a separate filtering axis.
  * "All" clears the status filter entirely.
  */
-export const PAYMENT_BUTTON_VIEW_TABS = [
+const ALL_PAYMENT_BUTTON_VIEW_TABS = [
   { value: "all", label: "All" },
   { value: "ACTIVE", label: "Active" },
   { value: "DISABLED", label: "Disabled" },
   { value: "DRAFT", label: "Draft" },
 ] as const;
 
-export type PaymentButtonViewTab = (typeof PAYMENT_BUTTON_VIEW_TABS)[number]["value"];
+export type PaymentButtonViewTab = (typeof ALL_PAYMENT_BUTTON_VIEW_TABS)[number]["value"];
+
+/** Draft has no backend status (see DESIGN_ONLY_FIELDS_ENABLED). */
+export const PAYMENT_BUTTON_VIEW_TABS = ALL_PAYMENT_BUTTON_VIEW_TABS.filter(
+  (tab) => DESIGN_ONLY_FIELDS_ENABLED || tab.value !== "DRAFT"
+);
 
 /** Options in the Status filter chip's checkbox list. */
 export const PAYMENT_BUTTON_STATUS_FILTERS: FilterChipOption[] = [
   { value: "ACTIVE", label: "Active" },
   { value: "DISABLED", label: "Disabled" },
   { value: "DRAFT", label: "Draft" },
-];
+].filter((option) => DESIGN_ONLY_FIELDS_ENABLED || option.value !== "DRAFT");
 
 export const PAYMENT_BUTTON_STATUS_LABEL: Record<PaymentButtonStatus, string> = {
   ACTIVE: "Active",
@@ -50,9 +74,13 @@ export const PAYMENT_BUTTON_STATUS_LABEL: Record<PaymentButtonStatus, string> = 
 export const CUSTOMER_DECIDES_LABEL = "Customer decides";
 
 /** The search box's placeholder hints, rendered as "Search by " + hint. */
-export const PAYMENT_BUTTON_SEARCH_HINTS = ["button title", "button ID"];
+export const PAYMENT_BUTTON_SEARCH_HINTS = DESIGN_ONLY_FIELDS_ENABLED
+  ? ["button title", "button ID"]
+  : ["button ID"];
 
-export const PAYMENT_BUTTON_SEARCH_ARIA_LABEL = "Search payment buttons by title or button ID";
+export const PAYMENT_BUTTON_SEARCH_ARIA_LABEL = DESIGN_ONLY_FIELDS_ENABLED
+  ? "Search payment buttons by title or button ID"
+  : "Search payment buttons by button ID";
 
 /** The Amount select's options, each with the glyph its trigger shows. */
 export const PAYMENT_BUTTON_AMOUNT_TYPES: {
@@ -65,16 +93,24 @@ export const PAYMENT_BUTTON_AMOUNT_TYPES: {
 ];
 
 /** The payer details the button can ask for, in the order the form lists them. */
-export const PAYMENT_BUTTON_COLLECT_FIELDS: {
+type PaymentButtonCollectOption = {
   key: keyof PaymentButtonCollectFields;
   label: string;
   icon: IconName;
-}[] = [
+};
+
+const ALL_PAYMENT_BUTTON_COLLECT_FIELDS: PaymentButtonCollectOption[] = [
   { key: "name", label: "Name", icon: "user" },
   { key: "email", label: "Email", icon: "mail" },
   { key: "phone", label: "Phone", icon: "phone" },
   { key: "billingAddress", label: "Billing address", icon: "map-pin" },
 ];
+
+/** Create sends only email and phone (`pbRequiredFields`), so Name and
+ *  Billing address are design-only (see DESIGN_ONLY_FIELDS_ENABLED). */
+export const PAYMENT_BUTTON_COLLECT_FIELDS = ALL_PAYMENT_BUTTON_COLLECT_FIELDS.filter(
+  (field) => DESIGN_ONLY_FIELDS_ENABLED || field.key === "email" || field.key === "phone"
+);
 
 /** Fallback when the MID's enabled currencies haven't loaded (or failed to). */
 export const DEFAULT_BUTTON_CURRENCY = "INR";

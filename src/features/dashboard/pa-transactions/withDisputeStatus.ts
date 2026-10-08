@@ -1,5 +1,8 @@
 import { formatNow } from "@/features/dashboard/pa-transactions/formatNow";
-import type { DisputeEventStatus } from "@/features/dashboard/pa-transactions/financial/types";
+import type {
+  DisputeEvent,
+  DisputeEventStatus,
+} from "@/features/dashboard/pa-transactions/financial/types";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
 
 /** Updates one specific dispute (by id) on the transaction in place, used
@@ -11,7 +14,10 @@ export function withDisputeStatus(
   disputeId: string,
   status: DisputeEventStatus,
   documents?: string[],
-  resolvedOn?: string
+  resolvedOn?: string,
+  /** Anything else that changes with the status (a withdrawal, a fee, a
+   *  partially accepted amount). */
+  patch: Partial<DisputeEvent> = {}
 ): PaTransaction {
   const disputes = transaction.disputes ?? [];
   const index = disputes.findIndex((d) => d.id === disputeId);
@@ -37,6 +43,7 @@ export function withDisputeStatus(
     // the beginning, never resumes at whatever phase the dispute was in
     // before, see DisputeEvent.reviewPhase.
     reviewPhase: status === "UNDER_REVIEW" ? undefined : target.reviewPhase,
+    ...patch,
   };
   const nextDisputes = [...disputes];
   nextDisputes[index] = updated;

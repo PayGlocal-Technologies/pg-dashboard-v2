@@ -3,8 +3,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
   Button,
-  Callout,
-  CalloutText,
   Command,
   CommandEmpty,
   CommandGroup,
@@ -32,6 +30,7 @@ import {
   getSubtotal,
   getTaxAmount,
   getTotalAmount,
+  resolveItemType,
 } from "@/features/dashboard/create-invoice/helpers";
 import { DISCOUNT_TYPE_OPTIONS } from "@/features/dashboard/create-invoice/constants";
 import { useLineItemSuggestions } from "@/features/dashboard/create-invoice/hooks";
@@ -54,6 +53,40 @@ function formatMoney(symbol: string, amount: number | string): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+/**
+ * The catalogue entries matching a typed query, de-duplicated. Exported so the
+ * invoice-link editor's item picker filters exactly the same way.
+ *
+ * An empty query lists the whole catalogue rather than nothing, matching
+ * production's own item-name autocomplete. Entries that differ in nothing are
+ * one suggestion: they carry no id, so the same item recurs whenever it was
+ * billed more than once.
+ */
+export function filterLineItemSuggestions(
+  suggestions: LineItemSuggestion[],
+  query: string
+): { item: LineItemSuggestion; key: string }[] {
+  const needle = query.trim().toLowerCase();
+  const seen = new Set<string>();
+  const unique: { item: LineItemSuggestion; key: string }[] = [];
+  for (const item of suggestions) {
+    if (!item.name) continue;
+    if (needle && !item.name.toLowerCase().includes(needle)) continue;
+    // A distinct SKU is a distinct item even when every visible field matches.
+    const dedupeKey = [
+      item.name,
+      item.unitPrice ?? "",
+      item.hsn ?? "",
+      item.type ?? "",
+      item.skuId ?? "",
+    ].join("|");
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+    unique.push({ item, key: dedupeKey });
+  }
+  return unique;
 }
 
 export function LineItemsSection({
@@ -163,7 +196,7 @@ export function LineItemsSection({
       {
         key,
         description: item.name,
-        type: item.type ?? "",
+        type: resolveItemType(item),
         hsn: item.hsn ?? "",
         gstRate: "",
         unitPrice: item.unitPrice ?? "",
@@ -177,25 +210,11 @@ export function LineItemsSection({
 
   // flux's Command is a presentational shell and does no filtering of its own,
   // so the search is applied here — see BillToSection's client picker for the
-  // same pattern. An empty query lists the whole catalogue
-  // rather than nothing, matching production's own item-name autocomplete
-  // inside AddLineItemDialog.
-  const matchingSuggestions = useMemo(() => {
-    const needle = addQuery.trim().toLowerCase();
-    const seen = new Set<string>();
-    const unique: { item: LineItemSuggestion; key: string }[] = [];
-    for (const item of suggestions) {
-      if (!item.name) continue;
-      if (needle && !item.name.toLowerCase().includes(needle)) continue;
-      const dedupeKey = [item.name, item.unitPrice ?? "", item.hsn ?? "", item.type ?? ""].join(
-        "|"
-      );
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
-      unique.push({ item, key: dedupeKey });
-    }
-    return unique;
-  }, [suggestions, addQuery]);
+  // same pattern.
+  const matchingSuggestions = useMemo(
+    () => filterLineItemSuggestions(suggestions, addQuery),
+    [suggestions, addQuery]
+  );
 
   const selectedCurrency = currencies.find((option) => option.currencyCode === currency);
 
@@ -647,12 +666,13 @@ export function LineItemsSection({
           the other as a code — "$0.00 vs NZD 100.00" reads as two currencies
           when it is meant to read as two amounts of one. */}
       {linkedExpectedTotal && (
-        <Callout variant="error" className="mt-3">
-          <CalloutText>
+        <div className="mt-3 flex items-start gap-1.5 text-[12.5px] leading-relaxed text-destructive">
+          <Icon name="alert-circle" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <p>
             Items total {currency} {total}, which must match the linked transaction:{" "}
             {linkedCurrency || currency} {linkedExpectedTotal}.
-          </CalloutText>
-        </Callout>
+          </p>
+        </div>
       )}
 
       <AddLineItemDialog
@@ -679,7 +699,7 @@ export function LineItemsSection({
  * is the search box, the matching catalogue entries are listed here, and "Add
  * new item" is pinned outside the scrollable list so it never scrolls away.
  */
-function LineItemSuggestionsContent({
+export function LineItemSuggestionsContent({
   query,
   matches,
   symbol,
@@ -692,6 +712,9 @@ function LineItemSuggestionsContent({
   onSelect: (item: LineItemSuggestion) => void;
   onAddNew: (name?: string) => void;
 }) {
+  const trimmed = query.trim();
+  const noMatch = matches.length === 0 && !!trimmed;
+
   // side="bottom" + avoidCollisions={false}: Radix flips a panel above its
   // trigger when the viewport runs out of room below, which here meant the
   // suggestions could land on top of the item row you were adding to. Pinned
@@ -706,23 +729,14 @@ function LineItemSuggestionsContent({
     >
       <Command>
         <CommandList id="line-items-listbox" aria-label="Items">
+          {/* A short line, not a button: the action stays in the footer below
+              where it always is, so nothing jumps when the search stops
+              matching. CommandEmpty's own py-6 is sized for an empty list
+              with nothing else in the panel, which is not the case here. */}
           {matches.length === 0 && (
-            <CommandEmpty>
-              {query.trim() ? (
-                // The one prominent affordance for "nothing here matches what
-                // you typed" — a primary button, not a muted line of text, so
-                // it reads as the obvious next step. Carries the query through,
-                // so the form opens with the name already filled in.
-                <Button
-                  type="button"
-                  variant="primary"
-                  size="sm"
-                  className="w-full justify-start"
-                  leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-                  onClick={() => onAddNew(query.trim())}
-                >
-                  Add &ldquo;{query.trim()}&rdquo;
-                </Button>
+            <CommandEmpty className="px-3 py-3 text-left text-[12.5px]">
+              {trimmed ? (
+                <>No saved items match &ldquo;{trimmed}&rdquo;.</>
               ) : (
                 "No items billed yet."
               )}
@@ -757,23 +771,21 @@ function LineItemSuggestionsContent({
         </CommandList>
       </Command>
 
-      {/* Hidden when the empty state above is already offering this exact
-          action for the typed query, so the panel never shows two "add an
-          item" buttons at once. */}
-      {!(matches.length === 0 && query.trim()) && (
-        <div className="border-t border-border p-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full shadow-none"
-            leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-            onClick={() => onAddNew()}
-          >
-            Add new item
-          </Button>
-        </div>
-      )}
+      {/* Always here, in one place. With a query that matched nothing it
+          becomes "Add "…"" and carries the typed name into the dialog;
+          otherwise it opens the dialog blank. */}
+      <div className="border-t border-border p-3">
+        <Button
+          type="button"
+          variant={noMatch ? "primary" : "outline"}
+          size="sm"
+          className="w-full shadow-none"
+          leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
+          onClick={() => onAddNew(noMatch ? trimmed : undefined)}
+        >
+          {noMatch ? <>Add &ldquo;{trimmed}&rdquo;</> : "Add new item"}
+        </Button>
+      </div>
     </PopoverContent>
   );
 }

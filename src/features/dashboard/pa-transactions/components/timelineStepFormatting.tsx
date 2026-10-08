@@ -21,6 +21,11 @@ function describeTimelineStep(
   onViewSettlement: (settlementId: string) => void
 ): TimelineStep["description"] {
   switch (step.label) {
+    case "Payment started":
+    case "Payment captured":
+    case "Payment failed":
+    case "Payment expired":
+      return amountLabel ? `${amountLabel} · ${when}` : when;
     case "Settled":
       return (
         <span className="flex flex-wrap items-center gap-x-1.5">
@@ -67,7 +72,14 @@ function describeTimelineStep(
           )}
         </span>
       );
-    case "Awaiting your response":
+    case "Evidence submitted":
+      return when;
+    case "Dispute won":
+    case "Dispute lost":
+    case "Dispute withdrawn":
+    case "Dispute accepted":
+      return amountLabel ? `${amountLabel} · ${when}` : when;
+    case "Action required":
       return step.respondBy
         ? `Respond by ${formatDisplayDateTime(step.respondBy) ?? step.respondBy}`
         : undefined;

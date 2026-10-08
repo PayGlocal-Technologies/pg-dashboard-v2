@@ -82,21 +82,25 @@ export function AddAddressDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-        <DialogTitle>Complete billing address</DialogTitle>
-        <p className="mt-1 text-[12.5px] text-muted-foreground">
-          {client?.businessName ? (
-            <>
-              <span className="font-medium text-foreground">{client.businessName}</span> is missing
-              address details an invoice needs.
-            </>
-          ) : (
-            "This client is missing address details an invoice needs."
-          )}
-        </p>
+      {/* Pinned header and footer around a scrolling body, so Save stays in
+          view however tall the address form gets. */}
+      <DialogContent className="flex max-h-[85vh] max-w-lg flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 border-b border-border px-6 py-4 pr-14">
+          <DialogTitle>Complete billing address</DialogTitle>
+          <p className="mt-1 text-[12.5px] text-muted-foreground">
+            {client?.businessName ? (
+              <>
+                <span className="font-medium text-foreground">{client.businessName}</span> is
+                missing address details an invoice needs.
+              </>
+            ) : (
+              "This client is missing address details an invoice needs."
+            )}
+          </p>
+        </div>
 
         {isLoading || !client ? (
-          <div className="mt-4 space-y-3">
+          <div className="space-y-3 px-6 py-5">
             <Shimmer className="h-10 w-full" />
             <Shimmer className="h-10 w-full" />
             <Shimmer className="h-10 w-full" />
@@ -169,7 +173,7 @@ function AddressBody({
 
   return (
     <>
-      <div className="mt-4 space-y-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-6 py-5">
         <Field>
           <FieldLabel htmlFor="client-address-street1">Address line 1</FieldLabel>
           <Input
@@ -251,7 +255,7 @@ function AddressBody({
         </div>
       </div>
 
-      <div className="mt-5 flex justify-end gap-2 border-t border-border pt-4">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border px-6 py-4">
         <Button type="button" variant="secondary" size="sm" onClick={onCancel}>
           Cancel
         </Button>

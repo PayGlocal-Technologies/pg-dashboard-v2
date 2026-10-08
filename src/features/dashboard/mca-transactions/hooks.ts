@@ -290,10 +290,12 @@ export function useDocumentPending(timeframe: string): {
 }
 
 /**
- * Documents pending broken down by currency — a live snapshot of everything
- * currently DOCUMENT_PENDING (no timeframe). Scoped like useDocumentPending.
+ * Documents pending broken down by currency for a timeframe (today | week |
+ * month | ytd). An empty timeframe sends none, which the endpoint answers with
+ * a live snapshot of everything currently DOCUMENT_PENDING. Scoped like
+ * useDocumentPending.
  */
-export function useDocumentPendingByCurrency(): {
+export function useDocumentPendingByCurrency(timeframe = ""): {
   breakdown: DocumentPendingByCurrencyData | undefined;
   isLoading: boolean;
   isError: boolean;
@@ -301,8 +303,8 @@ export function useDocumentPendingByCurrency(): {
   const { scopeId: merchantId, isReady } = useScopeId("PACB");
 
   const { data, isPending, isError } = useGet<DocumentPendingByCurrencyResponse>(
-    ["mca-document-pending-by-currency", merchantId],
-    mcaDocumentPendingByCurrencyApi(merchantId),
+    ["mca-document-pending-by-currency", merchantId, timeframe],
+    mcaDocumentPendingByCurrencyApi(merchantId, timeframe),
     { enabled: isReady }
   );
 

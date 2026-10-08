@@ -83,7 +83,7 @@ export function McaClientAnalyticsCard({ onViewAll }: McaClientAnalyticsCardProp
           />
         ) : !hasData ? (
           <PlaceholderState
-            variant="no-analytics"
+            variant="no-metric-data"
             size="sm"
             title="No client activity yet"
             description="As clients start paying, you'll see which of them contribute most to your revenue."
