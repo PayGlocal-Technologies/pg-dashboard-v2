@@ -50,6 +50,7 @@ import type {
   PaTransactionsResponse,
 } from "@/features/dashboard/pa-transactions/types";
 import type { TableReqBody } from "@/types/transactions";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 /** Always shown: a transaction row is unreadable without these. */
 const FIXED_COLUMN_KEYS = ["totalAmount", "externalStatus", "formattedCreationDateTime"];
@@ -341,7 +342,21 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
             className="py-16"
           />
         }
-        columns={columns}
+        columns={[
+          ...columns,
+          rowActionColumn((row) => (
+            <Button
+              variant="outline"
+              size="sm"
+              rightIcon={<Icon name="chevron-right" className="w-2.5 h-2.5" />}
+              // Revealed on row hover or focus, as on MCA Transactions.
+              className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap shadow-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+              onClick={() => onViewDetails(row)}
+            >
+              View details
+            </Button>
+          )),
+        ]}
         data={rows}
         isLoading={isPending}
         emptyTitle={emptyCopy.title}
@@ -361,18 +376,6 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
         // The whole row opens the drawer; clicks on the row's own buttons are
         // skipped by DataTable, so View details does only its own job.
         onRowClick={onViewDetails}
-        rowAction={(row) => (
-          <Button
-            variant="outline"
-            size="sm"
-            rightIcon={<Icon name="chevron-right" className="w-2.5 h-2.5" />}
-            // Revealed on row hover or focus, as on MCA Transactions.
-            className="h-auto min-h-0 gap-1 rounded-md px-2 py-1 text-[11px] whitespace-nowrap shadow-none opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
-            onClick={() => onViewDetails(row)}
-          >
-            View details
-          </Button>
-        )}
       />
     );
 

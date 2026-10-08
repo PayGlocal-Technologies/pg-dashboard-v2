@@ -37,6 +37,7 @@ import {
   useEbrcSearch,
   useRefreshEbrcRequests,
 } from "@/features/dashboard/ebrc-generation/hooks";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 /**
  * `status` has no fixed enum on the wire — pg-dashboard renders it raw — so
@@ -360,7 +361,20 @@ export function EbrcStatusTable() {
 
         <DataTable
           className="rounded-none border-0"
-          columns={orderedColumns}
+          columns={[
+            ...orderedColumns,
+            rowActionColumn<EbrcRequestRow>((row) => (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setOpenRequest(row)}
+                className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+              >
+                View details
+              </Button>
+            )),
+          ]}
           data={rows}
           rowKey={(row) => row.id}
           isLoading={isLoading}
@@ -375,17 +389,6 @@ export function EbrcStatusTable() {
           // Hidden until the row is hovered/focused — DataTable's own
           // rowAction slot handles the opacity reveal, same treatment the
           // Transactions table's row-level "View details" uses.
-          rowAction={(row) => (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setOpenRequest(row)}
-              className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-            >
-              View details
-            </Button>
-          )}
           density="compact"
           tableLayout="content"
           pagination={{

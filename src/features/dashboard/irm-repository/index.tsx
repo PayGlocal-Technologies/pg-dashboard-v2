@@ -42,6 +42,7 @@ import {
   type MappingStatus,
   type ProcessStatus,
 } from "@/features/dashboard/ebrc-generation/types";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 /** What the search actually matches. The box's text is sent as a full-text
  *  `queryString`, so it spans the whole record — these are the fields worth
@@ -413,24 +414,26 @@ export function IrmRepositoryFeature() {
 
           <DataTable
             className="rounded-none border-0"
-            columns={orderedColumns}
+            columns={[
+              ...orderedColumns,
+              rowActionColumn<IrmRepositoryRow>((row) => (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setOpenRow(row)}
+                  className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
+                >
+                  View details
+                </Button>
+              )),
+            ]}
             data={rows}
             rowKey={(row) => row.id}
             onRowClick={setOpenRow}
             // Hidden until the row is hovered/focused — DataTable's own
             // rowAction slot handles the opacity reveal, same treatment the
             // Transactions table's row-level "View details" uses.
-            rowAction={(row) => (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setOpenRow(row)}
-                className="h-auto min-h-0 rounded-md px-2 py-1 text-[11px] whitespace-nowrap"
-              >
-                View details
-              </Button>
-            )}
             isLoading={isLoading}
             skeletonRows={pageSize}
             emptyTitle={isError ? "Couldn't load IRMs" : "No IRMs found"}

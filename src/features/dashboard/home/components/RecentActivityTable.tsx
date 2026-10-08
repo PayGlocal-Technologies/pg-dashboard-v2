@@ -22,6 +22,7 @@ import {
   type RecentSettlement,
 } from "@/features/dashboard/home/mock-data";
 import { formatDate, formatCurrency, truncate } from "@/lib/utils/format";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 // ── Status mapping: raw (lowercase) value → display meta ──────────────────────
 type StatusMeta = { label: string; variant: BadgeVariant; trailIcon?: BadgeTrailIcon };
@@ -258,9 +259,7 @@ export function RecentActivityTable({
         variant="ghost"
         size="sm"
         className="h-7 text-[12px] font-medium text-primary hover:text-primary/80"
-        onClick={() =>
-          router.push(tab === "transactions" ? "/mca-transactions" : "/settlements")
-        }
+        onClick={() => router.push(tab === "transactions" ? "/mca-transactions" : "/settlements")}
       >
         View all
       </Button>
@@ -293,7 +292,7 @@ export function RecentActivityTable({
   return tab === "transactions" ? (
     <DataTableCard<RecentTransaction>
       {...shell}
-      columns={transactionColumns}
+      columns={[...transactionColumns, rowActionColumn(() => rowActionButton("View details"))]}
       data={transactions.slice(0, 7)}
       rowKey={(row) => row.id}
       isLoading={isLoading}
@@ -309,12 +308,11 @@ export function RecentActivityTable({
           className="py-12"
         />
       }
-      rowAction={rowActionButton("View details")}
     />
   ) : (
     <DataTableCard<RecentSettlement>
       {...shell}
-      columns={settlementColumns}
+      columns={[...settlementColumns, rowActionColumn(() => rowActionButton("View report"))]}
       data={settlements}
       rowKey={(row) => row.id}
       isLoading={isLoading}
@@ -330,7 +328,6 @@ export function RecentActivityTable({
           className="py-12"
         />
       }
-      rowAction={rowActionButton("View report")}
     />
   );
 }

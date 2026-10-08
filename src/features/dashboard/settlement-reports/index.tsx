@@ -77,6 +77,7 @@ import type {
   SettlementRow,
   SettlementStatus,
 } from "@/features/dashboard/settlement-reports/types";
+import { rowActionColumn } from "@/components/common/rowActionColumn";
 
 const SETTLEMENT_PAGE_LIMIT = 50;
 
@@ -605,12 +606,51 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                       className="py-14"
                     />
                   }
-                  columns={buildSettlementColumns({
-                    columnOrder: effectiveColumnOrder,
-                    hiddenColumns,
-                    showMerchantId,
-                    withPayoutDetails: showPayoutDetails,
-                  })}
+                  columns={[
+                    ...buildSettlementColumns({
+                      columnOrder: effectiveColumnOrder,
+                      hiddenColumns,
+                      showMerchantId,
+                      withPayoutDetails: showPayoutDetails,
+                    }),
+                    rowActionColumn((row) => (
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadRowReport(row)}
+                          leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
+                          className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                        >
+                          Download
+                        </Button>
+                        {/* BACKEND GAP: detail route is mock-backed (no per-settlement
+                         * detail endpoint in the old API). */}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            showPayoutDetails
+                              ? openDetails(row)
+                              : router.push(
+                                  settlementDetailPath(
+                                    activeContext,
+                                    // A live summary row does not name its merchant
+                                    // yet, so the page's own scope stands in — see
+                                    // downloadRowReport, which has the same fallback.
+                                    row.merchantId || scopeId,
+                                    row.id
+                                  )
+                                )
+                          }
+                          rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+                          className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+                        >
+                          View details
+                        </Button>
+                      </div>
+                    )),
+                  ]}
                   data={filteredEnhancedRows}
                   isLoading={!enhancedIsMock && isPending}
                   emptyTitle={emptyCopy.title}
@@ -621,43 +661,6 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                   // Payments: the whole row opens the details drawer; clicks on the
                   // row's own buttons are skipped by DataTable.
                   onRowClick={showPayoutDetails ? openDetails : undefined}
-                  rowAction={(row) => (
-                    <div className="flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => downloadRowReport(row)}
-                        leftIcon={<Icon name="download" className="h-2.5 w-2.5" />}
-                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                      >
-                        Download
-                      </Button>
-                      {/* BACKEND GAP: detail route is mock-backed (no per-settlement
-                       * detail endpoint in the old API). */}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          showPayoutDetails
-                            ? openDetails(row)
-                            : router.push(
-                                settlementDetailPath(
-                                  activeContext,
-                                  // A live summary row does not name its merchant
-                                  // yet, so the page's own scope stands in — see
-                                  // downloadRowReport, which has the same fallback.
-                                  row.merchantId || scopeId,
-                                  row.id
-                                )
-                              )
-                        }
-                        rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-                        className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-                      >
-                        View details
-                      </Button>
-                    </div>
-                  )}
                 />
               </div>
 
