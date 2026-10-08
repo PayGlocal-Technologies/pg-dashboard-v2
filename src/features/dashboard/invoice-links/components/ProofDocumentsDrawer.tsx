@@ -1,14 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Button,
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  Shimmer,
-} from "@/components/ui";
+import { Button, Drawer, DrawerContent, DrawerHeader, DrawerTitle, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { AppImage } from "@/components/common/AppImage";
 import { PdfViewer } from "@/components/common/PdfViewer";

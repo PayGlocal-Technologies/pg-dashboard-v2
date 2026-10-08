@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -26,6 +26,8 @@ import {
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
 import { SelectMidView } from "@/components/common/SelectMidView";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { useAccountSetup } from "@/stores/useAccountSetup";
 // Presentational only (ui + Icon + cn), so it is safe to borrow across
 // features — the same way mca-links borrows CountryCell from mca-transactions.
 import { ChipField } from "@/features/dashboard/create-invoice/components/InvoiceHeaderChips";
@@ -59,6 +61,7 @@ import {
   validateLineItem,
   validatePhone,
   validateRecipient,
+  validateRequiredAddress,
   type LineItemErrors,
 } from "@/features/dashboard/invoice-links/create/helpers";
 import {
@@ -70,6 +73,8 @@ import {
   useInvoiceDraft,
   useInvoiceEditorMid,
   useImportItemsToSku,
+  useInvoiceLinkConfig,
+  useRequiredAddresses,
   useInvoiceLinkTemplates,
   useInvoiceLogo,
   useMerchantShortName,
@@ -295,6 +300,35 @@ function requestToItems(request: DraftRequest | undefined): InvoiceLineItem[] {
 export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) {
   const router = useRouter();
   const { needsMidChoice, midOptions } = useInvoiceLinkMidScope();
+  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+  const mid = useInvoiceEditorMid();
+  // gcc-ui-temp only lets a merchant create an invoice link when their invoice
+  // config has `merchantInvoiceEnabled`. Checked here, for the MID the link
+  // will be raised under, rather than on the list's button: the list may span
+  // several MIDs, and only once one is chosen is there a single config to ask.
+  // Not read while a MID is still to be picked.
+  const { isInvoiceEnabled } = useInvoiceLinkConfig(needsMidChoice ? "" : mid);
+
+  const shell = (body: ReactNode) => (
+    <>
+      <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label="Close"
+          className="h-9 w-9 shrink-0 p-0"
+          onClick={() => router.push("/invoice-links")}
+        >
+          <Icon name="x" className="h-4 w-4" />
+        </Button>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          {invoiceId ? "Edit invoice link" : "Create an invoice link"}
+        </h1>
+      </header>
+      <div className="mx-auto w-full max-w-2xl px-6 py-16">{body}</div>
+    </>
+  );
 
   /**
    * The editor cannot open without knowing which account the link is for:
@@ -307,27 +341,43 @@ export function InvoiceLinkEditorFeature({ invoiceId }: { invoiceId?: string }) 
    * answered.
    */
   if (needsMidChoice) {
-    return (
-      <>
-        <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            aria-label="Close"
-            className="h-9 w-9 shrink-0 p-0"
-            onClick={() => router.push("/invoice-links")}
-          >
-            <Icon name="x" className="h-4 w-4" />
-          </Button>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">
-            {invoiceId ? "Edit invoice link" : "Create an invoice link"}
-          </h1>
-        </header>
-        <div className="mx-auto w-full max-w-2xl px-6 py-16">
-          <SelectMidView midType="PA" midOptions={midOptions} showSidebarHint={false} />
-        </div>
-      </>
+    return shell(<SelectMidView midType="PA" midOptions={midOptions} showSidebarHint={false} />);
+  }
+
+  // Create only: gcc gates the Create action, not editing an existing link.
+  // Held back on an explicit false alone — while the config loads, or if it
+  // fails, the editor opens as before rather than a hiccup locking it.
+  if (!invoiceId && isInvoiceEnabled === false) {
+    return shell(
+      <PlaceholderState
+        variant="empty-table"
+        title="Invoice links aren't switched on for this account"
+        description="Contact your account manager to enable invoice links for this Merchant ID."
+        className="rounded-xl border border-border bg-card py-16"
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {midOptions.length > 1 ? (
+              // Clearing the selection brings back the account picker above.
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedMidDetails({ mid: "", status: "", color: "" })}
+              >
+                Choose another account
+              </Button>
+            ) : null}
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => router.push("/invoice-links")}
+            >
+              Back to Invoice Links
+            </Button>
+          </div>
+        }
+      />
     );
   }
 
@@ -343,6 +393,9 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
   const initialTemplateId = invoiceId ? null : searchParams.get("templateId");
   const mid = useInvoiceEditorMid();
   const currencies = useInvoiceCurrencies();
+  // gcc-ui-temp's merchant configs (features/Invoice/helper.js).
+  const invoiceConfig = useInvoiceLinkConfig(mid);
+  const requiredAddresses = useRequiredAddresses(mid);
   // gcc-ui-temp sends `addressCountry` as an ISO2 code; the form holds names.
   const countries = useInvoiceCountries();
   // Matched ignoring case and punctuation: the client book and this list do
@@ -440,6 +493,12 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     return { ...merged, txnCurrency: merged.txnCurrency || currencies[0]?.value || "" };
   }, [serverValues, edits, currencies]);
 
+  // A required shipping address that is "same as billing" is the billing one,
+  // so billing is held to it too — gcc copies billing into shipping then.
+  const billingRequired =
+    requiredAddresses.billing || (requiredAddresses.shipping && values.shippingSameAsBilling);
+  const shippingRequired = requiredAddresses.shipping && !values.shippingSameAsBilling;
+
   // Untouched rows come from the server; the moment the merchant edits the
   // grid their copy wins outright.
   const items = itemsOverride ?? serverItems;
@@ -482,7 +541,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
       if (recipients.length === 0) {
         setRecipientsError("Choose at least one client");
         recipientsOk = false;
-      } else if (recipients.some((r) => validateRecipient(r).length > 0)) {
+      } else if (recipients.some((r) => validateRecipient(r, requiredAddresses).length > 0)) {
         recipientsOk = false;
       }
     } else {
@@ -493,10 +552,10 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
       const phoneNumber = validatePhone(values.phoneNumber);
       if (phoneNumber) next.phoneNumber = phoneNumber;
 
-      const billingErrors = validateAddress(values.billing);
+      const billingErrors = validateRequiredAddress(values.billing, billingRequired);
       Object.entries(billingErrors).forEach(([k, v]) => v && (next[`billing.${k}`] = v));
       if (!values.shippingSameAsBilling) {
-        const shippingErrors = validateAddress(values.shipping);
+        const shippingErrors = validateRequiredAddress(values.shipping, shippingRequired);
         Object.entries(shippingErrors).forEach(([k, v]) => v && (next[`shipping.${k}`] = v));
       }
     }
@@ -542,12 +601,17 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     met: string
   ): InvoiceRequirement => ({ id, label, fieldId, done: !problem, detail: problem || met });
 
-  const recipientIssues = recipients.filter((r) => validateRecipient(r).length > 0).length;
+  const recipientIssues = recipients.filter(
+    (r) => validateRecipient(r, requiredAddresses).length > 0
+  ).length;
   const itemsTotal = getTotalAmount(items, values.discount || "0", values.discountType);
   const itemRowsInvalid = items.some((item) => Object.keys(validateLineItem(item)).length > 0);
-  const billingInvalid = Object.values(validateAddress(values.billing)).some(Boolean);
+  const billingInvalid = Object.values(
+    validateRequiredAddress(values.billing, billingRequired)
+  ).some(Boolean);
   const shippingInvalid =
-    !values.shippingSameAsBilling && Object.values(validateAddress(values.shipping)).some(Boolean);
+    !values.shippingSameAsBilling &&
+    Object.values(validateRequiredAddress(values.shipping, shippingRequired)).some(Boolean);
 
   const requirements: InvoiceRequirement[] = [
     requirement(
@@ -1016,6 +1080,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
                     recipients={recipients}
                     onChange={updateRecipients}
                     error={recipientsError}
+                    requiredAddresses={requiredAddresses}
                   />
                 ) : (
                   <EditorSection icon="user" title="Who you're billing">
@@ -1098,13 +1163,19 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
                     icon="map-pin"
                     title="Billing and shipping"
                     subtitle={
-                      addressFilled
-                        ? `${addressFilled} field(s) filled in`
-                        : "Optional on an invoice link"
+                      requiredAddresses.billing || requiredAddresses.shipping
+                        ? "Required for this account"
+                        : addressFilled
+                          ? `${addressFilled} field(s) filled in`
+                          : "Optional on an invoice link"
                     }
                     collapsible
                     defaultOpen={false}
-                    forceOpen={hasAddressError}
+                    // Required by the merchant's config: held open, as gcc forces
+                    // those sections open.
+                    forceOpen={
+                      hasAddressError || requiredAddresses.billing || requiredAddresses.shipping
+                    }
                   >
                     <div className="space-y-4">
                       <AddressFields
@@ -1260,6 +1331,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
       <CreatedLinkDialog
         open={createdLink !== null}
         link={createdLink ?? ""}
+        isShared={invoiceConfig.isCustomerSharing}
         // Same as the batch results: closing stays in the editor; the dialog's
         // own button is the way to the list.
         onOpenChange={(next) => {

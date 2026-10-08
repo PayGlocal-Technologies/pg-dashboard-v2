@@ -39,6 +39,8 @@ import {
   invoiceTemplatesApi,
   merchantAdditionalInfoApi,
   merchantProfileApi,
+  invoiceLinkConfigApi,
+  paymentLinkFormConfigApi,
 } from "@/features/dashboard/invoice-links/create/services";
 import {
   CLIENT_PICKER_LIMIT,
@@ -260,6 +262,64 @@ export function useInvoiceLogo(mid: string) {
     uploadedExtension && mid ? { name: mid, fileExtension: uploadedExtension } : NO_MERCHANT_LOGO;
 
   return { displayUrl, upload, isUploading, merchantLogo };
+}
+
+// ── Merchant configuration (gcc-ui-temp's invoice configs) ───────────────────
+
+/** Reads a field off a response that may or may not wrap it in `data`. */
+function pick<T>(body: unknown, key: string): T | undefined {
+  const root = body as Record<string, unknown> | undefined;
+  const inner = root?.data as Record<string, unknown> | undefined;
+  return (inner?.[key] ?? root?.[key]) as T | undefined;
+}
+
+export interface InvoiceLinkConfig {
+  /** Undefined until known; Create is held back only on an explicit false. */
+  isInvoiceEnabled: boolean | undefined;
+  /** Created links are also sent to the customer. Changes the success title. */
+  isCustomerSharing: boolean;
+}
+
+/** GET …/invoice/config. gcc reads it unwrapped (`res.data.merchantInvoiceEnabled`). */
+export function useInvoiceLinkConfig(mid: string): InvoiceLinkConfig {
+  const { data } = useGet<unknown>(["invoice-link-config", mid], invoiceLinkConfigApi(mid), {
+    enabled: !!mid,
+    staleTime: Infinity,
+  });
+  const enabled = pick<boolean>(data, "merchantInvoiceEnabled");
+  return {
+    isInvoiceEnabled: data === undefined ? undefined : !!enabled,
+    isCustomerSharing: !!pick<boolean>(data, "invoiceCustomerSharing"),
+  };
+}
+
+export interface RequiredAddresses {
+  billing: boolean;
+  shipping: boolean;
+}
+
+/**
+ * Which address sections this merchant must fill, from the payment-link form
+ * config's `plRequiredFields` — gcc forces those sections open and makes
+ * street, country, state, city and postcode required in them.
+ */
+export function useRequiredAddresses(mid: string): RequiredAddresses {
+  const { data } = useGet<unknown>(
+    ["payment-link-form-config", mid],
+    paymentLinkFormConfigApi(mid),
+    { enabled: !!mid, staleTime: Infinity }
+  );
+  const fields = pick<{ billingAddressRequired?: boolean; shippingAddressRequired?: boolean }>(
+    data,
+    "plRequiredFields"
+  );
+  return useMemo(
+    () => ({
+      billing: !!fields?.billingAddressRequired,
+      shipping: !!fields?.shippingAddressRequired,
+    }),
+    [fields?.billingAddressRequired, fields?.shippingAddressRequired]
+  );
 }
 
 /** Country options for both address sections. */

@@ -89,3 +89,25 @@ export const clientSearchApi = (mid: string): string =>
 /** One client in full, used to pick up a client just added from the picker. */
 export const clientByIdApi = (mid: string, clientId: string): string =>
   mid && clientId ? `${BASE_URL_V3}/mca-client/${mid}/${clientId}` : "";
+
+// ── Merchant configuration ───────────────────────────────────────────────────
+// Two of the configs gcc-ui-temp's invoice editor loads (features/Invoice/
+// helper.js fetchInitialData). pg-dashboard reads neither for invoice links;
+// gcc is the source of truth here. gcc's third, …/invoice/default-values, is
+// deliberately not ported (decided 2026-10-08).
+
+/**
+ * GET: `{ merchantInvoiceEnabled, invoiceCustomerSharing }`. The first gates
+ * Create on the list; the second says whether a created link is also sent to
+ * the customer. From gcc's `getInvoiceLinkConfig`.
+ */
+export const invoiceLinkConfigApi = (mid: string): string =>
+  mid ? `${BASE_URL_V1}/merchants/${mid}/invoice/config` : "";
+
+/**
+ * GET: the payment-link form config, of which invoice links read only
+ * `plRequiredFields.billingAddressRequired` / `shippingAddressRequired`.
+ * From gcc's `getPLConfigFormForm`.
+ */
+export const paymentLinkFormConfigApi = (mid: string): string =>
+  mid ? `${BASE_URL_V1}/merchants/${mid}/payment-link-form/config` : "";
