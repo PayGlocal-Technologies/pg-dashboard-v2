@@ -8,11 +8,7 @@ import { StaticLinkHero } from "@/features/dashboard/static-link/components/Stat
 import { StaticLinkIntroDialog } from "@/features/dashboard/static-link/components/StaticLinkIntroDialog";
 import { StaticLinkTransactions } from "@/features/dashboard/static-link/components/StaticLinkTransactions";
 import { STATIC_LINK_INTRO_SEEN_KEY } from "@/features/dashboard/static-link/constants";
-import {
-  splitShareableLink,
-  staticLinkHost,
-  toDisplayLink,
-} from "@/features/dashboard/static-link/helpers";
+import { splitShareableLink, toDisplayLink } from "@/features/dashboard/static-link/helpers";
 import { useStaticLink } from "@/features/dashboard/static-link/hooks";
 
 /**
@@ -90,7 +86,6 @@ export function StaticLinkFeature() {
         open={howItWorksOpen}
         onOpenChange={setHowItWorksOpen}
         url={toDisplayLink(link?.shareableLink) || "Your link will appear here"}
-        host={staticLinkHost(link?.shareableLink) || "pay.payglocal.in"}
       />
     </div>
   );

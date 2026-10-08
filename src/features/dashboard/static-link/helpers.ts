@@ -192,8 +192,3 @@ export function splitShareableLink(shareableLink?: string | null): {
   if (at === -1) return { prefix: link ? `${link}/@` : "", handle: "" };
   return { prefix: link.slice(0, at + 1), handle: link.slice(at + 1) };
 }
-
-/** The link's host (`buy.example`), for the How it works illustration. */
-export function staticLinkHost(shareableLink?: string | null): string {
-  return toDisplayLink(shareableLink).split("/")[0] ?? "";
-}
