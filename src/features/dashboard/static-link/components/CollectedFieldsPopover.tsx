@@ -13,14 +13,70 @@ import {
   TooltipTrigger,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { buildDisplayFieldsRequest } from "@/features/dashboard/static-link/helpers";
 import type {
   StaticLinkCollectedField,
   StaticLinkDisplayFieldsRequest,
 } from "@/features/dashboard/static-link/types";
 
-const toRequiredKeys = (fields: StaticLinkCollectedField[]): string[] =>
+export const toRequiredKeys = (fields: StaticLinkCollectedField[]): string[] =>
   fields.filter((field) => field.required).map((field) => field.fieldKey);
+
+/**
+ * The details-to-collect checklist, shared by the Configure popover and the
+ * Edit Static Link dialog: a ticked row is required at checkout, and a row
+ * PayGlocal has pinned shows ticked, disabled and locked.
+ */
+export function CollectedFieldsChecklist({
+  fields,
+  requiredKeys,
+  onToggle,
+  className,
+}: {
+  fields: StaticLinkCollectedField[];
+  requiredKeys: string[];
+  onToggle: (field: StaticLinkCollectedField) => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("space-y-2.5", className)}>
+      {fields.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Your link doesn&apos;t collect any details yet.
+        </p>
+      ) : (
+        fields.map((field) => {
+          const id = `static-link-field-${field.fieldKey}`;
+          const row = (
+            <div className="flex items-center gap-2.5">
+              <Checkbox
+                id={id}
+                checked={field.platformLocked || requiredKeys.includes(field.fieldKey)}
+                disabled={field.platformLocked}
+                onCheckedChange={() => onToggle(field)}
+              />
+              <Label htmlFor={id} className="text-[13px] font-medium text-foreground">
+                {field.label}
+              </Label>
+              {field.platformLocked && (
+                <Icon name="lock" className="h-3 w-3 text-muted-foreground" aria-hidden />
+              )}
+            </div>
+          );
+          return field.platformLocked ? (
+            <Tooltip key={field.fieldKey}>
+              <TooltipTrigger asChild>{row}</TooltipTrigger>
+              <TooltipContent>PayGlocal requires this detail</TooltipContent>
+            </Tooltip>
+          ) : (
+            <div key={field.fieldKey}>{row}</div>
+          );
+        })
+      )}
+    </div>
+  );
+}
 
 /**
  * "Configure": what the checkout asks a customer for before they pay through
@@ -105,41 +161,12 @@ export function CollectedFieldsPopover({
           cannot be changed.
         </p>
 
-        <div className="mt-3 space-y-2.5">
-          {fields.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Your link doesn&apos;t collect any details yet.
-            </p>
-          ) : (
-            fields.map((field) => {
-              const id = `static-link-field-${field.fieldKey}`;
-              const row = (
-                <div className="flex items-center gap-2.5">
-                  <Checkbox
-                    id={id}
-                    checked={field.platformLocked || requiredKeys.includes(field.fieldKey)}
-                    disabled={field.platformLocked}
-                    onCheckedChange={() => toggle(field)}
-                  />
-                  <Label htmlFor={id} className="text-[13px] font-medium text-foreground">
-                    {field.label}
-                  </Label>
-                  {field.platformLocked && (
-                    <Icon name="lock" className="h-3 w-3 text-muted-foreground" aria-hidden />
-                  )}
-                </div>
-              );
-              return field.platformLocked ? (
-                <Tooltip key={field.fieldKey}>
-                  <TooltipTrigger asChild>{row}</TooltipTrigger>
-                  <TooltipContent>PayGlocal requires this detail</TooltipContent>
-                </Tooltip>
-              ) : (
-                <div key={field.fieldKey}>{row}</div>
-              );
-            })
-          )}
-        </div>
+        <CollectedFieldsChecklist
+          fields={fields}
+          requiredKeys={requiredKeys}
+          onToggle={toggle}
+          className="mt-3"
+        />
 
         <div className="mt-4 flex justify-end gap-2">
           <Button type="button" variant="outline" size="sm" onClick={() => setOpen(false)}>

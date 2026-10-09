@@ -36,15 +36,19 @@ export function StaticLinkTransactions({
 
   if (isLoading) return null;
 
+  // No link yet (the banner above says how to get one): the table's empty
+  // state, since there is nothing to list until there is a link to pay on.
   return (
-    <Card className="gap-0 p-5">
+    <div className="space-y-3">
       <h2 className="text-[15px] font-semibold text-foreground">Linked transactions</h2>
-      <PlaceholderState
-        variant="empty-table"
-        title="No static link on this Merchant ID"
-        description="Use the Merchant ID dropdown in the sidebar to select the account your link belongs to."
-        className="py-12"
-      />
-    </Card>
+      <Card className="gap-0 p-0">
+        <PlaceholderState
+          variant="empty-table"
+          title="No payments yet"
+          description="Payments made through your static link will show up here."
+          className="py-16"
+        />
+      </Card>
+    </div>
   );
 }

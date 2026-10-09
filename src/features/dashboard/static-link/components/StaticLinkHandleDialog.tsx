@@ -18,9 +18,18 @@ import {
   STATIC_LINK_HANDLE_MIN,
 } from "@/features/dashboard/static-link/constants";
 import {
+  CollectedFieldsChecklist,
+  toRequiredKeys,
+} from "@/features/dashboard/static-link/components/CollectedFieldsPopover";
+import {
+  buildDisplayFieldsRequest,
   sanitizeStaticLinkHandle,
   validateStaticLinkHandle,
 } from "@/features/dashboard/static-link/helpers";
+import type {
+  StaticLinkCollectedField,
+  StaticLinkDisplayFieldsRequest,
+} from "@/features/dashboard/static-link/types";
 
 /** The link as it will read, with the handle picked out. */
 function LinkPreview({ prefix, handle }: { prefix: string; handle: string }) {
@@ -40,23 +49,45 @@ function LinkPreview({ prefix, handle }: { prefix: string; handle: string }) {
 function HandleSteps({
   currentHandle,
   linkPrefix,
+  fields,
   isSaving,
   onCancel,
+  onSaveFields,
   onConfirm,
 }: {
   currentHandle: string;
   linkPrefix: string;
+  fields: StaticLinkCollectedField[];
   isSaving: boolean;
   onCancel: () => void;
+  onSaveFields: (body: StaticLinkDisplayFieldsRequest) => void;
   onConfirm: (handle: string) => void;
 }) {
   const [handle, setHandle] = useState(currentHandle);
+  const [requiredKeys, setRequiredKeys] = useState(() => toRequiredKeys(fields));
   const [confirming, setConfirming] = useState(false);
 
   // Sanitized as they type, so what they confirm is what the server stores.
   const sanitized = sanitizeStaticLinkHandle(handle);
   const error = validateStaticLinkHandle(handle);
-  const unchanged = sanitized === currentHandle;
+
+  const toggle = (field: StaticLinkCollectedField) => {
+    if (field.platformLocked) return;
+    setRequiredKeys((keys) =>
+      keys.includes(field.fieldKey)
+        ? keys.filter((key) => key !== field.fieldKey)
+        : [...keys, field.fieldKey]
+    );
+  };
+
+  // The details save first (only the rows that moved, as Configure sends
+  // them), then the name: the call that names the link is the one that
+  // switches it on and locks it.
+  const confirm = () => {
+    const displayFields = buildDisplayFieldsRequest(fields, requiredKeys);
+    if (displayFields.length) onSaveFields({ displayFields });
+    onConfirm(sanitized);
+  };
 
   if (confirming) {
     return (
@@ -90,7 +121,7 @@ function HandleSteps({
             size="sm"
             isLoading={isSaving}
             leftIcon={<Icon name="check" className="h-3.5 w-3.5" />}
-            onClick={() => onConfirm(sanitized)}
+            onClick={confirm}
           >
             Confirm and lock
           </Button>
@@ -101,9 +132,10 @@ function HandleSteps({
 
   return (
     <>
-      <DialogTitle>Choose your link name</DialogTitle>
+      <DialogTitle>Edit your static link</DialogTitle>
       <DialogDescription className="mt-2">
-        This is the address customers will see. You can set it once, so pick carefully.
+        Name the address customers will see, and choose what they fill in before paying. The name
+        can be set once, so pick carefully.
       </DialogDescription>
 
       <Field className="mt-5 gap-2">
@@ -131,6 +163,19 @@ function HandleSteps({
         <LinkPreview prefix={linkPrefix} handle={sanitized || "yourbusiness"} />
       </div>
 
+      <div className="mt-5">
+        <p className="text-sm font-medium text-foreground">Details to collect</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Ticked details are required before a customer can pay.
+        </p>
+        <CollectedFieldsChecklist
+          fields={fields}
+          requiredKeys={requiredKeys}
+          onToggle={toggle}
+          className="mt-3"
+        />
+      </div>
+
       <div className="mt-6 flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onCancel}>
           Cancel
@@ -139,7 +184,8 @@ function HandleSteps({
           type="button"
           variant="primary"
           size="sm"
-          disabled={Boolean(error) || unchanged}
+          // The current name can be kept: confirming still switches the link on.
+          disabled={Boolean(error)}
           onClick={() => setConfirming(true)}
         >
           Continue
@@ -150,17 +196,21 @@ function HandleSteps({
 }
 
 /**
- * The one chance a merchant gets to name their own link (pg-dashboard's
- * StaticLinkHandleModal). Two steps on purpose: an ordinary edit, then a
- * confirmation that spells out it cannot be undone, since the server locks
- * the handle the moment the activation succeeds.
+ * Edit Static Link: the one chance a merchant gets to name their own link
+ * (pg-dashboard's StaticLinkHandleModal), together with the details the
+ * checkout collects (its CollectedFieldsDropdown). Two steps on purpose: an
+ * ordinary edit, then a confirmation that spells out the name cannot be
+ * undone, since the server locks the handle the moment the activation
+ * succeeds.
  */
 export function StaticLinkHandleDialog({
   open,
   onOpenChange,
   currentHandle,
   linkPrefix,
+  fields,
   isSaving,
+  onSaveFields,
   onConfirm,
 }: {
   open: boolean;
@@ -169,7 +219,11 @@ export function StaticLinkHandleDialog({
   currentHandle: string;
   /** Everything before the handle, e.g. "buy.payglocal.com/@". */
   linkPrefix: string;
+  /** The details the checkout collects, the checklist's starting state. */
+  fields: StaticLinkCollectedField[];
   isSaving: boolean;
+  /** The changed details, saved just before the name. */
+  onSaveFields: (body: StaticLinkDisplayFieldsRequest) => void;
   /** Confirmed: send it. Also activates the link, which is what locks it. */
   onConfirm: (handle: string) => void;
 }) {
@@ -179,8 +233,10 @@ export function StaticLinkHandleDialog({
         <HandleSteps
           currentHandle={currentHandle}
           linkPrefix={linkPrefix}
+          fields={fields}
           isSaving={isSaving}
           onCancel={() => onOpenChange(false)}
+          onSaveFields={onSaveFields}
           onConfirm={onConfirm}
         />
       </DialogContent>
