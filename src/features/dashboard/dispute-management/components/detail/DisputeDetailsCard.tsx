@@ -42,7 +42,7 @@ export function DisputeDetailsCard({ dispute, now }: { dispute: DisputeCase; now
           </span>
         }
       />
-      {dispute.caseId && <DetailRow label="Case ID" value={dispute.caseId} />}
+      <DetailRow label="Case ID" value={dispute.caseId || "-"} />
       <DetailRow
         label="Disputed Amount"
         value={`${formatCurrency(dispute.amount, dispute.currency)} ${dispute.currency}`}
@@ -62,6 +62,9 @@ export function DisputeDetailsCard({ dispute, now }: { dispute: DisputeCase; now
           }
         />
       )}
+      {/* CbDetailsHeaderData's Reason: the code, then the network's description
+          or the "outside standard categories" fallback, on every state. */}
+      <DetailRow label="Reason" value={`${dispute.reasonCode} - ${dispute.reasonDescription}`} />
       <DetailRow
         label="Payment Method"
         value={

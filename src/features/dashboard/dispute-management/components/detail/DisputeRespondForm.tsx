@@ -20,8 +20,11 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn, formatCurrency } from "@/lib/utils";
-import { usePost } from "@/lib/api/hooks";
-import { cbRemoveProofDocApi } from "@/features/dashboard/dispute-management/services";
+import { usePost, usePut } from "@/lib/api/hooks";
+import {
+  cbDocUpdateApi,
+  cbRemoveProofDocApi,
+} from "@/features/dashboard/dispute-management/services";
 import {
   UPLOAD_ACCEPT,
   UPLOAD_MAX_MB,
@@ -32,10 +35,14 @@ import {
   uniqueFileName,
 } from "@/features/dashboard/dispute-management/helpers";
 import {
+  disambiguateCaptureName,
   useCbDocumentUpload,
   useCbDocuments,
   useCbStaticData,
 } from "@/features/dashboard/dispute-management/hooks";
+
+/** The picker's accepted extensions, for dropped files (antd's Dragger enforced `accept`). */
+const ACCEPTED_EXTENSIONS = UPLOAD_ACCEPT.split(",").map((ext) => ext.trim().toLowerCase());
 import {
   DisputeFormTimelineCard,
   type DisputeFormStep,
@@ -92,20 +99,43 @@ export function DisputeRespondForm({
   const [docIndex, setDocIndex] = useState("0");
   const selectedDoc = docOptions[Number(docIndex)] ?? docOptions[0];
 
-  const remove = usePost<unknown, { fileNames: string[] }>(cbRemoveProofDocApi(dispute.cbId), {
-    onSuccess: () => {
-      toast.success("File removed successfully.");
-      documents.refetchProof();
-    },
-    onError: (e) => toast.error(apiErrorMessage(e, "Failed to remove file.")),
+  // FileCard's isCbDelete: PUT `/doc/update` with `action: "DELETE"`, the
+  // path pg-dashboard's upload drawer removes a file (or a failed attempt) by.
+  const remove = usePut<unknown, { reqBody: object }>(cbDocUpdateApi(dispute.cbId), {
+    onSuccess: documents.refetchProof,
+    onError: (e) => toast.error(apiErrorMessage(e, "Failed to delete document")),
   });
+  const deleteFile = (fileId: string) =>
+    remove.mutate({
+      reqBody: { cbDocRequest: { fileId, action: "DELETE", cbDocType: "PROOF_DOCS" } },
+    });
+  // CbUploadDocs' bin on a listed document: POST `/doc/delete/proof`, in
+  // Upload documents and Insufficient documents.
+  const removeListed = usePost<unknown, { fileNames: string[] }>(
+    cbRemoveProofDocApi(dispute.cbId),
+    {
+      onSuccess: () => {
+        toast.success("File removed successfully.");
+        documents.refetchProof();
+      },
+      onError: (e) => toast.error(apiErrorMessage(e, "Failed to remove file.")),
+    }
+  );
+  // Before the response (docs first, a state pg-dashboard never uploads in)
+  // only the drawer's path applies.
+  const removeListedDoc = (fileId: string) =>
+    dispute.status === "UPLOAD_DOC" || dispute.status === "INSUFFICIENT_DOC"
+      ? removeListed.mutate({ fileNames: [fileId] })
+      : deleteFile(fileId);
 
   // Before the response (Action required) as well as after it (Upload
   // documents, Insufficient documents).
+  // Never at arbitration (CbUploadDocs: no upload or submit there).
   const canUpload =
-    dispute.status === "ACTION_REQUIRED" ||
-    dispute.status === "UPLOAD_DOC" ||
-    dispute.status === "INSUFFICIENT_DOC";
+    dispute.level !== "ARBITRATION" &&
+    (dispute.status === "ACTION_REQUIRED" ||
+      dispute.status === "UPLOAD_DOC" ||
+      dispute.status === "INSUFFICIENT_DOC");
   const uploaded = documents.proof;
   const hasDocuments = uploaded.length > 0;
   const canSubmit = canUpload && hasDocuments && !uploader.isUploading;
@@ -128,11 +158,17 @@ export function DisputeRespondForm({
       ...uploader.rows.map((row) => row.fileName),
     ];
     for (const file of Array.from(fileList)) {
+      const extension = `.${file.name.split(".").pop()?.toLowerCase() ?? ""}`;
+      if (!ACCEPTED_EXTENSIONS.includes(extension)) {
+        toast.error("File type not supported. Upload a PDF, JPG, PNG, TXT, DOCX or ZIP.");
+        continue;
+      }
       if (file.size / 1024 / 1024 >= UPLOAD_MAX_MB) {
         toast.error(`File must be smaller than ${UPLOAD_MAX_MB}MB`);
         continue;
       }
-      const fileName = uniqueFileName(file.name, names);
+      // getUniqueFileName, then useS3FileUpload's capture-name stamp.
+      const fileName = disambiguateCaptureName(uniqueFileName(file.name, names));
       names.push(fileName);
       const renamed =
         fileName !== file.name ? new File([file], fileName, { type: file.type }) : file;
@@ -430,7 +466,11 @@ export function DisputeRespondForm({
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() => uploader.dismissRow(row.fileName)}
+                          // A failed attempt that reached the server is deleted there too (FileCard).
+                          onClick={() => {
+                            if (row.fileId) deleteFile(row.fileId);
+                            uploader.dismissRow(row.fileName);
+                          }}
                           aria-label={`Dismiss ${row.fileName}`}
                           className="h-6 w-6 min-h-0 min-w-0 rounded-md p-0 text-muted-foreground"
                         >
@@ -474,8 +514,8 @@ export function DisputeRespondForm({
                       <Button
                         type="button"
                         variant="ghost"
-                        disabled={!canUpload || remove.isPending}
-                        onClick={() => doc.fileId && remove.mutate({ fileNames: [doc.fileId] })}
+                        disabled={!canUpload || remove.isPending || removeListed.isPending}
+                        onClick={() => doc.fileId && removeListedDoc(doc.fileId)}
                         aria-label={`Remove ${name}`}
                         className="h-6 w-6 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground"
                       >
@@ -490,12 +530,12 @@ export function DisputeRespondForm({
             <Button
               type="button"
               variant="ghost"
-              disabled={!canUpload}
+              disabled={!canUpload || !selectedDoc}
               onClick={() => fileInputRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                if (canUpload) addFiles(e.dataTransfer.files);
+                if (canUpload && selectedDoc) addFiles(e.dataTransfer.files);
               }}
               className="mt-4 h-auto min-h-30 w-full rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 p-6 text-center hover:bg-primary/10"
             >

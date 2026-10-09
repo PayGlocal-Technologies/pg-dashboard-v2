@@ -35,6 +35,7 @@ export function DisputeDetailsDrawer({
   onOpenChange,
   onExpand,
   instant = false,
+  onOpenTransaction,
 }: {
   /** The selected dispute's ID, for the header while its details load. */
   cbId: string;
@@ -46,6 +47,8 @@ export function DisputeDetailsDrawer({
   onExpand: () => void;
   /** Skip the slide in/out while DrawerExpandMorph covers the drawer. */
   instant?: boolean;
+  /** Opens the dispute's transaction (gid, mid). */
+  onOpenTransaction?: (gid: string, mid: string) => void;
 }) {
   const { isBelow } = useBreakpoint();
   const isBottomSheet = isBelow("md");
@@ -69,6 +72,7 @@ export function DisputeDetailsDrawer({
             isLoading={isLoading}
             flow={flow}
             onClose={() => onOpenChange(false)}
+            onOpenTransaction={onOpenTransaction}
             // Nothing to expand until the case has loaded.
             onExpand={isBottomSheet || !dispute ? undefined : onExpand}
           />
@@ -87,6 +91,7 @@ export function DisputeDrawerBody({
   flow,
   onClose,
   onExpand,
+  onOpenTransaction,
 }: {
   cbId: string;
   dispute: DisputeCase | null;
@@ -94,6 +99,7 @@ export function DisputeDrawerBody({
   flow: DisputeFlow;
   onClose?: () => void;
   onExpand?: () => void;
+  onOpenTransaction?: (gid: string, mid: string) => void;
 }) {
   return (
     <>
@@ -122,7 +128,12 @@ export function DisputeDrawerBody({
       </DrawerHeader>
       <div className="min-h-0 flex-1 overflow-y-auto p-6 [&_.shadow-sm]:shadow-none">
         {dispute ? (
-          <DisputeDetailView dispute={dispute} flow={flow} layout="drawer" />
+          <DisputeDetailView
+            dispute={dispute}
+            flow={flow}
+            layout="drawer"
+            onOpenTransaction={onOpenTransaction}
+          />
         ) : (
           <DisputeDetailPlaceholder isLoading={isLoading} layout="drawer" />
         )}

@@ -12,10 +12,7 @@ import {
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 import { formatTimestamp } from "@/lib/utils/format";
-import {
-  formatFee,
-  formatFeeWithCode,
-} from "@/features/dashboard/dispute-management/disputeStages";
+import { formatFee } from "@/features/dashboard/dispute-management/disputeStages";
 import type { DisputeCase } from "@/features/dashboard/dispute-management/types";
 
 /** Which confirmation: contest (first round and pre-arbitration), contest at arbitration, withdraw. */
@@ -51,7 +48,7 @@ export function DisputeConfirmDialog({
             "The dispute will be closed",
             "Amount will be returned to the customer and settled from your account",
             dispute.withdrawalFee
-              ? `Arbitration withdrawal fee of ${formatFeeWithCode(dispute.withdrawalFee)} will be charged to you`
+              ? `Arbitration withdrawal fee of ${dispute.withdrawalFee.amount} ${dispute.withdrawalFee.currency} will be charged to you`
               : "No arbitration withdrawal fee will be charged to you",
           ],
           tone: "warning" as const,

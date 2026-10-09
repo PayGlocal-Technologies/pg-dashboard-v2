@@ -22,6 +22,8 @@ import type {
 // ── List request body ────────────────────────────────────────────────────────
 
 export type DisputeFilters = {
+  /** Stage (fieldSearch.cbLevel), on every tab. */
+  cbLevel?: string[];
   /** Status (fieldSearch.displayStatus). */
   displayStatus?: string[];
   /** Reason (fieldSearch.cbReasonCode): v2's own filter; pg-dashboard offers it to internal users only. */
@@ -67,6 +69,7 @@ export function buildDisputeSearchBody({
 }): DisputeSearchBody {
   const fieldSearch: Record<string, string[]> = {};
   if (merchantMids && merchantMids.length > 0) fieldSearch.merchantId = merchantMids;
+  if (filters.cbLevel?.length) fieldSearch.cbLevel = filters.cbLevel;
   if (filters.displayStatus?.length) fieldSearch.displayStatus = filters.displayStatus;
   if (filters.cbReasonCode?.length) fieldSearch.cbReasonCode = filters.cbReasonCode;
   const hasFilters = Object.keys(fieldSearch).length > 0;

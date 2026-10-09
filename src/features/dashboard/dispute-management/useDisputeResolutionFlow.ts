@@ -81,9 +81,9 @@ export function useDisputeResolutionFlow({
 
   const accept = usePut<unknown, { cbAmount: string }>(cbAcceptApi(mid, cbId));
   const contest = usePut<unknown, { cbAmount: string }>(cbContestApi(mid, cbId));
-  const fulfil = usePost<unknown, Partial<FulfilmentData>>(cbFulfillmentApi(mid, cbId), {
-    invalidateQueries: false,
-  });
+  // Refreshes every query on success, as pg-dashboard's does, so the case's
+  // `fulfillmentDataRequired` is read again.
+  const fulfil = usePost<unknown, Partial<FulfilmentData>>(cbFulfillmentApi(mid, cbId));
   const submitEvidence = usePost<unknown, Record<string, never>>(cbSubmitEvidenceApi(cbId));
 
   function openForm(mode: DisputeRespondMode, response: PendingResponse | null) {

@@ -28,7 +28,9 @@ import { MultiSelectChipFilter } from "@/components/common/MultiSelectChipFilter
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { SegmentedTabs } from "@/components/common/SegmentedTabs";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { MidGuard } from "@/components/common/MidGuard";
+import { NoFeatureView } from "@/components/common/NoFeatureView";
+import { useFeatureApplicable } from "@/lib/hooks/useFeatureApplicable";
+import { useAccountSetup } from "@/stores/useAccountSetup";
 import { ReportDownloadDrawer, type ReportWindow } from "@/components/common/ReportDownloadDrawer";
 import { toYmd } from "@/components/common/reportWindow";
 import { rowActionColumn } from "@/components/common/rowActionColumn";
@@ -40,7 +42,11 @@ import {
 } from "@/components/common/DrawerExpandMorph";
 import { useContentAreaElement } from "@/components/layout/ContentAreaContext";
 import { useApp } from "@/stores/useApp";
-import { PA_DRAWER_WIDTH_PX } from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
+import {
+  PA_DRAWER_WIDTH_PX,
+  TransactionDetailsDrawer,
+} from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
+import { useTransactionLookup } from "@/features/dashboard/pa-transactions/useTransactionLookup";
 import {
   TransactionDateTimeFilter,
   type TransactionDateTimeValue,
@@ -64,8 +70,10 @@ import { DisputeStatCards } from "@/features/dashboard/dispute-management/compon
 import { MOCK_DISPUTE_ROWS } from "@/features/dashboard/dispute-management/mockRows";
 import {
   ALL_DISPUTES_TAB,
+  CB_LEVEL_META,
   CB_SORT_KEY,
   DEFAULT_DISPUTE_TAB,
+  DISPUTE_FEATURE,
   DEFAULT_SORT,
   DISPLAY_STATUS_META,
   DISPUTE_STATUS_SEGMENTS,
@@ -169,33 +177,52 @@ function setScrollTop(el: HTMLElement, value: number): void {
  *
  * Gated as pg-dashboard gates it, in two steps: the merchant must hold the
  * DISPUTE product (or a role that bypasses it), else the page explains the
- * product; a selected MID must carry DISPUTE, else MidGuard shows the
- * standard "not available for this MID" view. The sidebar entry carries the
- * `cbSearchResults` permission, as in pg-dashboard.
+ * product (EmptyEnableProduct, with its Contact us); a selected MID must
+ * carry DISPUTE in any of its feature lists, else the standard "not
+ * available for this MID" view (ChargebacksTable.tsx:472-481). There is no
+ * PA-only check: pg-dashboard asks useFeatureApplicable alone. The sidebar
+ * entry carries the `cbSearchResults` permission, as in pg-dashboard.
  */
 export function DisputeManagementFeature() {
   const isEnabled = useDisputeEnabled();
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+  const hasFeature = useFeatureApplicable(selectedMid, DISPUTE_FEATURE);
 
   if (!isEnabled) {
     return (
       <div className="page-enter mx-auto max-w-[1400px] space-y-4">
         <PageHeader title="Dispute Management" />
-        <PlaceholderState
-          variant="empty-table"
-          title="Stay protected against Disputes"
-          description="PayGlocal gives you end-to-end visibility and support for handling disputed transactions. Contact your account manager to switch this on."
-          className="rounded-xl border border-border bg-card py-16"
-        />
+        <div className="flex flex-col items-center rounded-xl border border-border bg-card pb-16">
+          <PlaceholderState
+            variant="empty-table"
+            title="Stay protected against Disputes"
+            description="PayGlocal gives you end-to-end visibility and support for handling disputed transactions."
+            className="pt-16 pb-4"
+          />
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              void navigator.clipboard
+                ?.writeText(SUPPORT_EMAIL)
+                .then(() => toast.success("Support email copied to clipboard"));
+            }}
+          >
+            Contact us
+          </Button>
+        </div>
       </div>
     );
   }
 
-  return (
-    <MidGuard productType="PA" feature="DISPUTE">
-      <DisputeManagementPage />
-    </MidGuard>
-  );
+  if (selectedMid && !hasFeature) return <NoFeatureView />;
+
+  return <DisputeManagementPage />;
 }
+
+/** EmptyEnableProduct's Contact us: copies this address. */
+const SUPPORT_EMAIL = "merchant.support@payglocal.in";
 
 function DisputeManagementPage() {
   const now = useNow();
@@ -212,6 +239,7 @@ function DisputeManagementPage() {
   );
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string[] | undefined>(undefined);
+  const [stageFilter, setStageFilter] = useState<string[] | undefined>(undefined);
   const [reason, setReason] = useState<string[] | undefined>(undefined);
   const [disputedDate, setDisputedDate] = useState<TransactionDateTimeValue | undefined>(undefined);
   const [sort, setSort] = useState<DisputeSort>(DEFAULT_SORT);
@@ -220,10 +248,10 @@ function DisputeManagementPage() {
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
   const [howItWorksOpen, setHowItWorksOpen] = useState(false);
-  // Read once on mount; dismissing writes it back.
-  const [firstTime, setFirstTime] = useState(() =>
-    readFirstTime(FIRST_TIME_STORAGE_KEY, username)
-  );
+  // computeIsFirstTime, read every render (the profile may arrive after the
+  // page); dismissing writes it back.
+  const [firstTimeDismissed, setFirstTimeDismissed] = useState(false);
+  const firstTime = !firstTimeDismissed && readFirstTime(FIRST_TIME_STORAGE_KEY, username);
 
   // The Metrics section's own period control (mock, see above).
   const [metricsTimeframe, setMetricsTimeframe] = useState<DisputeTimeframe>("ytd");
@@ -237,6 +265,13 @@ function DisputeManagementPage() {
     label: DISPLAY_STATUS_META[value].label,
   }));
   const activeStatus = statusFilter?.filter((v) => statusOptions.some((o) => o.value === v));
+  // The Stage filter, on every tab: both compliance levels by their filter labels.
+  const stageOptions = (Object.keys(CB_LEVEL_META) as (keyof typeof CB_LEVEL_META)[]).map(
+    (level) => ({
+      value: level,
+      label: CB_LEVEL_META[level].filterLabel ?? CB_LEVEL_META[level].label,
+    })
+  );
   const reasonOptions = sortReasonCodes(Object.keys(staticData?.cbReasonMap ?? {})).map(
     (code) => ({
       value: code,
@@ -248,6 +283,7 @@ function DisputeManagementPage() {
     () =>
       buildDisputeSearchBody({
         filters: {
+          cbLevel: stageFilter,
           displayStatus: activeStatus,
           cbReasonCode: reason,
           startTime: disputedDate?.startTime,
@@ -260,12 +296,17 @@ function DisputeManagementPage() {
         pageLimit: pageSize,
         merchantMids,
       }),
-    [activeStatus, reason, disputedDate, search, tab, sort, page, pageSize, merchantMids]
+    [stageFilter, activeStatus, reason, disputedDate, search, tab, sort, page, pageSize, merchantMids]
   );
   const list = useDisputeSearch(body, isReady && !isGuestUser);
 
-  const hasActive =
-    !!activeStatus?.length || !!reason?.length || !!disputedDate || search.trim() !== "";
+  const hasFilters =
+    !!stageFilter?.length || !!activeStatus?.length || !!reason?.length || !!disputedDate;
+  const hasActive = hasFilters || search.trim() !== "";
+  // pg-dashboard's first-dispute popover: a merchant's very first dispute,
+  // alone on Action required with no filter applied (search is not a filter there).
+  const showFirstDispute =
+    firstTime && tab === "ACTION_REQUIRED" && !hasFilters && list.rows.length === 1;
 
   // Every list interaction goes back to page 1, as pg-dashboard does.
   const resetPage =
@@ -277,10 +318,11 @@ function DisputeManagementPage() {
   const onSearch = (value: string) => {
     setSearch(value);
     setPage(1);
-    // A search always runs across every bucket.
-    if (value.trim() && value !== search) setTab(ALL_DISPUTES_TAB);
+    // A search runs across every bucket, cleared or not, as pg-dashboard's handleSearch.
+    setTab(ALL_DISPUTES_TAB);
   };
   const onClear = () => {
+    setStageFilter(undefined);
     setStatusFilter(undefined);
     setReason(undefined);
     setDisputedDate(undefined);
@@ -346,11 +388,16 @@ function DisputeManagementPage() {
 
   function dismissFirstDispute() {
     dismissFirstTime(FIRST_TIME_STORAGE_KEY, username);
-    setFirstTime(false);
+    setFirstTimeDismissed(true);
   }
 
+  // The Order ID / Transaction ID link: the PA transaction's own drawer, over
+  // the dispute (pg-dashboard opens PaTransactionDetails from the Order ID).
+  const txnLookup = useTransactionLookup();
+
   function onViewDetails(row: DisputeRecord) {
-    if (firstTime) dismissFirstDispute();
+    // handleFirstTime: only does anything while the notice is showing.
+    if (showFirstDispute) dismissFirstDispute();
     setSelected({ mid: row.merchantId, cbId: row.cbId });
     setInstantDrawer(false);
     setDrawerOpen(true);
@@ -418,9 +465,8 @@ function DisputeManagementPage() {
   const columnDefs = disputeColumnDefs({ tab, showMerchantId });
   const tableColumns = [
     ...buildDisputeColumns({ tab, showMerchantId, now, columnOrder, hiddenColumns }),
-    // "Take action" only when the merchant has to act (their own bucket is
-    // ACTION_REQUIRED), else "View details". The internal bucket is ops' to
-    // act on, so it never tells a merchant to take action.
+    // "Take action" when either bucket is ACTION_REQUIRED, else "View
+    // details" (columns.tsx:63-79), exactly as pg-dashboard reads it today.
     rowActionColumn<DisputeRecord>((row) => (
       <Button
         variant="outline"
@@ -429,15 +475,13 @@ function DisputeManagementPage() {
         rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
         className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
       >
-        {row.merchantBucket === "ACTION_REQUIRED" ? "Take action" : "View details"}
+        {[row.merchantBucket, row.glocalBucket].includes("ACTION_REQUIRED")
+          ? "Take action"
+          : "View details"}
       </Button>
     )),
   ];
 
-  // pg-dashboard's first-dispute popover: a merchant's very first dispute,
-  // alone on Action required with nothing filtered.
-  const showFirstDispute =
-    firstTime && tab === "ACTION_REQUIRED" && !hasActive && list.rows.length === 1;
 
   const emptyCopy = hasActive
     ? {
@@ -461,6 +505,7 @@ function DisputeManagementPage() {
                 backLabel="Back to Dispute Management"
                 onBack={backToList}
                 onCollapse={collapseToDrawer}
+                onOpenTransaction={txnLookup.openTransaction}
               />
             ) : (
               <DisputeDetailPlaceholder isLoading={isCaseLoading} layout="page" />
@@ -556,6 +601,12 @@ function DisputeManagementPage() {
                   {/* One group for the row, so moving from one open chip to the
                   next closes the first and leaves the second open. */}
                   <FilterChipGroup className="flex items-center gap-2 flex-wrap">
+                    <MultiSelectChipFilter
+                      value={stageFilter}
+                      options={stageOptions}
+                      onChange={resetPage(setStageFilter)}
+                      placeholder="Stage"
+                    />
                     {statusOptions.length > 1 && (
                       <MultiSelectChipFilter
                         value={activeStatus}
@@ -700,8 +751,14 @@ function DisputeManagementPage() {
         onOpenChange={onDrawerOpenChange}
         onExpand={expandToPage}
         instant={instantDrawer}
+        onOpenTransaction={txnLookup.openTransaction}
       />
       {dispute && <DisputeFlowDialogs dispute={dispute} flow={flow} />}
+      <TransactionDetailsDrawer
+        transaction={txnLookup.transaction}
+        open={txnLookup.open}
+        onOpenChange={txnLookup.setOpen}
+      />
       {morph && selected && dispute && (
         <DrawerExpandMorph
           key={morph.kind}

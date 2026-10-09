@@ -48,6 +48,21 @@ const GUIDE_FOR: Record<CbExternalDrawerViewStatus, GuideKey> = {
   DISPUTE_RESOLVED_BY_REFUND: "CLEARED",
 };
 
+/**
+ * Whether the case has a status card at all. pg-dashboard draws none for a
+ * dispute resolved by refund, none for the upload and review states at
+ * arbitration (no branch in CbArbActionCard), and the customer's-favour
+ * close only at arbitration (CbArbActionCard alone handles it).
+ */
+export function hasStatusCard(dispute: DisputeCase): boolean {
+  const isArb = dispute.screenStage === "ARBITRATION";
+  if (dispute.status === "DISPUTE_RESOLVED_BY_REFUND") return false;
+  if (isArb && ["UPLOAD_DOC", "INSUFFICIENT_DOC", "UNDER_REVIEW"].includes(dispute.status))
+    return false;
+  if (!isArb && dispute.status === "DISPUTE_CLOSED_CUSTOMER_FAV") return false;
+  return true;
+}
+
 /** "on 27 Jul '26, 09:49 AM", or nothing when the API has no date yet. */
 function onDate(value: string | null | undefined): string {
   const formatted = value ? formatTimestamp(value, "") : "";
@@ -95,9 +110,12 @@ export function DisputeStatusCard({
     description: `Your supporting evidence was submitted${onDate(dispute.submittedOn)}.`,
     state: "complete",
   };
+  // At arbitration nothing new was reviewed, so the step only says it was sent (CbArbActionCard).
   const sentStep = (state: DisputeFormStep["state"]): DisputeFormStep => ({
     label: "Sent to the bank",
-    description: `Your evidence was reviewed and sent to the customer's bank${onDate(dispute.representedOn)}.`,
+    description: isArb
+      ? `Your evidence was sent to the customer's bank${onDate(dispute.representedOn)}.`
+      : `Your evidence was reviewed and sent to the customer's bank${onDate(dispute.representedOn)}.`,
     state,
   });
   const bankStep = (state: DisputeFormStep["state"]): DisputeFormStep => ({
@@ -166,7 +184,10 @@ export function DisputeStatusCard({
         );
       break;
 
+    // Arbitration takes no documents: CbArbActionCard has no branch for the
+    // upload or review states, so nothing shows there, as in pg-dashboard.
     case "UPLOAD_DOC":
+      if (isArb) break;
       card = (
         <DisputeStatusNoticeCard
           icon="upload"
@@ -185,6 +206,7 @@ export function DisputeStatusCard({
       break;
 
     case "INSUFFICIENT_DOC":
+      if (isArb) break;
       card = (
         <DisputeStatusNoticeCard
           icon="alert-triangle"
@@ -201,6 +223,7 @@ export function DisputeStatusCard({
       break;
 
     case "UNDER_REVIEW":
+      if (isArb) break;
       card = (
         <DisputeStatusNoticeCard
           icon="clock"

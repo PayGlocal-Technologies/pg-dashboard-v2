@@ -120,6 +120,11 @@ export function useDisputeSearch(body: DisputeSearchBody, enabled: boolean) {
     undefined,
     enabled
   );
+  // pg-dashboard toasts a failed list fetch (ChargebacksTable.tsx:255-263).
+  const failure = query.error;
+  useEffect(() => {
+    if (failure) toast.error((failure as Error)?.message || "An error occurred");
+  }, [failure]);
   return {
     rows: query.data?.data?.data ?? [],
     total: query.data?.data?.totalCount ?? 0,
@@ -326,11 +331,31 @@ export type UploadRow = {
   docType: string;
   status: "active" | "success" | "error";
   message: string;
+  /** The server's id for a failed attempt, so its row can be deleted there too. */
+  fileId?: string;
 };
 
 const MAX_ATTEMPTS = 5;
 const POLL_MS = 2_000;
 const POLL_WINDOW_MS = 30_000;
+/** useS3FileUpload's S3_UPLOAD_TIMEOUT_MS. */
+const S3_UPLOAD_TIMEOUT_MS = 120_000;
+/** documentUpload.ts' UPLOAD_STATUS_TIMEOUT_MS: one status read, at most. */
+const UPLOAD_STATUS_TIMEOUT_MS = 15_000;
+
+const GENERIC_CAPTURE_NAME = /^(image|photo|capture)(\s*\(\d+\))?\.(jpe?g|png|heic|heif)$/i;
+
+/**
+ * useS3FileUpload's disambiguateCaptureName: a phone camera's generic name
+ * (`image.jpg`, `photo (2).png`) gets a timestamp, so two captures never
+ * collide on the server.
+ */
+export function disambiguateCaptureName(name: string): string {
+  if (!GENERIC_CAPTURE_NAME.test(name)) return name;
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0) return `${name}-${Date.now()}`;
+  return `${name.slice(0, dot)}-${Date.now()}${name.slice(dot)}`;
+}
 
 /** pg-dashboard reads the slot from either `res.data` or `res.data.data`. */
 function unwrapSlot(res: InitiateResponse | undefined): InitiateData {
@@ -363,17 +388,19 @@ export function useCbDocumentUpload(cbId: string, onUploaded: () => void) {
   const initiate = usePut<InitiateResponse, { reqBody: object }>(cbMerchantDocUploadApi(cbId), {
     invalidateQueries: false,
   });
-  const s3 = usePut<
-    unknown,
-    { dynamicUrl: string; customHeaders: Record<string, string>; reqBody: File }
-  >("", { invalidateQueries: false });
 
   const update = (fileName: string, patch: Partial<UploadRow>) =>
     setRows((prev) => prev.map((row) => (row.fileName === fileName ? { ...row, ...patch } : row)));
 
+  // fetchUploadStatus: bounded at 15s, and any failure is just "not ready
+  // yet" (null), so a failed poll is neither reported nor allowed to stall
+  // the loop past its deadline.
   const checkStatus = async (fileId: string): Promise<StatusResponse | null> => {
     try {
-      return await getOnce<StatusResponse>(cbUploadStatusApi(cbId, fileId));
+      const res = await api.get<StatusResponse>(cbUploadStatusApi(cbId, fileId), {
+        timeout: UPLOAD_STATUS_TIMEOUT_MS,
+      });
+      return res.data;
     } catch {
       return null;
     }
@@ -408,10 +435,9 @@ export function useCbDocumentUpload(cbId: string, onUploaded: () => void) {
 
       const extension = file.name.split(".").pop()?.toLowerCase() || "";
       const md = slot.metaData;
-      await s3.mutateAsync({
-        dynamicUrl: slot.presignedPutUrl,
-        reqBody: file,
-        customHeaders: {
+      await api.put(slot.presignedPutUrl, file, {
+        timeout: S3_UPLOAD_TIMEOUT_MS,
+        headers: {
           "Content-Type": CONTENT_TYPE_BY_EXTENSION[extension] || "application/octet-stream",
           ...(md?.gid ? { "x-amz-meta-gid": md.gid } : {}),
           "x-amz-meta-fileextension": md?.fileExtension ?? "",
@@ -467,7 +493,11 @@ export function useCbDocumentUpload(cbId: string, onUploaded: () => void) {
         return true;
       }
     }
-    update(fileName, { status: "error", message: `Failed after ${MAX_ATTEMPTS} attempts.` });
+    update(fileName, {
+      status: "error",
+      message: `Failed after ${MAX_ATTEMPTS} attempts.`,
+      fileId,
+    });
     return false;
   };
 

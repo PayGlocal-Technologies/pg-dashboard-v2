@@ -1,11 +1,11 @@
 "use client";
 
-import { Button, Separator, Shimmer } from "@/components/ui";
+import { useState } from "react";
+import { Button, CopyableCell as LinkedCopyableCell, Separator, Shimmer } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { cn, formatCurrency } from "@/lib/utils";
 import { formatTimestamp } from "@/lib/utils/format";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
-import { CopyableCell } from "@/components/common/CopyableCell";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import {
   DetailBackLink,
@@ -26,6 +26,7 @@ import { paymentRow, respondBy } from "@/features/dashboard/dispute-management/h
 import { formatFeeWithCode } from "@/features/dashboard/dispute-management/disputeStages";
 import {
   useCbDocuments,
+  useCbStaticData,
   useCbTimeline,
   useDisputeCase,
   useNow,
@@ -34,7 +35,10 @@ import {
   useDisputeResolutionFlow,
   type DisputeFlow,
 } from "@/features/dashboard/dispute-management/useDisputeResolutionFlow";
-import { DisputeStatusCard } from "@/features/dashboard/dispute-management/components/detail/DisputeStatusCard";
+import {
+  DisputeStatusCard,
+  hasStatusCard,
+} from "@/features/dashboard/dispute-management/components/detail/DisputeStatusCard";
 import { DocumentChips } from "@/features/dashboard/dispute-management/components/detail/DisputeStatusNoticeCard";
 import { DisputeDetailsCard } from "@/features/dashboard/dispute-management/components/detail/DisputeDetailsCard";
 import { DisputeAcceptChoice } from "@/features/dashboard/dispute-management/components/detail/DisputeAcceptChoice";
@@ -66,12 +70,13 @@ const CONTESTING: CbExternalDrawerViewStatus[] = [
  */
 function headline(dispute: DisputeCase): { title: string; amount: number } {
   const { status } = dispute;
+  // An amount the API has not set yet shows 0.00, as pg-dashboard's header does.
   if (CONTESTING.includes(status))
-    return { title: "Contesting for", amount: dispute.levelContestedAmount ?? dispute.amount };
+    return { title: "Contesting for", amount: dispute.levelContestedAmount ?? 0 };
   if (status === "DISPUTE_CLOSED")
     return { title: "Accepted amount", amount: dispute.levelAcceptedAmount ?? 0 };
   if (status === "DISPUTE_CLOSED_MERCHANT_FAV" || status === "DISPUTE_CLOSED_CUSTOMER_FAV")
-    return { title: "Contested for", amount: dispute.levelContestedAmount ?? dispute.amount };
+    return { title: "Contested for", amount: dispute.levelContestedAmount ?? 0 };
   if (status === "DISPUTE_RESOLVED_BY_REFUND")
     return { title: "Dispute resolved by refund", amount: dispute.amount };
   if (status === "NO_RESPONSE") return { title: "Disputed amount", amount: dispute.amount };
@@ -124,9 +129,9 @@ export function DisputeFlowDialogs({
       <DisputeAcceptChoice
         open={flow.acceptDialogOpen}
         onOpenChange={flow.setAcceptDialogOpen}
-        // What "accept in full" returns: the contested part when one is
-        // already set (after a partial accept), else the whole level amount.
-        amount={dispute.levelContestedAmount || dispute.amount}
+        // The level's amount, shown and used as the partial limit, as
+        // pg-dashboard's accept drawer (cbAmountDetails.amount) does.
+        amount={dispute.amount}
         currency={dispute.currency}
         daysToRespond={respondBy(dispute.dueDate, now).days}
         allowPartial={dispute.level !== "ARBITRATION"}
@@ -135,6 +140,8 @@ export function DisputeFlowDialogs({
         isAccepting={flow.isAccepting}
       />
       <DisputeFulfilmentDialog
+        // Remounted per opening, so it starts empty every time.
+        key={flow.fulfilmentOpen ? "fulfilment-open" : "fulfilment-closed"}
         open={flow.fulfilmentOpen}
         onClose={flow.closeFulfilment}
         onSubmit={flow.submitFulfilment}
@@ -173,6 +180,8 @@ export function DisputeDetailPlaceholder({
 
 function TimelineSection({ mid, cbId }: { mid: string; cbId: string }) {
   const { items, isLoading } = useCbTimeline(mid, cbId);
+  // The newest three, the rest behind View more, as CbTimelineCard shows them.
+  const [showAll, setShowAll] = useState(false);
   // The API's own entries, newest first, as pg-dashboard lists them.
   const steps: TimelineStep[] = items.map((item, index) => {
     const label = item.actionDescription || "-";
@@ -192,7 +201,19 @@ function TimelineSection({ mid, cbId }: { mid: string; cbId: string }) {
       ) : steps.length === 0 ? (
         <p className="text-[13px] text-muted-foreground">No updates yet.</p>
       ) : (
-        <PaymentTimeline steps={steps} variant="ticks" />
+        <>
+          <PaymentTimeline steps={showAll ? steps : steps.slice(0, 3)} variant="ticks" />
+          {steps.length > 3 && (
+            <Button
+              type="button"
+              variant="link"
+              onClick={() => setShowAll((prev) => !prev)}
+              className="h-auto w-fit p-0 text-sm font-medium"
+            >
+              {showAll ? "Show less" : "View more"}
+            </Button>
+          )}
+        </>
       )}
     </DetailSection>
   );
@@ -214,6 +235,7 @@ export function DisputeDetailView({
   onBack,
   onCollapse,
   decorative = false,
+  onOpenTransaction,
 }: {
   dispute: DisputeCase;
   flow: DisputeFlow;
@@ -225,8 +247,11 @@ export function DisputeDetailView({
   onCollapse?: () => void;
   /** A still copy for the expand/collapse hand-off: no entry animation. */
   decorative?: boolean;
+  /** Opens the dispute's transaction (gid, mid); pg-dashboard's Order ID link. */
+  onOpenTransaction?: (gid: string, mid: string) => void;
 }) {
   const now = useNow();
+  const staticData = useCbStaticData();
   const documents = useCbDocuments(dispute.cbId);
   const isDrawer = layout === "drawer";
   const mid = dispute.merchantId;
@@ -254,7 +279,15 @@ export function DisputeDetailView({
     dispute.payment.maskedCardNo
   );
   const accepted = dispute.levelAcceptedAmount;
-  const showAccepted = accepted !== null && accepted !== 0 && CONTESTING.includes(dispute.status);
+  // CB_EXTERNAL_AMOUNT_DETAILS_MAPPER's subTitle: the accepted amount (when
+  // not zero) while contesting and once won or lost; only the disputed amount
+  // once accepted; no strip at all otherwise.
+  const isFav =
+    dispute.status === "DISPUTE_CLOSED_MERCHANT_FAV" ||
+    dispute.status === "DISPUTE_CLOSED_CUSTOMER_FAV";
+  const showStrip = CONTESTING.includes(dispute.status) || isFav || dispute.status === "DISPUTE_CLOSED";
+  const showAccepted =
+    accepted !== null && accepted !== 0 && (CONTESTING.includes(dispute.status) || isFav);
   const isArb = dispute.level === "ARBITRATION";
   const fee =
     isArb && dispute.status === "DISPUTE_CLOSED" && dispute.withdrawalFee
@@ -262,12 +295,12 @@ export function DisputeDetailView({
       : isArb && dispute.status === "DISPUTE_CLOSED_CUSTOMER_FAV" && dispute.penaltyFee
         ? { label: "Penalty fee", value: formatFeeWithCode(dispute.penaltyFee) }
         : null;
-  const showStrip = head.title !== "Dispute raised for" && head.title !== "Disputed amount";
 
   const proofDocuments = documents.proof.map((doc) => ({
     name: doc.originalFileName || doc.fileName || "Document",
     url: doc.url,
-    label: doc.shortDesc ?? null,
+    // CbUploadedFile: the file's own label, else its type's from the static data.
+    label: doc.shortDesc || staticData?.cbDocInfo?.[doc.docType || "OTHER"]?.shortDesc || null,
   }));
   const cdfDocuments = documents.cdf.map((doc) => ({
     name: doc.originalFileName || doc.fileName || "Document",
@@ -357,8 +390,7 @@ export function DisputeDetailView({
       onUploadEvidence={flow.handleUploadEvidence}
     />
   );
-  const statusSection =
-    dispute.status === "DISPUTE_RESOLVED_BY_REFUND" ? null : (
+  const statusSection = !hasStatusCard(dispute) ? null : (
       <section>
         <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Dispute
@@ -371,20 +403,26 @@ export function DisputeDetailView({
   const disputeDetailsSection = <DisputeDetailsCard dispute={dispute} now={now} />;
 
   const txn = dispute.transaction;
+  // Opens the transaction by its GID. pg-dashboard passes the order ID where a
+  // GID is expected; the lookup matches on the real GID, so it gets that.
+  const openTransaction =
+    onOpenTransaction && dispute.txnGid
+      ? () => onOpenTransaction(dispute.txnGid, dispute.merchantId)
+      : undefined;
   const paymentSection = (
     <DetailSection title="Payment Details">
       <DetailRow
         label="Transaction ID"
         value={
           dispute.txnGid ? (
-            <span className="group">
-              <CopyableCell
-                value={truncateId(dispute.txnGid)}
-                copyValue={dispute.txnGid}
-                label="Transaction ID"
-                className="font-medium text-foreground"
-              />
-            </span>
+            <LinkedCopyableCell
+              value={dispute.txnGid}
+              display={truncateId(dispute.txnGid)}
+              label="Transaction ID"
+              onClick={openTransaction}
+              accent={!!openTransaction}
+              className="font-medium"
+            />
           ) : (
             "-"
           )
@@ -394,14 +432,14 @@ export function DisputeDetailView({
         <DetailRow
           label="Order ID"
           value={
-            <span className="group">
-              <CopyableCell
-                value={truncateId(dispute.orderId)}
-                copyValue={dispute.orderId}
-                label="Order ID"
-                className="font-medium text-foreground"
-              />
-            </span>
+            <LinkedCopyableCell
+              value={dispute.orderId}
+              display={truncateId(dispute.orderId)}
+              label="Order ID"
+              onClick={openTransaction}
+              accent={!!openTransaction}
+              className="font-medium"
+            />
           }
         />
       )}

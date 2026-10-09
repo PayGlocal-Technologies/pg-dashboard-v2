@@ -67,6 +67,13 @@ export const cbFulfillmentApi = (mid: string, cbId: string) =>
 export const cbMerchantDocUploadApi = (cbId: string) =>
   cbId ? `${BASE_URL_V2}/cb/${cbId}/doc/update/merchant` : "";
 
+/**
+ * The same update endpoint without `/merchant`: pg-dashboard's upload drawer
+ * removes a file through it with `action: "DELETE"` (FileCard's isCbDelete),
+ * merchants included.
+ */
+export const cbDocUpdateApi = (cbId: string) => (cbId ? `${BASE_URL_V2}/cb/${cbId}/doc/update` : "");
+
 export const cbUploadStatusApi = (cbId: string, fileId: string) =>
   both(cbId, fileId) ? `${BASE_URL_V2}/cb/${cbId}/doc/verify-upload/${fileId}` : "";
 

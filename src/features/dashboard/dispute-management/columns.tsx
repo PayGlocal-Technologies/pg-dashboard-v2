@@ -58,12 +58,13 @@ function AmountCell({ row }: { row: DisputeRecord }) {
     <span className="inline-flex items-center justify-end gap-1.5">
       <Tooltip>
         <TooltipTrigger asChild>
+          {/* ChargeBackTooltip: the words "Amount Updated" with an info mark. */}
           <span
             tabIndex={0}
-            aria-label="Amount updated"
-            className="inline-flex text-amber-600 dark:text-amber-400"
+            className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-amber-600 dark:text-amber-400"
           >
-            <Icon name="info" size={13} aria-hidden />
+            Amount Updated
+            <Icon name="info" size={12} aria-hidden />
           </span>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs">

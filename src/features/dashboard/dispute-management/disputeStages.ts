@@ -62,7 +62,7 @@ export function stageWarnings(dispute: DisputeCase): string[] {
     return [
       "At this stage, you need to submit additional supporting documents to continue contesting the dispute.",
       penaltyFee
-        ? `If this case moves to arbitration and the decision is not in your favour, an arbitration fee up to ${formatFeeWithCode(penaltyFee)} may apply`
+        ? `If this case moves to arbitration and the decision is not in your favour, an arbitration fee up to ${penaltyFee.amount} ${penaltyFee.currency} may apply`
         : "If this case moves to arbitration and the decision is not in your favour, an arbitration fee may apply",
       "You can choose to accept the dispute at this stage to avoid further escalation",
     ];
