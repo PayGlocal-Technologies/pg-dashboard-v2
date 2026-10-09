@@ -20,7 +20,7 @@ export function FeatureBanner({
   description,
   action,
 }: {
-  /** Root-relative path under public/, URL-encoded (the files have spaces). */
+  /** Root-relative path under public/, e.g. "/assets/banner-states/static-link.webp". */
   imageSrc: string;
   title: string;
   description: string;

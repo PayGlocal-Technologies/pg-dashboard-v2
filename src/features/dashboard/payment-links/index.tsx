@@ -226,7 +226,7 @@ export function PaymentLinksFeature() {
 
       {showBanner && (
         <FeatureBanner
-          imageSrc="/assets/banner-states/Payment%20links.png"
+          imageSrc="/assets/banner-states/payment-links.webp"
           title="Send a link. Collect a payment."
           description="Generate a payment link for any amount and share it with your customers to collect payments with ease."
           action={

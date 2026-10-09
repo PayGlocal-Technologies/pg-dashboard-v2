@@ -89,7 +89,7 @@ export function PaymentButtonFeature() {
 
       {showBanner && (
         <FeatureBanner
-          imageSrc="/assets/banner-states/Payment%20button.png"
+          imageSrc="/assets/banner-states/payment-button.webp"
           title="Accept payments with a click"
           description="Add payment buttons to your website and other digital touchpoints with a simple, low-code integration. Accept payments without building a complete checkout experience."
           action={isEnabled ? createAction : <EnableProductAction product="Payment Button" />}

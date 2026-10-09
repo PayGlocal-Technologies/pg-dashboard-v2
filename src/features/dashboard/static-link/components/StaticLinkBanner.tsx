@@ -24,7 +24,7 @@ export function StaticLinkBanner({
 }) {
   return (
     <FeatureBanner
-      imageSrc="/assets/banner-states/Static%20link%20emtpy%20state.png"
+      imageSrc="/assets/banner-states/static-link.webp"
       title="One link. Multiple payments."
       description="Share one permanent payment link with your customers and collect payments whenever they're ready."
       action={

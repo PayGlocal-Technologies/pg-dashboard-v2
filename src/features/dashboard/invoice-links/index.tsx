@@ -68,7 +68,7 @@ export function InvoiceLinksFeature() {
 
   const banner = showBanner && (
     <FeatureBanner
-      imageSrc="/assets/banner-states/Invoice%20links.png"
+      imageSrc="/assets/banner-states/invoice-links.webp"
       title="Your invoices, ready to share"
       description="Create and customise invoices for your business, then share them with customers to make payments simpler."
       action={

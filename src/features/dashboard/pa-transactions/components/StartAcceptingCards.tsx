@@ -20,7 +20,7 @@ const PRODUCTS: {
     title: "Payment Links",
     description:
       "Create and share payment links with your customers. No coding or integration required.",
-    imageSrc: "/assets/banner-states/txn-%20subcard1.png",
+    imageSrc: "/assets/banner-states/transactions-payment-links.webp",
     href: "/payment-links",
     linkLabel: "Create a payment link",
   },
@@ -28,7 +28,7 @@ const PRODUCTS: {
     title: "Payment Pages",
     description:
       "Build a custom payment page for your products and collect payments with a simple, branded checkout experience.",
-    imageSrc: "/assets/banner-states/txn%20subcard%202.png",
+    imageSrc: "/assets/banner-states/transactions-payment-pages.webp",
     // Payment Pages hasn't been migrated yet, so there is nowhere to send it.
     href: null,
     linkLabel: "Create a payment page",
@@ -37,7 +37,7 @@ const PRODUCTS: {
     title: "Static Link",
     description:
       "Give your business a permanent payment link that customers can use to pay you anytime.",
-    imageSrc: "/assets/banner-states/txn%20subcard%203.png",
+    imageSrc: "/assets/banner-states/transactions-static-link.webp",
     href: "/static-link",
     linkLabel: "Enable now",
   },

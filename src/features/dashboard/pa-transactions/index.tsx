@@ -44,7 +44,7 @@ export function PaTransactionsFeature() {
       {!detailsOpen && showBanner && (
         <>
           <FeatureBanner
-            imageSrc="/assets/banner-states/Transaction%20empty%20state.png"
+            imageSrc="/assets/banner-states/transactions.webp"
             title="Track every payment in one place."
             description="View your transactions, payment status and customer details as soon as you start accepting payments."
             action={
