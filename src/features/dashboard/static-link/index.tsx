@@ -4,12 +4,19 @@ import { useEffect, useState } from "react";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { HowItWorksDialog } from "@/features/dashboard/static-link/components/HowItWorksDialog";
 import { StaticLinkHandleDialog } from "@/features/dashboard/static-link/components/StaticLinkHandleDialog";
+import { StaticLinkBanner } from "@/features/dashboard/static-link/components/StaticLinkBanner";
 import { StaticLinkHero } from "@/features/dashboard/static-link/components/StaticLinkHero";
 import { StaticLinkIntroDialog } from "@/features/dashboard/static-link/components/StaticLinkIntroDialog";
 import { StaticLinkTransactions } from "@/features/dashboard/static-link/components/StaticLinkTransactions";
 import { STATIC_LINK_INTRO_SEEN_KEY } from "@/features/dashboard/static-link/constants";
-import { splitShareableLink, toDisplayLink } from "@/features/dashboard/static-link/helpers";
+import {
+  canCustomizeStaticLinkHandle,
+  splitShareableLink,
+  toCollectedFields,
+  toDisplayLink,
+} from "@/features/dashboard/static-link/helpers";
 import { useStaticLink } from "@/features/dashboard/static-link/hooks";
+import { staticLinkOrigin } from "@/constants/environment";
 
 /**
  * Static Link, at /static-link: the merchant's one permanent payment link
@@ -46,20 +53,34 @@ export function StaticLinkFeature() {
     return () => window.clearTimeout(id);
   }, []);
 
-  const { prefix, handle } = splitShareableLink(link?.shareableLink);
+  const { prefix: serverPrefix, handle } = splitShareableLink(link?.shareableLink);
+  // The server's own prefix when it has issued the link; until then the
+  // environment's link host, so the name editor still previews a full
+  // address ("uat.payglocal.me/@yourname") rather than the bare name.
+  const prefix = serverPrefix || `${toDisplayLink(staticLinkOrigin())}/@`;
+
+  // The banner stands in for the link card until the merchant has a link of
+  // their own: none on this account yet (Enable it now), or one they haven't
+  // set up (Edit Static Link). Setting it up locks its name, which is what
+  // swaps the banner for the card with the real link and Copy.
+  const showBanner = !isLoading && (!link || canCustomizeStaticLinkHandle(link));
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
       {merchantId ? (
         <>
-          <StaticLinkHero
-            link={link}
-            isLoading={isLoading}
-            isSaving={isSaving}
-            onHowItWorks={() => setHowItWorksOpen(true)}
-            onEditHandle={() => setHandleOpen(true)}
-            onSaveDisplayFields={saveDisplayFields}
-          />
+          {showBanner ? (
+            <StaticLinkBanner canEdit={!!link} onEdit={() => setHandleOpen(true)} />
+          ) : (
+            <StaticLinkHero
+              link={link}
+              isLoading={isLoading}
+              isSaving={isSaving}
+              onHowItWorks={() => setHowItWorksOpen(true)}
+              onEditHandle={() => setHandleOpen(true)}
+              onSaveDisplayFields={saveDisplayFields}
+            />
+          )}
           <StaticLinkTransactions
             merchantId={merchantId}
             productId={link?.productId}
@@ -76,7 +97,9 @@ export function StaticLinkFeature() {
         onOpenChange={setHandleOpen}
         currentHandle={handle}
         linkPrefix={prefix}
+        fields={toCollectedFields(link)}
         isSaving={isSaving}
+        onSaveFields={saveDisplayFields}
         onConfirm={(next) => {
           setHandleOpen(false);
           activateWithHandle(next);

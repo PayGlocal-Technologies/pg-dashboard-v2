@@ -129,7 +129,9 @@ export interface InvoiceLinkFilters {
 export function useInvoiceLinks(
   filters: InvoiceLinkFilters,
   page: number,
-  pageSize: number = INVOICE_LINKS_PAGE_LIMIT
+  pageSize: number = INVOICE_LINKS_PAGE_LIMIT,
+  /** False skips the call (the product isn't enabled, so there is nothing to list). */
+  enabled = true
 ) {
   const isGuestUser = useApp((s) => s.isGuestUser);
   const { filter: midFilter, isReady } = useInvoiceLinkMidFilter();
@@ -158,7 +160,7 @@ export function useInvoiceLinks(
     invoiceLinksSearchApi(),
     body,
     undefined,
-    isReady && !isGuestUser
+    enabled && isReady && !isGuestUser
   );
 
   const rows: InvoiceLink[] = query.data?.data?.data ?? [];
@@ -174,6 +176,17 @@ export function useInvoiceLinks(
     /** False when there is no MID to scope to — the table shows its empty state rather than an unscoped list. */
     isReady,
   };
+}
+
+/**
+ * Whether the merchant has raised any invoice link, in any status: the list
+ * search unfiltered, one row, read for its total. What decides if the page
+ * still leads with the banner. Null until it has answered.
+ */
+export function useHasInvoiceLinks(enabled: boolean): boolean | null {
+  const { totalCount, isPending, isReady } = useInvoiceLinks({}, 1, 1, enabled);
+  if (!enabled || !isReady) return false;
+  return isPending ? null : totalCount > 0;
 }
 
 // ── Row actions ──────────────────────────────────────────────────────────────

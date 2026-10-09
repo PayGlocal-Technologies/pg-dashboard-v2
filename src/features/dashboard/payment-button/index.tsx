@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { PageHeader } from "@/components/ui";
+import { Card, PageHeader } from "@/components/ui";
 import { MidGuard } from "@/components/common/MidGuard";
 import { PaymentButtonTable } from "@/features/dashboard/payment-button/components/PaymentButtonTable";
-import { PaymentButtonNotEnabled } from "@/features/dashboard/payment-button/components/PaymentButtonNotEnabled";
+import { PlaceholderState } from "@/components/common/PlaceholderState";
+import { EnableProductAction, FeatureBanner } from "@/components/common/FeatureBanner";
 import {
   CreatePaymentButtonDialog,
   EditPaymentButtonDialog,
 } from "@/features/dashboard/payment-button/components/create/CreatePaymentButtonFeature";
 import {
+  useHasPaymentButtons,
   usePaymentButtonCreateScope,
   usePaymentButtonsEnabled,
 } from "@/features/dashboard/payment-button/hooks";
@@ -60,35 +62,54 @@ export function PaymentButtonFeature() {
   const [editTarget, setEditTarget] = useState<PaymentButtonEditTarget | null>(null);
   const openEdit = (row: PaymentButton) => setEditTarget({ mid: row.mid, buttonId: row.buttonId });
 
-  if (!isEnabled) {
-    return (
-      <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
-        <PageHeader title="Payment Button" subtitle={PAYMENT_BUTTON_PAGE_SUBTITLE} />
-        <PaymentButtonNotEnabled className="rounded-xl border border-border bg-card" />
-      </div>
-    );
-  }
+  // Not enabled: the banner asks them to enable it, over an empty table (no
+  // list call, nothing to create). Enabled with no button yet: the banner
+  // leads, pointing at Create. Once a button exists the page is the list.
+  const hasButtons = useHasPaymentButtons(isEnabled);
+  const showBanner = !isEnabled || hasButtons === false;
+
+  const createAction = (
+    <MidScopedAction
+      label="Create payment button"
+      icon="plus"
+      variant="primary"
+      needsMidChoice={needsMidChoice}
+      midOptions={midOptions}
+      onRun={openCreate}
+    />
+  );
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
       <PageHeader
         title="Payment Button"
         subtitle={PAYMENT_BUTTON_PAGE_SUBTITLE}
-        actions={
-          <MidScopedAction
-            label="Create payment button"
-            icon="plus"
-            variant="primary"
-            needsMidChoice={needsMidChoice}
-            midOptions={midOptions}
-            onRun={openCreate}
-          />
-        }
+        actions={isEnabled ? createAction : undefined}
       />
 
-      <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
-        <PaymentButtonTable onEdit={openEdit} />
-      </MidGuard>
+      {showBanner && (
+        <FeatureBanner
+          imageSrc="/assets/banner-states/payment-button.webp"
+          title="Accept payments with a click"
+          description="Add payment buttons to your website and other digital touchpoints with a simple, low-code integration. Accept payments without building a complete checkout experience."
+          action={isEnabled ? createAction : <EnableProductAction product="Payment Button" />}
+        />
+      )}
+
+      {isEnabled ? (
+        <MidGuard productType="PA" feature={PAYMENT_BUTTONS_FEATURE}>
+          <PaymentButtonTable onEdit={openEdit} />
+        </MidGuard>
+      ) : (
+        <Card className="gap-0 p-0">
+          <PlaceholderState
+            variant="empty-table"
+            title="No payment buttons yet"
+            description="Payment buttons you create will show up here."
+            className="py-16"
+          />
+        </Card>
+      )}
 
       <EditPaymentButtonDialog
         target={editTarget}

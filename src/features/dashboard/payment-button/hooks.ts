@@ -20,6 +20,7 @@ import {
 } from "@/features/dashboard/payment-button/services";
 import {
   buildLiveEmbedLines,
+  buildPaymentButtonListBody,
   copyEmbedCode,
   embedLinesToText,
   mapWqrEntry,
@@ -100,6 +101,21 @@ export function usePaymentButtons(body: PaymentButtonListRequest | null): {
     refetch: () => void refetch(),
     refresh: async () => ({ failed: (await refetch()).isError }),
   };
+}
+
+/**
+ * Whether the merchant has made any payment button, in any status: the list
+ * search unfiltered, one row, read for its total. What decides if the page
+ * still leads with the banner. Null until it has answered.
+ */
+export function useHasPaymentButtons(enabled: boolean): boolean | null {
+  const mids = usePaymentButtonListMids();
+  const body = enabled
+    ? buildPaymentButtonListBody({ mids, statuses: [], search: "", pageLimit: 1, from: 0 })
+    : null;
+  const { totalCount, isLoading } = usePaymentButtons(body);
+  if (!body) return false;
+  return isLoading ? null : totalCount > 0;
 }
 
 export interface PaymentButtonCreateScope {

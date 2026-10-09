@@ -28,6 +28,27 @@ const PAYMENT_LINKS_QUERY_KEY = ["payment-links"] as const;
 export const PAYMENT_LINKS_FEATURE = "PAYMENT_LINKS";
 
 /**
+ * Whether the merchant has Payment Links at all: the product key in
+ * `merchantEnabledProducts.paymentProducts`, which pg-dashboard checks before
+ * it lets anyone create one (create-mca-payment-invoice, QuickAccess).
+ */
+export function usePaymentLinksEnabled(): boolean {
+  const paymentProducts = useApp((s) => s.merchantEnabledProducts?.paymentProducts);
+  return !!paymentProducts?.includes(PAYMENT_LINKS_FEATURE);
+}
+
+/**
+ * Whether the merchant has created any payment link, in any status: the same
+ * search unfiltered, one row, read for its total. What decides if the page
+ * still leads with the banner. Null until it has answered.
+ */
+export function useHasPaymentLinks(enabled: boolean): boolean | null {
+  const { totalCount, isPending, isReady } = usePaymentLinks({}, 1, { enabled, pageSize: 1 });
+  if (!enabled || !isReady) return false;
+  return isPending ? null : totalCount > 0;
+}
+
+/**
  * "Which account is this link for?" for Create, as pg-dashboard asks it
  * (ChooseMidSelect, over useApplicableMids("PAYMENT_LINKS")): a merchant with
  * several eligible PA MIDs and none selected picks one first, and the pick is
@@ -121,7 +142,18 @@ export function toPaymentLinkRow(api: PaymentLinkApiRow): PaymentLinkRow {
  * `startTime`/`endTime`, the search box as the search query, and paging as
  * `from`/`pageLimit`.
  */
-export function usePaymentLinks(filters: PaymentLinkFilters, page: number) {
+export function usePaymentLinks(
+  filters: PaymentLinkFilters,
+  page: number,
+  {
+    enabled = true,
+    pageSize = PAYMENT_LINKS_PAGE_LIMIT,
+  }: {
+    /** False skips the call (the product isn't enabled, so there is nothing to list). */
+    enabled?: boolean;
+    pageSize?: number;
+  } = {}
+) {
   const isGuestUser = useApp((s) => s.isGuestUser);
   const { filter: midFilter, isReady } = usePaymentLinkMidFilter();
 
@@ -137,8 +169,8 @@ export function usePaymentLinks(filters: PaymentLinkFilters, page: number) {
       // (index.tsx onSearch → `newFilters.searchQuery`), never exact-match.
       emailExactMatch: false,
       selectedMid: midFilter,
-      pageLimit: PAYMENT_LINKS_PAGE_LIMIT,
-      from: (page - 1) * PAYMENT_LINKS_PAGE_LIMIT,
+      pageLimit: pageSize,
+      from: (page - 1) * pageSize,
     }
   );
 
@@ -147,7 +179,7 @@ export function usePaymentLinks(filters: PaymentLinkFilters, page: number) {
     paymentLinksSearchApi,
     body,
     undefined,
-    isReady && !isGuestUser
+    enabled && isReady && !isGuestUser
   );
 
   const rows = useMemo(() => (query.data?.data?.data ?? []).map(toPaymentLinkRow), [query.data]);

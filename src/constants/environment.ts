@@ -73,3 +73,20 @@ export function dashboardOrigin(env: AppEnv = getAppEnv()): string {
 export function cdnOrigin(env: AppEnv = getAppEnv()): string {
   return CDN_ORIGIN_BY_ENV[env];
 }
+
+/**
+ * Host of a merchant's Static Link (`<origin>/@<handle>`). The server issues
+ * the link itself; this is only the fallback the name editor previews against
+ * when the server hasn't sent one yet.
+ * TODO(integration): only UAT is confirmed (uat.payglocal.me/@<handle>); dev
+ * and prod follow the same pattern until checked against a live link.
+ */
+export const STATIC_LINK_ORIGIN_BY_ENV: Record<AppEnv, string> = {
+  dev: "https://dev.payglocal.me",
+  uat: "https://uat.payglocal.me",
+  prod: "https://payglocal.me",
+};
+
+export function staticLinkOrigin(env: AppEnv = getAppEnv()): string {
+  return STATIC_LINK_ORIGIN_BY_ENV[env];
+}
