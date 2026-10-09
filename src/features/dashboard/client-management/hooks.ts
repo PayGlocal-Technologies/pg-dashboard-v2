@@ -653,6 +653,9 @@ export function useClients({ search, countries, page }: ClientsArgs): {
       { country: countries },
       {
         searchQuery: search || undefined,
+        // pg-dashboard sends the client search as a plain query, email or
+        // not (tableRequestbodyBuilder: `mcaClients` → queryString).
+        emailExactMatch: false,
         // The key is `mid`, not `merchantId`: midFilter names itself merchantId
         // because that is what the OpenSearch txn endpoints want, while the client
         // search wants `mid`. Only the values carry over.
