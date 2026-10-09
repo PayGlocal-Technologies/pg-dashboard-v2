@@ -60,7 +60,7 @@ function buildColumn(key: string): Column<SettlementRow> | null {
               value={row.merchantId}
               copyValue={row.merchantId}
               label="Merchant ID"
-              className="text-primary/80 transition-colors hover:text-primary"
+              valueClassName="text-muted-foreground"
             />
           ) : (
             <span className="text-[13px] text-muted-foreground">—</span>

@@ -252,7 +252,7 @@ export function EbrcStatusTable() {
           type="button"
           variant="link"
           size="sm"
-          className="h-auto min-h-0 p-0 tabular-nums text-[12.5px]"
+          className="h-auto min-h-0 p-0 tabular-nums text-[12.5px] text-muted-foreground"
           onClick={() => setOpenRequest(row)}
         >
           {row.requestId}
@@ -263,7 +263,9 @@ export function EbrcStatusTable() {
       key: "dgftAckId",
       header: "DGFT Ack. ID",
       minWidth: 130,
-      render: (row) => <span className="tabular-nums text-[12.5px]">{row.dgftAckId}</span>,
+      render: (row) => (
+        <span className="tabular-nums text-[12.5px] text-muted-foreground">{row.dgftAckId}</span>
+      ),
     },
     { key: "iecNumber", header: "IEC Number", minWidth: 110, render: (row) => row.iecNumber },
     {

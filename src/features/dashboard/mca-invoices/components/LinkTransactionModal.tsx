@@ -156,7 +156,9 @@ function LinkTransactionBody({
       key: "gid",
       header: "Transaction ID",
       minWidth: 170,
-      render: (row) => <span className="tabular-nums text-[12px] text-foreground">{row.gid}</span>,
+      render: (row) => (
+        <span className="tabular-nums text-[12px] text-muted-foreground">{row.gid}</span>
+      ),
     },
     {
       key: "amount",

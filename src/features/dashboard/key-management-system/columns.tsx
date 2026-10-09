@@ -78,9 +78,9 @@ export function buildKeyColumns(
       // The certificate row's "id" is a description, not something to copy.
       render: (row) =>
         kind === "certificate" ? (
-          <span className="text-[13px] leading-snug text-foreground">{row.kid}</span>
+          <span className="text-[13px] leading-snug text-muted-foreground">{row.kid}</span>
         ) : row.kid ? (
-          <CopyableCell value={row.kid} label="Key ID" />
+          <CopyableCell value={row.kid} label="Key ID" valueClassName="text-muted-foreground" />
         ) : (
           <span className="text-[13px] text-muted-foreground">—</span>
         ),

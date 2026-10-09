@@ -235,7 +235,9 @@ export function buildInvoiceLinkColumns(opts?: {
       key: "id",
       header: "Invoice ID",
       minWidth: 170,
-      render: (row) => <CopyableCell value={row.id} label="Invoice ID" />,
+      render: (row) => (
+        <CopyableCell value={row.id} label="Invoice ID" valueClassName="text-muted-foreground" />
+      ),
     },
     {
       // Source renders the email as the cell and hangs a tooltip carrying
