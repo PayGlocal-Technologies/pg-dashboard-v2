@@ -15,7 +15,7 @@ import {
 import type { BadgeVariant } from "@payglocal_ui/flux-ui";
 import { CopyableCell } from "@/components/common/CopyableCell";
 import { Icon, type IconName } from "@/components/icon";
-import { formatCurrency, formatTransactionTimestamp, truncateId } from "@/lib/utils/format";
+import { formatCurrency, formatTransactionTimestamp } from "@/lib/utils/format";
 import type { InvoiceLink } from "@/features/dashboard/invoice-links/types";
 import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
 
@@ -236,38 +236,6 @@ export function buildInvoiceLinkColumns(opts?: {
       header: "Invoice ID",
       minWidth: 170,
       render: (row) => <CopyableCell value={row.id} label="Invoice ID" />,
-    },
-    {
-      key: "plId",
-      header: "PL ID",
-      minWidth: 170,
-      render: (row) =>
-        row.plId ? (
-          <CopyableCell
-            // Shortened in the middle so the column stays narrow; the full
-            // PL ID is what's copied (and in the tooltip).
-            value={truncateId(row.plId)}
-            copyValue={row.plId}
-            label="PL ID"
-          />
-        ) : (
-          <span>-</span>
-        ),
-    },
-    {
-      key: "merchantReferenceId",
-      header: "Merchant Reference No",
-      minWidth: 190,
-      render: (row) =>
-        row.merchantReferenceId ? (
-          <CopyableCell
-            value={row.merchantReferenceId}
-            label="Merchant reference no"
-            valueClassName="text-foreground"
-          />
-        ) : (
-          <span className="text-foreground">-</span>
-        ),
     },
     {
       // Source renders the email as the cell and hangs a tooltip carrying
