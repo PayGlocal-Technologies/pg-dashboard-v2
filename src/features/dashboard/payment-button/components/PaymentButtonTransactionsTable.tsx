@@ -47,6 +47,7 @@ import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithToolt
 import {
   PA_METHOD_FILTERS,
   PA_STATUS_FILTERS,
+  PA_DEFAULT_VIEW_STATUSES,
   PA_VIEW_TABS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/pa-transactions/constants";
@@ -166,7 +167,8 @@ export function PaymentButtonTransactionsTable({
   const { urlMid } = useResolvedMids("PA");
 
   const [search, setSearch] = useState("");
-  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  // Opens on the Success tab, as the Transactions page does.
+  const [statusFilters, setStatusFilters] = useState<string[]>(PA_DEFAULT_VIEW_STATUSES);
   const [methodFilters, setMethodFilters] = useState<string[]>([]);
   const [countryFilters, setCountryFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE);
@@ -457,7 +459,6 @@ export function PaymentButtonTransactionsTable({
     <>
       <DataTableCard<PaTransaction>
         className="hidden lg:block"
-        title="Linked transactions"
         tabs={tabBar}
         toolbar={desktopControls}
         columns={columns}

@@ -130,7 +130,13 @@ export const RECEIPT_COLUMNS: Column<Receipt>[] = [
     header: "Invoice ID",
     minWidth: 165,
     cellClassName: "overflow-visible",
-    render: (row) => <CopyableCell value={row.invoiceId} label="Invoice ID" />,
+    render: (row) => (
+      <CopyableCell
+        value={row.invoiceId}
+        label="Invoice ID"
+        valueClassName="text-muted-foreground"
+      />
+    ),
   },
   {
     key: "amount",
@@ -184,7 +190,13 @@ export function buildReceiptColumns(showMerchantId: boolean): Column<Receipt>[] 
     header: "Merchant ID",
     minWidth: 150,
     cellClassName: "overflow-visible",
-    render: (row) => <CopyableCell value={row.merchantId ?? ""} label="Merchant ID" />,
+    render: (row) => (
+      <CopyableCell
+        value={row.merchantId ?? ""}
+        label="Merchant ID"
+        valueClassName="text-muted-foreground"
+      />
+    ),
   };
   return [merchantIdColumn, ...RECEIPT_COLUMNS];
 }

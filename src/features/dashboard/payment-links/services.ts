@@ -28,3 +28,17 @@ export const countryStatesApi = (iso2: string): string =>
 
 /** Dial codes for the phone field: GET → `{ data: { countryCallingCodes } }`. */
 export const countryCallingCodesApi = `${BASE_URL_V1}/static/iso/countryCallingCodes`;
+
+// ── List ─────────────────────────────────────────────────────────────────────
+// From pg-dashboard's src/features/mca-payment-invoice-links/services.ts.
+
+/** The payment links list: POST a TableReqBody → `{ data: { data, totalCount } }`. */
+export const paymentLinksSearchApi = `${BASE_URL_V1}/search/payment-link`;
+
+/** The list export: POST `{ startTime, endTime, ... }` → a CSV file. */
+export const paymentLinksReportApi = (mid: string): string =>
+  `${BASE_URL_V1}/search/payment-link/${mid}/download`;
+
+/** Disable (deactivate) an Active link: PUT, no body. */
+export const paymentLinkDisableApi = (mid: string, paymentLinkId: string): string =>
+  `${BASE_URL_V1}/customer-data/payment-link/disable/${mid}/plId/${paymentLinkId}`;

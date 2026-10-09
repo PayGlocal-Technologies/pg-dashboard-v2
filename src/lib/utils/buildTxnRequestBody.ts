@@ -1,9 +1,9 @@
 import type { TableReqBody, TxnFilterValues } from "@/types/transactions";
 
 // Not @/validators' isValidEmail: that one trims, and this classifier
-// feeds the untrimmed searchQuery straight into an exact-match encEmailId
-// lookup. Trimming here would route a padded query to a search that then can't
-// match. Worth unifying, but only alongside trimming the value itself.
+// feeds the untrimmed searchQuery straight into an exact-match lookup.
+// Trimming here would route a padded query to a search that then can't match.
+// Worth unifying, but only alongside trimming the value itself.
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const isEmail = (v: string) => EMAIL_RE.test(v);
 
@@ -15,12 +15,20 @@ export function buildTxnRequestBody(
   filters: TxnFilterValues,
   opts: {
     searchQuery?: string;
+    /**
+     * Whether an email-shaped query becomes an exact-match search (default).
+     * pg-dashboard does that only where it passes the text as
+     * `props.searchQuery` (the transactions tables). The payment links list
+     * passes it as a filter (`newFilters.searchQuery`), so there an email is a
+     * plain full-text QUERY like any other text: pass false for those.
+     */
+    emailExactMatch?: boolean;
     selectedMid?: { key: string; value: string[] };
     pageLimit?: number;
     from?: number;
   } = {}
 ): TableReqBody {
-  const { searchQuery, selectedMid, pageLimit = 15, from = 0 } = opts;
+  const { searchQuery, emailExactMatch = true, selectedMid, pageLimit = 15, from = 0 } = opts;
 
   const fieldSearch: Record<string, string | string[]> = {};
   let queryString: string | undefined;
@@ -77,19 +85,17 @@ export function buildTxnRequestBody(
     fieldSearch[selectedMid.key] = selectedMid.value;
   }
 
-  // Search query: email detection → exact-match, else full-text
-  if (searchQuery) {
-    if (isEmail(searchQuery)) {
-      fieldSearch.encEmailId = searchQuery;
-    } else {
-      queryString = searchQuery;
-    }
-  }
+  // Search query: an email is an exact-match search, anything else full-text.
+  // Either way the text travels as `queryString`, as pg-dashboard's
+  // tableRequestbodyBuilder sends it (an email is never put in fieldSearch);
+  // only the searchFilterType below tells the two apart.
+  const isEmailSearch = emailExactMatch && !!searchQuery && isEmail(searchQuery);
+  if (searchQuery) queryString = searchQuery;
 
   const { startTime, endTime } = filters;
   const hasFilters = Object.keys(fieldSearch).length > 0;
   const hasTimeRange = !!(startTime && endTime);
-  const hasEmail = !!fieldSearch.encEmailId;
+  const hasEmail = isEmailSearch;
 
   // Determine searchFilterType — mirrors pg-dashboard logic
   let searchFilterType = "DEFAULT";

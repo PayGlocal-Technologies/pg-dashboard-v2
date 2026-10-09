@@ -52,6 +52,8 @@ export interface PaymentLinkConfig {
   merchantSIEnabled?: boolean;
   plCustomerSharing?: boolean;
   maxPlExpiryHours?: number;
+  /** The expiry offered first and preselected, in hours (else 48). */
+  defaultPlExpiryHours?: number;
   merchantPlPreferredCurrency?: string | null;
   /** Non-percentage SI: a fixed subsequent amount instead of a first-instalment split. */
   enableNonPercentageSi?: boolean;

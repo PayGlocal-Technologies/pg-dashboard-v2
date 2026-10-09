@@ -309,7 +309,7 @@ export function buildPaColumns({
         header: "Merchant ID",
         minWidth: 145,
         render: (row) => (
-          <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+          <span className="whitespace-nowrap text-[12px] font-medium text-muted-foreground">
             {row.merchantId ?? "N/A"}
           </span>
         ),

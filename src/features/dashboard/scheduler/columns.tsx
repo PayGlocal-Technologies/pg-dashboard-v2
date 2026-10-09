@@ -81,6 +81,7 @@ export function buildExecutedColumns({
           id={row.siId}
           label="SI ID"
           truncate={false}
+          className="text-muted-foreground"
           onOpen={() => onOpenSiTransactions(row)}
         />
       ),
@@ -93,6 +94,7 @@ export function buildExecutedColumns({
         <LinkedId
           id={row.successGid}
           label="Transaction ID"
+          className="text-muted-foreground"
           onOpen={() => onOpenTransaction(row.successGid, row)}
         />
       ),
@@ -169,6 +171,7 @@ export function buildProjectedColumns({
           id={row.siId}
           label="SI ID"
           truncate={false}
+          className="text-muted-foreground"
           onOpen={() => onOpenSiTransactions(row)}
         />
       ),

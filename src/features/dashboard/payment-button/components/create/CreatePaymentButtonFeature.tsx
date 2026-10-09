@@ -296,17 +296,6 @@ function CreatePaymentButtonEditor({
     // rings are unaffected, Tailwind keeps them on a separate shadow layer.
     <div className="flex h-full min-h-0 flex-col [&_*]:shadow-none">
       <header className="flex shrink-0 flex-wrap items-center gap-4 border-b border-border px-5 py-3">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-label="Close"
-          className="h-9 w-9 shrink-0 p-0"
-          onClick={close}
-        >
-          <Icon name="x" className="h-4 w-4" />
-        </Button>
-
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -330,6 +319,18 @@ function CreatePaymentButtonEditor({
             )}
           </div>
         </div>
+
+        {/* Close on the right, where every other dialog in the app has it. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-label="Close"
+          className="h-9 w-9 shrink-0 p-0"
+          onClick={close}
+        >
+          <Icon name="x" className="h-4 w-4" />
+        </Button>
       </header>
 
       <div
@@ -407,8 +408,16 @@ function CreatePaymentButtonEditor({
               icon="credit-card"
               title="What you'll be collecting"
               description="Collected from the customer on the payment page after they click the button"
+              bare
             >
-              <div className="grid gap-4 sm:grid-cols-2">
+              {/* A narrow Currency (a code and its flag) and the Website taking
+                  the rest; the design-only amount fields keep two equal halves. */}
+              <div
+                className={cn(
+                  "grid gap-4",
+                  DESIGN_ONLY_FIELDS_ENABLED ? "sm:grid-cols-2" : "grid-cols-[7.5rem_minmax(0,1fr)]"
+                )}
+              >
                 {/* Amount type and value are not sent on create, only the
                     currency is (iso3CurrencyCode); see
                     DESIGN_ONLY_FIELDS_ENABLED. */}
@@ -889,7 +898,6 @@ function CreatePaymentButtonEditor({
           type="button"
           variant="primary"
           size="sm"
-          leftIcon={<Icon name={edit ? "check" : "send"} className="h-3.5 w-3.5" />}
           isLoading={isCreating || isSaving}
           disabled={isCreating || isSaving || !!created}
           onClick={() => void form.handleSubmit()}
@@ -955,7 +963,7 @@ export function CreatePaymentButtonDialog({
       <Dialog open={open && !live} onOpenChange={onOpenChange}>
         <DialogContent
           showClose={false}
-          className="flex max-h-[min(88vh,820px)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+          className="flex max-h-[min(88vh,820px)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[440px]"
         >
           <DialogTitle asChild>
             <VisuallyHidden>Create a new payment button</VisuallyHidden>
@@ -1011,7 +1019,7 @@ export function EditPaymentButtonDialog({
     <Dialog open={!!target} onOpenChange={onOpenChange}>
       <DialogContent
         showClose={false}
-        className="flex max-h-[min(88vh,820px)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        className="flex max-h-[min(88vh,820px)] max-w-[calc(100%-1.5rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[440px]"
       >
         <DialogTitle asChild>
           <VisuallyHidden>Edit payment button</VisuallyHidden>

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
+import { brandBackdropStyle, INVOICE_PREVIEW_BACKDROP } from "@/lib/utils/brandBackdrop";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -996,10 +997,9 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
           </SplitButton>
         </header>
 
-        {/* Preview column at 40rem, narrower than create-invoice's 46rem: an
-            invoice-link document is lighter, and the form beside it needs the
-            room more. */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]">
+        {/* Preview column at 46rem, the same as create-invoice, so the two
+            invoice editors share one layout. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_46rem]">
           <div className="min-h-0 overflow-y-auto">
             <div className="mx-auto max-w-250 space-y-5 px-6 py-6 lg:px-10">
               {/* Captioned chips, the way the invoice editor opens: the two
@@ -1262,8 +1262,15 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
             </div>
           </div>
 
-          {/* Preview fills the right column, as it does in invoice management. */}
-          <div className="min-h-0 overflow-y-auto bg-muted/30">
+          {/* Preview fills the right column on the same brand backdrop as
+              create-invoice's preview column. */}
+          <div
+            className="brand-backdrop min-h-0 overflow-y-auto bg-cover bg-top bg-no-repeat"
+            // A wash layered under the image (not `opacity` on this div)
+            // lightens the image itself without touching the foreground
+            // content's own opacity.
+            style={brandBackdropStyle(55, INVOICE_PREVIEW_BACKDROP)}
+          >
             <div className="space-y-4 p-4 md:p-6">
               <p className="text-[13px] font-medium text-muted-foreground">
                 Customer preview

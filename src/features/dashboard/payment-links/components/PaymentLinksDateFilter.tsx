@@ -48,7 +48,7 @@ export function PaymentLinksDateFilter({ value, onChange }: PaymentLinksDateFilt
   return (
     <CalendarDateFilterChip
       chipKey="pl-date"
-      label="Date"
+      label="Creation date"
       value={value}
       presets={PRESETS}
       onChange={(next) =>
