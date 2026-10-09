@@ -152,10 +152,11 @@ export const regularNavigation: NavGroup[] = [
     ],
   },
   {
-    // The MCA tree's Administration group, same labels, icons and permissions:
-    // the client book already spans PA and PACB MIDs (see useClientMids), and
-    // the SKU catalogue feeds PA Invoice Links too.
-    label: "Administration",
+    // The MCA tree's Clients & Catalogs group, same labels, icons and
+    // permissions: the client book already spans PA and PACB MIDs (see
+    // useClientMids), and the SKU catalogue feeds PA Invoice Links too.
+    // Heading matches pg-dashboard's "Clients & Catalogs" menu.
+    label: "Clients & Catalogs",
     items: [
       {
         label: "Client management",
@@ -248,7 +249,8 @@ export const mcaNavigation: NavGroup[] = [
     ],
   },
   {
-    label: "Administration",
+    // pg-dashboard's "Clients & Catalogs" menu.
+    label: "Clients & Catalogs",
     items: [
       // /client-management, not pg-dashboard's /mca-clients route: this app
       // has its own page, gated on the same getAllMcaClient permission.
@@ -259,6 +261,11 @@ export const mcaNavigation: NavGroup[] = [
         permission: ["getAllMcaClient"],
       },
       { label: "SKU management", href: "/sku-management", icon: "package", permission: [] },
+    ],
+  },
+  {
+    label: "Administration",
+    items: [
       // userSearchV3, the permission pg-dashboard's sidebar gates Team
       // Management on in every menu (the page lists users through it).
       {
