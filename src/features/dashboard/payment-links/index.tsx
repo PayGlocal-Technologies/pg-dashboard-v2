@@ -42,11 +42,13 @@ import {
 import {
   buildPaymentLinksReportBody,
   useDisablePaymentLink,
+  usePaymentLinkMidScope,
   usePaymentLinks,
   usePaymentLinksReport,
 } from "@/features/dashboard/payment-links/hooks";
 import type { PaymentLinkRow } from "@/features/dashboard/payment-links/types";
 import { rowActionColumn } from "@/components/common/rowActionColumn";
+import { MidScopedAction } from "@/components/common/MidScopedAction";
 
 export function PaymentLinksFeature() {
   const [search, setSearch] = useState("");
@@ -146,6 +148,15 @@ export function PaymentLinksFeature() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
+  // Create asks which account first when the merchant has several eligible
+  // MIDs and none selected (usePaymentLinkMidScope); the pick becomes the
+  // selected MID, which the create form reads.
+  const { needsMidChoice, midOptions, selectMid } = usePaymentLinkMidScope();
+  const openCreate = (mid: string) => {
+    if (mid) selectMid(mid);
+    setCreateOpen(true);
+  };
+
   const openDetails = (row: PaymentLinkRow) => {
     setDetailsRow(row);
     setDetailsOpen(true);
@@ -185,14 +196,14 @@ export function PaymentLinksFeature() {
             >
               Report
             </Button>
-            <Button
+            <MidScopedAction
+              label="Create Payment Link"
+              icon="plus"
               variant="primary"
-              size="sm"
-              leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-              onClick={() => setCreateOpen(true)}
-            >
-              Create Payment Link
-            </Button>
+              needsMidChoice={needsMidChoice}
+              midOptions={midOptions}
+              onRun={openCreate}
+            />
           </>
         }
       />
@@ -255,14 +266,15 @@ export function PaymentLinksFeature() {
               description={emptyCopy.description}
               action={
                 hasNarrowingFilters ? undefined : (
-                  <Button
-                    type="button"
+                  <MidScopedAction
+                    label="Create payment link"
+                    icon="plus"
                     variant="primary"
-                    leftIcon={<Icon name="plus" className="h-3.5 w-3.5" />}
-                    onClick={() => setCreateOpen(true)}
-                  >
-                    Create payment link
-                  </Button>
+                    size="md"
+                    needsMidChoice={needsMidChoice}
+                    midOptions={midOptions}
+                    onRun={openCreate}
+                  />
                 )
               }
               className="py-16"

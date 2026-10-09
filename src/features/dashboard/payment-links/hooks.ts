@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { usePost, usePostQuery, usePut } from "@/lib/api/hooks";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
+import { isFeatureAvailableForMid } from "@/lib/hooks/useFeatureApplicable";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { downloadBlob } from "@/lib/utils/format";
 import type { TableReqBody } from "@/types/transactions";
@@ -22,6 +23,47 @@ import type {
 } from "@/features/dashboard/payment-links/types";
 
 const PAYMENT_LINKS_QUERY_KEY = ["payment-links"] as const;
+
+/** The per-MID entitlement pg-dashboard checks (FEATURE_MAP.PAYMENT). */
+export const PAYMENT_LINKS_FEATURE = "PAYMENT_LINKS";
+
+/**
+ * "Which account is this link for?" for Create, as pg-dashboard asks it
+ * (ChooseMidSelect, over useApplicableMids("PAYMENT_LINKS")): a merchant with
+ * several eligible PA MIDs and none selected picks one first, and the pick is
+ * written to the selected-MID store the sidebar uses, so the list and the
+ * create form both follow it. One eligible MID, or one already selected,
+ * needs no choice.
+ *
+ * The options are the PA MIDs that carry PAYMENT_LINKS; if that narrows to
+ * nothing (tidsInfo and paMids come from different responses and can
+ * disagree), every PA MID is offered.
+ */
+export function usePaymentLinkMidScope(): {
+  needsMidChoice: boolean;
+  midOptions: string[];
+  selectMid: (mid: string) => void;
+} {
+  const paMids = useApp((s) => s.paMids);
+  const tidsInfo = useApp((s) => s.tidsInfo);
+  const isMultiMidUser = useApp((s) => s.isMultiMidUser);
+  const selectedMid = useAccountSetup((s) => s.selectedMidDetails.mid);
+  const setSelectedMidDetails = useAccountSetup((s) => s.setSelectedMidDetails);
+
+  const midOptions = useMemo(() => {
+    const eligible = paMids.filter((mid) =>
+      isFeatureAvailableForMid(mid, PAYMENT_LINKS_FEATURE, isMultiMidUser, tidsInfo)
+    );
+    return eligible.length > 0 ? eligible : paMids;
+  }, [paMids, tidsInfo, isMultiMidUser]);
+
+  return {
+    needsMidChoice: midOptions.length > 1 && !selectedMid,
+    midOptions,
+    // pg-dashboard's own tint for this pick (color "#E5B5FF").
+    selectMid: (mid: string) => setSelectedMidDetails({ mid, color: "#E5B5FF" }),
+  };
+}
 
 /**
  * The list's MID scope, keyed on **`mid`** as pg-dashboard builds it

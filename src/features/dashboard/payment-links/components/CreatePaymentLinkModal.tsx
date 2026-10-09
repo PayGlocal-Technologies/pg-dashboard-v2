@@ -166,6 +166,32 @@ interface CreatePaymentLinkModalProps {
  * POST /customer-data/payment-link/{mid}; on success the link is handed to
  * the list (`onCreated`), which opens it with its link, QR and Copy.
  */
+/** The expiry select's value for "Custom date and time". */
+const CUSTOM_EXPIRY = "custom";
+
+/**
+ * Whole hours from `nowMs` to a picked "YYYY-MM-DD HH:mm", rounded up, as
+ * pg-dashboard counts a custom expiry (`Math.ceil(minutes / 60)`); 0 or less
+ * once it has passed, NaN-safe (an unreadable value is 0).
+ */
+function hoursUntil(picked: string, nowMs: number): number {
+  const m = picked.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (!m) return 0;
+  const [, y, mo, d, hh = "0", mm = "0"] = m;
+  const at = new Date(Number(y), Number(mo) - 1, Number(d), Number(hh), Number(mm)).getTime();
+  const minutes = Math.floor((at - nowMs) / 60_000);
+  return minutes > 0 ? Math.ceil(minutes / 60) : 0;
+}
+
+/**
+ * hoursUntil from this moment. Only ever called from event handlers (a pick,
+ * a submit), never during render; kept out of the component so the clock
+ * read sits outside it.
+ */
+function hoursFromNow(picked: string): number {
+  return hoursUntil(picked, Date.now());
+}
+
 /**
  * The link's ID from the URL the create returns. The hosted link carries it
  * as the `x-gl-link-id` query parameter (".../payments/pl?x-gl-link-id=…");
@@ -196,6 +222,16 @@ export function CreatePaymentLinkModal({
   const [attempted, setAttempted] = useState(false);
   // Upstream disables today and earlier for the first instalment; captured
   // once (see CLAUDE.md's no-Date-during-render rule).
+  // Custom expiry, as pg-dashboard's "Custom" choice: a date and time
+  // ("YYYY-MM-DD HH:mm"), sent as the whole hours from now to then.
+  const [isCustomExpiry, setIsCustomExpiry] = useState(false);
+  const [customExpiry, setCustomExpiry] = useState("");
+  const [todayKey] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+      d.getDate()
+    ).padStart(2, "0")}`;
+  });
   const [tomorrowKey] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -213,7 +249,11 @@ export function CreatePaymentLinkModal({
     ...formValues,
     paymentDetails: {
       ...formValues.paymentDetails,
-      expiry: formValues.paymentDetails.expiry || defaultExpiry,
+      // A custom expiry stays as picked (0 until a date is chosen, which
+      // validation then reports); otherwise the default stands in.
+      expiry: isCustomExpiry
+        ? formValues.paymentDetails.expiry
+        : formValues.paymentDetails.expiry || defaultExpiry,
     },
   };
 
@@ -228,7 +268,14 @@ export function CreatePaymentLinkModal({
 
   const enableNonPercentageSi = !!config.enableNonPercentageSi;
   const plan = calculateInstalmentPlan(values, enableNonPercentageSi);
-  const errors: FieldErrors = attempted ? validatePaymentLink(values, config, currency) : {};
+  const validate = (): FieldErrors => {
+    const found = validatePaymentLink(values, config, currency);
+    if (isCustomExpiry && !customExpiry) {
+      found["paymentDetails.expiry"] = "Please select a date for custom expiry";
+    }
+    return found;
+  };
+  const errors: FieldErrors = attempted ? validate() : {};
 
   const billingStates = usePaymentLinkStates(values.billingDetails.country);
   const shippingStates = usePaymentLinkStates(values.shippingDetails.country);
@@ -256,13 +303,24 @@ export function CreatePaymentLinkModal({
 
   const submit = () => {
     setAttempted(true);
-    if (Object.keys(validatePaymentLink(values, config, currency)).length > 0) return;
+    if (Object.keys(validate()).length > 0) return;
+    // A custom expiry is counted from now, at submit, not from when it was
+    // picked; one already passed is refused rather than sent as 1 hour.
+    let submitValues = values;
+    if (isCustomExpiry) {
+      const hours = hoursFromNow(customExpiry);
+      if (hours <= 0) {
+        toast.error("Choose an expiry in the future");
+        return;
+      }
+      submitValues = { ...values, paymentDetails: { ...values.paymentDetails, expiry: hours } };
+    }
     if (!mid) {
       toast.error("Select a merchant account to create a payment link");
       return;
     }
 
-    const body = buildCreatePaymentLinkRequest(values, mid, currency, callingCode, plan);
+    const body = buildCreatePaymentLinkRequest(submitValues, mid, currency, callingCode, plan);
     createLink(body, {
       onSuccess: (response) => {
         const link = response?.data?.paymentLink ?? "";
@@ -297,12 +355,14 @@ export function CreatePaymentLinkModal({
           paymentLinkUrl: link.replace(/^https?:\/\//i, ""),
           paymentFor: values.paymentDetails.productDescription,
           createdAt: new Date(now).toISOString(),
-          expiresAt: new Date(now + values.paymentDetails.expiry * 3_600_000).toISOString(),
+          expiresAt: new Date(now + submitValues.paymentDetails.expiry * 3_600_000).toISOString(),
           notifyVia: callingCode === "+91" ? ["SMS", "Email"] : ["Email"],
         });
         onOpenChange(false);
         form.reset();
         setAttempted(false);
+        setIsCustomExpiry(false);
+        setCustomExpiry("");
       },
       onError: (error) => toast.error(error?.message || "Failed to create link"),
     });
@@ -566,11 +626,44 @@ export function CreatePaymentLinkModal({
               <SelectField
                 id="pl-expiry"
                 label="Payment link will expire in"
-                value={String(values.paymentDetails.expiry)}
-                options={expiryOptions}
-                onChange={(v) => form.setFieldValue("paymentDetails.expiry", Number(v))}
-                error={errors["paymentDetails.expiry"]}
+                value={isCustomExpiry ? CUSTOM_EXPIRY : String(values.paymentDetails.expiry)}
+                options={[
+                  ...expiryOptions,
+                  { value: CUSTOM_EXPIRY, label: "Custom date and time" },
+                ]}
+                onChange={(v) => {
+                  if (v === CUSTOM_EXPIRY) {
+                    setIsCustomExpiry(true);
+                    form.setFieldValue(
+                      "paymentDetails.expiry",
+                      customExpiry ? Math.max(hoursFromNow(customExpiry), 0) : 0
+                    );
+                    return;
+                  }
+                  setIsCustomExpiry(false);
+                  form.setFieldValue("paymentDetails.expiry", Number(v));
+                }}
+                error={isCustomExpiry ? undefined : errors["paymentDetails.expiry"]}
               />
+              {isCustomExpiry && (
+                <Field className="gap-1.5">
+                  <FieldLabel htmlFor="pl-custom-expiry">Expires on</FieldLabel>
+                  <DatePicker
+                    value={customExpiry}
+                    onChange={(v) => {
+                      setCustomExpiry(v);
+                      form.setFieldValue(
+                        "paymentDetails.expiry",
+                        v ? Math.max(hoursFromNow(v), 0) : 0
+                      );
+                    }}
+                    min={todayKey}
+                    showTime
+                    placeholder="Select date and time"
+                  />
+                  <FieldError>{errors["paymentDetails.expiry"]}</FieldError>
+                </Field>
+              )}
               {config.merchantSIEnabled && (
                 <Field orientation="horizontal" className="items-center gap-3">
                   <Switch
