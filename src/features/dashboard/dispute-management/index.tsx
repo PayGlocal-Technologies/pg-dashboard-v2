@@ -465,8 +465,9 @@ function DisputeManagementPage() {
   const columnDefs = disputeColumnDefs({ tab, showMerchantId });
   const tableColumns = [
     ...buildDisputeColumns({ tab, showMerchantId, now, columnOrder, hiddenColumns }),
-    // "Take action" when either bucket is ACTION_REQUIRED, else "View
-    // details" (columns.tsx:63-79), exactly as pg-dashboard reads it today.
+    // "Take action" when the merchant's own bucket is ACTION_REQUIRED, else
+    // "View details" (pg-dashboard uat 5f3a0b793, columns.tsx: each side
+    // reads its own bucket).
     rowActionColumn<DisputeRecord>((row) => (
       <Button
         variant="outline"
@@ -475,9 +476,7 @@ function DisputeManagementPage() {
         rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
         className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
       >
-        {[row.merchantBucket, row.glocalBucket].includes("ACTION_REQUIRED")
-          ? "Take action"
-          : "View details"}
+        {row.merchantBucket === "ACTION_REQUIRED" ? "Take action" : "View details"}
       </Button>
     )),
   ];
