@@ -15,6 +15,8 @@ import {
   NAME_TEXT_PATTERN_MESSAGE,
   PHONE_MAX_LENGTH,
   ZIPCODE_MAX_LENGTH,
+  EXPIRY_OPTIONS,
+  FALLBACK_EXPIRY_HOURS,
 } from "@/features/dashboard/payment-links/create/constants";
 import type {
   AddressDetails,
@@ -416,4 +418,38 @@ export function buildCreatePaymentLinkRequest(
       },
     }),
   };
+}
+
+/** "48" → "2 days", "36" → "36 hrs", as upstream's formatLinkExpiryLabelFromHours. */
+function expiryLabel(hours: number): string {
+  if (hours > 0 && hours % 24 === 0) {
+    const days = hours / 24;
+    return days === 1 ? "1 day" : `${days} days`;
+  }
+  return `${hours} hrs`;
+}
+
+/**
+ * The merchant's default expiry, in hours: the config's `defaultPlExpiryHours`
+ * when it is a positive number, else 48, as upstream's CreateLinkForm reads it.
+ */
+export function defaultExpiryHours(raw: unknown): number {
+  const n = Number(raw);
+  return raw != null && Number.isFinite(n) && n > 0 ? Math.round(n) : FALLBACK_EXPIRY_HOURS;
+}
+
+/**
+ * Upstream's buildOrderedLinkExpiryOptions: the default first (labelled as
+ * such), then the rest; a default that isn't one of the fixed choices takes
+ * the first slot in its place.
+ */
+export function expiryOptionsFor(defaultHours: number): { value: string; label: string }[] {
+  const match = EXPIRY_OPTIONS.find((o) => o.value === defaultHours);
+  const ordered = match
+    ? [match, ...EXPIRY_OPTIONS.filter((o) => o.value !== match.value)]
+    : [{ label: expiryLabel(defaultHours), value: defaultHours }, ...EXPIRY_OPTIONS.slice(1)];
+  return ordered.map((o) => ({
+    value: String(o.value),
+    label: o.value === defaultHours ? `${o.label} (Default)` : o.label,
+  }));
 }

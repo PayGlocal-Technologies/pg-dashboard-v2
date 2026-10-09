@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { toast } from "sonner";
 import {
   Button,
@@ -15,9 +16,12 @@ import {
   StatusBadge,
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
-import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { PAYMENT_LINK_STATUS_META } from "@/features/dashboard/payment-links/columns";
+import { cn, formatCurrency } from "@/lib/utils";
+import { formatTransactionTimestamp, truncateId, truncateMiddle } from "@/lib/utils/format";
+import { paymentLinkStatusMeta } from "@/features/dashboard/payment-links/columns";
 import { PaymentLinkQrCard } from "@/features/dashboard/payment-links/components/PaymentLinkQrCard";
+import { useDisablePaymentLink } from "@/features/dashboard/payment-links/hooks";
+import { ConfirmActionDialog } from "@/features/dashboard/mca-invoices/components/ConfirmActionDialog";
 import type { PaymentLinkRow } from "@/features/dashboard/payment-links/types";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 
@@ -69,12 +73,21 @@ interface PaymentLinkDetailsModalProps {
 }
 
 export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLinkDetailsModalProps) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const { disable, isPending: isDeactivating } = useDisablePaymentLink(() => {
+    setConfirmOpen(false);
+    onOpenChange(false);
+  });
+
   if (!row) return null;
 
-  const fullUrl = `https://${row.paymentLinkUrl}`;
+  const fullUrl = row.paymentLinkUrl ? `https://${row.paymentLinkUrl}` : "";
   const phoneFlag = row.customerPhone ? phoneIso2(row.customerPhone) : undefined;
-  const statusMeta = PAYMENT_LINK_STATUS_META[row.status];
-  const showQr = row.status === "ACTIVE";
+  const statusMeta = paymentLinkStatusMeta(row.status);
+  const showQr = row.status === "ACTIVE" && !!fullUrl;
+  // Middle-truncated, keeping the host and the link's own ID tail; the full
+  // link shows on hover and is what Copy copies.
+  const displayUrl = truncateMiddle(fullUrl, 32, 10);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -86,7 +99,11 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
           <div className="flex min-w-0 items-center gap-2">
             <DialogTitle className="shrink-0 pr-0">Payment Link Details</DialogTitle>
             <div className="flex min-w-0 items-center gap-0.5 rounded-md bg-muted py-0.5 pr-0.5 pl-2">
-              <span className="truncate tabular-nums text-sm text-muted-foreground">{row.id}</span>
+              {/* Shortened like every ID in the app ("a39...ae2ed2f4"); the
+                  full ID shows on hover and is what Copy copies. */}
+              <span title={row.id} className="truncate tabular-nums text-sm text-muted-foreground">
+                {truncateId(row.id)}
+              </span>
               <Button
                 type="button"
                 variant="ghost"
@@ -119,6 +136,21 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
                 trailIcon={statusMeta.trailIcon}
                 size="sm"
               />
+              {/* Only an Active link can be deactivated, as in pg-dashboard;
+                  it sits at the far end of the amount row, beside the status
+                  it changes. */}
+              {row.status === "ACTIVE" && row.mid && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Icon name="ban" className="h-3.5 w-3.5" />}
+                  onClick={() => setConfirmOpen(true)}
+                  className="ml-auto text-foreground"
+                >
+                  Deactivate link
+                </Button>
+              )}
             </div>
           </div>
 
@@ -126,26 +158,29 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
               where that isn't supported), so a real link is never clipped
               and the copy button sits right after it; never wider than the
               modal. The link reads as one, in the primary blue. */}
-          <InputGroup className="w-fit max-w-full">
-            {/* text-primary!: globals.css colours every input with an
+          {fullUrl && (
+            <InputGroup className="w-fit max-w-full">
+              {/* text-primary!: globals.css colours every input with an
                 unlayered rule, which beats any (layered) Tailwind utility
                 however specific, and Flux mutes read-only text besides. */}
-            <InputGroupInput
-              readOnly
-              value={fullUrl}
-              size={fullUrl.length}
-              className="pl-3 pr-1 tabular-nums text-sm text-primary! field-sizing-content w-auto min-w-0 flex-auto"
-            />
-            <InputGroupAddon align="inline-end">
-              <InputGroupButton
-                type="button"
-                onClick={() => copyToClipboard(fullUrl, "Payment link copied")}
-                aria-label="Copy payment link"
-              >
-                <Icon name="copy" size={13} />
-              </InputGroupButton>
-            </InputGroupAddon>
-          </InputGroup>
+              <InputGroupInput
+                readOnly
+                value={displayUrl}
+                size={displayUrl.length}
+                title={fullUrl}
+                className="pl-3 pr-1 tabular-nums text-sm text-primary! field-sizing-content w-auto min-w-0 flex-auto"
+              />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  type="button"
+                  onClick={() => copyToClipboard(fullUrl, "Payment link copied")}
+                  aria-label="Copy payment link"
+                >
+                  <Icon name="copy" size={13} />
+                </InputGroupButton>
+              </InputGroupAddon>
+            </InputGroup>
+          )}
 
           {/* Link Details and Customer Details, stacked full-width cards,
            * each an elongated rectangle with a 2-column grid of stacked
@@ -153,9 +188,9 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
           <Card className="gap-4 p-5">
             <h3 className="text-sm font-semibold text-foreground">Link Details</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <DetailField label="Created At" value={formatDate(row.createdAt)} />
-              <DetailField label="Expires At" value={formatDate(row.expiresAt)} />
-              <DetailField label="Notify Via" value={row.notifyVia.join(", ")} />
+              <DetailField label="Created At" value={formatTransactionTimestamp(row.createdAt)} />
+              <DetailField label="Expires At" value={formatTransactionTimestamp(row.expiresAt)} />
+              <DetailField label="Notify Via" value={row.notifyVia.join(", ") || "—"} />
               <DetailField
                 label="Status"
                 value={
@@ -173,7 +208,7 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
           <Card className="gap-4 p-5">
             <h3 className="text-sm font-semibold text-foreground">Customer Details</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <DetailField label="Customer Name" value={row.customerName} />
+              <DetailField label="Customer Name" value={row.customerName || "—"} />
               <DetailField
                 label="Phone Number"
                 value={
@@ -189,11 +224,11 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
               />
               <DetailField
                 label="Email Address"
-                value={row.customerDetails}
+                value={row.customerDetails || "—"}
                 className="lowercase"
                 span
               />
-              <DetailField label="Billing Address" value={row.billingAddress} span />
+              <DetailField label="Billing Address" value={row.billingAddress || "—"} span />
             </div>
           </Card>
 
@@ -212,16 +247,31 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
           <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button
-            type="button"
-            variant="primary"
-            size="sm"
-            onClick={() => copyToClipboard(fullUrl, "Payment link copied")}
-          >
-            Copy Payment Link
-          </Button>
+          {fullUrl && (
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={() => copyToClipboard(fullUrl, "Payment link copied")}
+            >
+              Copy Payment Link
+            </Button>
+          )}
         </div>
       </DialogContent>
+
+      {/* pg-dashboard's popconfirm copy, in the same small dialog Invoice
+          Links uses for its Disable. */}
+      <ConfirmActionDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Are you sure you want to deactivate this link?"
+        description="Deactivating the link will prevent any further transactions."
+        confirmLabel="Deactivate"
+        isDestructive
+        isPending={isDeactivating}
+        onConfirm={() => disable(row.mid, row.id)}
+      />
     </Dialog>
   );
 }

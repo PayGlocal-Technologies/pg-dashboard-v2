@@ -26,13 +26,14 @@ import {
   DEFAULT_CALLING_CODE,
   DEFAULT_CALLING_CODE_ISO2,
   DEFAULT_VALUES,
-  EXPIRY_OPTIONS,
   FIRST_INSTALMENT_TYPE_OPTIONS,
   FREQUENCY_OPTIONS,
 } from "@/features/dashboard/payment-links/create/constants";
 import {
   buildCreatePaymentLinkRequest,
   calculateInstalmentPlan,
+  defaultExpiryHours,
+  expiryOptionsFor,
   validatePaymentLink,
   type FieldErrors,
 } from "@/features/dashboard/payment-links/create/helpers";
@@ -165,6 +166,20 @@ interface CreatePaymentLinkModalProps {
  * POST /customer-data/payment-link/{mid}; on success the link is handed to
  * the list (`onCreated`), which opens it with its link, QR and Copy.
  */
+/**
+ * The link's ID from the URL the create returns. The hosted link carries it
+ * as the `x-gl-link-id` query parameter (".../payments/pl?x-gl-link-id=…");
+ * a path-style link falls back to its last segment.
+ */
+function paymentLinkIdFrom(link: string): string {
+  try {
+    const url = new URL(link);
+    return url.searchParams.get("x-gl-link-id") || url.pathname.split("/").pop() || "";
+  } catch {
+    return link.split("/").pop() ?? "";
+  }
+}
+
 export function CreatePaymentLinkModal({
   open,
   onOpenChange,
@@ -190,7 +205,17 @@ export function CreatePaymentLinkModal({
   });
 
   const form = useForm({ defaultValues: DEFAULT_VALUES });
-  const values = useStore(form.store, (s) => s.values);
+  const formValues = useStore(form.store, (s) => s.values);
+  // The merchant's default expiry stands in until another is picked (the
+  // field starts unset, at 0), so validation and the request both see it.
+  const defaultExpiry = defaultExpiryHours(config.defaultPlExpiryHours);
+  const values = {
+    ...formValues,
+    paymentDetails: {
+      ...formValues.paymentDetails,
+      expiry: formValues.paymentDetails.expiry || defaultExpiry,
+    },
+  };
 
   // The merchant's preferred currency and India's dial code stand in until
   // the merchant picks another, as upstream's initial values do.
@@ -208,9 +233,7 @@ export function CreatePaymentLinkModal({
   const billingStates = usePaymentLinkStates(values.billingDetails.country);
   const shippingStates = usePaymentLinkStates(values.shippingDetails.country);
 
-  const expiryOptions = EXPIRY_OPTIONS.filter((o) => o.value <= (config.maxPlExpiryHours ?? 0)).map(
-    (o) => ({ value: String(o.value), label: o.label })
-  );
+  const expiryOptions = expiryOptionsFor(defaultExpiry);
   const isRecurring = !!config.merchantSIEnabled && values.paymentDetails.isRecurringPayment;
 
   // Changing the amount (or the first instalment's terms) invalidates the
@@ -248,10 +271,12 @@ export function CreatePaymentLinkModal({
           : Number(values.paymentDetails.totalAmount) || 0;
         const now = Date.now();
         const billing = values.billingDetails;
-        // The list still runs on mock rows, so the created link joins them
-        // locally; its link is the server's.
+        // The create invalidates every query, so the list refetches the new
+        // link from the server on its own. This row only opens its details
+        // straight away (link, QR, Copy), before that refetch lands.
         onCreated({
-          id: link.split("/").pop() || `pl_${now}`,
+          id: paymentLinkIdFrom(link) || `pl_${now}`,
+          mid,
           amount,
           currency,
           status: "ACTIVE",
@@ -273,7 +298,7 @@ export function CreatePaymentLinkModal({
           paymentFor: values.paymentDetails.productDescription,
           createdAt: new Date(now).toISOString(),
           expiresAt: new Date(now + values.paymentDetails.expiry * 3_600_000).toISOString(),
-          notifyVia: [],
+          notifyVia: callingCode === "+91" ? ["SMS", "Email"] : ["Email"],
         });
         onOpenChange(false);
         form.reset();
@@ -468,7 +493,9 @@ export function CreatePaymentLinkModal({
                         showSearch
                         filterOption={(option, query) => {
                           const q = query.toLowerCase();
-                          const name = callingCodes.find((c) => c.value === option.value)?.countryName;
+                          const name = callingCodes.find(
+                            (c) => c.value === option.value
+                          )?.countryName;
                           return (
                             option.label.toLowerCase().includes(q) ||
                             option.value.toLowerCase().includes(q) ||
