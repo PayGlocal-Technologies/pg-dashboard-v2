@@ -457,7 +457,6 @@ export function PaymentButtonTransactionsTable({
     <>
       <DataTableCard<PaTransaction>
         className="hidden lg:block"
-        title="Linked transactions"
         tabs={tabBar}
         toolbar={desktopControls}
         columns={columns}
