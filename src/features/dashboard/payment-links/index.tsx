@@ -42,15 +42,25 @@ import {
 import {
   buildPaymentLinksReportBody,
   useDisablePaymentLink,
+  useHasPaymentLinks,
   usePaymentLinkMidScope,
   usePaymentLinks,
+  usePaymentLinksEnabled,
   usePaymentLinksReport,
 } from "@/features/dashboard/payment-links/hooks";
 import type { PaymentLinkRow } from "@/features/dashboard/payment-links/types";
 import { rowActionColumn } from "@/components/common/rowActionColumn";
 import { MidScopedAction } from "@/components/common/MidScopedAction";
+import { EnableProductAction, FeatureBanner } from "@/components/common/FeatureBanner";
 
 export function PaymentLinksFeature() {
+  // Not enabled: the banner asks them to enable it, and there is nothing to
+  // list or create. Enabled with no link yet: the banner leads, pointing at
+  // Create. Once a link exists the page is just the list.
+  const productEnabled = usePaymentLinksEnabled();
+  const hasLinks = useHasPaymentLinks(productEnabled);
+  const showBanner = !productEnabled || hasLinks === false;
+
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState(PAYMENT_LINK_DEFAULT_STATUS);
   const [dateFilter, setDateFilter] = useState<PaymentLinksDateValue | undefined>(undefined);
@@ -85,7 +95,8 @@ export function PaymentLinksFeature() {
       startTime: dateFilter?.from ? toStartOfDayMs(dateFilter.from) : undefined,
       endTime: dateFilter?.to ? toEndOfDayMs(dateFilter.to) : undefined,
     },
-    page
+    page,
+    { enabled: productEnabled }
   );
 
   const handleRefresh = async () => {
@@ -176,37 +187,64 @@ export function PaymentLinksFeature() {
         title="Payment Links"
         subtitle={isReady && !isPending ? `${totalCount} Links Created` : undefined}
         actions={
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={
-                <Icon name="refresh" className={cn("h-3.5 w-3.5", isFetching && "animate-spin")} />
-              }
-              onClick={() => void handleRefresh()}
-              disabled={!isReady || isFetching}
-            >
-              Refresh
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
-              onClick={openReportDrawer}
-            >
-              Report
-            </Button>
-            <MidScopedAction
-              label="Create Payment Link"
-              icon="plus"
-              variant="primary"
-              needsMidChoice={needsMidChoice}
-              midOptions={midOptions}
-              onRun={openCreate}
-            />
-          </>
+          productEnabled && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={
+                  <Icon
+                    name="refresh"
+                    className={cn("h-3.5 w-3.5", isFetching && "animate-spin")}
+                  />
+                }
+                onClick={() => void handleRefresh()}
+                disabled={!isReady || isFetching}
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={<Icon name="download" className="h-3.5 w-3.5" />}
+                onClick={openReportDrawer}
+              >
+                Report
+              </Button>
+              <MidScopedAction
+                label="Create Payment Link"
+                icon="plus"
+                variant="primary"
+                needsMidChoice={needsMidChoice}
+                midOptions={midOptions}
+                onRun={openCreate}
+              />
+            </>
+          )
         }
       />
+
+      {showBanner && (
+        <FeatureBanner
+          imageSrc="/assets/banner-states/Payment%20links.png"
+          title="Send a link. Collect a payment."
+          description="Generate a payment link for any amount and share it with your customers to collect payments with ease."
+          action={
+            productEnabled ? (
+              <MidScopedAction
+                label="Create payment link"
+                icon="plus"
+                variant="primary"
+                needsMidChoice={needsMidChoice}
+                midOptions={midOptions}
+                onRun={openCreate}
+              />
+            ) : (
+              <EnableProductAction product="Payment Links" />
+            )
+          }
+        />
+      )}
 
       {/* No metrics section: there is no payment links analytics endpoint
           yet, and the cards that were here drew static figures as if they
@@ -265,7 +303,7 @@ export function PaymentLinksFeature() {
               title={emptyCopy.title}
               description={emptyCopy.description}
               action={
-                hasNarrowingFilters ? undefined : (
+                hasNarrowingFilters || showBanner ? undefined : (
                   <MidScopedAction
                     label="Create payment link"
                     icon="plus"

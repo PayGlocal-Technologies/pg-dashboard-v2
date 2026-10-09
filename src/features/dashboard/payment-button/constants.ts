@@ -215,4 +215,4 @@ export const PAYMENT_BUTTON_NOT_ENABLED = {
 };
 
 /** Where pg-dashboard's "Contact us" sends a merchant to have a product enabled. */
-export const MERCHANT_SUPPORT_EMAIL = "merchant.support@payglocal.in";
+export { MERCHANT_SUPPORT_EMAIL } from "@/constants/support";
