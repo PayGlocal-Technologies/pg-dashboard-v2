@@ -179,7 +179,6 @@ export const buildPaymentLinkColumns = (nowMs: number): Column<PaymentLinkRow>[]
             <StatusBadge
               variant={chip.warning ? "warning" : "muted"}
               label={chip.label}
-              trailIcon={chip.warning ? "clock" : undefined}
               size="sm"
             />
           )}

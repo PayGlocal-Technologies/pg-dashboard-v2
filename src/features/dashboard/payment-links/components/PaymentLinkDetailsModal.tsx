@@ -37,15 +37,33 @@ async function copyToClipboard(value: string, message: string) {
 interface DetailFieldProps {
   label: string;
   value: React.ReactNode;
+  /**
+   * Text to copy: shows a copy button beside the value while the field is
+   * hovered (or the button focused). Left out, or empty, for no copy.
+   */
+  copy?: string;
   span?: boolean;
   className?: string;
 }
 
-function DetailField({ label, value, span, className }: DetailFieldProps) {
+function DetailField({ label, value, copy, span, className }: DetailFieldProps) {
   return (
-    <div className={cn(span && "col-span-2", className)}>
+    <div className={cn("group/field", span && "col-span-2", className)}>
       <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="mt-1 text-sm font-semibold leading-snug text-foreground">{value}</div>
+      <div className="mt-1 flex items-start gap-1 text-sm font-semibold leading-snug text-foreground">
+        <div className="min-w-0">{value}</div>
+        {copy && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => copyToClipboard(copy, `${label} copied`)}
+            aria-label={`Copy ${label.toLowerCase()}`}
+            className="h-5 w-5 min-h-0 min-w-0 shrink-0 rounded-md p-0 text-muted-foreground opacity-0 transition-opacity group-hover/field:opacity-100 focus-visible:opacity-100 hover:bg-muted"
+          >
+            <Icon name="copy" size={12} />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
@@ -121,10 +139,7 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
           {/* Hero, amount and status are the priority, same headline
            * typography as the Settlement Details page's amount. */}
           <div>
-            <p className="text-sm text-muted-foreground">
-              Payment for <span className="font-semibold text-foreground">{row.paymentFor}</span>
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               {/* Symbol and figure, then the currency code: "$1,000.00 USD". */}
               <p className="flex items-baseline gap-1.5 text-4xl font-bold tracking-tight text-foreground tabular-nums">
                 {formatCurrency(row.amount, row.currency)}
@@ -152,6 +167,12 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
                 </Button>
               )}
             </div>
+            {/* What the link is for, under the amount it charges. */}
+            {row.paymentFor && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                Payment for <span className="font-semibold text-foreground">{row.paymentFor}</span>
+              </p>
+            )}
           </div>
 
           {/* Hugs the link (field-sizing: content; `size` is the fallback
@@ -208,9 +229,14 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
           <Card className="gap-4 p-5">
             <h3 className="text-sm font-semibold text-foreground">Customer Details</h3>
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <DetailField label="Customer Name" value={row.customerName || "—"} />
+              <DetailField
+                label="Customer Name"
+                value={row.customerName || "—"}
+                copy={row.customerName}
+              />
               <DetailField
                 label="Phone Number"
+                copy={row.customerPhone}
                 value={
                   row.customerPhone ? (
                     <span className="inline-flex items-center gap-2">
@@ -222,13 +248,24 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
                   )
                 }
               />
+              {/* Billing address on the left, the email beside it on the right;
+                  only the email itself is lowercased, not its label. */}
+              <DetailField
+                label="Billing Address"
+                value={row.billingAddress || "—"}
+                copy={row.billingAddress}
+              />
               <DetailField
                 label="Email Address"
-                value={row.customerDetails || "—"}
-                className="lowercase"
-                span
+                copy={row.customerDetails}
+                value={
+                  row.customerDetails ? (
+                    <span className="break-all lowercase">{row.customerDetails}</span>
+                  ) : (
+                    "—"
+                  )
+                }
               />
-              <DetailField label="Billing Address" value={row.billingAddress || "—"} span />
             </div>
           </Card>
 

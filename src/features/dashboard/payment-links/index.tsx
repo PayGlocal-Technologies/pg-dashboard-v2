@@ -272,43 +272,44 @@ export function PaymentLinksFeature() {
         columns={[
           ...columns,
           rowActionColumn((row) => (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
-                onClick={() => openDetails(row)}
-                className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
-              >
-                View details
-              </Button>
-              {/* pg-dashboard's row menu: Disable Link, offered only on an
-                  Active link (greyed otherwise). Clicks stop here, so opening
-                  the menu never also opens the row's details. */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <IconButton
-                    aria-label={`More actions for payment link ${row.id}`}
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <Icon name="more-horizontal" className="h-4 w-4" />
-                  </IconButton>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                  <DropdownMenuItem
-                    disabled={row.status.toUpperCase() !== "ACTIVE" || !row.mid}
-                    onSelect={() => setDisableTarget(row)}
-                  >
-                    <Icon name="ban" className="h-3.5 w-3.5" />
-                    Disable link
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              rightIcon={<Icon name="chevron-right" className="h-2.5 w-2.5" />}
+              onClick={() => openDetails(row)}
+              className="h-auto min-h-0 gap-1 whitespace-nowrap rounded-md px-2 py-1 text-[11px]"
+            >
+              View details
+            </Button>
           )),
         ]}
+        // pg-dashboard's row menu: Disable Link, offered only on an Active
+        // link (greyed otherwise). In flux's rowAction slot, pinned to the
+        // table's right edge; clicks stop here, so opening the menu never
+        // also opens the row's details.
+        rowAction={(row) => (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <IconButton
+                aria-label={`More actions for payment link ${row.id}`}
+                variant="ghost"
+                size="sm"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Icon name="more-vertical" className="h-4 w-4" />
+              </IconButton>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+              <DropdownMenuItem
+                disabled={row.status.toUpperCase() !== "ACTIVE" || !row.mid}
+                onSelect={() => setDisableTarget(row)}
+              >
+                <Icon name="ban" className="h-3.5 w-3.5" />
+                Disable link
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         data={rows}
         isLoading={isReady && isPending}
         skeletonRows={PAYMENT_LINKS_PAGE_LIMIT}

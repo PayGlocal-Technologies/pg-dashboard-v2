@@ -473,9 +473,13 @@ export function CreatePaymentLinkModal({
                     Phone number
                   </FieldLabel>
                   <div className="flex">
-                    <div className="w-28 shrink-0 [&_button]:rounded-r-none">
+                    {/* Wide enough for the longest code with its flag
+                        ("+1-684"), with the trigger's padding trimmed so the
+                        code itself gets the room. */}
+                    <div className="w-[8.5rem] shrink-0 [&_button]:rounded-r-none">
                       <SingleSelect
                         id="pl-calling-code"
+                        className="gap-1.5 px-3"
                         value={callingCodeIso2}
                         options={callingCodes.map((c) => ({
                           value: c.value,
