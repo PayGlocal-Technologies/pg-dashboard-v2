@@ -11,47 +11,33 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
-import { formatDisplayDateTime } from "@/features/dashboard/pa-transactions/paColumns";
-import {
-  ARBITRATION_FEE,
-  WITHDRAWAL_FEE,
-  formatFee,
-} from "@/features/dashboard/pa-transactions/status/disputeStages";
+import { formatTimestamp } from "@/lib/utils/format";
+import { formatFee } from "@/features/dashboard/dispute-management/disputeStages";
+import type { DisputeCase } from "@/features/dashboard/dispute-management/types";
 
-/** Which confirmation, per the "Pre-arb and arb" design. */
-export type DisputeConfirmKind = "contest-prearb" | "contest-arb" | "withdraw";
+/** Which confirmation: contest (first round and pre-arbitration), contest at arbitration, withdraw. */
+export type DisputeConfirmKind = "contest" | "contest-arb" | "withdraw";
 
 /**
- * The last check before an escalation step that can't be undone:
- *
- *  - contest-prearb: evidence will be needed, by the deadline; accepting may
- *    be safer without it.
- *  - contest-arb: this is the final stage, nothing can be added after it,
- *    and losing charges the arbitration fee.
- *  - withdraw: the dispute closes, the amount goes back to the customer, and
- *    a withdrawal fee is charged or not, depending on the case.
+ * The last check before a step that can't be undone, with pg-dashboard's
+ * merchant copy (AcceptContestDrawer's CONTEST/ARBITRATION_EXTERNAL_INFO,
+ * CbWithdrawDrawer's ARB_EXTERNAL_WITHDRAW_INFO) and the dispute's own fees.
  */
 export function DisputeConfirmDialog({
   kind,
   open,
   onOpenChange,
-  amount,
-  currency,
-  respondBy,
-  withdrawalFeeApplies,
+  dispute,
   onConfirm,
 }: {
   kind: DisputeConfirmKind | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  amount: number;
-  currency: string;
-  respondBy?: string;
-  withdrawalFeeApplies?: boolean;
+  dispute: DisputeCase;
   onConfirm: () => void;
 }) {
-  const money = `${formatCurrency(amount, currency)}`;
-  const deadline = respondBy ? (formatDisplayDateTime(respondBy) ?? respondBy) : undefined;
+  const money = formatCurrency(dispute.amount, dispute.currency);
+  const deadline = formatTimestamp(dispute.dueDate, "");
 
   const content =
     kind === "withdraw"
@@ -60,12 +46,12 @@ export function DisputeConfirmDialog({
           lead: "If you withdraw at this stage:",
           points: [
             "The dispute will be closed",
-            `${money} will be returned to the customer and settled from your account`,
-            withdrawalFeeApplies
-              ? `A withdrawal fee of ${formatFee(WITHDRAWAL_FEE)} will be charged and settled from your account`
+            "Amount will be returned to the customer and settled from your account",
+            dispute.withdrawalFee
+              ? `Arbitration withdrawal fee of ${dispute.withdrawalFee.amount} ${dispute.withdrawalFee.currency} will be charged to you`
               : "No arbitration withdrawal fee will be charged to you",
           ],
-          tone: withdrawalFeeApplies ? ("warning" as const) : ("neutral" as const),
+          tone: "warning" as const,
           confirm: "Confirm withdrawal",
         }
       : kind === "contest-arb"
@@ -73,8 +59,10 @@ export function DisputeConfirmDialog({
             title: `Do you want to proceed to arbitration for ${money}?`,
             lead: "Before you proceed, here's what to know",
             points: [
-              "This is the final stage. No further documents or actions are allowed after this.",
-              `If the dispute is lost, a ${formatFee(ARBITRATION_FEE)} arbitration fee will be charged`,
+              "This is the final stage. No further documents or actions are allowed at this stage.",
+              dispute.penaltyFee
+                ? `If the dispute is lost, an arbitration fee of ${formatFee(dispute.penaltyFee)} may apply`
+                : "If the dispute is lost, an additional fee may be charged",
             ],
             tone: "warning" as const,
             confirm: "Contest dispute",
@@ -88,7 +76,8 @@ export function DisputeConfirmDialog({
             ],
             note: "If you don't have supporting evidence, accepting the dispute may be the safer option.",
             tone: "warning" as const,
-            confirm: "Contest dispute",
+            // Opens the evidence form; the contest is sent with the evidence, on Submit.
+            confirm: "Continue",
           };
 
   return (

@@ -34,7 +34,9 @@ function BreakupRow({ label, value, negative, emphasis }: BreakupRowProps) {
 interface AmountBreakdownBodyProps {
   amountReceived: number;
   /** Omitted where no real fee is known (the PA details show the settlement's
-   *  own fee instead, see SettlementFeeBreakdown); the row is then dropped. */
+   *  own fee instead, see SettlementFeeBreakdown) or where the processing fee
+   *  isn't relevant (a dispute's own page, where netAmount must exclude it
+   *  too); the row is then dropped. */
   fee?: number;
   /** Omitted along with `fee`; the Net Amount row is then dropped. */
   netAmount?: number;
