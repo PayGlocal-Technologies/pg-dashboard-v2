@@ -19,7 +19,7 @@ export interface InvoiceLineItem {
    * Set when the row came from a template line that references the SKU
    * catalogue. Saving it back as a template keeps the reference, so the price
    * and name stay live. Editing the description, item code or price detaches
-   * the row (see LineItemsGrid), because the merchant has then overridden what
+   * the row (see LineItemDialog), because the merchant has then overridden what
    * the catalogue says.
    */
   skuId?: string;

@@ -21,6 +21,7 @@ import {
 import { Icon } from "@/components/icon";
 import { useClientGeo } from "@/features/dashboard/create-invoice/hooks";
 import type { BillerDetails } from "@/features/dashboard/create-invoice/types";
+import { RequiredMark } from "@/components/common/RequiredMark";
 
 function formatBillerAddress(biller: BillerDetails | undefined): string {
   if (!biller) return "";
@@ -157,14 +158,6 @@ const BILLER_FIELD_IDS = {
   email: "biller-email",
   phone: "biller-phone",
 } as const;
-
-function RequiredMark() {
-  return (
-    <span aria-hidden className="text-destructive">
-      *
-    </span>
-  );
-}
 
 function EditBillerBody({
   billerDetails,

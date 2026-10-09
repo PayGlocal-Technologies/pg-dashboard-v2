@@ -5,9 +5,9 @@ import { Icon } from "@/components/icon";
 import { ACCOUNT_HELPER_TEXT } from "@/features/dashboard/multi-currency/accountGuides";
 
 /**
- * "How it works?" as a modal — the same per-currency copy `HowItWorksPanel`
- * renders inline, behind an overlay instead of reflowing the page beside it.
- * Renders nothing for a currency with no entry, same as the panel.
+ * "How it works?" as a modal: the per-currency account guide copy, behind an
+ * overlay instead of reflowing the page beside it. Renders nothing for a
+ * currency with no entry.
  */
 export function HowItWorksDialog({
   open,
@@ -28,8 +28,7 @@ export function HowItWorksDialog({
 
         <Separator className="my-4" />
 
-        {/* Icon + heading + paragraph, twice, separated by a divider — the
-            same shape HowItWorksPanel uses for this copy. */}
+        {/* Icon + heading + paragraph, twice, separated by a divider. */}
         <div className="flex flex-col gap-5">
           <div className="flex flex-col gap-2">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-muted text-muted-foreground">

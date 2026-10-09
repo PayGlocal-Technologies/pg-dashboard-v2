@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { Shimmer, formatTimestamp } from "@/components/ui";
 import { MandateStatusBadge } from "@/features/dashboard/manage-mandates/columns";
-import { LinkedId } from "@/features/dashboard/manage-mandates/components/LinkedId";
+import { LinkedId } from "@/components/common/LinkedId";
 import {
   formatCompactDate,
   formatMandateAmount,

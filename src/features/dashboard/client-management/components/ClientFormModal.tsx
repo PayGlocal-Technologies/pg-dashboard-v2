@@ -55,9 +55,8 @@ import {
 import { ClientTagsInput } from "@/features/dashboard/client-management/components/ClientTagsInput";
 import { ClientContractUpload } from "@/features/dashboard/client-management/components/ClientContractUpload";
 import type { ClientFormValues } from "@/features/dashboard/client-management/types";
+import { RequiredMark } from "@/components/common/RequiredMark";
 
-/** Red asterisk before a required field's label — the same marker the Add item
- *  form uses, so required-ness reads identically across the product. */
 /**
  * flux's country list, shaped for SingleSelect. Module scope because
  * COUNTRIES is a constant — there is nothing to recompute per render.
@@ -66,14 +65,6 @@ const countrySelectOptions = COUNTRIES.map((country) => ({
   value: country.code,
   label: `${country.flag} ${country.name}`,
 }));
-
-function RequiredMark() {
-  return (
-    <span aria-hidden className="text-destructive">
-      *
-    </span>
-  );
-}
 
 /**
  * "+ Add website", "+ Add tags", "+ Add shipping address"… — the trigger for

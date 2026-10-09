@@ -301,13 +301,6 @@ export function formatSharePct(fraction: number): string {
   return "<0.001%";
 }
 
-/** Compact number formatting: 1_500 -> "1.5K", 2_400_000 -> "2.4M". */
-export function formatNumber(num: number): string {
-  if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-  if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
-  return num.toString();
-}
-
 // Kept as names for the billing-period callers that already read them. They were
 // a second, character-for-character copy of the two tables at the top of this
 // file until they were pointed at them — one set of month names per app.

@@ -33,7 +33,7 @@ import {
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { RequiredMark } from "@/features/dashboard/sku-management/components/item-form/FormSection";
+import { RequiredMark } from "@/components/common/RequiredMark";
 import {
   CollapsibleEditorSection,
   EditorSection,
@@ -386,7 +386,7 @@ function CreatePaymentButtonEditor({
                         {(field) => (
                           <Field>
                             <FieldLabel htmlFor="payment-button-label">
-                              Button Label <RequiredMark />
+                              Button Label <RequiredMark placement="after" />
                             </FieldLabel>
                             <Input
                               id="payment-button-label"

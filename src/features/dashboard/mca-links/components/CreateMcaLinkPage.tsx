@@ -29,6 +29,7 @@ import { currencySymbol } from "@/lib/utils/format";
 import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
 import { CURRENCY_FILTER_OPTIONS } from "@/features/dashboard/multi-currency/constants";
 import { CustomerPreview } from "@/features/dashboard/mca-links/components/CustomerPreview";
+import { RequiredMark } from "@/components/common/RequiredMark";
 
 // Same receiving currencies the MCA filter chips offer, so a merchant
 // can never build a link in a currency there's no account to receive it in.
@@ -62,15 +63,6 @@ function StepIndicator({ step, complete }: { step: number; complete: boolean }) 
       )}
     >
       {complete ? <Icon name="check" className="h-3.5 w-3.5" /> : step}
-    </span>
-  );
-}
-
-/** Red asterisk before a required field's label, matching the reference. */
-function RequiredMark() {
-  return (
-    <span aria-hidden className="text-destructive">
-      *
     </span>
   );
 }

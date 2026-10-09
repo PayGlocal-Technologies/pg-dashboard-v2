@@ -39,9 +39,9 @@ function useResendCountdown(sentAt: number | null): number {
 }
 
 /**
- * The verify step of a protected action, laid out as the dialog steps in
- * Settings' EditContactDialog: a header band, the code field, then a footer
- * band with the actions. The parent sends the first code (so a failed send
+ * The verify step of a protected action, laid out as a dialog step: a header
+ * band, the code field, then a footer band with the actions. The parent sends
+ * the first code (so a failed send
  * never opens this step) and makes the protected call once `onVerified` runs.
  *
  * Switching method sends a fresh code by that method, as pg-dashboard does.

@@ -21,8 +21,6 @@ import {
 import { FxCalculatorModal } from "@/features/dashboard/multi-currency/components/FxCalculatorModal";
 import { useUrlAction } from "@/lib/hooks/useUrlAction";
 import { AccountCurrencyNotice } from "@/features/dashboard/multi-currency/components/AccountCurrencyNotice";
-// Side-panel variant, kept for reference — superseded below by the modal.
-// import { HowItWorksPanel } from "@/features/dashboard/multi-currency/components/HowItWorksPanel";
 import { HowItWorksDialog } from "@/features/dashboard/multi-currency/components/HowItWorksDialog";
 import {
   useAccountDocumentDownload,
