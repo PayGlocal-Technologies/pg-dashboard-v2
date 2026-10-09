@@ -16,6 +16,7 @@ import {
   toDisplayLink,
 } from "@/features/dashboard/static-link/helpers";
 import { useStaticLink } from "@/features/dashboard/static-link/hooks";
+import { staticLinkOrigin } from "@/constants/environment";
 
 /**
  * Static Link, at /static-link: the merchant's one permanent payment link
@@ -52,7 +53,11 @@ export function StaticLinkFeature() {
     return () => window.clearTimeout(id);
   }, []);
 
-  const { prefix, handle } = splitShareableLink(link?.shareableLink);
+  const { prefix: serverPrefix, handle } = splitShareableLink(link?.shareableLink);
+  // The server's own prefix when it has issued the link; until then the
+  // environment's link host, so the name editor still previews a full
+  // address ("uat.payglocal.me/@yourname") rather than the bare name.
+  const prefix = serverPrefix || `${toDisplayLink(staticLinkOrigin())}/@`;
 
   // The banner stands in for the link card until the merchant has a link of
   // their own: none on this account yet (Enable it now), or one they haven't
