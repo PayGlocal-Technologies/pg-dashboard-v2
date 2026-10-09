@@ -3,7 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import type { AxiosError } from "axios";
 import { useDelete, useGet, usePost, usePostQuery, usePut } from "@/lib/api/hooks";
+import { api } from "@/lib/api/axios";
+import { handleApiError } from "@/lib/api/handleApiError";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import type { TableReqBody } from "@/types/transactions";
 // The client book's own wire → render mapping and country reference data, so a
@@ -40,6 +43,7 @@ import {
   merchantAdditionalInfoApi,
   merchantProfileApi,
   invoiceLinkConfigApi,
+  paymentLinkFormConfigApi,
 } from "@/features/dashboard/invoice-links/create/services";
 import {
   CLIENT_PICKER_LIMIT,
@@ -270,6 +274,35 @@ function pick<T>(body: unknown, key: string): T | undefined {
   const root = body as Record<string, unknown> | undefined;
   const inner = root?.data as Record<string, unknown> | undefined;
   return (inner?.[key] ?? root?.[key]) as T | undefined;
+}
+
+export interface RequiredAddresses {
+  billing: boolean;
+  shipping: boolean;
+}
+
+/**
+ * Which addresses this merchant's links must carry, from the payment-link form
+ * config's `plRequiredFields` (gcc-ui-temp reads it for invoice links). gcc
+ * makes street, country, state, city and postcode required in each.
+ */
+export function useRequiredAddresses(mid: string): RequiredAddresses {
+  const { data } = useGet<unknown>(
+    ["payment-link-form-config", mid],
+    paymentLinkFormConfigApi(mid),
+    { enabled: !!mid, staleTime: Infinity }
+  );
+  const fields = pick<{ billingAddressRequired?: boolean; shippingAddressRequired?: boolean }>(
+    data,
+    "plRequiredFields"
+  );
+  return useMemo(
+    () => ({
+      billing: !!fields?.billingAddressRequired,
+      shipping: !!fields?.shippingAddressRequired,
+    }),
+    [fields?.billingAddressRequired, fields?.shippingAddressRequired]
+  );
 }
 
 export interface InvoiceLinkConfig {
@@ -630,8 +663,6 @@ export function useInvoiceLinkClients(
   isLoading: boolean;
   isError: boolean;
   refetch: () => void;
-  /** Reads one client by id and hands it over, for a client just created. */
-  fetchClient: (clientId: string, onLoaded: (client: Client) => void) => void;
 } {
   const countryMap = useClientCountryMap();
 
@@ -661,42 +692,46 @@ export function useInvoiceLinkClients(
     [data, countryMap]
   );
 
-  const [pending, setPending] = useState<{
-    id: string;
-    onLoaded: (client: Client) => void;
-  } | null>(null);
-
-  const { refetch: readClient } = useGet<ClientByIdResponse>(
-    ["client", mid, pending?.id ?? ""],
-    pending ? clientByIdApi(mid, pending.id) : "",
-    undefined,
-    { enabled: false, staleTime: 0 }
-  );
-
-  useEffect(() => {
-    if (!pending) return;
-
-    const run = async (): Promise<void> => {
-      const result = await readClient();
-      const record = result.data?.data?.client;
-      if (record) pending.onLoaded(toClient(record, countryMap));
-      setPending(null);
-    };
-
-    void run();
-  }, [pending, readClient, countryMap]);
-
-  const fetchClient = useCallback(
-    (clientId: string, onLoaded: (client: Client) => void) =>
-      setPending({ id: clientId, onLoaded }),
-    []
-  );
-
   return {
     clients,
     isLoading: !!mid && isPending,
     isError,
     refetch: () => void refetch(),
-    fetchClient,
   };
+}
+
+/**
+ * Reads one client's full record: GET /v3/mca-client/{mid}/{clientId}.
+ *
+ * The picker lists clients from the search endpoint, whose rows carry no
+ * address, so every pick is read in full before it can be billed — the
+ * recipient's billing and shipping addresses come from this. Each call is its
+ * own cached query, so several picks in a row load in parallel (the earlier
+ * single-slot reader could only hold one at a time). Rejects when there is no
+ * record, so the caller can mark that client as failed.
+ */
+export function useFetchClientDetails(mid: string): (clientId: string) => Promise<Client> {
+  const queryClient = useQueryClient();
+  const countryMap = useClientCountryMap();
+
+  return useCallback(
+    async (clientId: string) => {
+      const response = await queryClient.fetchQuery({
+        queryKey: ["client", mid, clientId],
+        queryFn: async () => {
+          try {
+            const res = await api.get<ClientByIdResponse>(clientByIdApi(mid, clientId));
+            return res.data;
+          } catch (error) {
+            return handleApiError(error as AxiosError);
+          }
+        },
+        staleTime: 30_000,
+      });
+      const record = response?.data?.client;
+      if (!record) throw new Error("The client's details could not be read.");
+      return toClient(record, countryMap);
+    },
+    [queryClient, mid, countryMap]
+  );
 }

@@ -25,6 +25,7 @@ import {
 } from "@/components/ui";
 import { Icon } from "@/components/icon";
 import { MidGuard } from "@/components/common/MidGuard";
+import { brandBackdropStyle, INVOICE_PREVIEW_BACKDROP } from "@/lib/utils/brandBackdrop";
 import { SelectMidView } from "@/components/common/SelectMidView";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { useAccountSetup } from "@/stores/useAccountSetup";
@@ -61,6 +62,7 @@ import {
   validateLineItem,
   validatePhone,
   validateRecipient,
+  validateRequiredAddress,
   type LineItemErrors,
 } from "@/features/dashboard/invoice-links/create/helpers";
 import {
@@ -73,6 +75,7 @@ import {
   useInvoiceEditorMid,
   useImportItemsToSku,
   useInvoiceLinkConfig,
+  useRequiredAddresses,
   useInvoiceLinkTemplates,
   useInvoiceLogo,
   useMerchantShortName,
@@ -393,6 +396,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
   const currencies = useInvoiceCurrencies();
   // gcc-ui-temp's merchant configs (features/Invoice/helper.js).
   const invoiceConfig = useInvoiceLinkConfig(mid);
+  const requiredAddresses = useRequiredAddresses(mid);
   // gcc-ui-temp sends `addressCountry` as an ISO2 code; the form holds names.
   const countries = useInvoiceCountries();
   // Matched ignoring case and punctuation: the client book and this list do
@@ -490,6 +494,12 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     return { ...merged, txnCurrency: merged.txnCurrency || currencies[0]?.value || "" };
   }, [serverValues, edits, currencies]);
 
+  // A required shipping address that is "same as billing" is the billing one,
+  // so billing is held to it too — gcc copies billing into shipping then.
+  const billingRequired =
+    requiredAddresses.billing || (requiredAddresses.shipping && values.shippingSameAsBilling);
+  const shippingRequired = requiredAddresses.shipping && !values.shippingSameAsBilling;
+
   // Untouched rows come from the server; the moment the merchant edits the
   // grid their copy wins outright.
   const items = itemsOverride ?? serverItems;
@@ -532,7 +542,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
       if (recipients.length === 0) {
         setRecipientsError("Choose at least one client");
         recipientsOk = false;
-      } else if (recipients.some((r) => validateRecipient(r).length > 0)) {
+      } else if (recipients.some((r) => validateRecipient(r, requiredAddresses).length > 0)) {
         recipientsOk = false;
       }
     } else {
@@ -543,10 +553,10 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
       const phoneNumber = validatePhone(values.phoneNumber);
       if (phoneNumber) next.phoneNumber = phoneNumber;
 
-      const billingErrors = validateAddress(values.billing);
+      const billingErrors = validateRequiredAddress(values.billing, billingRequired);
       Object.entries(billingErrors).forEach(([k, v]) => v && (next[`billing.${k}`] = v));
       if (!values.shippingSameAsBilling) {
-        const shippingErrors = validateAddress(values.shipping);
+        const shippingErrors = validateRequiredAddress(values.shipping, shippingRequired);
         Object.entries(shippingErrors).forEach(([k, v]) => v && (next[`shipping.${k}`] = v));
       }
     }
@@ -592,12 +602,18 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
     met: string
   ): InvoiceRequirement => ({ id, label, fieldId, done: !problem, detail: problem || met });
 
-  const recipientIssues = recipients.filter((r) => validateRecipient(r).length > 0).length;
+  const recipientsLoading = recipients.filter((r) => r.detailsStatus === "loading").length;
+  const recipientIssues = recipients.filter(
+    (r) => validateRecipient(r, requiredAddresses).length > 0
+  ).length;
   const itemsTotal = getTotalAmount(items, values.discount || "0", values.discountType);
   const itemRowsInvalid = items.some((item) => Object.keys(validateLineItem(item)).length > 0);
-  const billingInvalid = Object.values(validateAddress(values.billing)).some(Boolean);
+  const billingInvalid = Object.values(
+    validateRequiredAddress(values.billing, billingRequired)
+  ).some(Boolean);
   const shippingInvalid =
-    !values.shippingSameAsBilling && Object.values(validateAddress(values.shipping)).some(Boolean);
+    !values.shippingSameAsBilling &&
+    Object.values(validateRequiredAddress(values.shipping, shippingRequired)).some(Boolean);
 
   const requirements: InvoiceRequirement[] = [
     requirement(
@@ -621,9 +637,11 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
           "recipients",
           recipients.length === 0
             ? "Pick at least one client."
-            : recipientIssues > 0
-              ? `${recipientIssues} client${recipientIssues === 1 ? " needs" : "s need"} details completed.`
-              : null,
+            : recipientsLoading > 0
+              ? "Loading client details…"
+              : recipientIssues > 0
+                ? `${recipientIssues} client${recipientIssues === 1 ? " needs" : "s need"} details completed.`
+                : null,
           recipients.length === 1
             ? recipients[0].fullName
             : `${recipients.length} clients, one link each.`
@@ -979,10 +997,9 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
           </SplitButton>
         </header>
 
-        {/* Preview column at 40rem, narrower than create-invoice's 46rem: an
-            invoice-link document is lighter, and the form beside it needs the
-            room more. */}
-        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_40rem]">
+        {/* Preview column at 46rem, the same as create-invoice, so the two
+            invoice editors share one layout. */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_46rem]">
           <div className="min-h-0 overflow-y-auto">
             <div className="mx-auto max-w-250 space-y-5 px-6 py-6 lg:px-10">
               {/* Captioned chips, the way the invoice editor opens: the two
@@ -1066,6 +1083,7 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
                     recipients={recipients}
                     onChange={updateRecipients}
                     error={recipientsError}
+                    requiredAddresses={requiredAddresses}
                   />
                 ) : (
                   <EditorSection icon="user" title="Who you're billing">
@@ -1148,13 +1166,19 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
                     icon="map-pin"
                     title="Billing and shipping"
                     subtitle={
-                      addressFilled
-                        ? `${addressFilled} field(s) filled in`
-                        : "Optional on an invoice link"
+                      requiredAddresses.billing || requiredAddresses.shipping
+                        ? "Required for this account"
+                        : addressFilled
+                          ? `${addressFilled} field(s) filled in`
+                          : "Optional on an invoice link"
                     }
                     collapsible
                     defaultOpen={false}
-                    forceOpen={hasAddressError}
+                    // Required by the merchant's config: held open, as gcc forces
+                    // those sections open.
+                    forceOpen={
+                      hasAddressError || requiredAddresses.billing || requiredAddresses.shipping
+                    }
                   >
                     <div className="space-y-4">
                       <AddressFields
@@ -1238,8 +1262,15 @@ function InvoiceLinkEditor({ invoiceId }: { invoiceId?: string }) {
             </div>
           </div>
 
-          {/* Preview fills the right column, as it does in invoice management. */}
-          <div className="min-h-0 overflow-y-auto bg-muted/30">
+          {/* Preview fills the right column on the same brand backdrop as
+              create-invoice's preview column. */}
+          <div
+            className="brand-backdrop min-h-0 overflow-y-auto bg-cover bg-top bg-no-repeat"
+            // A wash layered under the image (not `opacity` on this div)
+            // lightens the image itself without touching the foreground
+            // content's own opacity.
+            style={brandBackdropStyle(55, INVOICE_PREVIEW_BACKDROP)}
+          >
             <div className="space-y-4 p-4 md:p-6">
               <p className="text-[13px] font-medium text-muted-foreground">
                 Customer preview
