@@ -89,7 +89,7 @@ export interface DisputeEvent {
   resolvedOn?: string;
   /** File names submitted as evidence, see DisputeRespondForm's onSubmit. */
   documents?: string[];
-  /** When documents was actually set (see withDisputeStatus in
+  /** When documents was actually set (see
    * TransactionDetailFeature), used by generateTimelineEvents for the
    * EVIDENCE_SUBMITTED entry's own timestamp, falls back to raisedOn/
    * resolvedOn for mock data that doesn't set this explicitly. */
@@ -98,7 +98,7 @@ export interface DisputeEvent {
    * currently reviewing the submitted evidence. Undefined means
    * "PAYGLOCAL_REVIEW", PayGlocal's own internal review immediately after
    * submission, before a representation is forwarded to the issuing bank.
-   * Set by withDisputeStatus whenever a fresh submission restarts review. */
+   */
   reviewPhase?: DisputeReviewPhase;
   /** The dispute's broader stage in the card-network process, separate from
    * `reviewPhase` (a narrower PayGlocal-vs-bank detail only meaningful

@@ -1,45 +1,93 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui";
+import {
+  Button,
+  Callout,
+  CalloutTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  Field,
+  FieldError,
+  FieldLabel,
+  Input,
+} from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
+import { plural } from "@/features/dashboard/dispute-management/helpers";
 
 interface DisputeAcceptChoiceProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   amount: number;
   currency: string;
+  /** Days left to submit evidence, for the partial accept's "What happens next". */
+  daysToRespond: number;
+  /** pg-dashboard offers no partial accept at arbitration. */
+  allowPartial: boolean;
   onAcceptFull: () => void;
-  onAcceptPartially: () => void;
+  /** The amount to return to the customer, as typed. Accepted with the evidence, on its Submit. */
+  onAcceptPartially: (acceptedAmount: string) => void;
+  isAccepting: boolean;
 }
 
-type ChoiceView = "choice" | "confirm-full";
+type ChoiceView = "choice" | "confirm-full" | "partial";
 
-/** Pop-up shown the moment "Accept dispute" is clicked on DisputeActionCard,
- * not a full-screen navigation. First asks full vs. partial, "Accept
- * partially" closes the dialog and hands off to DisputeRespondForm (the
- * "screen approach"), "Accept in full" advances to a second, irreversible
- * confirmation step inside the same dialog before calling onAcceptFull. */
+/**
+ * pg-dashboard's partial-amount rule (AcceptContestDrawer): required, and
+ * between 0.01 and the disputed amount, both ends included.
+ */
+function acceptedAmountError(value: string, max: number): string | null {
+  const text = value.trim();
+  if (!text) return "Amount is required";
+  if (!/^\d+(\.\d+)?$/.test(text)) return "The Amount must be a positive number";
+  const n = Number(text);
+  if (n < 0.01 || n > max) return `The Amount must be between 0.01 and ${max}`;
+  return null;
+}
+
+/** Pop-up shown the moment "Accept dispute" is clicked. First asks full vs.
+ * partial. "Accept in full" advances to an irreversible confirmation step;
+ * "Accept partially" asks how much is returned to the customer, as
+ * pg-dashboard's accept drawer does, then goes on to the evidence form; the
+ * amount is accepted together with the evidence, on the form's Submit. */
 export function DisputeAcceptChoice({
   open,
   onOpenChange,
   amount,
   currency,
+  daysToRespond,
+  allowPartial,
   onAcceptFull,
   onAcceptPartially,
+  isAccepting,
 }: DisputeAcceptChoiceProps) {
   const [view, setView] = useState<ChoiceView>("choice");
+  const [partial, setPartial] = useState("");
+  const [showError, setShowError] = useState(false);
   const amountLabel = `${formatCurrency(amount, currency)} ${currency}`;
+  const partialError = acceptedAmountError(partial, amount);
 
   function handleOpenChange(next: boolean) {
     // Reset to the first step every time the dialog (re)opens, not via an
     // effect, see CLAUDE.md's hooks-purity rules.
-    if (next) setView("choice");
+    if (next) {
+      setView("choice");
+      setPartial("");
+      setShowError(false);
+    }
     onOpenChange(next);
   }
 
-  const options: {
+  function confirmPartial() {
+    setShowError(true);
+    if (partialError) return;
+    onAcceptPartially(partial.trim());
+  }
+
+  const allOptions: {
     key: string;
     icon: IconName;
     title: string;
@@ -62,12 +110,10 @@ export function DisputeAcceptChoice({
       description:
         "Refund part of the disputed amount and contest the rest with supporting evidence.",
       tag: "Needs documents",
-      onSelect: () => {
-        onOpenChange(false);
-        onAcceptPartially();
-      },
+      onSelect: () => setView("partial"),
     },
   ];
+  const options = allOptions.filter((opt) => allowPartial || opt.key !== "partial");
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -130,6 +176,80 @@ export function DisputeAcceptChoice({
                 </Button>
               ))}
             </div>
+          </>
+        ) : view === "partial" ? (
+          <>
+            <div className="flex items-start gap-3 px-6 pt-6 pr-14">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Icon name="scale" size={18} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg leading-tight">Accept a partial amount</DialogTitle>
+                <DialogDescription className="mt-0.5 text-[13px]">
+                  Out of {amountLabel} disputed.
+                </DialogDescription>
+              </div>
+            </div>
+
+            <form
+              className="flex flex-col gap-4 px-6 pt-4 pb-6"
+              noValidate
+              onSubmit={(e) => {
+                e.preventDefault();
+                confirmPartial();
+              }}
+            >
+              <Field>
+                <FieldLabel htmlFor="dispute-accepted-amount">
+                  Enter the amount you&apos;re agreeing to return to the customer{" "}
+                  <span className="text-destructive">*</span>
+                </FieldLabel>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="dispute-accepted-amount"
+                    inputMode="decimal"
+                    placeholder="Enter amount"
+                    value={partial}
+                    aria-invalid={showError && !!partialError}
+                    onChange={(e) => setPartial(e.target.value)}
+                  />
+                  <span className="shrink-0 text-sm text-muted-foreground">/ {amountLabel}</span>
+                </div>
+                {showError && partialError ? <FieldError>{partialError}</FieldError> : null}
+              </Field>
+
+              <Callout variant="warning">
+                <Icon name="alert-triangle" size={16} aria-hidden className="mt-0.5 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <CalloutTitle className="text-sm font-semibold">What happens next</CalloutTitle>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4 text-[13px] leading-relaxed opacity-90">
+                    <li>
+                      The accepted amount will be returned to the customer and settled from your
+                      account
+                    </li>
+                    <li>You&apos;ll continue to contest the remaining amount</li>
+                    <li>Supporting evidence will be required for contesting the remaining amount</li>
+                    <li>Evidence must be submitted within {plural(Math.max(daysToRespond, 0), "day")}</li>
+                  </ul>
+                </div>
+              </Callout>
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Icon name="chevron-left" size={13} />}
+                  onClick={() => setView("choice")}
+                  className="shadow-none"
+                >
+                  Back
+                </Button>
+                <Button type="submit" variant="primary" size="sm" isLoading={isAccepting}>
+                  {`Continue${partial.trim() && !partialError ? ` with ${formatCurrency(Number(partial), currency)} ${currency}` : ""}`}
+                </Button>
+              </div>
+            </form>
           </>
         ) : (
           <>

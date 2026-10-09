@@ -1,13 +1,22 @@
-import {
-  ARBITRATION_FEE,
-  WITHDRAWAL_FEE,
-  formatFee,
-  type EscalationStage,
-} from "@/features/dashboard/pa-transactions/status/disputeStages";
+import { formatFee } from "@/features/dashboard/dispute-management/disputeStages";
+import type {
+  DisputeCase,
+  DisputeScreenStage,
+} from "@/features/dashboard/dispute-management/types";
 import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import type { DisputeEventStatus } from "@/features/dashboard/pa-transactions/financial/types";
+
+/** Which explainer: the guide's own vocabulary, one entry per kind of state. */
+export type GuideKey =
+  | "NEEDS_RESPONSE"
+  | "UNDER_REVIEW"
+  | "MORE_EVIDENCE_NEEDED"
+  | "REOPENED"
+  | "CLEARED"
+  | "CHARGED_BACK"
+  | "ACCEPTED"
+  | "EXPIRED";
 
 type GuideTone = "warning" | "info" | "success" | "danger" | "neutral";
 
@@ -41,7 +50,7 @@ const TONE_CLASS: Record<GuideTone, string> = {
  * review cycle, escalating through Dispute -> Pre-arbitration -> Arbitration
  * on each loss, which is why that ladder is repeated as shared context
  * below rather than only explaining the one status in isolation. */
-const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
+const STAGE_GUIDES: Record<GuideKey, StageGuide> = {
   NEEDS_RESPONSE: {
     title: "Action required",
     icon: "alert-triangle",
@@ -202,13 +211,17 @@ const STAGE_GUIDES: Record<DisputeEventStatus, StageGuide> = {
 
 /** Shared context shown under every status's own explanation, since a
  * single dispute can run through this whole ladder — see the STAGE_GUIDES
- * doc comment above. */
-const ESCALATION_LADDER: {
-  stage: EscalationStage;
+ * doc comment above. Review times are pg-dashboard's; fees are the
+ * dispute's own, or "may apply" where the case carries none. Both
+ * compliance levels sit on the pre-arbitration rung. */
+const escalationLadder = (
+  dispute: DisputeCase
+): {
+  stage: DisputeScreenStage;
   icon: IconName;
   label: string;
   description: string;
-}[] = [
+}[] => [
   {
     stage: "CHARGEBACK",
     icon: "file-text",
@@ -220,20 +233,22 @@ const ESCALATION_LADDER: {
     stage: "PRE_ARBITRATION",
     icon: "chevron-up",
     label: "Pre-arbitration",
-    description: `If the bank rules against you, it can escalate to pre-arbitration. Accept now to avoid further escalation, or submit additional evidence. The bank may take up to 60 business days to decide.`,
+    description: `If the bank rules against you, it can escalate to pre-arbitration (or a pre-compliance review). Accept now to avoid further escalation, or submit additional evidence. The bank may take up to 45 business days to decide.`,
   },
   {
     stage: "ARBITRATION",
     icon: "chevrons-up",
     label: "Arbitration",
-    description: `The final stage: no new documents can be added. Withdraw (a ${formatFee(WITHDRAWAL_FEE)} withdrawal fee may apply), or let the bank make a final decision; if it goes against you, a ${formatFee(ARBITRATION_FEE)} arbitration fee is charged.`,
+    description: `The final stage: no new documents can be added. Withdraw (${dispute.withdrawalFee ? `a ${formatFee(dispute.withdrawalFee)} withdrawal fee may apply` : "a withdrawal fee may apply"}), or let the bank make a final decision within 24 hours; if it goes against you, ${dispute.penaltyFee ? `a ${formatFee(dispute.penaltyFee)} arbitration fee may apply` : "an arbitration fee may apply"}.`,
   },
 ];
 
 interface DisputeStageGuideDialogProps {
-  status: DisputeEventStatus;
+  guide: GuideKey;
   /** The dispute's current stage, highlighted in the stages list. */
-  stage?: EscalationStage;
+  stage?: DisputeScreenStage;
+  /** For the stage ladder's fees. */
+  dispute: DisputeCase;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -246,12 +261,14 @@ interface DisputeStageGuideDialogProps {
  * points one per row, then the stages as a stepper with the current one
  * marked. */
 export function DisputeStageGuideDialog({
-  status,
+  guide: guideKey,
   stage,
+  dispute,
   open,
   onOpenChange,
 }: DisputeStageGuideDialogProps) {
-  const guide = STAGE_GUIDES[status];
+  const guide = STAGE_GUIDES[guideKey];
+  const ladder = escalationLadder(dispute);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -294,9 +311,9 @@ export function DisputeStageGuideDialog({
             Dispute stages
           </p>
           <ol className="mt-4">
-            {ESCALATION_LADDER.map((level, i) => {
+            {ladder.map((level, i) => {
               const current = level.stage === stage;
-              const last = i === ESCALATION_LADDER.length - 1;
+              const last = i === ladder.length - 1;
               return (
                 <li key={level.stage} className="relative flex gap-3 pb-5 last:pb-0">
                   {/* The line joining each step to the next. */}

@@ -1,239 +1,264 @@
-import { Badge, type Column, StatusBadge } from "@/components/ui";
-import { Icon, type IconName } from "@/components/icon";
-import { PaymentMethodLogo } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
-import { CountryFlag } from "@/features/dashboard/multi-currency/components/CountryFlag";
+import {
+  Badge,
+  type Column,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui";
+import { Icon } from "@/components/icon";
 import { cn, formatCurrency } from "@/lib/utils";
-import { formatDisplayDateTime } from "@/features/dashboard/pa-transactions/paColumns";
-import { parseFormattedTimestamp } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
+import { formatTimestamp } from "@/lib/utils/format";
+import { CopyableCell } from "@/components/common/CopyableCell";
+import { PaymentMethodLogo } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
+import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithTooltip";
-import { formatFee } from "@/features/dashboard/pa-transactions/status/disputeStages";
-import { DISPUTE_STATUS_META } from "@/features/dashboard/pa-transactions/status/disputeStatus";
-import type { DisputeResolution, DisputeRow } from "@/features/dashboard/dispute-management/types";
 import { AmountHeader, AmountWithCode } from "@/components/common/AmountCell";
-
-// Reuses DISPUTE_STATUS_META as-is, same chip labels/colors as the disputed
-// rows already shown in the Transactions table, so a dispute looks
-// identical wherever it appears.
-const RESOLUTION_LABEL: Record<DisputeResolution, string> = {
-  NO_RESPONSE: "No response",
-  CONTESTED: "Contested",
-  CUSTOMER_DROPPED: "Customer dropped",
-  ACCEPTED: "Accepted",
-  WITHDRAWN: "Withdrawn",
-};
-
-/** When a row has no explicit resolution, the most likely one for its status. */
-const DEFAULT_RESOLUTION: Partial<Record<DisputeRow["status"], DisputeResolution>> = {
-  CLEARED: "CONTESTED",
-  CHARGED_BACK: "CONTESTED",
-  ACCEPTED: "ACCEPTED",
-  EXPIRED: "NO_RESPONSE",
-};
-
-/**
- * DISPUTE_STATUS_META's chip, with a closed dispute's "Won" / "Lost" label
- * extended by how it got there: "Lost · No response", "Won · Contested",
- * "Won · Customer dropped". Colour and icon stay the status's own. Open
- * disputes keep their plain status label.
- */
-function statusMeta(row: DisputeRow) {
-  const meta = DISPUTE_STATUS_META[row.status];
-  const resolution = row.resolution ?? DEFAULT_RESOLUTION[row.status];
-  if (!resolution) return meta;
-  // The chip says just Won or Lost; how it got there, and any fee charged,
-  // is the tooltip.
-  const why =
-    resolution === "WITHDRAWN"
-      ? "You withdrew at arbitration. The amount was returned to the customer."
-      : (meta.tooltip ?? "");
-  const fee = row.appliedFee
-    ? ` ${row.appliedFee.kind === "ARBITRATION" ? "Arbitration" : "Withdrawal"} fee of ${formatFee(row.appliedFee)} charged.`
-    : "";
-  return {
-    ...meta,
-    tooltip: `${meta.label} · ${RESOLUTION_LABEL[resolution]}. ${why}${fee}`.trim(),
-  };
-}
+import {
+  CB_LEVEL_META,
+  DISPLAY_STATUS_META,
+  RESPOND_BY_TABS,
+  SINGLE_STATUS_TABS,
+} from "@/features/dashboard/dispute-management/constants";
+import {
+  amountHistory,
+  isAmountUpdated,
+  levelAmount,
+  paymentRow,
+  respondBy,
+  showsRespondBy,
+} from "@/features/dashboard/dispute-management/helpers";
+import type { DisputeBucket, DisputeRecord } from "@/features/dashboard/dispute-management/types";
 
 // Same type treatment as the Transactions table: the amount in bold, every
-// supporting value (reason, email, method digits, dates) in regular-weight
-// muted 13px, so the two tables read identically.
+// supporting value in regular-weight muted 13px.
 const MUTED_CELL = "whitespace-nowrap text-[13px] text-muted-foreground";
 
-function DateTimeCell({ value }: { value?: string }) {
-  const formatted = formatDisplayDateTime(value);
-  return <span className={cn(MUTED_CELL, "tabular-nums")}>{formatted ?? "N/A"}</span>;
+/** pg-dashboard writes every list amount in rupees (`₹ … INR`); search rows carry no currency. */
+const LIST_CURRENCY = "INR";
+
+function DateTimeCell({ value }: { value?: string | null }) {
+  return <span className={cn(MUTED_CELL, "tabular-nums")}>{formatTimestamp(value, "N/A")}</span>;
 }
 
-const ONE_HOUR_MS = 60 * 60 * 1000;
-const ONE_DAY_MS = 24 * ONE_HOUR_MS;
-
-/** Time-remaining countdown for a dispute's own response deadline (status-
- * vocabulary spec §27): a plain date once the deadline is more than 7 days
- * out, "N days left" inside 7 days, switching to "N hours left" inside 24h,
- * "Overdue" once it's passed. `nowMs` is captured once by the caller (see
- * DisputeManagementFeature's own lazy useState(() => Date.now()) initializer,
- * CLAUDE.md's no-Date.now()-during-render rule) rather than read fresh here. */
-export function formatRespondByCountdown(value: string | undefined, nowMs: number): string {
-  if (!value) return "N/A";
-  const deadline = parseFormattedTimestamp(value);
-  if (!deadline) return "N/A";
-  const diff = deadline - nowMs;
-  if (diff <= 0) return "Overdue";
-  if (diff < ONE_DAY_MS) {
-    const hours = Math.max(1, Math.round(diff / ONE_HOUR_MS));
-    return `${hours} hour${hours === 1 ? "" : "s"} left`;
-  }
-  if (diff < 7 * ONE_DAY_MS) {
-    const days = Math.max(1, Math.round(diff / ONE_DAY_MS));
-    return `${days} day${days === 1 ? "" : "s"} left`;
-  }
-  return formatDisplayDateTime(value) ?? "N/A";
-}
-
-function DeadlineCell({ value, nowMs }: { value?: string; nowMs: number }) {
-  const label = formatRespondByCountdown(value, nowMs);
-  // Same size and weight as every other cell; a deadline inside a day (or
-  // past) is marked by colour only.
-  const urgent = label === "Overdue" || label.endsWith("hours left") || label.endsWith("hour left");
+/**
+ * The current level's amount and, when a later level changed it, an info
+ * mark whose tooltip lists each level's amount (pg-dashboard's "Amount
+ * Updated" note, ChargeBackTooltip).
+ */
+function AmountCell({ row }: { row: DisputeRecord }) {
+  const amount = (
+    <AmountWithCode
+      amount={formatCurrency(Number(levelAmount(row) ?? 0), LIST_CURRENCY)}
+      code={LIST_CURRENCY}
+    />
+  );
+  if (!isAmountUpdated(row)) return amount;
+  const history = amountHistory(row);
   return (
-    <span className={cn(MUTED_CELL, "tabular-nums", urgent && "text-red-600 dark:text-red-400")}>
-      {label}
+    <span className="inline-flex items-center justify-end gap-1.5">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <span
+            tabIndex={0}
+            aria-label="Amount updated"
+            className="inline-flex text-amber-600 dark:text-amber-400"
+          >
+            <Icon name="info" size={13} aria-hidden />
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p className="mb-1.5 font-medium">Disputed amount has been updated</p>
+          <dl className="flex flex-col gap-1">
+            {history.map((item, index) => (
+              <div
+                key={item.label}
+                className={cn(
+                  "flex justify-between gap-4",
+                  index === history.length - 1 && "font-semibold"
+                )}
+              >
+                <dt>{item.label}</dt>
+                <dd className="tabular-nums">
+                  {formatCurrency(Number(item.value), LIST_CURRENCY)} {LIST_CURRENCY}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </TooltipContent>
+      </Tooltip>
+      {amount}
     </span>
   );
 }
 
-/** The Transactions table's Customer Email flag: the currency's country
- *  (INR → India, USD → US, EUR → EU). */
-function flagIso2(currency?: string): string | undefined {
-  const c = (currency?.trim() || "INR").toUpperCase();
-  if (c.length !== 3) return undefined;
-  return c === "EUR" ? "EU" : c.slice(0, 2);
+/**
+ * The response deadline and, while it has not passed, how long is left (red
+ * inside two days, amber inside five). Only for rows still awaiting the
+ * merchant (showsRespondBy); the list never says "Past due", as
+ * pg-dashboard's doesn't.
+ */
+function DeadlineCell({ row, now }: { row: DisputeRecord; now: number }) {
+  if (!showsRespondBy(row)) return <span className={MUTED_CELL}>-</span>;
+  const due = respondBy(row.dueDate, now);
+  return (
+    <span className="flex flex-col">
+      <span className={cn(MUTED_CELL, "tabular-nums")}>{formatTimestamp(row.dueDate, "-")}</span>
+      {!due.isOverdue && (
+        <span
+          className={cn(
+            "whitespace-nowrap text-[12px]",
+            due.tone === "danger"
+              ? "text-red-600 dark:text-red-400"
+              : due.tone === "warning"
+                ? "text-amber-600 dark:text-amber-400"
+                : "text-muted-foreground"
+          )}
+        >
+          {due.text}
+        </span>
+      )}
+    </span>
+  );
 }
 
-/** Payment method as the Transactions table shows it: the logo, then the
- *  card's last four (or the method's name) in muted monospace. */
-function PaymentMethodCellView({ row }: { row: DisputeRow }) {
-  const last4 = row.maskedCardNumber?.replace(/x/gi, "").trim();
-  const instrument = row.paymentInstrument?.toUpperCase() ?? "";
+/** Payment method as the Transactions table shows it: the logo, then the card's last four. */
+function PaymentMethodCellView({ row }: { row: DisputeRecord }) {
+  const tx = paymentRow(row.paymentMethod, row.subPaymentMethod, row.maskedCardNo);
+  const last4 = row.maskedCardNo?.replace(/x/gi, "").trim();
   const text = last4
     ? `••• ${last4}`
-    : instrument.includes("UPI")
+    : row.paymentMethod === "UPI"
       ? "UPI"
-      : instrument.startsWith("NETBANKING")
+      : row.paymentMethod === "INB"
         ? "Net Banking"
-        : "•••••••";
+        : row.paymentMethod === "PAYMENT_ACCOUNT"
+          ? "Apple Pay"
+          : "•••••••";
   return (
     <div className="flex items-center gap-1.5">
-      <PaymentMethodLogo row={row} />
+      <PaymentMethodLogo row={tx} />
       <span className="whitespace-nowrap font-mono text-[13px] text-muted-foreground">{text}</span>
     </div>
   );
 }
 
-const DISPUTE_ESCALATION_PHASE_LABEL: Record<NonNullable<DisputeRow["disputePhase"]>, string> = {
-  DISPUTE: "Dispute",
-  PRE_ARBITRATION: "Pre-arbitration",
-  ARBITRATION: "Arbitration",
-};
-
 /**
- * The escalation round as a chip, so how far a dispute has gone reads at a
- * glance: Dispute (first round) plain, Pre-arbitration amber with one
- * up-chevron, Arbitration red with two (the last round, where losing carries
- * a fee). Colour always comes with the label and chevrons, never alone.
+ * The level as a chip, so how far a dispute has gone reads at a glance:
+ * Dispute plain, Pre-Compliance and Pre-Arbitration amber with one
+ * up-chevron, Arbitration red with two. Colour always comes with the label.
  */
-const PHASE_CHIP: Record<
-  NonNullable<DisputeRow["disputePhase"]>,
-  { variant: "secondary" | "warning" | "error"; icon?: IconName }
-> = {
-  DISPUTE: { variant: "secondary" },
-  PRE_ARBITRATION: { variant: "warning", icon: "chevron-up" },
-  ARBITRATION: { variant: "error", icon: "chevrons-up" },
-};
-
-function PhaseCell({ phase }: { phase?: DisputeRow["disputePhase"] }) {
-  if (!phase) {
-    return <span className="text-[12px] text-muted-foreground">{"–"}</span>;
-  }
-  const { variant, icon } = PHASE_CHIP[phase];
+function StageCell({ row }: { row: DisputeRecord }) {
+  const meta = CB_LEVEL_META[row.cbLevel];
+  if (!meta) return <span className={MUTED_CELL}>{row.cbLevel || "–"}</span>;
   return (
     <Badge
-      variant={variant}
+      variant={meta.variant}
       size="sm"
-      // Same height, radius and type size as the Status chip beside it.
       className="gap-1 whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium"
     >
-      {DISPUTE_ESCALATION_PHASE_LABEL[phase]}
-      {icon && <Icon name={icon} size={12} aria-hidden />}
+      {meta.label}
+      {meta.chevrons === 1 && <Icon name="chevron-up" size={12} aria-hidden />}
+      {meta.chevrons === 2 && <Icon name="chevrons-up" size={12} aria-hidden />}
     </Badge>
   );
 }
 
-// Every reorderable/hideable data column, keyed so ColumnManager
-// (reused as-is from the transactions feature) can toggle visibility and
-// reorder independently. "respondBy" is appended separately in
-// buildDisputeColumns, only when the active segment needs it. Status stays
-// the one 8-term vocabulary/chip (see the dispute-workflow PDF's own much
-// finer set of screens). Stage is the escalation round (Dispute,
-// Pre-arbitration, Arbitration, as in the Disputes workflow PDF): one column,
-// not a second step-level "stage" alongside it, which read as a duplicate.
-export const DISPUTE_COLUMN_DEFS: { key: string; label: string }[] = [
-  { key: "amount", label: "Amount" },
-  { key: "status", label: "Status" },
-  { key: "disputePhase", label: "Stage" },
-  { key: "reason", label: "Reason" },
-  { key: "paymentMethod", label: "Payment method" },
-  { key: "customerEmail", label: "Customer email" },
-  { key: "disputedOn", label: "Disputed on" },
-];
+/**
+ * Every data column, in default order, each keyed so the column manager can
+ * reorder and hide it. Which appear depends on the tab (Status, and Respond
+ * by vs Completed on) and on whether the list spans several merchant IDs.
+ */
+export function disputeColumnDefs({
+  tab,
+  showMerchantId,
+}: {
+  tab: DisputeBucket;
+  showMerchantId: boolean;
+}): { key: string; label: string }[] {
+  return [
+    { key: "cbId", label: "Dispute ID" },
+    ...(showMerchantId ? [{ key: "merchantId", label: "Merchant ID" }] : []),
+    { key: "amount", label: "Amount" },
+    ...(SINGLE_STATUS_TABS.includes(tab) ? [] : [{ key: "status", label: "Status" }]),
+    { key: "stage", label: "Stage" },
+    { key: "reason", label: "Reason" },
+    { key: "paymentMethod", label: "Payment method" },
+    // BACKEND GAP - see the Customer email column below.
+    // { key: "customerEmail", label: "Customer email" },
+    { key: "disputedOn", label: "Disputed on" },
+    RESPOND_BY_TABS.includes(tab)
+      ? { key: "respondBy", label: "Respond by" }
+      : { key: "completedOn", label: "Completed on" },
+  ];
+}
 
-export const DISPUTE_COLUMN_ORDER: string[] = DISPUTE_COLUMN_DEFS.map((d) => d.key);
-
-function buildColumn(key: string): Column<DisputeRow> | null {
+function buildColumn(key: string, now: number): Column<DisputeRecord> | null {
   switch (key) {
+    case "cbId":
+      return {
+        key: "cbId",
+        header: "Dispute ID",
+        minWidth: 150,
+        render: (row) => (
+          <span className="group">
+            <CopyableCell
+              value={truncateId(row.cbId)}
+              copyValue={row.cbId}
+              label="Dispute ID"
+              className="text-[13px] font-medium text-foreground"
+            />
+          </span>
+        ),
+      };
+    case "merchantId":
+      return {
+        key: "merchantId",
+        header: "Merchant ID",
+        minWidth: 140,
+        render: (row) => <span className={MUTED_CELL}>{row.merchantId || "-"}</span>,
+      };
     case "amount":
       return {
         key: "amount",
         header: <AmountHeader />,
         align: "right",
-        minWidth: 135,
-        render: (row) => (
-          <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
-        ),
+        minWidth: 150,
+        render: (row) => <AmountCell row={row} />,
       };
     case "status":
       return {
         key: "status",
         header: "Status",
-        // Fits the longest chip, "Won · Customer dropped", on one line.
-        minWidth: 200,
+        minWidth: 170,
         render: (row) => {
-          const { label, variant, trailIcon, tooltip } = statusMeta(row);
+          const meta = DISPLAY_STATUS_META[row.displayStatus];
+          if (!meta) return <span className={MUTED_CELL}>{row.displayStatus || "-"}</span>;
           return (
             <StatusBadgeWithTooltip
-              variant={variant}
-              label={label}
-              trailIcon={trailIcon}
-              tooltip={tooltip}
+              variant={meta.variant}
+              label={meta.label}
+              trailIcon={meta.trailIcon}
+              tooltip={meta.tooltip}
               size="sm"
             />
           );
         },
       };
-    case "disputePhase":
+    case "stage":
       return {
-        key: "disputePhase",
+        key: "stage",
         header: "Stage",
-        minWidth: 130,
-        render: (row) => <PhaseCell phase={row.disputePhase} />,
+        minWidth: 140,
+        render: (row) => <StageCell row={row} />,
       };
     case "reason":
       return {
         key: "reason",
         header: "Reason",
-        minWidth: 160,
-        render: (row) => <span className={MUTED_CELL}>{row.reason}</span>,
+        minWidth: 170,
+        render: (row) => (
+          <span className={MUTED_CELL}>{row.cbReasonShortDescription || "Other reason"}</span>
+        ),
       };
     case "paymentMethod":
       return {
@@ -242,70 +267,74 @@ function buildColumn(key: string): Column<DisputeRow> | null {
         minWidth: 145,
         render: (row) => <PaymentMethodCellView row={row} />,
       };
+    /*
+      BACKEND GAP - Customer email column (kept from v2's design). Search
+      rows carry no customer email (pg-dashboard's ChargebackRecord has
+      none), so it could only ever show "-". Restore with the def above
+      once /v1/search/cb returns it:
+
     case "customerEmail":
       return {
         key: "customerEmail",
         header: "Customer email",
         minWidth: 190,
-        render: (row) => {
-          const iso2 = flagIso2(row.currency);
-          return (
-            <span className="flex items-center gap-2 whitespace-nowrap">
-              {iso2 && <CountryFlag iso2={iso2} alt="" />}
-              <span className="text-[13px] lowercase text-muted-foreground">
-                {row.email || "—"}
-              </span>
-            </span>
-          );
-        },
+        render: (row) => <span className={MUTED_CELL}>{row.customerEmail || "-"}</span>,
       };
+    */
     case "disputedOn":
       return {
         key: "disputedOn",
         header: "Disputed on",
-        minWidth: 130,
-        render: (row) => <DateTimeCell value={row.disputedOn} />,
+        minWidth: 140,
+        sorter: true,
+        render: (row) => <DateTimeCell value={row.formattedCreationTime} />,
+      };
+    case "respondBy":
+      return {
+        key: "respondBy",
+        header: "Respond by",
+        minWidth: 150,
+        sorter: true,
+        render: (row) => <DeadlineCell row={row} now={now} />,
+      };
+    case "completedOn":
+      return {
+        key: "completedOn",
+        header: "Completed on",
+        minWidth: 140,
+        sorter: true,
+        render: (row) => <DateTimeCell value={row.formattedCbCompletionTime} />,
       };
     default:
       return null;
   }
 }
 
-interface BuildDisputeColumnsOptions {
-  columnOrder?: string[];
-  hiddenColumns?: Set<string>;
-  /** "Respond by" only makes sense while a dispute still needs a merchant
-   * response, so it's added conditionally rather than living in the regular
-   * reorderable column set. */
-  showRespondBy?: boolean;
-  /** A fixed point in time (see DisputeManagementFeature's own lazy
-   * useState(() => Date.now()) initializer), only required when
-   * showRespondBy is true, drives the "N days/hours left" countdown. */
-  nowMs?: number;
-}
-
+/** The tab's columns in the managed order, less any the merchant hid. */
 export function buildDisputeColumns({
-  columnOrder = DISPUTE_COLUMN_ORDER,
+  tab,
+  showMerchantId,
+  now,
+  columnOrder,
   hiddenColumns,
-  showRespondBy = false,
-  nowMs,
-}: BuildDisputeColumnsOptions = {}): Column<DisputeRow>[] {
-  const cols: Column<DisputeRow>[] = [];
-
-  for (const key of columnOrder) {
-    if (hiddenColumns?.has(key)) continue;
-    const col = buildColumn(key);
-    if (col) cols.push(col);
-  }
-
-  if (showRespondBy) {
-    cols.push({
-      key: "respondBy",
-      header: "Respond by",
-      minWidth: 130,
-      render: (row) => <DeadlineCell value={row.respondBy} nowMs={nowMs ?? 0} />,
-    });
-  }
-
-  return cols;
+}: {
+  tab: DisputeBucket;
+  showMerchantId: boolean;
+  now: number;
+  columnOrder: string[] | null;
+  hiddenColumns: string[];
+}): Column<DisputeRecord>[] {
+  const available = disputeColumnDefs({ tab, showMerchantId }).map((d) => d.key);
+  // A saved order may miss this tab's own columns (Respond by vs Completed
+  // on): those keep their default slot at the end.
+  const ordered = columnOrder
+    ? [
+        ...columnOrder.filter((key) => available.includes(key)),
+        ...available.filter((key) => !columnOrder.includes(key)),
+      ]
+    : available;
+  return ordered
+    .filter((key) => !hiddenColumns.includes(key))
+    .map((key) => buildColumn(key, now))
+    .filter((c): c is Column<DisputeRecord> => c !== null);
 }

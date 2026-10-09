@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Button,
   Calendar,
@@ -65,6 +65,9 @@ export interface ReportDownloadDrawerProps {
   /** Called with the chosen window. The caller builds its own request body
    *  from it, since every report endpoint shapes that differently. */
   onGenerate: (window: ReportWindow) => void;
+  /** Extra report options, shown under the window picker (e.g. Dispute
+   *  Management's report source). The caller owns their state. */
+  children?: ReactNode;
 }
 
 const EMPTY_DATE_RANGE = { from: "", to: "" };
@@ -111,6 +114,7 @@ export function ReportDownloadDrawer({
   initialRelativeRange = EMPTY_RELATIVE_RANGE,
   isGenerating,
   onGenerate,
+  children,
 }: ReportDownloadDrawerProps) {
   // `today` is read once on mount (no Date during render, see CLAUDE.md);
   // the drawer is remounted on every open, so it never goes stale.
@@ -331,6 +335,8 @@ export function ReportDownloadDrawer({
                 : "Enter how far back the report should go."}
             </FieldError>
           )}
+
+          {children}
         </div>
 
         <DrawerFooter className="flex-col gap-3 px-6 pb-5 pt-4">

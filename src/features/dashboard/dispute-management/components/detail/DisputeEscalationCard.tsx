@@ -1,27 +1,16 @@
 "use client";
 
-import { useState } from "react";
 import { Badge, Button, Callout, CalloutTitle, Card } from "@/components/ui";
 import { Icon, type IconName } from "@/components/icon";
 import { cn } from "@/lib/utils";
-import { parseFormattedTimestamp } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
 import { ACTION_CARD_CLASS } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
-import { stageOf, stageWarnings } from "@/features/dashboard/pa-transactions/status/disputeStages";
-import { ChargebackProtectedChip } from "@/features/dashboard/pa-transactions/components/ChargebackProtectedChip";
-import { isFraudDispute } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
-import type { DisputeEvent } from "@/features/dashboard/pa-transactions/financial/types";
+import { stageWarnings } from "@/features/dashboard/dispute-management/disputeStages";
+import { respondBy } from "@/features/dashboard/dispute-management/helpers";
+// BACKEND GAP - see the chip note in DisputeActionCard.
+// import { ChargebackProtectedChip } from "@/features/dashboard/dispute-management/components/detail/ChargebackProtectedChip";
+import type { DisputeCase } from "@/features/dashboard/dispute-management/types";
 
-/** "2 days to respond" / "5 hours to respond" / "Response overdue". */
-function timeToRespond(respondBy: string | undefined, nowMs: number): string | undefined {
-  const deadline = respondBy ? parseFormattedTimestamp(respondBy) : undefined;
-  if (!deadline) return undefined;
-  const diff = deadline - nowMs;
-  if (diff <= 0) return "Response overdue";
-  const hours = Math.max(1, Math.round(diff / 3_600_000));
-  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} to respond`;
-  const days = Math.round(hours / 24);
-  return `${days} day${days === 1 ? "" : "s"} to respond`;
-}
+const BADGE_VARIANT = { danger: "error", warning: "warning", muted: "secondary" } as const;
 
 function Choice({
   icon,
@@ -61,9 +50,11 @@ function Choice({
 }
 
 /**
- * The decision a merchant faces when a dispute escalates, per the
- * "Pre-arb and arb" design: the stage, the clock, what it can cost, then the
- * two ways forward side by side.
+ * The decision a merchant faces when a dispute escalates (pg-dashboard's
+ * CbPreArbActionCard / CbArbActionCard, ACTION_REQUIRED): the stage, the
+ * clock, what it can cost (the dispute's own fees), then the two ways
+ * forward side by side. Both compliance levels use the pre-arbitration
+ * screen, as in pg-dashboard.
  *
  *  - Pre-arbitration: Accept dispute (full or partial, the same accept
  *    dialog as the first round) OR Continue contesting (more evidence).
@@ -73,22 +64,21 @@ function Choice({
  */
 export function DisputeEscalationCard({
   dispute,
+  now,
   onAccept,
   onWithdraw,
   onContest,
   onLearnMore,
 }: {
-  dispute: DisputeEvent;
+  dispute: DisputeCase;
+  now: number;
   onAccept: () => void;
   onWithdraw: () => void;
   onContest: () => void;
   onLearnMore: () => void;
 }) {
-  // Captured once (CLAUDE.md: no Date.now() during render).
-  const [nowMs] = useState(() => Date.now());
-  const stage = stageOf(dispute);
-  const isArbitration = stage === "ARBITRATION";
-  const clock = timeToRespond(dispute.respondBy, nowMs);
+  const isArbitration = dispute.screenStage === "ARBITRATION";
+  const clock = respondBy(dispute.dueDate, now);
   const warnings = stageWarnings(dispute);
 
   return (
@@ -98,16 +88,9 @@ export function DisputeEscalationCard({
           <h2 className="text-base font-bold text-foreground">
             {isArbitration ? "Arbitration review started" : "Pre-arbitration review started"}
           </h2>
-          {clock && (
-            <Badge variant="error" size="sm" className="rounded-md">
-              {clock}
-            </Badge>
-          )}
-          {isFraudDispute(dispute.reason) && (
-            <span className="sm:ml-auto">
-              <ChargebackProtectedChip />
-            </span>
-          )}
+          <Badge variant={BADGE_VARIANT[clock.tone]} size="sm" className="rounded-md">
+            {clock.text}
+          </Badge>
         </div>
         <p className="mt-1.5 text-sm text-muted-foreground">
           {isArbitration

@@ -14,11 +14,11 @@ import { cn } from "@/lib/utils";
 import { CopyableText } from "@/components/common/CopyableText";
 import { truncateMiddle } from "@/lib/utils/format";
 import {
+  DisputeDetailPlaceholder,
   DisputeDetailView,
   type DisputeFlow,
-} from "@/features/dashboard/pa-transactions/components/DisputeDetailFeature";
-import type { DisputeEvent } from "@/features/dashboard/pa-transactions/financial/types";
-import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
+} from "@/features/dashboard/dispute-management/components/detail/DisputeDetailView";
+import type { DisputeCase } from "@/features/dashboard/dispute-management/types";
 
 /**
  * The collapsed view of a dispute: a right-side drawer over the list, built
@@ -27,16 +27,19 @@ import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
  * no Expand, as there is no full-page view in the mobile flow.
  */
 export function DisputeDetailsDrawer({
-  transaction,
+  cbId,
   dispute,
+  isLoading,
   flow,
   open,
   onOpenChange,
   onExpand,
   instant = false,
 }: {
-  transaction: PaTransaction | undefined;
-  dispute: DisputeEvent | undefined;
+  /** The selected dispute's ID, for the header while its details load. */
+  cbId: string;
+  dispute: DisputeCase | null;
+  isLoading: boolean;
   flow: DisputeFlow;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -59,13 +62,15 @@ export function DisputeDetailsDrawer({
         <DrawerTitle asChild>
           <VisuallyHidden>Dispute details</VisuallyHidden>
         </DrawerTitle>
-        {transaction && dispute && (
+        {cbId && (
           <DisputeDrawerBody
-            transaction={transaction}
+            cbId={cbId}
             dispute={dispute}
+            isLoading={isLoading}
             flow={flow}
             onClose={() => onOpenChange(false)}
-            onExpand={isBottomSheet ? undefined : onExpand}
+            // Nothing to expand until the case has loaded.
+            onExpand={isBottomSheet || !dispute ? undefined : onExpand}
           />
         )}
       </DrawerContent>
@@ -76,14 +81,16 @@ export function DisputeDetailsDrawer({
 /** The drawer's inside, shared with the expand/collapse hand-off so the
  *  moving panel shows the real content in the real place. */
 export function DisputeDrawerBody({
-  transaction,
+  cbId,
   dispute,
+  isLoading = false,
   flow,
   onClose,
   onExpand,
 }: {
-  transaction: PaTransaction;
-  dispute: DisputeEvent;
+  cbId: string;
+  dispute: DisputeCase | null;
+  isLoading?: boolean;
   flow: DisputeFlow;
   onClose?: () => void;
   onExpand?: () => void;
@@ -107,19 +114,18 @@ export function DisputeDrawerBody({
           )}
         </div>
         <CopyableText
-          value={dispute.id}
-          displayValue={truncateMiddle(dispute.id, 10, 6)}
+          value={cbId}
+          displayValue={truncateMiddle(cbId, 10, 6)}
           valueClassName="min-w-0 truncate text-muted-foreground"
           className="ml-auto min-w-0"
         />
       </DrawerHeader>
       <div className="min-h-0 flex-1 overflow-y-auto p-6 [&_.shadow-sm]:shadow-none">
-        <DisputeDetailView
-          transaction={transaction}
-          dispute={dispute}
-          flow={flow}
-          layout="drawer"
-        />
+        {dispute ? (
+          <DisputeDetailView dispute={dispute} flow={flow} layout="drawer" />
+        ) : (
+          <DisputeDetailPlaceholder isLoading={isLoading} layout="drawer" />
+        )}
       </div>
     </>
   );
