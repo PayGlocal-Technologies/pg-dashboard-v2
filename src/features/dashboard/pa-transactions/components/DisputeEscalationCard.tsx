@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { parseFormattedTimestamp } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
 import { ACTION_CARD_CLASS } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
 import { stageOf, stageWarnings } from "@/features/dashboard/pa-transactions/status/disputeStages";
+import { ChargebackProtectedChip } from "@/features/dashboard/pa-transactions/components/ChargebackProtectedChip";
+import { isFraudDispute } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
 import type { DisputeEvent } from "@/features/dashboard/pa-transactions/financial/types";
 
 /** "2 days to respond" / "5 hours to respond" / "Response overdue". */
@@ -40,13 +42,17 @@ function Choice({
         <Icon name={icon} size={18} aria-hidden />
       </span>
       <p className="text-sm font-semibold text-foreground">{title}</p>
-      <p className="max-w-64 text-[13px] leading-relaxed text-muted-foreground">{description}</p>
+      <p className="mb-1 max-w-64 text-[13px] leading-relaxed text-muted-foreground">
+        {description}
+      </p>
+      {/* Pinned to the bottom: the two choices stretch to the same height,
+       * so their buttons line up whatever each description's length. */}
       <Button
         type="button"
         variant="primary"
         size="sm"
         onClick={onAction}
-        className="mt-1 w-full max-w-60"
+        className="mt-auto w-full max-w-60"
       >
         {action}
       </Button>
@@ -96,6 +102,11 @@ export function DisputeEscalationCard({
             <Badge variant="error" size="sm" className="rounded-md">
               {clock}
             </Badge>
+          )}
+          {isFraudDispute(dispute.reason) && (
+            <span className="sm:ml-auto">
+              <ChargebackProtectedChip />
+            </span>
           )}
         </div>
         <p className="mt-1.5 text-sm text-muted-foreground">

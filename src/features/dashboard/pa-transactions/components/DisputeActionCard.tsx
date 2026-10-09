@@ -9,6 +9,8 @@ import {
 } from "@/components/ui";
 import { cn } from "@/lib/utils";
 import { ACTION_CARD_CLASS } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
+import { ChargebackProtectedChip } from "@/features/dashboard/pa-transactions/components/ChargebackProtectedChip";
+import { isFraudDispute } from "@/features/dashboard/pa-transactions/disputeReasonMeta";
 
 interface DisputeActionCardProps {
   /** Short, concise, merchant-facing label derived from the dispute's own
@@ -52,7 +54,12 @@ export function DisputeActionCard({
   return (
     // The merchant has to act here, so it carries the action-card wash.
     <Card className={cn("gap-0 p-5", ACTION_CARD_CLASS)}>
-      <h2 className="text-base font-bold text-foreground">{merchantLabel}</h2>
+      {/* A fraud dispute carries the protection chip beside its title,
+       * where the merchant is deciding what to do. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h2 className="text-base font-bold text-foreground">{merchantLabel}</h2>
+        {isFraudDispute(reason) && <ChargebackProtectedChip />}
+      </div>
       <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         <Badge variant="secondary" size="sm" square className="tabular-nums">
           {reasonCode}
@@ -85,27 +92,28 @@ export function DisputeActionCard({
           You may either contest the dispute by providing evidence that the charge is legitimate, or
           accept it immediately to refund the cardholder and close the dispute.
         </p>
-      </div>
-
-      <Separator className="my-4" />
-
-      <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* Part of the guidance, so it sits with it rather than sharing the
+         * action row, where it wrapped loose above the buttons in the
+         * drawer. */}
         <Button
           type="button"
           variant="link"
           onClick={onLearnMore}
-          className="h-auto w-fit p-0 text-sm font-medium"
+          className="mt-1.5 h-auto w-fit p-0 text-sm font-medium"
         >
           Learn how to respond to disputes
         </Button>
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={onAccept}>
-            Accept dispute
-          </Button>
-          <Button type="button" variant="primary" size="sm" onClick={onContest}>
-            Contest dispute
-          </Button>
-        </div>
+      </div>
+
+      <Separator className="my-4" />
+
+      <div className="flex items-center justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onAccept}>
+          Accept dispute
+        </Button>
+        <Button type="button" variant="primary" size="sm" onClick={onContest}>
+          Contest dispute
+        </Button>
       </div>
     </Card>
   );

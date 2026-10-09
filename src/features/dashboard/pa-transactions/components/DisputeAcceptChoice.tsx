@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui";
-import { Icon } from "@/components/icon";
+import { Icon, type IconName } from "@/components/icon";
 import { formatCurrency } from "@/lib/utils";
 
 interface DisputeAcceptChoiceProps {
@@ -39,71 +39,141 @@ export function DisputeAcceptChoice({
     onOpenChange(next);
   }
 
+  const options: {
+    key: string;
+    icon: IconName;
+    title: string;
+    description: string;
+    tag: string;
+    onSelect: () => void;
+  }[] = [
+    {
+      key: "full",
+      icon: "rotate-ccw",
+      title: "Accept in full",
+      description: `Refund the full ${amountLabel} to the cardholder and close this dispute.`,
+      tag: "Closes immediately",
+      onSelect: () => setView("confirm-full"),
+    },
+    {
+      key: "partial",
+      icon: "scale",
+      title: "Accept partially",
+      description:
+        "Refund part of the disputed amount and contest the rest with supporting evidence.",
+      tag: "Needs documents",
+      onSelect: () => {
+        onOpenChange(false);
+        onAcceptPartially();
+      },
+    },
+  ];
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className={view === "choice" ? "sm:max-w-lg" : "sm:max-w-md"}>
+      <DialogContent className="gap-0 p-0 sm:max-w-md">
         {view === "choice" ? (
           <>
-            <DialogTitle>Accept dispute</DialogTitle>
-            <DialogDescription>
-              Choose how much of this {amountLabel} dispute you want to accept.
-            </DialogDescription>
+            <div className="flex items-start gap-3 px-6 pt-6 pr-14">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Icon name="receipt" size={18} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg leading-tight">Accept dispute</DialogTitle>
+                <DialogDescription className="mt-0.5 text-[13px]">
+                  Choose how much of this dispute you want to accept.
+                </DialogDescription>
+              </div>
+            </div>
 
-            {/* Button wraps all of its children in a single inline span, so
-             * each option's title/description need their own flex-col
-             * wrapper here, putting flex-col on the Button itself has no
-             * effect since it only ever has that one wrapper span as a
-             * direct child (see DisputeRespondForm's upload dropzone for the
-             * same fix). */}
-            <div className="mt-2 grid gap-2.5 sm:grid-cols-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setView("confirm-full")}
-                className="h-full min-h-0 w-full items-start justify-start rounded-xl p-4 text-left"
-              >
-                <span className="flex flex-col items-start gap-1">
-                  <span className="text-sm font-semibold text-foreground">Accept in full</span>
-                  <span className="text-xs leading-relaxed whitespace-normal text-muted-foreground">
-                    Refund the full disputed amount ({amountLabel}) to the cardholder and close this
-                    dispute immediately.
-                  </span>
-                </span>
-              </Button>
+            <div className="mx-6 mt-4 flex items-center justify-between gap-3 rounded-lg bg-muted/50 px-3.5 py-2.5">
+              <span className="text-[13px] text-muted-foreground">Disputed amount</span>
+              <span className="text-sm font-semibold tabular-nums text-foreground">
+                {amountLabel}
+              </span>
+            </div>
 
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  onOpenChange(false);
-                  onAcceptPartially();
-                }}
-                className="h-full min-h-0 w-full items-start justify-start rounded-xl p-4 text-left"
-              >
-                <span className="flex flex-col items-start gap-1">
-                  <span className="text-sm font-semibold text-foreground">Accept partially</span>
-                  <span className="text-xs leading-relaxed whitespace-normal text-muted-foreground">
-                    Refund only part of the disputed amount and contest the rest with supporting
-                    evidence.
+            {/* Button wraps its children in one inline span, so each option's
+             * layout lives on its own inner wrapper (see DisputeRespondForm's
+             * upload dropzone for the same fix). */}
+            <div className="flex flex-col gap-2.5 px-6 pt-4 pb-6">
+              {options.map((opt) => (
+                <Button
+                  key={opt.key}
+                  type="button"
+                  variant="outline"
+                  onClick={opt.onSelect}
+                  className="group h-auto min-h-0 w-full justify-start rounded-xl p-4 text-left whitespace-normal shadow-none transition-colors hover:border-primary/60 hover:bg-primary/5 focus-visible:border-primary"
+                >
+                  <span className="flex w-full items-center gap-3.5">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground/70 transition-colors group-hover:bg-primary/10 group-hover:text-primary">
+                      <Icon name={opt.icon} size={18} aria-hidden />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-semibold text-foreground">{opt.title}</span>
+                        <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                          {opt.tag}
+                        </span>
+                      </span>
+                      <span className="text-xs leading-relaxed font-normal text-muted-foreground">
+                        {opt.description}
+                      </span>
+                    </span>
+                    <Icon
+                      name="chevron-right"
+                      size={16}
+                      aria-hidden
+                      className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+                    />
                   </span>
-                </span>
-              </Button>
+                </Button>
+              ))}
             </div>
           </>
         ) : (
           <>
-            <DialogTitle>Accept dispute in full?</DialogTitle>
-            <DialogDescription>
-              {amountLabel} will be refunded to the cardholder and this dispute will be marked as
-              lost. This action cannot be undone.
-            </DialogDescription>
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="flex items-start gap-3 px-6 pt-6 pr-14">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
+                <Icon name="alert-triangle" size={18} aria-hidden />
+              </span>
+              <div className="min-w-0">
+                <DialogTitle className="text-lg leading-tight">Accept dispute in full?</DialogTitle>
+                <DialogDescription className="mt-0.5 text-[13px]">
+                  This action cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+
+            <dl className="mx-6 mt-4 divide-y divide-border rounded-lg border border-border">
+              <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <dt className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                  <Icon name="rotate-ccw" size={14} aria-hidden />
+                  Refunded to the cardholder
+                </dt>
+                <dd className="text-sm font-semibold tabular-nums text-foreground">
+                  {amountLabel}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                <dt className="flex items-center gap-2 text-[13px] text-muted-foreground">
+                  <Icon name="x" size={14} aria-hidden />
+                  Dispute outcome
+                </dt>
+                <dd className="text-sm font-semibold text-red-600 dark:text-red-400">
+                  Marked as lost
+                </dd>
+              </div>
+            </dl>
+
+            <div className="flex justify-end gap-2 px-6 pt-5 pb-6">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 leftIcon={<Icon name="chevron-left" size={13} />}
                 onClick={() => setView("choice")}
+                className="shadow-none"
               >
                 Back
               </Button>

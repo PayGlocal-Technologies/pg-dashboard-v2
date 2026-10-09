@@ -70,3 +70,9 @@ export function getDisputeReasonMeta(reason: string): DisputeReasonMeta {
     }
   );
 }
+
+/** A fraud dispute (card-network reason 10.4, "Fraudulent"): the ones
+ *  PayGlocal's chargeback protection covers. */
+export function isFraudDispute(reason: string): boolean {
+  return getDisputeReasonMeta(reason).reasonCode === DISPUTE_REASON_DETAILS.FRAUDULENT!.reasonCode;
+}

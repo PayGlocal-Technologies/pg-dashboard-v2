@@ -24,6 +24,10 @@ interface UseDisputeResolutionFlowArgs {
    * transaction already updated) — e.g. navigate back to a list. Omit to
    * stay on the current page. */
   onAccepted?: () => void;
+  /** Called whenever the evidence form opens (contest, or the contested
+   *  part of a partial accept). The Dispute Management drawer uses it to
+   *  expand into the full page, where the form has room. */
+  onOpenForm?: () => void;
 }
 
 /** The Accept/Contest workflow itself — the part that actually mutates the
@@ -41,6 +45,7 @@ export function useDisputeResolutionFlow({
   currency,
   dispute,
   onAccepted,
+  onOpenForm,
 }: UseDisputeResolutionFlowArgs) {
   const stage = dispute ? stageOf(dispute) : "CHARGEBACK";
   const setStoredTransaction = useTransactionDetail((s) => s.setTransaction);
@@ -80,6 +85,7 @@ export function useDisputeResolutionFlow({
   function openContestForm() {
     setRespondMode("contest");
     setDisputeScreen("respond");
+    onOpenForm?.();
   }
 
   /** Arbitration only. */
@@ -125,6 +131,7 @@ export function useDisputeResolutionFlow({
   function handleAcceptPartially() {
     setRespondMode("partial");
     setDisputeScreen("respond");
+    onOpenForm?.();
   }
 
   function handleConfirmAcceptFull() {

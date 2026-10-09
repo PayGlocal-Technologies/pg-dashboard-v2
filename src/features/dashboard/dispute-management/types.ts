@@ -79,7 +79,6 @@ export interface DisputeRow {
   appliedFee?: DisputeEvent["appliedFee"];
 }
 
-// TODO(integration): this feature has no data source yet (the list renders
-// empty, see DISPUTE_ROWS in index.tsx). Wire up
-// the real chargeback-search endpoint (`v1/search/cb`, see pg-dashboard's
-// features/chargebacks/services.ts) once it's available.
+// TODO(integration): this feature is mock-data only, see mockRows.ts. Wire up
+// the real chargeback-search endpoint (see ChargebackDetails/ChargebackDetailsResponse
+// in @/features/dashboard/pa-transactions/types) once it's available.

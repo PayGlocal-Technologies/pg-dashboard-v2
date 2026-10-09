@@ -1,10 +1,11 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
 import { Card } from "@/components/ui";
-import { Icon } from "@/components/icon";
 import { SectionLabel } from "@/features/dashboard/pa-transactions/components/TransactionDetailPrimitives";
-import { cn } from "@/lib/utils";
+import {
+  SettlementTimelineStepper,
+  type SettlementStepStatus,
+} from "@/features/dashboard/mca-transactions/components/SettlementTimelineStepper";
 
 export type DisputeFormStepState = "complete" | "current" | "locked";
 
@@ -14,96 +15,26 @@ export interface DisputeFormStep {
   state: DisputeFormStepState;
 }
 
-function StepMarker({ state }: { state: DisputeFormStepState }) {
-  return (
-    <span
-      className={cn(
-        "relative flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full border-2 transition-colors",
-        state === "complete" && "border-emerald-500 bg-card",
-        state === "current" && "border-primary bg-card",
-        state === "locked" && "border-border bg-muted"
-      )}
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        {state === "complete" ? (
-          <motion.span
-            key="complete"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: "spring", stiffness: 500, damping: 22 }}
-          >
-            <Icon name="check" size={9} strokeWidth={3} className="text-emerald-500" aria-hidden />
-          </motion.span>
-        ) : state === "locked" ? (
-          <motion.span
-            key="locked"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-          >
-            <Icon name="lock" size={8} className="text-muted-foreground/60" aria-hidden />
-          </motion.span>
-        ) : (
-          <motion.span
-            key="current"
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="block h-1.5 w-1.5 rounded-full bg-primary"
-          />
-        )}
-      </AnimatePresence>
-    </span>
-  );
-}
+/** Each form step as the MCA timeline draws it. */
+const STEPPER_STATUS: Record<DisputeFormStepState, SettlementStepStatus> = {
+  complete: "success",
+  current: "inProgress",
+  locked: "pending",
+};
 
-/** The vertical-line step list itself, shared by DisputeFormTimelineCard
- * (wrapped in its own Card below) and DisputeStatusNoticeCard (embedded
- * directly inside an already-existing card), so both read as "the same
- * timeline" wherever they appear. */
+/** The step list itself, shared by DisputeFormTimelineCard (wrapped in its
+ * own Card below) and DisputeStatusNoticeCard (embedded directly inside an
+ * already-existing card). Drawn by the MCA Transactions timeline, so every
+ * dispute timeline has the same ticks and connecting line. */
 export function DisputeStepList({ steps }: { steps: DisputeFormStep[] }) {
   return (
-    <ol className="flex flex-col">
-      {steps.map((step, i) => {
-        const isLast = i === steps.length - 1;
-        return (
-          <li key={step.label} className="flex items-stretch gap-3">
-            <div className="flex flex-col items-center">
-              <StepMarker state={step.state} />
-              {!isLast && (
-                <motion.div
-                  aria-hidden="true"
-                  className="my-1 w-px flex-1"
-                  animate={{
-                    backgroundColor:
-                      step.state === "complete"
-                        ? "var(--color-emerald-500, #10b981)"
-                        : "var(--border)",
-                  }}
-                  transition={{ duration: 0.3 }}
-                />
-              )}
-            </div>
-            <div className={cn("min-w-0", !isLast && "pb-5")}>
-              <p
-                className={cn(
-                  "text-sm font-semibold",
-                  step.state === "locked" ? "text-muted-foreground/60" : "text-foreground/85"
-                )}
-              >
-                {step.label}
-              </p>
-              <p
-                className={cn(
-                  "text-xs",
-                  step.state === "locked" ? "text-muted-foreground/50" : "text-muted-foreground"
-                )}
-              >
-                {step.description}
-              </p>
-            </div>
-          </li>
-        );
-      })}
-    </ol>
+    <SettlementTimelineStepper
+      items={steps.map((step) => ({
+        status: STEPPER_STATUS[step.state],
+        title: step.label,
+        subtitle: step.description,
+      }))}
+    />
   );
 }
 
