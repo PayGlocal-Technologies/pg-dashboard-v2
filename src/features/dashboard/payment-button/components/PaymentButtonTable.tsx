@@ -97,7 +97,8 @@ export function PaymentButtonTable({ onEdit }: PaymentButtonTableProps) {
   // straight to this table. Read once on mount.
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
-  const [statuses, setStatuses] = useState<string[]>([]);
+  // Opens on the Active tab: the buttons currently taking payments.
+  const [statuses, setStatuses] = useState<string[]>(["ACTIVE"]);
   const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
   // Date and Time, pg-dashboard's `date` filter: an absolute range, or "Last N
   // days" resolved to epoch millis once, when applied (resolving it per render
