@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { DataCardList, DataTableCard } from "@/components/ui";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
-import { type AmountRangeValue } from "@/components/common/filters/FilterChips";
 import { useApp } from "@/stores/useApp";
 import { useAccountSetup } from "@/stores/useAccountSetup";
 import { usePost } from "@/lib/api/hooks";
@@ -45,7 +44,6 @@ import type {
 } from "@/features/dashboard/mca-receipts/types";
 import type { MonthRange } from "@/components/common/filters/FilterChips";
 
-const EMPTY_AMOUNT_RANGE: AmountRangeValue = { min: "", max: "" };
 const EMPTY_ROWS: Receipt[] = [];
 
 /**
@@ -72,7 +70,6 @@ export function McaReceiptTable() {
   // the merchant edits filters afterwards.
   const searchParams = useSearchParams();
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
-  const [amountRange, setAmountRange] = useState<AmountRangeValue>(EMPTY_AMOUNT_RANGE);
   // The service window the list request is bounded by. Lazy initialisers: both
   // read the clock, which must not happen during render (CLAUDE.md).
   const [defaultPeriod] = useState<MonthRange>(() => defaultReceiptPeriod());
@@ -146,8 +143,8 @@ export function McaReceiptTable() {
   const monthsWithData = useMemo(() => receiptMonthsWithData(sourceRows), [sourceRows]);
 
   const filtered = useMemo(
-    () => filterReceipts(sourceRows, { search, amountRange }),
-    [sourceRows, search, amountRange]
+    () => filterReceipts(sourceRows, { search }),
+    [sourceRows, search]
   );
 
   const totalCount = filtered.length;
@@ -186,11 +183,6 @@ export function McaReceiptTable() {
 
   const renderFilterChips = () => (
     <ReceiptFilterChips
-      amountRange={amountRange}
-      onAmountRangeChange={(next) => {
-        setAmountRange(next);
-        setPage(1);
-      }}
       periodBounds={periodBounds}
       monthsWithData={monthsWithData}
       period={period}
@@ -218,8 +210,6 @@ export function McaReceiptTable() {
   // will arrive instead of offering an action this page doesn't have.
   const hasNarrowingFilters =
     !!search.trim() ||
-    amountRange.min !== EMPTY_AMOUNT_RANGE.min ||
-    amountRange.max !== EMPTY_AMOUNT_RANGE.max ||
     period.start !== defaultPeriod.start ||
     period.end !== defaultPeriod.end;
 

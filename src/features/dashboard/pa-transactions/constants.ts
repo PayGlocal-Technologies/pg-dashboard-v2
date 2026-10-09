@@ -47,13 +47,14 @@ export const PA_PAYMENT_STATUS_OPTIONS: FilterOption[] = [
 ];
 
 // ── Table view tabs → the payment statuses each one filters to ─────────────
+// The table opens on Success (PA_DEFAULT_VIEW_STATUSES).
 // Shortcuts onto the Status chip, built from the list above. That list has no
 // plain SUCCESS, so Success is the captured state. No Disputed tab: disputes
 // are not shown on this page.
 export const PA_VIEW_TABS = [
   { value: "all", label: "All", statuses: [] as string[] },
   { value: "success", label: "Success", statuses: ["SENT_FOR_CAPTURE"] },
-  { value: "refunded", label: "Refunded", statuses: ["SENT_FOR_REFUND"] },
+  { value: "refunded", label: "Refunds", statuses: ["SENT_FOR_REFUND"] },
   {
     value: "failed",
     label: "Failed",
@@ -74,6 +75,11 @@ export const PA_ORDER_STATUS_OPTIONS: FilterOption[] = [
   { value: "AUTHORIZED", label: "Authorised" },
   { value: "REVERSED", label: "Reversed" },
   { value: "CAPTURED", label: "Captured" },
+];
+
+/** The statuses the table opens on: the Success tab's. */
+export const PA_DEFAULT_VIEW_STATUSES: string[] = [
+  ...(PA_VIEW_TABS.find((t) => t.value === "success")?.statuses ?? []),
 ];
 
 // ── Payment method chip options (the production method codes) ───────────────

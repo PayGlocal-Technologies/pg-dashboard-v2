@@ -45,7 +45,6 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/mca-transactions",
   "/multi-currency",
   "/my-queries",
-  "/pa-dashboard",
   "/pa-transactions",
   "/payment-links",
   "/payment-button",

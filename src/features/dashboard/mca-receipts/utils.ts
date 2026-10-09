@@ -1,4 +1,4 @@
-import type { AmountRangeValue, MonthRange } from "@/components/common/filters/FilterChips";
+import type { MonthRange } from "@/components/common/filters/FilterChips";
 import { formatCurrency } from "@/lib/utils/format";
 import {
   RECEIPT_DEFAULT_LOOKBACK_MONTHS,
@@ -100,7 +100,6 @@ export function receiptMonthsWithData(receipts: Receipt[]): Set<string> {
 
 export interface ReceiptFilters {
   search: string;
-  amountRange: AmountRangeValue;
 }
 
 /**
@@ -108,7 +107,7 @@ export interface ReceiptFilters {
  *
  * Product and period are NOT among them: both are in the request body (see
  * buildReceiptRequestBody), so the response already covers one product over one
- * window. Search and amount stay here because the endpoint takes neither.
+ * window. Search stays here because the endpoint does not take it.
  *
  * The product test below is kept even so, as a narrowing safety net rather than
  * the primary filter: if a backend ignored `products`, this page would otherwise
@@ -117,12 +116,6 @@ export interface ReceiptFilters {
  */
 export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Receipt[] {
   const query = filters.search.trim().toLowerCase();
-  // Blank and non-numeric inputs both mean "no bound", so a half-typed minus sign
-  // never silently filters everything out.
-  const min = parseFloat(filters.amountRange.min);
-  const max = parseFloat(filters.amountRange.max);
-  const hasMin = !Number.isNaN(min);
-  const hasMax = !Number.isNaN(max);
 
   return receipts.filter((receipt) => {
     if (receipt.product !== RECEIPT_PRODUCT) return false;
@@ -139,15 +132,6 @@ export function filterReceipts(receipts: Receipt[], filters: ReceiptFilters): Re
       )
     ) {
       return false;
-    }
-
-    // Inclusive on both ends, so a range typed to match a figure the merchant can
-    // see in the Amount column returns that row.
-    if (hasMin || hasMax) {
-      const amount = parseFloat(receipt.amount);
-      if (Number.isNaN(amount)) return false;
-      if (hasMin && amount < min) return false;
-      if (hasMax && amount > max) return false;
     }
 
     return true;

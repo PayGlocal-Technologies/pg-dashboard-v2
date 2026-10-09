@@ -3,7 +3,6 @@ import type { StaticLinkBaseField } from "@/features/dashboard/static-link/types
 
 export const STATIC_LINK_TITLE = "A unique link for your business";
 export const STATIC_LINK_SUBTITLE = "That you and your customers can remember";
-export const STATIC_LINK_COPIED_MESSAGE = "Link copied";
 
 /** React Query keys: the lookup that finds the link's id, and the link read. */
 export const STATIC_LINK_SEARCH_QUERY_KEY = ["static-link-search"];

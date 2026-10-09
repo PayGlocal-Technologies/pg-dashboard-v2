@@ -27,7 +27,6 @@ import {
   formatWeekdayDate,
   formatWeekdayName,
 } from "@/lib/utils/format";
-import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import type { SettlementSchedule } from "@/features/dashboard/settlement-reports/calendarUtils";
 import { SettlementHolidayBanner } from "@/features/dashboard/mca-settlement-report/components/SettlementHolidayBanner";
 import { SettlementCalendarButton } from "@/features/dashboard/settlement-reports/components/SettlementCalendarButton";
@@ -85,11 +84,12 @@ const SETTLEMENT_PAGE_LIMIT = 50;
 const TOOLBAR_BUTTON_CLASS =
   "h-auto min-h-0 shrink-0 py-1 text-foreground shadow-[0_1px_2px_rgba(15,23,42,0.08),0_2px_8px_rgba(15,23,42,0.12)]!";
 
-/** The Payments table's two views: payouts still on their way, and paid. */
-const SETTLEMENT_STATUS_TABS = [
-  { value: "SETTLED", label: "Settled" },
-  { value: "PROCESSING", label: "Processing" },
-] as const satisfies readonly { value: SettlementStatus; label: string }[];
+/**
+ * The Payments table lists paid payouts only. There is no Processing view:
+ * the backend sends no in-flight settlements, so that tab could only ever be
+ * mock (and one remaining tab is no choice, so there is no tab bar either).
+ */
+const SETTLEMENT_TABLE_STATUS: SettlementStatus = "SETTLED";
 
 /** "Tonight" only holds when today's payments are still on track for a plain
  * T+1 cutoff, once a weekend/holiday pushes the date out, name the actual day
@@ -163,7 +163,7 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const activeProduct = toProductType(activeContext);
   const isMca = activeProduct === "PACB";
   // The Payments "Settlements" design: Settlement ID, Status and UTR columns,
-  // the Processing/Settled tabs, and the previous payout's UTR and breakup.
+  // settled payouts only, and the previous payout's UTR and breakup.
   // All mock-backed for now (see SettlementRow.settlementId), so only outside
   // production. MCA keeps its own layout.
   const showPayoutDetails = !isMca && SHOW_MOCK_SETTLEMENTS;
@@ -209,7 +209,6 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const [dateFilter, setDateFilter] = useState<SettlementDateValue | undefined>(undefined);
   const [showCycleInfo, setShowCycleInfo] = useState(false);
-  const [statusTab, setStatusTab] = useState<SettlementStatus>("SETTLED");
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(new Set());
   const dateFilterEnd = dateFilter
@@ -356,8 +355,10 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
 
   const filteredEnhancedRows = useMemo(() => {
     const searched = filterSettlementRows(enhancedRows, search);
-    return showPayoutDetails ? searched.filter((row) => row.status === statusTab) : searched;
-  }, [enhancedRows, search, showPayoutDetails, statusTab]);
+    return showPayoutDetails
+      ? searched.filter((row) => row.status === SETTLEMENT_TABLE_STATUS)
+      : searched;
+  }, [enhancedRows, search, showPayoutDetails]);
 
   const isError = isMca ? ffmsQuery.isError : paQuery.isError;
   const refetch = isMca ? ffmsQuery.refetch : paQuery.refetch;
@@ -526,15 +527,6 @@ export function SettlementReportsFeature({ product }: SettlementReportsFeaturePr
                 </div>
 
                 <DataTableCard<SettlementRow>
-                  tabs={
-                    showPayoutDetails ? (
-                      <UnderlineTabs
-                        tabs={SETTLEMENT_STATUS_TABS}
-                        value={statusTab}
-                        onValueChange={(v) => setStatusTab(v as SettlementStatus)}
-                      />
-                    ) : undefined
-                  }
                   toolbar={
                     <div className="flex flex-wrap items-center gap-2">
                       <RotatingSearchInput

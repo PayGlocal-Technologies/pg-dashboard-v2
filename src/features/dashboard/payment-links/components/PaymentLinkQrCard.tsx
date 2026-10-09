@@ -31,14 +31,6 @@ export function PaymentLinkQrCard({ url, onCopy, className }: PaymentLinkQrCardP
     };
   }, [url]);
 
-  function handleDownload() {
-    if (!dataUrl) return;
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = "payment-link-qr.png";
-    link.click();
-  }
-
   return (
     <Card className={className}>
       <div className="flex h-[168px] w-[168px] items-center justify-center rounded-lg border border-border bg-muted/30">
@@ -56,27 +48,15 @@ export function PaymentLinkQrCard({ url, onCopy, className }: PaymentLinkQrCardP
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onCopy}
-          className="whitespace-nowrap"
-        >
-          Copy to Clipboard
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleDownload}
-          disabled={!dataUrl}
-          className="whitespace-nowrap"
-        >
-          Download Image
-        </Button>
-      </div>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={onCopy}
+        className="whitespace-nowrap"
+      >
+        Copy to Clipboard
+      </Button>
     </Card>
   );
 }

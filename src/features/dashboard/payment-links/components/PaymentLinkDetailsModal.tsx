@@ -122,17 +122,19 @@ export function PaymentLinkDetailsModal({ row, open, onOpenChange }: PaymentLink
             </div>
           </div>
 
-          {/* 248px from sm up (with a trimmed left padding), just enough for the short link and its copy
-              button (full width on a phone); the link reads as one, in the
-              primary blue. */}
-          <InputGroup className="sm:w-62">
+          {/* Hugs the link (field-sizing: content; `size` is the fallback
+              where that isn't supported), so a real link is never clipped
+              and the copy button sits right after it; never wider than the
+              modal. The link reads as one, in the primary blue. */}
+          <InputGroup className="w-fit max-w-full">
             {/* text-primary!: globals.css colours every input with an
                 unlayered rule, which beats any (layered) Tailwind utility
                 however specific, and Flux mutes read-only text besides. */}
             <InputGroupInput
               readOnly
               value={fullUrl}
-              className="pl-3 tabular-nums text-sm text-primary!"
+              size={fullUrl.length}
+              className="pl-3 pr-1 tabular-nums text-sm text-primary! field-sizing-content w-auto min-w-0 flex-auto"
             />
             <InputGroupAddon align="inline-end">
               <InputGroupButton

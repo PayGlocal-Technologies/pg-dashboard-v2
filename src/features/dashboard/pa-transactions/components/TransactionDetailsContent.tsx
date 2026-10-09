@@ -30,15 +30,14 @@ import {
 } from "@/features/dashboard/pa-transactions/components/TransactionPaymentMethod";
 import { BankName } from "@/components/common/BankLogo";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
-import { PaymentTimeline } from "@/features/dashboard/pa-transactions/components/PaymentTimeline";
-import { formatTimelineSteps } from "@/features/dashboard/pa-transactions/components/timelineStepFormatting";
 import { validateRefund } from "@/features/dashboard/pa-transactions/financial/deriveFinancials";
-import { deriveTimelineSteps } from "@/features/dashboard/pa-transactions/financial/generateTimeline";
 import { formatNow } from "@/features/dashboard/pa-transactions/formatNow";
 import type { RefundEvent } from "@/features/dashboard/pa-transactions/financial/types";
 import { useRefundEvents } from "@/stores/useRefundEvents";
 import { useTransactionDetail } from "@/stores/useTransactionDetail";
 import type { PaTransaction } from "@/features/dashboard/pa-transactions/types";
+import { SettlementFeeBreakdown } from "@/features/dashboard/pa-transactions/components/SettlementFeeBreakdown";
+import { useSettlementDetail } from "@/features/dashboard/pa-transactions/useSettlementDetail";
 
 const EMPTY_REFUND_EVENTS: RefundEvent[] = [];
 
@@ -48,14 +47,16 @@ const REFUNDABLE_STATUSES = new Set(["SUCCESS", "SENT_FOR_CAPTURE"]);
 /**
  * Everything about one PA transaction, shared by the collapsed view (the
  * drawer) and the expanded one (the page), so the two can never drift: the
- * header (amount, status, when and how, who), Timeline,
- * Payment Breakdown, Linked Transactions, Payment Details, Customer Details
- * and Status Notes. Only the arrangement differs:
+ * header (amount, status, when and how, who), Payment Breakdown, Linked
+ * Transactions, Payment Details, Customer Details and Status Notes. Only the
+ * arrangement differs:
  *
  *  - "drawer": one column, header then each section in turn.
- *  - "page":   the header across the top, then a wide left column (timeline,
- *    breakdown, linked) beside a sticky right one (payment,
- *    customer, status notes).
+ *  - "page":   the header across the top, then a wide left column (breakdown,
+ *    linked) beside a sticky right one (payment, customer, status notes).
+ *
+ * No timeline: the backend has no payment event history to build one from,
+ * and pg-dashboard's details show none.
  *
  * The status chip is the table's own (columns.tsx), so a row and its details
  * always say the same thing. No dispute content: disputes are not shown on
@@ -83,6 +84,8 @@ export function TransactionDetailsContent({
   const [refundOpen, setRefundOpen] = useState(false);
 
   const detail = deriveTransactionDetail(transaction, refundEvents);
+  // The transaction's own merchant, as pg-dashboard addresses the read.
+  const settlement = useSettlementDetail(transaction.merchantId, transaction.gid);
   const status = getStatusMeta(transaction.externalStatus);
   const amount = parseFloat(transaction.totalAmount ?? "0");
   const currency = transaction.txnCurrency ?? "INR";
@@ -135,10 +138,6 @@ export function TransactionDetailsContent({
     router.push(`/pa-transactions/${encodeURIComponent(row.gid ?? "")}`);
   }
 
-  function goToSettlement(settlementId: string) {
-    router.push(`/reports/settlement-report/${encodeURIComponent(settlementId)}`);
-  }
-
   const header = (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -182,48 +181,28 @@ export function TransactionDetailsContent({
     </div>
   );
 
-  // A failed payment's step also says why, in small print under its time:
-  // the same reason Status Notes gives.
-  const timelineSteps = formatTimelineSteps(
-    deriveTimelineSteps(detail.financials),
-    currency,
-    goToSettlement
-  ).map((step) =>
-    step.id === "payment-failed" && detail.statusReason
-      ? {
-          ...step,
-          description: (
-            <>
-              {step.description}
-              <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground/80">
-                {detail.statusReason}
-              </span>
-            </>
-          ),
-        }
-      : step
-  );
-
-  const timeline = (
-    <section className="flex flex-col gap-2">
-      <SectionLabel>Timeline</SectionLabel>
-      <Card className="shadow-none gap-0 p-5">
-        <PaymentTimeline steps={timelineSteps} />
-      </Card>
-    </section>
-  );
-
   const breakdown = detail.amountBreakdown && (
     <section className="flex flex-col gap-2">
       <SectionLabel>Payment Breakdown</SectionLabel>
       <Card className="shadow-none gap-0 p-5">
+        {/* No Fee or Net rows: the derived fee is an estimate, not a
+            figure the backend gives. The real one is the settlement's, below. */}
         <AmountBreakdownBody
           amountReceived={detail.amountBreakdown.amountReceived}
-          fee={detail.amountBreakdown.fee}
           refundedAmount={detail.amountBreakdown.refundedAmount}
-          netAmount={detail.amountBreakdown.netAmount}
           currency={currency}
         />
+      </Card>
+    </section>
+  );
+
+  // The real fee: the settlement record's MDR fee and GST, read as
+  // pg-dashboard reads it. Absent until the payment has a settlement.
+  const settlementBreakdown = settlement && (
+    <section className="flex flex-col gap-2">
+      <SectionLabel>Settlement</SectionLabel>
+      <Card className="shadow-none gap-0 p-5">
+        <SettlementFeeBreakdown settlement={settlement} />
       </Card>
     </section>
   );
@@ -243,16 +222,8 @@ export function TransactionDetailsContent({
       <SectionLabel>Payment Details</SectionLabel>
       <Card className="shadow-none gap-0 p-5">
         <div className="flex flex-col gap-5">
-          {transaction.gid ? (
-            <CopyableDetailRow
-              layout="inline"
-              label="Transaction ID"
-              value={truncateId(transaction.gid)}
-              copyValue={transaction.gid}
-            />
-          ) : (
-            <DetailRow layout="inline" label="Transaction ID" value="Not available" />
-          )}
+          {/* No Transaction ID row: the drawer's header already carries it,
+              with its own copy. */}
           <CopyableDetailRow
             layout="inline"
             label="Merchant Transaction ID"
@@ -349,8 +320,8 @@ export function TransactionDetailsContent({
             width: "var(--morph-body-w, auto)",
           }}
         >
-          {timeline}
           {breakdown}
+          {settlementBreakdown}
           {paymentDetails}
           {customerDetails}
           {statusNotes}
@@ -369,9 +340,9 @@ export function TransactionDetailsContent({
       <Separator />
       <div className="grid gap-4 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="flex flex-col gap-4" data-morph-body>
-          {timeline}
           {isCaptured && !decorative && <ProductFeedback key={transaction.gid} />}
           {breakdown}
+          {settlementBreakdown}
           {linked}
         </div>
         <div className="flex flex-col gap-4 lg:sticky lg:top-4">

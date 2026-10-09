@@ -17,11 +17,8 @@ import {
   type PaymentLinksDateValue,
 } from "@/features/dashboard/payment-links/components/PaymentLinksDateFilter";
 import {
-  PaymentLinksAmountFilter,
-  type AmountRangeValue,
-} from "@/features/dashboard/payment-links/components/PaymentLinksAmountFilter";
-import {
   PAYMENT_LINKS_PAGE_LIMIT,
+  PAYMENT_LINK_DEFAULT_STATUS,
   PAYMENT_LINK_STATUS_FILTERS,
 } from "@/features/dashboard/payment-links/constants";
 import { paymentLinkRows as initialPaymentLinkRows } from "@/features/dashboard/payment-links/mock-data";
@@ -39,9 +36,8 @@ export function PaymentLinksFeature() {
   const [rows, setRows] = useState<PaymentLinkRow[]>(initialPaymentLinkRows);
 
   const [search, setSearch] = useState("");
-  const [status, setStatus] = useState("All");
+  const [status, setStatus] = useState(PAYMENT_LINK_DEFAULT_STATUS);
   const [dateFilter, setDateFilter] = useState<PaymentLinksDateValue | undefined>(undefined);
-  const [amountRange, setAmountRange] = useState<AmountRangeValue | undefined>(undefined);
   const [currency, setCurrency] = useState<string[] | undefined>(undefined);
 
   const onSearch = (v: string) => setSearch(v);
@@ -60,10 +56,6 @@ export function PaymentLinksFeature() {
         const dateKey = row.createdAt.slice(0, 10);
         if (dateKey < dateFilter.from || dateKey > dateFilter.to) return false;
       }
-      if (amountRange) {
-        if (amountRange.min != null && row.amount < amountRange.min) return false;
-        if (amountRange.max != null && row.amount > amountRange.max) return false;
-      }
       if (search) {
         const q = search.toLowerCase();
         return (
@@ -75,16 +67,16 @@ export function PaymentLinksFeature() {
       }
       return true;
     });
-  }, [rows, search, status, currency, dateFilter, amountRange]);
+  }, [rows, search, status, currency, dateFilter]);
 
-  // Which empty state applies. Status defaults to "All", so none of these
-  // count as a filter until the merchant changes one — a first-time merchant
-  // should be told what payment links are for, not to adjust filters.
+  // Which empty state applies. The default tab (Active) and the empty
+  // filters don't count as narrowing until the merchant changes one: a
+  // first-time merchant should be told what payment links are for, not to
+  // adjust filters.
   const hasNarrowingFilters =
     !!search.trim() ||
-    status !== "All" ||
+    status !== PAYMENT_LINK_DEFAULT_STATUS ||
     !!dateFilter ||
-    !!amountRange ||
     (currency?.length ?? 0) > 0;
 
   const emptyCopy = hasNarrowingFilters
@@ -170,7 +162,6 @@ export function PaymentLinksFeature() {
 
             <FilterChipGroup className="flex items-center gap-2 flex-wrap">
               <PaymentLinksDateFilter value={dateFilter} onChange={setDateFilter} />
-              <PaymentLinksAmountFilter value={amountRange} onChange={setAmountRange} />
               <MultiSelectChipFilter
                 value={currency}
                 options={currencyOptions}
