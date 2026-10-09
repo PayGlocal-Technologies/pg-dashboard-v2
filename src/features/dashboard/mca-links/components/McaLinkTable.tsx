@@ -9,7 +9,6 @@ import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
 import {
-  AmountFilterChip,
   CurrencyFilterChip,
   DateFilterChip,
   StatusFilterChip,
@@ -67,15 +66,11 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [currencyFilters, setCurrencyFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: "", to: "" });
-  const [amountRange, setAmountRange] = useState<{ min: string; max: string }>({
-    min: "",
-    max: "",
-  });
   // null until the merchant actually drags a column, at which point
   // DataTable renders that order instead of buildMcaLinkColumns' own default.
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
-  // Which of the Date/Amount/Status/Currency filter chip popovers is open,
+  // Which of the Date/Status/Currency filter chip popovers is open,
   // if any: shared so opening one closes whichever other one was open.
   const [page, setPage] = useState(1);
 
@@ -97,9 +92,7 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
     statusFilters.length > 0 ||
     currencyFilters.length > 0 ||
     !!dateRange.from ||
-    !!dateRange.to ||
-    !!amountRange.min ||
-    !!amountRange.max;
+    !!dateRange.to;
 
   const emptyCopy = hasNarrowingFilters
     ? {
@@ -112,8 +105,6 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
           "Share a payment link with your customer and collect international payments without a checkout.",
       };
 
-  const minAmount = amountRange.min ? parseFloat(amountRange.min) : undefined;
-  const maxAmount = amountRange.max ? parseFloat(amountRange.max) : undefined;
   const fromMs = dateRange.from ? toStartOfDayMs(dateRange.from) : undefined;
   const toMs = dateRange.to ? toEndOfDayMs(dateRange.to) : undefined;
 
@@ -132,12 +123,6 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
         .join(" ")
         .toLowerCase();
       if (!haystack.includes(query)) return false;
-    }
-
-    if (minAmount != null || maxAmount != null) {
-      const amount = parseFloat(link.amount ?? "0");
-      if (minAmount != null && amount < minAmount) return false;
-      if (maxAmount != null && amount > maxAmount) return false;
     }
 
     // Date filters the creation timestamp, matching what the Transactions
@@ -244,7 +229,7 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
               className="w-40 sm:w-56"
             />
 
-            {/* Filter group: Date, Amount, Status, Currency read as one
+            {/* Filter group: Date, Status, Currency read as one
             cohesive filtering control, so the gap within it is tight. */}
             <FilterChipGroup className="flex flex-wrap items-center gap-1.5">
               <DateFilterChip
@@ -253,14 +238,6 @@ export function McaLinkTable({ onCreateLink }: { onCreateLink: () => void }) {
                   setDateRange(next);
                   setPage(1);
                 }}
-              />
-              <AmountFilterChip
-                value={amountRange}
-                onChange={(next) => {
-                  setAmountRange(next);
-                  setPage(1);
-                }}
-                hint="Applies to the links currently loaded."
               />
               <StatusFilterChip
                 options={MCA_LINK_STATUS_FILTERS}

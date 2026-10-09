@@ -8,19 +8,11 @@ import { Icon } from "@/components/icon";
 import { RotatingSearchInput } from "@/components/common/RotatingSearchInput";
 import { PlaceholderState } from "@/components/common/PlaceholderState";
 import { UnderlineTabs } from "@/components/common/UnderlineTabs";
-import {
-  CurrencyFilterChip,
-  FilterChipGroup,
-  StatusFilterChip,
-} from "@/components/common/filters/FilterChips";
+import { FilterChipGroup, StatusFilterChip } from "@/components/common/filters/FilterChips";
 import {
   TransactionDateTimeFilter,
   type TransactionDateTimeValue,
 } from "@/features/dashboard/pa-transactions/components/TransactionDateTimeFilter";
-import {
-  TransactionAmountFilter,
-  type AmountRangeValue,
-} from "@/features/dashboard/pa-transactions/components/TransactionAmountFilter";
 import {
   TransactionDetailsDrawer,
   TransactionDrawerBody,
@@ -37,10 +29,10 @@ import { paTxnSearchApi } from "@/features/dashboard/pa-transactions/services";
 import { buildTxnRequestBody } from "@/lib/utils/buildTxnRequestBody";
 import { buildPaColumns } from "@/features/dashboard/pa-transactions/columns";
 import {
-  PA_CURRENCY_OPTIONS,
   PA_METHOD_CHIP_OPTIONS,
   PA_ORDER_STATUS_OPTIONS,
   PA_PAYMENT_STATUS_OPTIONS,
+  PA_DEFAULT_VIEW_STATUSES,
   PA_VIEW_TABS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/pa-transactions/constants";
@@ -77,12 +69,11 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
   const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   // The tabs are a shortcut onto the Status chip's own selection (as on MCA
   // Transactions), not a second filter: one state, both controls.
-  const [statuses, setStatuses] = useState<string[]>([]);
+  // Opens on the Success tab rather than All.
+  const [statuses, setStatuses] = useState<string[]>(PA_DEFAULT_VIEW_STATUSES);
   const [methods, setMethods] = useState<string[]>([]);
   const [orderStatuses, setOrderStatuses] = useState<string[]>([]);
-  const [currencies, setCurrencies] = useState<string[]>([]);
   const [dateTime, setDateTime] = useState<TransactionDateTimeValue | undefined>();
-  const [amount, setAmount] = useState<AmountRangeValue | undefined>();
   const [page, setPage] = useState(1);
   const [columnOrder, setColumnOrder] = useState<string[] | null>(null);
   const [hiddenColumns, setHiddenColumns] = useState<string[]>([]);
@@ -92,7 +83,6 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
       externalStatus: statuses.length ? statuses : undefined,
       paymentInstrument: methods.length ? methods : undefined,
       orderStatus: orderStatuses.length ? orderStatuses : undefined,
-      currency: currencies.length ? currencies : undefined,
       startTime: dateTime?.startTime,
       endTime: dateTime?.endTime,
     },
@@ -115,31 +105,20 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
     isReady
   );
 
-  // Amount narrows the page that came back. STOPGAP: the search request has
-  // no amount-range field, so this can't reach the server yet and only
-  // filters the rows on screen. TODO(integration): send it once the field
-  // is confirmed against pg-dashboard.
-  const rows = (data?.data?.data ?? []).filter((row) => {
-    if (!amount) return true;
-    const value = parseFloat(row.totalAmount ?? "");
-    if (Number.isNaN(value)) return false;
-    if (amount.min != null && value < amount.min) return false;
-    if (amount.max != null && value > amount.max) return false;
-    return true;
-  });
+  // No Currency or Amount chips: hidden for now. Amount could only ever
+  // narrow the loaded page, since the search has no amount-range field.
+  const rows = data?.data?.data ?? [];
   const totalCount = data?.data?.totalCount ?? 0;
 
   // Which empty state applies: nothing matched what was asked for, or nothing
-  // has come in yet. Both controls default to "All", so neither counts as a
-  // filter until the merchant actually changes one.
+  // has come in yet. The default tab (Success) doesn't count as a filter until
+  // the merchant actually changes it.
   const hasNarrowingFilters =
     !!search.trim() ||
-    statuses.length > 0 ||
+    (statuses.length > 0 && !sameSet(statuses, PA_DEFAULT_VIEW_STATUSES)) ||
     methods.length > 0 ||
     orderStatuses.length > 0 ||
-    currencies.length > 0 ||
-    !!dateTime ||
-    !!amount;
+    !!dateTime;
 
   /** Payments arrive rather than being created here, so the first-time state
    *  says what will land here instead of pushing an action this page lacks. */
@@ -254,11 +233,6 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
                 onChange={resetPage(setDateTime)}
                 triggerLabel="Date and time"
               />
-              <CurrencyFilterChip
-                options={PA_CURRENCY_OPTIONS}
-                value={currencies}
-                onChange={resetPage(setCurrencies)}
-              />
               <StatusFilterChip
                 options={PA_PAYMENT_STATUS_OPTIONS}
                 selected={statuses}
@@ -276,7 +250,6 @@ export function PaTransactionTable({ onDetailsOpenChange }: PaTransactionTablePr
                 selected={orderStatuses}
                 onChange={resetPage(setOrderStatuses)}
               />
-              <TransactionAmountFilter value={amount} onChange={resetPage(setAmount)} />
             </FilterChipGroup>
             <div className="ml-auto flex items-center gap-2">
               {/* Re-runs the same query; the icon spins while it's in flight. */}

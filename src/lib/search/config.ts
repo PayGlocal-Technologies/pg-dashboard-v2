@@ -25,11 +25,7 @@ import { settlementListPath } from "@/features/dashboard/settlement-reports/rout
 export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/client-management",
   "/dashboard",
-  // /dispute-management is deliberately absent, though the page exists and the
-  // nav links to it from both the Payments and global-tenant trees. It has no
-  // data source yet (the chargeback API is not wired), so a search result
-  // would promise a feature the data does not yet back. Re-add it here (and its keywords below) once the
-  // list is server-backed.
+  "/dispute-management",
   "/ebrc",
   "/ebrc-generation",
   "/echo",
@@ -45,7 +41,6 @@ export const NAVIGABLE_ROUTES: ReadonlySet<string> = new Set([
   "/mca-transactions",
   "/multi-currency",
   "/my-queries",
-  "/pa-dashboard",
   "/pa-transactions",
   "/payment-links",
   "/payment-button",
@@ -78,6 +73,7 @@ export const SEARCH_KEYWORDS: Readonly<Record<string, string[]>> = {
   "/settings/personal": ["profile", "change password", "email", "phone"],
   "/multi-currency": ["virtual account", "VBAN", "collection account", "USD", "EUR"],
   "/platforms": ["Upwork", "Toptal", "Freelancer", "Amazon", "marketplace", "connect"],
+  "/dispute-management": ["dispute", "chargeback", "pre-arbitration", "arbitration", "contest"],
   "/ebrc": ["bank realisation certificate", "FIRC", "DGFT"],
   // The two children of the eBRC nav item. Their labels say "eBRC Status" and
   // "IRM Repository", but a merchant arrives wanting to *generate* one, and

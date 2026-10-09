@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button, Card, Shimmer, StatusBadge } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { CollectedFieldsPopover } from "@/features/dashboard/static-link/components/CollectedFieldsPopover";
 import { StaticLinkArtwork } from "@/features/dashboard/static-link/components/StaticLinkArtwork";
 import {
-  STATIC_LINK_COPIED_MESSAGE,
   STATIC_LINK_SUBTITLE,
   STATIC_LINK_TITLE,
 } from "@/features/dashboard/static-link/constants";
@@ -67,10 +67,22 @@ export function StaticLinkHero({
   const shareableLink = link?.shareableLink ?? "";
   const displayLink = toDisplayLink(shareableLink);
 
+  // The button itself confirms the copy: green with "Copied" for 2 seconds,
+  // then back. A second click restarts the 2 seconds.
+  const [copied, setCopied] = useState(false);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+  }, []);
+
   const copy = () =>
     void navigator.clipboard
       .writeText(shareableLink)
-      .then(() => toast.success(STATIC_LINK_COPIED_MESSAGE))
+      .then(() => {
+        setCopied(true);
+        if (copiedTimer.current) clearTimeout(copiedTimer.current);
+        copiedTimer.current = setTimeout(() => setCopied(false), 2000);
+      })
       .catch(() => toast.error("Couldn't copy to clipboard"));
 
   return (
@@ -141,11 +153,16 @@ export function StaticLinkHero({
               size="sm"
               onClick={copy}
               disabled={!shareableLink}
-              aria-label={displayLink ? `Copy ${displayLink}` : "Copy link"}
-              leftIcon={<Icon name="copy" className="h-3.5 w-3.5" />}
-              className="h-[34px] min-h-[34px] px-3.5 text-[13px]"
+              aria-label={
+                copied ? "Link copied" : displayLink ? `Copy ${displayLink}` : "Copy link"
+              }
+              leftIcon={<Icon name={copied ? "check" : "copy"} className="h-3.5 w-3.5" />}
+              className={cn(
+                "h-[34px] min-h-[34px] px-3.5 text-[13px]",
+                copied && "bg-success! text-white! hover:bg-success!"
+              )}
             >
-              Copy Link
+              {copied ? "Copied" : "Copy Link"}
             </Button>
           </div>
         </div>

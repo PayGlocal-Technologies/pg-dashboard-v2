@@ -29,28 +29,24 @@ export const ZIPCODE_MAX_LENGTH = 10;
 export const DEFAULT_CALLING_CODE_ISO2 = "IN";
 export const DEFAULT_CALLING_CODE = "+91";
 
-/** Expiry choices, in hours, capped by the merchant's `maxPlExpiryHours`. */
+/**
+ * Expiry choices, in hours: pg-dashboard's live Payment Links modal
+ * (mca-payment-invoice-links/components/paymentLink/helpers.tsx
+ * LINK_EXPIRY_OPTIONS). Not capped by `maxPlExpiryHours`: that modal never
+ * reads it, and capping by a missing value left the list empty.
+ */
 export const EXPIRY_OPTIONS = [
-  { label: "2 hours", value: 2 },
-  { label: "4 hours", value: 4 },
-  { label: "8 hours", value: 8 },
-  { label: "16 hours", value: 16 },
-  { label: "24 hours", value: 24 },
   { label: "2 days", value: 48 },
-  { label: "3 days", value: 72 },
-  { label: "4 days", value: 96 },
-  { label: "5 days", value: 120 },
-  { label: "6 days", value: 144 },
-  { label: "7 days", value: 168 },
-  { label: "8 days", value: 192 },
-  { label: "9 days", value: 216 },
-  { label: "10 days", value: 240 },
-  { label: "15 days", value: 360 },
-  { label: "20 days", value: 480 },
-  { label: "25 days", value: 600 },
+  { label: "24 hrs", value: 24 },
+  { label: "1 week", value: 168 },
   { label: "30 days", value: 720 },
 ];
-export const DEFAULT_EXPIRY_HOURS = 2;
+
+/** Upstream's default when the config sends no usable `defaultPlExpiryHours`. */
+export const FALLBACK_EXPIRY_HOURS = 48;
+
+/** 0 = unset: the merchant's default (see expiryOptionsFor) applies until one is picked. */
+export const DEFAULT_EXPIRY_HOURS = 0;
 
 export const FREQUENCY_OPTIONS = [
   { label: "Weekly", value: "weekly" },

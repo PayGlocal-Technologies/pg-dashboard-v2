@@ -33,8 +33,13 @@ function BreakupRow({ label, value, negative, emphasis }: BreakupRowProps) {
 
 interface AmountBreakdownBodyProps {
   amountReceived: number;
-  fee: number;
-  netAmount: number;
+  /** Omitted where no real fee is known (the PA details show the settlement's
+   *  own fee instead, see SettlementFeeBreakdown) or where the processing fee
+   *  isn't relevant (a dispute's own page, where netAmount must exclude it
+   *  too); the row is then dropped. */
+  fee?: number;
+  /** Omitted along with `fee`; the Net Amount row is then dropped. */
+  netAmount?: number;
   currency: string;
   /** Sum of SUCCEEDED refunds only (see getRefundedAmount), the same value
    * the header status/timeline are derived from, only rendered when > 0. */
@@ -60,16 +65,18 @@ export function AmountBreakdownBody({
   return (
     <div className="flex flex-col gap-3">
       <BreakupRow label="Amount Received" value={formatCurrency(amountReceived, currency)} />
-      <BreakupRow label="Fee" value={formatCurrency(fee, currency)} negative />
+      {fee != null && <BreakupRow label="Fee" value={formatCurrency(fee, currency)} negative />}
       {!!refundedAmount && (
         <BreakupRow label="Refunded" value={formatCurrency(refundedAmount, currency)} negative />
       )}
       {!!disputedAmount && (
         <BreakupRow label="Disputed" value={formatCurrency(disputedAmount, currency)} />
       )}
-      <div className="border-t border-border pt-3">
-        <BreakupRow label="Net Amount" value={formatCurrency(netAmount, currency)} emphasis />
-      </div>
+      {netAmount != null && (
+        <div className="border-t border-border pt-3">
+          <BreakupRow label="Net Amount" value={formatCurrency(netAmount, currency)} emphasis />
+        </div>
+      )}
     </div>
   );
 }

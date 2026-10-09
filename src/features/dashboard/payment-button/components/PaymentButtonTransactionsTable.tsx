@@ -47,6 +47,8 @@ import { StatusBadgeWithTooltip } from "@/components/common/StatusBadgeWithToolt
 import {
   PA_METHOD_FILTERS,
   PA_STATUS_FILTERS,
+  PA_DEFAULT_VIEW_STATUSES,
+  PA_VIEW_TABS,
   TRANSACTIONS_PAGE_LIMIT,
 } from "@/features/dashboard/pa-transactions/constants";
 import type {
@@ -56,11 +58,10 @@ import type {
 import type { TableReqBody } from "@/types/transactions";
 import { TransactionDetailsDrawer } from "@/features/dashboard/pa-transactions/components/TransactionDetailsDrawer";
 
-/** Tabs: All, then each PA status the Transactions page's pills already name. */
-const VIEW_TABS = PA_STATUS_FILTERS.map((opt) => ({
-  value: opt.value === "All" ? "all" : opt.value,
-  label: opt.label,
-}));
+/** Tabs: the Transactions page's own (All, Success, Refunds, Failed). */
+const VIEW_TABS = PA_VIEW_TABS.map(({ value, label }) => ({ value, label }));
+const sameSet = (a: readonly string[], b: readonly string[]) =>
+  a.length === b.length && a.every((v) => b.includes(v));
 /** The same statuses as the Status chip's checklist (everything but "All"). */
 const STATUS_OPTIONS = PA_STATUS_FILTERS.filter((opt) => opt.value !== "All");
 const METHOD_OPTIONS = PA_METHOD_FILTERS.filter((opt) => opt.value !== "All");
@@ -166,7 +167,8 @@ export function PaymentButtonTransactionsTable({
   const { urlMid } = useResolvedMids("PA");
 
   const [search, setSearch] = useState("");
-  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  // Opens on the Success tab, as the Transactions page does.
+  const [statusFilters, setStatusFilters] = useState<string[]>(PA_DEFAULT_VIEW_STATUSES);
   const [methodFilters, setMethodFilters] = useState<string[]>([]);
   const [countryFilters, setCountryFilters] = useState<string[]>([]);
   const [dateRange, setDateRange] = useState<DateRangeValue>(EMPTY_DATE_RANGE);
@@ -284,17 +286,18 @@ export function PaymentButtonTransactionsTable({
   const reorderableColumns = PA_TRANSACTION_COLUMN_DEFS;
   const currentColumnOrder = columnOrder ?? reorderableColumns.map((c) => c.key);
 
+  // A tab stands for a set of statuses; one is active only when the filter
+  // holds exactly that set (anything else, e.g. from the Status chip, is All).
   const tabValue =
-    statusFilters.length === 1 && VIEW_TABS.some((tab) => tab.value === statusFilters[0])
-      ? statusFilters[0]
-      : "all";
+    PA_VIEW_TABS.find((t) => t.value !== "all" && sameSet(t.statuses, statusFilters))?.value ??
+    "all";
 
   const tabBar = (
     <UnderlineTabs
       tabs={VIEW_TABS}
       value={tabValue}
       onValueChange={(v) => {
-        setStatusFilters(v === "all" ? [] : [v]);
+        setStatusFilters([...(PA_VIEW_TABS.find((t) => t.value === v)?.statuses ?? [])]);
         setPage(1);
       }}
     />
@@ -456,7 +459,6 @@ export function PaymentButtonTransactionsTable({
     <>
       <DataTableCard<PaTransaction>
         className="hidden lg:block"
-        title="Linked transactions"
         tabs={tabBar}
         toolbar={desktopControls}
         columns={columns}

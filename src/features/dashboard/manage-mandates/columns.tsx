@@ -45,7 +45,16 @@ export function buildMandateColumns({
   renderActions: (row: Mandate) => ReactNode;
 }): Column<Mandate>[] {
   return [
-    { key: "mid", header: "Merchant ID", minWidth: 150, render: (row) => text(row.mid) },
+    {
+      key: "mid",
+      header: "Merchant ID",
+      minWidth: 150,
+      render: (row) => (
+        <span className="text-[13px] text-muted-foreground whitespace-nowrap">
+          {row.mid || "—"}
+        </span>
+      ),
+    },
     {
       key: "siId",
       header: "SI ID",
@@ -55,6 +64,7 @@ export function buildMandateColumns({
           id={row.siId}
           label="SI ID"
           truncate={false}
+          className="text-muted-foreground"
           onOpen={() => onOpenSiTransactions(row)}
         />
       ),
@@ -64,7 +74,7 @@ export function buildMandateColumns({
       header: "Mandate ID",
       minWidth: 160,
       render: (row) => (
-        <span className="tabular-nums text-[12.5px] whitespace-nowrap text-foreground">
+        <span className="tabular-nums text-[12.5px] whitespace-nowrap text-muted-foreground">
           {row.maskedMandateId || "—"}
         </span>
       ),
@@ -94,6 +104,7 @@ export function buildMandateColumns({
         <LinkedId
           id={row.initiateGid}
           label="Transaction ID"
+          className="text-muted-foreground"
           onOpen={() => onOpenInitiateTransaction(row)}
         />
       ),

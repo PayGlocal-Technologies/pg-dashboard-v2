@@ -2,27 +2,18 @@
 
 import { useState } from "react";
 import {
-  AmountFilterChip,
   MonthRangeFilterChip,
-  type AmountRangeValue,
   type MonthRange,
   FilterChipGroup,
 } from "@/components/common/filters/FilterChips";
-import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/mca-receipts/constants";
 
 /**
- * Amount and Month as one unit — the two filters the receipts table offers, and
- * no others.
- *
- * Both are shared chips from FilterChips.tsx: Amount is the min/max range every
- * other table uses, and Period is the year-and-month grid in its range form,
- * picking the start and end months the list request is bounded by.
- *
- * They do not narrow the same way. Amount is applied client-side over whatever
- * came back; Period goes into the request body, so changing it refetches. And
- * Period always has a value — the window the page opens on — which is why the
- * chip renders as active from first paint rather than reading as unset while it
- * silently bounds every row on screen.
+ * The receipts table's filter row: Period only (the Amount chip is hidden for
+ * now). Period is the shared year-and-month grid from FilterChips.tsx in its
+ * range form, picking the start and end months the list request is bounded
+ * by, so changing it refetches. It always has a value (the window the page
+ * opens on), which is why the chip renders as active from first paint rather
+ * than reading as unset while it silently bounds every row on screen.
  *
  * This owns the "which popover is open" state itself rather than taking it as a
  * prop, and that ownership is load-bearing: the table renders this row twice —
@@ -37,16 +28,12 @@ import { RECEIPT_AMOUNT_HINT } from "@/features/dashboard/mca-receipts/constants
  * carries the same note for the same reason.)
  */
 export function ReceiptFilterChips({
-  amountRange,
-  onAmountRangeChange,
   periodBounds,
   monthsWithData,
   period,
   defaultPeriod,
   onPeriodChange,
 }: {
-  amountRange: AmountRangeValue;
-  onAmountRangeChange: (next: AmountRangeValue) => void;
   /** The outer limits the Period grid can navigate within. */
   periodBounds: MonthRange;
   monthsWithData: Set<string>;
@@ -60,11 +47,6 @@ export function ReceiptFilterChips({
     // `contents` so the group adds no box of its own — the chips stay direct
     // children of the toolbar row that renders this.
     <FilterChipGroup className="contents">
-      <AmountFilterChip
-        value={amountRange}
-        onChange={onAmountRangeChange}
-        hint={RECEIPT_AMOUNT_HINT}
-      />
       <MonthRangeFilterChip
         bounds={periodBounds}
         value={period}

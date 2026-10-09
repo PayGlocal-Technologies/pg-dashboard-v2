@@ -142,7 +142,9 @@ const DATA_COLUMNS: Column<PaymentButton>[] = [
     // its right side takes the 14px every other cell has; flux applies
     // cellClassName to the header cell too, so both move together.
     cellClassName: "overflow-visible pl-8 pr-[14px]",
-    render: (row) => <CopyableCell value={row.buttonId} label="Button ID" />,
+    render: (row) => (
+      <CopyableCell value={row.buttonId} label="Button ID" valueClassName="text-muted-foreground" />
+    ),
   },
   {
     key: "amount",

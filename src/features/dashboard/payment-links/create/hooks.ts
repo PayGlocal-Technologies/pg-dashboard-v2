@@ -108,6 +108,8 @@ export interface CallingCodeOption {
   value: string;
   /** `+91`. */
   callingCode: string;
+  /** Matched by the field's search; not shown (see the label). */
+  countryName: string;
   label: string;
 }
 
@@ -122,11 +124,20 @@ export function usePaymentLinkCallingCodes(): CallingCodeOption[] {
   return useMemo(
     () =>
       (data?.data?.countryCallingCodes ?? [])
-        .filter((c) => c.callingCode)
+        // The API repeats some countries (LA comes back twice); the ISO2 is
+        // the option's value and key, so only its first entry is kept.
+        .filter(
+          (c, i, all) =>
+            c.callingCode && all.findIndex((o) => o.iso2CountryCode === c.iso2CountryCode) === i
+        )
         .map((c) => ({
           value: c.iso2CountryCode,
           callingCode: `+${c.callingCode}`,
-          label: `+${c.callingCode} ${c.countryName}`,
+          countryName: c.countryName,
+          // Just the code: the narrow field beside the phone number has no
+          // room for the country name (the flag says which country it is,
+          // and search still matches the name; see the modal's filterOption).
+          label: `+${c.callingCode}`,
         })),
     [data]
   );

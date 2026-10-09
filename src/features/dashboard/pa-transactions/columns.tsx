@@ -178,13 +178,18 @@ export function buildPaColumns(isPartnerUser: boolean): Column<PaTransaction>[] 
       minWidth: 210,
       render: (row) => {
         const iso2 = flagIso2(row);
+        // No email (or the backend's "N/A" placeholder) reads as a dash.
+        const email = row.encEmailId?.trim();
+        if (!email || email.toLowerCase() === "n/a") {
+          return <span className="text-[13px] text-muted-foreground">—</span>;
+        }
         return (
           <span className="flex items-center gap-2 whitespace-nowrap">
             {iso2 && <CountryFlag iso2={iso2} alt="" />}
             {/* Copy button revealed on row hover; it stops propagation, so
                 copying never also opens the row's drawer. */}
             <CopyableCell
-              value={row.encEmailId}
+              value={email}
               label="Email"
               valueClassName="text-[13px] text-foreground lowercase"
             />

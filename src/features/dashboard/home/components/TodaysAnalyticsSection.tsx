@@ -771,7 +771,8 @@ export function TodaysAnalyticsSection({ isLoading }: { isLoading?: boolean }) {
                 variant="outline"
                 size="sm"
                 className="h-7 shrink-0 px-2.5 text-xs"
-                onClick={() => router.push("/dispute-management")}
+                // Lands on the disputes waiting on the merchant, as pg-dashboard's Home card does.
+                onClick={() => router.push("/dispute-management?tab=ACTION_REQUIRED")}
                 rightIcon={<Icon name="arrow-up-right" className="h-3 w-3 shrink-0" aria-hidden />}
               >
                 Take action

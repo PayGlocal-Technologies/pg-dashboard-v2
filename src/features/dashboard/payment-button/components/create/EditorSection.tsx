@@ -36,15 +36,18 @@ export function EditorSection({
   icon,
   title,
   description,
+  bare,
   children,
 }: {
   icon: IconName;
   title: string;
   description?: string;
+  /** No card border or inset: the fields sit straight on the dialog. */
+  bare?: boolean;
   children: ReactNode;
 }) {
   return (
-    <Card className="gap-5 px-6 py-6">
+    <Card className={cn("gap-5 px-6 py-6", bare && "border-0 bg-transparent p-0")}>
       <SectionHeading icon={icon} title={title} description={description} />
       {children}
     </Card>

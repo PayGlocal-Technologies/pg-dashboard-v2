@@ -30,6 +30,9 @@ export const SETTLEMENT_STATUS_META: Record<
 
 const dash = <span className="text-[13px] text-muted-foreground">—</span>;
 
+/** The breakup ⓘ slot after the code (w-4, 16px) plus the gap before it (gap-1, 4px). */
+const BREAKUP_SLOT_OFFSET = "pr-5";
+
 /**
  * The info icon beside a settlement's amount: hover or focus it for the
  * breakup (gross, deductions, net), as on the previous-settled card. MOCK:
@@ -120,12 +123,13 @@ export function UtrNotGenerated({ settlementDate }: { settlementDate: string }) 
  */
 export function settlementColumnDefs(
   showMerchantId: boolean,
-  /** The Payments "Settlements" design: adds Settlement ID, Status and UTR
-   *  Number (mock-only for now, see SettlementRow.settlementId). */
+  /** The Payments "Settlements" design: adds Status and UTR Number
+   *  (mock-only for now, see SettlementRow.settlementId). No Settlement ID
+   *  column: the row's date already identifies it. */
   withPayoutDetails = false
 ): { key: string; label: string }[] {
   // Payments: amount and its state first, then how to trace it (UTR), what
-  // it covers, its own ID, and when.
+  // it covers, and when.
   if (withPayoutDetails) {
     return [
       { key: "amount", label: "Amount" },
@@ -133,7 +137,6 @@ export function settlementColumnDefs(
       { key: "utr", label: "UTR Number" },
       { key: "transactionCount", label: "Transactions" },
       ...(showMerchantId ? [{ key: "merchantId", label: "Merchant ID" }] : []),
-      { key: "settlementId", label: "Settlement ID" },
       { key: "date", label: "Date & Time" },
     ];
   }
@@ -165,27 +168,10 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
               value={row.merchantId}
               copyValue={row.merchantId}
               label="Merchant ID"
-              className="text-primary/80 transition-colors hover:text-primary"
+              valueClassName="text-muted-foreground"
             />
           ) : (
             <span className="text-[13px] text-muted-foreground">—</span>
-          ),
-      };
-    case "settlementId":
-      return {
-        key: "settlementId",
-        header: "Settlement ID",
-        minWidth: 150,
-        render: (row) =>
-          row.settlementId ? (
-            <CopyableCell
-              value={row.settlementId}
-              copyValue={row.settlementId}
-              label="Settlement ID"
-              className="text-[13px]"
-            />
-          ) : (
-            dash
           ),
       };
     case "status":
@@ -217,25 +203,48 @@ function buildColumn(key: string, withPayoutDetails = false): Column<SettlementR
           if (!utr) {
             return row.status === "PROCESSING" ? <UtrNotGenerated settlementDate={row.id} /> : dash;
           }
-          return <CopyableCell value={utr} copyValue={utr} label="UTR" className="text-[13px]" />;
+          return (
+            <CopyableCell
+              value={utr}
+              copyValue={utr}
+              label="UTR"
+              className="text-[13px]"
+              valueClassName="text-muted-foreground"
+            />
+          );
         },
       };
     }
     case "amount":
       return {
         key: "amount",
-        header: <AmountHeader />,
-        minWidth: 140,
-        // Right-aligned, last digit under the header's last letter (see
-        // AmountCell). The breakup ⓘ leads the figure, so the code stays the
-        // last thing in the cell and the figures stay lined up.
-        align: "right",
-        render: (row) => (
-          <span className="inline-flex items-center gap-1.5">
-            <AmountBreakup row={row} />
-            <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
+        // Payments puts the breakup ⓘ after the code, in a slot every row
+        // keeps (empty where there is no breakup), and the header is padded
+        // by the same slot, so the last digits still line up under the
+        // header's last letter (see AmountCell).
+        header: withPayoutDetails ? (
+          <span className={BREAKUP_SLOT_OFFSET}>
+            <AmountHeader />
           </span>
+        ) : (
+          <AmountHeader />
         ),
+        minWidth: 140,
+        align: "right",
+        render: (row) =>
+          withPayoutDetails ? (
+            <span className="inline-flex items-center gap-1">
+              <AmountWithCode
+                amount={formatCurrency(row.amount, row.currency)}
+                code={row.currency}
+              />
+              <span className="inline-flex w-4 shrink-0 justify-center">
+                <AmountBreakup row={row} />
+              </span>
+            </span>
+          ) : (
+            <AmountWithCode amount={formatCurrency(row.amount, row.currency)} code={row.currency} />
+          ),
       };
     case "transactionCount":
       return {
@@ -284,7 +293,7 @@ export function buildSettlementColumns({
 
   for (const key of order) {
     if (key === "merchantId" && !showMerchantId) continue;
-    if (!withPayoutDetails && (key === "settlementId" || key === "status" || key === "utr")) {
+    if (!withPayoutDetails && (key === "status" || key === "utr")) {
       continue;
     }
     if (hiddenColumns?.has(key)) continue;

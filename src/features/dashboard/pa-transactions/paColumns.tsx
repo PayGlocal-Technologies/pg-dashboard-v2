@@ -206,11 +206,18 @@ function buildColumn(key: string): Column<PaTransaction> | null {
         key: "customerEmail",
         header: "Customer Email",
         minWidth: 190,
-        render: (row) => (
-          <span className="whitespace-nowrap text-[12px] font-medium text-foreground lowercase">
-            {row.encEmailId ?? "N/A"}
-          </span>
-        ),
+        render: (row) => {
+          // No email (or the backend's "N/A" placeholder) reads as a dash, as
+          // every other empty cell does.
+          const email = row.encEmailId?.trim();
+          return email && email.toLowerCase() !== "n/a" ? (
+            <span className="whitespace-nowrap text-[12px] font-medium text-foreground lowercase">
+              {email}
+            </span>
+          ) : (
+            <span className="text-[13px] text-muted-foreground">—</span>
+          );
+        },
       };
     case "paymentMethod":
       return {
@@ -302,7 +309,7 @@ export function buildPaColumns({
         header: "Merchant ID",
         minWidth: 145,
         render: (row) => (
-          <span className="whitespace-nowrap text-[12px] font-medium text-foreground">
+          <span className="whitespace-nowrap text-[12px] font-medium text-muted-foreground">
             {row.merchantId ?? "N/A"}
           </span>
         ),

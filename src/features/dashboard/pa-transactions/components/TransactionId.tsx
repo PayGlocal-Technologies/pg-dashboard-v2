@@ -34,7 +34,7 @@ export function TransactionId({ id }: TransactionIdProps) {
 
   return (
     <div className="flex items-center gap-1">
-      <span title={id} className="whitespace-nowrap text-[12px] font-medium text-foreground">
+      <span title={id} className="whitespace-nowrap text-[12px] font-medium text-muted-foreground">
         {truncateId(id)}
       </span>
       <TooltipProvider delayDuration={200}>

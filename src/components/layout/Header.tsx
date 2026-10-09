@@ -23,9 +23,9 @@ import { useProductContext, type NavContext } from "@/stores/useProductContext";
  * and Multi-Currency Accounts (PACB), each carrying a `context` tag read by
  * useProductContext.ts. Partners is unrelated and carries none.
  *
- * Each tab lands on its context's own dashboard (/dashboard, /pa-dashboard,
- * /mca-dashboard) and sets the active context, which decides both the Sidebar
- * nav tree shown (the short Home tree, the MCA tree, or the full Payments
+ * Each tab lands on its context's own dashboard (/dashboard, /mca-dashboard;
+ * Payments on /pa-transactions while /pa-dashboard is hidden) and sets the
+ * active context, which decides both the Sidebar nav tree shown (the short Home tree, the MCA tree, or the full Payments
  * tree) and the data the feature screens beneath it resolve. Many of those
  * screens are shared by all three contexts (/team-management, ...), so the
  * same URL renders different data depending on the tab last picked, while a
@@ -34,8 +34,9 @@ import { useProductContext, type NavContext } from "@/stores/useProductContext";
 const HEADER_TABS: { label: string; href: string; context?: NavContext }[] = [
   { label: "Home", href: "/dashboard", context: "HOME" },
   // Each product tab lands on that product's own dashboard, the same way Home
-  // lands on /dashboard, rather than on one of its inner feature tables.
-  { label: "Payments", href: "/pa-dashboard", context: "PA" },
+  // lands on /dashboard. Payments is the exception while /pa-dashboard has no
+  // analytics (it is hidden): it lands on its Transactions table instead.
+  { label: "Payments", href: "/pa-transactions", context: "PA" },
   { label: "Multi-Currency Accounts", href: "/mca-dashboard", context: "PACB" },
   { label: "Partners", href: "/refer-and-earn" },
 ] as const;

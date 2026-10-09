@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui";
 import { Icon } from "@/components/icon";
+import { cn } from "@/lib/utils";
 import { truncateId } from "@/features/dashboard/pa-transactions/components/TransactionId";
 
 /**
@@ -16,6 +17,7 @@ export function LinkedId({
   label,
   onOpen,
   truncate = true,
+  className,
 }: {
   id: string;
   /** What the id is, for the copy toast and the buttons' names. */
@@ -23,6 +25,8 @@ export function LinkedId({
   onOpen: () => void;
   /** Long ids (GIDs) shortened to their ends; short ones read better whole. */
   truncate?: boolean;
+  /** Classes for the id text, e.g. to recolour it inside a table column. */
+  className?: string;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -47,7 +51,10 @@ export function LinkedId({
         title={id}
         aria-label={`Open ${label} ${id}`}
         onClick={onOpen}
-        className="h-auto min-h-0 p-0 tabular-nums text-[12.5px] font-medium whitespace-nowrap"
+        className={cn(
+          "h-auto min-h-0 p-0 tabular-nums text-[12.5px] font-medium whitespace-nowrap",
+          className
+        )}
       >
         {truncate ? truncateId(id) : id}
       </Button>
