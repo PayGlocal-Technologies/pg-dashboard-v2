@@ -12,9 +12,11 @@ import { ManageTemplatesDialog } from "@/features/dashboard/create-invoice/compo
 import { InvoiceLinkTable } from "@/features/dashboard/invoice-links/components/InvoiceLinkTable";
 import { INVOICE_LINKS_FEATURE } from "@/features/dashboard/invoice-links/constants";
 import {
+  useHasInvoiceLinks,
   useInvoiceLinkMidScope,
   useInvoiceLinksEnabled,
 } from "@/features/dashboard/invoice-links/hooks";
+import { EnableProductAction, FeatureBanner } from "@/components/common/FeatureBanner";
 import {
   useInvoiceEditorMid,
   useInvoiceLinkTemplates,
@@ -58,16 +60,63 @@ export function InvoiceLinksFeature() {
   // account first, so a multi-MID merchant is asked on the editor instead.
   useUrlAction("create", () => router.push("/invoice-links/create"));
 
+  // Not enabled: the banner asks them to enable it, over an empty table (no
+  // list call, nothing to create). Enabled with no link yet: the banner
+  // leads, pointing at Create. Once a link exists the page is the list.
+  const hasLinks = useHasInvoiceLinks(isEnabled);
+  const showBanner = !isEnabled || hasLinks === false;
+
+  const banner = showBanner && (
+    <FeatureBanner
+      imageSrc="/assets/banner-states/Invoice%20links.png"
+      title="Your invoices, ready to share"
+      description="Create and customise invoices for your business, then share them with customers to make payments simpler."
+      action={
+        isEnabled ? <CreateInvoiceLinkAction /> : <EnableProductAction product="Invoice Links" />
+      }
+    />
+  );
+
   if (!isEnabled) {
     return (
       <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
         <PageHeader title="Invoice Links" />
+        {banner}
         <PlaceholderState
           variant="empty-table"
-          title="Invoice Links isn't enabled on your account"
-          description="Raise invoice links for your customers and collect against them online. Contact your account manager to switch this on."
+          title="No invoice links yet"
+          description="Invoice links you raise for your customers will appear here once they are created."
           className="rounded-xl border border-border bg-card py-16"
         />
+      </div>
+    );
+  }
+
+  const header = (
+    <PageHeader
+      title="Invoice Links"
+      actions={
+        <>
+          <ManageTemplatesAction />
+          <CreateInvoiceLinkAction />
+        </>
+      }
+    />
+  );
+  const table = (
+    <MidGuard productType="PA" feature={INVOICE_LINKS_FEATURE}>
+      <InvoiceLinkTable />
+    </MidGuard>
+  );
+
+  // With the banner up the page flows as usual: the fixed-height layout
+  // below would squeeze the table under it.
+  if (showBanner) {
+    return (
+      <div className="max-w-[1400px] mx-auto space-y-4 page-enter">
+        {header}
+        {banner}
+        {table}
       </div>
     );
   }
@@ -79,19 +128,8 @@ export function InvoiceLinksFeature() {
     // header leaves, and its rows scroll between the column header and the
     // footer.
     <div className="page-enter mx-auto flex h-[calc(100dvh-57px-2rem)] min-h-[28rem] max-w-[1400px] flex-col gap-4 md:h-[calc(100dvh-57px-3rem)]">
-      <PageHeader
-        title="Invoice Links"
-        actions={
-          <>
-            <ManageTemplatesAction />
-            <CreateInvoiceLinkAction />
-          </>
-        }
-      />
-
-      <MidGuard productType="PA" feature={INVOICE_LINKS_FEATURE}>
-        <InvoiceLinkTable />
-      </MidGuard>
+      {header}
+      {table}
     </div>
   );
 }
