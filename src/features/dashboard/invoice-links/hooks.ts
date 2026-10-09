@@ -145,6 +145,8 @@ export function useInvoiceLinks(
       // (tableRequestbodyBuilder: `if (newFilters.linkId) queryString = ...`),
       // which is exactly what searchQuery does here for a non-email value.
       searchQuery: filters.linkId || undefined,
+      // A filter upstream, so never the email exact-match (see the option).
+      emailExactMatch: false,
       selectedMid: midFilter,
       pageLimit: pageSize,
       from: (page - 1) * pageSize,

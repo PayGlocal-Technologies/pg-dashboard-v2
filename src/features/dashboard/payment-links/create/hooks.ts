@@ -124,7 +124,12 @@ export function usePaymentLinkCallingCodes(): CallingCodeOption[] {
   return useMemo(
     () =>
       (data?.data?.countryCallingCodes ?? [])
-        .filter((c) => c.callingCode)
+        // The API repeats some countries (LA comes back twice); the ISO2 is
+        // the option's value and key, so only its first entry is kept.
+        .filter(
+          (c, i, all) =>
+            c.callingCode && all.findIndex((o) => o.iso2CountryCode === c.iso2CountryCode) === i
+        )
         .map((c) => ({
           value: c.iso2CountryCode,
           callingCode: `+${c.callingCode}`,

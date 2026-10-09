@@ -31,7 +31,11 @@ export function ConfirmActionDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
+      {/* One layer above every other dialog (flux puts each overlay at z-100,
+          content at z-101): opened from inside another dialog, as payment
+          links' Deactivate is, its dim-and-blur overlay must cover that
+          dialog too, not slide in underneath it. */}
+      <DialogContent className="z-[111] max-w-sm" overlayClassName="z-[110]">
         <DialogTitle>{title}</DialogTitle>
         <p className="mt-1 text-[12.5px] text-muted-foreground">{description}</p>
 
