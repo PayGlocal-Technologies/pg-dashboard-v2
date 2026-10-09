@@ -55,7 +55,14 @@ export function FeatureBanner({
  * like Payment Button's "Contact us", it hands them the support address
  * (copied, with the address in the toast too in case the copy is blocked).
  */
-export function EnableProductAction({ product }: { product: string }) {
+export function EnableProductAction({
+  product,
+  label = "Enable it now",
+}: {
+  product: string;
+  /** The design's wording for the page, "Enable it now" unless it says otherwise. */
+  label?: string;
+}) {
   const message = `Write to ${MERCHANT_SUPPORT_EMAIL} to have ${product} enabled.`;
   const requestEnable = () =>
     void navigator.clipboard
@@ -72,7 +79,7 @@ export function EnableProductAction({ product }: { product: string }) {
       // flush with the copy above it, at the body size.
       className="p-0! text-[14px]! font-normal hover:bg-transparent"
     >
-      Enable it now
+      {label}
     </Button>
   );
 }
